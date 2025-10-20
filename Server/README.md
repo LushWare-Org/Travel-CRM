@@ -64,7 +64,22 @@ Server/
 └── package.json
 ```
 
-## 🔌 API Endpoints
+## � Documentation
+
+For detailed documentation, see the [docs](./docs/) directory:
+
+- **[📖 Main Documentation](./docs/README.md)** - Complete documentation index
+- **[🏗️ Architecture](./docs/architecture/)** - System design and technical details
+- **[🚀 Development](./docs/development/)** - Setup guides and development workflow
+- **[📦 Deployment](./docs/deployment/)** - Production deployment guides
+
+### Quick Links
+- [Setup Guide](./docs/development/SETUP.md) - Get started quickly
+- [System Architecture](./docs/architecture/ARCHITECTURE.md) - Technical overview
+- [Development Roadmap](./docs/development/TODO.md) - What's next
+- [Environment Security](./docs/development/ENVIRONMENT_SECURITY.md) - Security best practices
+
+## �🔌 API Endpoints
 
 ### Authentication
 - `POST /api/v1/auth/register` - User registration
