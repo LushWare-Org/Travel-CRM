@@ -35,6 +35,14 @@ Security best practices for:
 - Production deployment security
 - Git security practices
 
+### [CI/CD Pipeline](../../docs/ci-cd/pipeline.md)
+Continuous Integration pipeline configuration and documentation:
+- GitHub Actions workflow setup
+- Automated testing and linting
+- Security scanning and auditing
+- Code quality checks
+- PR and deployment automation
+
 ## 🎯 Audience
 
 - **New Developers**: Getting started with the project
@@ -72,7 +80,21 @@ npm run seed
 - Update documentation if needed
 - Follow [Environment Security](./ENVIRONMENT_SECURITY.md) guidelines
 
-## 🔗 Related Documentation
+## � CI/CD Pipeline
+
+The project includes a comprehensive **Continuous Integration** pipeline that runs on every push and pull request to `main` and `develop` branches.
+
+**Pipeline Stages**:
+1. 🔍 **Lint & Code Quality** - ESLint checks
+2. 🧪 **Unit Tests** - Jest with coverage reporting
+3. 🏗️ **Build Check** - Syntax validation
+4. 🔐 **Security Audit** - Vulnerability scanning
+5. 📦 **Dependency Audit** - Outdated package detection
+6. ⚙️ **Environment Check** - Configuration validation
+
+**For detailed information**: See [CI/CD Pipeline Documentation](../../docs/ci-cd/pipeline.md)
+
+## �🔗 Related Documentation
 
 - **[System Architecture](../architecture/ARCHITECTURE.md)** - Technical system design
 - **[API Documentation](../../README.md)** - API endpoints and usage
