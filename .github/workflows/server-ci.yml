@@ -87,14 +87,13 @@ jobs:
           files: ./Server/coverage/coverage-final.json
           flags: unittests
           name: codecov-umbrella
-          working-directory: ./Server
           fail_ci_if_error: false
 
       - name: 📈 Comment coverage on PR
         if: github.event_name == 'pull_request'
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
-          working-directory: ./Server
+          lcov-file: ./Server/coverage/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 💾 Cache test results
@@ -158,10 +157,16 @@ jobs:
 
       - name: 🔍 Check for known vulnerabilities (snyk)
         working-directory: ./Server
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          npm install -g snyk
-          snyk auth ${{ secrets.SNYK_TOKEN || 'skip' }}
-          snyk test --severity-threshold=high || true
+          if [ -n "$SNYK_TOKEN" ]; then
+            npm install -g snyk
+            snyk auth $SNYK_TOKEN
+            snyk test --severity-threshold=high || true
+          else
+            echo "⚠️ Skipping Snyk scan - SNYK_TOKEN not configured"
+          fi
         continue-on-error: true
 
   # Job 5: Dependency Check
@@ -291,14 +296,13 @@ jobs:
     
     steps:
       - name: 📬 Notify Slack (Optional)
-        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        if: failure()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
           text: 'Server CI Pipeline ${{ job.status }}'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         continue-on-error: true
 
       - name: 📧 Comment on PR (Failure)
