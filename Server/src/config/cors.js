@@ -1,5 +1,5 @@
-export const corsOptions = {
-  origin: function (origin, callback) {
+export default {
+  origin: (origin, callback) => {
     const allowedOrigins = [
       process.env.CLIENT_URL,
       process.env.MANAGEMENT_URL,
@@ -12,10 +12,9 @@ export const corsOptions = {
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
     }
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   optionsSuccessStatus: 200,

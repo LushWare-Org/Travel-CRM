@@ -1,6 +1,8 @@
 // Placeholder for services
 // Business logic layer
 
-export const placeholder = () => {
-  // Services to be implemented
+export default {
+  placeholder: () => {
+    // Services to be implemented
+  },
 };

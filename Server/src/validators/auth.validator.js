@@ -1,6 +1,8 @@
 // Placeholder for validators
 // Request validation rules
 
-export const placeholder = () => {
-  // Validators to be implemented
+export default {
+  placeholder: () => {
+    // Validators to be implemented
+  },
 };

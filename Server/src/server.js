@@ -9,11 +9,8 @@ import mongoSanitize from 'express-mongo-sanitize';
 import xss from 'xss-clean';
 import morgan from 'morgan';
 
-// Load environment variables
-dotenv.config();
-
 // Import configurations
-import { corsOptions } from './config/cors.js';
+import corsOptions from './config/cors.js';
 import { limiter } from './config/rateLimiter.js';
 import logger from './config/logger.js';
 
@@ -30,8 +27,11 @@ import notificationRoutes from './routes/notification.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 
 // Import middleware
-import { errorHandler } from './middleware/errorHandler.js';
-import { notFound } from './middleware/notFound.js';
+import errorHandler from './middleware/errorHandler.js';
+import notFound from './middleware/notFound.js';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 
@@ -101,7 +101,7 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
-  
+
   app.listen(PORT, () => {
     logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
     console.log(`🚀 Server is running on http://localhost:${PORT}`);

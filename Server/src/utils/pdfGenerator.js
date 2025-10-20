@@ -3,15 +3,15 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
 
-export const generateInvoicePDF = async (invoice, user, booking) => {
+export function generateInvoicePDF(invoice, user, booking) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 50 });
       const fileName = `invoice-${invoice.invoiceNumber}.pdf`;
-      const filePath = path.join(__dirname, '../../uploads/invoices', fileName);
+      const filePath = path.join(dirname, '../../uploads/invoices', fileName);
 
       // Ensure directory exists
       const dir = path.dirname(filePath);
@@ -136,14 +136,14 @@ export const generateInvoicePDF = async (invoice, user, booking) => {
       reject(error);
     }
   });
-};
+}
 
-export const generateItineraryPDF = async (itinerary, packageData) => {
+export function generateItineraryPDF(itinerary, packageData) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 50 });
       const fileName = `itinerary-${Date.now()}.pdf`;
-      const filePath = path.join(__dirname, '../../uploads/itineraries', fileName);
+      const filePath = path.join(dirname, '../../uploads/itineraries', fileName);
 
       // Ensure directory exists
       const dir = path.dirname(filePath);
@@ -226,4 +226,4 @@ export const generateItineraryPDF = async (itinerary, packageData) => {
       reject(error);
     }
   });
-};
+}

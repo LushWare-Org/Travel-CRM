@@ -64,7 +64,7 @@ const itinerarySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 export default mongoose.model('Itinerary', itinerarySchema);

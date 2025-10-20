@@ -189,7 +189,7 @@ const seedDatabase = async () => {
     const adminUser = createdUsers.find((u) => u.role === 'admin');
     const packagesWithCreator = packages.map((pkg) => ({
       ...pkg,
-      createdBy: adminUser._id,
+      createdBy: adminUser.id,
     }));
 
     const createdPackages = await Package.create(packagesWithCreator);

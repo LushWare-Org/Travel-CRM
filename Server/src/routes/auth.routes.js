@@ -1,6 +1,12 @@
 import express from 'express';
 // Controllers will be implemented later
-// import { register, login, logout, forgotPassword, resetPassword } from '../controllers/auth.controller.js';
+// import {
+//   register,
+//   login,
+//   logout,
+//   forgotPassword,
+//   resetPassword
+// } from '../controllers/auth.controller.js';
 // import { authLimiter } from '../config/rateLimiter.js';
 
 const router = express.Router();

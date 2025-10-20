@@ -117,11 +117,11 @@ const packageSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Create slug from name
-packageSchema.pre('save', function (next) {
+packageSchema.pre('save', function createSlug(next) {
   if (this.isModified('name')) {
     this.slug = slugify(this.name, { lower: true });
   }

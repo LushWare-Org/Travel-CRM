@@ -53,7 +53,7 @@ class EmailService {
       <p>Your booking has been confirmed!</p>
       <h2>Booking Details:</h2>
       <ul>
-        <li><strong>Booking ID:</strong> ${booking._id}</li>
+        <li><strong>Booking ID:</strong> ${booking.id}</li>
         <li><strong>Package:</strong> ${booking.package.name}</li>
         <li><strong>Date:</strong> ${booking.travelDate}</li>
         <li><strong>Travelers:</strong> ${booking.numberOfTravelers}</li>
