@@ -2,6 +2,7 @@ import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
 import {
+  getDropdownOptions,
   getItineraries,
   getItinerary,
   getItineraryByPackage,
@@ -32,6 +33,9 @@ const router = express.Router();
 /**
  * Public Routes
  */
+
+// Get dropdown options for forms
+router.get('/dropdown-options', getDropdownOptions);
 
 // Get all itineraries (with pagination and filters)
 router.get(

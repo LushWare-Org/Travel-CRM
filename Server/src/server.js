@@ -68,6 +68,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Favicon route (to prevent 404 errors)
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // API Routes
 const API_VERSION = process.env.API_VERSION || 'v1';
 app.use(`/api/${API_VERSION}/auth`, authRoutes);

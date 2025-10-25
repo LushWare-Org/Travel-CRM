@@ -5,6 +5,48 @@ import Package from '../models/package.model.js';
 import ItineraryService from '../services/itinerary.service.js';
 
 /**
+ * @desc    Get dropdown options for itinerary form
+ * @route   GET /api/v1/itineraries/dropdown-options
+ * @access  Public
+ */
+export const getDropdownOptions = asyncHandler(async (req, res, next) => {
+  const dropdownOptions = {
+    accommodationTypes: [
+      { value: 'hotel', label: 'Hotel' },
+      { value: 'resort', label: 'Resort' },
+      { value: 'guesthouse', label: 'Guesthouse' },
+      { value: 'homestay', label: 'Homestay' },
+      { value: 'camp', label: 'Camp' },
+      { value: 'other', label: 'Other' },
+    ],
+    transportTypes: [
+      { value: 'flight', label: 'Flight' },
+      { value: 'train', label: 'Train' },
+      { value: 'bus', label: 'Bus' },
+      { value: 'car', label: 'Car' },
+      { value: 'boat', label: 'Boat' },
+      { value: 'walk', label: 'Walk' },
+      { value: 'other', label: 'Other' },
+    ],
+    mealOptions: [
+      { value: 'breakfast', label: 'Breakfast' },
+      { value: 'lunch', label: 'Lunch' },
+      { value: 'dinner', label: 'Dinner' },
+    ],
+    statusOptions: [
+      { value: 'draft', label: 'Draft' },
+      { value: 'published', label: 'Published' },
+      { value: 'archived', label: 'Archived' },
+    ],
+  };
+
+  res.status(200).json({
+    success: true,
+    data: dropdownOptions,
+  });
+});
+
+/**
  * @desc    Get all itineraries
  * @route   GET /api/v1/itineraries
  * @access  Public
