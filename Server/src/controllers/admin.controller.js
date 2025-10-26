@@ -6,15 +6,15 @@ import emailService from '../utils/emailService.js';
 import logger from '../config/logger.js';
 
 // Generate temporary password
-const generateTempPassword = () => {
-  return crypto.randomBytes(8).toString('hex'); // 16 character hex string
-};
+const generateTempPassword = () => crypto.randomBytes(8).toString('hex'); // 16 character hex string
 
 // @desc    Create sales rep or vendor (admin only)
 // @route   POST /api/v1/admin/users
 // @access  Private/Admin
 export const createStaff = asyncHandler(async (req, res, next) => {
-  const { name, email, phone, role } = req.body;
+  const {
+    name, email, phone, role,
+  } = req.body;
 
   // Validate role
   if (!['salesRep', 'vendor'].includes(role)) {
@@ -67,7 +67,7 @@ export const createStaff = asyncHandler(async (req, res, next) => {
   } catch (err) {
     // If email fails, still return success but log the error
     logger.error(`Failed to send credentials email: ${err.message}`);
-    
+
     res.status(201).json({
       status: 'success',
       message: `${role === 'salesRep' ? 'Sales Representative' : 'Vendor'} created successfully, but failed to send email. Please provide credentials manually.`,
@@ -91,7 +91,9 @@ export const createStaff = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/admin/users
 // @access  Private/Admin
 export const getAllUsers = asyncHandler(async (req, res, next) => {
-  const { role, isActive, search, page = 1, limit = 10 } = req.query;
+  const {
+    role, isActive, search, page = 1, limit = 10,
+  } = req.query;
 
   const query = {};
 
@@ -235,7 +237,7 @@ export const resetUserPassword = asyncHandler(async (req, res, next) => {
     });
   } catch (err) {
     logger.error(`Failed to send password reset email: ${err.message}`);
-    
+
     res.status(200).json({
       status: 'success',
       message: 'Password reset successfully, but failed to send email.',

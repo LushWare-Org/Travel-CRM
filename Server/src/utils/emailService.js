@@ -96,7 +96,14 @@ class EmailService {
 
   async sendStaffCredentials(user, tempPassword, role) {
     const loginUrl = `${process.env.CLIENT_URL}/login`;
-    const roleDisplay = role === 'salesRep' ? 'Sales Representative' : role === 'vendor' ? 'Vendor' : role;
+    let roleDisplay;
+    if (role === 'salesRep') {
+      roleDisplay = 'Sales Representative';
+    } else if (role === 'vendor') {
+      roleDisplay = 'Vendor';
+    } else {
+      roleDisplay = role;
+    }
     const subject = `Welcome to Trip Sky Way - Your ${roleDisplay} Account`;
     const html = `
       <h1>Welcome to Trip Sky Way!</h1>

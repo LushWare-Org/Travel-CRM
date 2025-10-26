@@ -45,7 +45,9 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
 // @route   POST /api/v1/auth/register
 // @access  Public
 export const register = asyncHandler(async (req, res, next) => {
-  const { name, email, phone, password } = req.body;
+  const {
+    name, email, phone, password,
+  } = req.body;
 
   // Check if user already exists
   const existingUser = await User.findOne({ email });

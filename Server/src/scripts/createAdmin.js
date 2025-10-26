@@ -12,7 +12,7 @@ const createAdminUser = async () => {
 
     // Check if admin already exists
     const existingAdmin = await User.findOne({ role: 'admin' });
-    
+
     if (existingAdmin) {
       console.log('Admin user already exists:');
       console.log('Email:', existingAdmin.email);
