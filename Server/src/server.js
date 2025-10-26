@@ -26,6 +26,12 @@ import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 
+// Billing Module Routes
+import quotationRoutes from './routes/quotation.routes.js';
+import paymentReceiptRoutes from './routes/paymentReceipt.routes.js';
+import creditNoteRoutes from './routes/creditNote.routes.js';
+import billingRoutes from './routes/billing.routes.js';
+
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
 import notFound from './middleware/notFound.js';
@@ -83,6 +89,12 @@ app.use(`/api/${API_VERSION}/itineraries`, itineraryRoutes);
 app.use(`/api/${API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${API_VERSION}/notifications`, notificationRoutes);
 app.use(`/api/${API_VERSION}/dashboard`, dashboardRoutes);
+
+// Billing Module Routes
+app.use(`/api/${API_VERSION}/billing/quotations`, quotationRoutes);
+app.use(`/api/${API_VERSION}/billing/receipts`, paymentReceiptRoutes);
+app.use(`/api/${API_VERSION}/billing/credit-notes`, creditNoteRoutes);
+app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 
 // Error handling
 app.use(notFound);
