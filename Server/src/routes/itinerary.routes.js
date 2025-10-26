@@ -41,35 +41,35 @@ router.get('/dropdown-options', getDropdownOptions);
 router.get(
   '/',
   validate(listItinerariesValidation),
-  getItineraries
+  getItineraries,
 );
 
 // Get single itinerary by ID
 router.get(
   '/:id',
   validate(getItineraryValidation),
-  getItinerary
+  getItinerary,
 );
 
 // Get itinerary by package ID
 router.get(
   '/package/:packageId',
   validate(getItineraryByPackageValidation),
-  getItineraryByPackage
+  getItineraryByPackage,
 );
 
 // Preview itinerary (formatted for display)
 router.get(
   '/:id/preview',
   validate(getItineraryValidation),
-  previewItinerary
+  previewItinerary,
 );
 
 // Download itinerary as PDF
 router.get(
   '/:id/pdf',
   validate(getItineraryValidation),
-  downloadItineraryPDF
+  downloadItineraryPDF,
 );
 
 /**
@@ -82,7 +82,7 @@ router.post(
   protect,
   authorize('admin', 'staff'),
   validate(createItineraryValidation),
-  createItinerary
+  createItinerary,
 );
 
 // Update itinerary
@@ -91,7 +91,7 @@ router.put(
   protect,
   authorize('admin', 'staff'),
   validate(updateItineraryValidation),
-  updateItinerary
+  updateItinerary,
 );
 
 // Delete itinerary
@@ -100,7 +100,7 @@ router.delete(
   protect,
   authorize('admin', 'staff'),
   validate(getItineraryValidation),
-  deleteItinerary
+  deleteItinerary,
 );
 
 // Clone itinerary to another package
@@ -109,7 +109,7 @@ router.post(
   protect,
   authorize('admin', 'staff'),
   validate(cloneItineraryValidation),
-  cloneItinerary
+  cloneItinerary,
 );
 
 /**
@@ -122,7 +122,7 @@ router.post(
   protect,
   authorize('admin', 'staff'),
   validate(addDayValidation),
-  addDay
+  addDay,
 );
 
 // Update specific day in itinerary
@@ -131,7 +131,7 @@ router.put(
   protect,
   authorize('admin', 'staff'),
   validate(updateDayValidation),
-  updateDay
+  updateDay,
 );
 
 // Delete specific day from itinerary
@@ -140,7 +140,7 @@ router.delete(
   protect,
   authorize('admin', 'staff'),
   validate(deleteDayValidation),
-  deleteDay
+  deleteDay,
 );
 
 export default router;

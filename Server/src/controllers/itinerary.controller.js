@@ -60,19 +60,19 @@ export const getItineraries = asyncHandler(async (req, res, next) => {
   } = req.query;
 
   const query = {};
-  
+
   // Filter by package if provided
   if (packageId) {
     query.package = packageId;
   }
 
   const skip = (page - 1) * limit;
-  
+
   const itineraries = await Itinerary.find(query)
     .populate('package', 'name destination duration price')
     .populate('createdBy', 'name email')
     .sort(sort)
-    .limit(parseInt(limit))
+    .limit(parseInt(limit, 10))
     .skip(skip);
 
   const total = await Itinerary.countDocuments(query);
@@ -82,9 +82,11 @@ export const getItineraries = asyncHandler(async (req, res, next) => {
     count: itineraries.length,
     total,
     totalPages: Math.ceil(total / limit),
-    currentPage: parseInt(page),
+    currentPage: parseInt(page, 10),
     data: itineraries,
   });
+
+  return undefined;
 });
 
 /**
@@ -125,6 +127,8 @@ export const getItineraryByPackage = asyncHandler(async (req, res, next) => {
     success: true,
     data: itinerary,
   });
+
+  return undefined;
 });
 
 /**
@@ -145,13 +149,13 @@ export const createItinerary = asyncHandler(async (req, res, next) => {
   const existingItinerary = await Itinerary.findOne({ package: packageId });
   if (existingItinerary) {
     return next(
-      new AppError('Itinerary already exists for this package', 400)
+      new AppError('Itinerary already exists for this package', 400),
     );
   }
 
   // Validate day numbers are sequential
   const dayNumbers = days.map((day) => day.dayNumber).sort((a, b) => a - b);
-  for (let i = 0; i < dayNumbers.length; i++) {
+  for (let i = 0; i < dayNumbers.length; i += 1) {
     if (dayNumbers[i] !== i + 1) {
       return next(new AppError('Day numbers must be sequential starting from 1', 400));
     }
@@ -165,10 +169,10 @@ export const createItinerary = asyncHandler(async (req, res, next) => {
   });
 
   // Update package with itinerary reference
-  await Package.findByIdAndUpdate(packageId, { itinerary: itinerary._id });
+  await Package.findByIdAndUpdate(packageId, { itinerary: itinerary.id });
 
   // Populate and return
-  const populatedItinerary = await Itinerary.findById(itinerary._id)
+  const populatedItinerary = await Itinerary.findById(itinerary.id)
     .populate('package')
     .populate('createdBy', 'name email');
 
@@ -177,6 +181,8 @@ export const createItinerary = asyncHandler(async (req, res, next) => {
     message: 'Itinerary created successfully',
     data: populatedItinerary,
   });
+
+  return undefined;
 });
 
 /**
@@ -208,7 +214,7 @@ export const updateItinerary = asyncHandler(async (req, res, next) => {
     {
       new: true,
       runValidators: true,
-    }
+    },
   )
     .populate('package')
     .populate('createdBy', 'name email');
@@ -232,7 +238,9 @@ export const addDay = asyncHandler(async (req, res, next) => {
     return next(new AppError('Itinerary not found', 404));
   }
 
-  const { dayNumber, title, description, activities, accommodation, meals, transport, places } = req.body;
+  const {
+    dayNumber, title, description, activities, accommodation, meals, transport, places,
+  } = req.body;
 
   // Check if day number already exists
   const dayExists = itinerary.days.find((day) => day.dayNumber === dayNumber);
@@ -277,7 +285,7 @@ export const updateDay = asyncHandler(async (req, res, next) => {
   }
 
   const dayIndex = itinerary.days.findIndex(
-    (day) => day.dayNumber === parseInt(req.params.dayNumber)
+    (day) => day.dayNumber === parseInt(req.params.dayNumber, 10),
   );
 
   if (dayIndex === -1) {
@@ -288,7 +296,7 @@ export const updateDay = asyncHandler(async (req, res, next) => {
   itinerary.days[dayIndex] = {
     ...itinerary.days[dayIndex].toObject(),
     ...req.body,
-    dayNumber: parseInt(req.params.dayNumber), // Ensure day number doesn't change
+    dayNumber: parseInt(req.params.dayNumber, 10), // Ensure day number doesn't change
   };
 
   await itinerary.save();
@@ -313,7 +321,7 @@ export const deleteDay = asyncHandler(async (req, res, next) => {
   }
 
   const dayIndex = itinerary.days.findIndex(
-    (day) => day.dayNumber === parseInt(req.params.dayNumber)
+    (day) => day.dayNumber === parseInt(req.params.dayNumber, 10),
   );
 
   if (dayIndex === -1) {
