@@ -5,7 +5,7 @@ import * as quotationController from '../controllers/quotation.controller.js';
 const router = express.Router();
 
 // Statistics (place before :id routes)
-router.get('/stats', protect, authorize('admin', 'staff', 'manager'), quotationController.getQuotationStats);
+router.get('/stats', protect, authorize('admin', 'salesRep'), quotationController.getQuotationStats);
 
 // Get all quotations
 router.get('/', protect, quotationController.getAllQuotations);
@@ -17,16 +17,16 @@ router.get('/lead/:leadId', protect, quotationController.getQuotationsByLeadId);
 router.get('/:id', protect, quotationController.getQuotationById);
 
 // Create quotation
-router.post('/', protect, authorize('admin', 'staff'), quotationController.createQuotation);
+router.post('/', protect, authorize('admin', 'salesRep'), quotationController.createQuotation);
 
 // Update quotation
-router.put('/:id', protect, authorize('admin', 'staff'), quotationController.updateQuotation);
+router.put('/:id', protect, authorize('admin', 'salesRep'), quotationController.updateQuotation);
 
 // Delete quotation
 router.delete('/:id', protect, authorize('admin'), quotationController.deleteQuotation);
 
 // Send quotation
-router.post('/:id/send', protect, authorize('admin', 'staff'), quotationController.sendQuotation);
+router.post('/:id/send', protect, authorize('admin', 'salesRep'), quotationController.sendQuotation);
 
 // Mark as viewed (can be public with token)
 router.post('/:id/viewed', quotationController.markQuotationViewed);
@@ -38,6 +38,6 @@ router.post('/:id/accept', protect, quotationController.acceptQuotation);
 router.post('/:id/reject', protect, quotationController.rejectQuotation);
 
 // Convert to invoice
-router.post('/:id/convert', protect, authorize('admin', 'staff'), quotationController.convertQuotationToInvoice);
+router.post('/:id/convert', protect, authorize('admin', 'salesRep'), quotationController.convertQuotationToInvoice);
 
 export default router;

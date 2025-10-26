@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['customer', 'staff', 'admin'],
+      enum: ['customer', 'salesRep', 'vendor', 'admin'],
       default: 'customer',
     },
     avatar: {
@@ -47,6 +47,19 @@ const userSchema = new mongoose.Schema(
     isEmailVerified: {
       type: Boolean,
       default: false,
+    },
+    isTempPassword: {
+      type: Boolean,
+      default: false,
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+    passwordChangedAt: Date,
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     },
     emailVerificationToken: String,
     emailVerificationExpire: Date,
@@ -72,6 +85,15 @@ userSchema.pre('save', async function hashPassword(next) {
 // Compare password
 userSchema.methods.matchPassword = async function matchPassword(enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
+};
+
+// Check if password changed after token was issued
+userSchema.methods.changedPasswordAfter = function changedPasswordAfter(JWTTimestamp) {
+  if (this.passwordChangedAt) {
+    const changedTimestamp = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
+    return JWTTimestamp < changedTimestamp;
+  }
+  return false;
 };
 
 // Generate JWT token

@@ -17,6 +17,7 @@ import logger from './config/logger.js';
 // Import routes
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import packageRoutes from './routes/package.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import leadRoutes from './routes/lead.routes.js';
@@ -81,6 +82,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 const API_VERSION = process.env.API_VERSION || 'v1';
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
 app.use(`/api/${API_VERSION}/users`, userRoutes);
+app.use(`/api/${API_VERSION}/admin`, adminRoutes);
 app.use(`/api/${API_VERSION}/packages`, packageRoutes);
 app.use(`/api/${API_VERSION}/bookings`, bookingRoutes);
 app.use(`/api/${API_VERSION}/leads`, leadRoutes);

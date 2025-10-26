@@ -1,26 +1,44 @@
 import express from 'express';
-// Controllers will be implemented later
-// import {
-//   register,
-//   login,
-//   logout,
-//   forgotPassword,
-//   resetPassword
-// } from '../controllers/auth.controller.js';
-// import { authLimiter } from '../config/rateLimiter.js';
+import {
+  register,
+  login,
+  logout,
+  getMe,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
+  resendVerification,
+  updateProfile,
+} from '../controllers/auth.controller.js';
+import { protect } from '../middleware/auth.js';
+import { authLimiter } from '../config/rateLimiter.js';
+import { validate } from '../middleware/validator.js';
+import {
+  registerSchema,
+  loginSchema,
+  changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from '../validators/auth.validator.js';
 
 const router = express.Router();
 
-// Authentication routes
-// router.post('/register', authLimiter, register);
-// router.post('/login', authLimiter, login);
-// router.post('/logout', logout);
-// router.post('/forgot-password', forgotPassword);
-// router.put('/reset-password/:token', resetPassword);
+// Public routes (with rate limiting)
+router.post('/register', authLimiter, validate(registerSchema), register);
+router.post('/login', authLimiter, validate(loginSchema), login);
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.put('/reset-password/:token', authLimiter, validate(resetPasswordSchema), resetPassword);
+router.get('/verify-email/:token', verifyEmail);
 
-// Placeholder route
-router.get('/', (req, res) => {
-  res.json({ message: 'Auth routes - To be implemented' });
-});
+// Protected routes (require authentication)
+router.use(protect);
+
+router.get('/me', getMe);
+router.post('/logout', logout);
+router.put('/change-password', validate(changePasswordSchema), changePassword);
+router.post('/resend-verification', resendVerification);
+router.put('/profile', validate(updateProfileSchema), updateProfile);
 
 export default router;

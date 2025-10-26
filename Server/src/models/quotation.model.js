@@ -6,13 +6,11 @@ const quotationSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true,
     },
     lead: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Lead',
       required: [true, 'Quotation must be linked to a lead'],
-      index: true,
     },
     customer: {
       name: {
@@ -230,6 +228,5 @@ quotationSchema.pre('save', async function (next) {
 quotationSchema.index({ lead: 1, createdAt: -1 });
 quotationSchema.index({ status: 1, validUntil: 1 });
 quotationSchema.index({ createdAt: -1 });
-quotationSchema.index({ quotationNumber: 1 });
 
 export default mongoose.model('Quotation', quotationSchema);

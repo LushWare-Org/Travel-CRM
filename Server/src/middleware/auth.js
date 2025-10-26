@@ -32,8 +32,19 @@ export const protect = asyncHandler(async (req, res, next) => {
       throw new AppError('Your account has been deactivated', 403);
     }
 
+    // Check if user changed password after token was issued
+    if (req.user.changedPasswordAfter(decoded.iat)) {
+      throw new AppError('Password was recently changed. Please login again.', 401);
+    }
+
     next();
   } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      throw new AppError('Invalid token. Please login again.', 401);
+    }
+    if (error.name === 'TokenExpiredError') {
+      throw new AppError('Your token has expired. Please login again.', 401);
+    }
     throw new AppError('Not authorized to access this route', 401);
   }
 });

@@ -80,7 +80,7 @@ router.get(
 router.post(
   '/',
   protect,
-  authorize('admin', 'staff'),
+  authorize('admin', 'salesRep'),
   validate(createItineraryValidation),
   createItinerary,
 );
@@ -89,7 +89,7 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin', 'staff'),
+  authorize('admin', 'salesRep'),
   validate(updateItineraryValidation),
   updateItinerary,
 );
@@ -98,7 +98,7 @@ router.put(
 router.delete(
   '/:id',
   protect,
-  authorize('admin', 'staff'),
+  authorize('admin', 'salesRep'),
   validate(getItineraryValidation),
   deleteItinerary,
 );
@@ -107,7 +107,7 @@ router.delete(
 router.post(
   '/:id/clone',
   protect,
-  authorize('admin', 'staff'),
+  authorize('admin', 'salesRep'),
   validate(cloneItineraryValidation),
   cloneItinerary,
 );
@@ -120,7 +120,7 @@ router.post(
 router.post(
   '/:id/days',
   protect,
-  authorize('admin', 'staff'),
+  authorize('admin', 'salesRep'),
   validate(addDayValidation),
   addDay,
 );
@@ -129,7 +129,7 @@ router.post(
 router.put(
   '/:id/days/:dayNumber',
   protect,
-  authorize('admin', 'staff'),
+  authorize('admin', 'salesRep'),
   validate(updateDayValidation),
   updateDay,
 );
@@ -138,7 +138,7 @@ router.put(
 router.delete(
   '/:id/days/:dayNumber',
   protect,
-  authorize('admin', 'staff'),
+  authorize('admin', 'salesRep'),
   validate(deleteDayValidation),
   deleteDay,
 );

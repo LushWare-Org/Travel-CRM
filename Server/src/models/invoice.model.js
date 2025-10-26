@@ -6,13 +6,11 @@ const invoiceSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true,
     },
     lead: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Lead',
       required: [true, 'Invoice must be linked to a lead'],
-      index: true,
     },
     quotation: {
       type: mongoose.Schema.Types.ObjectId,
@@ -288,7 +286,6 @@ invoiceSchema.index({ lead: 1, createdAt: -1 });
 invoiceSchema.index({ status: 1, dueDate: 1 });
 invoiceSchema.index({ paymentStatus: 1 });
 invoiceSchema.index({ createdAt: -1 });
-invoiceSchema.index({ invoiceNumber: 1 });
 invoiceSchema.index({ type: 1 });
 
 export default mongoose.model('Invoice', invoiceSchema);
