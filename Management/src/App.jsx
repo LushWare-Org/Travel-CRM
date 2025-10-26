@@ -1,35 +1,26 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Route, Switch } from "wouter";
+import Sidebar from "./pages/Sidebar";
+import Dashboard from "./pages/Dashboard";
+import LeadManagement from "./pages/LeadManagement";
+import ItineraryGeneration from "./pages/ItineraryGeneration";
+import BillingInvoicing from "./pages/BillingInvoicing";
+import UserManagement from "./pages/UserManagement";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
+      <div className="flex-1 overflow-auto">
+        <Switch>
+          <Route path="/" component={Dashboard} />
+          <Route path="/leads" component={LeadManagement} />
+          <Route path="/itineraries" component={ItineraryGeneration} />
+          <Route path="/billing" component={BillingInvoicing} />
+          <Route path="/users" component={UserManagement} />
+        </Switch>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;
