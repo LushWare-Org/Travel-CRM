@@ -180,13 +180,13 @@ creditNoteSchema.pre('save', async function (next) {
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
     this.creditNoteNumber = `CN-${year}${month}-${String(count + 1).padStart(5, '0')}`;
   }
-  
+
   // Calculate totals if items exist
   if (this.items && this.items.length > 0) {
     this.subtotal = this.items.reduce((sum, item) => sum + item.creditAmount, 0);
     this.totalAmount = this.subtotal + this.taxAmount;
   }
-  
+
   next();
 });
 

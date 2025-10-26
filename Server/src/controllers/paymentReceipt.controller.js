@@ -15,7 +15,7 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
       .populate('lead', 'name email phone')
       .populate('invoice', 'invoiceNumber totalAmount')
       .populate('createdBy', 'name email'),
-    req.query
+    req.query,
   )
     .filter()
     .sort()
@@ -100,7 +100,7 @@ export const createPaymentReceipt = asyncHandler(async (req, res) => {
   const receipt = await BillingService.recordPayment(
     req.body.invoice,
     req.body,
-    req.user.id
+    req.user.id,
   );
 
   res.status(201).json({
@@ -116,7 +116,7 @@ export const createPaymentReceipt = asyncHandler(async (req, res) => {
  * @access  Private (Admin)
  */
 export const updatePaymentReceipt = asyncHandler(async (req, res, next) => {
-  let receipt = await PaymentReceipt.findById(req.params.id);
+  const receipt = await PaymentReceipt.findById(req.params.id);
 
   if (!receipt) {
     return next(new AppError('Payment receipt not found', 404));
@@ -134,7 +134,7 @@ export const updatePaymentReceipt = asyncHandler(async (req, res, next) => {
 
   // Update allowed fields
   const allowedUpdates = ['notes', 'internalNotes', 'paymentDetails'];
-  Object.keys(req.body).forEach(key => {
+  Object.keys(req.body).forEach((key) => {
     if (allowedUpdates.includes(key) && req.body[key] !== undefined) {
       receipt[key] = req.body[key];
     }
@@ -328,7 +328,7 @@ export const downloadPaymentReceiptPDF = asyncHandler(async (req, res, next) => 
 
   // TODO: Generate PDF
   // const pdfBuffer = await pdfGenerator.generateReceiptPDF(receipt);
-  
+
   res.status(200).json({
     success: true,
     message: 'PDF generation feature to be implemented',

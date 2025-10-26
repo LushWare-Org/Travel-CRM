@@ -38,7 +38,7 @@ class BillingService {
     data.createdBy = userId;
 
     const quotation = await Quotation.create(data);
-    
+
     // Update lead status
     await Lead.findByIdAndUpdate(data.lead, {
       status: 'quoted',
@@ -54,7 +54,7 @@ class BillingService {
    */
   static async convertQuotationToInvoice(quotationId, userId, additionalData = {}) {
     const quotation = await Quotation.findById(quotationId);
-    
+
     if (!quotation) {
       throw new AppError('Quotation not found', 404);
     }
@@ -116,7 +116,7 @@ class BillingService {
    */
   static async recordPayment(invoiceId, paymentData, userId) {
     const invoice = await Invoice.findById(invoiceId);
-    
+
     if (!invoice) {
       throw new AppError('Invoice not found', 404);
     }
@@ -170,7 +170,7 @@ class BillingService {
    */
   static async createCreditNote(invoiceId, creditNoteData, userId) {
     const invoice = await Invoice.findById(invoiceId);
-    
+
     if (!invoice) {
       throw new AppError('Invoice not found', 404);
     }
@@ -200,7 +200,7 @@ class BillingService {
    */
   static async applyCreditNote(creditNoteId, userId) {
     const creditNote = await CreditNote.findById(creditNoteId);
-    
+
     if (!creditNote) {
       throw new AppError('Credit note not found', 404);
     }
@@ -217,7 +217,7 @@ class BillingService {
     creditNote.appliedToInvoice = true;
     creditNote.appliedAt = new Date();
     creditNote.lastModifiedBy = userId;
-    
+
     await creditNote.save();
 
     return creditNote;
@@ -236,23 +236,23 @@ class BillingService {
 
     // Calculate totals
     const totalQuoted = quotations
-      .filter(q => ['sent', 'viewed', 'accepted'].includes(q.status))
+      .filter((q) => ['sent', 'viewed', 'accepted'].includes(q.status))
       .reduce((sum, q) => sum + q.totalAmount, 0);
 
     const totalInvoiced = invoices
-      .filter(i => i.status !== 'cancelled')
+      .filter((i) => i.status !== 'cancelled')
       .reduce((sum, i) => sum + i.totalAmount, 0);
 
     const totalPaid = receipts
-      .filter(r => r.receiptStatus !== 'cancelled')
+      .filter((r) => r.receiptStatus !== 'cancelled')
       .reduce((sum, r) => sum + r.amount, 0);
 
     const totalCredited = creditNotes
-      .filter(cn => cn.status === 'applied')
+      .filter((cn) => cn.status === 'applied')
       .reduce((sum, cn) => sum + cn.totalAmount, 0);
 
     const totalOutstanding = invoices
-      .filter(i => i.status !== 'cancelled' && i.status !== 'paid')
+      .filter((i) => i.status !== 'cancelled' && i.status !== 'paid')
       .reduce((sum, i) => sum + i.outstandingAmount, 0);
 
     return {
@@ -319,7 +319,7 @@ class BillingService {
 
     const [invoices, receipts, creditNotes] = await Promise.all([
       Invoice.find({ ...dateFilter, ...filters }),
-      PaymentReceipt.find({ 
+      PaymentReceipt.find({
         paymentDate: {
           $gte: new Date(startDate),
           $lte: new Date(endDate),
@@ -331,19 +331,19 @@ class BillingService {
 
     // Calculate metrics
     const totalRevenue = invoices
-      .filter(i => i.status !== 'cancelled')
+      .filter((i) => i.status !== 'cancelled')
       .reduce((sum, i) => sum + i.totalAmount, 0);
 
     const totalCollected = receipts
-      .filter(r => r.receiptStatus !== 'cancelled')
+      .filter((r) => r.receiptStatus !== 'cancelled')
       .reduce((sum, r) => sum + r.amount, 0);
 
     const totalRefunded = creditNotes
-      .filter(cn => cn.refundStatus === 'completed')
+      .filter((cn) => cn.refundStatus === 'completed')
       .reduce((sum, cn) => sum + cn.totalAmount, 0);
 
     const outstandingAmount = invoices
-      .filter(i => i.status !== 'cancelled' && i.status !== 'paid')
+      .filter((i) => i.status !== 'cancelled' && i.status !== 'paid')
       .reduce((sum, i) => sum + i.outstandingAmount, 0);
 
     // Payment method breakdown
@@ -359,7 +359,7 @@ class BillingService {
 
     // Invoice status breakdown
     const invoiceStatusBreakdown = invoices.reduce((acc, invoice) => {
-      const status = invoice.status;
+      const { status } = invoice;
       if (!acc[status]) {
         acc[status] = { count: 0, total: 0 };
       }
@@ -378,7 +378,7 @@ class BillingService {
         totalCollected,
         totalRefunded,
         outstandingAmount,
-        collectionRate: totalRevenue > 0 ? (totalCollected / totalRevenue * 100).toFixed(2) : 0,
+        collectionRate: totalRevenue > 0 ? ((totalCollected / totalRevenue) * 100).toFixed(2) : 0,
       },
       invoices: {
         count: invoices.length,
@@ -400,7 +400,7 @@ class BillingService {
    */
   static async verifyPaymentReceipt(receiptId, userId) {
     const receipt = await PaymentReceipt.findById(receiptId);
-    
+
     if (!receipt) {
       throw new AppError('Payment receipt not found', 404);
     }
@@ -412,7 +412,7 @@ class BillingService {
     receipt.verified = true;
     receipt.verifiedBy = userId;
     receipt.verifiedAt = new Date();
-    
+
     await receipt.save();
 
     return receipt;
@@ -423,7 +423,7 @@ class BillingService {
    */
   static async reconcilePaymentReceipt(receiptId, userId) {
     const receipt = await PaymentReceipt.findById(receiptId);
-    
+
     if (!receipt) {
       throw new AppError('Payment receipt not found', 404);
     }
@@ -439,7 +439,7 @@ class BillingService {
     receipt.reconciled = true;
     receipt.reconciledBy = userId;
     receipt.reconciledAt = new Date();
-    
+
     await receipt.save();
 
     return receipt;

@@ -15,7 +15,7 @@ export const getAllCreditNotes = asyncHandler(async (req, res) => {
       .populate('lead', 'name email phone')
       .populate('invoice', 'invoiceNumber totalAmount')
       .populate('createdBy', 'name email'),
-    req.query
+    req.query,
   )
     .filter()
     .sort()
@@ -61,7 +61,7 @@ export const getCreditNoteById = asyncHandler(async (req, res, next) => {
  * @route   GET /api/v1/billing/credit-notes/lead/:leadId
  * @access  Private
  */
-export const getCreditNotesByLeadId = asyncHandler(async (req, res) => {
+export const getCreditNoteByLeadId = asyncHandler(async (req, res, next) => {
   const creditNotes = await CreditNote.find({ lead: req.params.leadId })
     .populate('invoice', 'invoiceNumber totalAmount')
     .populate('createdBy', 'name email')
@@ -79,7 +79,7 @@ export const getCreditNotesByLeadId = asyncHandler(async (req, res) => {
  * @route   GET /api/v1/billing/credit-notes/invoice/:invoiceId
  * @access  Private
  */
-export const getCreditNotesByInvoiceId = asyncHandler(async (req, res) => {
+export const getCreditNoteByInvoiceId = asyncHandler(async (req, res, next) => {
   const creditNotes = await CreditNote.find({ invoice: req.params.invoiceId })
     .populate('createdBy', 'name email')
     .sort({ issueDate: -1 });
@@ -96,11 +96,11 @@ export const getCreditNotesByInvoiceId = asyncHandler(async (req, res) => {
  * @route   POST /api/v1/billing/credit-notes
  * @access  Private (Admin, Staff)
  */
-export const createCreditNote = asyncHandler(async (req, res) => {
+export const createCreditNote = asyncHandler(async (req, res, next) => {
   const creditNote = await BillingService.createCreditNote(
     req.body.invoice,
     req.body,
-    req.user.id
+    req.user.id,
   );
 
   res.status(201).json({
@@ -116,7 +116,7 @@ export const createCreditNote = asyncHandler(async (req, res) => {
  * @access  Private (Admin)
  */
 export const updateCreditNote = asyncHandler(async (req, res, next) => {
-  let creditNote = await CreditNote.findById(req.params.id);
+  const creditNote = await CreditNote.findById(req.params.id);
 
   if (!creditNote) {
     return next(new AppError('Credit note not found', 404));
@@ -129,7 +129,7 @@ export const updateCreditNote = asyncHandler(async (req, res, next) => {
   creditNote.lastModifiedBy = req.user.id;
 
   // Update fields
-  Object.keys(req.body).forEach(key => {
+  Object.keys(req.body).forEach((key) => {
     if (req.body[key] !== undefined && key !== 'creditNoteNumber' && key !== 'lead' && key !== 'invoice') {
       creditNote[key] = req.body[key];
     }
@@ -239,7 +239,7 @@ export const rejectCreditNote = asyncHandler(async (req, res, next) => {
  * @route   PUT /api/v1/billing/credit-notes/:id/apply
  * @access  Private (Admin, Staff)
  */
-export const applyCreditNote = asyncHandler(async (req, res) => {
+export const applyCreditNote = asyncHandler(async (req, res, next) => {
   const creditNote = await BillingService.applyCreditNote(req.params.id, req.user.id);
 
   res.status(200).json({
@@ -318,12 +318,14 @@ export const generateVoucherFromCreditNote = asyncHandler(async (req, res, next)
 
   // Generate unique voucher code
   const voucherCode = `CN${creditNote.creditNoteNumber.replace(/[^0-9]/g, '')}-${Date.now().toString(36).toUpperCase()}`;
-  
+
   creditNote.voucherGenerated = true;
   creditNote.voucherCode = voucherCode;
   creditNote.voucherValue = creditNote.totalAmount;
-  creditNote.voucherExpiryDate = req.body.expiryDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year default
-  
+  // 1 year default
+  creditNote.voucherExpiryDate = req.body.expiryDate
+    || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
   await creditNote.save();
 
   res.status(200).json({
@@ -402,7 +404,7 @@ export const sendCreditNote = asyncHandler(async (req, res, next) => {
  * @route   GET /api/v1/billing/credit-notes/stats
  * @access  Private (Admin, Staff)
  */
-export const getCreditNoteStats = asyncHandler(async (req, res) => {
+export const getCreditNoteStats = asyncHandler(async (req, res, next) => {
   const stats = await CreditNote.aggregate([
     {
       $group: {

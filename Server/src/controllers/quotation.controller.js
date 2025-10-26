@@ -12,7 +12,7 @@ import { APIFeatures } from '../utils/apiFeatures.js';
 export const getAllQuotations = asyncHandler(async (req, res) => {
   const features = new APIFeatures(
     Quotation.find().populate('lead', 'name email phone status').populate('createdBy', 'name email'),
-    req.query
+    req.query,
   )
     .filter()
     .sort()
@@ -91,7 +91,7 @@ export const createQuotation = asyncHandler(async (req, res) => {
  * @access  Private (Admin, Staff)
  */
 export const updateQuotation = asyncHandler(async (req, res, next) => {
-  let quotation = await Quotation.findById(req.params.id);
+  const quotation = await Quotation.findById(req.params.id);
 
   if (!quotation) {
     return next(new AppError('Quotation not found', 404));
@@ -114,7 +114,7 @@ export const updateQuotation = asyncHandler(async (req, res, next) => {
   quotation.lastModifiedBy = req.user.id;
 
   // Update fields
-  Object.keys(req.body).forEach(key => {
+  Object.keys(req.body).forEach((key) => {
     if (req.body[key] !== undefined && key !== 'quotationNumber' && key !== 'lead') {
       quotation[key] = req.body[key];
     }
@@ -269,7 +269,7 @@ export const convertQuotationToInvoice = asyncHandler(async (req, res) => {
   const invoice = await BillingService.convertQuotationToInvoice(
     req.params.id,
     req.user.id,
-    req.body
+    req.body,
   );
 
   res.status(201).json({

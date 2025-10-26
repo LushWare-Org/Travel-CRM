@@ -31,7 +31,7 @@ export const getFinancialReports = asyncHandler(async (req, res, next) => {
   const reports = await BillingService.getFinancialReports(
     startDate,
     endDate,
-    req.query
+    req.query,
   );
 
   res.status(200).json({
@@ -45,7 +45,7 @@ export const getFinancialReports = asyncHandler(async (req, res, next) => {
  * @route   GET /api/v1/billing/dashboard
  * @access  Private (Admin, Staff)
  */
-export const getDashboardStats = asyncHandler(async (req, res) => {
+export const getDashboardStats = asyncHandler(async (req, res, next) => {
   const Quotation = (await import('../models/quotation.model.js')).default;
   const Invoice = (await import('../models/invoice.model.js')).default;
   const PaymentReceipt = (await import('../models/paymentReceipt.model.js')).default;
@@ -114,13 +114,15 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         totalOutstanding: totalOutstanding[0]?.total || 0,
         collectionRate:
           totalRevenue[0]?.total > 0
-            ? ((totalCollected[0]?.total / totalRevenue[0]?.total) * 100).toFixed(2)
+            ? (((totalCollected[0]?.total || 0) / (totalRevenue[0]?.total || 1)) * 100).toFixed(2)
             : 0,
       },
       recentPayments,
       pendingApprovals,
     },
   });
+
+  return undefined;
 });
 
 /**
@@ -238,11 +240,11 @@ export const getAgingReport = asyncHandler(async (req, res) => {
  */
 export const getPaymentMethodBreakdown = asyncHandler(async (req, res) => {
   const PaymentReceipt = (await import('../models/paymentReceipt.model.js')).default;
-  
+
   const { startDate, endDate } = req.query;
-  
+
   const matchQuery = { receiptStatus: { $ne: 'cancelled' } };
-  
+
   if (startDate && endDate) {
     matchQuery.paymentDate = {
       $gte: new Date(startDate),
@@ -347,7 +349,7 @@ export const getRevenueTrends = asyncHandler(async (req, res) => {
  */
 export const getTopCustomers = asyncHandler(async (req, res) => {
   const Invoice = (await import('../models/invoice.model.js')).default;
-  
+
   const { limit = 10 } = req.query;
 
   const topCustomers = await Invoice.aggregate([
@@ -366,7 +368,7 @@ export const getTopCustomers = asyncHandler(async (req, res) => {
       $sort: { totalInvoiced: -1 },
     },
     {
-      $limit: parseInt(limit),
+      $limit: parseInt(limit, 10),
     },
     {
       $lookup: {
@@ -404,8 +406,10 @@ export const getTopCustomers = asyncHandler(async (req, res) => {
  * @route   GET /api/v1/billing/export
  * @access  Private (Admin, Accountant)
  */
-export const exportBillingData = asyncHandler(async (req, res) => {
-  const { type, startDate, endDate, format = 'json' } = req.query;
+export const exportBillingData = asyncHandler(async (req, res, next) => {
+  const {
+    type, startDate, endDate,
+  } = req.query;
 
   if (!type || !startDate || !endDate) {
     return next(new AppError('Please provide type, startDate, and endDate', 400));
@@ -455,4 +459,6 @@ export const exportBillingData = asyncHandler(async (req, res) => {
     count: data.length,
     data,
   });
+
+  return undefined;
 });

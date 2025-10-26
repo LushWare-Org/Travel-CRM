@@ -197,32 +197,32 @@ quotationSchema.pre('save', async function (next) {
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
     this.quotationNumber = `QT-${year}${month}-${String(count + 1).padStart(5, '0')}`;
   }
-  
+
   // Calculate totals
   this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
-  
+
   // Calculate discount
   if (this.discountType === 'percentage') {
     this.discountAmount = (this.subtotal * this.discountValue) / 100;
   } else if (this.discountType === 'fixed') {
     this.discountAmount = this.discountValue;
   }
-  
+
   // Calculate service charge
   this.serviceChargeAmount = (this.subtotal * this.serviceChargeRate) / 100;
-  
+
   // Calculate tax
   const taxableAmount = this.subtotal - this.discountAmount + this.serviceChargeAmount;
   this.taxAmount = (taxableAmount * this.taxRate) / 100;
-  
+
   // Calculate total
   this.totalAmount = taxableAmount + this.taxAmount;
-  
+
   // Auto-expire check
   if (this.status === 'sent' && this.validUntil < new Date()) {
     this.status = 'expired';
   }
-  
+
   next();
 });
 

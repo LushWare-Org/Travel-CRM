@@ -159,7 +159,7 @@ const itinerarySchema = new mongoose.Schema(
 
 // Indexes for better query performance
 itinerarySchema.index({ status: 1, createdAt: -1 });
-itinerarySchema.index({ 'createdBy': 1 });
+itinerarySchema.index({ createdBy: 1 });
 
 // Pre-save middleware to calculate metadata
 itinerarySchema.pre('save', function calculateMetadata(next) {
@@ -210,7 +210,7 @@ itinerarySchema.virtual('completionPercentage').get(function getCompletionPercen
 
   this.days.forEach((day) => {
     totalFields += 4; // dayNumber, title, description, activities (required/recommended)
-    
+
     if (day.dayNumber) filledFields += 1;
     if (day.title) filledFields += 1;
     if (day.description) filledFields += 1;

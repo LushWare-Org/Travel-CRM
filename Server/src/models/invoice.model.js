@@ -228,36 +228,36 @@ invoiceSchema.pre('save', async function (next) {
     const count = await mongoose.model('Invoice').countDocuments();
     const year = new Date().getFullYear();
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
-    
+
     const prefix = this.type === 'proforma' ? 'PI' : 'INV';
     this.invoiceNumber = `${prefix}-${year}${month}-${String(count + 1).padStart(5, '0')}`;
   }
-  
+
   // Calculate totals if items exist
   if (this.items && this.items.length > 0) {
     this.subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
-    
+
     // Calculate discount
     if (this.discountType === 'percentage') {
       this.discountAmount = (this.subtotal * this.discountValue) / 100;
     } else if (this.discountType === 'fixed') {
       this.discountAmount = this.discountValue;
     }
-    
+
     // Calculate service charge
     this.serviceChargeAmount = (this.subtotal * this.serviceChargeRate) / 100;
-    
+
     // Calculate tax
     const taxableAmount = this.subtotal - this.discountAmount + this.serviceChargeAmount;
     this.taxAmount = (taxableAmount * this.taxRate) / 100;
-    
+
     // Calculate total
     this.totalAmount = taxableAmount + this.taxAmount;
   }
-  
+
   // Calculate outstanding amount
   this.outstandingAmount = this.totalAmount - this.paidAmount;
-  
+
   // Update payment status
   if (this.paidAmount === 0) {
     this.paymentStatus = 'unpaid';
@@ -267,19 +267,19 @@ invoiceSchema.pre('save', async function (next) {
   } else {
     this.paymentStatus = 'partial';
   }
-  
+
   // Update status based on payment
   if (this.paymentStatus === 'paid' && this.status !== 'cancelled') {
     this.status = 'paid';
   } else if (this.paymentStatus === 'partial' && this.status === 'sent') {
     this.status = 'partial';
   }
-  
+
   // Check if overdue
   if (this.status !== 'paid' && this.status !== 'cancelled' && this.dueDate < new Date()) {
     this.status = 'overdue';
   }
-  
+
   next();
 });
 

@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Itinerary from '../models/itinerary.model.js';
-import Package from '../models/package.model.js';
 import AppError from '../utils/appError.js';
 
 const filename = fileURLToPath(import.meta.url);
@@ -90,7 +89,7 @@ class ItineraryService {
 
         const fileName = `itinerary-${packageData.slug || itineraryId}-${Date.now()}.pdf`;
         const uploadsDir = path.join(dirname, '../../uploads/itineraries');
-        
+
         // Ensure directory exists
         if (!fs.existsSync(uploadsDir)) {
           fs.mkdirSync(uploadsDir, { recursive: true });
@@ -214,7 +213,7 @@ class ItineraryService {
     // Contact Information Box
     const contactBoxY = 520;
     doc.rect(75, contactBoxY, 445, 140).fillAndStroke('#FFFFFF', '#E2E8F0');
-    
+
     doc
       .fillColor(brandColor)
       .fontSize(14)
@@ -267,10 +266,10 @@ class ItineraryService {
       .fontSize(10)
       .font('Helvetica')
       .text('Detailed Travel Itinerary', 50, 700, { align: 'center' })
-      .text(`Generated on ${new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      .text(`Generated on ${new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
       })}`, 50, 720, { align: 'center' });
   }
 
@@ -360,7 +359,7 @@ class ItineraryService {
         .fillColor(secondaryColor)
         .fontSize(10)
         .font('Helvetica-Bold')
-        .text(fact.label + ':', 60, yPos)
+        .text(`${fact.label}:`, 60, yPos)
         .font('Helvetica')
         .text(fact.value, 200, yPos);
       yPos += 22;
@@ -449,7 +448,7 @@ class ItineraryService {
           .fontSize(10)
           .font('Helvetica-Bold')
           .text(`📍 ${place.name}`, 60, yPos);
-        
+
         yPos += 15;
 
         if (place.description) {
@@ -495,7 +494,7 @@ class ItineraryService {
         doc.text(
           `Type: ${day.accommodation.type.charAt(0).toUpperCase() + day.accommodation.type.slice(1)}`,
           60,
-          yPos + 43
+          yPos + 43,
         );
       }
 
@@ -520,7 +519,7 @@ class ItineraryService {
         .fontSize(10)
         .font('Helvetica-Bold')
         .text('🍽️ Meals Included', 60, yPos + 10);
-      
+
       doc
         .fillColor(secondaryColor)
         .fontSize(9)
@@ -534,7 +533,7 @@ class ItineraryService {
           .fontSize(10)
           .font('Helvetica-Bold')
           .text('🚗 Transport', 315, yPos + 10);
-        
+
         doc
           .fillColor(secondaryColor)
           .fontSize(9)
@@ -878,7 +877,7 @@ class ItineraryService {
    */
   static addFooter(doc, pageNumber, totalPages, secondaryColor) {
     const footerY = 770;
-    
+
     // Company name and contact info
     doc
       .fontSize(8)
@@ -888,14 +887,14 @@ class ItineraryService {
       .font('Helvetica')
       .text(' | ', { continued: true, link: null })
       .fillColor('#1E40AF')
-      .text('www.tripskyway.com', { 
+      .text('www.tripskyway.com', {
         continued: true,
         link: 'https://www.tripskyway.com',
         underline: true,
       })
       .fillColor(secondaryColor)
       .text(' | ', { continued: true, link: null })
-      .text('info@tripskyway.com', { 
+      .text('info@tripskyway.com', {
         continued: true,
         link: 'mailto:info@tripskyway.com',
         underline: true,
@@ -911,7 +910,7 @@ class ItineraryService {
       .fontSize(8)
       .fillColor(secondaryColor)
       .font('Helvetica')
-      .text(`Page ${pageNumber} of ${totalPages}`, 50, footerY + 12, { 
+      .text(`Page ${pageNumber} of ${totalPages}`, 50, footerY + 12, {
         align: 'center',
         width: 495,
       });

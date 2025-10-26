@@ -15,7 +15,7 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
       .populate('lead', 'name email phone status')
       .populate('quotation', 'quotationNumber')
       .populate('createdBy', 'name email'),
-    req.query
+    req.query,
   )
     .filter()
     .sort()
@@ -62,7 +62,7 @@ export const getInvoiceById = asyncHandler(async (req, res, next) => {
  * @route   GET /api/v1/billing/invoices/lead/:leadId
  * @access  Private
  */
-export const getInvoicesByLeadId = asyncHandler(async (req, res) => {
+export const getInvoiceByLeadId = asyncHandler(async (req, res, next) => {
   const invoices = await Invoice.find({ lead: req.params.leadId })
     .populate('quotation', 'quotationNumber')
     .populate('createdBy', 'name email')
@@ -81,9 +81,9 @@ export const getInvoicesByLeadId = asyncHandler(async (req, res) => {
  * @route   POST /api/v1/billing/invoices
  * @access  Private (Admin, Staff)
  */
-export const createInvoice = asyncHandler(async (req, res) => {
+export const createInvoice = asyncHandler(async (req, res, next) => {
   req.body.createdBy = req.user.id;
-  
+
   const invoice = await Invoice.create(req.body);
 
   res.status(201).json({
@@ -99,7 +99,7 @@ export const createInvoice = asyncHandler(async (req, res) => {
  * @access  Private (Admin, Staff)
  */
 export const updateInvoice = asyncHandler(async (req, res, next) => {
-  let invoice = await Invoice.findById(req.params.id);
+  const invoice = await Invoice.findById(req.params.id);
 
   if (!invoice) {
     return next(new AppError('Invoice not found', 404));
@@ -116,7 +116,7 @@ export const updateInvoice = asyncHandler(async (req, res, next) => {
   invoice.lastModifiedBy = req.user.id;
 
   // Update fields
-  Object.keys(req.body).forEach(key => {
+  Object.keys(req.body).forEach((key) => {
     if (req.body[key] !== undefined && key !== 'invoiceNumber' && key !== 'lead') {
       invoice[key] = req.body[key];
     }
@@ -259,7 +259,7 @@ export const sendPaymentReminder = asyncHandler(async (req, res, next) => {
  * @route   GET /api/v1/billing/invoices/overdue
  * @access  Private (Admin, Staff)
  */
-export const getOverdueInvoices = asyncHandler(async (req, res) => {
+export const getOverdueInvoices = asyncHandler(async (req, res, next) => {
   const invoices = await BillingService.getOverdueInvoices(req.query);
 
   res.status(200).json({
@@ -274,7 +274,7 @@ export const getOverdueInvoices = asyncHandler(async (req, res) => {
  * @route   GET /api/v1/billing/invoices/stats
  * @access  Private (Admin, Staff)
  */
-export const getInvoiceStats = asyncHandler(async (req, res) => {
+export const getInvoiceStats = asyncHandler(async (req, res, next) => {
   const stats = await Invoice.aggregate([
     {
       $group: {
@@ -337,7 +337,7 @@ export const downloadInvoicePDF = asyncHandler(async (req, res, next) => {
 
   // TODO: Generate PDF
   // const pdfBuffer = await pdfGenerator.generateInvoicePDF(invoice);
-  
+
   res.status(200).json({
     success: true,
     message: 'PDF generation feature to be implemented',

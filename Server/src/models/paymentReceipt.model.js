@@ -58,17 +58,17 @@ const paymentReceiptSchema = new mongoose.Schema(
         enum: ['visa', 'mastercard', 'amex', 'discover', 'other'],
       },
       cardLastFour: String,
-      
+
       // For bank transfer
       bankName: String,
       accountNumber: String,
       transactionReference: String,
-      
+
       // For cheque
       chequeNumber: String,
       chequeDate: Date,
       chequeBank: String,
-      
+
       // For online payment
       paymentGateway: {
         type: String,
@@ -76,7 +76,7 @@ const paymentReceiptSchema = new mongoose.Schema(
       },
       gatewayTransactionId: String,
       gatewayPaymentId: String,
-      
+
       // For UPI
       upiId: String,
       upiTransactionId: String,
@@ -104,7 +104,7 @@ const paymentReceiptSchema = new mongoose.Schema(
     },
     notes: String,
     internalNotes: String,
-    
+
     // References
     previousBalance: {
       type: Number,
@@ -114,7 +114,7 @@ const paymentReceiptSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    
+
     // Verification
     verified: {
       type: Boolean,
@@ -125,7 +125,7 @@ const paymentReceiptSchema = new mongoose.Schema(
       ref: 'User',
     },
     verifiedAt: Date,
-    
+
     // Reconciliation
     reconciled: {
       type: Boolean,
@@ -136,7 +136,7 @@ const paymentReceiptSchema = new mongoose.Schema(
       ref: 'User',
     },
     reconciledAt: Date,
-    
+
     // PDF and Communication
     pdfUrl: String,
     sentAt: Date,
@@ -144,7 +144,7 @@ const paymentReceiptSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    
+
     // Audit trail
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -155,7 +155,7 @@ const paymentReceiptSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
-    
+
     // Cancellation
     cancelledAt: Date,
     cancellationReason: String,
@@ -163,7 +163,7 @@ const paymentReceiptSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
-    
+
     // For refund receipts
     refundFor: {
       type: mongoose.Schema.Types.ObjectId,
@@ -195,14 +195,14 @@ paymentReceiptSchema.pre('save', async function (next) {
     try {
       const Invoice = mongoose.model('Invoice');
       const invoice = await Invoice.findById(this.invoice);
-      
+
       if (invoice) {
         this.previousBalance = invoice.outstandingAmount;
         this.outstandingBalance = invoice.outstandingAmount - this.amount;
-        
+
         // Determine receipt status
         const totalPaid = invoice.paidAmount + this.amount;
-        
+
         if (totalPaid >= invoice.totalAmount) {
           this.receiptStatus = 'paid-in-full';
         } else if (this.paymentType === 'advance') {
