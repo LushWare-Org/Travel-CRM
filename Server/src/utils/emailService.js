@@ -94,6 +94,83 @@ class EmailService {
     });
   }
 
+  async sendStaffCredentials(user, tempPassword, role) {
+    const loginUrl = `${process.env.CLIENT_URL}/login`;
+    let roleDisplay;
+    if (role === 'salesRep') {
+      roleDisplay = 'Sales Representative';
+    } else if (role === 'vendor') {
+      roleDisplay = 'Vendor';
+    } else {
+      roleDisplay = role;
+    }
+    const subject = `Welcome to Trip Sky Way - Your ${roleDisplay} Account`;
+    const html = `
+      <h1>Welcome to Trip Sky Way!</h1>
+      <p>Dear ${user.name},</p>
+      <p>An account has been created for you as a <strong>${roleDisplay}</strong>.</p>
+      <h2>Your Login Credentials:</h2>
+      <ul>
+        <li><strong>Email:</strong> ${user.email}</li>
+        <li><strong>Temporary Password:</strong> ${tempPassword}</li>
+      </ul>
+      <p><strong>Important:</strong> You must change this temporary password on your first login for security reasons.</p>
+      <a href="${loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Login Now</a>
+      <br><br>
+      <p>If you have any questions, please contact the administrator.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The Trip Sky Way Team</p>
+    `;
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      html,
+    });
+  }
+
+  async sendPasswordChanged(user) {
+    const subject = 'Password Changed Successfully';
+    const html = `
+      <h1>Password Changed</h1>
+      <p>Dear ${user.name},</p>
+      <p>Your password has been changed successfully.</p>
+      <p>If you did not make this change, please contact our support team immediately.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The Trip Sky Way Team</p>
+    `;
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      html,
+    });
+  }
+
+  async sendEmailVerification(user, verificationToken) {
+    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    const subject = 'Verify Your Email Address';
+    const html = `
+      <h1>Email Verification</h1>
+      <p>Dear ${user.name},</p>
+      <p>Thank you for registering with Trip Sky Way. Please verify your email address by clicking the link below:</p>
+      <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">Verify Email</a>
+      <p>This link will expire in 24 hours.</p>
+      <p>If you didn't create an account, please ignore this email.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The Trip Sky Way Team</p>
+    `;
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      html,
+    });
+  }
+
   async sendInvoice(user, invoice) {
     const subject = `Invoice #${invoice.invoiceNumber}`;
     const html = `

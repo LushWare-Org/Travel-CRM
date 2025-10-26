@@ -6,7 +6,6 @@ const creditNoteSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true,
     },
     lead: {
       type: mongoose.Schema.Types.ObjectId,
@@ -85,7 +84,6 @@ const creditNoteSchema = new mongoose.Schema(
       type: String,
       enum: ['draft', 'issued', 'applied', 'refunded', 'cancelled'],
       default: 'draft',
-      index: true,
     },
     refundStatus: {
       type: String,

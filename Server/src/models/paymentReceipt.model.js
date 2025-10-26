@@ -95,7 +95,6 @@ const paymentReceiptSchema = new mongoose.Schema(
       enum: ['paid-in-advance', 'paid-in-full', 'partial-payment', 'refunded', 'cancelled'],
       required: true,
       default: 'partial-payment',
-      index: true,
     },
     paymentType: {
       type: String,
