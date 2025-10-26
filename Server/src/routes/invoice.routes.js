@@ -1,10 +1,17 @@
 import express from 'express';
-import { getInvoiceByBooking, getMyInvoices } from '../controllers/invoice.controller.js';
+// import { protect, authorize } from '../middleware/auth.js';
+// Controllers will be implemented later
 
 const router = express.Router();
 
 // Invoice routes
-router.get('/me', getMyInvoices);
-router.get('/:bookingId', getInvoiceByBooking);
+// router.get('/:id', protect, getInvoice);
+// router.get('/:id/pdf', protect, downloadInvoicePDF);
+// router.post('/', protect, authorize('admin', 'staff'), createInvoice);
+
+// Placeholder route
+router.get('/', (req, res) => {
+  res.json({ message: 'Invoice routes - To be implemented' });
+});
 
 export default router;
