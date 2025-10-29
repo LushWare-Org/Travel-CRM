@@ -19,8 +19,28 @@ export const CATEGORY_OPTIONS = [
   { value: 'Honeymoon', label: 'Honeymoon' },
   { value: 'Family', label: 'Family' },
   { value: 'Adventure', label: 'Adventure' },
-  { value: 'Corporate', label: 'Corporate' },
+  { value: 'Budget', label: 'Budget' },
+  { value: 'Luxury', label: 'Luxury' },
+  { value: 'Religious', label: 'Religious' },
+  { value: 'Wildlife', label: 'Wildlife' },
+  { value: 'Beach', label: 'Beach' },
+  { value: 'Heritage', label: 'Heritage' },
+  { value: 'Other', label: 'Other' },
 ];
+
+// Backend category enum mapping
+export const CATEGORY_BACKEND_MAP = {
+  'Honeymoon': 'honeymoon',
+  'Family': 'family',
+  'Adventure': 'adventure',
+  'Budget': 'budget',
+  'Luxury': 'luxury',
+  'Religious': 'religious',
+  'Wildlife': 'wildlife',
+  'Beach': 'beach',
+  'Heritage': 'heritage',
+  'Other': 'other',
+};
 
 export const REGION_OPTIONS = [
   { value: 'Europe', label: 'Europe' },
