@@ -27,7 +27,9 @@ const NewEditPackageForm = ({
   const [showItinerary, setShowItinerary] = useState(false);
 
   useEffect(() => {
+    console.log('[NewEditPackageForm] formData prop received:', formData);
     setLocalFormData(formData);
+    console.log('[NewEditPackageForm] localFormData updated');
   }, [formData]);
 
   const handleBasicInfoChange = (data) => {
@@ -123,8 +125,10 @@ const NewEditPackageForm = ({
       status,
       updatedDate: new Date().toISOString().split('T')[0],
     };
+    console.log('[NewEditPackageForm] handleSave - data to save:', dataToSave);
     setFormData(dataToSave);
-    onSave?.();
+    // Pass the updated data directly to onSave instead of relying on state update
+    onSave?.(dataToSave);
   };
 
   return (

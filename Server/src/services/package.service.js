@@ -5,6 +5,7 @@
  */
 
 import Package from '../models/package.model.js';
+import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import logger from '../config/logger.js';
 
@@ -199,8 +200,9 @@ class PackageService {
         throw new AppError('Package not found', 404);
       }
 
-      // Check authorization (only creator or admin can update)
-      if (pkg.createdBy.toString() !== userId && !this.isAdmin(userId)) {
+      // Check authorization (only creator or admin/staff can update)
+      const isAuthorized = pkg.createdBy.toString() === userId.toString() || await this.isAdmin(userId);
+      if (!isAuthorized) {
         throw new AppError('Not authorized to update this package', 403);
       }
 
@@ -258,8 +260,9 @@ class PackageService {
         throw new AppError('Package not found', 404);
       }
 
-      // Check authorization (only creator or admin can delete)
-      if (pkg.createdBy.toString() !== userId && !this.isAdmin(userId)) {
+      // Check authorization (only creator or admin/staff can delete)
+      const isAuthorized = pkg.createdBy.toString() === userId.toString() || await this.isAdmin(userId);
+      if (!isAuthorized) {
         throw new AppError('Not authorized to delete this package', 403);
       }
 
@@ -457,9 +460,14 @@ class PackageService {
    * @param {string} userId - User ID
    * @returns {boolean} Is admin
    */
-  isAdmin(userId) {
-    // Implement based on your User model
-    return false;
+  async isAdmin(userId) {
+    try {
+      const user = await User.findById(userId);
+      return user && (user.role === 'admin' || user.role === 'staff');
+    } catch (error) {
+      logger.error(`Error checking admin status: ${error.message}`);
+      return false;
+    }
   }
 }
 

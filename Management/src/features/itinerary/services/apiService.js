@@ -4,7 +4,7 @@
  * Follows best practices for API integration
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 /**
  * Enhanced request wrapper with error handling and logging
@@ -24,6 +24,9 @@ async function makeRequest(endpoint, options = {}) {
 
   try {
     console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
+    if (options.body) {
+      console.log(`[API Request Body]:`, JSON.parse(options.body));
+    }
 
     const response = await fetch(url, config);
     const data = await response.json();
@@ -32,12 +35,35 @@ async function makeRequest(endpoint, options = {}) {
       const error = new Error(data.message || 'API request failed');
       error.status = response.status;
       error.data = data;
+      error.errors = data.errors || [];
+      
+      // Log detailed validation errors with FULL details
+      if (data.errors && Array.isArray(data.errors)) {
+        console.error('%c[VALIDATION ERRORS]:', 'color: red; font-weight: bold; font-size: 14px;');
+        data.errors.forEach((err, index) => {
+          console.error(`%c  Error ${index + 1}:`, 'color: red; font-weight: bold;');
+          console.error('    Field:', err.param || err.field || 'unknown');
+          console.error('    Message:', err.msg || err.message || 'No message');
+          console.error('    Value:', err.value);
+          console.error('    Location:', err.location || 'body');
+        });
+      }
+      
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error(`[API Error] ${endpoint}:`, error);
+    console.error(`[API Error] ${endpoint}:`, error.message);
+    if (error.errors && error.errors.length > 0) {
+      console.error('%c[DETAILED ERRORS]:', 'color: red; font-weight: bold;');
+      error.errors.forEach((err, index) => {
+        console.error(`%c  Error ${index + 1}:`, 'color: red;');
+        console.error('    Field:', err.param || err.field || 'unknown');
+        console.error('    Message:', err.msg || err.message || 'No message');
+        console.error('    Value:', err.value);
+      });
+    }
     throw error;
   }
 }

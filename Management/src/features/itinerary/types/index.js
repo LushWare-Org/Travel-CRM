@@ -96,9 +96,9 @@ export const createDefaultPackage = (overrides = {}) => ({
   _id: null,
   name: '',
   description: '',
-  destination: '',
+  destination: '', // Backend requires this, not "region"
   duration: 1,
-  price: '',
+  price: 0, // Must be a number, not a string
   maxGroupSize: 10,
   difficulty: DIFFICULTY_LEVEL.MODERATE,
   category: PACKAGE_CATEGORY.OTHER,

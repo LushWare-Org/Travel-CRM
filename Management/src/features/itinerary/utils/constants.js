@@ -3,10 +3,16 @@
  */
 
 export const CATEGORY_COLORS = {
-  Honeymoon: 'bg-pink-100 text-pink-800',
-  Family: 'bg-green-100 text-green-800',
-  Adventure: 'bg-orange-100 text-orange-800',
-  Corporate: 'bg-blue-100 text-blue-800',
+  honeymoon: 'bg-pink-100 text-pink-800',
+  family: 'bg-green-100 text-green-800',
+  adventure: 'bg-orange-100 text-orange-800',
+  budget: 'bg-yellow-100 text-yellow-800',
+  luxury: 'bg-purple-100 text-purple-800',
+  religious: 'bg-indigo-100 text-indigo-800',
+  wildlife: 'bg-lime-100 text-lime-800',
+  beach: 'bg-cyan-100 text-cyan-800',
+  heritage: 'bg-amber-100 text-amber-800',
+  other: 'bg-gray-100 text-gray-800',
 };
 
 export const STATUS_COLORS = {
@@ -16,10 +22,16 @@ export const STATUS_COLORS = {
 };
 
 export const CATEGORY_OPTIONS = [
-  { value: 'Honeymoon', label: 'Honeymoon' },
-  { value: 'Family', label: 'Family' },
-  { value: 'Adventure', label: 'Adventure' },
-  { value: 'Corporate', label: 'Corporate' },
+  { value: 'honeymoon', label: 'Honeymoon' },
+  { value: 'family', label: 'Family' },
+  { value: 'adventure', label: 'Adventure' },
+  { value: 'budget', label: 'Budget' },
+  { value: 'luxury', label: 'Luxury' },
+  { value: 'religious', label: 'Religious' },
+  { value: 'wildlife', label: 'Wildlife' },
+  { value: 'beach', label: 'Beach' },
+  { value: 'heritage', label: 'Heritage' },
+  { value: 'other', label: 'Other' },
 ];
 
 export const REGION_OPTIONS = [

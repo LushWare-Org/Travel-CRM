@@ -3,7 +3,7 @@
  * Main container that manages state and orchestrates all sub-components
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Swal from 'sweetalert2';
 
@@ -24,6 +24,7 @@ import {
 // Services
 import { generateAndDownloadPDF } from '../services/pdfService';
 import { uploadImage } from '../services/imageService';
+import ApiService from '../services/apiService';
 
 // Utils
 import {
@@ -66,6 +67,25 @@ const ItineraryGenerationContainer = () => {
   const filteredPackages = filterPackages(packages, searchTerm);
   const stats = calculatePackageStats(packages);
 
+  /**
+   * Load packages from API on component mount
+   */
+  useEffect(() => {
+    const loadPackages = async () => {
+      try {
+        const response = await ApiService.getPackages();
+        if (response.success && Array.isArray(response.data)) {
+          setPackages(response.data);
+        }
+      } catch (error) {
+        console.error('Error loading packages:', error);
+        // Keep using sample data if API fails
+      }
+    };
+
+    loadPackages();
+  }, []);
+
   // Handlers
   const handleNewPackageDialogOpen = () => {
     setNewFormData(createDefaultPackage());
@@ -78,31 +98,156 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleEditPackage = (pkg) => {
-    setEditPackageData({
+    console.log('[Container] Edit package clicked:', pkg);
+    const editData = {
       ...pkg,
       days: [...(pkg.days || [])],
       images: [...(pkg.images || [])],
-    });
+    };
+    console.log('[Container] Setting edit package data:', editData);
+    setEditPackageData(editData);
     setShowEditPackageDialog(true);
     setImages(pkg.images || []);
   };
 
-  const handleSaveNewPackage = (formData) => {
-    const newPackage = {
-      ...formData,
-      id: Math.max(...packages.map((p) => p.id || 0), 0) + 1,
-      createdDate: new Date().toISOString().split('T')[0],
-    };
-    setPackages((prev) => [...prev, newPackage]);
-    setShowNewPackageDialog(false);
-    Swal.fire('Success', VALIDATION_MESSAGES.PACKAGE_CREATED, 'success');
+  const handleSaveNewPackage = async (formData) => {
+    try {
+      console.log('[Container] handleSaveNewPackage called with:', formData);
+      
+      // Validate required fields
+      const requiredFields = {
+        name: 'Package Name',
+        category: 'Category',
+        destination: 'Destination',
+        description: 'Description'
+      };
+
+      const missingFields = Object.entries(requiredFields)
+        .filter(([key]) => !formData[key])
+        .map(([, label]) => label);
+
+      if (missingFields.length > 0) {
+        const message = `Please fill in these required fields:\n${missingFields.map(f => `• ${f}`).join('\n')}`;
+        Swal.fire('Missing Required Fields', message, 'error');
+        console.error('[Validation] Missing fields:', missingFields);
+        return;
+      }
+
+      // Ensure numeric fields are numbers
+      const sanitizedData = {
+        ...formData,
+        price: parseFloat(formData.price) || 0,
+        duration: parseInt(formData.duration, 10) || 1,
+        maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
+      };
+
+      console.log('[Debug] Form Data Before Sanitization:', formData);
+      console.log('[Debug] Sanitized Package Data:', sanitizedData);
+
+      // Log important fields separately for clarity
+      console.log('🔍 Key Fields Check:');
+      console.log('  - Name:', sanitizedData.name);
+      console.log('  - Category:', sanitizedData.category);
+      console.log('  - Destination:', sanitizedData.destination);
+      console.log('  - Price:', sanitizedData.price, '(type:', typeof sanitizedData.price, ')');
+      console.log('  - Duration:', sanitizedData.duration, '(type:', typeof sanitizedData.duration, ')');
+
+      // Call API to save package
+      const response = await ApiService.createPackage(sanitizedData);
+
+      if (response.success) {
+        // Update local state with the newly created package from API
+        setPackages((prev) => [...prev, response.data]);
+        setShowNewPackageDialog(false);
+        setNewFormData(createDefaultPackage());
+        setImages([]);
+        Swal.fire('Success', VALIDATION_MESSAGES.PACKAGE_CREATED, 'success');
+      } else {
+        Swal.fire('Error', response.message || 'Failed to create package', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating package:', error);
+      
+      // Show detailed validation errors if available
+      if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
+        const errorList = error.errors
+          .map((err) => `• ${err.param || err.field}: ${err.msg}`)
+          .join('\n');
+        
+        console.log('%c=== VALIDATION ERRORS ===', 'color: red; font-weight: bold; font-size: 14px;');
+        error.errors.forEach((err, idx) => {
+          console.log(`%c❌ Error ${idx + 1}:`, 'color: red; font-weight: bold;');
+          console.log('   Field:', err.param || err.field || 'unknown');
+          console.log('   Message:', err.msg || err.message || 'No message');
+          console.log('   Value received:', err.value);
+          console.log('   Type:', typeof err.value);
+          console.log('   Location:', err.location || 'body');
+        });
+        
+        Swal.fire('Validation Error', `Please fix the following:\n\n${errorList}`, 'error');
+      } else {
+        Swal.fire('Error', error.message || 'Failed to save package to database', 'error');
+      }
+    }
   };
 
-  const handleSaveEditPackage = (formData) => {
-    updatePackage(formData.id, formData);
-    setShowEditPackageDialog(false);
-    setEditPackageData(null);
-    Swal.fire('Success', VALIDATION_MESSAGES.PACKAGE_UPDATED, 'success');
+  const handleSaveEditPackage = async (formData) => {
+    try {
+      console.log('[Container] handleSaveEditPackage called with:', formData);
+      
+      // Validate required fields
+      const requiredFields = {
+        name: 'Package Name',
+        category: 'Category',
+        destination: 'Destination',
+        description: 'Description'
+      };
+
+      const missingFields = Object.entries(requiredFields)
+        .filter(([key]) => !formData[key] || formData[key].toString().trim() === '')
+        .map(([, label]) => label);
+
+      if (missingFields.length > 0) {
+        console.error('[Validation] Missing fields in edit:', missingFields);
+        Swal.fire('Validation Error', `Please fill in: ${missingFields.join(', ')}`, 'error');
+        return;
+      }
+
+      if (!formData._id && !formData.id) {
+        Swal.fire('Error', 'Package ID is missing', 'error');
+        return;
+      }
+
+      const packageId = formData._id || formData.id;
+      
+      // Sanitize data - ensure numeric fields are numbers
+      const sanitizedData = {
+        ...formData,
+        price: parseFloat(formData.price) || 0,
+        duration: parseInt(formData.duration, 10) || 1,
+        maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1
+      };
+
+      // Debug logging
+      console.log('[Container] Updating package ID:', packageId);
+      console.log('[Container] Edit sanitized data:', sanitizedData);
+      console.log('[Container] Auth token present:', !!localStorage.getItem('token'));
+      
+      const response = await ApiService.updatePackage(packageId, sanitizedData);
+
+      if (response.success) {
+        // Update local state
+        updatePackage(packageId, response.data);
+        setShowEditPackageDialog(false);
+        setEditPackageData(null);
+        Swal.fire('Success', VALIDATION_MESSAGES.PACKAGE_UPDATED, 'success');
+      } else {
+        Swal.fire('Error', response.message || 'Failed to update package', 'error');
+      }
+    } catch (error) {
+      console.error('[Container] Error updating package:', error);
+      Swal.fire('Error', error.message || 'Failed to update package', 'error');
+    }
   };
 
   const handleDownloadPackage = (pkg) => {
@@ -110,7 +255,7 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleDeletePackage = (id) => {
-    const pkg = packages.find((p) => p.id === id);
+    const pkg = packages.find((p) => p._id === id || p.id === id);
     if (!pkg) return;
 
     Swal.fire({
@@ -121,13 +266,25 @@ const ItineraryGenerationContainer = () => {
       confirmButtonText: 'Yes, delete it',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#e3342f',
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        deletePackage(id);
-        if (selectedPackage?.id === id) {
-          setSelectedPackage(null);
+        try {
+          const packageId = pkg._id || pkg.id;
+          const response = await ApiService.deletePackage(packageId);
+
+          if (response.success) {
+            deletePackage(packageId);
+            if (selectedPackage?._id === packageId || selectedPackage?.id === packageId) {
+              setSelectedPackage(null);
+            }
+            Swal.fire('Deleted', `${pkg.name} ${VALIDATION_MESSAGES.PACKAGE_DELETED}`, 'success');
+          } else {
+            Swal.fire('Error', response.message || 'Failed to delete package', 'error');
+          }
+        } catch (error) {
+          console.error('Error deleting package:', error);
+          Swal.fire('Error', error.message || 'Failed to delete package', 'error');
         }
-        Swal.fire('Deleted', `${pkg.name} ${VALIDATION_MESSAGES.PACKAGE_DELETED}`, 'success');
       }
     });
   };
@@ -141,21 +298,34 @@ const ItineraryGenerationContainer = () => {
       confirmButtonText: 'Yes, duplicate it',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#3b82f6',
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        const duplicatedPackage = {
-          ...pkg,
-          id: Math.max(...packages.map((p) => p.id || 0), 0) + 1,
-          name: `${pkg.name} (Copy)`,
-          status: 'draft',
-          createdDate: new Date().toISOString().split('T')[0],
-          updatedDate: new Date().toISOString().split('T')[0],
-          bookings: 0,
-          rating: 0,
-          reviews: 0,
-        };
-        setPackages((prev) => [...prev, duplicatedPackage]);
-        Swal.fire('Success', `${pkg.name} has been duplicated successfully.`, 'success');
+        try {
+          // Remove MongoDB _id if present to create a new document
+          const duplicateData = {
+            ...pkg,
+            name: `${pkg.name} (Copy)`,
+            status: 'draft',
+            bookings: 0,
+            rating: 0,
+            reviews: 0,
+          };
+          
+          // Remove _id to let backend create a new one
+          delete duplicateData._id;
+
+          const response = await ApiService.createPackage(duplicateData);
+
+          if (response.success) {
+            setPackages((prev) => [...prev, response.data]);
+            Swal.fire('Success', `${pkg.name} has been duplicated successfully.`, 'success');
+          } else {
+            Swal.fire('Error', response.message || 'Failed to duplicate package', 'error');
+          }
+        } catch (error) {
+          console.error('Error duplicating package:', error);
+          Swal.fire('Error', error.message || 'Failed to duplicate package', 'error');
+        }
       }
     });
   };
@@ -235,7 +405,7 @@ const ItineraryGenerationContainer = () => {
           <NewEditPackageForm
             formData={newFormData}
             setFormData={setNewFormData}
-            onSave={() => handleSaveNewPackage(newFormData)}
+            onSave={(updatedData) => handleSaveNewPackage(updatedData || newFormData)}
             onCancel={() => setShowNewPackageDialog(false)}
             onImageUpload={handleImageUpload}
             onImageRemove={handleImageRemove}
@@ -253,7 +423,7 @@ const ItineraryGenerationContainer = () => {
             <NewEditPackageForm
               formData={editPackageData}
               setFormData={setEditPackageData}
-              onSave={() => handleSaveEditPackage(editPackageData)}
+              onSave={(updatedData) => handleSaveEditPackage(updatedData || editPackageData)}
               onCancel={() => setShowEditPackageDialog(false)}
               onImageUpload={handleImageUpload}
               onImageRemove={handleImageRemove}

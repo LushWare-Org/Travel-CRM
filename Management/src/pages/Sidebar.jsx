@@ -1,10 +1,15 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { Menu, X, Home, Users, MapPin, DollarSign, User } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import toast from "react-hot-toast";
 
 const Sidebar = () => {
-  const [location, navigate] = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const navigationItems = [
     { icon: Home, label: "Dashboard", path: "/" },
@@ -13,6 +18,21 @@ const Sidebar = () => {
     { icon: DollarSign, label: "Billing", path: "/billing" },
     { icon: User, label: "User Management", path: "/users" }
   ];
+
+  const isActive = (path) => location.pathname === path;
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast.error("Logout failed");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div className={`${sidebarOpen ? "w-64" : "w-20"} bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 flex flex-col shadow-xl`}>
@@ -36,7 +56,7 @@ const Sidebar = () => {
             key={item.path}
             onClick={() => navigate(item.path)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-left ${
-              location === item.path ? "bg-slate-600 text-white" : "hover:bg-slate-700"
+              isActive(item.path) ? "bg-slate-600 text-white" : "hover:bg-slate-700"
             }`}
           >
             <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -45,7 +65,27 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-700">
+      {/* User Profile Section */}
+      {sidebarOpen && user && (
+        <div className="p-4 border-t border-slate-700 border-b">
+          <div className="bg-slate-700 rounded-lg p-3 mb-3">
+            <p className="text-xs text-gray-400">Logged in as</p>
+            <p className="text-sm font-semibold truncate">{user.name}</p>
+            <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="p-4 border-t border-slate-700 space-y-2">
+        <button
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="w-full flex items-center gap-3 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-gray-600 transition-colors text-white font-medium"
+        >
+          <LogOut className="w-5 h-5" />
+          {sidebarOpen && <span className="text-sm">{isLoggingOut ? "Logging out..." : "Logout"}</span>}
+        </button>
+
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="w-full flex items-center justify-center bg-slate-700 px-4 py-2 rounded-lg hover:bg-slate-600 transition-colors text-gray-300 hover:text-white"
