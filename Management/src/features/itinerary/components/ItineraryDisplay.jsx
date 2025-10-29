@@ -1,50 +1,151 @@
 /**
  * Itinerary Display Component
  * Shows itinerary information in read-only format
+ * Aligned with backend day-based structure
  */
 
-import { getSortedMiddleDayKeys } from '../utils/helpers';
-import { ITINERARY_LABELS } from '../utils/constants';
-
-const ItineraryDisplay = ({ itinerary, itineraryTitles }) => {
-  return (
-    <div className="space-y-3">
-      {/* Arrival Day */}
-      <div className="border p-4 rounded-md bg-blue-100">
-        <h4 className="bg-blue-500 text-white px-6 py-2 rounded-lg">
-          {ITINERARY_LABELS.ARRIVAL_DAY}
-        </h4>
-        <p className="font-bold mt-2">
-          {itineraryTitles.first_day || ITINERARY_LABELS.ARRIVAL_DAY}
-        </p>
-        <p className="text-sm text-gray-600 mt-1">{itinerary.first_day}</p>
+const ItineraryDisplay = ({ days = [] }) => {
+  if (!days || days.length === 0) {
+    return (
+      <div className="border-2 border-dashed border-gray-300 rounded-md p-8 text-center">
+        <p className="text-gray-500 text-sm">No itinerary data available</p>
       </div>
+    );
+  }
 
-      {/* Middle Days */}
-      {getSortedMiddleDayKeys(itinerary.middle_days || {}).map((dayKey) => (
-        <div key={dayKey} className="border p-4 rounded-md bg-blue-100">
-          <h4 className="bg-blue-500 text-white px-6 py-2 rounded-lg">
-            {`Day ${dayKey.split('_')[1]}`}
-          </h4>
-          <p className="font-bold mt-2">
-            {itineraryTitles.middle_days?.[dayKey] || `Day ${dayKey.split('_')[1]}`}
-          </p>
-          <p className="text-sm text-gray-600 mt-1">
-            {itinerary.middle_days?.[dayKey]}
-          </p>
+  return (
+    <div className="space-y-4">
+      {days.map((day) => (
+        <div key={day.dayNumber} className="border border-blue-200 rounded-lg overflow-hidden shadow-sm">
+          {/* Day Header */}
+          <div className="bg-blue-500 text-white px-6 py-3">
+            <h3 className="text-lg font-semibold">
+              Day {day.dayNumber}: {day.title || 'Day'}
+            </h3>
+          </div>
+
+          {/* Day Content */}
+          <div className="p-6 bg-blue-50 space-y-4">
+            {/* Description */}
+            {day.description && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Description</h4>
+                <p className="text-gray-600 text-sm whitespace-pre-wrap">{day.description}</p>
+              </div>
+            )}
+
+            {/* Activities */}
+            {day.activities && day.activities.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Activities</h4>
+                <ul className="list-disc list-inside space-y-1">
+                  {day.activities.map((activity, idx) => (
+                    <li key={idx} className="text-gray-600 text-sm">
+                      {activity}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Meals */}
+            {day.meals && (day.meals.breakfast || day.meals.lunch || day.meals.dinner) && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Meals Included</h4>
+                <div className="flex gap-4">
+                  {day.meals.breakfast && (
+                    <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                      🌅 Breakfast
+                    </span>
+                  )}
+                  {day.meals.lunch && (
+                    <span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
+                      🍽️ Lunch
+                    </span>
+                  )}
+                  {day.meals.dinner && (
+                    <span className="inline-block bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                      🌙 Dinner
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Transport */}
+            {day.transport && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Transport</h4>
+                <p className="text-gray-600 text-sm capitalize bg-white px-3 py-2 rounded">
+                  {day.transport}
+                </p>
+              </div>
+            )}
+
+            {/* Accommodation */}
+            {day.accommodation && day.accommodation.name && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Accommodation</h4>
+                <div className="bg-white p-3 rounded border border-gray-200 space-y-2">
+                  <p className="text-gray-700 font-medium">{day.accommodation.name}</p>
+                  {day.accommodation.type && (
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-semibold">Type:</span> {day.accommodation.type}
+                    </p>
+                  )}
+                  {day.accommodation.rating && (
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-semibold">Rating:</span> ⭐ {day.accommodation.rating}/5
+                    </p>
+                  )}
+                  {day.accommodation.address && (
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-semibold">Address:</span> {day.accommodation.address}
+                    </p>
+                  )}
+                  {day.accommodation.contactNumber && (
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-semibold">Contact:</span> {day.accommodation.contactNumber}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Places */}
+            {day.places && day.places.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Places to Visit</h4>
+                <div className="space-y-3">
+                  {day.places.map((place, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded border border-gray-200">
+                      <p className="font-medium text-gray-700">{place.name}</p>
+                      {place.description && (
+                        <p className="text-gray-600 text-sm mt-1">{place.description}</p>
+                      )}
+                      {place.duration && (
+                        <p className="text-gray-600 text-sm mt-1">
+                          <span className="font-semibold">Duration:</span> {place.duration}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            {day.notes && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Additional Notes</h4>
+                <p className="text-gray-600 text-sm bg-yellow-50 p-3 rounded border border-yellow-200">
+                  {day.notes}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       ))}
-
-      {/* Departure Day */}
-      <div className="border p-4 rounded-md bg-blue-100">
-        <h4 className="bg-blue-500 text-white px-6 py-2 rounded-lg">
-          {ITINERARY_LABELS.DEPARTURE_DAY}
-        </h4>
-        <p className="font-bold mt-2">
-          {itineraryTitles.last_day || ITINERARY_LABELS.DEPARTURE_DAY}
-        </p>
-        <p className="text-sm text-gray-600 mt-1">{itinerary.last_day}</p>
-      </div>
     </div>
   );
 };

@@ -1,11 +1,11 @@
 /**
  * PDF generation service for itineraries
+ * Aligned with backend day-based structure
  */
 
 import { jsPDF } from 'jspdf';
 import Swal from 'sweetalert2';
-import { PDF_CONFIG, ITINERARY_LABELS } from '../utils/constants';
-import { getSortedMiddleDayKeys } from '../utils/helpers';
+import { PDF_CONFIG } from '../utils/constants';
 
 /**
  * Generate and download PDF for a package
@@ -136,22 +136,41 @@ export const generateAndDownloadPDF = (pkg) => {
       yPos += textLines.length * lineHeight + 8;
     };
 
-    // Add itinerary sections
-    writeSection(
-      pkg.itineraryTitles.first_day || ITINERARY_LABELS.ARRIVAL_DAY,
-      pkg.itinerary.first_day || ''
-    );
+    // Add itinerary sections from days array
+    const days = pkg.days || [];
+    if (days.length > 0) {
+      days.forEach((day) => {
+        const title = `Day ${day.dayNumber}: ${day.title}`;
+        const details = [
+          `Description: ${day.description || ''}`,
+          day.activities && day.activities.length > 0 ? `Activities: ${day.activities.join(', ')}` : '',
+          day.transport ? `Transport: ${day.transport}` : '',
+          day.accommodation?.name ? `Accommodation: ${day.accommodation.name}` : '',
+          day.meals && (day.meals.breakfast || day.meals.lunch || day.meals.dinner)
+            ? `Meals: ${[
+                day.meals.breakfast ? 'Breakfast' : '',
+                day.meals.lunch ? 'Lunch' : '',
+                day.meals.dinner ? 'Dinner' : '',
+              ]
+                .filter(Boolean)
+                .join(', ')}`
+            : '',
+          day.notes ? `Notes: ${day.notes}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n');
 
-    getSortedMiddleDayKeys(pkg.itinerary.middle_days || {}).forEach((dayKey) => {
-      const title = pkg.itineraryTitles.middle_days?.[dayKey] || `Day ${dayKey.split('_')[1]}`;
-      const text = pkg.itinerary.middle_days?.[dayKey] || '';
-      writeSection(title, text);
-    });
-
-    writeSection(
-      pkg.itineraryTitles.last_day || ITINERARY_LABELS.DEPARTURE_DAY,
-      pkg.itinerary.last_day || ''
-    );
+        writeSection(title, details);
+      });
+    } else {
+      // Fallback for old structure if needed
+      if (pkg.itinerary?.first_day) {
+        writeSection('Arrival Day', pkg.itinerary.first_day);
+      }
+      if (pkg.itinerary?.last_day) {
+        writeSection('Departure Day', pkg.itinerary.last_day);
+      }
+    }
 
     // Footer on last page
     addFooter();

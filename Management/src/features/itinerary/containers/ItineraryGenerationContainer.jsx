@@ -29,7 +29,7 @@ import { uploadImage } from '../services/imageService';
 import {
   filterPackages,
   calculatePackageStats,
-  parseDurationToNights,
+  parseDurationToDays,
   validateItinerary,
 } from '../utils/helpers';
 import { VALIDATION_MESSAGES, CATEGORY_COLORS, STATUS_COLORS } from '../utils/constants';
@@ -53,14 +53,6 @@ const ItineraryGenerationContainer = () => {
   const {
     formData: newFormData,
     setFormData: setNewFormData,
-    nightsInput,
-    setNightsInput,
-    showItinerary,
-    setShowItinerary,
-    isItinerarySubmitted,
-    setIsItinerarySubmitted,
-    updateItinerarySection,
-    updateItineraryTitle,
   } = useItineraryForm(createDefaultPackage());
 
   const {
@@ -77,9 +69,6 @@ const ItineraryGenerationContainer = () => {
   // Handlers
   const handleNewPackageDialogOpen = () => {
     setNewFormData(createDefaultPackage());
-    setNightsInput('');
-    setShowItinerary(false);
-    setIsItinerarySubmitted(false);
     setImages([]);
     setShowNewPackageDialog(true);
   };
@@ -91,11 +80,9 @@ const ItineraryGenerationContainer = () => {
   const handleEditPackage = (pkg) => {
     setEditPackageData({
       ...pkg,
-      itinerary: { ...pkg.itinerary },
-      itineraryTitles: { ...pkg.itineraryTitles },
+      days: [...(pkg.days || [])],
       images: [...(pkg.images || [])],
     });
-    setNightsInput(parseDurationToNights(pkg.duration) || '');
     setShowEditPackageDialog(true);
     setShowItinerary(true);
     setIsItinerarySubmitted(true);
@@ -202,11 +189,11 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleItineraryChange = (e, section, dayKey) => {
-    updateItinerarySection(section, dayKey, e.target.value);
+    // No longer needed with new structure
   };
 
   const handleTitleChange = (e, section, dayKey) => {
-    updateItineraryTitle(section, dayKey, e.target.value);
+    // No longer needed with new structure
   };
 
   return (
@@ -252,14 +239,6 @@ const ItineraryGenerationContainer = () => {
             setFormData={setNewFormData}
             onSave={() => handleSaveNewPackage(newFormData)}
             onCancel={() => setShowNewPackageDialog(false)}
-            nightsInput={nightsInput}
-            setNightsInput={setNightsInput}
-            showItinerary={showItinerary}
-            setShowItinerary={setShowItinerary}
-            isItinerarySubmitted={isItinerarySubmitted}
-            setIsItinerarySubmitted={setIsItinerarySubmitted}
-            onItineraryChange={handleItineraryChange}
-            onTitleChange={handleTitleChange}
             onImageUpload={handleImageUpload}
             onImageRemove={handleImageRemove}
           />
@@ -278,14 +257,6 @@ const ItineraryGenerationContainer = () => {
               setFormData={setEditPackageData}
               onSave={() => handleSaveEditPackage(editPackageData)}
               onCancel={() => setShowEditPackageDialog(false)}
-              nightsInput={nightsInput}
-              setNightsInput={setNightsInput}
-              showItinerary={showItinerary}
-              setShowItinerary={setShowItinerary}
-              isItinerarySubmitted={isItinerarySubmitted}
-              setIsItinerarySubmitted={setIsItinerarySubmitted}
-              onItineraryChange={handleItineraryChange}
-              onTitleChange={handleTitleChange}
               onImageUpload={handleImageUpload}
               onImageRemove={handleImageRemove}
             />

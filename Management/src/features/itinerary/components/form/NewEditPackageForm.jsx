@@ -1,6 +1,7 @@
 /**
  * New/Edit Package Form Component
  * Main form component combining all package sections
+ * Aligned with backend day-based structure
  */
 
 import { useState, useEffect } from 'react';
@@ -12,24 +13,18 @@ import ItineraryEditor from '../ItineraryEditor';
 import ItineraryDisplay from '../ItineraryDisplay';
 import { validateItinerary } from '../../utils/helpers';
 import { VALIDATION_MESSAGES } from '../../utils/constants';
+import { createDefaultDay } from '../../types/index.js';
 
 const NewEditPackageForm = ({
   formData,
   setFormData,
   onSave,
   onCancel,
-  nightsInput,
-  setNightsInput,
-  showItinerary,
-  setShowItinerary,
-  isItinerarySubmitted,
-  setIsItinerarySubmitted,
-  onItineraryChange,
-  onTitleChange,
   onImageUpload,
   onImageRemove,
 }) => {
   const [localFormData, setLocalFormData] = useState(formData);
+  const [showItinerary, setShowItinerary] = useState(false);
 
   useEffect(() => {
     setLocalFormData(formData);
@@ -43,16 +38,66 @@ const NewEditPackageForm = ({
     setLocalFormData(data);
   };
 
-  const handleNightsChange = (nights) => {
-    setNightsInput(nights);
+  const handleDurationChange = (duration) => {
+    const daysCount = parseInt(duration, 10) || 0;
+    let newDays = [...(localFormData.days || [])];
+
+    // Add new days if needed
+    if (newDays.length < daysCount) {
+      for (let i = newDays.length + 1; i <= daysCount; i++) {
+        newDays.push(createDefaultDay(i));
+      }
+    }
+    // Remove extra days if needed
+    else if (newDays.length > daysCount) {
+      newDays = newDays.slice(0, daysCount);
+    }
+
     setLocalFormData((prev) => ({
       ...prev,
-      duration: nights > 0 ? `${nights + 1} Days / ${nights} Nights` : '',
+      duration: daysCount,
+      days: newDays,
     }));
   };
 
+  const handleDayChange = (dayNumber, dayData) => {
+    setLocalFormData((prev) => ({
+      ...prev,
+      days: prev.days.map((day) =>
+        day.dayNumber === dayNumber ? { ...day, ...dayData } : day
+      ),
+    }));
+  };
+
+  const handleAddDay = () => {
+    setLocalFormData((prev) => {
+      const newDayNumber = (prev.days?.length || 0) + 1;
+      return {
+        ...prev,
+        duration: newDayNumber,
+        days: [...(prev.days || []), createDefaultDay(newDayNumber)],
+      };
+    });
+  };
+
+  const handleRemoveDay = (dayNumber) => {
+    setLocalFormData((prev) => {
+      const filteredDays = prev.days.filter((day) => day.dayNumber !== dayNumber);
+      // Renumber remaining days
+      const renumberedDays = filteredDays.map((day, index) => ({
+        ...day,
+        dayNumber: index + 1,
+      }));
+      return {
+        ...prev,
+        duration: renumberedDays.length,
+        days: renumberedDays,
+      };
+    });
+  };
+
   const handleItinerarySubmit = () => {
-    const errors = validateItinerary(localFormData.itinerary);
+    const errors = validateItinerary(localFormData.days);
 
     if (Object.keys(errors).length > 0) {
       Swal.fire('Error', VALIDATION_MESSAGES.ITINERARY_INCOMPLETE, 'error');
@@ -60,19 +105,16 @@ const NewEditPackageForm = ({
     }
 
     setShowItinerary(true);
-    setIsItinerarySubmitted(true);
     Swal.fire('Success', VALIDATION_MESSAGES.ITINERARY_SUBMITTED, 'success');
   };
 
   const handleResetItinerary = () => {
     setLocalFormData((prev) => ({
       ...prev,
-      itinerary: { first_day: '', middle_days: {}, last_day: '' },
-      itineraryTitles: { first_day: '', middle_days: {}, last_day: '' },
+      duration: 1,
+      days: [],
     }));
-    setNightsInput('');
     setShowItinerary(false);
-    setIsItinerarySubmitted(false);
   };
 
   const handleSave = (status) => {
@@ -98,9 +140,8 @@ const NewEditPackageForm = ({
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Details</h3>
         <PackageDetails
           formData={localFormData}
-          nightsInput={nightsInput}
           onFormChange={handleDetailsChange}
-          onNightsChange={handleNightsChange}
+          onDurationChange={handleDurationChange}
         />
       </div>
 
@@ -120,10 +161,10 @@ const NewEditPackageForm = ({
         {!showItinerary ? (
           <div className="space-y-4">
             <ItineraryEditor
-              itinerary={localFormData.itinerary}
-              itineraryTitles={localFormData.itineraryTitles}
-              onItineraryChange={onItineraryChange}
-              onTitleChange={onTitleChange}
+              days={localFormData.days || []}
+              onDayChange={handleDayChange}
+              onAddDay={handleAddDay}
+              onRemoveDay={handleRemoveDay}
             />
 
             <div className="flex gap-3">
@@ -143,15 +184,9 @@ const NewEditPackageForm = ({
           </div>
         ) : (
           <div className="space-y-4">
-            <ItineraryDisplay
-              itinerary={localFormData.itinerary}
-              itineraryTitles={localFormData.itineraryTitles}
-            />
+            <ItineraryDisplay days={localFormData.days || []} />
             <button
-              onClick={() => {
-                setShowItinerary(false);
-                setIsItinerarySubmitted(false);
-              }}
+              onClick={() => setShowItinerary(false)}
               className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
             >
               Edit Itinerary

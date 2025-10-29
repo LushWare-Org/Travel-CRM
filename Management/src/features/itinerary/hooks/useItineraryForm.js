@@ -1,96 +1,69 @@
 /**
  * Custom hook for managing itinerary form data
+ * Aligned with backend day-based structure
  */
 
 import { useState, useCallback } from 'react';
-import {
-  calculateMiddleDays,
-  calculateMiddleDayTitles,
-  formatDuration,
-} from '../utils/helpers';
+import { generateDaysArray, formatDuration } from '../utils/helpers';
 
 export const useItineraryForm = (initialFormData) => {
   const [formData, setFormData] = useState(initialFormData);
-  const [nightsInput, setNightsInput] = useState('');
   const [showItinerary, setShowItinerary] = useState(false);
   const [isItinerarySubmitted, setIsItinerarySubmitted] = useState(false);
 
-  const handleNightsChange = useCallback(
-    (nights) => {
-      setNightsInput(nights.toString());
-      const middleDays = calculateMiddleDays(
-        nights,
-        formData.itinerary?.middle_days || {}
-      );
-      const middleTitles = calculateMiddleDayTitles(
-        nights,
-        formData.itineraryTitles?.middle_days || {}
-      );
+  const handleDurationChange = useCallback(
+    (duration) => {
+      const daysCount = parseInt(duration, 10) || 0;
+      const newDays = generateDaysArray(daysCount, formData.days || []);
 
       setFormData((prev) => ({
         ...prev,
-        duration: formatDuration(nights),
-        itinerary: {
-          ...prev.itinerary,
-          middle_days: middleDays,
-        },
-        itineraryTitles: {
-          ...prev.itineraryTitles,
-          middle_days: middleTitles,
-        },
+        duration: daysCount,
+        days: newDays,
       }));
     },
-    [formData.itinerary?.middle_days, formData.itineraryTitles?.middle_days]
+    [formData.days]
   );
 
-  const updateItinerarySection = useCallback(
-    (section, dayKey, value) => {
-      if (section === 'middle_days' && dayKey) {
-        setFormData((prev) => ({
-          ...prev,
-          itinerary: {
-            ...prev.itinerary,
-            middle_days: {
-              ...prev.itinerary.middle_days,
-              [dayKey]: value,
-            },
-          },
-        }));
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          itinerary: {
-            ...prev.itinerary,
-            [section]: value,
-          },
-        }));
-      }
+  const updateDay = useCallback(
+    (dayNumber, dayData) => {
+      setFormData((prev) => ({
+        ...prev,
+        days: prev.days.map((day) =>
+          day.dayNumber === dayNumber ? { ...day, ...dayData } : day
+        ),
+      }));
     },
     []
   );
 
-  const updateItineraryTitle = useCallback(
-    (section, dayKey, value) => {
-      if (section === 'middle_days' && dayKey) {
-        setFormData((prev) => ({
-          ...prev,
-          itineraryTitles: {
-            ...prev.itineraryTitles,
-            middle_days: {
-              ...prev.itineraryTitles.middle_days,
-              [dayKey]: value,
-            },
-          },
+  const addDay = useCallback(() => {
+    setFormData((prev) => {
+      const newDayNumber = (prev.days?.length || 0) + 1;
+      const { createDefaultDay } = require('../types/index.js');
+      return {
+        ...prev,
+        duration: newDayNumber,
+        days: [...(prev.days || []), createDefaultDay(newDayNumber)],
+      };
+    });
+  }, []);
+
+  const removeDay = useCallback(
+    (dayNumber) => {
+      setFormData((prev) => {
+        const filteredDays = prev.days.filter((day) => day.dayNumber !== dayNumber);
+        // Renumber remaining days
+        const renumberedDays = filteredDays.map((day, index) => ({
+          ...day,
+          dayNumber: index + 1,
         }));
-      } else {
-        setFormData((prev) => ({
+        return {
           ...prev,
-          itineraryTitles: {
-            ...prev.itineraryTitles,
-            [section]: value,
-          },
-        }));
-      }
+          duration: renumberedDays.length,
+          days: renumberedDays,
+        };
+      });
     },
     []
   );
@@ -98,10 +71,9 @@ export const useItineraryForm = (initialFormData) => {
   const resetItinerary = useCallback(() => {
     setFormData((prev) => ({
       ...prev,
-      itinerary: { first_day: '', middle_days: {}, last_day: '' },
-      itineraryTitles: { first_day: '', middle_days: {}, last_day: '' },
+      duration: 1,
+      days: [],
     }));
-    setNightsInput('');
     setShowItinerary(false);
     setIsItinerarySubmitted(false);
   }, []);
@@ -109,15 +81,14 @@ export const useItineraryForm = (initialFormData) => {
   return {
     formData,
     setFormData,
-    nightsInput,
-    setNightsInput,
     showItinerary,
     setShowItinerary,
     isItinerarySubmitted,
     setIsItinerarySubmitted,
-    handleNightsChange,
-    updateItinerarySection,
-    updateItineraryTitle,
+    handleDurationChange,
+    updateDay,
+    addDay,
+    removeDay,
     resetItinerary,
   };
 };

@@ -1,119 +1,76 @@
 /**
  * Helper functions for itinerary calculations and transformations
+ * Aligned with backend data structure
  */
+
+import { createDefaultDay } from '../types/index.js';
 
 /**
- * Calculate middle days based on number of nights
- * @param {number} nights - Number of nights
- * @param {object} currentMiddle - Current middle days object
- * @returns {object} - New middle days configuration
+ * Generate days array based on duration
+ * @param {number} days - Number of days (duration)
+ * @param {array} currentDays - Current days array
+ * @returns {array} - New days array
  */
-export const calculateMiddleDays = (nights, currentMiddle = {}) => {
-  const desiredMiddleCount = Math.max(0, nights - 1);
-  const currentMiddleKeys = Object.keys(currentMiddle)
-    .map((key) => parseInt(key.split('_')[1], 10))
-    .filter((num) => !isNaN(num));
-  const currentMax = currentMiddleKeys.length > 0 ? Math.max(...currentMiddleKeys) : 0;
+export const generateDaysArray = (days, currentDays = []) => {
+  const daysCount = parseInt(days, 10) || 0;
+  
+  if (daysCount <= 0) return [];
 
-  let newMiddleDays = { ...currentMiddle };
+  let newDays = [...currentDays];
 
-  // Add new days
-  if (desiredMiddleCount > currentMax) {
-    for (let i = currentMax + 1; i <= desiredMiddleCount; i++) {
-      const key = `day_${i}`;
-      newMiddleDays[key] = '';
+  // Add new days if needed
+  if (currentDays.length < daysCount) {
+    for (let i = currentDays.length + 1; i <= daysCount; i++) {
+      newDays.push(createDefaultDay(i));
     }
   }
-  // Remove extra days
-  else if (desiredMiddleCount < currentMax) {
-    for (let i = desiredMiddleCount + 1; i <= currentMax; i++) {
-      const key = `day_${i}`;
-      delete newMiddleDays[key];
-    }
+  // Remove extra days if needed
+  else if (currentDays.length > daysCount) {
+    newDays = newDays.slice(0, daysCount);
   }
 
-  return newMiddleDays;
+  return newDays;
 };
 
 /**
- * Calculate middle day titles based on number of nights
- * @param {number} nights - Number of nights
- * @param {object} currentTitles - Current middle days titles object
- * @returns {object} - New middle days titles configuration
+ * Format duration string from days count
+ * @param {number} days - Number of days
+ * @returns {number} - Number of nights (days - 1)
  */
-export const calculateMiddleDayTitles = (nights, currentTitles = {}) => {
-  const desiredMiddleCount = Math.max(0, nights - 1);
-  const currentKeys = Object.keys(currentTitles)
-    .map((key) => parseInt(key.split('_')[1], 10))
-    .filter((num) => !isNaN(num));
-  const currentMax = currentKeys.length > 0 ? Math.max(...currentKeys) : 0;
-
-  let newTitles = { ...currentTitles };
-
-  if (desiredMiddleCount > currentMax) {
-    for (let i = currentMax + 1; i <= desiredMiddleCount; i++) {
-      const key = `day_${i}`;
-      newTitles[key] = `Day ${i} Title`;
-    }
-  } else if (desiredMiddleCount < currentMax) {
-    for (let i = desiredMiddleCount + 1; i <= currentMax; i++) {
-      const key = `day_${i}`;
-      delete newTitles[key];
-    }
-  }
-
-  return newTitles;
+export const formatDuration = (days) => {
+  return parseInt(days, 10) || 1;
 };
 
 /**
- * Format duration string from nights count
- * @param {number} nights - Number of nights
- * @returns {string} - Formatted duration (e.g., "5 Days / 4 Nights")
+ * Parse duration string to extract days
+ * @param {string|number} duration - Duration value
+ * @returns {number} - Number of days
  */
-export const formatDuration = (nights) => {
-  const days = parseInt(nights, 10) + 1;
-  return `${days} Days / ${nights} Nights`;
+export const parseDurationToDays = (duration) => {
+  if (typeof duration === 'number') return duration;
+  const match = duration?.match(/(\d+)\s*Days?/);
+  return match ? parseInt(match[1], 10) : 1;
 };
 
 /**
- * Parse duration string to extract nights
- * @param {string} duration - Duration string (e.g., "5 Days / 4 Nights")
- * @returns {number} - Number of nights
- */
-export const parseDurationToNights = (duration) => {
-  const match = duration.match(/(\d+)\s*Nights?/);
-  return match ? parseInt(match[1], 10) : 0;
-};
-
-/**
- * Sort middle days by day number
- * @param {object} middleDays - Middle days object
- * @returns {array} - Sorted array of day keys
- */
-export const getSortedMiddleDayKeys = (middleDays = {}) => {
-  return Object.keys(middleDays).sort(
-    (a, b) => parseInt(a.split('_')[1], 10) - parseInt(b.split('_')[1], 10)
-  );
-};
-
-/**
- * Validate itinerary data
- * @param {object} itinerary - Itinerary object
+ * Validate itinerary data (days array)
+ * @param {array} days - Days array
  * @returns {object} - Errors object
  */
-export const validateItinerary = (itinerary) => {
+export const validateItinerary = (days) => {
   const errors = {};
 
-  if (!itinerary.first_day) {
-    errors.first_day = 'Arrival day itinerary is required.';
-  }
-  if (!itinerary.last_day) {
-    errors.last_day = 'Departure day itinerary is required.';
+  if (!Array.isArray(days) || days.length === 0) {
+    errors.days = 'At least one day is required in itinerary.';
+    return errors;
   }
 
-  Object.keys(itinerary.middle_days || {}).forEach((dayKey) => {
-    if (!itinerary.middle_days[dayKey]) {
-      errors[dayKey] = `Itinerary for ${dayKey} is required.`;
+  days.forEach((day, index) => {
+    if (!day.title) {
+      errors[`day${day.dayNumber}_title`] = `Day ${day.dayNumber} title is required.`;
+    }
+    if (!day.description) {
+      errors[`day${day.dayNumber}_description`] = `Day ${day.dayNumber} description is required.`;
     }
   });
 
@@ -127,10 +84,14 @@ export const validateItinerary = (itinerary) => {
  * @returns {array} - Filtered packages
  */
 export const filterPackages = (packages, searchTerm) => {
+  if (!searchTerm.trim()) return packages;
+  
+  const term = searchTerm.toLowerCase();
   return packages.filter(
     (pkg) =>
-      pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pkg.region.toLowerCase().includes(searchTerm.toLowerCase())
+      pkg.name?.toLowerCase().includes(term) ||
+      pkg.destination?.toLowerCase().includes(term) ||
+      pkg.category?.toLowerCase().includes(term)
   );
 };
 
