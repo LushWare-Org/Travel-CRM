@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, Plus, Search, Filter, MoreVertical, Phone, Mail, MapPin, Calendar, MessageSquare, Clock, X, Edit } from "lucide-react";
+import { ArrowLeft, Plus, Search, Filter, MoreVertical, Phone, Mail, MapPin, Calendar, MessageSquare, Clock, X, Edit, Loader2, Save, Trash2 } from "lucide-react";
+import { leadAPI } from "../services/api";
 
 const LeadManagement = () => {
   const [, navigate] = useLocation();
@@ -10,14 +11,17 @@ const LeadManagement = () => {
   const [showNewLeadDialog, setShowNewLeadDialog] = useState(false);
   const [showEditLeadDialog, setShowEditLeadDialog] = useState(false);
   const [showFilterDialog, setShowFilterDialog] = useState(false);
+  const [showRemarksDialog, setShowRemarksDialog] = useState(false);
+  const [remarksLead, setRemarksLead] = useState(null);
   const [newRemark, setNewRemark] = useState({ text: "", date: "" });
+  const [leadEditForm, setLeadEditForm] = useState(null);
   const [newLeadForm, setNewLeadForm] = useState({
     name: "",
     email: "",
     phone: "",
     city: "",
     whatsapp: "",
-    adviser: "",
+    salesRep: "",
     destination: "",
     platform: "",
     travelDate: "",
@@ -31,129 +35,62 @@ const LeadManagement = () => {
     phone: "",
     city: "",
     whatsapp: "",
-    adviser: "",
+    salesRep: "",
     destination: "",
     platform: "",
     travelDate: "",
     time: "",
+    status: "",
     remarks: [{ text: "", date: "" }],
   });
   const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState([]);
 
-  const [leads, setLeads] = useState([
-    {
-      id: 1,
-      name: "John Smith",
-      email: "john@example.com",
-      phone: "+1-555-0101",
-      city: "New York",
-      whatsapp: "+1-555-0101",
-      adviser: "Sarah Johnson",
-      destination: "Paris, France",
-      platform: "Website Form",
-      travelDate: "2024-12-15",
-      time: "10:30 AM",
-      remarks: [
-        { text: "Interested in romantic getaway", date: "2024-10-15" },
-        { text: "Prefers 5-star hotels", date: "2024-10-16" },
-        { text: "Flexible with dates", date: "2024-10-17" },
-      ],
-      status: "new",
-      createdDate: "2024-10-15",
-      lastContact: "2024-10-18",
-      interactions: 3,
-    },
-    {
-      id: 2,
-      name: "Emma Wilson",
-      email: "emma@example.com",
-      phone: "+1-555-0102",
-      city: "Los Angeles",
-      whatsapp: "+1-555-0102",
-      adviser: "Mike Chen",
-      destination: "Bali, Indonesia",
-      platform: "Social Media",
-      travelDate: "2024-11-20",
-      time: "2:00 PM",
-      remarks: [
-        { text: "Family trip with 2 kids", date: "2024-10-10" },
-        { text: "Budget conscious", date: "2024-10-11" },
-        { text: "Needs child-friendly activities", date: "2024-10-12" },
-      ],
-      status: "contacted",
-      createdDate: "2024-10-10",
-      lastContact: "2024-10-19",
-      interactions: 5,
-    },
-    {
-      id: 3,
-      name: "Robert Brown",
-      email: "robert@example.com",
-      phone: "+1-555-0103",
-      city: "Chicago",
-      whatsapp: "+1-555-0103",
-      adviser: "Sarah Johnson",
-      destination: "Dubai, UAE",
-      platform: "Phone Call",
-      travelDate: "2025-01-10",
-      time: "11:00 AM",
-      remarks: [
-        { text: "Corporate team building event", date: "2024-09-28" },
-        { text: "Group of 25 people", date: "2024-09-29" },
-        { text: "Luxury accommodation required", date: "2024-09-30" },
-      ],
-      status: "interested",
-      createdDate: "2024-09-28",
-      lastContact: "2024-10-17",
-      interactions: 8,
-    },
-    {
-      id: 4,
-      name: "Lisa Anderson",
-      email: "lisa@example.com",
-      phone: "+1-555-0104",
-      city: "Miami",
-      whatsapp: "+1-555-0104",
-      adviser: "Mike Chen",
-      destination: "Tokyo, Japan",
-      platform: "Referral",
-      travelDate: "2024-12-01",
-      time: "9:00 AM",
-      remarks: [
-        { text: "Honeymoon package confirmed", date: "2024-09-15" },
-        { text: "Cherry blossom season preferred", date: "2024-09-16" },
-      ],
-      status: "converted",
-      createdDate: "2024-09-15",
-      lastContact: "2024-10-18",
-      interactions: 12,
-    },
-    {
-      id: 5,
-      name: "David Martinez",
-      email: "david@example.com",
-      phone: "+1-555-0105",
-      city: "Houston",
-      whatsapp: "+1-555-0105",
-      adviser: "Sarah Johnson",
-      destination: "Maldives",
-      platform: "Website Form",
-      travelDate: "2024-11-25",
-      time: "3:30 PM",
-      remarks: [
-        { text: "Anniversary celebration", date: "2024-09-01" },
-        { text: "Private villa preferred", date: "2024-09-02" },
-        { text: "Water sports enthusiast", date: "2024-09-03" },
-      ],
-      status: "lost",
-      createdDate: "2024-09-01",
-      lastContact: "2024-10-10",
-      interactions: 4,
-    },
-  ]);
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const leadsPerPage = 10;
 
+  // Fetch leads on component mount and when filters change
+  useEffect(() => {
+    fetchLeads();
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [filterStatus, searchTerm]);
+
+  const fetchLeads = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Always fetch ALL leads without status filter for accurate counts
+      const params = {
+        limit: 1000, // Fetch all leads (adjust if you have more than 1000)
+        page: 1
+      };
+      
+      if (searchTerm) {
+        params.search = searchTerm;
+      }
+
+      const response = await leadAPI.getAllLeads(params);
+      
+      if (response.success) {
+        setLeads(response.data);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to fetch leads');
+      console.error('Error fetching leads:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Status colors configuration
   const statusColors = {
     new: { 
       id: "bg-blue-100 text-blue-800", 
@@ -179,11 +116,23 @@ const LeadManagement = () => {
       badge: "bg-green-100 text-green-800",
       tab: "bg-green-100 text-green-800"
     },
+    quoted: { 
+      id: "bg-cyan-100 text-cyan-800", 
+      border: "border-l-4 border-cyan-500", 
+      badge: "bg-cyan-100 text-cyan-800",
+      tab: "bg-cyan-100 text-cyan-800"
+    },
     lost: { 
       id: "bg-red-100 text-red-800", 
       border: "border-l-4 border-red-500", 
       badge: "bg-red-100 text-red-800",
       tab: "bg-red-100 text-red-800"
+    },
+    "not-interested": { 
+      id: "bg-gray-100 text-gray-800", 
+      border: "border-l-4 border-gray-500", 
+      badge: "bg-gray-100 text-gray-800",
+      tab: "bg-gray-100 text-gray-800"
     },
   };
 
@@ -191,50 +140,88 @@ const LeadManagement = () => {
     new: "New",
     contacted: "Contacted",
     interested: "Interested",
+    quoted: "Quoted",
     converted: "Converted",
     lost: "Loss",
+    "not-interested": "Not Interested",
   };
 
   const platforms = ["Website Form", "Social Media", "Phone Call", "Referral", "Email", "Walk-in"];
 
+  // Calculate absolute status counts from all leads (no filters applied)
+  const statusCounts = useMemo(() => {
+    return {
+      all: leads.length,
+      new: leads.filter((l) => l.status === 'new').length,
+      contacted: leads.filter((l) => l.status === 'contacted').length,
+      interested: leads.filter((l) => l.status === 'interested').length,
+      quoted: leads.filter((l) => l.status === 'quoted').length,
+      converted: leads.filter((l) => l.status === 'converted').length,
+      lost: leads.filter((l) => l.status === 'lost').length,
+      'not-interested': leads.filter((l) => l.status === 'not-interested').length,
+    };
+  }, [leads]);
+
   const filteredLeads = leads.filter((lead) => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      lead.name.toLowerCase().includes(searchLower) ||
-      lead.email.toLowerCase().includes(searchLower) ||
-      lead.phone.includes(searchTerm) ||
-      lead.city.toLowerCase().includes(searchLower) ||
-      lead.destination.toLowerCase().includes(searchLower);
+      (lead.name || '').toLowerCase().includes(searchLower) ||
+      (lead.email || '').toLowerCase().includes(searchLower) ||
+      (lead.phone || '').includes(searchTerm) ||
+      (lead.city || '').toLowerCase().includes(searchLower) ||
+      (lead.destination || '').toLowerCase().includes(searchLower) ||
+      (lead.salesRep || '').toLowerCase().includes(searchLower) ||
+      (lead.adviser || '').toLowerCase().includes(searchLower);
     const matchesStatus = filterStatus === "all" || lead.status === filterStatus;
     const matchesTravelDate =
-      (!filterTravelDateStart || lead.travelDate >= filterTravelDateStart) &&
-      (!filterTravelDateEnd || lead.travelDate <= filterTravelDateEnd);
+      (!filterTravelDateStart || (lead.travelDate || '') >= filterTravelDateStart) &&
+      (!filterTravelDateEnd || (lead.travelDate || '') <= filterTravelDateEnd);
     const matchesPlatform = filterPlatforms.length === 0 || filterPlatforms.includes(lead.platform);
     return matchesSearch && matchesStatus && matchesTravelDate && matchesPlatform;
   });
 
-  const handleAddLead = () => {
-    if (newLeadForm.name && newLeadForm.email && newLeadForm.phone) {
-      const newId = leads.length + 1;
-      const newLead = {
-        id: newId,
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredLeads.length / leadsPerPage);
+  const indexOfLastLead = currentPage * leadsPerPage;
+  const indexOfFirstLead = indexOfLastLead - leadsPerPage;
+  const currentLeads = filteredLeads.slice(indexOfFirstLead, indexOfLastLead);
+
+  // Pagination handlers
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleAddLead = async () => {
+    if (!newLeadForm.name || !newLeadForm.email || !newLeadForm.phone) {
+      alert("Please fill in required fields: Name, Email, and Phone");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const leadData = {
         name: newLeadForm.name.trim(),
-        email: newLeadForm.email,
-        phone: newLeadForm.phone,
-        city: newLeadForm.city,
-        whatsapp: newLeadForm.whatsapp,
-        adviser: newLeadForm.adviser,
-        destination: newLeadForm.destination,
-        platform: newLeadForm.platform,
-        travelDate: newLeadForm.travelDate,
-        time: newLeadForm.time,
-        status: "new",
-        createdDate: new Date().toISOString().split("T")[0],
-        lastContact: new Date().toISOString().split("T")[0],
-        remarks: newLeadForm.remarks.filter((r) => r.text.trim() !== ""),
-        interactions: 0,
+        email: newLeadForm.email.trim(),
+        phone: newLeadForm.phone.trim(),
+        city: newLeadForm.city || undefined,
+        whatsapp: newLeadForm.whatsapp || undefined,
+        salesRep: newLeadForm.salesRep || undefined,
+        destination: newLeadForm.destination || undefined,
+        platform: newLeadForm.platform || "Manual Entry",
+        source: "manual",
+        travelDate: newLeadForm.travelDate || undefined,
+        time: newLeadForm.time || undefined,
+        remarks: newLeadForm.remarks.filter((r) => r.text.trim() !== "").map(r => ({
+          text: r.text.trim(),
+          date: r.date || new Date().toISOString().split("T")[0]
+        })),
+        status: "new"
       };
-      setLeads([...leads, newLead]);
+
+      await leadAPI.createLead(leadData);
+      await fetchLeads(); // Refresh the list
       setShowNewLeadDialog(false);
       setNewLeadForm({
         name: "",
@@ -242,30 +229,55 @@ const LeadManagement = () => {
         phone: "",
         city: "",
         whatsapp: "",
-        adviser: "",
+        salesRep: "",
         destination: "",
         platform: "",
         travelDate: "",
         time: "",
         remarks: [{ text: "", date: "" }],
       });
+    } catch (error) {
+      alert(`Failed to create lead: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleEditLead = () => {
-    if (editLeadForm.name && editLeadForm.email && editLeadForm.phone) {
-      const updatedLead = {
-        ...editLeadForm,
+  const handleEditLead = async () => {
+    if (!editLeadForm.name || !editLeadForm.email || !editLeadForm.phone) {
+      alert("Please fill in required fields: Name, Email, and Phone");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const leadData = {
         name: editLeadForm.name.trim(),
-        remarks: editLeadForm.remarks.filter((r) => r.text.trim() !== ""),
-        lastContact: new Date().toISOString().split("T")[0],
+        email: editLeadForm.email.trim(),
+        phone: editLeadForm.phone.trim(),
+        city: editLeadForm.city || undefined,
+        whatsapp: editLeadForm.whatsapp || undefined,
+        salesRep: editLeadForm.salesRep || undefined,
+        destination: editLeadForm.destination || undefined,
+        platform: editLeadForm.platform || undefined,
+        travelDate: editLeadForm.travelDate || undefined,
+        time: editLeadForm.time || undefined,
+        remarks: editLeadForm.remarks.filter((r) => r.text.trim() !== "").map(r => ({
+          text: r.text.trim(),
+          date: r.date || new Date().toISOString().split("T")[0]
+        })),
+        status: editLeadForm.status
       };
-      setLeads(
-        leads.map((l) =>
-          l.id === editLeadForm.id ? { ...l, ...updatedLead } : l
-        )
-      );
-      setSelectedLead(updatedLead);
+
+      await leadAPI.updateLead(editLeadForm.id, leadData);
+      await fetchLeads(); // Refresh the list
+      
+      // Update selected lead if it's the one being edited
+      if (selectedLead && selectedLead._id === editLeadForm.id) {
+        const response = await leadAPI.getLead(editLeadForm.id);
+        setSelectedLead(response.data);
+      }
+      
       setShowEditLeadDialog(false);
       setEditLeadForm({
         id: null,
@@ -274,26 +286,44 @@ const LeadManagement = () => {
         phone: "",
         city: "",
         whatsapp: "",
-        adviser: "",
+        salesRep: "",
         destination: "",
         platform: "",
         travelDate: "",
         time: "",
+        status: "",
         remarks: [{ text: "", date: "" }],
       });
+    } catch (error) {
+      alert(`Failed to update lead: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleAddRemark = () => {
-    if (newRemark.text.trim() && selectedLead) {
-      const updatedRemarks = [...selectedLead.remarks, { text: newRemark.text.trim(), date: newRemark.date || "" }];
-      setLeads(
-        leads.map((l) =>
-          l.id === selectedLead.id ? { ...l, remarks: updatedRemarks } : l
-        )
-      );
-      setSelectedLead({ ...selectedLead, remarks: updatedRemarks });
+  const handleAddRemark = async () => {
+    if (!newRemark.text.trim() || !selectedLead) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await leadAPI.addRemark(selectedLead._id, {
+        text: newRemark.text.trim(),
+        date: newRemark.date || new Date().toISOString().split("T")[0]
+      });
+
+      // Refresh the selected lead
+      const response = await leadAPI.getLead(selectedLead._id);
+      setSelectedLead(response.data);
       setNewRemark({ text: "", date: "" });
+      
+      // Refresh the list
+      await fetchLeads();
+    } catch (error) {
+      alert(`Failed to add remark: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -323,21 +353,42 @@ const LeadManagement = () => {
 
   const openEditLeadDialog = (lead) => {
     setEditLeadForm({
-      id: lead.id,
+      id: lead._id || lead.id, // Support both API (_id) and legacy (id) formats
       name: lead.name,
       email: lead.email,
       phone: lead.phone,
       city: lead.city,
       whatsapp: lead.whatsapp,
-      adviser: lead.adviser,
+      salesRep: lead.salesRep || lead.adviser, // Support both old and new field names
       destination: lead.destination,
       platform: lead.platform,
-      travelDate: lead.travelDate,
+      travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
       time: lead.time,
-      remarks: lead.remarks.length > 0 ? [...lead.remarks] : [{ text: "", date: "" }],
+      remarks: lead.remarks && lead.remarks.length > 0 ? [...lead.remarks] : [{ text: "", date: "" }],
       status: lead.status,
     });
     setShowEditLeadDialog(true);
+  };
+
+  const handleSaveLeadEdit = async () => {
+    if (!selectedLead || !leadEditForm) return;
+    
+    try {
+      setIsSubmitting(true);
+      await leadAPI.updateLead(selectedLead._id, leadEditForm);
+      await fetchLeads();
+      setSelectedLead(null);
+      setLeadEditForm(null);
+    } catch (error) {
+      alert(`Failed to update lead: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelLeadEdit = () => {
+    setSelectedLead(null);
+    setLeadEditForm(null);
   };
 
   const handlePlatformFilterChange = (platform) => {
@@ -360,7 +411,7 @@ const LeadManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-full overflow-auto bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-6 shadow-sm z-10">
         <div className="flex justify-between items-center mb-4">
@@ -407,7 +458,7 @@ const LeadManagement = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name, email, contact, city, or destination..."
+              placeholder="Search by name, email, contact, city, destination, or sales rep..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -429,8 +480,10 @@ const LeadManagement = () => {
             { key: "new", label: "New", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: statusColors.new.tab, textColor: "text-blue-800" },
             { key: "contacted", label: "Contacted", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: statusColors.contacted.tab, textColor: "text-yellow-800" },
             { key: "interested", label: "Interested", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: statusColors.interested.tab, textColor: "text-purple-800" },
+            { key: "quoted", label: "Quoted", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: statusColors.quoted.tab, textColor: "text-cyan-800" },
             { key: "converted", label: "Converted", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: statusColors.converted.tab, textColor: "text-green-800" },
             { key: "lost", label: "Loss", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: statusColors.lost.tab, textColor: "text-red-800" },
+            { key: "not-interested", label: "Not Interested", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: statusColors["not-interested"].tab, textColor: "text-gray-800" },
           ].map(({ key, label, activeBg, inactiveBg, textColor }) => (
             <button
               key={key}
@@ -443,13 +496,35 @@ const LeadManagement = () => {
             >
               {label}
               <span className="ml-2 text-xs bg-opacity-20 bg-gray-200 px-2 py-1 rounded-full">
-                {key === "all" ? leads.length : leads.filter((l) => l.status === key).length}
+                {loading ? 0 : (statusCounts[key] || 0)}
               </span>
             </button>
           ))}
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-gray-600">Loading leads...</span>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">{error}</p>
+            <button
+              onClick={fetchLeads}
+              className="mt-2 text-red-600 hover:text-red-800 underline"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
         {/* Leads Table */}
+        {!loading && !error && (
         <div className="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -457,60 +532,96 @@ const LeadManagement = () => {
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">ID</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Contact No.</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">City</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Departure</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[180px]">E-mail ID</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Whatsapp</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Adviser</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Sales Rep</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">Destination</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Platform</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Travel Date</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[100px]">Time</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[200px]">Remarks 1</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[200px]">Remarks 2</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[200px]">Remarks 3</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Remarks</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredLeads.map((lead) => {
+              {!loading && !error && currentLeads.map((lead) => {
                 const colors = statusColors[lead.status];
+                
                 return (
                   <tr
-                    key={lead.id}
-                    className={`hover:bg-gray-50 transition-all duration-200 cursor-pointer ${colors.border}`}
-                    onClick={() => setSelectedLead(lead)}
+                    key={lead._id || lead.id}
+                    className={`hover:bg-gray-50 transition-all duration-200 cursor-pointer ${colors?.border || ''}`}
+                    onClick={() => {
+                      setSelectedLead(lead);
+                      setLeadEditForm({
+                        name: lead.name,
+                        email: lead.email,
+                        phone: lead.phone,
+                        city: lead.city,
+                        whatsapp: lead.whatsapp,
+                        salesRep: lead.salesRep || lead.adviser,
+                        destination: lead.destination,
+                        platform: lead.platform,
+                        travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
+                        time: lead.time,
+                        status: lead.status,
+                      });
+                    }}
                   >
-                    <td className={`px-4 py-3 text-sm font-bold border-r border-gray-200 ${colors.id}`}>
-                      {lead.id}
+                    <td className={`px-4 py-3 text-sm font-bold border-r border-gray-200 ${colors?.id || ''}`}>
+                      {(lead._id || lead.id).toString().substring(0, 8)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200 font-semibold">{lead.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.phone}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.city}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.email}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.whatsapp}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.adviser}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.destination}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.platform}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.travelDate}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.time}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {lead.remarks[0] ? `${lead.remarks[0].text}${lead.remarks[0].date ? ` (${lead.remarks[0].date})` : ""}` : ""}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {lead.remarks[1] ? `${lead.remarks[1].text}${lead.remarks[1].date ? ` (${lead.remarks[1].date})` : ""}` : ""}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {lead.remarks[2] ? `${lead.remarks[2].text}${lead.remarks[2].date ? ` (${lead.remarks[2].date})` : ""}` : ""}
+                    <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200 font-semibold">{lead.name || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.phone || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.city || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.email || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.whatsapp || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.salesRep || lead.adviser || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.destination || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.platform || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.time || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm border-r border-gray-200" onClick={(e) => { e.stopPropagation(); }}>
+                      <button
+                        onClick={() => {
+                          setRemarksLead(lead);
+                          setShowRemarksDialog(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors group"
+                      >
+                        <MessageSquare className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                        <span className="text-gray-700 font-medium">{lead.remarks?.length || 0}</span>
+                      </button>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap border-r border-gray-200">
-                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${colors.badge}`}>
-                        {statusLabels[lead.status]}
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${colors?.badge || 'bg-gray-100 text-gray-800'}`}>
+                        {statusLabels[lead.status] || lead.status || 'N/A'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      <button className="p-2 hover:bg-opacity-80 rounded-lg transition-colors bg-gray-100">
-                        <MoreVertical className="w-4 h-4" />
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLead(lead);
+                          setLeadEditForm({
+                            name: lead.name,
+                            email: lead.email,
+                            phone: lead.phone,
+                            city: lead.city,
+                            whatsapp: lead.whatsapp,
+                            salesRep: lead.salesRep || lead.adviser,
+                            destination: lead.destination,
+                            platform: lead.platform,
+                            travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
+                            time: lead.time,
+                            status: lead.status,
+                          });
+                        }}
+                        className="p-2 hover:bg-blue-100 rounded-lg transition-colors bg-gray-100"
+                      >
+                        <Edit className="w-4 h-4 text-blue-600" />
                       </button>
                     </td>
                   </tr>
@@ -525,165 +636,240 @@ const LeadManagement = () => {
             </div>
           )}
         </div>
+        )}
+        
+        {/* Pagination Controls */}
+        {!loading && !error && filteredLeads.length > 0 && (
+          <div className="mt-4 flex items-center justify-between bg-white px-4 py-3 border border-gray-200 rounded-lg">
+            <div className="text-sm text-gray-700">
+              Showing {(currentPage - 1) * leadsPerPage + 1} to {Math.min(currentPage * leadsPerPage, filteredLeads.length)} of {filteredLeads.length} leads
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 7) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 4) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 3) {
+                  pageNum = totalPages - 6 + i;
+                } else {
+                  pageNum = currentPage - 3 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => goToPage(pageNum)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                        : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
-        {/* Lead Detail Modal */}
-        {selectedLead && (
+        {/* Lead Detail Modal - Editable */}
+        {selectedLead && leadEditForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{selectedLead.name}</h2>
-                  <p className="text-gray-600 mt-1">Lead details and communication history</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Edit Lead - {leadEditForm.name}</h2>
+                  <p className="text-gray-600 mt-1">Update lead information</p>
                 </div>
-                <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <X className="w-5 h-5" />
+                <button onClick={handleCancelLeadEdit} className="p-2 hover:bg-red-50 rounded-lg transition-all duration-200 group">
+                  <X className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors duration-200" />
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Status & Assignment */}
+              <div className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-2">Current Status</label>
-                    <select
-                      value={selectedLead.status}
-                      onChange={(e) =>
-                        setLeads(
-                          leads.map((l) =>
-                            l.id === selectedLead.id ? { ...l, status: e.target.value } : l
-                          )
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="new">New</option>
-                      <option value="contacted">Contacted</option>
-                      <option value="interested">Interested</option>
-                      <option value="converted">Converted</option>
-                      <option value="lost">Loss</option>
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                    <input
+                      type="text"
+                      value={leadEditForm.name}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-2">Adviser</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact No. *</label>
+                    <input
+                      type="tel"
+                      value={leadEditForm.phone}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, phone: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Departure</label>
+                    <input
+                      type="text"
+                      value={leadEditForm.city}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, city: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">E-mail ID *</label>
+                    <input
+                      type="email"
+                      value={leadEditForm.email}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, email: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp</label>
+                    <input
+                      type="tel"
+                      value={leadEditForm.whatsapp}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, whatsapp: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
                     <select
-                      value={selectedLead.adviser}
-                      onChange={(e) =>
-                        setLeads(
-                          leads.map((l) =>
-                            l.id === selectedLead.id ? { ...l, adviser: e.target.value } : l
-                          )
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={leadEditForm.salesRep}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, salesRep: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
+                      <option value="">Select Sales Rep</option>
                       <option value="Sarah Johnson">Sarah Johnson</option>
                       <option value="Mike Chen">Mike Chen</option>
                       <option value="Lisa Anderson">Lisa Anderson</option>
                       <option value="David Brown">David Brown</option>
                     </select>
                   </div>
-                </div>
+                  </div>
 
-                {/* Contact Info */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Mail className="w-4 h-4" />
-                    <a href={`mailto:${selectedLead.email}`} className="hover:text-blue-600">Email: {selectedLead.email}</a>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Phone className="w-4 h-4" />
-                    <a href={`tel:${selectedLead.phone}`} className="hover:text-blue-600">Phone No: {selectedLead.phone}</a>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Phone className="w-4 h-4 text-green-500" />
-                    <a href={`https://wa.me/${selectedLead.whatsapp.replace(/[^0-9]/g, "")}`} className="hover:text-blue-600">WhatsApp No: {selectedLead.whatsapp}</a>
-                  </div>
-                </div>
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">City</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">{selectedLead.city}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Destination</label>
+                    <input
+                      type="text"
+                      value={leadEditForm.destination}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, destination: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">Destination</p>
-                    <p className="text-sm font-semibold text-gray-900 flex items-center gap-1 mt-1">
-                      <MapPin className="w-4 h-4" />
-                      {selectedLead.destination}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Platform</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">{selectedLead.platform}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Travel Date</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">{selectedLead.travelDate}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Time</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">{selectedLead.time}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Interactions</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1 flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-gray-400" />
-                      {selectedLead.interactions}
-                    </p>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+                    <select
+                      value={leadEditForm.platform}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, platform: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select Platform</option>
+                      <option value="Website Form">Website Form</option>
+                      <option value="Social Media">Social Media</option>
+                      <option value="Phone Call">Phone Call</option>
+                      <option value="Referral">Referral</option>
+                      <option value="Email">Email</option>
+                      <option value="Walk-in">Walk-in</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* Remarks */}
+                <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700 block mb-2">Remarks</label>
-                  <div className="space-y-2 mb-4">
-                    {selectedLead.remarks.map((remark, index) => (
-                      <div key={index} className="p-3 bg-gray-50 rounded-lg text-sm">
-                        {remark.text}
-                        {remark.date && <span className="text-xs text-gray-500 block mt-1">({remark.date})</span>}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <textarea
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={2}
-                        value={newRemark.text}
-                        onChange={(e) => setNewRemark({ ...newRemark, text: e.target.value })}
-                        placeholder="Add new remark..."
-                      />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Travel Date</label>
                       <input
                         type="date"
-                        value={newRemark.date}
-                        onChange={(e) => setNewRemark({ ...newRemark, date: e.target.value })}
-                        className="w-40 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={leadEditForm.travelDate}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, travelDate: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
-                    <button
-                      onClick={handleAddRemark}
-                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      Add Remark
-                    </button>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
+                    <input
+                      type="text"
+                      value={leadEditForm.time}
+                      onChange={(e) => setLeadEditForm({...leadEditForm, time: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => openEditLeadDialog(selectedLead)}
-                    className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-2"
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={leadEditForm.status}
+                    onChange={(e) => setLeadEditForm({...leadEditForm, status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <Edit className="w-4 h-4" />
-                    Edit Lead
-                  </button>
-                  <button className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium">
-                    Send Follow-up Email
-                  </button>
-                  <button className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium">
-                    Call Now
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="interested">Interested</option>
+                    <option value="quoted">Quoted</option>
+                    <option value="converted">Converted</option>
+                    <option value="lost">Lost</option>
+                    <option value="not-interested">Not Interested</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 pt-4">
+                  <a
+                    href={`mailto:${leadEditForm.email}`}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium flex items-center justify-center gap-2"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </a>
+                  <a
+                    href={`https://wa.me/${leadEditForm.whatsapp?.replace(/[^0-9]/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+                  >
+                    <Phone className="w-4 h-4" />
+                    WhatsApp
+                  </a>
+                  <button
+                    onClick={handleSaveLeadEdit}
+                    disabled={isSubmitting}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -702,9 +888,9 @@ const LeadManagement = () => {
                 </div>
                 <button
                   onClick={() => setShowNewLeadDialog(false)}
-                  className="p-2 hover:bg-gray-100 rounded transition-colors"
+                  className="p-2 hover:bg-red-50 rounded-lg transition-all duration-200 group"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors duration-200" />
                 </button>
               </div>
 
@@ -734,13 +920,13 @@ const LeadManagement = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Departure</label>
                     <input
                       type="text"
                       value={newLeadForm.city}
                       onChange={(e) => setNewLeadForm({ ...newLeadForm, city: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter city"
+                      placeholder="Enter departure city"
                     />
                   </div>
                   <div>
@@ -767,13 +953,13 @@ const LeadManagement = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Adviser</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
                     <select
-                      value={newLeadForm.adviser}
-                      onChange={(e) => setNewLeadForm({ ...newLeadForm, adviser: e.target.value })}
+                        value={newLeadForm.salesRep}
+                          onChange={(e) => setNewLeadForm({ ...newLeadForm, salesRep: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="">Select Adviser</option>
+                      <option value="">Select Sales Rep</option>
                       <option value="Sarah Johnson">Sarah Johnson</option>
                       <option value="Mike Chen">Mike Chen</option>
                       <option value="Lisa Anderson">Lisa Anderson</option>
@@ -880,9 +1066,17 @@ const LeadManagement = () => {
                   </button>
                   <button
                     onClick={handleAddLead}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
+                    disabled={isSubmitting}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Add Lead
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      "Add Lead"
+                    )}
                   </button>
                 </div>
               </div>
@@ -901,9 +1095,9 @@ const LeadManagement = () => {
                 </div>
                 <button
                   onClick={() => setShowEditLeadDialog(false)}
-                  className="p-2 hover:bg-gray-100 rounded transition-colors"
+                  className="p-2 hover:bg-red-50 rounded-lg transition-all duration-200 group"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors duration-200" />
                 </button>
               </div>
 
@@ -933,13 +1127,13 @@ const LeadManagement = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Departure</label>
                     <input
                       type="text"
                       value={editLeadForm.city}
                       onChange={(e) => setEditLeadForm({ ...editLeadForm, city: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter city"
+                      placeholder="Enter departure city"
                     />
                   </div>
                   <div>
@@ -966,13 +1160,13 @@ const LeadManagement = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Adviser</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
                     <select
-                      value={editLeadForm.adviser}
-                      onChange={(e) => setEditLeadForm({ ...editLeadForm, adviser: e.target.value })}
+                        value={editLeadForm.salesRep}
+                          onChange={(e) => setEditLeadForm({ ...editLeadForm, salesRep: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="">Select Adviser</option>
+                      <option value="">Select Sales Rep</option>
                       <option value="Sarah Johnson">Sarah Johnson</option>
                       <option value="Mike Chen">Mike Chen</option>
                       <option value="Lisa Anderson">Lisa Anderson</option>
@@ -1033,6 +1227,23 @@ const LeadManagement = () => {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={editLeadForm.status}
+                    onChange={(e) => setEditLeadForm({ ...editLeadForm, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="interested">Interested</option>
+                    <option value="quoted">Quoted</option>
+                    <option value="converted">Converted</option>
+                    <option value="lost">Loss</option>
+                    <option value="not-interested">Not Interested</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
                   <div className="space-y-2">
                     {editLeadForm.remarks.map((remark, index) => (
@@ -1079,11 +1290,67 @@ const LeadManagement = () => {
                   </button>
                   <button
                     onClick={handleEditLead}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
+                    disabled={isSubmitting}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Save Changes
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Remarks Dialog */}
+        {showRemarksDialog && remarksLead && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Remarks - {remarksLead.name}</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {remarksLead.remarks?.length || 0} total remarks
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowRemarksDialog(false);
+                    setRemarksLead(null);
+                  }}
+                  className="p-2 hover:bg-red-50 rounded-lg transition-all duration-200 group"
+                >
+                  <X className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors duration-200" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {remarksLead.remarks && remarksLead.remarks.length > 0 ? (
+                  remarksLead.remarks.map((remark, index) => (
+                    <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm text-gray-900 mb-2">{remark.text}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-500">
+                          {remark.date ? new Date(remark.date).toLocaleDateString() : 'No date'}
+                        </span>
+                        <span className="text-xs font-medium text-gray-600">
+                          Remark #{index + 1}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <p className="text-lg">No remarks available</p>
+                    <p className="text-sm mt-2">No remarks have been added to this lead yet.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1100,9 +1367,9 @@ const LeadManagement = () => {
                 </div>
                 <button
                   onClick={() => setShowFilterDialog(false)}
-                  className="p-2 hover:bg-gray-100 rounded transition-colors"
+                  className="p-2 hover:bg-red-50 rounded-lg transition-all duration-200 group"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors duration-200" />
                 </button>
               </div>
 

@@ -9,10 +9,12 @@ import logger from '../config/logger.js';
 const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
   const token = user.getSignedJwtToken();
 
+  // Calculate cookie expiration (7 days default)
+  const cookieExpiresIn = parseInt(process.env.COOKIE_EXPIRES_IN || process.env.JWT_COOKIE_EXPIRES_IN || '7', 10);
+  const maxAge = isNaN(cookieExpiresIn) ? 7 * 24 * 60 * 60 * 1000 : cookieExpiresIn * 24 * 60 * 60 * 1000;
+  
   const options = {
-    expires: new Date(
-      Date.now() + parseInt(process.env.JWT_COOKIE_EXPIRES_IN, 10) * 24 * 60 * 60 * 1000,
-    ),
+    maxAge: maxAge,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',

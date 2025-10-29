@@ -37,7 +37,7 @@ const UserManagement = () => {
       name: "Sarah Johnson",
       email: "sarah@travelagency.com",
       phone: "+1-555-1234",
-      role: "Adviser",
+      role: "Sales Rep",
       status: "active",
       createdDate: "2024-01-15",
       lastActive: "2024-10-22",
@@ -48,7 +48,7 @@ const UserManagement = () => {
       name: "Mike Chen",
       email: "mike@travelagency.com",
       phone: "+1-555-5678",
-      role: "Adviser",
+      role: "Sales Rep",
       status: "active",
       createdDate: "2024-02-10",
       lastActive: "2024-10-21",
@@ -81,7 +81,7 @@ const UserManagement = () => {
       name: "Emma Wilson",
       email: "emma@travelagency.com",
       phone: "+1-555-7890",
-      role: "Adviser",
+      role: "Sales Rep",
       status: "active",
       createdDate: "2024-05-20",
       lastActive: "2024-10-19",
@@ -94,7 +94,7 @@ const UserManagement = () => {
       badge: "bg-purple-100 text-purple-800",
       tab: "bg-purple-100 text-purple-800"
     },
-    Adviser: { 
+    "Sales Rep": { 
       badge: "bg-blue-100 text-blue-800",
       tab: "bg-blue-100 text-blue-800"
     },
@@ -109,7 +109,7 @@ const UserManagement = () => {
     inactive: "bg-red-100 text-red-800",
   };
 
-  const roles = ["Admin", "Adviser", "Accountant"];
+  const roles = ["Admin", "Sales Rep", "Accountant"];
 
   const filteredUsers = users.filter((user) => {
     const searchLower = searchTerm.toLowerCase();
@@ -244,7 +244,7 @@ const UserManagement = () => {
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-              <p className="text-gray-600 mt-1">Manage staff, advisers, and access permissions</p>
+              <p className="text-gray-600 mt-1">Manage staff, sales reps, and access permissions</p>
             </div>
           </div>
           <button
@@ -267,14 +267,14 @@ const UserManagement = () => {
             <p className="text-2xl font-bold text-gray-900 mt-1">{users.filter(u => u.status === "active").length}</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-600 font-medium">Advisers</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{users.filter(u => u.role === "Adviser").length}</p>
+            <p className="text-xs text-gray-600 font-medium">Sales Reps</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{users.filter(u => u.role === "Sales Rep").length}</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-600 font-medium">Avg. Leads/Adviser</p>
+            <p className="text-xs text-gray-600 font-medium">Avg. Leads/Sales Rep</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
-              {users.filter(u => u.role === "Adviser").reduce((acc, u) => acc + u.leadsAssigned, 0) / 
-              (users.filter(u => u.role === "Adviser").length || 1)}
+              {users.filter(u => u.role === "Sales Rep").reduce((acc, u) => acc + u.leadsAssigned, 0) / 
+              (users.filter(u => u.role === "Sales Rep").length || 1)}
             </p>
           </div>
         </div>
@@ -307,7 +307,7 @@ const UserManagement = () => {
           {[
             { key: "all", label: "All Users", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: "bg-white", textColor: "text-gray-700" },
             { key: "Admin", label: "Admins", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: roleColors.Admin.tab, textColor: "text-purple-800" },
-            { key: "Adviser", label: "Advisers", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: roleColors.Adviser.tab, textColor: "text-blue-800" },
+            { key: "Sales Rep", label: "Sales Reps", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: roleColors["Sales Rep"].tab, textColor: "text-blue-800" },
             { key: "Accountant", label: "Accountants", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: roleColors.Accountant.tab, textColor: "text-green-800" },
           ].map(({ key, label, activeBg, inactiveBg, textColor }) => (
             <button
@@ -414,7 +414,7 @@ const UserManagement = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="Admin">Admin</option>
-                      <option value="Adviser">Adviser</option>
+                      <option value="Sales Rep">Sales Rep</option>
                       <option value="Accountant">Accountant</option>
                     </select>
                   </div>
@@ -630,7 +630,7 @@ const UserManagement = () => {
                     >
                       <option value="">Select Role</option>
                       <option value="Admin">Admin</option>
-                      <option value="Adviser">Adviser</option>
+                      <option value="Sales Rep">Sales Rep</option>
                       <option value="Accountant">Accountant</option>
                     </select>
                   </div>
@@ -739,7 +739,7 @@ const UserManagement = () => {
                     >
                       <option value="">Select Role</option>
                       <option value="Admin">Admin</option>
-                      <option value="Adviser">Adviser</option>
+                      <option value="Sales Rep">Sales Rep</option>
                       <option value="Accountant">Accountant</option>
                     </select>
                   </div>
