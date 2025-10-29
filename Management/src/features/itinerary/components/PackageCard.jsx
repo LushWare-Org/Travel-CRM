@@ -26,6 +26,11 @@ const PackageCard = ({
   onDelete,
   onDuplicate,
 }) => {
+  // Guard: Return null if pkg is invalid
+  if (!pkg || typeof pkg !== 'object') {
+    return null;
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
       {/* Image Section */}
@@ -77,15 +82,15 @@ const PackageCard = ({
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2 text-gray-600">
             <Calendar className="w-4 h-4" />
-            {pkg.duration}
+            {pkg.duration || 'N/A'} days
           </div>
           <div className="flex items-center gap-2 text-gray-600">
             <MapPin className="w-4 h-4" />
-            {pkg.destinations.join(', ')}
+            {Array.isArray(pkg.destinations) ? pkg.destinations.join(', ') : pkg.region || 'N/A'}
           </div>
           <div className="flex items-center gap-2 text-gray-600">
             <Briefcase className="w-4 h-4" />
-            {pkg.accommodation}
+            {pkg.accommodation || 'N/A'}
           </div>
         </div>
 
@@ -93,16 +98,16 @@ const PackageCard = ({
         <div className="flex justify-between items-center pt-3 border-t border-gray-200">
           <div className="flex items-center gap-1">
             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            <span className="text-sm font-semibold">{pkg.rating}</span>
-            <span className="text-xs text-gray-500">({pkg.reviews})</span>
+            <span className="text-sm font-semibold">{pkg.rating || 0}</span>
+            <span className="text-xs text-gray-500">({pkg.reviews || 0})</span>
           </div>
-          <div className="text-lg font-bold text-blue-600">{pkg.price}</div>
+          <div className="text-lg font-bold text-blue-600">{pkg.price || 'Contact us'}</div>
         </div>
 
         {/* Bookings */}
         <div className="flex items-center gap-2 text-sm text-gray-600 pt-2 border-t border-gray-200">
           <Users className="w-4 h-4" />
-          {pkg.bookings} bookings
+          {pkg.bookings || 0} bookings
         </div>
 
         {/* Action Buttons */}

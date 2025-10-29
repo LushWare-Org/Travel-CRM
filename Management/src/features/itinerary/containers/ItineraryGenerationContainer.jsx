@@ -84,8 +84,6 @@ const ItineraryGenerationContainer = () => {
       images: [...(pkg.images || [])],
     });
     setShowEditPackageDialog(true);
-    setShowItinerary(true);
-    setIsItinerarySubmitted(true);
     setImages(pkg.images || []);
   };
 

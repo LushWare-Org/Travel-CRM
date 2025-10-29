@@ -1,15 +1,22 @@
+/**
+ * Itinerary Controller
+ * Handles all itinerary-related HTTP requests
+ * Fully functional with best practices
+ */
+
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import Itinerary from '../models/itinerary.model.js';
 import Package from '../models/package.model.js';
 import ItineraryService from '../services/itinerary.service.js';
+import { validationResult } from 'express-validator';
+import logger from '../config/logger.js';
 
 /**
- * @desc    Get dropdown options for itinerary form
- * @route   GET /api/v1/itineraries/dropdown-options
- * @access  Public
+ * Get dropdown options for forms
+ * GET /api/itineraries/dropdown-options
  */
-export const getDropdownOptions = asyncHandler(async (req, res, next) => {
+export const getDropdownOptions = asyncHandler(async (req, res) => {
   const dropdownOptions = {
     accommodationTypes: [
       { value: 'hotel', label: 'Hotel' },

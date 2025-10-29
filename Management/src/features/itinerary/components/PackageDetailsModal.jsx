@@ -55,7 +55,7 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
               Destinations
             </label>
             <div className="flex gap-2 flex-wrap">
-              {pkg.destinations.map((dest, idx) => (
+              {Array.isArray(pkg.destinations) && pkg.destinations.map((dest, idx) => (
                 <span
                   key={idx}
                   className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800"
@@ -63,6 +63,9 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
                   {dest}
                 </span>
               ))}
+              {!Array.isArray(pkg.destinations) && (
+                <span className="text-sm text-gray-600">No destinations specified</span>
+              )}
             </div>
           </div>
 
@@ -72,12 +75,15 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
               Activities
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {pkg.activities.map((activity, idx) => (
+              {Array.isArray(pkg.activities) && pkg.activities.map((activity, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
                   <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                   {activity}
                 </div>
               ))}
+              {!Array.isArray(pkg.activities) && (
+                <span className="text-sm text-gray-600">No activities specified</span>
+              )}
             </div>
           </div>
 
@@ -105,10 +111,11 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
             <label className="text-sm font-medium text-gray-700 block mb-3">
               Day-wise Itinerary
             </label>
-            <ItineraryDisplay
-              itinerary={pkg.itinerary}
-              itineraryTitles={pkg.itineraryTitles}
-            />
+            {Array.isArray(pkg.days) && pkg.days.length > 0 ? (
+              <ItineraryDisplay days={pkg.days} />
+            ) : (
+              <p className="text-sm text-gray-600">No itinerary specified</p>
+            )}
           </div>
 
           {/* Rating and Reviews */}

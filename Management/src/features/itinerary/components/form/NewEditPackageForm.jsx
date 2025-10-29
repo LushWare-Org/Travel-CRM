@@ -140,8 +140,9 @@ const NewEditPackageForm = ({
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Details</h3>
         <PackageDetails
           formData={localFormData}
+          nightsInput={localFormData.duration || 1}
           onFormChange={handleDetailsChange}
-          onDurationChange={handleDurationChange}
+          onNightsChange={handleDurationChange}
         />
       </div>
 
