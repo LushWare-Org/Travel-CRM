@@ -25,6 +25,12 @@ const itinerarySchema = new mongoose.Schema(
           required: true,
           trim: true,
         },
+        locations: [
+          {
+            type: String,
+            trim: true,
+          },
+        ],
         activities: [
           {
             type: String,
@@ -121,6 +127,10 @@ const itinerarySchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      totalLocations: {
+        type: Number,
+        default: 0,
+      },
       totalPlaces: {
         type: Number,
         default: 0,
@@ -165,6 +175,7 @@ itinerarySchema.index({ createdBy: 1 });
 itinerarySchema.pre('save', function calculateMetadata(next) {
   if (this.isModified('days')) {
     let totalActivities = 0;
+    let totalLocations = 0;
     let totalPlaces = 0;
     let breakfastCount = 0;
     let lunchCount = 0;
@@ -172,6 +183,7 @@ itinerarySchema.pre('save', function calculateMetadata(next) {
 
     this.days.forEach((day) => {
       totalActivities += day.activities?.length || 0;
+      totalLocations += day.locations?.length || 0;
       totalPlaces += day.places?.length || 0;
 
       if (day.meals?.breakfast) breakfastCount += 1;
@@ -182,6 +194,7 @@ itinerarySchema.pre('save', function calculateMetadata(next) {
     this.metadata = {
       ...this.metadata,
       totalActivities,
+      totalLocations,
       totalPlaces,
       mealsIncluded: {
         breakfast: breakfastCount,

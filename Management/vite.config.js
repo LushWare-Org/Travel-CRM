@@ -11,5 +11,9 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    port: 3000,
+  },
+  define: {
+    'process.env': JSON.stringify(process.env),
   },
 });

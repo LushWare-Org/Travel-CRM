@@ -1,6 +1,10 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+
+// Load environment variables FIRST before any other imports
+dotenv.config();
+
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -26,6 +30,7 @@ import itineraryRoutes from './routes/itinerary.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
 
 // Billing Module Routes
 import quotationRoutes from './routes/quotation.routes.js';
@@ -36,9 +41,6 @@ import billingRoutes from './routes/billing.routes.js';
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
 import notFound from './middleware/notFound.js';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 
@@ -91,6 +93,7 @@ app.use(`/api/${API_VERSION}/itineraries`, itineraryRoutes);
 app.use(`/api/${API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${API_VERSION}/notifications`, notificationRoutes);
 app.use(`/api/${API_VERSION}/dashboard`, dashboardRoutes);
+app.use(`/api/${API_VERSION}/upload`, uploadRoutes);
 
 // Billing Module Routes
 app.use(`/api/${API_VERSION}/billing/quotations`, quotationRoutes);
