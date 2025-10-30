@@ -351,8 +351,27 @@ const ItineraryGenerationContainer = () => {
     }
   };
 
-  const handleDownloadPackage = (pkg) => {
-    generateAndDownloadPDF(pkg);
+  const handleDownloadPackage = async (pkg) => {
+    try {
+      Swal.fire({
+        title: 'Generating PDF',
+        html: 'Please wait while we prepare your itinerary PDF...',
+        allowOutsideClick: false,
+        didOpen: async () => {
+          Swal.showLoading();
+          try {
+            await generateAndDownloadPDF(pkg);
+          } catch (error) {
+            console.error('Error generating PDF:', error);
+            Swal.hideLoading();
+            Swal.fire('Error', 'Failed to generate PDF. Please try again.', 'error');
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error in handleDownloadPackage:', error);
+      Swal.fire('Error', 'Failed to prepare PDF download', 'error');
+    }
   };
 
   const handleDeletePackage = (id) => {
