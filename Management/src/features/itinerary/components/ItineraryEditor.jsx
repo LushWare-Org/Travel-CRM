@@ -80,12 +80,13 @@ const ItineraryEditor = ({
               </label>
               <textarea
                 rows="2"
-                value={(day.activities || []).join(', ')}
-                onChange={(e) =>
-                  onDayChange(day.dayNumber, {
-                    activities: e.target.value.split(',').map((a) => a.trim()).filter(Boolean),
-                  })
-                }
+                value={typeof day.activities === 'string' ? day.activities : (day.activities || []).join(', ')}
+                onChange={(e) => onDayChange(day.dayNumber, { activities: e.target.value })}
+                onBlur={(e) => {
+                  // Convert to array on blur
+                  const activitiesArray = e.target.value.split(',').map((a) => a.trim()).filter(Boolean);
+                  onDayChange(day.dayNumber, { activities: activitiesArray });
+                }}
                 placeholder="Activity 1, Activity 2, Activity 3"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
