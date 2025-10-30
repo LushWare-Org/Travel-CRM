@@ -143,6 +143,30 @@ const ItineraryDisplay = ({ days = [] }) => {
                 </p>
               </div>
             )}
+
+            {/* Day Images */}
+            {day.images && day.images.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Day Images</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {day.images.map((img, idx) => {
+                    const imageUrl = typeof img === 'string' ? img : img.url;
+                    return (
+                      <div key={idx} className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-colors shadow-sm">
+                        <img
+                          src={imageUrl}
+                          alt={`Day ${day.dayNumber} Image ${idx + 1}`}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                          onError={(e) => {
+                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ))}
