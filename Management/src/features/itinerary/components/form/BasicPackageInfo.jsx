@@ -4,6 +4,7 @@
  */
 
 import { CATEGORY_OPTIONS } from '../../utils/constants';
+import { COUNTRIES } from '../../utils/countries';
 
 const BasicPackageInfo = ({ formData, onChange }) => {
   const handleChange = (e) => {
@@ -87,14 +88,19 @@ const BasicPackageInfo = ({ formData, onChange }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Destination <span className="text-red-500">*</span>
           </label>
-          <input
-            type="text"
+          <select
             name="destination"
             value={formData.destination || ''}
             onChange={handleChange}
-            placeholder="e.g., Delhi, Agra, Jaipur"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          >
+            <option value="">Select Country</option>
+            {COUNTRIES.map((country) => (
+              <option key={country.value} value={country.label}>
+                {country.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
