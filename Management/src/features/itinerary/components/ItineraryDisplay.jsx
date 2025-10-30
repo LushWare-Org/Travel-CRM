@@ -34,6 +34,23 @@ const ItineraryDisplay = ({ days = [] }) => {
               </div>
             )}
 
+            {/* Locations Covered */}
+            {day.locations && day.locations.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Locations Covered</h4>
+                <div className="flex flex-wrap gap-2">
+                  {day.locations.map((location, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
+                    >
+                      📍 {location}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Activities */}
             {day.activities && day.activities.length > 0 && (
               <div>
