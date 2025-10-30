@@ -176,10 +176,10 @@ export default function Login() {
         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-800 font-medium mb-2">Test Credentials:</p>
           <p className="text-xs text-yellow-700">
-            Email: <code className="bg-white px-2 py-1 rounded">admin@example.com</code>
+            Email: <code className="bg-white px-2 py-1 rounded">admin@tripskyway.com</code>
           </p>
           <p className="text-xs text-yellow-700">
-            Password: <code className="bg-white px-2 py-1 rounded">password123</code>
+            Password: <code className="bg-white px-2 py-1 rounded">Admin@123456</code>
           </p>
         </div>
       </div>
