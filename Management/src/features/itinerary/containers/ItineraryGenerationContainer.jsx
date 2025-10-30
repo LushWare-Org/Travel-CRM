@@ -98,7 +98,8 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleEditPackage = (pkg) => {
-    console.log('[Container] Edit package clicked:', pkg);
+    console.log('[DEBUG] Edit package clicked. Package object:', pkg);
+    console.log('[DEBUG] Package _id:', pkg._id, 'Package id:', pkg.id);
     
     // Extract days from itinerary if present
     const days = pkg.days || pkg.itinerary?.days || [];
@@ -108,7 +109,10 @@ const ItineraryGenerationContainer = () => {
       days: [...days],
       images: [...(pkg.images || [])],
     };
-    console.log('[Container] Setting edit package data:', editData);
+    
+    console.log('[DEBUG] Edit data prepared:', editData);
+    console.log('[DEBUG] Edit data _id:', editData._id, 'Edit data id:', editData.id);
+    
     setEditPackageData(editData);
     setShowEditPackageDialog(true);
     setImages(pkg.images || []);
@@ -116,8 +120,6 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveNewPackage = async (formData) => {
     try {
-      console.log('[Container] handleSaveNewPackage called with:', formData);
-      
       // Validate required fields
       const requiredFields = {
         name: 'Package Name',
@@ -133,9 +135,34 @@ const ItineraryGenerationContainer = () => {
       if (missingFields.length > 0) {
         const message = `Please fill in these required fields:\n${missingFields.map(f => `• ${f}`).join('\n')}`;
         Swal.fire('Missing Required Fields', message, 'error');
-        console.error('[Validation] Missing fields:', missingFields);
         return;
       }
+
+      // Clean up days data - remove invalid enum values and incomplete days
+      const cleanDays = (formData.days || [])
+        .filter(day => day.title && day.description) // Only include days with required fields
+        .map(day => {
+          const cleanDay = { ...day };
+          
+          // Remove empty transport enum
+          if (!cleanDay.transport || cleanDay.transport === '') {
+            delete cleanDay.transport;
+          }
+          
+          // Remove or fix accommodation with empty type
+          if (cleanDay.accommodation) {
+            if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
+              delete cleanDay.accommodation.type;
+            }
+            // If accommodation object is now empty or only has empty values, remove it
+            const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
+            if (!hasValidData) {
+              delete cleanDay.accommodation;
+            }
+          }
+          
+          return cleanDay;
+        });
 
       // Ensure numeric fields are numbers
       const sanitizedData = {
@@ -143,18 +170,8 @@ const ItineraryGenerationContainer = () => {
         price: parseFloat(formData.price) || 0,
         duration: parseInt(formData.duration, 10) || 1,
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
+        days: cleanDays, // Use cleaned days
       };
-
-      console.log('[Debug] Form Data Before Sanitization:', formData);
-      console.log('[Debug] Sanitized Package Data:', sanitizedData);
-
-      // Log important fields separately for clarity
-      console.log('🔍 Key Fields Check:');
-      console.log('  - Name:', sanitizedData.name);
-      console.log('  - Category:', sanitizedData.category);
-      console.log('  - Destination:', sanitizedData.destination);
-      console.log('  - Price:', sanitizedData.price, '(type:', typeof sanitizedData.price, ')');
-      console.log('  - Duration:', sanitizedData.duration, '(type:', typeof sanitizedData.duration, ')');
 
       // Call API to save package
       const response = await ApiService.createPackage(sanitizedData);
@@ -197,7 +214,9 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveEditPackage = async (formData) => {
     try {
-      console.log('[Container] handleSaveEditPackage called with:', formData);
+      console.log('[DEBUG] handleSaveEditPackage called');
+      console.log('[DEBUG] formData received:', formData);
+      console.log('[DEBUG] formData._id:', formData._id, 'formData.id:', formData.id);
       
       // Validate required fields
       const requiredFields = {
@@ -212,30 +231,53 @@ const ItineraryGenerationContainer = () => {
         .map(([, label]) => label);
 
       if (missingFields.length > 0) {
-        console.error('[Validation] Missing fields in edit:', missingFields);
         Swal.fire('Validation Error', `Please fill in: ${missingFields.join(', ')}`, 'error');
         return;
       }
 
       if (!formData._id && !formData.id) {
+        console.error('[DEBUG] No ID found in formData!');
         Swal.fire('Error', 'Package ID is missing', 'error');
         return;
       }
 
       const packageId = formData._id || formData.id;
+      console.log('[DEBUG] Using packageId:', packageId);
+      
+      // Clean up days data - remove invalid enum values and incomplete days
+      const cleanDays = (formData.days || [])
+        .filter(day => day.title && day.description) // Only include days with required fields
+        .map(day => {
+          const cleanDay = { ...day };
+          
+          // Remove empty transport enum
+          if (!cleanDay.transport || cleanDay.transport === '') {
+            delete cleanDay.transport;
+          }
+          
+          // Remove or fix accommodation with empty type
+          if (cleanDay.accommodation) {
+            if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
+              delete cleanDay.accommodation.type;
+            }
+            // If accommodation object is now empty or only has empty values, remove it
+            const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
+            if (!hasValidData) {
+              delete cleanDay.accommodation;
+            }
+          }
+          
+          return cleanDay;
+        });
       
       // Sanitize data - ensure numeric fields are numbers
       const sanitizedData = {
         ...formData,
         price: parseFloat(formData.price) || 0,
         duration: parseInt(formData.duration, 10) || 1,
-        maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1
+        maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1,
+        days: cleanDays, // Use cleaned days
       };
-
-      // Debug logging
-      console.log('[Container] Updating package ID:', packageId);
-      console.log('[Container] Edit sanitized data:', sanitizedData);
-      console.log('[Container] Auth token present:', !!localStorage.getItem('token'));
       
       const response = await ApiService.updatePackage(packageId, sanitizedData);
 

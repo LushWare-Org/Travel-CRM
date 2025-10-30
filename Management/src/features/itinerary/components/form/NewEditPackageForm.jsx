@@ -27,19 +27,14 @@ const NewEditPackageForm = ({
   const [showItinerary, setShowItinerary] = useState(false);
 
   useEffect(() => {
-    console.log('[NewEditPackageForm] formData prop received:', formData);
-    console.log('[NewEditPackageForm] ID in formData:', formData?._id || formData?.id);
     setLocalFormData(formData);
-    console.log('[NewEditPackageForm] localFormData updated');
   }, [formData]);
 
   const handleBasicInfoChange = (data) => {
-    console.log('[NewEditPackageForm] handleBasicInfoChange - preserving ID:', data._id || data.id);
     setLocalFormData(data);
   };
 
   const handleDetailsChange = (data) => {
-    console.log('[NewEditPackageForm] handleDetailsChange - preserving ID:', data._id || data.id);
     setLocalFormData(data);
   };
 
@@ -125,7 +120,6 @@ const NewEditPackageForm = ({
   const handleSave = (status) => {
     // Ensure we preserve _id and id fields
     const packageId = localFormData._id || localFormData.id;
-    console.log('[NewEditPackageForm] handleSave - package ID:', packageId);
     
     const dataToSave = {
       ...localFormData,
@@ -141,8 +135,6 @@ const NewEditPackageForm = ({
       }
     }
     
-    console.log('[NewEditPackageForm] handleSave - data to save:', dataToSave);
-    console.log('[NewEditPackageForm] handleSave - ID in data:', dataToSave._id || dataToSave.id);
     setFormData(dataToSave);
     // Pass the updated data directly to onSave instead of relying on state update
     onSave?.(dataToSave);
