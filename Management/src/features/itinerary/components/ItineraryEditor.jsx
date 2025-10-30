@@ -8,6 +8,7 @@ import { Trash2, Plus, Upload, X } from 'lucide-react';
 import { useState } from 'react';
 import { uploadItineraryImages } from '../../../services/cloudinaryService';
 import Swal from 'sweetalert2';
+import ActivitySelector from './ActivitySelector';
 
 const ItineraryEditor = ({
   days = [],
@@ -113,19 +114,11 @@ const ItineraryEditor = ({
             {/* Activities */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Activities (comma-separated)
+                Activities
               </label>
-              <textarea
-                rows="2"
-                value={typeof day.activities === 'string' ? day.activities : (day.activities || []).join(', ')}
-                onChange={(e) => onDayChange(day.dayNumber, { activities: e.target.value })}
-                onBlur={(e) => {
-                  // Convert to array on blur
-                  const activitiesArray = e.target.value.split(',').map((a) => a.trim()).filter(Boolean);
-                  onDayChange(day.dayNumber, { activities: activitiesArray });
-                }}
-                placeholder="Activity 1, Activity 2, Activity 3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <ActivitySelector
+                activities={day.activities || []}
+                onChange={(activities) => onDayChange(day.dayNumber, { activities })}
               />
             </div>
 
