@@ -99,9 +99,13 @@ const ItineraryGenerationContainer = () => {
 
   const handleEditPackage = (pkg) => {
     console.log('[Container] Edit package clicked:', pkg);
+    
+    // Extract days from itinerary if present
+    const days = pkg.days || pkg.itinerary?.days || [];
+    
     const editData = {
       ...pkg,
-      days: [...(pkg.days || [])],
+      days: [...days],
       images: [...(pkg.images || [])],
     };
     console.log('[Container] Setting edit package data:', editData);

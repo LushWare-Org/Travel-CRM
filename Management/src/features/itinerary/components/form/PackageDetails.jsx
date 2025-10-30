@@ -1,15 +1,8 @@
 /**
  * Package Details Form Component
- * Handles pricing, duration, destinations, activities, accommodation, and transport
+ * Handles pricing, duration, and max group size
+ * Note: Destinations, activities, accommodation, and transport are in itinerary days
  */
-
-import MultiSelectDropdown from '../MultiSelectDropdown';
-import {
-  DESTINATION_OPTIONS,
-  ACTIVITY_OPTIONS,
-  ACCOMMODATION_OPTIONS,
-  TRANSPORT_OPTIONS,
-} from '../../utils/constants';
 
 const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange }) => {
   const handleChange = (e) => {
@@ -23,12 +16,10 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
     onFormChange({ ...formData, price: numValue });
   };
 
-  const handleDestinationsChange = (values) => {
-    onFormChange({ ...formData, destinations: values });
-  };
-
-  const handleActivitiesChange = (values) => {
-    onFormChange({ ...formData, activities: values });
+  const handleMaxGroupSizeChange = (e) => {
+    const { value } = e.target;
+    const numValue = value === '' ? 10 : parseInt(value, 10) || 10;
+    onFormChange({ ...formData, maxGroupSize: numValue });
   };
 
   return (
@@ -61,86 +52,64 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
         </div>
       </div>
 
-      {/* Price */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Price <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="number"
-          name="price"
-          value={formData.price || ''}
-          onChange={handlePriceChange}
-          placeholder="Enter price (e.g., 2499)"
-          min="0"
-          step="0.01"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <p className="text-xs text-gray-500 mt-1">Enter numeric value only (no currency symbols)</p>
-      </div>
-
-      {/* Destinations */}
-      <div>
-        <MultiSelectDropdown
-          label="Destinations"
-          options={DESTINATION_OPTIONS}
-          selectedValues={formData.destinations || []}
-          onChange={handleDestinationsChange}
-          placeholder="Select destinations..."
-          allowCustom={true}
-        />
-      </div>
-
-      {/* Activities */}
-      <div>
-        <MultiSelectDropdown
-          label="Activities"
-          options={ACTIVITY_OPTIONS}
-          selectedValues={formData.activities || []}
-          onChange={handleActivitiesChange}
-          placeholder="Select activities..."
-          allowCustom={true}
-        />
-      </div>
-
-      {/* Accommodation and Transport */}
+      {/* Price and Max Group Size */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Accommodation
+            Price <span className="text-red-500">*</span>
           </label>
-          <select
-            name="accommodation"
-            value={formData.accommodation}
-            onChange={handleChange}
+          <input
+            type="number"
+            name="price"
+            value={formData.price || ''}
+            onChange={handlePriceChange}
+            placeholder="Enter price (e.g., 2499)"
+            min="0"
+            step="0.01"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select Accommodation</option>
-            {ACCOMMODATION_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
+          <p className="text-xs text-gray-500 mt-1">Enter numeric value only (no currency symbols)</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Transport
+            Max Group Size
           </label>
-          <select
-            name="transport"
-            value={formData.transport}
-            onChange={handleChange}
+          <input
+            type="number"
+            name="maxGroupSize"
+            value={formData.maxGroupSize || 10}
+            onChange={handleMaxGroupSizeChange}
+            placeholder="Max Group Size"
+            min="1"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select Transport</option>
-            {TRANSPORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
+          <p className="text-xs text-gray-500 mt-1">Maximum number of people per group</p>
         </div>
+      </div>
+
+      {/* Difficulty Level */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Difficulty Level
+        </label>
+        <select
+          name="difficulty"
+          value={formData.difficulty || 'moderate'}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="easy">Easy</option>
+          <option value="moderate">Moderate</option>
+          <option value="difficult">Difficult</option>
+        </select>
+        <p className="text-xs text-gray-500 mt-1">Select the difficulty level of this tour</p>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+        <p className="text-sm text-blue-800">
+          <strong>Note:</strong> Specific destinations, activities, accommodation, and transport details 
+          are added in the Day-wise Itinerary section below.
+        </p>
       </div>
     </div>
   );

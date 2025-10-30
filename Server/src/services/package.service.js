@@ -5,6 +5,7 @@
  */
 
 import Package from '../models/package.model.js';
+import Itinerary from '../models/itinerary.model.js';
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import logger from '../config/logger.js';
@@ -18,10 +19,28 @@ class PackageService {
    */
   async createPackage(packageData, userId) {
     try {
+      // Extract days array if present
+      const { days, ...pkgData } = packageData;
+
+      // Create the package first
       const newPackage = await Package.create({
-        ...packageData,
+        ...pkgData,
         createdBy: userId,
       });
+
+      // Create itinerary if days are provided
+      if (days && Array.isArray(days) && days.length > 0) {
+        const itinerary = await Itinerary.create({
+          package: newPackage._id,
+          days: days,
+          createdBy: userId,
+          status: packageData.status || 'draft',
+        });
+
+        // Link itinerary to package
+        newPackage.itinerary = itinerary._id;
+        await newPackage.save();
+      }
 
       // Populate references
       await newPackage.populate('createdBy', 'name email role');
@@ -206,6 +225,9 @@ class PackageService {
         throw new AppError('Not authorized to update this package', 403);
       }
 
+      // Extract days array if present
+      const { days, ...pkgUpdateData } = updateData;
+
       // Update allowed fields
       const allowedFields = [
         'name',
@@ -224,14 +246,38 @@ class PackageService {
         'isFeatured',
         'availableFrom',
         'availableTo',
-        'itinerary',
+        'images',
+        'coverImage',
       ];
 
-      Object.keys(updateData).forEach((key) => {
+      Object.keys(pkgUpdateData).forEach((key) => {
         if (allowedFields.includes(key)) {
-          pkg[key] = updateData[key];
+          pkg[key] = pkgUpdateData[key];
         }
       });
+
+      // Handle itinerary/days update
+      if (days && Array.isArray(days)) {
+        if (pkg.itinerary) {
+          // Update existing itinerary
+          const itinerary = await Itinerary.findById(pkg.itinerary);
+          if (itinerary) {
+            itinerary.days = days;
+            itinerary.status = updateData.status || itinerary.status;
+            itinerary.metadata.lastModifiedBy = userId;
+            await itinerary.save();
+          }
+        } else {
+          // Create new itinerary
+          const newItinerary = await Itinerary.create({
+            package: pkg._id,
+            days: days,
+            createdBy: userId,
+            status: updateData.status || 'draft',
+          });
+          pkg.itinerary = newItinerary._id;
+        }
+      }
 
       const updatedPackage = await pkg.save();
 

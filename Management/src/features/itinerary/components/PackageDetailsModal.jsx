@@ -33,59 +33,82 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700">Category</label>
-              <p className="text-sm text-gray-900 mt-1">{pkg.category}</p>
+              <p className="text-sm text-gray-900 mt-1 capitalize">{pkg.category || 'N/A'}</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Region</label>
-              <p className="text-sm text-gray-900 mt-1">{pkg.region}</p>
+              <label className="text-sm font-medium text-gray-700">Destination</label>
+              <p className="text-sm text-gray-900 mt-1">{pkg.destination || 'N/A'}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Duration</label>
-              <p className="text-sm text-gray-900 mt-1">{pkg.duration}</p>
+              <p className="text-sm text-gray-900 mt-1">{pkg.duration ? `${pkg.duration} days` : 'N/A'}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Price</label>
-              <p className="text-sm font-bold text-blue-600 mt-1">{pkg.price}</p>
+              <p className="text-sm font-bold text-blue-600 mt-1">
+                ${typeof pkg.price === 'number' ? pkg.price.toFixed(2) : pkg.price || 'N/A'}
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Max Group Size</label>
+              <p className="text-sm text-gray-900 mt-1">{pkg.maxGroupSize || 10}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Difficulty</label>
+              <p className="text-sm text-gray-900 mt-1 capitalize">{pkg.difficulty || 'N/A'}</p>
             </div>
           </div>
 
-          {/* Destinations */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-2">
-              Destinations
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {Array.isArray(pkg.destinations) && pkg.destinations.map((dest, idx) => (
-                <span
-                  key={idx}
-                  className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800"
-                >
-                  {dest}
-                </span>
-              ))}
-              {!Array.isArray(pkg.destinations) && (
-                <span className="text-sm text-gray-600">No destinations specified</span>
-              )}
+          {/* Highlights */}
+          {pkg.highlights && pkg.highlights.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">
+                Highlights
+              </label>
+              <div className="space-y-1">
+                {pkg.highlights.map((highlight, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></span>
+                    <span>{highlight}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Activities */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-2">
-              Activities
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {Array.isArray(pkg.activities) && pkg.activities.map((activity, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                  {activity}
-                </div>
-              ))}
-              {!Array.isArray(pkg.activities) && (
-                <span className="text-sm text-gray-600">No activities specified</span>
-              )}
+          {/* Inclusions */}
+          {pkg.inclusions && pkg.inclusions.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">
+                Inclusions
+              </label>
+              <div className="space-y-1">
+                {pkg.inclusions.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="text-green-500">✓</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Exclusions */}
+          {pkg.exclusions && pkg.exclusions.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">
+                Exclusions
+              </label>
+              <div className="space-y-1">
+                {pkg.exclusions.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="text-red-500">✗</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Images */}
           {pkg.images && pkg.images.length > 0 && (
@@ -111,21 +134,25 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
             <label className="text-sm font-medium text-gray-700 block mb-3">
               Day-wise Itinerary
             </label>
-            {Array.isArray(pkg.days) && pkg.days.length > 0 ? (
-              <ItineraryDisplay days={pkg.days} />
-            ) : (
-              <p className="text-sm text-gray-600">No itinerary specified</p>
-            )}
+            {/* Check for days in multiple possible locations */}
+            {(() => {
+              const days = pkg.days || pkg.itinerary?.days || [];
+              return Array.isArray(days) && days.length > 0 ? (
+                <ItineraryDisplay days={days} />
+              ) : (
+                <p className="text-sm text-gray-600">No itinerary specified</p>
+              );
+            })()}
           </div>
 
           {/* Rating and Reviews */}
           <div className="border-t pt-4">
             <div className="flex items-center gap-2 mb-2">
               <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              <span className="font-semibold">{pkg.rating}</span>
-              <span className="text-sm text-gray-600">({pkg.reviews} reviews)</span>
+              <span className="font-semibold">{pkg.rating || 0}</span>
+              <span className="text-sm text-gray-600">({pkg.numReviews || 0} reviews)</span>
             </div>
-            <p className="text-sm text-gray-600">Bookings: {pkg.bookings}</p>
+            <p className="text-sm text-gray-600">Bookings: {pkg.bookings || 0}</p>
           </div>
         </div>
       </div>

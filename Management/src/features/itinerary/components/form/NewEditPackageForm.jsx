@@ -28,15 +28,18 @@ const NewEditPackageForm = ({
 
   useEffect(() => {
     console.log('[NewEditPackageForm] formData prop received:', formData);
+    console.log('[NewEditPackageForm] ID in formData:', formData?._id || formData?.id);
     setLocalFormData(formData);
     console.log('[NewEditPackageForm] localFormData updated');
   }, [formData]);
 
   const handleBasicInfoChange = (data) => {
+    console.log('[NewEditPackageForm] handleBasicInfoChange - preserving ID:', data._id || data.id);
     setLocalFormData(data);
   };
 
   const handleDetailsChange = (data) => {
+    console.log('[NewEditPackageForm] handleDetailsChange - preserving ID:', data._id || data.id);
     setLocalFormData(data);
   };
 
@@ -120,12 +123,26 @@ const NewEditPackageForm = ({
   };
 
   const handleSave = (status) => {
+    // Ensure we preserve _id and id fields
+    const packageId = localFormData._id || localFormData.id;
+    console.log('[NewEditPackageForm] handleSave - package ID:', packageId);
+    
     const dataToSave = {
       ...localFormData,
       status,
       updatedDate: new Date().toISOString().split('T')[0],
     };
+    
+    // Ensure _id is explicitly included if it exists
+    if (packageId) {
+      dataToSave._id = packageId;
+      if (localFormData.id) {
+        dataToSave.id = localFormData.id;
+      }
+    }
+    
     console.log('[NewEditPackageForm] handleSave - data to save:', dataToSave);
+    console.log('[NewEditPackageForm] handleSave - ID in data:', dataToSave._id || dataToSave.id);
     setFormData(dataToSave);
     // Pass the updated data directly to onSave instead of relying on state update
     onSave?.(dataToSave);
