@@ -4,7 +4,7 @@
  */
 
 import { CATEGORY_OPTIONS } from '../../utils/constants';
-import { COUNTRIES } from '../../utils/countries';
+import DestinationSelector from '../DestinationSelector';
 
 const BasicPackageInfo = ({ formData, onChange }) => {
   const handleChange = (e) => {
@@ -88,19 +88,14 @@ const BasicPackageInfo = ({ formData, onChange }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Destination <span className="text-red-500">*</span>
           </label>
-          <select
+          <DestinationSelector
             name="destination"
             value={formData.destination || ''}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select Country</option>
-            {COUNTRIES.map((country) => (
-              <option key={country.value} value={country.label}>
-                {country.label}
-              </option>
-            ))}
-          </select>
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Select from popular destinations or type a custom one
+          </p>
         </div>
       </div>
 

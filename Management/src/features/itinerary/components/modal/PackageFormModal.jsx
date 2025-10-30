@@ -16,7 +16,7 @@ const PackageFormModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="border-b border-gray-200 p-6 flex justify-between items-center sticky top-0 bg-white">
+        <div className="border-b border-gray-200 p-6 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
             {subtitle && <p className="text-gray-600 mt-1">{subtitle}</p>}
