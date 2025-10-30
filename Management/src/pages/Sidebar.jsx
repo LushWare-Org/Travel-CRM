@@ -35,7 +35,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className={`${sidebarOpen ? "w-64" : "w-20"} bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 flex flex-col shadow-xl`}>
+    <div className={`${sidebarOpen ? "w-64" : "w-20"} h-full bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 flex flex-col shadow-xl`}>
       <div className="p-6 border-b border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center font-bold text-lg flex-shrink-0">
@@ -50,7 +50,7 @@ const Sidebar = () => {
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {navigationItems.map((item) => (
           <button
             key={item.path}
@@ -88,10 +88,19 @@ const Sidebar = () => {
 
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="w-full flex items-center justify-center bg-slate-700 px-4 py-2 rounded-lg hover:bg-slate-600 transition-colors text-gray-300 hover:text-white"
+          className="w-full flex items-center justify-center gap-2 bg-slate-700 px-4 py-2 rounded-lg hover:bg-slate-600 transition-colors text-gray-300 hover:text-white mb-2"
         >
           {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
+        {sidebarOpen && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </button>
+        )}
       </div>
     </div>
   );

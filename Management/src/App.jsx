@@ -76,6 +76,59 @@ function AppContent() {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    if (authAPI.isAuthenticated()) {
+      try {
+        const storedUser = authAPI.getStoredUser();
+        if (storedUser) {
+          setUser(storedUser);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        handleLogout();
+      }
+    }
+    setIsLoading(false);
+  };
+
+  const handleLogin = () => {
+    const storedUser = authAPI.getStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
+      setIsAuthenticated(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    await authAPI.logout();
+    setIsAuthenticated(false);
+    setUser(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <>
       <Router 

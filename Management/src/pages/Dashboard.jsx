@@ -79,7 +79,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="h-full overflow-auto">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-6 shadow-sm">
         <div className="flex justify-between items-center">
