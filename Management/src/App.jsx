@@ -4,7 +4,7 @@ import Sidebar from "./pages/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import LeadManagement from "./pages/LeadManagement";
 import ItineraryGeneration from "./pages/ItineraryGeneration";
-import BillingInvoicing from "./pages/BillingInvoicing";
+import EnhancedBillingInvoicing from "./pages/EnhancedBillingInvoicing";
 import UserManagement from "./pages/UserManagement";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -60,7 +60,7 @@ function AppContent() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/leads" element={<LeadManagement />} />
                   <Route path="/itineraries" element={<ItineraryGeneration />} />
-                  <Route path="/billing" element={<BillingInvoicing />} />
+                  <Route path="/billing" element={<EnhancedBillingInvoicing />} />
                   <Route path="/users" element={<UserManagement />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
