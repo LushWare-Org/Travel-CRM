@@ -135,4 +135,30 @@ packageSchema.virtual('reviews', {
   localField: '_id',
 });
 
+// Indexes for better query performance
+packageSchema.index({ slug: 1 }, { unique: true });
+packageSchema.index({ category: 1 });
+packageSchema.index({ destination: 1 });
+packageSchema.index({ isActive: 1 });
+packageSchema.index({ isFeatured: 1 });
+packageSchema.index({ createdBy: 1 });
+packageSchema.index({ price: 1 });
+packageSchema.index({ duration: 1 });
+packageSchema.index({ rating: -1 });
+packageSchema.index({ bookings: -1 });
+packageSchema.index({ createdAt: -1 });
+
+// Text index for full-text search
+packageSchema.index({
+  name: 'text',
+  description: 'text',
+  destination: 'text',
+  highlights: 'text',
+});
+
+// Compound indexes for common queries
+packageSchema.index({ isActive: 1, category: 1 });
+packageSchema.index({ isActive: 1, isFeatured: 1 });
+packageSchema.index({ isActive: 1, price: 1 });
+
 export default mongoose.model('Package', packageSchema);

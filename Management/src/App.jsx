@@ -1,83 +1,104 @@
-import { Route, Switch, Redirect } from "wouter";
-import { useState, useEffect } from "react";
-import { authAPI } from "./services/api";
-import Login from "./pages/Login";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import Sidebar from "./pages/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import LeadManagement from "./pages/LeadManagement";
 import ItineraryGeneration from "./pages/ItineraryGeneration";
 import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
+import Login from "./pages/Login";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { useAuth } from "./contexts/AuthContext";
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState(null);
+function AppContent() {
+  const { isAuthenticated, loading } = useAuth();
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    if (authAPI.isAuthenticated()) {
-      try {
-        const storedUser = authAPI.getStoredUser();
-        if (storedUser) {
-          setUser(storedUser);
-          setIsAuthenticated(true);
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        handleLogout();
-      }
-    }
-    setIsLoading(false);
-  };
-
-  const handleLogin = () => {
-    const storedUser = authAPI.getStoredUser();
-    if (storedUser) {
-      setUser(storedUser);
-      setIsAuthenticated(true);
-    }
-  };
-
-  const handleLogout = async () => {
-    await authAPI.logout();
-    setIsAuthenticated(false);
-    setUser(null);
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="mb-4">
+            <svg
+              className="animate-spin h-12 w-12 text-blue-600 mx-auto"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </div>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar user={user} onLogout={handleLogout} />
+    <Routes>
+      <Route path="/login" element={<Login />} />
       
-      {/* Main content area */}
-      <div className="flex-1 overflow-auto">
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/leads" component={LeadManagement} />
-          <Route path="/itineraries" component={ItineraryGeneration} />
-          <Route path="/billing" component={BillingInvoicing} />
-          <Route path="/users" component={UserManagement} />
-        </Switch>
-      </div>
-    </div>
+      <Route
+        path="/*"
+        element={
+          isAuthenticated ? (
+            <div className="flex h-screen bg-gray-50">
+              <Sidebar />
+              <div className="flex-1 overflow-auto">
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/leads" element={<LeadManagement />} />
+                  <Route path="/itineraries" element={<ItineraryGeneration />} />
+                  <Route path="/billing" element={<BillingInvoicing />} />
+                  <Route path="/users" element={<UserManagement />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </div>
+            </div>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <>
+      <Router 
+        future={{ 
+          v7_startTransition: true,
+          v7_relativeSplatPath: true 
+        }}
+      >
+        <AppContent />
+      </Router>
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        gutter={8}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
+      />
+    </>
   );
 }
 
