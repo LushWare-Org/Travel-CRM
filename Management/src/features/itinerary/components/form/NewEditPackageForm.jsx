@@ -182,6 +182,7 @@ const NewEditPackageForm = ({
               onDayChange={handleDayChange}
               onAddDay={handleAddDay}
               onRemoveDay={handleRemoveDay}
+              destination={localFormData.destination}
             />
 
             <div className="flex gap-3">

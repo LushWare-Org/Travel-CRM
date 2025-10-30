@@ -9,12 +9,14 @@ import { useState } from 'react';
 import { uploadItineraryImages } from '../../../services/cloudinaryService';
 import Swal from 'sweetalert2';
 import ActivitySelector from './ActivitySelector';
+import LocationSelector from './LocationSelector';
 
 const ItineraryEditor = ({
   days = [],
   onDayChange,
   onAddDay,
   onRemoveDay,
+  destination = '', // Add destination prop
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
 
@@ -108,6 +110,18 @@ const ItineraryEditor = ({
                 onChange={(e) => onDayChange(day.dayNumber, { description: e.target.value })}
                 placeholder="Detailed description of the day's activities..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Locations Covered */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Locations Covered
+              </label>
+              <LocationSelector
+                locations={day.locations || []}
+                onChange={(locations) => onDayChange(day.dayNumber, { locations })}
+                destination={destination}
               />
             </div>
 
