@@ -117,14 +117,18 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
                 Images
               </label>
               <div className="flex space-x-2 mt-2 flex-wrap gap-2">
-                {pkg.images.map((image, index) => (
-                  <img
-                    key={index}
-                    src={image}
-                    alt={`Package Image ${index}`}
-                    className="w-24 h-24 object-cover rounded"
-                  />
-                ))}
+                {pkg.images.map((image, index) => {
+                  // Handle both string URLs and image objects
+                  const imageUrl = typeof image === 'string' ? image : image.url;
+                  return (
+                    <img
+                      key={index}
+                      src={imageUrl}
+                      alt={`Package Image ${index}`}
+                      className="w-24 h-24 object-cover rounded"
+                    />
+                  );
+                })}
               </div>
             </div>
           )}

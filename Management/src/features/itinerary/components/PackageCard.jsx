@@ -41,7 +41,8 @@ const PackageCard = ({
         style={
           pkg.images && pkg.images.length > 0
             ? {
-                backgroundImage: `url(${pkg.images[0]})`,
+                // Handle both string URLs and image objects
+                backgroundImage: `url(${typeof pkg.images[0] === 'string' ? pkg.images[0] : pkg.images[0].url})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
               }

@@ -28,7 +28,15 @@ export const createPackage = asyncHandler(async (req, res, next) => {
   const packageData = req.body;
   const userId = req.user._id;
 
+  // Debug logging for images
+  console.log('[Package Controller] Creating package');
+  console.log('[Package Controller] Images received:', packageData.images);
+  console.log('[Package Controller] Images count:', packageData.images?.length || 0);
+
   const newPackage = await packageService.createPackage(packageData, userId);
+
+  console.log('[Package Controller] Package created with images:', newPackage.images);
+  console.log('[Package Controller] Saved images count:', newPackage.images?.length || 0);
 
   res.status(201).json({
     success: true,
@@ -106,7 +114,15 @@ export const updatePackage = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
   const updateData = req.body;
 
+  // Debug logging for images
+  console.log('[Package Controller] Updating package:', id);
+  console.log('[Package Controller] Images received:', updateData.images);
+  console.log('[Package Controller] Images count:', updateData.images?.length || 0);
+
   const updatedPackage = await packageService.updatePackage(id, updateData, userId);
+
+  console.log('[Package Controller] Package updated with images:', updatedPackage.images);
+  console.log('[Package Controller] Saved images count:', updatedPackage.images?.length || 0);
 
   res.status(200).json({
     success: true,

@@ -23,7 +23,7 @@ import {
 
 // Services
 import { generateAndDownloadPDF } from '../services/pdfService';
-import { uploadImage } from '../services/imageService';
+import { uploadPackageImages } from '../../../services/cloudinaryService';
 import ApiService from '../services/apiService';
 
 // Utils
@@ -46,6 +46,7 @@ const ItineraryGenerationContainer = () => {
   const [showNewPackageDialog, setShowNewPackageDialog] = useState(false);
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
   const [editPackageData, setEditPackageData] = useState(null);
+  const [isUploadingImages, setIsUploadingImages] = useState(false); // Track upload state
 
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(
@@ -100,26 +101,55 @@ const ItineraryGenerationContainer = () => {
   const handleEditPackage = (pkg) => {
     console.log('[DEBUG] Edit package clicked. Package object:', pkg);
     console.log('[DEBUG] Package _id:', pkg._id, 'Package id:', pkg.id);
+    console.log('[DEBUG] Package images:', pkg.images);
     
     // Extract days from itinerary if present
     const days = pkg.days || pkg.itinerary?.days || [];
     
+    // Ensure images are properly formatted - no blob URLs for existing images
+    const formattedImages = (pkg.images || []).map(img => {
+      // If it's already an image object with url and public_id, keep it
+      if (typeof img === 'object' && img.url) {
+        return img;
+      }
+      // If it's a string URL, convert to object format
+      if (typeof img === 'string') {
+        return {
+          url: img,
+          public_id: img.split('/').pop()?.split('.')[0] || 'unknown',
+        };
+      }
+      return img;
+    });
+    
     const editData = {
       ...pkg,
       days: [...days],
-      images: [...(pkg.images || [])],
+      images: [...formattedImages],
     };
     
     console.log('[DEBUG] Edit data prepared:', editData);
-    console.log('[DEBUG] Edit data _id:', editData._id, 'Edit data id:', editData.id);
+    console.log('[DEBUG] Formatted images:', formattedImages);
     
     setEditPackageData(editData);
     setShowEditPackageDialog(true);
-    setImages(pkg.images || []);
+    setImages(formattedImages); // Use formatted images, not raw pkg.images
   };
 
   const handleSaveNewPackage = async (formData) => {
     try {
+      // Prevent saving while images are uploading
+      if (isUploadingImages) {
+        Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
+        return;
+      }
+
+      // Filter out any temporary images (safety check)
+      const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
+      
+      console.log('[DEBUG] handleSaveNewPackage - All images:', images);
+      console.log('[DEBUG] handleSaveNewPackage - Valid images:', validImages);
+
       // Validate required fields
       const requiredFields = {
         name: 'Package Name',
@@ -171,7 +201,14 @@ const ItineraryGenerationContainer = () => {
         duration: parseInt(formData.duration, 10) || 1,
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
         days: cleanDays, // Use cleaned days
+        images: validImages, // Use only valid images (no temp blobs)
       };
+
+      console.log('[DEBUG] ==> SAVING PACKAGE <==');
+      console.log('[DEBUG] Valid images to save:', validImages);
+      console.log('[DEBUG] Images count:', validImages?.length);
+      console.log('[DEBUG] First image:', validImages?.[0]);
+      console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
 
       // Call API to save package
       const response = await ApiService.createPackage(sanitizedData);
@@ -214,6 +251,18 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveEditPackage = async (formData) => {
     try {
+      // Prevent saving while images are uploading
+      if (isUploadingImages) {
+        Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
+        return;
+      }
+
+      // Filter out any temporary images (safety check)
+      const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
+      
+      console.log('[DEBUG] handleSaveEditPackage - All images:', images);
+      console.log('[DEBUG] handleSaveEditPackage - Valid images:', validImages);
+
       console.log('[DEBUG] handleSaveEditPackage called');
       console.log('[DEBUG] formData received:', formData);
       console.log('[DEBUG] formData._id:', formData._id, 'formData.id:', formData.id);
@@ -277,7 +326,13 @@ const ItineraryGenerationContainer = () => {
         duration: parseInt(formData.duration, 10) || 1,
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1,
         days: cleanDays, // Use cleaned days
+        images: validImages, // Use only valid images (no temp blobs)
       };
+
+      console.log('[DEBUG] ==> UPDATING PACKAGE <==');
+      console.log('[DEBUG] Valid images to save:', validImages);
+      console.log('[DEBUG] Images count:', validImages?.length);
+      console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
       
       const response = await ApiService.updatePackage(packageId, sanitizedData);
 
@@ -377,24 +432,70 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleImageUpload = async (files) => {
-    const fileArray = Array.from(files);
-    for (const file of fileArray) {
-      const tempUrl = URL.createObjectURL(file);
-      setImages((prev) => [...prev, tempUrl]);
+    if (!files || files.length === 0) return;
 
-      try {
-        const uploadedUrl = await uploadImage(file);
-        setImages((prev) =>
-          prev.map((url) => (url === tempUrl ? uploadedUrl : url))
-        );
-      } catch (error) {
-        removeImage(images.indexOf(tempUrl));
-        Swal.fire(
-          'Error',
-          VALIDATION_MESSAGES.IMAGE_UPLOAD_FAILED,
-          'error'
-        );
+    const fileArray = Array.from(files);
+    
+    // Set uploading state to prevent saving during upload
+    setIsUploadingImages(true);
+    
+    // Create temporary image objects for immediate feedback
+    const tempImages = fileArray.map(file => ({
+      url: URL.createObjectURL(file),
+      public_id: 'temp-' + Date.now() + '-' + Math.random(),
+      isTemp: true,
+    }));
+    setImages((prev) => [...prev, ...tempImages]);
+
+    try {
+      console.log('[DEBUG] Starting upload for', fileArray.length, 'files');
+      
+      // Upload all images to Cloudinary - now returns full image objects
+      const uploadedImages = await uploadPackageImages(files, (progress) => {
+        console.log(`Upload progress: ${progress.current}/${progress.total}`);
+      });
+
+      console.log('[DEBUG] Uploaded images from Cloudinary:', uploadedImages);
+
+      // Replace temporary image objects with actual Cloudinary image objects
+      setImages((prev) => {
+        // Filter out ALL temp images first
+        const withoutTemp = prev.filter(img => !img.isTemp);
+        // Add all uploaded images
+        const finalImages = [...withoutTemp, ...uploadedImages];
+        console.log('[DEBUG] Final images state after upload:', finalImages);
+        return finalImages;
+      });
+      
+      // Clean up temporary URLs
+      tempImages.forEach(img => URL.revokeObjectURL(img.url));
+
+      Swal.fire('Success', `${uploadedImages.length} image(s) uploaded successfully!`, 'success');
+    } catch (error) {
+      console.error('[DEBUG] Upload error:', error);
+      console.error('[DEBUG] Error message:', error.message);
+      console.error('[DEBUG] Error stack:', error.stack);
+      
+      // Remove temporary images on error
+      setImages((prev) => prev.filter(img => !img.isTemp));
+      tempImages.forEach(img => URL.revokeObjectURL(img.url));
+      
+      // Show more specific error message
+      let errorMessage = 'Failed to upload images';
+      if (error.message.includes('500')) {
+        errorMessage = 'Server error occurred. Please check if the server is running and Cloudinary credentials are configured.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+      
+      Swal.fire(
+        'Error',
+        errorMessage,
+        'error'
+      );
+    } finally {
+      // Always reset uploading state
+      setIsUploadingImages(false);
     }
   };
 
@@ -455,6 +556,8 @@ const ItineraryGenerationContainer = () => {
             onCancel={() => setShowNewPackageDialog(false)}
             onImageUpload={handleImageUpload}
             onImageRemove={handleImageRemove}
+            images={images}
+            isUploadingImages={isUploadingImages}
           />
         </PackageFormModal>
 
@@ -473,6 +576,8 @@ const ItineraryGenerationContainer = () => {
               onCancel={() => setShowEditPackageDialog(false)}
               onImageUpload={handleImageUpload}
               onImageRemove={handleImageRemove}
+              images={images}
+              isUploadingImages={isUploadingImages}
             />
           )}
         </PackageFormModal>

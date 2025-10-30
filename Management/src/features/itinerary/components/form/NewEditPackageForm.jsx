@@ -22,6 +22,8 @@ const NewEditPackageForm = ({
   onCancel,
   onImageUpload,
   onImageRemove,
+  images, // Images state from parent container
+  isUploadingImages, // Upload state from parent
 }) => {
   const [localFormData, setLocalFormData] = useState(formData);
   const [showItinerary, setShowItinerary] = useState(false);
@@ -163,9 +165,10 @@ const NewEditPackageForm = ({
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Images</h3>
         <ImageUpload
-          images={localFormData.images}
+          images={images || localFormData.images || []}
           onImageUpload={onImageUpload}
           onImageRemove={onImageRemove}
+          isUploading={isUploadingImages}
         />
       </div>
 
