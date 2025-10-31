@@ -227,3 +227,137 @@ export function generateItineraryPDF(itinerary, packageData) {
     }
   });
 }
+
+// Generate a professional itinerary PDF using full lead details
+export function generateLeadItineraryPDF(lead, itinerary) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 50 });
+      const fileName = `itinerary-${(lead.name || 'lead').replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.pdf`;
+      const filePath = path.join(dirname, '../../uploads/itineraries', fileName);
+
+      // Ensure directory exists
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      const primary = '#1e3a8a'; // blue-800
+      const secondary = '#7c3aed'; // purple-600
+      const gray = '#374151'; // gray-700
+
+      const stream = fs.createWriteStream(filePath);
+      doc.pipe(stream);
+
+      // Header / Branding
+      doc
+        .fillColor(primary)
+        .fontSize(24)
+        .text('TRIP SKY WAY', { align: 'left' })
+        .moveDown(0.2)
+        .fontSize(10)
+        .fillColor(gray)
+        .text('Travel & Tours', { align: 'left' })
+        .moveDown(0.5);
+
+      // Title
+      doc
+        .fontSize(22)
+        .fillColor(primary)
+        .text('CUSTOM ITINERARY', { align: 'center' })
+        .moveDown(0.5);
+
+      // Lead overview box
+      const startY = doc.y;
+      doc
+        .rect(50, startY, 500, 110)
+        .strokeColor(primary)
+        .lineWidth(1)
+        .stroke();
+
+      doc
+        .fillColor(gray)
+        .fontSize(12)
+        .text(`Lead Name: ${lead.name || '-'}`, 60, startY + 10)
+        .text(`Email: ${lead.email || '-'}`, 60, startY + 30)
+        .text(`Phone: ${lead.phone || '-'}`, 60, startY + 50)
+        .text(`WhatsApp: ${lead.whatsapp || '-'}`, 60, startY + 70)
+        .text(`Sales Rep: ${lead.salesRep || '-'}`, 300, startY + 10)
+        .text(`Departure: ${lead.city || '-'}`, 300, startY + 30)
+        .text(`Destination: ${lead.destination || '-'}`, 300, startY + 50)
+        .text(`Travel Date: ${lead.travelDate ? new Date(lead.travelDate).toLocaleDateString() : '-'}`, 300, startY + 70)
+        .moveDown(2);
+
+      doc.moveDown(3);
+
+      // Section: Day-wise itinerary
+      doc
+        .fontSize(16)
+        .fillColor(primary)
+        .text('Day-by-Day Plan', { underline: true })
+        .moveDown(0.5);
+
+      let y = doc.y;
+      (itinerary.days || []).forEach((day, idx) => {
+        if (y > 700) {
+          doc.addPage();
+          y = 50;
+        }
+        const blockTop = y;
+        // Card border
+        doc
+          .rect(50, blockTop, 500, 120)
+          .strokeColor('#e5e7eb')
+          .lineWidth(1)
+          .stroke();
+
+        // Day header
+        doc
+          .fillColor(secondary)
+          .fontSize(14)
+          .text(`Day ${day.dayNumber || idx + 1}: ${day.title || ''}`, 60, blockTop + 10)
+          .fillColor(gray)
+          .fontSize(10)
+          .text(day.description || '', 60, blockTop + 30, { width: 480 });
+
+        // Two columns: Destinations/Activities and Hotel
+        const leftY = blockTop + 60;
+        doc
+          .fontSize(10)
+          .fillColor(primary)
+          .text('Destinations:', 60, leftY)
+          .fillColor(gray)
+          .text((day.locations && day.locations.length > 0) ? `• ${day.locations.join('\n• ')}` : '-', 60, leftY + 15, { width: 220 });
+
+        doc
+          .fillColor(primary)
+          .text('Activities:', 60, leftY + 60)
+          .fillColor(gray)
+          .text((day.activities && day.activities.length > 0) ? `• ${day.activities.join('\n• ')}` : '-', 60, leftY + 75, { width: 220 });
+
+        doc
+          .fillColor(primary)
+          .text('Hotel:', 320, leftY)
+          .fillColor(gray)
+          .text(day.accommodation?.name ? `${day.accommodation.name}` : '-', 320, leftY + 15, { width: 220 });
+
+        y = blockTop + 140;
+        doc.moveDown(0.5);
+      });
+
+      // Footer
+      doc
+        .moveDown(1)
+        .fontSize(9)
+        .fillColor(gray)
+        .text('Thank you for choosing Trip Sky Way. For assistance, contact support@tripskyway.com', 50, 760, { align: 'center' });
+
+      doc.end();
+
+      stream.on('finish', () => resolve(filePath));
+      stream.on('error', (err) => reject(err));
+    } catch (error) {
+      reject(error);
+    }
+  });
+}

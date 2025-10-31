@@ -13,6 +13,9 @@ import {
   getMyLeads,
   getLeadStats,
   searchLeads,
+  setLeadItinerary,
+  getLeadItinerary,
+  downloadLeadItineraryPDF,
 } from '../controllers/lead.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -39,6 +42,14 @@ router.route('/:id/unassign').patch(authorize('admin'), unassignLead);
 
 // Status routes
 router.route('/status/:status').get(authorize('admin', 'salesRep'), getLeadsByStatus);
+
+// Itinerary routes
+router.route('/:id/itinerary')
+  .get(authorize('admin', 'salesRep'), getLeadItinerary)
+  .put(authorize('admin', 'salesRep'), setLeadItinerary);
+
+router.route('/:id/itinerary/pdf')
+  .get(authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
 
 // My leads (assigned to current user)
 router.route('/my-leads').get(authorize('salesRep'), getMyLeads);

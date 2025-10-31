@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import User from '../models/user.model.js';
+import Settings from '../models/settings.model.js';
 import Package from '../models/package.model.js';
 import Itinerary from '../models/itinerary.model.js';
 import { seedLeadStatuses } from './seedLeadStatus.js';
@@ -20,11 +21,38 @@ const users = [
     isEmailVerified: true,
   },
   {
-    name: 'Sales Representative',
-    email: 'sales@tripskyway.com',
+    name: 'Amal',
+    email: 'amal@tripskyway.com',
     password: 'Sales@123456',
     role: 'salesRep',
     phone: '9876543211',
+    isActive: true,
+    isEmailVerified: true,
+  },
+  {
+    name: 'Kamal',
+    email: 'kamal@tripskyway.com',
+    password: 'Sales@123456',
+    role: 'salesRep',
+    phone: '9876543213',
+    isActive: true,
+    isEmailVerified: true,
+  },
+  {
+    name: 'Nimal',
+    email: 'nimal@tripskyway.com',
+    password: 'Sales@123456',
+    role: 'salesRep',
+    phone: '9876543214',
+    isActive: true,
+    isEmailVerified: true,
+  },
+  {
+    name: 'Sunil',
+    email: 'sunil@tripskyway.com',
+    password: 'Sales@123456',
+    role: 'salesRep',
+    phone: '9876543215',
     isActive: true,
     isEmailVerified: true,
   },
@@ -179,6 +207,7 @@ const seedDatabase = async () => {
 
     // Clear existing data
     await User.deleteMany({});
+    await Settings.deleteMany({});
     await Package.deleteMany({});
     await Itinerary.deleteMany({});
     console.log('✓ Cleared existing data');
@@ -196,6 +225,10 @@ const seedDatabase = async () => {
 
     const createdPackages = await Package.create(packagesWithCreator);
     console.log(`✓ Created ${createdPackages.length} packages`);
+
+    // Initialize Settings (default manual mode)
+    await Settings.create({ assignmentMode: 'manual', autoStrategy: 'round_robin' });
+    console.log('✓ Initialized settings');
 
     // Seed Lead Status Options
     console.log('\n--- Seeding Lead Status Options ---');

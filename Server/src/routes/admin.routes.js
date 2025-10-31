@@ -12,6 +12,8 @@ import {
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
 import { createStaffSchema, updateUserStatusSchema, updateProfileSchema } from '../validators/auth.validator.js';
+import { getSettings, updateSettings } from '../controllers/settings.controller.js';
+import { updateSettingsSchema } from '../validators/settings.validator.js';
 
 const router = express.Router();
 
@@ -21,6 +23,10 @@ router.use(authorize('admin'));
 
 // Dashboard stats
 router.get('/stats', getDashboardStats);
+
+// Settings (assignment config)
+router.get('/settings', getSettings);
+router.put('/settings', validate(updateSettingsSchema), updateSettings);
 
 // User management
 router.route('/users')

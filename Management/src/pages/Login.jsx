@@ -175,12 +175,33 @@ export default function Login() {
         {/* Test Credentials Info */}
         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-800 font-medium mb-2">Test Credentials:</p>
-          <p className="text-xs text-yellow-700">
-            Email: <code className="bg-white px-2 py-1 rounded">admin@tripskyway.com</code>
-          </p>
-          <p className="text-xs text-yellow-700">
-            Password: <code className="bg-white px-2 py-1 rounded">Admin@123456</code>
-          </p>
+          <div className="grid grid-cols-1 gap-1 text-xs text-yellow-700">
+            <p>
+              Admin — Email: <code className="bg-white px-2 py-1 rounded">admin@tripskyway.com</code>
+            </p>
+            <p>
+              Admin — Password: <code className="bg-white px-2 py-1 rounded">Admin@123456</code>
+            </p>
+            <hr className="my-2 border-yellow-200" />
+            <p>
+              Sales Rep (Amal) — Email: <code className="bg-white px-2 py-1 rounded">amal@tripskyway.com</code>
+            </p>
+            <p>
+              Sales Rep (Amal) — Password: <code className="bg-white px-2 py-1 rounded">Sales@123456</code>
+            </p>
+            <p>
+              Sales Rep (Kamal) — Email: <code className="bg-white px-2 py-1 rounded">kamal@tripskyway.com</code>
+            </p>
+            <p>
+              Sales Rep (Kamal) — Password: <code className="bg-white px-2 py-1 rounded">Sales@123456</code>
+            </p>
+            <p>
+              Sales Rep (Nimal) — Email: <code className="bg-white px-2 py-1 rounded">nimal@tripskyway.com</code>
+            </p>
+            <p>
+              Sales Rep (Nimal) — Password: <code className="bg-white px-2 py-1 rounded">Sales@123456</code>
+            </p>
+          </div>
         </div>
       </div>
     </div>
