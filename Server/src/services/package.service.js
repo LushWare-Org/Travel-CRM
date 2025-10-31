@@ -22,24 +22,41 @@ class PackageService {
       // Extract days array if present
       const { days, ...pkgData } = packageData;
 
-      // Create the package first
+      // Ensure description meets minimum length requirement
+      if (!pkgData.description || pkgData.description.trim().length < 10) {
+        throw new Error('Description must be at least 10 characters long');
+      }
+
+      // Remove any null or undefined _id fields
+      delete pkgData._id;
+      delete pkgData.id;
+      delete pkgData._v;
+      delete pkgData.__v;
+
+      // Create the package first (without itinerary reference initially)
       const newPackage = await Package.create({
         ...pkgData,
         createdBy: userId,
       });
 
-      // Create itinerary if days are provided
+      // Create itinerary if days are provided and valid
       if (days && Array.isArray(days) && days.length > 0) {
-        const itinerary = await Itinerary.create({
-          package: newPackage._id,
-          days: days,
-          createdBy: userId,
-          status: packageData.status || 'draft',
-        });
+        try {
+          const itinerary = await Itinerary.create({
+            package: newPackage._id,
+            days: days,
+            createdBy: userId,
+            status: packageData.status || 'draft',
+          });
 
-        // Link itinerary to package
-        newPackage.itinerary = itinerary._id;
-        await newPackage.save();
+          // Link itinerary to package
+          newPackage.itinerary = itinerary._id;
+          await newPackage.save();
+        } catch (itineraryError) {
+          logger.warn(`Itinerary creation warning for package ${newPackage._id}: ${itineraryError.message}`);
+          // Don't fail the entire operation if itinerary creation fails
+          // The package was created successfully
+        }
       }
 
       // Populate references
