@@ -179,6 +179,31 @@ export const leadAPI = {
     return api.get(`/leads/${id}/remarks`);
   },
 
+  // Itinerary
+  getItinerary: async (leadId) => {
+    const api = new ApiService();
+    return api.get(`/leads/${leadId}/itinerary`);
+  },
+  setItinerary: async (leadId, days) => {
+    const api = new ApiService();
+    return api.put(`/leads/${leadId}/itinerary`, { days });
+  },
+  downloadItineraryPDF: async (leadId) => {
+    const url = `${API_BASE_URL}/leads/${leadId}/itinerary/pdf`;
+    const response = await fetch(url, { headers: new ApiService().getAuthHeaders() });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = `itinerary-${leadId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+
   // Assign lead
   assignLead: async (id, userId) => {
     const api = new ApiService();
@@ -189,6 +214,54 @@ export const leadAPI = {
   unassignLead: async (id) => {
     const api = new ApiService();
     return api.patch(`/leads/${id}/unassign`);
+  },
+};
+
+// Admin/Settings API Methods
+export const adminAPI = {
+  getSettings: async () => {
+    const api = new ApiService();
+    return api.get('/admin/settings');
+  },
+  updateSettings: async (data) => {
+    const api = new ApiService();
+    return api.put('/admin/settings', data);
+  },
+  getSalesReps: async () => {
+    const api = new ApiService();
+    // fetch active sales reps, large limit to avoid pagination in UI
+    return api.get('/admin/users', { role: 'salesRep', isActive: true, limit: 200, page: 1 });
+  },
+};
+
+// Billing/Quotation API Methods
+export const quotationAPI = {
+  create: async (payload) => {
+    const api = new ApiService();
+    return api.post('/billing/quotations', payload);
+  },
+  getByLead: async (leadId) => {
+    const api = new ApiService();
+    return api.get('/billing/quotations/lead/' + leadId);
+  },
+  send: async (quotationId) => {
+    const api = new ApiService();
+    return api.post(`/billing/quotations/${quotationId}/send`);
+  },
+  downloadPDF: async (quotationId) => {
+    const url = `${API_BASE_URL}/billing/quotations/${quotationId}/pdf`;
+    const response = await fetch(url, { headers: new ApiService().getAuthHeaders() });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = `quotation-${quotationId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   },
 };
 

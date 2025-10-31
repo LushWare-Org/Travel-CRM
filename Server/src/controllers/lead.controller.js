@@ -2,6 +2,12 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import Lead from '../models/lead.model.js';
 import { APIFeatures, getPaginationData } from '../utils/apiFeatures.js';
+import Settings from '../models/settings.model.js';
+import User from '../models/user.model.js';
+import { assignSalesRepIfNeeded } from '../services/assignment.service.js';
+import Itinerary from '../models/itinerary.model.js';
+import mongoose from 'mongoose';
+import { generateItineraryPDF, generateLeadItineraryPDF } from '../utils/pdfGenerator.js';
 
 // @desc    Create a new lead
 // @route   POST /api/v1/leads
@@ -19,6 +25,29 @@ export const createLead = asyncHandler(async (req, res, next) => {
         notes: 'Initial status',
       },
     ];
+  }
+
+  // Auto-assign if enabled and no explicit manual assignment requested
+  const settings = await Settings.getSingleton();
+  const isManualMode = settings.assignmentMode === 'manual';
+
+  // If manual and client sent assignedTo, mark manual assignment metadata
+  if (isManualMode && req.body.assignedTo) {
+    req.body.assignmentMode = 'manual';
+    req.body.assignedBy = req.user._id;
+    // Ensure salesRep name mirrors assignedTo user
+    const rep = await User.findById(req.body.assignedTo).select('name');
+    if (rep) {
+      req.body.salesRep = rep.name;
+    }
+  }
+
+  if (!isManualMode) {
+    await assignSalesRepIfNeeded(req.body);
+    if (req.body.assignedTo) {
+      const rep = await User.findById(req.body.assignedTo).select('name');
+      if (rep) req.body.salesRep = rep.name;
+    }
   }
 
   const lead = await Lead.create(req.body);
@@ -209,6 +238,11 @@ export const assignLead = asyncHandler(async (req, res, next) => {
   lead.assignedTo = req.body.assignedTo;
   lead.assignedBy = req.user._id;
   lead.assignmentMode = 'manual';
+  // Mirror salesRep name for UI
+  const rep = await User.findById(req.body.assignedTo).select('name');
+  if (rep) {
+    lead.salesRep = rep.name;
+  }
 
   await lead.save();
 
@@ -323,6 +357,113 @@ export const searchLeads = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Set or replace a lead's current itinerary (day-by-day)
+// @route   PUT /api/v1/leads/:id/itinerary
+// @access  Private (Admin, SalesRep)
+export const setLeadItinerary = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
+  }
+
+  // Basic normalization of incoming days
+  const daysInput = Array.isArray(req.body.days) ? req.body.days : [];
+  const days = daysInput.map((d, idx) => ({
+    dayNumber: d.dayNumber || idx + 1,
+    title: d.title || `Day ${idx + 1}`,
+    description: (d.description && String(d.description).trim()) || (d.title ? String(d.title) : `Day ${idx + 1} plan`),
+    locations: d.locations || (d.destination ? [d.destination] : []),
+    activities: d.activities || [],
+    accommodation: d.accommodation || (d.hotel ? { name: d.hotel } : {}),
+    meals: d.meals || {},
+    transport: d.transport || undefined,
+    places: d.places || [],
+    images: d.images || [],
+    notes: d.notes || '',
+  }));
+
+  let itinerary;
+  if (lead.currentItinerary) {
+    // Update existing itinerary in place
+    itinerary = await Itinerary.findById(lead.currentItinerary);
+    if (itinerary) {
+      itinerary.days = days;
+      itinerary.status = itinerary.status || 'draft';
+      itinerary.metadata = {
+        ...(itinerary.metadata || {}),
+        lastModifiedBy: req.user._id,
+      };
+      await itinerary.save();
+      return res.status(200).json({ success: true, data: itinerary });
+    }
+    // Fallback: if the referenced itinerary is missing, create a fresh one
+  }
+
+  // Create new itinerary (first time)
+  itinerary = await Itinerary.create({
+    package: new mongoose.Types.ObjectId(),
+    days,
+    status: 'draft',
+    createdBy: req.user._id,
+  });
+
+  lead.currentItinerary = itinerary._id;
+  if (!lead.itineraryVersions) lead.itineraryVersions = [];
+  lead.itineraryVersions.push(itinerary._id);
+  await lead.save();
+
+  res.status(200).json({ success: true, data: itinerary });
+});
+
+// @desc    Get a lead's current itinerary
+// @route   GET /api/v1/leads/:id/itinerary
+// @access  Private (Admin, SalesRep)
+export const getLeadItinerary = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
+  }
+  if (!lead.currentItinerary) {
+    return res.status(200).json({ success: true, data: null });
+  }
+  const itinerary = await Itinerary.findById(lead.currentItinerary);
+  res.status(200).json({ success: true, data: itinerary });
+});
+
+// @desc    Download current itinerary as PDF
+// @route   GET /api/v1/leads/:id/itinerary/pdf
+// @access  Private (Admin, SalesRep)
+export const downloadLeadItineraryPDF = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
+  }
+  if (!lead.currentItinerary) {
+    throw new AppError('No itinerary found for this lead', 404);
+  }
+  const itinerary = await Itinerary.findById(lead.currentItinerary);
+  if (!itinerary) {
+    throw new AppError('Itinerary not found', 404);
+  }
+
+  // Minimal package meta for PDF header (since we may not have a package)
+  const packageMeta = {
+    name: lead.destination || 'Custom Itinerary',
+    duration: itinerary.days?.length || 0,
+    destination: (itinerary.days?.[0]?.locations?.[0]) || (lead.city || ''),
+    price: 0,
+    inclusions: [],
+    exclusions: [],
+  };
+
+  const filePath = await generateLeadItineraryPDF(lead, itinerary);
+  return res.download(filePath, (err) => {
+    if (err) {
+      throw new AppError('Failed to download PDF', 500);
+    }
+  });
+});
+
 export default {
   createLead,
   getLeads,
@@ -337,4 +478,7 @@ export default {
   getMyLeads,
   getLeadStats,
   searchLeads,
+  setLeadItinerary,
+  getLeadItinerary,
+  downloadLeadItineraryPDF,
 };
