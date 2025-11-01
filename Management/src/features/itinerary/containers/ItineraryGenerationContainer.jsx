@@ -150,21 +150,44 @@ const ItineraryGenerationContainer = () => {
       console.log('[DEBUG] handleSaveNewPackage - All images:', images);
       console.log('[DEBUG] handleSaveNewPackage - Valid images:', validImages);
 
-      // Validate required fields
-      const requiredFields = {
-        name: 'Package Name',
-        category: 'Category',
-        destination: 'Destination',
-        description: 'Description'
-      };
+      // Validate required fields with detailed checks
+      const validationErrors = [];
 
-      const missingFields = Object.entries(requiredFields)
-        .filter(([key]) => !formData[key])
-        .map(([, label]) => label);
+      if (!formData.name || !formData.name.trim()) {
+        validationErrors.push('Package Name is required');
+      } else if (formData.name.trim().length < 3 || formData.name.trim().length > 100) {
+        validationErrors.push('Package Name must be between 3 and 100 characters');
+      }
 
-      if (missingFields.length > 0) {
-        const message = `Please fill in these required fields:\n${missingFields.map(f => `• ${f}`).join('\n')}`;
-        Swal.fire('Missing Required Fields', message, 'error');
+      if (!formData.category || !formData.category.trim()) {
+        validationErrors.push('Category is required');
+      }
+
+      if (!formData.destination || !formData.destination.trim()) {
+        validationErrors.push('Destination is required');
+      } else if (formData.destination.trim().length < 2 || formData.destination.trim().length > 100) {
+        validationErrors.push('Destination must be between 2 and 100 characters');
+      }
+
+      if (!formData.description || !formData.description.trim()) {
+        validationErrors.push('Description is required');
+      } else if (formData.description.trim().length < 10) {
+        validationErrors.push(`Description must be at least 10 characters (currently ${formData.description.trim().length} characters)`);
+      } else if (formData.description.trim().length > 2000) {
+        validationErrors.push('Description must not exceed 2000 characters');
+      }
+
+      if (!formData.price || parseFloat(formData.price) < 0) {
+        validationErrors.push('Valid Price is required');
+      }
+
+      if (!formData.duration || parseInt(formData.duration, 10) < 1) {
+        validationErrors.push('Duration must be at least 1 day');
+      }
+
+      if (validationErrors.length > 0) {
+        const message = `Please fix the following errors:\n${validationErrors.map(f => `• ${f}`).join('\n')}`;
+        Swal.fire('Validation Errors', message, 'error');
         return;
       }
 
@@ -194,7 +217,7 @@ const ItineraryGenerationContainer = () => {
           return cleanDay;
         });
 
-      // Ensure numeric fields are numbers
+      // Ensure numeric fields are numbers and remove _id for new packages
       const sanitizedData = {
         ...formData,
         price: parseFloat(formData.price) || 0,
@@ -203,6 +226,12 @@ const ItineraryGenerationContainer = () => {
         days: cleanDays, // Use cleaned days
         images: validImages, // Use only valid images (no temp blobs)
       };
+
+      // Remove _id field for new packages (should not be included in POST request)
+      delete sanitizedData._id;
+      delete sanitizedData.id;
+      delete sanitizedData._v;
+      delete sanitizedData.__v;
 
       console.log('[DEBUG] ==> SAVING PACKAGE <==');
       console.log('[DEBUG] Valid images to save:', validImages);
@@ -267,20 +296,44 @@ const ItineraryGenerationContainer = () => {
       console.log('[DEBUG] formData received:', formData);
       console.log('[DEBUG] formData._id:', formData._id, 'formData.id:', formData.id);
       
-      // Validate required fields
-      const requiredFields = {
-        name: 'Package Name',
-        category: 'Category',
-        destination: 'Destination',
-        description: 'Description'
-      };
+      // Validate required fields with detailed checks
+      const validationErrors = [];
 
-      const missingFields = Object.entries(requiredFields)
-        .filter(([key]) => !formData[key] || formData[key].toString().trim() === '')
-        .map(([, label]) => label);
+      if (!formData.name || !formData.name.trim()) {
+        validationErrors.push('Package Name is required');
+      } else if (formData.name.trim().length < 3 || formData.name.trim().length > 100) {
+        validationErrors.push('Package Name must be between 3 and 100 characters');
+      }
 
-      if (missingFields.length > 0) {
-        Swal.fire('Validation Error', `Please fill in: ${missingFields.join(', ')}`, 'error');
+      if (!formData.category || !formData.category.trim()) {
+        validationErrors.push('Category is required');
+      }
+
+      if (!formData.destination || !formData.destination.trim()) {
+        validationErrors.push('Destination is required');
+      } else if (formData.destination.trim().length < 2 || formData.destination.trim().length > 100) {
+        validationErrors.push('Destination must be between 2 and 100 characters');
+      }
+
+      if (!formData.description || !formData.description.trim()) {
+        validationErrors.push('Description is required');
+      } else if (formData.description.trim().length < 10) {
+        validationErrors.push(`Description must be at least 10 characters (currently ${formData.description.trim().length} characters)`);
+      } else if (formData.description.trim().length > 2000) {
+        validationErrors.push('Description must not exceed 2000 characters');
+      }
+
+      if (!formData.price || parseFloat(formData.price) < 0) {
+        validationErrors.push('Valid Price is required');
+      }
+
+      if (!formData.duration || parseInt(formData.duration, 10) < 1) {
+        validationErrors.push('Duration must be at least 1 day');
+      }
+
+      if (validationErrors.length > 0) {
+        const message = `Please fix the following errors:\n${validationErrors.map(f => `• ${f}`).join('\n')}`;
+        Swal.fire('Validation Errors', message, 'error');
         return;
       }
 
@@ -328,6 +381,14 @@ const ItineraryGenerationContainer = () => {
         days: cleanDays, // Use cleaned days
         images: validImages, // Use only valid images (no temp blobs)
       };
+
+      // Remove internal fields that should not be updated
+      delete sanitizedData._id;
+      delete sanitizedData._v;
+      delete sanitizedData.__v;
+      delete sanitizedData.createdAt;
+      delete sanitizedData.createdBy;
+      delete sanitizedData.slug; // Let backend regenerate if needed
 
       console.log('[DEBUG] ==> UPDATING PACKAGE <==');
       console.log('[DEBUG] Valid images to save:', validImages);

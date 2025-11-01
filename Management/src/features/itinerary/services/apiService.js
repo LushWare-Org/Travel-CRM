@@ -82,16 +82,39 @@ class ApiService {
   }
 
   static async createPackage(packageData) {
+    // Clean the data - remove _id fields and internal properties
+    const cleanData = {
+      ...packageData,
+    };
+    delete cleanData._id;
+    delete cleanData.id;
+    delete cleanData._v;
+    delete cleanData.__v;
+    delete cleanData.createdAt;
+    delete cleanData.createdBy;
+    delete cleanData.slug;
+    
     return makeRequest('/packages', {
       method: 'POST',
-      body: JSON.stringify(packageData),
+      body: JSON.stringify(cleanData),
     });
   }
 
   static async updatePackage(id, packageData) {
+    // Clean the data - remove _id fields and internal properties
+    const cleanData = {
+      ...packageData,
+    };
+    delete cleanData._id;
+    delete cleanData._v;
+    delete cleanData.__v;
+    delete cleanData.createdAt;
+    delete cleanData.createdBy;
+    delete cleanData.slug;
+    
     return makeRequest(`/packages/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(packageData),
+      body: JSON.stringify(cleanData),
     });
   }
 

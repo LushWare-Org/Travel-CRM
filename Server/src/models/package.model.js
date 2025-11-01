@@ -137,10 +137,21 @@ const packageSchema = new mongoose.Schema(
   },
 );
 
-// Create slug from name
-packageSchema.pre('save', function createSlug(next) {
+// Create slug from name with uniqueness handling
+packageSchema.pre('save', async function createSlug(next) {
   if (this.isModified('name')) {
-    this.slug = slugify(this.name, { lower: true });
+    let slug = slugify(this.name, { lower: true });
+    
+    // For new documents, check for slug conflicts
+    if (this.isNew) {
+      let existingCount = await this.constructor.countDocuments({ slug });
+      if (existingCount > 0) {
+        // Append timestamp to make slug unique
+        slug = `${slug}-${Date.now()}`;
+      }
+    }
+    
+    this.slug = slug;
   }
   next();
 });
