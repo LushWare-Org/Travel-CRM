@@ -112,6 +112,23 @@ const packageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    customizedForLead: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Lead',
+    },
+    originalPackage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Package',
+    },
+    customizedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    customizationNotes: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Customization notes cannot exceed 500 characters'],
+    },
   },
   {
     timestamps: true,
@@ -128,12 +145,12 @@ packageSchema.pre('save', function createSlug(next) {
   next();
 });
 
-// Virtual for reviews
-packageSchema.virtual('reviews', {
-  ref: 'Review',
-  foreignField: 'package',
-  localField: '_id',
-});
+// Virtual for reviews (commented out until Review model is created)
+// packageSchema.virtual('reviews', {
+//   ref: 'Review',
+//   foreignField: 'package',
+//   localField: '_id',
+// });
 
 // Indexes for better query performance
 packageSchema.index({ slug: 1 }, { unique: true });
@@ -147,6 +164,8 @@ packageSchema.index({ duration: 1 });
 packageSchema.index({ rating: -1 });
 packageSchema.index({ bookings: -1 });
 packageSchema.index({ createdAt: -1 });
+packageSchema.index({ customizedForLead: 1 });
+packageSchema.index({ originalPackage: 1 });
 
 // Text index for full-text search
 packageSchema.index({

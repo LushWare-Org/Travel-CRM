@@ -24,6 +24,7 @@ const NewEditPackageForm = ({
   onImageRemove,
   images, // Images state from parent container
   isUploadingImages, // Upload state from parent
+  hideLeadManagementButtons = false, // Hide buttons when used in lead management
 }) => {
   const [localFormData, setLocalFormData] = useState(formData);
   const [showItinerary, setShowItinerary] = useState(false);
@@ -185,20 +186,22 @@ const NewEditPackageForm = ({
               destination={localFormData.destination}
             />
 
-            <div className="flex gap-3">
-              <button
-                onClick={handleItinerarySubmit}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
-              >
-                Submit Itinerary
-              </button>
-              <button
-                onClick={handleResetItinerary}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
-              >
-                Reset Itinerary
-              </button>
-            </div>
+            {!hideLeadManagementButtons && (
+              <div className="flex gap-3">
+                <button
+                  onClick={handleItinerarySubmit}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+                >
+                  Submit Itinerary
+                </button>
+                <button
+                  onClick={handleResetItinerary}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
+                >
+                  Reset Itinerary
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -214,26 +217,43 @@ const NewEditPackageForm = ({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 pt-6 border-t border-gray-200">
-        <button
-          onClick={() => handleSave('draft')}
-          className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
-        >
-          Save as Draft
-        </button>
-        <button
-          onClick={() => handleSave('published')}
-          className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
-        >
-          Publish
-        </button>
-        <button
-          onClick={onCancel}
-          className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-200 transition-colors font-medium"
-        >
-          Cancel
-        </button>
-      </div>
+      {!hideLeadManagementButtons ? (
+        <div className="flex gap-3 pt-6 border-t border-gray-200">
+          <button
+            onClick={() => handleSave('draft')}
+            className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
+          >
+            Save as Draft
+          </button>
+          <button
+            onClick={() => handleSave('published')}
+            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+          >
+            Publish
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-200 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-3 pt-6 border-t border-gray-200">
+          <button
+            onClick={() => handleSave('published')}
+            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+          >
+            Save Customized Package
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-200 transition-colors font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 };

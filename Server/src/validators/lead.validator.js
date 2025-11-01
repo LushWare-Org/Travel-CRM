@@ -126,6 +126,18 @@ export const createLeadSchema = Joi.object({
     .messages({
       'string.pattern.base': 'assignedTo must be a valid ObjectId',
     }),
+  package: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .allow(null, '')
+    .messages({
+      'string.pattern.base': 'Package must be a valid ObjectId',
+    }),
+  packageName: Joi.string()
+    .trim()
+    .allow(null, '')
+    .messages({
+      'string.base': 'Package name must be a string',
+    }),
   remarks: Joi.array()
     .items(
       Joi.object({
@@ -191,6 +203,18 @@ export const updateLeadSchema = Joi.object({
       'any.only': 'Priority must be one of: low, medium, high',
     }),
   assignedTo: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).allow(null),
+  package: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .allow(null, '')
+    .messages({
+      'string.pattern.base': 'Package must be a valid ObjectId',
+    }),
+  packageName: Joi.string()
+    .trim()
+    .allow(null, '')
+    .messages({
+      'string.base': 'Package name must be a string',
+    }),
   remarks: Joi.array()
     .items(
       Joi.object({

@@ -23,10 +23,18 @@ class PackageService {
       const { days, ...pkgData } = packageData;
 
       // Create the package first
-      const newPackage = await Package.create({
+      // Phase 5: Handle customization tracking fields
+      const packagePayload = {
         ...pkgData,
         createdBy: userId,
-      });
+      };
+
+      // If this is a customized package, set customizedBy
+      if (pkgData.customizedForLead || pkgData.originalPackage) {
+        packagePayload.customizedBy = userId;
+      }
+
+      const newPackage = await Package.create(packagePayload);
 
       // Create itinerary if days are provided
       if (days && Array.isArray(days) && days.length > 0) {
@@ -176,15 +184,16 @@ class PackageService {
     try {
       const pkg = await Package.findById(packageId)
         .populate('createdBy', 'name email role')
-        .populate('itinerary')
-        .populate({
-          path: 'reviews',
-          select: 'rating comment author createdAt',
-          populate: {
-            path: 'author',
-            select: 'name email',
-          },
-        });
+        .populate('itinerary');
+        // Reviews population commented out until Review model is created
+        // .populate({
+        //   path: 'reviews',
+        //   select: 'rating comment author createdAt',
+        //   populate: {
+        //     path: 'author',
+        //     select: 'name email',
+        //   },
+        // });
 
       if (!pkg) {
         throw new AppError('Package not found', 404);
