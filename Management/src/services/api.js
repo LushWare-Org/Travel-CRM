@@ -232,6 +232,26 @@ export const adminAPI = {
     // fetch active sales reps, large limit to avoid pagination in UI
     return api.get('/admin/users', { role: 'salesRep', isActive: true, limit: 200, page: 1 });
   },
+  getSalesRepsAndAdmins: async () => {
+    const api = new ApiService();
+    // fetch both active sales reps and admins, large limit to avoid pagination in UI
+    // Make two separate calls and combine results
+    const [salesRepsRes, adminsRes] = await Promise.all([
+      api.get('/admin/users', { role: 'salesRep', isActive: true, limit: 200, page: 1 }),
+      api.get('/admin/users', { role: 'admin', isActive: true, limit: 200, page: 1 }),
+    ]);
+    
+    // Combine results
+    const salesReps = (salesRepsRes.status === 'success' && salesRepsRes.data?.users) ? salesRepsRes.data.users : [];
+    const admins = (adminsRes.status === 'success' && adminsRes.data?.users) ? adminsRes.data.users : [];
+    
+    return {
+      status: 'success',
+      data: {
+        users: [...salesReps, ...admins],
+      },
+    };
+  },
 };
 
 // Billing/Quotation API Methods
@@ -262,6 +282,94 @@ export const quotationAPI = {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  },
+};
+
+// Invoice API Methods
+export const invoiceAPI = {
+  create: async (payload) => {
+    const api = new ApiService();
+    return api.post('/billing/invoices', payload);
+  },
+  getByLead: async (leadId) => {
+    const api = new ApiService();
+    return api.get('/billing/invoices/lead/' + leadId);
+  },
+  send: async (invoiceId) => {
+    const api = new ApiService();
+    return api.post(`/billing/invoices/${invoiceId}/send`);
+  },
+  downloadPDF: async (invoiceId) => {
+    const url = `${API_BASE_URL}/billing/invoices/${invoiceId}/pdf`;
+    const response = await fetch(url, { headers: new ApiService().getAuthHeaders() });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = `invoice-${invoiceId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+};
+
+// Payment Receipt API Methods
+export const receiptAPI = {
+  create: async (payload) => {
+    const api = new ApiService();
+    return api.post('/billing/receipts', payload);
+  },
+  getByLead: async (leadId) => {
+    const api = new ApiService();
+    return api.get('/billing/receipts/lead/' + leadId);
+  },
+  send: async (receiptId) => {
+    const api = new ApiService();
+    return api.post(`/billing/receipts/${receiptId}/send`);
+  },
+  downloadPDF: async (receiptId) => {
+    const url = `${API_BASE_URL}/billing/receipts/${receiptId}/pdf`;
+    const response = await fetch(url, { headers: new ApiService().getAuthHeaders() });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = `receipt-${receiptId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+};
+
+// Package API Methods
+export const packageAPI = {
+  // Get all packages
+  getAll: async (params = {}) => {
+    const api = new ApiService();
+    // Validator only allows limit up to 100, so use that
+    const queryParams = { limit: 100, page: 1, ...params };
+    return api.get('/packages', queryParams);
+  },
+  // Get single package
+  getById: async (id) => {
+    const api = new ApiService();
+    return api.get(`/packages/${id}`);
+  },
+  // Create new package
+  create: async (packageData) => {
+    const api = new ApiService();
+    return api.post('/packages', packageData);
+  },
+  // Update package
+  update: async (id, packageData) => {
+    const api = new ApiService();
+    return api.put(`/packages/${id}`, packageData);
   },
 };
 
