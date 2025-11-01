@@ -33,8 +33,8 @@ class PackageService {
       delete pkgData._v;
       delete pkgData.__v;
 
-      // Create the package first (without itinerary reference initially)
-      const newPackage = await Package.create({
+      // Prepare package payload
+      const packagePayload = {
         ...pkgData,
         createdBy: userId,
       };
