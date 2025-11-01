@@ -9,7 +9,6 @@ import {
   RemarksDialog, 
   FilterDialog, 
   SettingsDialog, 
-  ItineraryDialog,
   LeadStats,
   LeadFilters,
   LeadTable
@@ -25,7 +24,6 @@ const LeadManagement = () => {
   const [showRemarksDialog, setShowRemarksDialog] = useState(false);
   const [remarksLead, setRemarksLead] = useState(null);
   const [leadEditForm, setLeadEditForm] = useState(null);
-  const [showItineraryDialog, setShowItineraryDialog] = useState(false);
   const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState([]);
@@ -69,11 +67,11 @@ const LeadManagement = () => {
     })();
   }, []);
 
-  // Fetch sales reps (admin-only; ignore errors if not admin)
+  // Fetch sales reps and admins (admin-only; ignore errors if not admin)
   useEffect(() => {
     (async () => {
       try {
-        const res = await adminAPI.getSalesReps();
+        const res = await adminAPI.getSalesRepsAndAdmins();
         if (res.status === 'success' && res.data?.users) {
           setSalesReps(res.data.users.map(u => ({ id: u._id || u.id, name: u.name })));
         }
@@ -339,10 +337,6 @@ const LeadManagement = () => {
             setRemarksLead(lead);
             setShowRemarksDialog(true);
           }}
-          onItineraryClick={(lead) => {
-            setSelectedLead(lead);
-            setShowItineraryDialog(true);
-          }}
           onEditClick={(lead) => {
             setSelectedLead(lead);
             setLeadEditForm({
@@ -358,6 +352,18 @@ const LeadManagement = () => {
               time: lead.time,
               status: lead.status,
             });
+          }}
+          onQuotationClick={(lead) => {
+            toast.success('Quotation feature coming soon!');
+            // TODO: Implement quotation dialog/functionality
+          }}
+          onInvoiceClick={(lead) => {
+            toast.success('Invoice feature coming soon!');
+            // TODO: Implement invoice dialog/functionality
+          }}
+          onReceiptClick={(lead) => {
+            toast.success('Receipt feature coming soon!');
+            // TODO: Implement receipt dialog/functionality
           }}
           currentPage={currentPage}
           totalPages={totalPages}
@@ -429,14 +435,6 @@ const LeadManagement = () => {
           onPlatformFilterChange={handlePlatformFilterChange}
           onClear={clearFilters}
           onApply={applyFilters}
-        />
-
-        {/* Itinerary Dialog */}
-        <ItineraryDialog
-          isOpen={showItineraryDialog}
-          onClose={() => setShowItineraryDialog(false)}
-          lead={selectedLead}
-          onSuccess={fetchLeads}
         />
 
         {/* Settings Dialog (Admin) */}

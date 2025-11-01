@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Plus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { leadAPI } from '../../../services/api';
+import { leadAPI, packageAPI } from '../../../services/api';
+import LocationAutocomplete from './LocationAutocomplete';
 
 const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [packages, setPackages] = useState([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -17,8 +20,49 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     platform: "",
     travelDate: "",
     time: "",
+    package: "",
+    packageName: "",
     remarks: [{ text: "", date: "" }],
   });
+
+  // Fetch packages when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchPackages();
+    }
+  }, [isOpen]);
+
+  const fetchPackages = async () => {
+    try {
+      setLoadingPackages(true);
+      
+      // Fetch all packages (without isActive filter since it needs to be boolean, we'll filter client-side)
+      // Validator only allows limit up to 100, so we'll fetch up to 100 and filter client-side
+      const response = await packageAPI.getAll();
+      
+      if (response && response.success === true && response.data) {
+        // response.data is already the packages array from the controller
+        let packagesList = Array.isArray(response.data) ? response.data : [];
+        
+        // Filter to only show active packages
+        packagesList = packagesList.filter(pkg => pkg.isActive !== false);
+        
+        setPackages(packagesList);
+      } else {
+        console.error('Unexpected response format:', response);
+        setPackages([]);
+      }
+    } catch (error) {
+      console.error('Error fetching packages:', error);
+      setPackages([]);
+      // Only show error if it's not an auth issue (401/403)
+      if (error.message && !error.message.includes('401') && !error.message.includes('403')) {
+        toast.error('Failed to load packages');
+      }
+    } finally {
+      setLoadingPackages(false);
+    }
+  };
 
   const addRemarkField = () => {
     setFormData({
@@ -65,6 +109,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         source: "manual",
         travelDate: formData.travelDate || undefined,
         time: formData.time || undefined,
+        package: formData.package || undefined,
+        packageName: formData.packageName || undefined,
         remarks: formData.remarks.filter((r) => r.text.trim() !== "").map(r => ({
           text: r.text.trim(),
           date: r.date || new Date().toISOString().split("T")[0]
@@ -88,6 +134,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         platform: "",
         travelDate: "",
         time: "",
+        package: "",
+        packageName: "",
         remarks: [{ text: "", date: "" }],
       });
 
@@ -145,12 +193,10 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Departure</label>
-              <input
-                type="text"
+              <LocationAutocomplete
                 value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter departure city"
+                onChange={(value) => setFormData({ ...formData, city: value })}
+                placeholder="e.g., Colombo, Sri Lanka"
               />
             </div>
             <div>
@@ -197,6 +243,41 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Package</label>
+              <select
+                value={formData.package || ''}
+                onChange={(e) => {
+                  const packageId = e.target.value;
+                  const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
+                  setFormData({ 
+                    ...formData, 
+                    package: packageId,
+                    packageName: selectedPackage?.name || '',
+                    destination: selectedPackage?.destination || formData.destination // Auto-fill destination if package has one
+                  });
+                }}
+                disabled={loadingPackages}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
+                {packages && packages.length > 0 ? (
+                  packages.map((pkg) => (
+                    <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
+                      {pkg.name || 'Unnamed Package'}
+                    </option>
+                  ))
+                ) : (
+                  !loadingPackages && <option value="" disabled>No packages found</option>
+                )}
+              </select>
+              {packages.length === 0 && !loadingPackages && (
+                <p className="text-xs text-gray-500 mt-1">No packages available (Found {packages.length} packages)</p>
+              )}
+              {packages.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">{packages.length} package(s) available</p>
+              )}
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Destination</label>
               <input
                 type="text"
@@ -206,6 +287,9 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 placeholder="e.g., Paris, France"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
               <select
