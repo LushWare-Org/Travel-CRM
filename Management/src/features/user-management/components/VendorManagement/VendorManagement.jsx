@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash, Building2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash, Building2, CheckCircle, AlertCircle, Copy, Mail } from 'lucide-react';
 import { 
   UserTableHeader, 
   Pagination, 
@@ -24,10 +24,15 @@ const VendorManagement = () => {
       phone: '+1-555-1111',
       location: 'Maldives',
       verificationStatus: 'verified',
+      accountStatus: 'verified',
       createdAt: '2024-02-01',
+      invitationSentAt: '2024-02-01',
+      firstLoginAt: '2024-02-02',
       rating: 4.8,
       partneredSince: '2024-02-01',
-      contactPerson: 'Ahmed Hassan'
+      contactPerson: 'Ahmed Hassan',
+      passwordExpireDate: '2025-02-01',
+      twoFactorEnabled: true
     },
     {
       id: 2,
@@ -37,10 +42,15 @@ const VendorManagement = () => {
       phone: '+1-555-2222',
       location: 'Multiple Cities',
       verificationStatus: 'verified',
+      accountStatus: 'verified',
       createdAt: '2024-01-15',
+      invitationSentAt: '2024-01-15',
+      firstLoginAt: '2024-01-16',
       rating: 4.5,
       partneredSince: '2024-01-15',
-      contactPerson: 'Maria Garcia'
+      contactPerson: 'Maria Garcia',
+      passwordExpireDate: '2025-01-15',
+      twoFactorEnabled: false
     },
     {
       id: 3,
@@ -50,10 +60,15 @@ const VendorManagement = () => {
       phone: '+1-555-3333',
       location: 'Nepal',
       verificationStatus: 'pending',
+      accountStatus: 'pending_first_login',
       createdAt: '2024-10-01',
+      invitationSentAt: '2024-10-01',
+      firstLoginAt: null,
       rating: 0,
       partneredSince: null,
-      contactPerson: 'Raj Patel'
+      contactPerson: 'Raj Patel',
+      passwordExpireDate: null,
+      twoFactorEnabled: false
     }
   ]);
 
@@ -64,8 +79,13 @@ const VendorManagement = () => {
   const [showNewVendorDialog, setShowNewVendorDialog] = useState(false);
   const [showEditVendorDialog, setShowEditVendorDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResendInviteConfirm, setShowResendInviteConfirm] = useState(false);
+  const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [vendorToDelete, setVendorToDelete] = useState(null);
+  const [vendorToResendInvite, setVendorToResendInvite] = useState(null);
+  const [vendorToResetPassword, setVendorToResetPassword] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -78,6 +98,137 @@ const VendorManagement = () => {
   });
 
   const ITEMS_PER_PAGE = 10;
+
+  // 🔐 Generate secure temporary password
+  const generateTemporaryPassword = () => {
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*';
+    
+    const allChars = uppercase + lowercase + numbers + symbols;
+    let password = '';
+    
+    // Ensure at least one of each type
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += symbols[Math.floor(Math.random() * symbols.length)];
+    
+    // Fill rest randomly to make 12 characters
+    for (let i = password.length; i < 12; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    
+    // Shuffle password
+    return password.split('').sort(() => Math.random() - 0.5).join('');
+  };
+
+  // 📧 Simulate sending invitation email
+  const sendInvitationEmail = (vendor, tempPassword) => {
+    console.log(`📧 Invitation email sent to ${vendor.email}`);
+    console.log(`
+      ╔════════════════════════════════════════════════════════════╗
+      ║         VENDOR PARTNER ACCOUNT INVITATION EMAIL            ║
+      ╚════════════════════════════════════════════════════════════╝
+      
+      To: ${vendor.email}
+      Subject: Welcome to Trip Sky Way - Vendor Partner Account
+      
+      ─────────────────────────────────────────────────────────────
+      
+      Dear ${vendor.contactPerson},
+      
+      Welcome to Trip Sky Way! Your vendor partner account has been
+      created and is ready for activation.
+      
+      🏢 BUSINESS DETAILS:
+      ├─ Business Name: ${vendor.name}
+      ├─ Type: ${vendor.type}
+      └─ Location: ${vendor.location}
+      
+      📋 ACCOUNT DETAILS:
+      ├─ Email: ${vendor.email}
+      ├─ Temporary Password: ${tempPassword}
+      └─ Invitation Link: https://tripskiway.com/auth/invite/${vendor.id}
+      
+      🔐 FIRST LOGIN INSTRUCTIONS:
+      1. Click the invitation link above (expires in 48 hours)
+      2. Enter your email and temporary password
+      3. You MUST create a new permanent password
+      4. Complete business verification steps
+      5. Your account will be activated after admin review
+      
+      ⏰ IMPORTANT: Temporary password expires in 48 hours
+      
+      PASSWORD REQUIREMENTS:
+      ├─ Minimum 12 characters
+      ├─ At least one uppercase letter (A-Z)
+      ├─ At least one lowercase letter (a-z)
+      ├─ At least one number (0-9)
+      └─ At least one special character (!@#$%^&*)
+      
+      📊 NEXT STEPS:
+      After first login, you can:
+      ├─ Manage your inventory/services
+      ├─ View bookings and reservations
+      ├─ Access reporting and analytics
+      ├─ Manage pricing and availability
+      └─ Track commissions and payments
+      
+      ✅ ACCOUNT VERIFICATION:
+      Your account is currently pending verification. Our team will
+      review your business details within 24-48 hours.
+      
+      If you have any questions or didn't request this account,
+      please contact support@tripskiway.com immediately.
+      
+      Best regards,
+      Trip Sky Way Partner Team
+      https://tripskiway.com/partner-support
+      
+      ─────────────────────────────────────────────────────────────
+    `);
+  };
+
+  // 📧 Simulate sending password reset email
+  const sendPasswordResetEmail = (vendor, tempPassword) => {
+    console.log(`📧 Password reset email sent to ${vendor.email}`);
+    console.log(`
+      ╔════════════════════════════════════════════════════════════╗
+      ║           PASSWORD RESET REQUEST                           ║
+      ╚════════════════════════════════════════════════════════════╝
+      
+      To: ${vendor.email}
+      Subject: Password Reset - Trip Sky Way Vendor Account
+      
+      ─────────────────────────────────────────────────────────────
+      
+      Dear ${vendor.contactPerson},
+      
+      A password reset has been initiated for your vendor account.
+      
+      🔑 NEW TEMPORARY PASSWORD: ${tempPassword}
+      🔗 Reset Link: https://tripskiway.com/auth/reset/${vendor.id}
+      
+      ⏰ This temporary password expires in 48 hours
+      
+      PASSWORD REQUIREMENTS:
+      ├─ Minimum 12 characters
+      ├─ At least one uppercase letter
+      ├─ At least one lowercase letter
+      ├─ At least one number
+      └─ At least one special character
+      
+      If you did not request this password reset, please contact
+      support@tripskiway.com immediately.
+      
+      Best regards,
+      Trip Sky Way Partner Team
+      
+      ─────────────────────────────────────────────────────────────
+    `);
+  };
 
   const filteredVendors = useMemo(() => {
     return vendors.filter(vendor => {
@@ -122,16 +273,29 @@ const VendorManagement = () => {
 
   const handleAddVendor = () => {
     if (formData.name && formData.type && formData.email && formData.location) {
+      const tempPassword = generateTemporaryPassword();
+      
       const newVendor = {
         id: Math.max(...vendors.map(v => v.id), 0) + 1,
         ...formData,
         verificationStatus: 'pending',
+        accountStatus: 'pending_first_login',
         createdAt: new Date().toISOString().split('T')[0],
+        invitationSentAt: new Date().toISOString().split('T')[0],
+        firstLoginAt: null,
         rating: 0,
-        partneredSince: null
+        partneredSince: null,
+        passwordExpireDate: null,
+        twoFactorEnabled: false
       };
+      
+      // Send invitation email
+      sendInvitationEmail(newVendor, tempPassword);
+      
       setVendors([...vendors, newVendor]);
       setShowNewVendorDialog(false);
+      setSuccessMessage(`✅ Invitation sent to ${formData.email}`);
+      setTimeout(() => setSuccessMessage(''), 5000);
       resetForm();
     }
   };
@@ -153,8 +317,54 @@ const VendorManagement = () => {
       ));
       setSelectedVendor(null);
       setShowEditVendorDialog(false);
+      setSuccessMessage('✅ Vendor updated successfully');
+      setTimeout(() => setSuccessMessage(''), 5000);
       resetForm();
     }
+  };
+
+  // 🔄 Resend invitation to pending vendor
+  const handleResendInvitation = (vendor) => {
+    setVendorToResendInvite(vendor);
+    setShowResendInviteConfirm(true);
+  };
+
+  const confirmResendInvitation = () => {
+    const tempPassword = generateTemporaryPassword();
+    sendInvitationEmail(vendorToResendInvite, tempPassword);
+    
+    setVendors(vendors.map(v => 
+      v.id === vendorToResendInvite.id 
+        ? { ...v, invitationSentAt: new Date().toISOString().split('T')[0] }
+        : v
+    ));
+    
+    setSuccessMessage(`✅ Invitation resent to ${vendorToResendInvite.email}`);
+    setTimeout(() => setSuccessMessage(''), 5000);
+    setShowResendInviteConfirm(false);
+    setVendorToResendInvite(null);
+  };
+
+  // 🔑 Force password reset
+  const handleForcePasswordReset = (vendor) => {
+    setVendorToResetPassword(vendor);
+    setShowPasswordResetConfirm(true);
+  };
+
+  const confirmPasswordReset = () => {
+    const tempPassword = generateTemporaryPassword();
+    sendPasswordResetEmail(vendorToResetPassword, tempPassword);
+    
+    setVendors(vendors.map(v => 
+      v.id === vendorToResetPassword.id 
+        ? { ...v, accountStatus: 'pending_password_reset' }
+        : v
+    ));
+    
+    setSuccessMessage(`✅ Password reset link sent to ${vendorToResetPassword.email}`);
+    setTimeout(() => setSuccessMessage(''), 5000);
+    setShowPasswordResetConfirm(false);
+    setVendorToResetPassword(null);
   };
 
   const handleDeleteVendor = (vendor) => {
@@ -167,22 +377,28 @@ const VendorManagement = () => {
     setShowDeleteConfirm(false);
     setVendorToDelete(null);
     setSelectedVendor(null);
+    setSuccessMessage(`✅ Vendor deleted successfully`);
+    setTimeout(() => setSuccessMessage(''), 5000);
   };
 
   const handleVerifyVendor = (vendor) => {
     setVendors(vendors.map(v =>
       v.id === vendor.id
-        ? { ...v, verificationStatus: 'verified', partneredSince: new Date().toISOString().split('T')[0] }
+        ? { ...v, verificationStatus: 'verified', accountStatus: 'verified', partneredSince: new Date().toISOString().split('T')[0] }
         : v
     ));
+    setSuccessMessage(`✅ Vendor verified successfully`);
+    setTimeout(() => setSuccessMessage(''), 5000);
   };
 
   const handleRejectVendor = (vendor) => {
     setVendors(vendors.map(v =>
       v.id === vendor.id
-        ? { ...v, verificationStatus: 'rejected' }
+        ? { ...v, verificationStatus: 'rejected', accountStatus: 'rejected' }
         : v
     ));
+    setSuccessMessage(`✅ Vendor rejected`);
+    setTimeout(() => setSuccessMessage(''), 5000);
   };
 
   const openEditDialog = (vendor) => {
@@ -201,6 +417,14 @@ const VendorManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <p className="text-green-800 font-medium">{successMessage}</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -217,6 +441,18 @@ const VendorManagement = () => {
           <Plus className="w-4 h-4" />
           Add Vendor
         </button>
+      </div>
+
+      {/* Security Info Banner */}
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-blue-900">Account & Security Policy</p>
+          <p className="text-sm text-blue-800 mt-1">
+            Vendors receive invitation emails with temporary passwords. They must set a permanent password on first login. 
+            Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
+          </p>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -280,6 +516,8 @@ const VendorManagement = () => {
         onDelete={handleDeleteVendor}
         onVerify={handleVerifyVendor}
         onReject={handleRejectVendor}
+        onResendInvite={handleResendInvitation}
+        onForcePasswordReset={handleForcePasswordReset}
       />
 
       <Pagination
@@ -300,10 +538,22 @@ const VendorManagement = () => {
         onSubmit={handleAddVendor}
         title="Add New Vendor"
         subtitle="Register a new partner (hotel, travel agent, service provider, etc.)"
-        submitLabel="Register Vendor"
+        submitLabel="Register & Send Invitation"
         submitColor="indigo"
       >
         <div className="space-y-4">
+          {/* What Happens Next */}
+          <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+            <p className="text-xs font-semibold text-indigo-900">WHAT HAPPENS NEXT:</p>
+            <ol className="text-xs text-indigo-800 mt-2 space-y-1 ml-4">
+              <li>1. ✅ Vendor account is created in the system</li>
+              <li>2. 🔐 Temporary password is generated automatically</li>
+              <li>3. 📧 Invitation email is sent to their address</li>
+              <li>4. 🔑 They must set permanent password on first login</li>
+              <li>5. ✓ Admin must verify business details before activation</li>
+            </ol>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Business Name" required>
               <input
@@ -321,7 +571,7 @@ const VendorManagement = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Select Type</option>
-                {VENDOR_TYPES.map(type => (
+                {['Hotel', 'Travel Agent', 'Resort', 'Restaurant', 'Car Rental', 'Tour Operator', 'Airline', 'Other'].map(type => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
@@ -380,12 +630,14 @@ const VendorManagement = () => {
             />
           </FormGroup>
 
-          <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-lg">
-            <p className="text-xs font-semibold text-indigo-900 mb-2">Verification Process</p>
-            <ul className="text-xs text-indigo-800 space-y-1">
-              <li>• New vendors will be marked as "Pending Review"</li>
-              <li>• Admin verification required before partnership activation</li>
-              <li>• Rating system updated after first booking</li>
+          <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+            <p className="text-xs font-semibold text-green-900 mb-2">🔐 Account Security</p>
+            <ul className="text-xs text-green-800 space-y-1">
+              <li>• Temporary password: Auto-generated (12 chars, secure)</li>
+              <li>• Sent via email: Vendor receives invitation link</li>
+              <li>• First login: Must create permanent password</li>
+              <li>• Verification: Admin reviews business details</li>
+              <li>• Password expires: After 90 days</li>
             </ul>
           </div>
         </div>
@@ -480,6 +732,34 @@ const VendorManagement = () => {
         confirmLabel="Delete"
         cancelLabel="Cancel"
         isDangerous={true}
+      />
+
+      {/* Resend Invitation Dialog */}
+      <ConfirmationDialog
+        isOpen={showResendInviteConfirm}
+        onClose={() => {
+          setShowResendInviteConfirm(false);
+          setVendorToResendInvite(null);
+        }}
+        onConfirm={confirmResendInvitation}
+        title="Resend Invitation"
+        description={`Resend invitation email to ${vendorToResendInvite?.email}? They will receive a new temporary password and invitation link.`}
+        confirmLabel="Resend"
+        cancelLabel="Cancel"
+      />
+
+      {/* Password Reset Dialog */}
+      <ConfirmationDialog
+        isOpen={showPasswordResetConfirm}
+        onClose={() => {
+          setShowPasswordResetConfirm(false);
+          setVendorToResetPassword(null);
+        }}
+        onConfirm={confirmPasswordReset}
+        title="Force Password Reset"
+        description={`Send password reset email to ${vendorToResetPassword?.email}? They will receive a new temporary password and must create a permanent one.`}
+        confirmLabel="Send Reset Email"
+        cancelLabel="Cancel"
       />
     </div>
   );

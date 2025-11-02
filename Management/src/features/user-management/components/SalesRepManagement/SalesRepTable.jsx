@@ -1,9 +1,9 @@
 import React from 'react';
-import { Edit, Trash } from 'lucide-react';
+import { Edit, Trash, Mail, Key } from 'lucide-react';
 import { STATUS_COLORS } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 
-const SalesRepTable = ({ reps, onEdit, onDelete }) => {
+const SalesRepTable = ({ reps, onEdit, onDelete, onResendInvite, onForcePasswordReset }) => {
   return (
     <div className="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
       <table className="min-w-full divide-y divide-gray-200">
@@ -53,17 +53,42 @@ const SalesRepTable = ({ reps, onEdit, onDelete }) => {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    {/* Resend Invitation - Show if pending first login */}
+                    {rep.accountStatus === 'pending_first_login' && (
+                      <button
+                        onClick={() => onResendInvite?.(rep)}
+                        className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600 flex-shrink-0"
+                        title="Resend Invitation Email"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {/* Force Password Reset - Show if account is active or needs reset */}
+                    {(rep.accountStatus === 'verified' || rep.accountStatus === 'pending_password_reset') && (
+                      <button
+                        onClick={() => onForcePasswordReset?.(rep)}
+                        className="p-2 hover:bg-purple-100 rounded-lg transition-colors text-purple-600 flex-shrink-0"
+                        title="Force Password Reset"
+                      >
+                        <Key className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {/* Edit Button */}
                     <button
                       onClick={() => onEdit(rep)}
-                      className="p-2 hover:bg-yellow-100 rounded-lg transition-colors text-yellow-600"
+                      className="p-2 hover:bg-yellow-100 rounded-lg transition-colors text-yellow-600 flex-shrink-0"
                       title="Edit"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
+
+                    {/* Delete Button */}
                     <button
                       onClick={() => onDelete(rep)}
-                      className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600"
+                      className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600 flex-shrink-0"
                       title="Delete"
                     >
                       <Trash className="w-4 h-4" />
