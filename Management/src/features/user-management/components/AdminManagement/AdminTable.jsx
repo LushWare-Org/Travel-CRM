@@ -37,7 +37,9 @@ const AdminTable = ({ admins, onEdit, onDelete, onSelectAdmin, onResendInvite, o
       case 'verified':
         return <span className="text-xs text-green-700 font-medium">✓ Verified</span>;
       case 'pending_first_login':
-        return <span className="text-xs text-blue-700 font-medium">Pending First Login</span>;
+        return <span className="text-xs text-blue-700 font-medium">🔐 Pending First Login</span>;
+      case 'pending_password_reset':
+        return <span className="text-xs text-orange-700 font-medium">🔄 Password Reset Required</span>;
       case 'pending_password_change':
         return <span className="text-xs text-orange-700 font-medium">Password Change Required</span>;
       default:
@@ -62,13 +64,13 @@ const AdminTable = ({ admins, onEdit, onDelete, onSelectAdmin, onResendInvite, o
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {admins.map(admin => (
-              <tr key={admin.id} className="hover:bg-gray-50 transition-colors">
+            {admins.map((admin, index) => (
+              <tr key={admin.id || admin._id || `admin-${index}-${admin.email}`} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4">
-                  <p className="font-medium text-gray-900">{admin.name}</p>
-                  <p className="text-xs text-gray-500">{admin.phone}</p>
+                  <p className="font-medium text-gray-900">{admin.name || '—'}</p>
+                  <p className="text-xs text-gray-500">{admin.phone || '—'}</p>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{admin.email}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{admin.email || '—'}</td>
                 <td className="px-6 py-4">
                   {getStatusBadge(admin)}
                 </td>

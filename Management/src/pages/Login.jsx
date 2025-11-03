@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
@@ -57,10 +58,36 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      const success = await login(formData.email, formData.password);
-      if (success) {
-        navigate('/');
+      // Use axios directly to handle the response properly
+      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'}/auth/login`, {
+        email: formData.email,
+        password: formData.password,
+      });
+
+      // Check if password change is required
+      if (response.data.data?.mustChangePassword) {
+        // Store temporary credentials and redirect to password reset
+        localStorage.setItem('resetEmail', formData.email);
+        localStorage.setItem('tempPassword', formData.password);
+        toast.success('🔐 Please set your new password');
+        navigate('/reset-password');
+        return;
       }
+
+      // Normal login flow
+      const { token: authToken, user: userData } = response.data.data;
+      localStorage.setItem('token', authToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      // Update auth context
+      axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+
+      toast.success('Login successful');
+      navigate('/');
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
+      toast.error(errorMessage);
+      console.error('Login error:', error);
     } finally {
       setIsSubmitting(false);
     }

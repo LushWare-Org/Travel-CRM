@@ -216,6 +216,9 @@ export const createUser = asyncHandler(async (req, res, next) => {
       role: userRole,
       createdBy: req.user.id,
       isEmailVerified: userRole !== 'customer', // Auto-verify non-customer users
+      // Set temporary password flags for admin users
+      isTempPassword: userRole === 'admin',
+      mustChangePassword: userRole === 'admin',
     });
 
     // Generate JWT token for the new user

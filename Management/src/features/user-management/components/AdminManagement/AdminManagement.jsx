@@ -71,7 +71,8 @@ const AdminManagement = () => {
           email: admin.email,
           phone: admin.phone || '',
           status: admin.isActive ? 'active' : 'inactive',
-          accountStatus: admin.isEmailVerified ? 'verified' : 'pending_first_login',
+          // Use mustChangePassword flag to determine account status
+          accountStatus: admin.mustChangePassword ? 'pending_password_reset' : (admin.isEmailVerified ? 'verified' : 'pending_first_login'),
           createdAt: admin.createdAt,
           lastActive: admin.lastLogin,
           permissions: admin.permissions || [],
@@ -80,7 +81,8 @@ const AdminManagement = () => {
           invitationSentAt: admin.createdAt,
           firstLoginAt: admin.lastLogin,
           isEmailVerified: admin.isEmailVerified,
-          isTempPassword: admin.isTempPassword
+          isTempPassword: admin.isTempPassword,
+          mustChangePassword: admin.mustChangePassword
         }));
         setAdmins(transformedAdmins);
       } else {
@@ -248,32 +250,44 @@ const AdminManagement = () => {
       });
 
       if (response.status === 'success') {
+        // Get user data from response
+        const userData = response.data?.user || response.data;
+        
+        // Verify we have the ID field
+        if (!userData._id && !userData.id) {
+          throw new Error('Invalid response: missing user ID');
+        }
+
         const newAdmin = {
-          id: response.data._id,
-          name: response.data.name,
-          email: response.data.email,
-          phone: response.data.phone,
+          id: userData._id || userData.id,
+          name: userData.name || formData.name,
+          email: userData.email || formData.email,
+          phone: userData.phone || phoneDigitsOnly,
           status: 'active',
-          accountStatus: 'pending_first_login',
-          createdAt: response.data.createdAt,
-          lastActive: null,
+          accountStatus: userData.mustChangePassword ? 'pending_password_reset' : (userData.isEmailVerified ? 'verified' : 'pending_first_login'),
+          createdAt: userData.createdAt || new Date().toISOString(),
+          lastActive: userData.lastLogin || null,
           permissions: formData.permissions || [],
           twoFactorEnabled: formData.twoFactorEnabled || false,
-          passwordExpireDate: null,
+          passwordExpireDate: userData.passwordExpireDate || null,
           invitationSentAt: new Date().toISOString(),
-          firstLoginAt: null
+          firstLoginAt: userData.lastLogin || null,
+          isEmailVerified: userData.isEmailVerified || false,
+          isTempPassword: userData.isTempPassword || true,
+          mustChangePassword: userData.mustChangePassword || true
         };
 
-        setAdmins([...admins, newAdmin]);
+        // Log email details AFTER creating the object (so email is defined)
+        console.log(`📧 Email sent to ${newAdmin.email}`);
+        console.log(`Temporary Password: ${tempPassword}`);
+
+        // Update state with new admin
+        setAdmins(prev => [...prev, newAdmin]);
         setShowNewAdminDialog(false);
         setSearchTerm(''); // Clear search bar after creation
         setSuccessMessage(`✅ Admin created! Invitation sent to ${newAdmin.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
-
-        // Log email details (in production, this would be sent via email service)
-        console.log(`📧 Email sent to ${newAdmin.email}`);
-        console.log(`Temporary Password: ${tempPassword}`);
       }
     } catch (err) {
       console.error('Error creating admin:', err);
