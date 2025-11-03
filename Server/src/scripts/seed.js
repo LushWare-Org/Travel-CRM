@@ -260,5 +260,42 @@ const seedDatabase = async () => {
   }
 };
 
+/**
+ * Reset Admin Password Utility
+ * Use this to reset admin@tripskyway.com password back to original
+ * Run with: node resetAdminPassword.js
+ */
+export const resetAdminPassword = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✓ Connected to MongoDB');
+
+    const admin = await User.findOne({ email: 'admin@tripskyway.com' });
+    
+    if (!admin) {
+      console.error('❌ Admin user not found');
+      process.exit(1);
+    }
+
+    // Reset password and clear temporary flags
+    admin.password = 'Admin@123456';
+    admin.isTempPassword = false;
+    admin.mustChangePassword = false;
+    admin.passwordChangedAt = Date.now();
+    
+    await admin.save();
+
+    console.log('✅ Admin password reset successfully!');
+    console.log('\n✓ Email: admin@tripskyway.com');
+    console.log('✓ Password: Admin@123456');
+    console.log('\nYou can now log in to the admin panel.\n');
+
+    process.exit(0);
+  } catch (error) {
+    console.error('Error resetting admin password:', error);
+    process.exit(1);
+  }
+};
+
 seedDatabase();
 
