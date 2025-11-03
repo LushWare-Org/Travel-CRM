@@ -1,3 +1,4 @@
+import fs from 'fs';
 import Invoice from '../models/invoice.model.js';
 import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
@@ -82,6 +83,25 @@ export const getInvoiceByLeadId = asyncHandler(async (req, res, next) => {
  * @access  Private (Admin, Staff)
  */
 export const createInvoice = asyncHandler(async (req, res, next) => {
+  // Verify lead exists and auto-populate customer info
+  const Lead = (await import('../models/lead.model.js')).default;
+  if (req.body.lead) {
+    const lead = await Lead.findById(req.body.lead);
+    if (!lead) {
+      return next(new AppError('Lead not found', 404));
+    }
+
+    // Auto-populate customer info from lead if not provided
+    if (!req.body.customer) {
+      req.body.customer = {
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        address: lead.address,
+      };
+    }
+  }
+
   req.body.createdBy = req.user.id;
 
   const invoice = await Invoice.create(req.body);
@@ -335,12 +355,25 @@ export const downloadInvoicePDF = asyncHandler(async (req, res, next) => {
     return next(new AppError('Invoice not found', 404));
   }
 
-  // TODO: Generate PDF
-  // const pdfBuffer = await pdfGenerator.generateInvoicePDF(invoice);
+  try {
+    const { generateInvoicePDF } = await import('../utils/billingPDFGenerator.js');
+    const pdfPath = await generateInvoicePDF(invoice, invoice.lead);
 
-  res.status(200).json({
-    success: true,
-    message: 'PDF generation feature to be implemented',
-    data: invoice,
-  });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="invoice-${invoice.invoiceNumber || invoice._id}.pdf"`);
+    
+    const fileStream = fs.createReadStream(pdfPath);
+    fileStream.pipe(res);
+
+    fileStream.on('end', () => {
+      // Optionally delete the file after sending (or keep it for caching)
+      // fs.unlinkSync(pdfPath);
+    });
+
+    fileStream.on('error', (error) => {
+      return next(new AppError('Error reading PDF file', 500));
+    });
+  } catch (error) {
+    return next(new AppError(`Error generating PDF: ${error.message}`, 500));
+  }
 });

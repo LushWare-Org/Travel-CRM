@@ -1,3 +1,4 @@
+import fs from 'fs';
 import PaymentReceipt from '../models/paymentReceipt.model.js';
 import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
@@ -326,12 +327,26 @@ export const downloadPaymentReceiptPDF = asyncHandler(async (req, res, next) => 
     return next(new AppError('Payment receipt not found', 404));
   }
 
-  // TODO: Generate PDF
-  // const pdfBuffer = await pdfGenerator.generateReceiptPDF(receipt);
+  try {
+    const { generateReceiptPDF } = await import('../utils/billingPDFGenerator.js');
+    const invoice = receipt.invoice || null;
+    const pdfPath = await generateReceiptPDF(receipt, invoice, receipt.lead);
 
-  res.status(200).json({
-    success: true,
-    message: 'PDF generation feature to be implemented',
-    data: receipt,
-  });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="receipt-${receipt.receiptNumber || receipt._id}.pdf"`);
+    
+    const fileStream = fs.createReadStream(pdfPath);
+    fileStream.pipe(res);
+
+    fileStream.on('end', () => {
+      // Optionally delete the file after sending (or keep it for caching)
+      // fs.unlinkSync(pdfPath);
+    });
+
+    fileStream.on('error', (error) => {
+      return next(new AppError('Error reading PDF file', 500));
+    });
+  } catch (error) {
+    return next(new AppError(`Error generating PDF: ${error.message}`, 500));
+  }
 });

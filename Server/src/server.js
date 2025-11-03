@@ -88,7 +88,10 @@ app.use(`/api/${API_VERSION}/admin`, adminRoutes);
 app.use(`/api/${API_VERSION}/packages`, packageRoutes);
 app.use(`/api/${API_VERSION}/bookings`, bookingRoutes);
 app.use(`/api/${API_VERSION}/leads`, leadRoutes);
+// Legacy route for backwards compatibility (if needed)
 app.use(`/api/${API_VERSION}/invoices`, invoiceRoutes);
+// Billing module route (preferred)
+app.use(`/api/${API_VERSION}/billing/invoices`, invoiceRoutes);
 app.use(`/api/${API_VERSION}/itineraries`, itineraryRoutes);
 app.use(`/api/${API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${API_VERSION}/notifications`, notificationRoutes);

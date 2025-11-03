@@ -16,6 +16,9 @@ router.get('/lead/:leadId', protect, paymentReceiptController.getPaymentReceipts
 // Get payment receipts by invoice
 router.get('/invoice/:invoiceId', protect, paymentReceiptController.getPaymentReceiptsByInvoiceId);
 
+// Download PDF (must be before :id route)
+router.get('/:id/pdf', protect, paymentReceiptController.downloadPaymentReceiptPDF);
+
 // Get payment receipt by ID
 router.get('/:id', protect, paymentReceiptController.getPaymentReceiptById);
 
@@ -36,8 +39,5 @@ router.put('/:id/reconcile', protect, authorize('admin'), paymentReceiptControll
 
 // Send payment receipt
 router.post('/:id/send', protect, authorize('admin', 'salesRep'), paymentReceiptController.sendPaymentReceipt);
-
-// Download PDF
-router.get('/:id/pdf', protect, paymentReceiptController.downloadPaymentReceiptPDF);
 
 export default router;

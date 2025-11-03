@@ -13,6 +13,9 @@ router.get('/', protect, quotationController.getAllQuotations);
 // Get quotations by lead
 router.get('/lead/:leadId', protect, quotationController.getQuotationsByLeadId);
 
+// Download PDF (must be before :id route)
+router.get('/:id/pdf', protect, quotationController.downloadQuotationPDF);
+
 // Get quotation by ID
 router.get('/:id', protect, quotationController.getQuotationById);
 

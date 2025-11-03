@@ -4,7 +4,7 @@ const paymentReceiptSchema = new mongoose.Schema(
   {
     receiptNumber: {
       type: String,
-      required: true,
+      required: false, // Auto-generated in pre-save hook
       unique: true,
       index: true,
     },

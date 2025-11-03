@@ -1,3 +1,4 @@
+import fs from 'fs';
 import Quotation from '../models/quotation.model.js';
 import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
@@ -313,4 +314,42 @@ export const getQuotationStats = asyncHandler(async (req, res) => {
       byStatus: stats,
     },
   });
+});
+
+/**
+ * @desc    Download quotation PDF
+ * @route   GET /api/v1/billing/quotations/:id/pdf
+ * @access  Private
+ */
+export const downloadQuotationPDF = asyncHandler(async (req, res, next) => {
+  const quotation = await Quotation.findById(req.params.id)
+    .populate('lead')
+    .populate('package')
+    .populate('createdBy');
+
+  if (!quotation) {
+    return next(new AppError('Quotation not found', 404));
+  }
+
+  try {
+    const { generateQuotationPDF } = await import('../utils/billingPDFGenerator.js');
+    const pdfPath = await generateQuotationPDF(quotation, quotation.lead);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="quotation-${quotation.quotationNumber || quotation._id}.pdf"`);
+    
+    const fileStream = fs.createReadStream(pdfPath);
+    fileStream.pipe(res);
+
+    fileStream.on('end', () => {
+      // Optionally delete the file after sending (or keep it for caching)
+      // fs.unlinkSync(pdfPath);
+    });
+
+    fileStream.on('error', (error) => {
+      return next(new AppError('Error reading PDF file', 500));
+    });
+  } catch (error) {
+    return next(new AppError(`Error generating PDF: ${error.message}`, 500));
+  }
 });

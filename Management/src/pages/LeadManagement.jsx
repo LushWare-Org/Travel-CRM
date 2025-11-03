@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import toast from 'react-hot-toast';
 import { useLocation } from "wouter";
-import { ArrowLeft, Plus, Search, Filter, MoreVertical, Phone, Mail, MapPin, Calendar, MessageSquare, Clock, X, Edit, Loader2, Save, Trash2 } from "lucide-react";
-import { leadAPI, adminAPI, quotationAPI } from "../services/api";
+import { Plus, Loader2 } from "lucide-react";
+import { leadAPI, adminAPI } from "../services/api";
 import { 
   NewLeadDialog, 
   EditLeadDialog, 
@@ -11,7 +11,10 @@ import {
   SettingsDialog, 
   LeadStats,
   LeadFilters,
-  LeadTable
+  LeadTable,
+  QuotationDialog,
+  InvoiceDialog,
+  ReceiptDialog
 } from "../features/lead-management/components";
 
 const LeadManagement = () => {
@@ -24,6 +27,10 @@ const LeadManagement = () => {
   const [showRemarksDialog, setShowRemarksDialog] = useState(false);
   const [remarksLead, setRemarksLead] = useState(null);
   const [leadEditForm, setLeadEditForm] = useState(null);
+  const [showQuotationDialog, setShowQuotationDialog] = useState(false);
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [billingLead, setBillingLead] = useState(null);
   const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState([]);
@@ -354,16 +361,16 @@ const LeadManagement = () => {
             });
           }}
           onQuotationClick={(lead) => {
-            toast.success('Quotation feature coming soon!');
-            // TODO: Implement quotation dialog/functionality
+            setBillingLead(lead);
+            setShowQuotationDialog(true);
           }}
           onInvoiceClick={(lead) => {
-            toast.success('Invoice feature coming soon!');
-            // TODO: Implement invoice dialog/functionality
+            setBillingLead(lead);
+            setShowInvoiceDialog(true);
           }}
           onReceiptClick={(lead) => {
-            toast.success('Receipt feature coming soon!');
-            // TODO: Implement receipt dialog/functionality
+            setBillingLead(lead);
+            setShowReceiptDialog(true);
           }}
           currentPage={currentPage}
           totalPages={totalPages}
@@ -445,6 +452,39 @@ const LeadManagement = () => {
           settingsForm={settingsForm}
           onSettingsFormChange={setSettingsForm}
           onSave={saveSettings}
+        />
+
+        {/* Quotation Dialog */}
+        <QuotationDialog
+          isOpen={showQuotationDialog}
+          onClose={() => {
+            setShowQuotationDialog(false);
+            setBillingLead(null);
+          }}
+          lead={billingLead}
+          onSuccess={fetchLeads}
+        />
+
+        {/* Invoice Dialog */}
+        <InvoiceDialog
+          isOpen={showInvoiceDialog}
+          onClose={() => {
+            setShowInvoiceDialog(false);
+            setBillingLead(null);
+          }}
+          lead={billingLead}
+          onSuccess={fetchLeads}
+        />
+
+        {/* Receipt Dialog */}
+        <ReceiptDialog
+          isOpen={showReceiptDialog}
+          onClose={() => {
+            setShowReceiptDialog(false);
+            setBillingLead(null);
+          }}
+          lead={billingLead}
+          onSuccess={fetchLeads}
         />
       </div>
     </div>
