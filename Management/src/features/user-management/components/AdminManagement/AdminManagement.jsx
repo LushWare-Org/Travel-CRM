@@ -378,28 +378,41 @@ const AdminManagement = () => {
       setIsSubmitting(true);
       setError(null);
 
-      const tempPassword = generateTemporaryPassword();
-      
-      // In a real app, you'd call an API to send password reset email
-      setAdmins(admins.map(a => 
-        a.id === admin.id 
-          ? { 
-              ...a, 
-              status: 'password_reset_required',
-              accountStatus: 'pending_password_change'
-            }
-          : a
-      ));
-      
-      setSuccessMessage(`✅ Password reset email sent to ${admin.email}`);
-      setTimeout(() => setSuccessMessage(''), 5000);
+      // ✅ Call the backend API to force password reset and send email
+      const response = await adminService.resetUserPassword(admin.id);
 
-      // Log email details
-      console.log(`📧 Password reset email sent to ${admin.email}`);
-      console.log(`Temporary Password: ${tempPassword}`);
+      if (response.status === 'success') {
+        // Update admin status to reflect password reset
+        setAdmins(admins.map(a => 
+          a.id === admin.id 
+            ? { 
+                ...a, 
+                status: 'password_reset_required',
+                accountStatus: 'pending_password_change',
+                isTempPassword: true
+              }
+            : a
+        ));
+        
+        setSuccessMessage(`✅ Password reset email sent to ${admin.email}`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+
+        console.log(`📧 Password reset email sent to ${admin.email}`);
+        console.log(`Response:`, response);
+      } else {
+        setError(response.message || 'Failed to send password reset email');
+      }
     } catch (err) {
       console.error('Error sending password reset:', err);
-      setError(err.message || 'Failed to send password reset email');
+      
+      // Provide better error messages
+      let errorMessage = err.message || 'Failed to send password reset email';
+      
+      if (err.message.includes('Cannot reset other admin passwords')) {
+        errorMessage = '🔒 Security Policy: Admins can only reset their own password or non-admin user passwords. You cannot reset another admin\'s password.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

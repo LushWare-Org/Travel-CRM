@@ -192,6 +192,22 @@ class AdminService {
   }
 
   /**
+   * Force password reset for a user (admin only)
+   * Generates a temporary password and sends reset email
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Success response with message
+   */
+  async resetUserPassword(userId) {
+    try {
+      const response = await this.api.post(`/admin/users/${userId}/reset-password`);
+      return response;
+    } catch (error) {
+      console.error(`Error resetting password for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * ==================== ADMIN OPERATIONS ====================
    */
 
