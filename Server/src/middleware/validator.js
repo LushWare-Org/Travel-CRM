@@ -2,7 +2,7 @@ import { validationResult } from 'express-validator';
 import AppError from '../utils/appError.js';
 
 /**
- * Validation middleware for Joi schemas
+ * Validation middleware for Joi schemas (body validation only)
  * @param {Object} schema - Joi validation schema
  * @returns {Function} Express middleware function
  */
@@ -23,6 +23,34 @@ export const validate = (schema) => (req, res, next) => {
 
   // Replace request body with validated value
   req.body = value;
+  return next();
+};
+
+/**
+ * Validation middleware for Joi schemas with flexible request location
+ * @param {Object} schema - Joi validation schema
+ * @param {String} location - Where to validate ('body', 'query', 'params')
+ * @returns {Function} Express middleware function
+ */
+export const validateRequest = (schema, location = 'body') => (req, res, next) => {
+  const dataToValidate = req[location];
+
+  const { error, value } = schema.validate(dataToValidate, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+
+  if (error) {
+    const formattedErrors = error.details.map((detail) => ({
+      field: detail.path.join('.'),
+      message: detail.message,
+    }));
+
+    return next(new AppError('Validation failed', 400, formattedErrors));
+  }
+
+  // Replace request data with validated value
+  req[location] = value;
   return next();
 };
 

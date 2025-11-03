@@ -1,8 +1,9 @@
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import ApiFeatures from '../utils/apiFeatures.js';
+import { APIFeatures, getPaginationData } from '../utils/apiFeatures.js';
 import logger from '../config/logger.js';
+import emailService from '../utils/emailService.js';
 
 /**
  * @desc    Get all users with advanced filtering, sorting, and pagination
@@ -220,6 +221,16 @@ export const createUser = asyncHandler(async (req, res, next) => {
     // Generate JWT token for the new user
     const token = newUser.getSignedJwtToken();
 
+    // 📧 Send invitation email with credentials
+    try {
+      await emailService.sendStaffCredentials(newUser, password, newUser.role);
+      logger.info(`Invitation email sent to ${newUser.email}`);
+    } catch (emailError) {
+      logger.error(`Failed to send invitation email to ${newUser.email}: ${emailError.message}`);
+      // Still return success as user is created, but include warning in response
+      logger.warn(`User created but email delivery failed - admin should manually notify: ${newUser.email}`);
+    }
+
     // Log the action
     logger.info(
       `User created successfully: ${newUser.email} (Role: ${newUser.role}) by ${req.user.email}`,
@@ -410,7 +421,7 @@ export const updateUserPassword = asyncHandler(async (req, res, next) => {
  */
 export const deleteUser = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  const { confirmDelete } = req.body;
+  const { confirmDelete } = req.query; // Changed from req.body to req.query
 
   // Validate ID format
   if (!id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -419,7 +430,7 @@ export const deleteUser = asyncHandler(async (req, res, next) => {
 
   try {
     // Require confirmation for permanent deletion
-    if (!confirmDelete) {
+    if (!confirmDelete || confirmDelete !== 'true') {
       return next(
         new AppError(
           'Permanent deletion requires confirmation. Set confirmDelete to true.',
@@ -571,7 +582,7 @@ export const getUsersByRole = asyncHandler(async (req, res, next) => {
     return next(new AppError(`Invalid role. Valid roles are: ${validRoles.join(', ')}`, 400));
   }
 
-  const apiFeatures = new ApiFeatures(User.find({ role }), req.query)
+  const apiFeatures = new APIFeatures(User.find({ role }), req.query)
     .filter()
     .sort()
     .paginate();

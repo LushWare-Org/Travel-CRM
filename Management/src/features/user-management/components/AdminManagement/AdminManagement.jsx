@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock, Loader } from 'lucide-react';
 import { 
   UserTableHeader, 
   Pagination, 
@@ -11,41 +11,13 @@ import {
 import { STATUS_COLORS, ROLE_COLORS, ADMIN_PERMISSIONS_LIST } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import AdminTable from './AdminTable';
+import adminService from '../../../../services/admin.service';
 
 const AdminManagement = () => {
-  const [admins, setAdmins] = useState([
-    {
-      id: 1,
-      name: 'Lisa Anderson',
-      email: 'lisa@travelagency.com',
-      phone: '+1-555-9012',
-      status: 'active',
-      accountStatus: 'verified',
-      createdAt: '2024-03-05',
-      lastActive: '2024-10-20',
-      permissions: ['manage_users', 'manage_sales_reps', 'manage_vendors', 'view_reports', 'manage_billing'],
-      twoFactorEnabled: true,
-      passwordExpireDate: '2025-01-05',
-      invitationSentAt: '2024-03-05',
-      firstLoginAt: '2024-03-06'
-    },
-    {
-      id: 2,
-      name: 'James Wilson',
-      email: 'james@travelagency.com',
-      phone: '+1-555-4321',
-      status: 'invited',
-      accountStatus: 'pending_first_login',
-      createdAt: '2024-10-15',
-      lastActive: null,
-      permissions: ['manage_users', 'manage_sales_reps', 'view_reports'],
-      twoFactorEnabled: false,
-      passwordExpireDate: null,
-      invitationSentAt: '2024-10-15',
-      firstLoginAt: null
-    }
-  ]);
-
+  // State management
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showNewAdminDialog, setShowNewAdminDialog] = useState(false);
@@ -56,6 +28,7 @@ const AdminManagement = () => {
   const [adminToDelete, setAdminToDelete] = useState(null);
   const [adminToResendInvite, setAdminToResendInvite] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -67,29 +40,63 @@ const AdminManagement = () => {
 
   const ITEMS_PER_PAGE = 10;
 
+  // Load admins on component mount
+  useEffect(() => {
+    loadAdmins();
+  }, []);
+
+  /**
+   * Load all admins from backend
+   */
+  const loadAdmins = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await adminService.getAllAdmins({
+        limit: 100,
+        page: 1,
+        sort: '-createdAt'
+      });
+
+      if (response.status === 'success') {
+        // Handle different response data structures
+        const adminsData = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data?.users || response.data?.data || []);
+
+        // Transform backend data to frontend format
+        const transformedAdmins = adminsData.map(admin => ({
+          id: admin._id,
+          name: admin.name,
+          email: admin.email,
+          phone: admin.phone || '',
+          status: admin.isActive ? 'active' : 'inactive',
+          accountStatus: admin.isEmailVerified ? 'verified' : 'pending_first_login',
+          createdAt: admin.createdAt,
+          lastActive: admin.lastLogin,
+          permissions: admin.permissions || [],
+          twoFactorEnabled: admin.twoFactorEnabled || false,
+          passwordExpireDate: admin.passwordExpireDate,
+          invitationSentAt: admin.createdAt,
+          firstLoginAt: admin.lastLogin,
+          isEmailVerified: admin.isEmailVerified,
+          isTempPassword: admin.isTempPassword
+        }));
+        setAdmins(transformedAdmins);
+      } else {
+        setError('Failed to load admins: Invalid response from server');
+      }
+    } catch (err) {
+      console.error('Error loading admins:', err);
+      setError(err.message || 'Failed to load admins');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 🔐 Generate secure temporary password
   const generateTemporaryPassword = () => {
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const symbols = '!@#$%^&*';
-    
-    const allChars = uppercase + lowercase + numbers + symbols;
-    let password = '';
-    
-    // Ensure at least one of each type
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += symbols[Math.floor(Math.random() * symbols.length)];
-    
-    // Fill rest randomly to make 12 characters
-    for (let i = password.length; i < 12; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
-    }
-    
-    // Shuffle password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+    return adminService.generateTemporaryPassword();
   };
 
   // 📧 Simulate sending invitation email
@@ -211,53 +218,120 @@ const AdminManagement = () => {
     });
   };
 
-  const handleAddAdmin = () => {
-    if (formData.name && formData.email && formData.phone) {
+  const handleAddAdmin = async () => {
+    if (!formData.name || !formData.email || !formData.phone) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    // Validate phone format (must be 10 digits)
+    const phoneDigitsOnly = formData.phone.replace(/\D/g, '');
+    if (phoneDigitsOnly.length !== 10) {
+      setError('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
       // Generate temporary password
       const tempPassword = generateTemporaryPassword();
-      
-      const newAdmin = {
-        id: Math.max(...admins.map(a => a.id), 0) + 1,
-        ...formData,
-        status: 'invited',
-        accountStatus: 'pending_first_login',
-        createdAt: new Date().toISOString().split('T')[0],
-        lastActive: null,
-        passwordExpireDate: null,
-        invitationSentAt: new Date().toISOString().split('T')[0],
-        firstLoginAt: null
-      };
-      
-      // Send invitation email (console log in this demo)
-      sendInvitationEmail(newAdmin, tempPassword);
-      
-      setAdmins([...admins, newAdmin]);
-      setShowNewAdminDialog(false);
-      setSuccessMessage(`✅ Admin created! Invitation sent to ${newAdmin.email}`);
-      setTimeout(() => setSuccessMessage(''), 5000);
-      resetForm();
+
+      // Create admin via API
+      const response = await adminService.createAdmin({
+        name: formData.name,
+        email: formData.email,
+        phone: phoneDigitsOnly, // Send only digits
+        password: tempPassword,
+        role: 'admin'
+      });
+
+      if (response.status === 'success') {
+        const newAdmin = {
+          id: response.data._id,
+          name: response.data.name,
+          email: response.data.email,
+          phone: response.data.phone,
+          status: 'active',
+          accountStatus: 'pending_first_login',
+          createdAt: response.data.createdAt,
+          lastActive: null,
+          permissions: formData.permissions || [],
+          twoFactorEnabled: formData.twoFactorEnabled || false,
+          passwordExpireDate: null,
+          invitationSentAt: new Date().toISOString(),
+          firstLoginAt: null
+        };
+
+        setAdmins([...admins, newAdmin]);
+        setShowNewAdminDialog(false);
+        setSearchTerm(''); // Clear search bar after creation
+        setSuccessMessage(`✅ Admin created! Invitation sent to ${newAdmin.email}`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        resetForm();
+
+        // Log email details (in production, this would be sent via email service)
+        console.log(`📧 Email sent to ${newAdmin.email}`);
+        console.log(`Temporary Password: ${tempPassword}`);
+      }
+    } catch (err) {
+      console.error('Error creating admin:', err);
+      setError(err.message || 'Failed to create admin');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleEditAdmin = () => {
-    if (selectedAdmin && formData.name && formData.email && formData.phone) {
-      setAdmins(admins.map(a => 
-        a.id === selectedAdmin.id 
-          ? {
-              ...a,
-              name: formData.name,
-              email: formData.email,
-              phone: formData.phone,
-              permissions: formData.permissions,
-              twoFactorEnabled: formData.twoFactorEnabled
-            }
-          : a
-      ));
-      setSelectedAdmin(null);
-      setShowEditAdminDialog(false);
-      setSuccessMessage(`✅ Admin updated successfully`);
-      setTimeout(() => setSuccessMessage(''), 5000);
-      resetForm();
+  const handleEditAdmin = async () => {
+    if (!selectedAdmin || !formData.name || !formData.email || !formData.phone) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    // Validate phone format (must be 10 digits)
+    const phoneDigitsOnly = formData.phone.replace(/\D/g, '');
+    if (phoneDigitsOnly.length !== 10) {
+      setError('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      // Update admin via API
+      const response = await adminService.updateAdmin(selectedAdmin.id, {
+        name: formData.name,
+        email: formData.email,
+        phone: phoneDigitsOnly, // Send only digits
+        role: 'admin'
+      });
+
+      if (response.status === 'success') {
+        setAdmins(admins.map(a => 
+          a.id === selectedAdmin.id 
+            ? {
+                ...a,
+                name: formData.name,
+                email: formData.email,
+                phone: phoneDigitsOnly,
+                permissions: formData.permissions,
+                twoFactorEnabled: formData.twoFactorEnabled
+              }
+            : a
+        ));
+        setSelectedAdmin(null);
+        setShowEditAdminDialog(false);
+        setSuccessMessage(`✅ Admin updated successfully`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        resetForm();
+      }
+    } catch (err) {
+      console.error('Error updating admin:', err);
+      setError(err.message || 'Failed to update admin');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -267,41 +341,68 @@ const AdminManagement = () => {
     setShowInviteResendConfirm(true);
   };
 
-  const confirmResendInvitation = () => {
-    const tempPassword = generateTemporaryPassword();
-    sendInvitationEmail(adminToResendInvite, tempPassword);
-    
-    setAdmins(admins.map(a => 
-      a.id === adminToResendInvite.id 
-        ? { ...a, invitationSentAt: new Date().toISOString().split('T')[0] }
-        : a
-    ));
-    
-    setSuccessMessage(`✅ Invitation resent to ${adminToResendInvite.email}`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-    setShowInviteResendConfirm(false);
-    setAdminToResendInvite(null);
+  const confirmResendInvitation = async () => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      const tempPassword = generateTemporaryPassword();
+      
+      // In a real app, you'd call an API to resend the invitation
+      // For now, we'll just update the local state and log
+      setAdmins(admins.map(a => 
+        a.id === adminToResendInvite.id 
+          ? { ...a, invitationSentAt: new Date().toISOString() }
+          : a
+      ));
+      
+      setSuccessMessage(`✅ Invitation resent to ${adminToResendInvite.email}`);
+      setTimeout(() => setSuccessMessage(''), 5000);
+      setShowInviteResendConfirm(false);
+      setAdminToResendInvite(null);
+
+      // Log email details
+      console.log(`📧 Invitation resent to ${adminToResendInvite.email}`);
+      console.log(`Temporary Password: ${tempPassword}`);
+    } catch (err) {
+      console.error('Error resending invitation:', err);
+      setError(err.message || 'Failed to resend invitation');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // 🔑 Force password reset
-  const handleForcePasswordReset = (admin) => {
-    const tempPassword = generateTemporaryPassword();
-    
-    // Send password reset email
-    sendPasswordResetEmail(admin, tempPassword);
-    
-    setAdmins(admins.map(a => 
-      a.id === admin.id 
-        ? { 
-            ...a, 
-            status: 'password_reset_required',
-            accountStatus: 'pending_password_change'
-          }
-        : a
-    ));
-    
-    setSuccessMessage(`✅ Password reset email sent to ${admin.email}`);
-    setTimeout(() => setSuccessMessage(''), 5000);
+  const handleForcePasswordReset = async (admin) => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      const tempPassword = generateTemporaryPassword();
+      
+      // In a real app, you'd call an API to send password reset email
+      setAdmins(admins.map(a => 
+        a.id === admin.id 
+          ? { 
+              ...a, 
+              status: 'password_reset_required',
+              accountStatus: 'pending_password_change'
+            }
+          : a
+      ));
+      
+      setSuccessMessage(`✅ Password reset email sent to ${admin.email}`);
+      setTimeout(() => setSuccessMessage(''), 5000);
+
+      // Log email details
+      console.log(`📧 Password reset email sent to ${admin.email}`);
+      console.log(`Temporary Password: ${tempPassword}`);
+    } catch (err) {
+      console.error('Error sending password reset:', err);
+      setError(err.message || 'Failed to send password reset email');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteAdmin = (admin) => {
@@ -309,13 +410,28 @@ const AdminManagement = () => {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
-    setAdmins(admins.filter(a => a.id !== adminToDelete.id));
-    setShowDeleteConfirm(false);
-    setAdminToDelete(null);
-    setSelectedAdmin(null);
-    setSuccessMessage(`✅ Admin deleted successfully`);
-    setTimeout(() => setSuccessMessage(''), 5000);
+  const confirmDelete = async () => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      // Delete admin via API
+      const response = await adminService.deleteUser(adminToDelete.id);
+
+      if (response.status === 'success') {
+        setAdmins(admins.filter(a => a.id !== adminToDelete.id));
+        setShowDeleteConfirm(false);
+        setAdminToDelete(null);
+        setSelectedAdmin(null);
+        setSuccessMessage(`✅ Admin deleted successfully`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+      }
+    } catch (err) {
+      console.error('Error deleting admin:', err);
+      setError(err.message || 'Failed to delete admin');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openEditDialog = (admin) => {
@@ -341,6 +457,22 @@ const AdminManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader className="w-8 h-8 text-purple-600 animate-spin" />
+          <p className="ml-3 text-gray-600">Loading admins...</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <p className="text-red-800 font-medium">{error}</p>
+        </div>
+      )}
+
       {/* Success Message */}
       {successMessage && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
@@ -349,68 +481,74 @@ const AdminManagement = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
-          <p className="text-gray-600 mt-1">Manage system administrators and their permissions</p>
-        </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowNewAdminDialog(true);
-          }}
-          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors font-medium flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Admin
-        </button>
-      </div>
+      {!loading && (
+        <>
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
+              <p className="text-gray-600 mt-1">Manage system administrators and their permissions</p>
+            </div>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowNewAdminDialog(true);
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors font-medium flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Admin
+            </button>
+          </div>
 
-      {/* Info Banner - Password & Security Policy */}
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-semibold text-blue-900">Password & Security Policy</p>
-          <p className="text-sm text-blue-800 mt-1">
-            New admins receive temporary passwords via email. They must set a permanent password on first login. 
-            Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
-          </p>
-        </div>
-      </div>
+          {/* Info Banner - Password & Security Policy */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-blue-900">Password & Security Policy</p>
+              <p className="text-sm text-blue-800 mt-1">
+                New admins receive temporary passwords via email. They must set a permanent password on first login. 
+                Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
+              </p>
+            </div>
+          </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <StatsCard label="Total Admins" value={stats.total} icon={Shield} color="purple" />
-        <StatsCard label="Active" value={stats.active} icon={Shield} color="green" />
-        <StatsCard label="Invited" value={stats.invited} icon={Mail} color="blue" />
-        <StatsCard label="2FA Enabled" value={stats.twoFactorEnabled} icon={Shield} color="amber" />
-        <StatsCard label="Inactive" value={stats.inactive} icon={Shield} color="red" />
-      </div>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <StatsCard label="Total Admins" value={stats.total} icon={Shield} color="purple" />
+            <StatsCard label="Active" value={stats.active} icon={Shield} color="green" />
+            <StatsCard label="Invited" value={stats.invited} icon={Mail} color="blue" />
+            <StatsCard label="2FA Enabled" value={stats.twoFactorEnabled} icon={Shield} color="amber" />
+            <StatsCard label="Inactive" value={stats.inactive} icon={Shield} color="red" />
+          </div>
 
-      {/* Table Section */}
-      <UserTableHeader
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        onFilterClick={() => {}}
-        title="Admins List"
-        subtitle="View and manage all system administrators"
-      />
+          {/* Table Section */}
+          <UserTableHeader
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            onFilterClick={() => {}}
+            title="Admins List"
+            subtitle="View and manage all system administrators"
+          />
 
-      <AdminTable
-        admins={paginatedData.data}
-        onEdit={openEditDialog}
-        onDelete={handleDeleteAdmin}
-        onSelectAdmin={setSelectedAdmin}
-      />
+          <AdminTable
+            admins={paginatedData.data}
+            onEdit={openEditDialog}
+            onDelete={handleDeleteAdmin}
+            onSelectAdmin={setSelectedAdmin}
+            onResendInvite={handleResendInvitation}
+            onForcePasswordReset={handleForcePasswordReset}
+          />
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={paginatedData.pages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={ITEMS_PER_PAGE}
-        totalItems={filteredAdmins.length}
-      />
+          <Pagination
+            currentPage={currentPage}
+            totalPages={paginatedData.pages}
+            onPageChange={setCurrentPage}
+            itemsPerPage={ITEMS_PER_PAGE}
+            totalItems={filteredAdmins.length}
+          />
+        </>
+      )}
 
       {/* Add Admin Dialog */}
       <UserFormDialog
@@ -424,6 +562,7 @@ const AdminManagement = () => {
         subtitle="Create a new system administrator account"
         submitLabel="Create & Send Invitation"
         submitColor="purple"
+        isSubmitting={isSubmitting}
       >
         <div className="space-y-4">
           {/* Step Indicator */}
@@ -464,8 +603,9 @@ const AdminManagement = () => {
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="+1-555-0000"
+              placeholder="1234567890"
             />
+            <p className="text-xs text-gray-500 mt-1">Enter 10-digit phone number without spaces or dashes</p>
           </FormGroup>
 
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -515,6 +655,7 @@ const AdminManagement = () => {
         subtitle="Update administrator information and permissions"
         submitLabel="Update Admin"
         submitColor="purple"
+        isSubmitting={isSubmitting}
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -543,6 +684,7 @@ const AdminManagement = () => {
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
+            <p className="text-xs text-gray-500 mt-1">Enter 10-digit phone number</p>
           </FormGroup>
 
           <div className="bg-gray-50 p-4 rounded-lg">

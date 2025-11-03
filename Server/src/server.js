@@ -1,9 +1,15 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Get current directory for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load environment variables FIRST before any other imports
-dotenv.config();
+dotenv.config({ path: join(__dirname, '../.env') });
 
 import cors from 'cors';
 import helmet from 'helmet';
@@ -41,6 +47,7 @@ import billingRoutes from './routes/billing.routes.js';
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
 import notFound from './middleware/notFound.js';
+import emailService from './utils/emailService.js';
 
 const app = express();
 
@@ -122,10 +129,13 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/api/${API_VERSION}`);
+    
+    // Verify email service after server starts
+    await emailService.verifyConnection();
   });
 };
 

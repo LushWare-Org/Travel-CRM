@@ -3,7 +3,7 @@ import { Edit, Trash, Mail, RotateCcw, CheckCircle, Clock } from 'lucide-react';
 import { STATUS_COLORS } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 
-const AdminTable = ({ admins, onEdit, onDelete, onResendInvite, onForcePasswordReset }) => {
+const AdminTable = ({ admins, onEdit, onDelete, onSelectAdmin, onResendInvite, onForcePasswordReset }) => {
   const getStatusBadge = (admin) => {
     if (admin.status === 'invited') {
       return (
