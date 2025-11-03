@@ -14,6 +14,9 @@ router.get('/', protect, invoiceController.getAllInvoices);
 // Get invoices by lead
 router.get('/lead/:leadId', protect, invoiceController.getInvoiceByLeadId);
 
+// Download PDF (must be before :id route)
+router.get('/:id/pdf', protect, invoiceController.downloadInvoicePDF);
+
 // Get invoice by ID
 router.get('/:id', protect, invoiceController.getInvoiceById);
 
@@ -34,8 +37,5 @@ router.post('/:id/viewed', invoiceController.markInvoiceViewed);
 
 // Send payment reminder
 router.post('/:id/remind', protect, authorize('admin', 'salesRep'), invoiceController.sendPaymentReminder);
-
-// Download PDF
-router.get('/:id/pdf', protect, invoiceController.downloadInvoicePDF);
 
 export default router;

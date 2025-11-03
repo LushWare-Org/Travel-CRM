@@ -260,9 +260,17 @@ export const quotationAPI = {
     const api = new ApiService();
     return api.post('/billing/quotations', payload);
   },
+  getById: async (quotationId) => {
+    const api = new ApiService();
+    return api.get(`/billing/quotations/${quotationId}`);
+  },
   getByLead: async (leadId) => {
     const api = new ApiService();
     return api.get('/billing/quotations/lead/' + leadId);
+  },
+  update: async (quotationId, payload) => {
+    const api = new ApiService();
+    return api.put(`/billing/quotations/${quotationId}`, payload);
   },
   send: async (quotationId) => {
     const api = new ApiService();
@@ -295,6 +303,10 @@ export const invoiceAPI = {
     const api = new ApiService();
     return api.get('/billing/invoices/lead/' + leadId);
   },
+  update: async (invoiceId, payload) => {
+    const api = new ApiService();
+    return api.put(`/billing/invoices/${invoiceId}`, payload);
+  },
   send: async (invoiceId) => {
     const api = new ApiService();
     return api.post(`/billing/invoices/${invoiceId}/send`);
@@ -325,6 +337,10 @@ export const receiptAPI = {
   getByLead: async (leadId) => {
     const api = new ApiService();
     return api.get('/billing/receipts/lead/' + leadId);
+  },
+  update: async (receiptId, payload) => {
+    const api = new ApiService();
+    return api.put(`/billing/receipts/${receiptId}`, payload);
   },
   send: async (receiptId) => {
     const api = new ApiService();

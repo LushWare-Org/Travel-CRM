@@ -4,7 +4,7 @@ const invoiceSchema = new mongoose.Schema(
   {
     invoiceNumber: {
       type: String,
-      required: true,
+      required: false, // Auto-generated in pre-save hook
       unique: true,
     },
     lead: {
@@ -50,7 +50,7 @@ const invoiceSchema = new mongoose.Schema(
         },
         category: {
           type: String,
-          enum: ['accommodation', 'transportation', 'activity', 'food', 'guide', 'insurance', 'visa', 'other'],
+          enum: ['accommodation', 'transportation', 'activity', 'food', 'guide', 'insurance', 'visa', 'package', 'other'],
           default: 'other',
         },
         quantity: {
