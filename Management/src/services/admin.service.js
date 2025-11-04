@@ -253,11 +253,12 @@ class AdminService {
    * @param {string} adminData.email - Admin email
    * @param {string} adminData.phone - Admin phone
    * @param {string} adminData.password - Temporary password
+   * @param {Array<string>} adminData.permissions - Admin permissions
    * @returns {Promise<Object>} Created admin
    */
   async createAdmin(adminData) {
     try {
-      const response = await this.api.post('/users', {
+      const response = await this.api.post('/admin/users', {
         ...adminData,
         role: 'admin'
       });
@@ -276,7 +277,7 @@ class AdminService {
    */
   async updateAdmin(adminId, updateData) {
     try {
-      const response = await this.api.put(`/users/${adminId}`, updateData);
+      const response = await this.api.put(`/admin/users/${adminId}`, updateData);
       return response;
     } catch (error) {
       console.error(`Error updating admin ${adminId}:`, error);
@@ -327,6 +328,55 @@ class AdminService {
       return response;
     } catch (error) {
       console.error('Error updating settings:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ==================== PERMISSIONS ====================
+   */
+
+  /**
+   * Get available permissions list
+   * @returns {Promise<Object>} List of available permissions
+   */
+  async getAvailablePermissions() {
+    try {
+      const response = await this.api.get('/admin/permissions/available');
+      return response;
+    } catch (error) {
+      console.error('Error fetching available permissions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get admin user permissions
+   * @param {string} adminId - Admin user ID
+   * @returns {Promise<Object>} Admin permissions
+   */
+  async getAdminPermissions(adminId) {
+    try {
+      const response = await this.api.get(`/admin/users/${adminId}/permissions`);
+      return response;
+    } catch (error) {
+      console.error(`Error fetching permissions for admin ${adminId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update admin user permissions
+   * @param {string} adminId - Admin user ID
+   * @param {Array<string>} permissions - Array of permission IDs
+   * @returns {Promise<Object>} Updated admin
+   */
+  async updateAdminPermissions(adminId, permissions) {
+    try {
+      const response = await this.api.patch(`/admin/users/${adminId}/permissions`, { permissions });
+      return response;
+    } catch (error) {
+      console.error(`Error updating permissions for admin ${adminId}:`, error);
       throw error;
     }
   }

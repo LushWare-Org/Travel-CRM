@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash, User, TrendingUp, Mail, CheckCircle, AlertCircle, Copy } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Edit, Trash, User, TrendingUp, Mail, CheckCircle, AlertCircle, Copy, Loader } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { 
   UserTableHeader, 
   Pagination, 
@@ -11,67 +12,17 @@ import {
 import { STATUS_COLORS } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import SalesRepTable from './SalesRepTable';
+import salesRepService from '../../../../services/salesRep.service';
 
 const SalesRepManagement = () => {
-  const [salesReps, setSalesReps] = useState([
-    {
-      id: 1,
-      name: 'Sarah Johnson',
-      email: 'sarah@travelagency.com',
-      phone: '+1-555-1234',
-      status: 'active', // active, invited, inactive
-      accountStatus: 'verified', // verified, pending_first_login, pending_password_reset
-      createdAt: '2024-01-15',
-      lastActive: '2024-10-22',
-      invitationSentAt: '2024-01-15',
-      firstLoginAt: '2024-01-16',
-      leadsAssigned: 45,
-      leadsConverted: 12,
-      commissionRate: 10,
-      totalEarnings: 25000,
-      passwordExpireDate: '2025-01-15',
-      twoFactorEnabled: true
-    },
-    {
-      id: 2,
-      name: 'Mike Chen',
-      email: 'mike@travelagency.com',
-      phone: '+1-555-5678',
-      status: 'active',
-      accountStatus: 'verified',
-      createdAt: '2024-02-10',
-      lastActive: '2024-10-21',
-      invitationSentAt: '2024-02-10',
-      firstLoginAt: '2024-02-11',
-      leadsAssigned: 32,
-      leadsConverted: 8,
-      commissionRate: 10,
-      totalEarnings: 18500,
-      passwordExpireDate: '2025-02-10',
-      twoFactorEnabled: false
-    },
-    {
-      id: 3,
-      name: 'Emma Wilson',
-      email: 'emma@travelagency.com',
-      phone: '+1-555-7890',
-      status: 'invited',
-      accountStatus: 'pending_first_login',
-      createdAt: '2024-05-20',
-      lastActive: null,
-      invitationSentAt: '2024-05-20',
-      firstLoginAt: null,
-      leadsAssigned: 0,
-      leadsConverted: 0,
-      commissionRate: 12,
-      totalEarnings: 0,
-      passwordExpireDate: null,
-      twoFactorEnabled: false
-    }
-  ]);
-
+  const isInitialMount = useRef(true);
+  const [salesReps, setSalesReps] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [showNewRepDialog, setShowNewRepDialog] = useState(false);
   const [showEditRepDialog, setShowEditRepDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -81,8 +32,13 @@ const SalesRepManagement = () => {
   const [repToDelete, setRepToDelete] = useState(null);
   const [repToResendInvite, setRepToResendInvite] = useState(null);
   const [repToResetPassword, setRepToResetPassword] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [copiedId, setCopiedId] = useState(null);
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    totalLeads: 0,
+    totalEarnings: 0,
+    avgConversion: 0
+  });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -94,276 +50,117 @@ const SalesRepManagement = () => {
 
   const ITEMS_PER_PAGE = 10;
 
-  // 🔐 Generate secure temporary password
-  const generateTemporaryPassword = () => {
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const symbols = '!@#$%^&*';
-    
-    const allChars = uppercase + lowercase + numbers + symbols;
-    let password = '';
-    
-    // Ensure at least one of each type
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += symbols[Math.floor(Math.random() * symbols.length)];
-    
-    // Fill rest randomly to make 12 characters
-    for (let i = password.length; i < 12; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
+  // Load sales reps from backend on mount
+  useEffect(() => {
+    loadSalesReps();
+    loadStats();
+  }, []);
+
+  // Reload when page or search changes (skip initial mount to avoid duplicate call)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
     }
     
-    // Shuffle password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
-  };
+    loadSalesReps();
+  }, [currentPage, searchTerm]);
 
-  // 📧 Simulate sending invitation email
-  const sendInvitationEmail = (rep, tempPassword) => {
-    console.log(`📧 Invitation email sent to ${rep.email}`);
-    console.log(`
-      ╔════════════════════════════════════════════════════════════╗
-      ║         SALES REP ACCOUNT INVITATION EMAIL                 ║
-      ╚════════════════════════════════════════════════════════════╝
+  /**
+   * Load sales reps from backend API with pagination
+   */
+  const loadSalesReps = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
       
-      To: ${rep.email}
-      Subject: Welcome to Trip Sky Way - Your Sales Rep Account
-      
-      ─────────────────────────────────────────────────────────────
-      
-      Dear ${rep.name},
-      
-      Welcome to Trip Sky Way! Your sales representative account has
-      been created and is ready for you to activate.
-      
-      📋 ACCOUNT DETAILS:
-      ├─ Email: ${rep.email}
-      ├─ Temporary Password: ${tempPassword}
-      └─ Invitation Link: https://tripskiway.com/auth/invite/${rep.id}
-      
-      🔐 FIRST LOGIN INSTRUCTIONS:
-      1. Click the invitation link above (expires in 48 hours)
-      2. Enter your email and temporary password
-      3. You MUST create a new permanent password
-      4. Review and accept commission terms
-      5. Your account will be fully activated
-      
-      ⏰ IMPORTANT: Temporary password expires in 48 hours
-      
-      PASSWORD REQUIREMENTS:
-      ├─ Minimum 12 characters
-      ├─ At least one uppercase letter (A-Z)
-      ├─ At least one lowercase letter (a-z)
-      ├─ At least one number (0-9)
-      └─ At least one special character (!@#$%^&*)
-      
-      💰 YOUR COMMISSION:
-      ├─ Commission Rate: ${rep.commissionRate}%
-      ├─ Calculated on: Confirmed bookings only
-      └─ Paid: Monthly via bank transfer
-      
-      📊 START USING THE SYSTEM:
-      After first login, you'll have access to:
-      ├─ Lead Dashboard
-      ├─ Performance Metrics
-      ├─ Commission Tracking
-      └─ Customer Management Tools
-      
-      If you have any questions or didn't request this account,
-      please contact support@tripskiway.com immediately.
-      
-      Best regards,
-      Trip Sky Way Team
-      https://tripskiway.com/support
-      
-      ─────────────────────────────────────────────────────────────
-    `);
-  };
-
-  // 📧 Simulate sending password reset email
-  const sendPasswordResetEmail = (rep, tempPassword) => {
-    console.log(`📧 Password reset email sent to ${rep.email}`);
-    console.log(`
-      ╔════════════════════════════════════════════════════════════╗
-      ║           PASSWORD RESET REQUEST                           ║
-      ╚════════════════════════════════════════════════════════════╝
-      
-      To: ${rep.email}
-      Subject: Password Reset - Trip Sky Way Account
-      
-      ─────────────────────────────────────────────────────────────
-      
-      Dear ${rep.name},
-      
-      A password reset has been initiated for your account.
-      
-      🔑 NEW TEMPORARY PASSWORD: ${tempPassword}
-      🔗 Reset Link: https://tripskiway.com/auth/reset/${rep.id}
-      
-      ⏰ This temporary password expires in 48 hours
-      
-      PASSWORD REQUIREMENTS:
-      ├─ Minimum 12 characters
-      ├─ At least one uppercase letter
-      ├─ At least one lowercase letter
-      ├─ At least one number
-      └─ At least one special character
-      
-      If you did not request this password reset, please contact
-      support@tripskiway.com immediately.
-      
-      Best regards,
-      Trip Sky Way Team
-      
-      ─────────────────────────────────────────────────────────────
-    `);
-  };
-
-  const filteredReps = useMemo(() => {
-    return filterUsers(salesReps, searchTerm, {});
-  }, [salesReps, searchTerm]);
-
-  const paginatedData = useMemo(() => {
-    return paginateArray(filteredReps, currentPage, ITEMS_PER_PAGE);
-  }, [filteredReps, currentPage]);
-
-  const stats = useMemo(() => {
-    const totalEarnings = salesReps.reduce((sum, rep) => sum + rep.totalEarnings, 0);
-    const totalLeads = salesReps.reduce((sum, rep) => sum + rep.leadsAssigned, 0);
-    const totalConverted = salesReps.reduce((sum, rep) => sum + rep.leadsConverted, 0);
-    const conversionRate = totalLeads > 0 ? ((totalConverted / totalLeads) * 100).toFixed(1) : 0;
-
-    return {
-      total: salesReps.length,
-      active: salesReps.filter(r => r.status === 'active').length,
-      totalLeads,
-      totalEarnings,
-      avgConversion: conversionRate
-    };
-  }, [salesReps]);
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      commissionRate: 10,
-      targetLeads: 50
-    });
-  };
-
-  const handleAddRep = () => {
-    if (formData.name && formData.email && formData.phone) {
-      const tempPassword = generateTemporaryPassword();
-      
-      const newRep = {
-        id: Math.max(...salesReps.map(r => r.id), 0) + 1,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        status: 'invited',
-        accountStatus: 'pending_first_login',
-        createdAt: new Date().toISOString().split('T')[0],
-        lastActive: null,
-        invitationSentAt: new Date().toISOString().split('T')[0],
-        firstLoginAt: null,
-        leadsAssigned: 0,
-        leadsConverted: 0,
-        commissionRate: formData.commissionRate,
-        totalEarnings: 0,
-        passwordExpireDate: null,
-        twoFactorEnabled: false
+      // Build params object - only include search if it has a value
+      const params = {
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        sort: '-createdAt'
       };
       
-      // Send invitation email
-      sendInvitationEmail(newRep, tempPassword);
+      // Only add search if it's not empty
+      if (searchTerm && searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
       
-      setSalesReps([...salesReps, newRep]);
-      setShowNewRepDialog(false);
-      setSuccessMessage(`✅ Invitation sent to ${formData.email}`);
-      setTimeout(() => setSuccessMessage(''), 5000);
-      resetForm();
+      const response = await salesRepService.getAllSalesReps(params);
+
+      console.log('Sales Rep Full Response:', response); // Debug log
+      console.log('Response Data Keys:', response.data ? Object.keys(response.data) : 'NO DATA'); // Debug
+      console.log('Response Data:', JSON.stringify(response.data, null, 2)); // Debug
+
+      // Handle different response structures
+      let repsData = [];
+      if (response.status === 'success' && response.data) {
+        repsData = response.data.salesReps || [];
+      } else if (Array.isArray(response.data)) {
+        repsData = response.data;
+      } else if (Array.isArray(response)) {
+        repsData = response;
+      }
+
+      console.log('Raw Reps Data:', repsData); // Debug log
+
+      // Transform the data to match the expected format
+      const transformedReps = repsData.map(rep => ({
+        id: rep._id || rep.id,
+        name: rep.name,
+        email: rep.email,
+        phone: rep.phone || '',
+        status: rep.isActive ? 'active' : 'inactive',
+        accountStatus: rep.mustChangePassword ? 'pending_password_reset' : (rep.isEmailVerified ? 'verified' : 'pending_first_login'),
+        commissionRate: rep.commissionRate || 10,
+        leadsAssigned: rep.leadsAssigned || 0,
+        leadsConverted: rep.leadsConverted || 0,
+        createdAt: rep.createdAt,
+        isActive: rep.isActive,
+        isEmailVerified: rep.isEmailVerified,
+        isTempPassword: rep.isTempPassword,
+        mustChangePassword: rep.mustChangePassword
+      }));
+      
+      console.log('Transformed Reps:', transformedReps); // Debug log
+      setSalesReps(transformedReps);
+      
+      // Handle pagination
+      if (response.data && response.data.pagination) {
+        setTotalPages(response.data.pagination.totalPages || 1);
+      } else {
+        setTotalPages(1);
+      }
+    } catch (err) {
+      const errorMsg = err.userMessage || err.message || 'Failed to load sales representatives';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error('Load sales reps error:', err);
+      console.error('Error details:', err.response || err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleEditRep = () => {
-    if (selectedRep && formData.name && formData.email && formData.phone) {
-      setSalesReps(salesReps.map(r => 
-        r.id === selectedRep.id 
-          ? {
-              ...r,
-              name: formData.name,
-              email: formData.email,
-              phone: formData.phone,
-              commissionRate: formData.commissionRate
-            }
-          : r
-      ));
-      setSelectedRep(null);
-      setShowEditRepDialog(false);
-      setSuccessMessage('✅ Sales rep updated successfully');
-      setTimeout(() => setSuccessMessage(''), 5000);
-      resetForm();
+  /**
+   * Load statistics from backend
+   */
+  const loadStats = async () => {
+    try {
+      const response = await salesRepService.getSalesRepStats();
+      
+      if (response.data) {
+        setStats({
+          total: response.data.total || 0,
+          active: response.data.active || 0,
+          totalLeads: response.data.totalLeads || 0,
+          totalEarnings: response.data.totalEarnings || 0,
+          avgConversion: response.data.avgConversion || 0
+        });
+      }
+    } catch (err) {
+      console.error('Load stats error:', err);
     }
-  };
-
-  // 🔄 Resend invitation to pending rep
-  const handleResendInvitation = (rep) => {
-    setRepToResendInvite(rep);
-    setShowResendInviteConfirm(true);
-  };
-
-  const confirmResendInvitation = () => {
-    const tempPassword = generateTemporaryPassword();
-    sendInvitationEmail(repToResendInvite, tempPassword);
-    
-    setSalesReps(salesReps.map(r => 
-      r.id === repToResendInvite.id 
-        ? { ...r, invitationSentAt: new Date().toISOString().split('T')[0] }
-        : r
-    ));
-    
-    setSuccessMessage(`✅ Invitation resent to ${repToResendInvite.email}`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-    setShowResendInviteConfirm(false);
-    setRepToResendInvite(null);
-  };
-
-  // 🔑 Force password reset
-  const handleForcePasswordReset = (rep) => {
-    setRepToResetPassword(rep);
-    setShowPasswordResetConfirm(true);
-  };
-
-  const confirmPasswordReset = () => {
-    const tempPassword = generateTemporaryPassword();
-    sendPasswordResetEmail(repToResetPassword, tempPassword);
-    
-    setSalesReps(salesReps.map(r => 
-      r.id === repToResetPassword.id 
-        ? { ...r, accountStatus: 'pending_password_reset' }
-        : r
-    ));
-    
-    setSuccessMessage(`✅ Password reset link sent to ${repToResetPassword.email}`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-    setShowPasswordResetConfirm(false);
-    setRepToResetPassword(null);
-  };
-
-  const handleDeleteRep = (rep) => {
-    setRepToDelete(rep);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDelete = () => {
-    setSalesReps(salesReps.filter(r => r.id !== repToDelete.id));
-    setShowDeleteConfirm(false);
-    setRepToDelete(null);
-    setSelectedRep(null);
-    setSuccessMessage(`✅ Sales rep deleted successfully`);
-    setTimeout(() => setSuccessMessage(''), 5000);
   };
 
   const openEditDialog = (rep) => {
@@ -378,84 +175,324 @@ const SalesRepManagement = () => {
     setShowEditRepDialog(true);
   };
 
+  /**
+   * Reset form to initial state
+   */
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      commissionRate: 10,
+      targetLeads: 50
+    });
+    setSelectedRep(null);
+  };
+
+  /**
+   * Handle adding a new sales representative
+   */
+  const handleAddRep = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.commissionRate < 0 || formData.commissionRate > 100) {
+      toast.error('Commission rate must be between 0 and 100');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        commissionRate: formData.commissionRate
+      };
+
+      const response = await salesRepService.createSalesRep(payload);
+
+      if (response.data) {
+        toast.success(`✅ Sales rep created! Invitation sent to ${formData.email}`);
+        setShowNewRepDialog(false);
+        resetForm();
+        await loadSalesReps();
+        await loadStats();
+      }
+    } catch (err) {
+      const errorMsg = err.userMessage || err.message || 'Failed to create sales representative';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error('Create sales rep error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Handle editing a sales representative
+   */
+  const handleEditRep = async (e) => {
+    e.preventDefault();
+
+    if (!selectedRep) return;
+
+    // Validation
+    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.commissionRate < 0 || formData.commissionRate > 100) {
+      toast.error('Commission rate must be between 0 and 100');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        commissionRate: formData.commissionRate
+      };
+
+      const response = await salesRepService.updateSalesRep(selectedRep._id, payload);
+
+      if (response.data) {
+        toast.success('✅ Sales representative updated successfully');
+        setShowEditRepDialog(false);
+        resetForm();
+        await loadSalesReps();
+        await loadStats();
+      }
+    } catch (err) {
+      const errorMsg = err.userMessage || err.message || 'Failed to update sales representative';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error('Update sales rep error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Handle delete confirmation dialog
+   */
+  const handleDeleteRep = (rep) => {
+    setRepToDelete(rep);
+    setShowDeleteConfirm(true);
+  };
+
+  /**
+   * Confirm and delete sales representative
+   */
+  const confirmDelete = async () => {
+    if (!repToDelete) return;
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      const response = await salesRepService.deleteSalesRep(repToDelete._id);
+
+      if (response.data) {
+        toast.success(`✅ Sales representative deleted successfully`);
+        setShowDeleteConfirm(false);
+        setRepToDelete(null);
+        await loadSalesReps();
+        await loadStats();
+      }
+    } catch (err) {
+      const errorMsg = err.userMessage || err.message || 'Failed to delete sales representative';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error('Delete sales rep error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Handle resend invitation confirmation dialog
+   */
+  const handleResendInvitation = (rep) => {
+    setRepToResendInvite(rep);
+    setShowResendInviteConfirm(true);
+  };
+
+  /**
+   * Confirm and resend invitation
+   */
+  const confirmResendInvitation = async () => {
+    if (!repToResendInvite) return;
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      const response = await salesRepService.resetSalesRepPassword(repToResendInvite._id);
+
+      if (response.data) {
+        toast.success(`✅ Invitation resent to ${repToResendInvite.email}`);
+        setShowResendInviteConfirm(false);
+        setRepToResendInvite(null);
+      }
+    } catch (err) {
+      const errorMsg = err.userMessage || err.message || 'Failed to resend invitation';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error('Resend invitation error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Handle force password reset confirmation dialog
+   */
+  const handleForcePasswordReset = (rep) => {
+    setRepToResetPassword(rep);
+    setShowPasswordResetConfirm(true);
+  };
+
+  /**
+   * Confirm and send password reset
+   */
+  const confirmPasswordReset = async () => {
+    if (!repToResetPassword) return;
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      const response = await salesRepService.resetSalesRepPassword(repToResetPassword._id);
+
+      if (response.data) {
+        toast.success(`✅ Password reset email sent to ${repToResetPassword.email}`);
+        setShowPasswordResetConfirm(false);
+        setRepToResetPassword(null);
+      }
+    } catch (err) {
+      const errorMsg = err.userMessage || err.message || 'Failed to send password reset';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      console.error('Password reset error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Success Message */}
-      {successMessage && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <p className="text-green-800 font-medium">{successMessage}</p>
+      {/* Error Alert */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <p className="text-red-800 font-medium">{error}</p>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Sales Representatives</h2>
-          <p className="text-gray-600 mt-1">Manage sales team members and track performance</p>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center gap-3">
+          <Loader className="w-5 h-5 text-blue-600 animate-spin" />
+          <p className="text-gray-700 font-medium">Loading sales representatives...</p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowNewRepDialog(true);
-          }}
-          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-colors font-medium flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Sales Rep
-        </button>
-      </div>
+      )}
 
-      {/* Security Info Banner */}
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-semibold text-blue-900">Account & Security Policy</p>
-          <p className="text-sm text-blue-800 mt-1">
-            Sales reps receive invitation emails with temporary passwords. They must set a permanent password on first login. 
-            Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
-          </p>
-        </div>
-      </div>
+      {!isLoading && (
+        <>
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Sales Representatives</h2>
+              <p className="text-gray-600 mt-1">Manage sales team members and track performance</p>
+            </div>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowNewRepDialog(true);
+              }}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4" />
+              Add Sales Rep
+            </button>
+          </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <StatsCard label="Total Reps" value={stats.total} icon={User} color="blue" />
-        <StatsCard label="Active Reps" value={stats.active} icon={User} color="green" />
-        <StatsCard label="Total Leads" value={stats.totalLeads} icon={TrendingUp} color="purple" />
-        <StatsCard label="Conv. Rate (%)" value={stats.avgConversion} icon={TrendingUp} color="orange" />
-        <StatsCard 
-          label="Total Earnings" 
-          value={`$${(stats.totalEarnings / 1000).toFixed(1)}K`} 
-          icon={User} 
-          color="green" 
-        />
-      </div>
+          {/* Security Info Banner */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-blue-900">Account & Security Policy</p>
+              <p className="text-sm text-blue-800 mt-1">
+                Sales reps receive invitation emails with temporary passwords. They must set a permanent password on first login. 
+                Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
+              </p>
+            </div>
+          </div>
 
-      {/* Table Section */}
-      <UserTableHeader
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        onFilterClick={() => {}}
-        title="Sales Representatives List"
-        subtitle="Monitor performance and manage sales team"
-      />
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <StatsCard label="Total Reps" value={stats.total} icon={User} color="blue" />
+            <StatsCard label="Active Reps" value={stats.active} icon={User} color="green" />
+            <StatsCard label="Total Leads" value={stats.totalLeads} icon={TrendingUp} color="purple" />
+            <StatsCard label="Conv. Rate (%)" value={stats.avgConversion} icon={TrendingUp} color="orange" />
+            <StatsCard 
+              label="Total Earnings" 
+              value={`$${(stats.totalEarnings / 1000).toFixed(1)}K`} 
+              icon={User} 
+              color="green" 
+            />
+          </div>
 
-      <SalesRepTable
-        reps={paginatedData.data}
-        onEdit={openEditDialog}
-        onDelete={handleDeleteRep}
-        onResendInvite={handleResendInvitation}
-        onForcePasswordReset={handleForcePasswordReset}
-      />
+          {/* Table Section */}
+          <UserTableHeader
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            onFilterClick={() => {}}
+            title="Sales Representatives List"
+            subtitle="Monitor performance and manage sales team"
+          />
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={paginatedData.pages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={ITEMS_PER_PAGE}
-        totalItems={filteredReps.length}
-      />
+          {salesReps.length > 0 ? (
+            <>
+              <SalesRepTable
+                reps={salesReps}
+                onEdit={openEditDialog}
+                onDelete={handleDeleteRep}
+                onResendInvite={handleResendInvitation}
+                onForcePasswordReset={handleForcePasswordReset}
+              />
+
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={ITEMS_PER_PAGE}
+                totalItems={salesReps.length}
+              />
+            </>
+          ) : (
+            <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg text-center">
+              <User className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 font-medium">No sales representatives found</p>
+              <p className="text-sm text-gray-500 mt-1">Create your first sales rep by clicking the "Add Sales Rep" button</p>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Add Sales Rep Dialog */}
       <UserFormDialog
@@ -467,8 +504,9 @@ const SalesRepManagement = () => {
         onSubmit={handleAddRep}
         title="Add New Sales Representative"
         subtitle="Onboard a new sales team member"
-        submitLabel="Create & Send Invitation"
+        submitLabel={isSubmitting ? 'Creating...' : 'Create & Send Invitation'}
         submitColor="blue"
+        isSubmitting={isSubmitting}
       >
         <div className="space-y-4">
           {/* What Happens Next */}
@@ -488,7 +526,8 @@ const SalesRepManagement = () => {
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="John Doe"
               />
             </FormGroup>
@@ -497,7 +536,8 @@ const SalesRepManagement = () => {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="john@email.com"
               />
             </FormGroup>
@@ -509,7 +549,8 @@ const SalesRepManagement = () => {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="+1-555-0000"
               />
             </FormGroup>
@@ -518,7 +559,8 @@ const SalesRepManagement = () => {
                 type="number"
                 value={formData.commissionRate}
                 onChange={(e) => setFormData({ ...formData, commissionRate: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="10"
                 min="0"
                 max="100"
@@ -548,8 +590,9 @@ const SalesRepManagement = () => {
         onSubmit={handleEditRep}
         title="Edit Sales Representative"
         subtitle="Update sales rep information"
-        submitLabel="Update Sales Rep"
+        submitLabel={isSubmitting ? 'Updating...' : 'Update Sales Rep'}
         submitColor="blue"
+        isSubmitting={isSubmitting}
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -558,7 +601,8 @@ const SalesRepManagement = () => {
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </FormGroup>
             <FormGroup label="Email" required>
@@ -566,7 +610,8 @@ const SalesRepManagement = () => {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </FormGroup>
           </div>
@@ -577,7 +622,8 @@ const SalesRepManagement = () => {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </FormGroup>
             <FormGroup label="Commission Rate (%)" required>
@@ -585,7 +631,8 @@ const SalesRepManagement = () => {
                 type="number"
                 value={formData.commissionRate}
                 onChange={(e) => setFormData({ ...formData, commissionRate: parseFloat(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 min="0"
                 max="100"
               />
@@ -604,9 +651,10 @@ const SalesRepManagement = () => {
         onConfirm={confirmDelete}
         title="Delete Sales Representative"
         description={`Are you sure you want to delete ${repToDelete?.name}? Their assigned leads will need to be reassigned.`}
-        confirmLabel="Delete"
+        confirmLabel={isSubmitting ? 'Deleting...' : 'Delete'}
         cancelLabel="Cancel"
         isDangerous={true}
+        isSubmitting={isSubmitting}
       />
 
       {/* Resend Invitation Dialog */}
@@ -619,8 +667,9 @@ const SalesRepManagement = () => {
         onConfirm={confirmResendInvitation}
         title="Resend Invitation"
         description={`Resend invitation email to ${repToResendInvite?.email}? They will receive a new temporary password and invitation link.`}
-        confirmLabel="Resend"
+        confirmLabel={isSubmitting ? 'Sending...' : 'Resend'}
         cancelLabel="Cancel"
+        isSubmitting={isSubmitting}
       />
 
       {/* Password Reset Dialog */}
@@ -633,8 +682,9 @@ const SalesRepManagement = () => {
         onConfirm={confirmPasswordReset}
         title="Force Password Reset"
         description={`Send password reset email to ${repToResetPassword?.email}? They will receive a new temporary password and must create a permanent one.`}
-        confirmLabel="Send Reset Email"
+        confirmLabel={isSubmitting ? 'Sending...' : 'Send Reset Email'}
         cancelLabel="Cancel"
+        isSubmitting={isSubmitting}
       />
     </div>
   );

@@ -26,8 +26,9 @@ const RBAC_PERMISSIONS = {
 
 /**
  * Check if a role has permission for an action on a resource
+ * For admins, also checks their specific permissions array
  */
-const hasPermission = (role, resource, action) => {
+const hasPermission = (role, resource, action, userPermissions = []) => {
   const rolePermissions = RBAC_PERMISSIONS[role];
 
   if (!rolePermissions) {
@@ -36,6 +37,38 @@ const hasPermission = (role, resource, action) => {
 
   if (rolePermissions.all) {
     return true;
+  }
+
+  // For admins, check granular permissions if available
+  if (role === 'admin' && userPermissions && userPermissions.length > 0) {
+    // Map resource/action to permission
+    const permissionMap = {
+      'user:manage': 'manage_users',
+      'user:create': 'manage_users',
+      'user:update': 'manage_users',
+      'user:delete': 'manage_users',
+      'salesRep:manage': 'manage_sales_reps',
+      'salesRep:create': 'manage_sales_reps',
+      'salesRep:update': 'manage_sales_reps',
+      'salesRep:delete': 'manage_sales_reps',
+      'vendor:manage': 'manage_vendors',
+      'vendor:create': 'manage_vendors',
+      'vendor:update': 'manage_vendors',
+      'vendor:delete': 'manage_vendors',
+      'admin:manage': 'manage_admins',
+      'admin:create': 'manage_admins',
+      'admin:update': 'manage_admins',
+      'admin:delete': 'manage_admins',
+      'reports:view': 'view_reports',
+      'billing:manage': 'manage_billing',
+      'settings:manage': 'system_settings',
+      'audit:view': 'audit_log',
+    };
+
+    const requiredPermission = permissionMap[`${resource}:${action}`];
+    if (requiredPermission) {
+      return userPermissions.includes(requiredPermission);
+    }
   }
 
   const resourcePermissions = rolePermissions[resource];
@@ -53,7 +86,7 @@ export const checkPermission = (resource, action) => {
       throw new AppError('User not authenticated', 401);
     }
 
-    const hasAccess = hasPermission(req.user.role, resource, action);
+    const hasAccess = hasPermission(req.user.role, resource, action, req.user.permissions);
 
     if (!hasAccess) {
       logger.warn(`Unauthorized access attempt: User ${req.user.email} (${req.user.role}) tried to ${action} ${resource}`);
@@ -252,3 +285,5 @@ export default {
   preventPrivilegeEscalation,
   hasPermission,
 };
+
+export { hasPermission };

@@ -246,7 +246,8 @@ const AdminManagement = () => {
         email: formData.email,
         phone: phoneDigitsOnly, // Send only digits
         password: tempPassword,
-        role: 'admin'
+        role: 'admin',
+        permissions: formData.permissions || [] // ✅ Include permissions
       });
 
       if (response.status === 'success') {
@@ -280,7 +281,7 @@ const AdminManagement = () => {
           accountStatus: accountStatus,
           createdAt: userData.createdAt || new Date().toISOString(),
           lastActive: userData.lastLogin || null,
-          permissions: formData.permissions || [],
+          permissions: userData.permissions || formData.permissions || [], // ✅ Use backend data first
           twoFactorEnabled: formData.twoFactorEnabled || false,
           passwordExpireDate: userData.passwordExpireDate || null,
           invitationSentAt: new Date().toISOString(),
@@ -327,13 +328,25 @@ const AdminManagement = () => {
       setIsSubmitting(true);
       setError(null);
 
-      // Update admin via API
+      // Get current user from localStorage
+      const currentUserStr = localStorage.getItem('user');
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+      const isEditingSelf = currentUser && (currentUser.id === selectedAdmin.id || currentUser._id === selectedAdmin.id);
+
+      // Update admin basic info via API
       const response = await adminService.updateAdmin(selectedAdmin.id, {
         name: formData.name,
         email: formData.email,
         phone: phoneDigitsOnly, // Send only digits
         role: 'admin'
       });
+
+      // Only update permissions if NOT editing own account
+      if (!isEditingSelf) {
+        await adminService.updateAdminPermissions(selectedAdmin.id, formData.permissions || []);
+      } else {
+        console.log('⚠️ Skipping permission update - cannot modify own permissions');
+      }
 
       if (response.status === 'success') {
         setAdmins(admins.map(a => 
@@ -343,14 +356,20 @@ const AdminManagement = () => {
                 name: formData.name,
                 email: formData.email,
                 phone: phoneDigitsOnly,
-                permissions: formData.permissions,
+                permissions: isEditingSelf ? a.permissions : (formData.permissions || []), // Keep old permissions if editing self
                 twoFactorEnabled: formData.twoFactorEnabled
               }
             : a
         ));
         setSelectedAdmin(null);
         setShowEditAdminDialog(false);
-        setSuccessMessage(`✅ Admin updated successfully`);
+        
+        if (isEditingSelf) {
+          setSuccessMessage(`✅ Profile updated successfully (permissions cannot be self-modified)`);
+        } else {
+          setSuccessMessage(`✅ Admin updated successfully`);
+        }
+        
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
       }
@@ -493,6 +512,14 @@ const AdminManagement = () => {
         ? prev.permissions.filter(p => p !== permissionId)
         : [...prev.permissions, permissionId]
     }));
+  };
+
+  // Check if editing own account
+  const isEditingSelf = () => {
+    if (!selectedAdmin) return false;
+    const currentUserStr = localStorage.getItem('user');
+    const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+    return currentUser && (currentUser.id === selectedAdmin.id || currentUser._id === selectedAdmin.id);
   };
 
   return (
@@ -729,14 +756,33 @@ const AdminManagement = () => {
 
           <div className="bg-gray-50 p-4 rounded-lg">
             <p className="text-sm font-semibold text-gray-900 mb-3">Permissions</p>
+            
+            {/* Warning for self-edit */}
+            {isEditingSelf() && (
+              <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <strong>Note:</strong> You cannot modify your own permissions for security reasons.
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {ADMIN_PERMISSIONS_LIST.map(perm => (
-                <label key={perm.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white p-2 rounded transition-colors">
+                <label 
+                  key={perm.id} 
+                  className={`flex items-center gap-2 text-sm p-2 rounded transition-colors ${
+                    isEditingSelf() 
+                      ? 'opacity-60 cursor-not-allowed bg-gray-100' 
+                      : 'cursor-pointer hover:bg-white'
+                  }`}
+                >
                   <input
                     type="checkbox"
                     checked={formData.permissions.includes(perm.id)}
                     onChange={() => togglePermission(perm.id)}
-                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    disabled={isEditingSelf()}
+                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <div>
                     <span className="text-gray-900">{perm.label}</span>
