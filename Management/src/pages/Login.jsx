@@ -58,32 +58,16 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      // Use axios directly to handle the response properly
-      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'}/auth/login`, {
-        email: formData.email,
-        password: formData.password,
-      });
-
-      // Check if password change is required
-      if (response.data.data?.mustChangePassword) {
-        // Store temporary credentials and redirect to password reset
-        localStorage.setItem('resetEmail', formData.email);
-        localStorage.setItem('tempPassword', formData.password);
-        toast.success('🔐 Please set your new password');
+      // Use the login function from AuthContext to ensure state is properly updated
+      const result = await login(formData.email, formData.password);
+      
+      if (result === 'password-reset-required') {
+        // Password reset is required, AuthContext already stored credentials and showed toast
         navigate('/reset-password');
-        return;
+      } else if (result === true) {
+        // Login successful
+        navigate('/');
       }
-
-      // Normal login flow
-      const { token: authToken, user: userData } = response.data.data;
-      localStorage.setItem('token', authToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-
-      // Update auth context
-      axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
-
-      toast.success('Login successful');
-      navigate('/');
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
       toast.error(errorMessage);

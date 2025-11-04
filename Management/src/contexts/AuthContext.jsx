@@ -43,6 +43,15 @@ export const AuthProvider = ({ children }) => {
           password,
         });
 
+        // Check if password change is required (for first-time login with temporary password)
+        if (response.data.data?.mustChangePassword) {
+          // Store temporary credentials for password reset
+          localStorage.setItem('resetEmail', email);
+          localStorage.setItem('tempPassword', password);
+          toast.success('🔐 Please set your new password');
+          return 'password-reset-required';
+        }
+
         const { token: authToken, user: userData } = response.data.data;
 
         // Save to localStorage
@@ -57,7 +66,6 @@ export const AuthProvider = ({ children }) => {
         // Set default authorization header
         axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
 
-        toast.success('Login successful');
         return true;
       } catch (error) {
         const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';

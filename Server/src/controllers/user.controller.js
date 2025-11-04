@@ -252,6 +252,8 @@ export const createUser = asyncHandler(async (req, res, next) => {
           role: newUser.role,
           isActive: newUser.isActive,
           isEmailVerified: newUser.isEmailVerified,
+          isTempPassword: newUser.isTempPassword,
+          mustChangePassword: newUser.mustChangePassword,
           createdAt: newUser.createdAt,
         },
         token,

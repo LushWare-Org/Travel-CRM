@@ -258,13 +258,26 @@ const AdminManagement = () => {
           throw new Error('Invalid response: missing user ID');
         }
 
+        // Apply defaults for fields that backend might not return
+        const isEmailVerified = userData.isEmailVerified ?? false;
+        const isTempPassword = userData.isTempPassword ?? true;
+        const mustChangePassword = userData.mustChangePassword ?? true;
+
+        // Determine account status based on the actual flags (after defaults applied)
+        let accountStatus = 'pending_first_login';
+        if (mustChangePassword) {
+          accountStatus = 'pending_password_reset';
+        } else if (isEmailVerified) {
+          accountStatus = 'verified';
+        }
+
         const newAdmin = {
           id: userData._id || userData.id,
           name: userData.name || formData.name,
           email: userData.email || formData.email,
           phone: userData.phone || phoneDigitsOnly,
           status: 'active',
-          accountStatus: userData.mustChangePassword ? 'pending_password_reset' : (userData.isEmailVerified ? 'verified' : 'pending_first_login'),
+          accountStatus: accountStatus,
           createdAt: userData.createdAt || new Date().toISOString(),
           lastActive: userData.lastLogin || null,
           permissions: formData.permissions || [],
@@ -272,9 +285,9 @@ const AdminManagement = () => {
           passwordExpireDate: userData.passwordExpireDate || null,
           invitationSentAt: new Date().toISOString(),
           firstLoginAt: userData.lastLogin || null,
-          isEmailVerified: userData.isEmailVerified || false,
-          isTempPassword: userData.isTempPassword || true,
-          mustChangePassword: userData.mustChangePassword || true
+          isEmailVerified: isEmailVerified,
+          isTempPassword: isTempPassword,
+          mustChangePassword: mustChangePassword
         };
 
         // Log email details AFTER creating the object (so email is defined)
