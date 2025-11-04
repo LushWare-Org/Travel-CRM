@@ -327,6 +327,61 @@ export const resendVerification = asyncHandler(async (req, res, next) => {
   }
 });
 
+// @desc    Reset temporary password (for users with temp credentials)
+// @route   POST /api/v1/auth/reset-temp-password
+// @access  Public
+export const resetTempPassword = asyncHandler(async (req, res, next) => {
+  const { email, currentPassword, newPassword, confirmPassword } = req.body;
+
+  // Verify passwords match
+  if (newPassword !== confirmPassword) {
+    throw new AppError('Passwords do not match', 400);
+  }
+
+  // Find user by email
+  const user = await User.findOne({ email }).select('+password');
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Verify temporary password
+  const isPasswordMatch = await user.matchPassword(currentPassword);
+  if (!isPasswordMatch) {
+    throw new AppError('Invalid temporary password', 401);
+  }
+
+  // Check if user has temporary password flag
+  if (!user.isTempPassword) {
+    throw new AppError('This user does not have a temporary password', 400);
+  }
+
+  // Update password
+  user.password = newPassword;
+  user.isTempPassword = false;
+  user.mustChangePassword = false;
+  user.passwordChangedAt = Date.now();
+  await user.save();
+
+  // Send password changed email
+  emailService
+    .sendPasswordChanged(user)
+    .catch((err) => logger.error(`Failed to send password changed email: ${err.message}`));
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Password reset successful. You can now log in with your new password.',
+    data: {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    },
+  });
+});
+
 // @desc    Update user profile
 // @route   PUT /api/v1/auth/profile
 // @access  Private

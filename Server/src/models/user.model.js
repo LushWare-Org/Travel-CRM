@@ -36,6 +36,26 @@ const userSchema = new mongoose.Schema(
       enum: ['customer', 'salesRep', 'vendor', 'admin'],
       default: 'customer',
     },
+    permissions: {
+      type: [String],
+      default: [],
+      validate: {
+        validator(permissionsArray) {
+          const validPermissions = [
+            'manage_users',
+            'manage_sales_reps',
+            'manage_vendors',
+            'manage_admins',
+            'view_reports',
+            'manage_billing',
+            'system_settings',
+            'audit_log',
+          ];
+          return permissionsArray.every((perm) => validPermissions.includes(perm));
+        },
+        message: 'Invalid permission specified',
+      },
+    },
     avatar: {
       public_id: String,
       url: String,

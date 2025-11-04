@@ -1,9 +1,15 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Get current directory for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load environment variables FIRST before any other imports
-dotenv.config();
+dotenv.config({ path: join(__dirname, '../.env') });
 
 import cors from 'cors';
 import helmet from 'helmet';
@@ -22,6 +28,7 @@ import logger from './config/logger.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import salesRepRoutes from './routes/salesRep.routes.js';
 import packageRoutes from './routes/package.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import leadRoutes from './routes/lead.routes.js';
@@ -41,6 +48,7 @@ import billingRoutes from './routes/billing.routes.js';
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
 import notFound from './middleware/notFound.js';
+import emailService from './utils/emailService.js';
 
 const app = express();
 
@@ -85,6 +93,7 @@ const API_VERSION = process.env.API_VERSION || 'v1';
 app.use(`/api/${API_VERSION}/auth`, authRoutes);
 app.use(`/api/${API_VERSION}/users`, userRoutes);
 app.use(`/api/${API_VERSION}/admin`, adminRoutes);
+app.use(`/api/${API_VERSION}/sales-reps`, salesRepRoutes);
 app.use(`/api/${API_VERSION}/packages`, packageRoutes);
 app.use(`/api/${API_VERSION}/bookings`, bookingRoutes);
 app.use(`/api/${API_VERSION}/leads`, leadRoutes);
@@ -125,10 +134,13 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/api/${API_VERSION}`);
+    
+    // Verify email service after server starts
+    await emailService.verifyConnection();
   });
 };
 
