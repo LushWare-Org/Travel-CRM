@@ -20,10 +20,6 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
   const page = parseInt(req.query.page, 10) || 1;
   const limit = parseInt(req.query.limit, 10) || 10;
 
-  // 🔍 DEBUG LOGGING
-  console.log('🔍 getAllSalesReps - Query params received:', req.query);
-  console.log('🔍 Page:', page, 'Limit:', limit);
-
   // Validate pagination
   if (page < 1 || limit < 1 || limit > 100) {
     return next(new AppError('Invalid pagination parameters', 400));
@@ -36,13 +32,11 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
     // Active status filter
     if (req.query.isActive !== undefined) {
       filter.isActive = req.query.isActive === 'true';
-      console.log('🔍 Added isActive filter:', filter.isActive);
     }
 
     // Email verified filter
     if (req.query.isEmailVerified !== undefined) {
       filter.isEmailVerified = req.query.isEmailVerified === 'true';
-      console.log('🔍 Added isEmailVerified filter:', filter.isEmailVerified);
     }
 
     // Search functionality
@@ -52,10 +46,7 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
         { email: { $regex: req.query.search, $options: 'i' } },
         { phone: { $regex: req.query.search, $options: 'i' } },
       ];
-      console.log('🔍 Added search filter:', req.query.search);
     }
-
-    console.log('🔍 Final filter object:', JSON.stringify(filter, null, 2));
 
     // Build sort object
     let sortObj = {};
@@ -91,8 +82,6 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
         .lean(),
       User.countDocuments(filter),
     ]);
-
-    console.log('🔍 Query results - Found:', salesReps.length, 'Total count:', totalSalesReps);
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalSalesReps / limit);

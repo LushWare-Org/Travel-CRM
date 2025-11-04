@@ -29,9 +29,7 @@ class SalesRepService {
    */
   async getAllSalesReps(params = {}) {
     try {
-      console.log('📤 Sales Rep Service - Params being sent:', params);
       const response = await this.api.get(this.endpoint, params);
-      console.log('📥 Sales Rep Service - Response received:', response);
       return response;
     } catch (error) {
       console.error('Error fetching sales reps:', error);

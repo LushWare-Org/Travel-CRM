@@ -69,28 +69,24 @@ const SalesRepManagement = () => {
   /**
    * Load sales reps from backend API with pagination
    */
-  const loadSalesReps = async () => {
+  const loadSalesReps = async (page = currentPage, search = searchTerm) => {
     try {
       setIsLoading(true);
       setError('');
       
       // Build params object - only include search if it has a value
       const params = {
-        page: currentPage,
+        page: page,
         limit: ITEMS_PER_PAGE,
         sort: '-createdAt'
       };
       
       // Only add search if it's not empty
-      if (searchTerm && searchTerm.trim()) {
-        params.search = searchTerm.trim();
+      if (search && search.trim()) {
+        params.search = search.trim();
       }
       
       const response = await salesRepService.getAllSalesReps(params);
-
-      console.log('Sales Rep Full Response:', response); // Debug log
-      console.log('Response Data Keys:', response.data ? Object.keys(response.data) : 'NO DATA'); // Debug
-      console.log('Response Data:', JSON.stringify(response.data, null, 2)); // Debug
 
       // Handle different response structures
       let repsData = [];
@@ -101,8 +97,6 @@ const SalesRepManagement = () => {
       } else if (Array.isArray(response)) {
         repsData = response;
       }
-
-      console.log('Raw Reps Data:', repsData); // Debug log
 
       // Transform the data to match the expected format
       const transformedReps = repsData.map(rep => ({
@@ -122,7 +116,6 @@ const SalesRepManagement = () => {
         mustChangePassword: rep.mustChangePassword
       }));
       
-      console.log('Transformed Reps:', transformedReps); // Debug log
       setSalesReps(transformedReps);
       
       // Handle pagination
@@ -223,7 +216,13 @@ const SalesRepManagement = () => {
         toast.success(`✅ Sales rep created! Invitation sent to ${formData.email}`);
         setShowNewRepDialog(false);
         resetForm();
-        await loadSalesReps();
+        
+        // Reset search and pagination state
+        setSearchTerm('');
+        setCurrentPage(1);
+        
+        // Force reload with explicit parameters to ensure we get all reps
+        await loadSalesReps(1, '');
         await loadStats();
       }
     } catch (err) {
@@ -266,7 +265,7 @@ const SalesRepManagement = () => {
         commissionRate: formData.commissionRate
       };
 
-      const response = await salesRepService.updateSalesRep(selectedRep._id, payload);
+      const response = await salesRepService.updateSalesRep(selectedRep.id, payload);
 
       if (response.data) {
         toast.success('✅ Sales representative updated successfully');
@@ -303,9 +302,9 @@ const SalesRepManagement = () => {
       setIsSubmitting(true);
       setError('');
 
-      const response = await salesRepService.deleteSalesRep(repToDelete._id);
+      const response = await salesRepService.deleteSalesRep(repToDelete.id);
 
-      if (response.data) {
+      if (response.status === 'success') {
         toast.success(`✅ Sales representative deleted successfully`);
         setShowDeleteConfirm(false);
         setRepToDelete(null);
@@ -340,7 +339,7 @@ const SalesRepManagement = () => {
       setIsSubmitting(true);
       setError('');
 
-      const response = await salesRepService.resetSalesRepPassword(repToResendInvite._id);
+      const response = await salesRepService.resetSalesRepPassword(repToResendInvite.id);
 
       if (response.data) {
         toast.success(`✅ Invitation resent to ${repToResendInvite.email}`);
@@ -375,7 +374,7 @@ const SalesRepManagement = () => {
       setIsSubmitting(true);
       setError('');
 
-      const response = await salesRepService.resetSalesRepPassword(repToResetPassword._id);
+      const response = await salesRepService.resetSalesRepPassword(repToResetPassword.id);
 
       if (response.data) {
         toast.success(`✅ Password reset email sent to ${repToResetPassword.email}`);
