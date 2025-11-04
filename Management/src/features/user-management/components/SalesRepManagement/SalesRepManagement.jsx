@@ -99,22 +99,35 @@ const SalesRepManagement = () => {
       }
 
       // Transform the data to match the expected format
-      const transformedReps = repsData.map(rep => ({
-        id: rep._id || rep.id,
-        name: rep.name,
-        email: rep.email,
-        phone: rep.phone || '',
-        status: rep.isActive ? 'active' : 'inactive',
-        accountStatus: rep.mustChangePassword ? 'pending_password_reset' : (rep.isEmailVerified ? 'verified' : 'pending_first_login'),
-        commissionRate: rep.commissionRate || 10,
-        leadsAssigned: rep.leadsAssigned || 0,
-        leadsConverted: rep.leadsConverted || 0,
-        createdAt: rep.createdAt,
-        isActive: rep.isActive,
-        isEmailVerified: rep.isEmailVerified,
-        isTempPassword: rep.isTempPassword,
-        mustChangePassword: rep.mustChangePassword
-      }));
+      const transformedReps = repsData.map(rep => {
+        // Determine status based on account state
+        let status = 'inactive';
+        if (rep.isActive) {
+          // If they have a temp password or haven't verified email, they're still "invited"
+          if (rep.isTempPassword || !rep.isEmailVerified) {
+            status = 'invited';
+          } else {
+            status = 'active';
+          }
+        }
+        
+        return {
+          id: rep._id || rep.id,
+          name: rep.name,
+          email: rep.email,
+          phone: rep.phone || '',
+          status: status,
+          accountStatus: rep.mustChangePassword ? 'pending_password_reset' : (rep.isEmailVerified ? 'verified' : 'pending_first_login'),
+          commissionRate: rep.commissionRate || 10,
+          leadsAssigned: rep.leadsAssigned || 0,
+          leadsConverted: rep.leadsConverted || 0,
+          createdAt: rep.createdAt,
+          isActive: rep.isActive,
+          isEmailVerified: rep.isEmailVerified,
+          isTempPassword: rep.isTempPassword,
+          mustChangePassword: rep.mustChangePassword
+        };
+      });
       
       setSalesReps(transformedReps);
       
