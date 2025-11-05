@@ -32,7 +32,31 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // Handle non-JSON responses (like rate limit errors)
+        const text = await response.text();
+        if (!response.ok) {
+          // Try to parse as JSON if it looks like JSON
+          try {
+            data = JSON.parse(text);
+          } catch {
+            // If not JSON, create error object
+            data = {
+              message: text || `HTTP error! status: ${response.status}`,
+              error: text || `HTTP error! status: ${response.status}`,
+            };
+          }
+        } else {
+          data = { message: text };
+        }
+      }
 
       if (!response.ok) {
         // Extract detailed error information
@@ -268,8 +292,31 @@ export const adminAPI = {
   },
 };
 
+// Manual Itinerary API Methods
+export const manualItineraryAPI = {
+  // Get manual itinerary by lead ID
+  getByLead: async (leadId) => {
+    const api = new ApiService();
+    return api.get(`/manual-itineraries/lead/${leadId}`);
+  },
+  // Create or update manual itinerary
+  createOrUpdate: async (leadId, days) => {
+    const api = new ApiService();
+    return api.post(`/manual-itineraries/lead/${leadId}`, { days });
+  },
+  // Delete manual itinerary
+  delete: async (itineraryId) => {
+    const api = new ApiService();
+    return api.delete(`/manual-itineraries/${itineraryId}`);
+  },
+};
+
 // Billing/Quotation API Methods
 export const quotationAPI = {
+  getAll: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/billing/quotations', params);
+  },
   create: async (payload) => {
     const api = new ApiService();
     return api.post('/billing/quotations', payload);
@@ -309,6 +356,10 @@ export const quotationAPI = {
 
 // Invoice API Methods
 export const invoiceAPI = {
+  getAll: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/billing/invoices', params);
+  },
   create: async (payload) => {
     const api = new ApiService();
     return api.post('/billing/invoices', payload);
@@ -316,6 +367,10 @@ export const invoiceAPI = {
   getByLead: async (leadId) => {
     const api = new ApiService();
     return api.get('/billing/invoices/lead/' + leadId);
+  },
+  getById: async (invoiceId) => {
+    const api = new ApiService();
+    return api.get(`/billing/invoices/${invoiceId}`);
   },
   update: async (invoiceId, payload) => {
     const api = new ApiService();
@@ -344,6 +399,10 @@ export const invoiceAPI = {
 
 // Payment Receipt API Methods
 export const receiptAPI = {
+  getAll: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/billing/receipts', params);
+  },
   create: async (payload) => {
     const api = new ApiService();
     return api.post('/billing/receipts', payload);
@@ -351,6 +410,10 @@ export const receiptAPI = {
   getByLead: async (leadId) => {
     const api = new ApiService();
     return api.get('/billing/receipts/lead/' + leadId);
+  },
+  getById: async (receiptId) => {
+    const api = new ApiService();
+    return api.get(`/billing/receipts/${receiptId}`);
   },
   update: async (receiptId, payload) => {
     const api = new ApiService();
@@ -400,6 +463,25 @@ export const packageAPI = {
   update: async (id, packageData) => {
     const api = new ApiService();
     return api.put(`/packages/${id}`, packageData);
+  },
+  // Get itinerary by package ID
+  getItineraryByPackage: async (packageId) => {
+    const api = new ApiService();
+    return api.get(`/itineraries/package/${packageId}`);
+  },
+};
+
+// Customized Package API Methods
+export const customizedPackageAPI = {
+  // Get customized package by ID
+  getById: async (id) => {
+    const api = new ApiService();
+    return api.get(`/customized-packages/${id}`);
+  },
+  // Get itinerary by customized package ID
+  getItineraryByPackage: async (packageId) => {
+    const api = new ApiService();
+    return api.get(`/itineraries/package/${packageId}`);
   },
 };
 

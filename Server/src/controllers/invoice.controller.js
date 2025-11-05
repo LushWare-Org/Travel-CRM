@@ -125,13 +125,16 @@ export const updateInvoice = asyncHandler(async (req, res, next) => {
     return next(new AppError('Invoice not found', 404));
   }
 
-  if (invoice.status === 'paid') {
-    return next(new AppError('Cannot update paid invoice', 400));
-  }
-
+  // Allow updating paid invoices (forms are always-editable)
+  // Only prevent updating cancelled invoices
   if (invoice.status === 'cancelled') {
     return next(new AppError('Cannot update cancelled invoice', 400));
   }
+
+  // Preserve payment information if invoice was already paid
+  const existingPaidAmount = invoice.paidAmount || 0;
+  const existingPayments = invoice.payments || [];
+  const existingPaymentStatus = invoice.paymentStatus;
 
   invoice.lastModifiedBy = req.user.id;
 
@@ -142,7 +145,34 @@ export const updateInvoice = asyncHandler(async (req, res, next) => {
     }
   });
 
+  // Recalculate outstanding amount based on new total, preserving existing payments
+  invoice.outstandingAmount = invoice.totalAmount - existingPaidAmount;
+
+  // Update payment status based on existing payments
+  if (existingPaidAmount === 0) {
+    invoice.paymentStatus = 'unpaid';
+  } else if (existingPaidAmount >= invoice.totalAmount) {
+    invoice.paymentStatus = 'paid';
+    if (!invoice.paidDate) invoice.paidDate = new Date();
+  } else {
+    invoice.paymentStatus = 'partial';
+  }
+
+  // Update status based on payment
+  if (invoice.paymentStatus === 'paid' && invoice.status !== 'cancelled') {
+    invoice.status = 'paid';
+  } else if (invoice.paymentStatus === 'partial' && invoice.status === 'sent') {
+    invoice.status = 'partial';
+  }
+
+  // Preserve existing payments
+  invoice.payments = existingPayments;
+
   await invoice.save();
+
+  await invoice.populate('lead', 'name email phone');
+  await invoice.populate('quotation', 'quotationNumber totalAmount');
+  await invoice.populate('customer');
 
   res.status(200).json({
     success: true,

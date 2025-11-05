@@ -86,6 +86,46 @@ const LeadTable = ({
     }
   };
 
+  const getPackageDisplay = (lead) => {
+    // Check for customized package first
+    if (lead.customizedPackage?.name) {
+      return {
+        name: lead.customizedPackage.name,
+        badge: (
+          <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-semibold" title="Customized Package">
+            ✨ Custom
+          </span>
+        ),
+      };
+    }
+
+    // Check for regular package
+    if (lead.package?.name || lead.packageName) {
+      return {
+        name: lead.package?.name || lead.packageName,
+        badge: null,
+      };
+    }
+
+    // Check for manual itinerary
+    if (lead.manualItinerary?._id || lead.manualItinerary) {
+      return {
+        name: 'Manual Itinerary',
+        badge: (
+          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full font-semibold" title="Manual Itinerary">
+            📋 Manual
+          </span>
+        ),
+      };
+    }
+
+    // No package or itinerary
+    return {
+      name: 'N/A',
+      badge: null,
+    };
+  };
+
   return (
     <>
       <div className="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm relative">
@@ -130,18 +170,15 @@ const LeadTable = ({
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.whatsapp || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.salesRep || lead.adviser || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm border-r border-gray-200">
-                    {lead.packageName || lead.package?.name ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-700">{lead.packageName || lead.package?.name}</span>
-                        {lead.package?.customizedForLead && (
-                          <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-semibold" title="Customized Package">
-                            ✨ Custom
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      'N/A'
-                    )}
+                    {(() => {
+                      const packageInfo = getPackageDisplay(lead);
+                      return (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-gray-700">{packageInfo.name}</span>
+                          {packageInfo.badge}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.destination || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.platform || 'N/A'}</td>

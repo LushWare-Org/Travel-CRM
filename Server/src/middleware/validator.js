@@ -2,80 +2,78 @@ import { validationResult } from 'express-validator';
 import AppError from '../utils/appError.js';
 
 /**
- * Validation middleware for Joi schemas (body validation only)
- * @param {Object} schema - Joi validation schema
+ * Validation middleware that handles both Joi schemas and express-validator arrays
+ * @param {Object|Array} schema - Joi validation schema or express-validator array
+ * @param {string} location - Request location to validate ('body', 'query', 'params'), defaults to 'body'
  * @returns {Function} Express middleware function
  */
-export const validate = (schema) => async (req, res, next) => {
-  try {
-    // Check if body is empty or undefined
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return next(new AppError('Request body is empty or not properly parsed', 400));
+export const validateRequest = (schema, location = 'body') => {
+  // Check if it's an express-validator array (array of functions)
+  if (Array.isArray(schema) && schema.length > 0 && typeof schema[0] === 'function') {
+    // Handle express-validator
+    return async (req, res, next) => {
+      // Execute all validations
+      await Promise.all(schema.map((validation) => validation.run(req)));
+
+      const errors = validationResult(req);
+
+      if (!errors.isEmpty()) {
+        const formattedErrors = errors.array().map((error) => ({
+          field: error.path || error.param,
+          message: error.msg,
+          value: error.value,
+        }));
+
+        return next(new AppError('Validation failed', 400, formattedErrors));
+      }
+
+      return next();
+    };
+  }
+
+  // Handle Joi schema
+  return (req, res, next) => {
+    if (!schema || typeof schema.validate !== 'function') {
+      return next(new AppError('Invalid validation schema', 500));
     }
-    
-    console.log('🔍 Validation - Request body:', JSON.stringify(req.body, null, 2));
-    
-    // validateAsync returns a Promise that resolves to the validated value
-    const value = await schema.validateAsync(req.body, {
+
+    // Determine which request property to validate based on location
+    const source = location === 'query' ? req.query : location === 'params' ? req.params : req.body;
+
+    const { error, value } = schema.validate(source, {
       abortEarly: false,
       stripUnknown: true,
     });
-    
-    console.log('✅ Validation passed - Validated value:', JSON.stringify(value, null, 2));
-    
-    // Replace request body with validated value
-    req.body = value;
-    
-    return next();
-  } catch (error) {
-    if (error.details) {
-      console.error('❌ Validation errors:', error.details.map(d => ({
-        field: d.path.join('.'),
-        message: d.message,
-        value: d.context?.value
-      })));
-      
+
+    if (error) {
       const formattedErrors = error.details.map((detail) => ({
         field: detail.path.join('.'),
         message: detail.message,
       }));
+
       return next(new AppError('Validation failed', 400, formattedErrors));
     }
-    
-    return next(error);
-  }
+
+    // Replace the appropriate request property with validated value
+    if (location === 'query') {
+      req.query = value;
+    } else if (location === 'params') {
+      req.params = value;
+    } else {
+      req.body = value;
+    }
+
+    return next();
+  };
 };
 
 /**
- * Validation middleware for Joi schemas with flexible request location
- * @param {Object} schema - Joi validation schema
- * @param {String} location - Where to validate ('body', 'query', 'params')
+ * Validation middleware that handles both Joi schemas and express-validator arrays
+ * @param {Object|Array} schema - Joi validation schema or express-validator array
  * @returns {Function} Express middleware function
  */
-export const validateRequest = (schema, location = 'body') => async (req, res, next) => {
-  const dataToValidate = req[location];
-
-  try {
-    // validateAsync returns a Promise that resolves to the validated value
-    const value = await schema.validateAsync(dataToValidate, {
-      abortEarly: false,
-      stripUnknown: true,
-    });
-
-    // Replace request data with validated value
-    req[location] = value;
-    return next();
-  } catch (error) {
-    if (error.details) {
-      const formattedErrors = error.details.map((detail) => ({
-        field: detail.path.join('.'),
-        message: detail.message,
-      }));
-      return next(new AppError('Validation failed', 400, formattedErrors));
-    }
-    
-    return next(error);
-  }
+export const validate = (schema) => {
+  return validateRequest(schema, 'body');
 };
 
 /**

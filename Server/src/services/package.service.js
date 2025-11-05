@@ -5,6 +5,7 @@
  */
 
 import Package from '../models/package.model.js';
+import CustomizedPackage from '../models/customizedPackage.model.js';
 import Itinerary from '../models/itinerary.model.js';
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
@@ -39,11 +40,52 @@ class PackageService {
         createdBy: userId,
       };
 
-      // If this is a customized package, set customizedBy
+      // If this is a customized package, store in CustomizedPackage collection
       if (pkgData.customizedForLead || pkgData.originalPackage) {
         packagePayload.customizedBy = userId;
+        
+        // Ensure required fields for customized package
+        if (!pkgData.customizedForLead) {
+          throw new Error('customizedForLead is required for customized packages');
+        }
+        if (!pkgData.originalPackage) {
+          throw new Error('originalPackage is required for customized packages');
+        }
+
+        // Create customized package in separate collection
+        const newCustomizedPackage = await CustomizedPackage.create(packagePayload);
+
+        // Create itinerary if days are provided and valid
+        if (days && Array.isArray(days) && days.length > 0) {
+          try {
+            const itinerary = await Itinerary.create({
+              package: newCustomizedPackage._id,
+              packageModel: 'CustomizedPackage',
+              days: days,
+              createdBy: userId,
+              status: packageData.status || 'draft',
+            });
+
+            // Link itinerary to customized package
+            newCustomizedPackage.itinerary = itinerary._id;
+            await newCustomizedPackage.save();
+          } catch (itineraryError) {
+            logger.warn(`Itinerary creation warning for customized package ${newCustomizedPackage._id}: ${itineraryError.message}`);
+            // Don't fail the entire operation if itinerary creation fails
+          }
+        }
+
+        // Populate references
+        await newCustomizedPackage.populate('createdBy', 'name email role');
+        await newCustomizedPackage.populate('itinerary');
+        await newCustomizedPackage.populate('originalPackage', 'name destination');
+        await newCustomizedPackage.populate('customizedForLead', 'name email');
+
+        logger.info(`Customized package created: ${newCustomizedPackage._id}`);
+        return newCustomizedPackage;
       }
 
+      // Regular package creation
       const newPackage = await Package.create(packagePayload);
 
       // Create itinerary if days are provided and valid
@@ -51,6 +93,7 @@ class PackageService {
         try {
           const itinerary = await Itinerary.create({
             package: newPackage._id,
+            packageModel: 'Package',
             days: days,
             createdBy: userId,
             status: packageData.status || 'draft',

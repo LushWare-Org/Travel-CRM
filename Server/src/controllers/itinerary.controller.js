@@ -171,6 +171,7 @@ export const createItinerary = asyncHandler(async (req, res, next) => {
   // Create itinerary
   const itinerary = await Itinerary.create({
     package: packageId,
+    packageModel: 'Package',
     days,
     createdBy: req.user.id,
   });
@@ -434,6 +435,7 @@ export const cloneItinerary = asyncHandler(async (req, res, next) => {
   // Clone itinerary
   const clonedItinerary = await Itinerary.create({
     package: targetPackageId,
+    packageModel: 'Package',
     days: sourceItinerary.days.map((day) => ({
       dayNumber: day.dayNumber,
       title: day.title,

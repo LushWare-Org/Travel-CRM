@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Loader2 } from 'lucide-react';
+import { X, Plus, Loader2, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { leadAPI, packageAPI } from '../../../services/api';
+import { leadAPI, packageAPI, manualItineraryAPI } from '../../../services/api';
 import LocationAutocomplete from './LocationAutocomplete';
+import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
+import LocationAutocompleteMulti from './LocationAutocompleteMulti';
+import { createDefaultDay } from '../../itinerary/types/index.js';
 
 const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
+  const [showManualItinerary, setShowManualItinerary] = useState(false);
+  const [itineraryDays, setItineraryDays] = useState([]);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -89,17 +94,12 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.phone) {
-      alert("Please fill in required fields: Name, Email, and Phone");
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       const leadData = {
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        name: formData.name?.trim() || undefined,
+        email: formData.email?.trim() || undefined,
+        phone: formData.phone?.trim() || undefined,
         city: formData.city || undefined,
         whatsapp: formData.whatsapp || undefined,
         salesRep: formData.salesRep || undefined,
@@ -118,7 +118,20 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         status: "new"
       };
 
-      await leadAPI.createLead(leadData);
+      const response = await leadAPI.createLead(leadData);
+      const leadId = response.data?._id || response.data?.id;
+
+      // Save manual itinerary if days exist
+      if (showManualItinerary && itineraryDays.length > 0) {
+        try {
+          await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
+        } catch (itineraryError) {
+          console.error('Error saving manual itinerary:', itineraryError);
+          // Don't fail the entire operation if itinerary save fails
+          toast.error('Lead created but itinerary save failed');
+        }
+      }
+
       toast.success('Lead created successfully');
       
       // Reset form
@@ -138,6 +151,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         packageName: "",
         remarks: [{ text: "", date: "" }],
       });
+      setItineraryDays([]);
+      setShowManualItinerary(false);
 
       onSuccess?.();
       onClose();
@@ -169,7 +184,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
               <input
                 type="text"
                 value={formData.name}
@@ -179,7 +194,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Contact No. *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
               <input
                 type="tel"
                 value={formData.phone}
@@ -200,7 +215,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">E-mail ID *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">E-mail ID</label>
               <input
                 type="email"
                 value={formData.email}
@@ -366,6 +381,56 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 Add Another Remark
               </button>
             </div>
+          </div>
+
+          {/* Manual Itinerary Section */}
+          <div className="border-t pt-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Manual Itinerary</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowManualItinerary(!showManualItinerary);
+                  if (!showManualItinerary && itineraryDays.length === 0) {
+                    setItineraryDays([createDefaultDay(1)]);
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                {showManualItinerary ? 'Hide Itinerary' : 'Add Manual Itinerary'}
+              </button>
+            </div>
+
+            {showManualItinerary && (
+              <div className="mt-4">
+                <ItineraryEditor
+                  days={itineraryDays}
+                  onDayChange={(dayNumber, dayData) => {
+                    setItineraryDays(prev =>
+                      prev.map(day =>
+                        day.dayNumber === dayNumber ? { ...day, ...dayData } : day
+                      )
+                    );
+                  }}
+                  onAddDay={() => {
+                    const newDayNumber = itineraryDays.length + 1;
+                    setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
+                  }}
+                  onRemoveDay={(dayNumber) => {
+                    const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
+                    const renumberedDays = filteredDays.map((day, index) => ({
+                      ...day,
+                      dayNumber: index + 1,
+                    }));
+                    setItineraryDays(renumberedDays);
+                  }}
+                  destination={formData.destination}
+                  useLocationAutocomplete={true}
+                  LocationAutocompleteComponent={LocationAutocompleteMulti}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

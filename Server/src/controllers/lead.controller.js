@@ -59,6 +59,15 @@ export const createLead = asyncHandler(async (req, res, next) => {
     }
   }
 
+  // If customizedPackage is provided, populate packageName
+  if (req.body.customizedPackage) {
+    const CustomizedPackage = (await import('../models/customizedPackage.model.js')).default;
+    const customPkg = await CustomizedPackage.findById(req.body.customizedPackage).select('name');
+    if (customPkg) {
+      req.body.packageName = customPkg.name;
+    }
+  }
+
   const lead = await Lead.create(req.body);
 
   res.status(201).json({
@@ -75,7 +84,9 @@ export const getLeads = asyncHandler(async (req, res, next) => {
     Lead.find()
       .populate('assignedTo', 'name email role')
       .populate('currentItinerary')
-      .populate('package', 'name customizedForLead originalPackage customizedBy'),
+      .populate('package', 'name customizedForLead originalPackage customizedBy')
+      .populate('customizedPackage', 'name originalPackage customizedForLead')
+      .populate('manualItinerary', 'days'),
     req.query,
   );
 
@@ -120,6 +131,8 @@ export const getLead = asyncHandler(async (req, res, next) => {
     .populate('assignedBy', 'name email')
     .populate('currentItinerary')
     .populate('package', 'name destination duration price customizedForLead originalPackage customizedBy customizationNotes')
+    .populate('customizedPackage', 'name originalPackage customizedForLead')
+    .populate('manualItinerary', 'days')
     .populate('remarks.addedBy', 'name email');
 
   if (!lead) {
@@ -165,6 +178,21 @@ export const updateLead = asyncHandler(async (req, res, next) => {
         req.body.packageName = null;
       }
     } else {
+      req.body.packageName = null;
+    }
+  }
+
+  // If customizedPackage is being updated, populate packageName
+  if (req.body.customizedPackage !== undefined) {
+    if (req.body.customizedPackage) {
+      const CustomizedPackage = (await import('../models/customizedPackage.model.js')).default;
+      const customPkg = await CustomizedPackage.findById(req.body.customizedPackage).select('name');
+      if (customPkg) {
+        req.body.packageName = customPkg.name;
+      } else {
+        req.body.packageName = null;
+      }
+    } else if (!req.body.package) {
       req.body.packageName = null;
     }
   }
@@ -309,6 +337,9 @@ export const unassignLead = asyncHandler(async (req, res, next) => {
 export const getLeadsByStatus = asyncHandler(async (req, res, next) => {
   const leads = await Lead.find({ status: req.params.status })
     .populate('assignedTo', 'name email role')
+    .populate('package', 'name')
+    .populate('customizedPackage', 'name')
+    .populate('manualItinerary', 'days')
     .sort('-createdAt');
 
   res.status(200).json({
@@ -325,6 +356,9 @@ export const getMyLeads = asyncHandler(async (req, res, next) => {
   const leads = await Lead.find({ assignedTo: req.user._id })
     .populate('assignedTo', 'name email role')
     .populate('currentItinerary')
+    .populate('package', 'name')
+    .populate('customizedPackage', 'name')
+    .populate('manualItinerary', 'days')
     .sort('-createdAt');
 
   res.status(200).json({
@@ -376,6 +410,9 @@ export const searchLeads = asyncHandler(async (req, res, next) => {
     ],
   })
     .populate('assignedTo', 'name email role')
+    .populate('package', 'name')
+    .populate('customizedPackage', 'name')
+    .populate('manualItinerary', 'days')
     .limit(20);
 
   res.status(200).json({
