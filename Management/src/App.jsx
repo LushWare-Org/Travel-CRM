@@ -7,6 +7,7 @@ import ItineraryGeneration from "./pages/ItineraryGeneration";
 import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -48,6 +49,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       
       <Route
         path="/*"

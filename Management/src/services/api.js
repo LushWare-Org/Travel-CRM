@@ -59,8 +59,22 @@ class ApiService {
       }
 
       if (!response.ok) {
-        const errorMessage = data.message || data.error?.message || `HTTP error! status: ${response.status}`;
-        throw new Error(errorMessage);
+        // Extract detailed error information
+        let errorMessage = data.message || data.error?.message || `HTTP error! status: ${response.status}`;
+        
+        // Include validation errors if available
+        if (data.error?.errors && Array.isArray(data.error.errors)) {
+          const validationErrors = data.error.errors.map(err => `${err.field}: ${err.message}`).join('; ');
+          errorMessage = `${errorMessage} - ${validationErrors}`;
+        } else if (data.error?.details && Array.isArray(data.error.details)) {
+          const validationErrors = data.error.details.map(err => `${err.field}: ${err.message}`).join('; ');
+          errorMessage = `${errorMessage} - ${validationErrors}`;
+        }
+        
+        const error = new Error(errorMessage);
+        error.status = response.status;
+        error.data = data;
+        throw error;
       }
 
       return data;

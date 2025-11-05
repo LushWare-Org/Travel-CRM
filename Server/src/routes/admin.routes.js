@@ -8,10 +8,18 @@ import {
   updateUser,
   deleteUser,
   getDashboardStats,
+  updateAdminPermissions,
+  getAdminPermissions,
+  getAvailablePermissions,
 } from '../controllers/admin.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
-import { createStaffSchema, updateUserStatusSchema, updateProfileSchema } from '../validators/auth.validator.js';
+import { 
+  createStaffSchema, 
+  updateUserStatusSchema, 
+  updateProfileSchema,
+  updatePermissionsSchema,
+} from '../validators/auth.validator.js';
 import { getSettings, updateSettings } from '../controllers/settings.controller.js';
 import { updateSettingsSchema } from '../validators/settings.validator.js';
 
@@ -28,6 +36,9 @@ router.get('/stats', getDashboardStats);
 router.get('/settings', getSettings);
 router.put('/settings', validate(updateSettingsSchema), updateSettings);
 
+// Permissions
+router.get('/permissions/available', getAvailablePermissions);
+
 // User management
 router.route('/users')
   .get(getAllUsers)
@@ -40,5 +51,10 @@ router.route('/users/:id')
 
 router.patch('/users/:id/status', validate(updateUserStatusSchema), updateUserStatus);
 router.post('/users/:id/reset-password', resetUserPassword);
+
+// Admin permissions management
+router.route('/users/:id/permissions')
+  .get(getAdminPermissions)
+  .patch(validate(updatePermissionsSchema), updateAdminPermissions);
 
 export default router;
