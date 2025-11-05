@@ -27,6 +27,8 @@ import bookingRoutes from './routes/booking.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import invoiceRoutes from './routes/invoice.routes.js';
 import itineraryRoutes from './routes/itinerary.routes.js';
+import manualItineraryRoutes from './routes/manualItinerary.routes.js';
+import customizedPackageRoutes from './routes/customizedPackage.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
@@ -93,6 +95,8 @@ app.use(`/api/${API_VERSION}/invoices`, invoiceRoutes);
 // Billing module route (preferred)
 app.use(`/api/${API_VERSION}/billing/invoices`, invoiceRoutes);
 app.use(`/api/${API_VERSION}/itineraries`, itineraryRoutes);
+app.use(`/api/${API_VERSION}/manual-itineraries`, manualItineraryRoutes);
+app.use(`/api/${API_VERSION}/customized-packages`, customizedPackageRoutes);
 app.use(`/api/${API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${API_VERSION}/notifications`, notificationRoutes);
 app.use(`/api/${API_VERSION}/dashboard`, dashboardRoutes);

@@ -4,17 +4,17 @@ const leadSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Please provide a name'],
+      required: false,
       trim: true,
     },
     email: {
       type: String,
-      required: [true, 'Please provide an email'],
+      required: false,
       lowercase: true,
     },
     phone: {
       type: String,
-      required: [true, 'Please provide a phone number'],
+      required: false,
     },
     whatsapp: {
       type: String,
@@ -55,6 +55,10 @@ const leadSchema = new mongoose.Schema(
     package: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Package',
+    },
+    customizedPackage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CustomizedPackage',
     },
     packageName: {
       type: String,
@@ -127,6 +131,10 @@ const leadSchema = new mongoose.Schema(
     currentItinerary: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Itinerary',
+    },
+    manualItinerary: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ManualItinerary',
     },
     itineraryVersions: [
       {

@@ -17,6 +17,8 @@ const ItineraryEditor = ({
   onAddDay,
   onRemoveDay,
   destination = '', // Add destination prop
+  useLocationAutocomplete = false, // New prop to determine location input type
+  LocationAutocompleteComponent = null, // Optional custom location autocomplete component
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
 
@@ -118,11 +120,18 @@ const ItineraryEditor = ({
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Locations Covered
               </label>
-              <LocationSelector
-                locations={day.locations || []}
-                onChange={(locations) => onDayChange(day.dayNumber, { locations })}
-                destination={destination}
-              />
+              {useLocationAutocomplete && LocationAutocompleteComponent ? (
+                <LocationAutocompleteComponent
+                  locations={day.locations || []}
+                  onChange={(locations) => onDayChange(day.dayNumber, { locations })}
+                />
+              ) : (
+                <LocationSelector
+                  locations={day.locations || []}
+                  onChange={(locations) => onDayChange(day.dayNumber, { locations })}
+                  destination={destination}
+                />
+              )}
             </div>
 
             {/* Activities */}

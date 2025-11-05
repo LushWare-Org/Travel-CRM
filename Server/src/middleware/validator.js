@@ -2,28 +2,58 @@ import { validationResult } from 'express-validator';
 import AppError from '../utils/appError.js';
 
 /**
- * Validation middleware for Joi schemas
- * @param {Object} schema - Joi validation schema
+ * Validation middleware that handles both Joi schemas and express-validator arrays
+ * @param {Object|Array} schema - Joi validation schema or express-validator array
  * @returns {Function} Express middleware function
  */
-export const validate = (schema) => (req, res, next) => {
-  const { error, value } = schema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
+export const validate = (schema) => {
+  // Check if it's an express-validator array (array of functions)
+  if (Array.isArray(schema) && schema.length > 0 && typeof schema[0] === 'function') {
+    // Handle express-validator
+    return async (req, res, next) => {
+      // Execute all validations
+      await Promise.all(schema.map((validation) => validation.run(req)));
 
-  if (error) {
-    const formattedErrors = error.details.map((detail) => ({
-      field: detail.path.join('.'),
-      message: detail.message,
-    }));
+      const errors = validationResult(req);
 
-    return next(new AppError('Validation failed', 400, formattedErrors));
+      if (!errors.isEmpty()) {
+        const formattedErrors = errors.array().map((error) => ({
+          field: error.path || error.param,
+          message: error.msg,
+          value: error.value,
+        }));
+
+        return next(new AppError('Validation failed', 400, formattedErrors));
+      }
+
+      return next();
+    };
   }
 
-  // Replace request body with validated value
-  req.body = value;
-  return next();
+  // Handle Joi schema
+  return (req, res, next) => {
+    if (!schema || typeof schema.validate !== 'function') {
+      return next(new AppError('Invalid validation schema', 500));
+    }
+
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      const formattedErrors = error.details.map((detail) => ({
+        field: detail.path.join('.'),
+        message: detail.message,
+      }));
+
+      return next(new AppError('Validation failed', 400, formattedErrors));
+    }
+
+    // Replace request body with validated value
+    req.body = value;
+    return next();
+  };
 };
 
 /**

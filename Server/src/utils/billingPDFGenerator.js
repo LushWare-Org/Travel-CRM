@@ -127,10 +127,7 @@ export function generateQuotationPDF(quotation, lead) {
         .fontSize(10)
         .font('Helvetica-Bold')
         .text('Description', 60, tableTop + 8)
-        .text('Category', 200, tableTop + 8)
-        .text('Qty', 280, tableTop + 8)
-        .text('Unit Price', 330, tableTop + 8)
-        .text('Total', 460, tableTop + 8);
+        .text('Price', 460, tableTop + 8);
 
       // Table Rows
       let rowY = tableTop + 25;
@@ -149,10 +146,7 @@ export function generateQuotationPDF(quotation, lead) {
           .fillColor(COLORS.gray800)
           .fontSize(9)
           .font('Helvetica')
-          .text(item.description || '', 60, rowY + 8, { width: 130 })
-          .text(item.category || 'other', 200, rowY + 8, { width: 70 })
-          .text(String(item.quantity || 1), 280, rowY + 8)
-          .text(`${formatCurrency(item.unitPrice || 0)}`, 330, rowY + 8, { width: 80, align: 'right' })
+          .text(item.description || '', 60, rowY + 8, { width: 380 })
           .text(`${formatCurrency(item.totalPrice || 0)}`, 460, rowY + 8, { width: 75, align: 'right' });
 
         rowY += rowHeight;
@@ -378,10 +372,7 @@ export function generateInvoicePDF(invoice, lead) {
         .fontSize(10)
         .font('Helvetica-Bold')
         .text('Description', 60, tableTop + 8)
-        .text('Category', 200, tableTop + 8)
-        .text('Qty', 280, tableTop + 8)
-        .text('Unit Price', 330, tableTop + 8)
-        .text('Total', 460, tableTop + 8);
+        .text('Price', 460, tableTop + 8);
 
       // Table Rows
       let rowY = tableTop + 25;
@@ -400,10 +391,7 @@ export function generateInvoicePDF(invoice, lead) {
           .fillColor(COLORS.gray800)
           .fontSize(9)
           .font('Helvetica')
-          .text(item.description || '', 60, rowY + 8, { width: 130 })
-          .text(item.category || 'other', 200, rowY + 8, { width: 70 })
-          .text(String(item.quantity || 1), 280, rowY + 8)
-          .text(`${formatCurrency(item.unitPrice || 0)}`, 330, rowY + 8, { width: 80, align: 'right' })
+          .text(item.description || '', 60, rowY + 8, { width: 380 })
           .text(`${formatCurrency(item.totalPrice || 0)}`, 460, rowY + 8, { width: 75, align: 'right' });
 
         rowY += rowHeight;
@@ -800,6 +788,6 @@ export function generateReceiptPDF(receipt, invoice, lead) {
  * Format currency with proper symbols
  */
 function formatCurrency(amount) {
-  return `LKR ${parseFloat(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `INR ${parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
