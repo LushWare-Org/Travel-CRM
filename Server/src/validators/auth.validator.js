@@ -166,11 +166,28 @@ export const createStaffSchema = Joi.object({
       'string.pattern.base': 'Please provide a valid 10-digit phone number',
     }),
   role: Joi.string()
-    .valid('salesRep', 'vendor')
+    .valid('salesRep', 'vendor', 'admin')
     .required()
     .messages({
       'string.empty': 'Role is required',
-      'any.only': 'Role must be either salesRep or vendor',
+      'any.only': 'Role must be either salesRep, vendor, or admin',
+    }),
+  permissions: Joi.array()
+    .items(
+      Joi.string().valid(
+        'manage_users',
+        'manage_sales_reps',
+        'manage_vendors',
+        'manage_admins',
+        'view_reports',
+        'manage_billing',
+        'system_settings',
+        'audit_log',
+      ),
+    )
+    .messages({
+      'array.base': 'Permissions must be an array',
+      'any.only': 'Invalid permission specified',
     }),
 });
 
@@ -181,5 +198,28 @@ export const updateUserStatusSchema = Joi.object({
     .messages({
       'boolean.base': 'isActive must be a boolean value',
       'any.required': 'isActive is required',
+    }),
+});
+
+// Update admin permissions validation
+export const updatePermissionsSchema = Joi.object({
+  permissions: Joi.array()
+    .items(
+      Joi.string().valid(
+        'manage_users',
+        'manage_sales_reps',
+        'manage_vendors',
+        'manage_admins',
+        'view_reports',
+        'manage_billing',
+        'system_settings',
+        'audit_log',
+      ),
+    )
+    .required()
+    .messages({
+      'array.base': 'Permissions must be an array',
+      'any.only': 'Invalid permission specified',
+      'any.required': 'Permissions array is required',
     }),
 });

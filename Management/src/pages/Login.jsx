@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
@@ -57,10 +58,20 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      const success = await login(formData.email, formData.password);
-      if (success) {
+      // Use the login function from AuthContext to ensure state is properly updated
+      const result = await login(formData.email, formData.password);
+      
+      if (result === 'password-reset-required') {
+        // Password reset is required, AuthContext already stored credentials and showed toast
+        navigate('/reset-password');
+      } else if (result === true) {
+        // Login successful
         navigate('/');
       }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
+      toast.error(errorMessage);
+      console.error('Login error:', error);
     } finally {
       setIsSubmitting(false);
     }

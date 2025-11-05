@@ -13,12 +13,12 @@ const generateTempPassword = () => crypto.randomBytes(8).toString('hex'); // 16 
 // @access  Private/Admin
 export const createStaff = asyncHandler(async (req, res, next) => {
   const {
-    name, email, phone, role,
+    name, email, phone, role, permissions,
   } = req.body;
 
   // Validate role
-  if (!['salesRep', 'vendor'].includes(role)) {
-    throw new AppError('Invalid role. Only salesRep and vendor can be created through this endpoint', 400);
+  if (!['salesRep', 'vendor', 'admin'].includes(role)) {
+    throw new AppError('Invalid role. Only salesRep, vendor, and admin can be created through this endpoint', 400);
   }
 
   // Check if user already exists
@@ -37,6 +37,7 @@ export const createStaff = asyncHandler(async (req, res, next) => {
     phone,
     password: tempPassword,
     role,
+    permissions: role === 'admin' && permissions ? permissions : [], // Only apply permissions to admins
     isTempPassword: true,
     mustChangePassword: true,
     isEmailVerified: true, // Staff accounts are pre-verified
@@ -51,7 +52,7 @@ export const createStaff = asyncHandler(async (req, res, next) => {
 
     res.status(201).json({
       status: 'success',
-      message: `${role === 'salesRep' ? 'Sales Representative' : 'Vendor'} created successfully. Login credentials sent to their email.`,
+      message: `${role === 'salesRep' ? 'Sales Representative' : role === 'vendor' ? 'Vendor' : 'Administrator'} created successfully. Login credentials sent to their email.`,
       data: {
         user: {
           id: user._id,
@@ -59,6 +60,7 @@ export const createStaff = asyncHandler(async (req, res, next) => {
           email: user.email,
           role: user.role,
           phone: user.phone,
+          permissions: user.permissions,
           isActive: user.isActive,
           createdAt: user.createdAt,
         },
@@ -70,7 +72,7 @@ export const createStaff = asyncHandler(async (req, res, next) => {
 
     res.status(201).json({
       status: 'success',
-      message: `${role === 'salesRep' ? 'Sales Representative' : 'Vendor'} created successfully, but failed to send email. Please provide credentials manually.`,
+      message: `${role === 'salesRep' ? 'Sales Representative' : role === 'vendor' ? 'Vendor' : 'Administrator'} created successfully, but failed to send email. Please provide credentials manually.`,
       data: {
         user: {
           id: user._id,
@@ -78,6 +80,7 @@ export const createStaff = asyncHandler(async (req, res, next) => {
           email: user.email,
           role: user.role,
           phone: user.phone,
+          permissions: user.permissions,
           isActive: user.isActive,
           createdAt: user.createdAt,
         },
@@ -354,6 +357,120 @@ export const getDashboardStats = asyncHandler(async (req, res, next) => {
           admin: adminCount,
         },
       },
+    },
+  });
+});
+
+// @desc    Update admin permissions
+// @route   PATCH /api/v1/admin/users/:id/permissions
+// @access  Private/Admin
+export const updateAdminPermissions = asyncHandler(async (req, res, next) => {
+  const { permissions } = req.body;
+
+  if (!Array.isArray(permissions)) {
+    throw new AppError('Permissions must be an array', 400);
+  }
+
+  const user = await User.findById(req.params.id);
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Only admins can have permissions
+  if (user.role !== 'admin') {
+    throw new AppError('Permissions can only be assigned to admin users', 400);
+  }
+
+  // Prevent modifying own permissions
+  if (user._id.toString() === req.user.id.toString()) {
+    throw new AppError('You cannot modify your own permissions', 400);
+  }
+
+  const validPermissions = [
+    'manage_users',
+    'manage_sales_reps',
+    'manage_vendors',
+    'manage_admins',
+    'view_reports',
+    'manage_billing',
+    'system_settings',
+    'audit_log',
+  ];
+
+  // Validate all permissions
+  const invalidPermissions = permissions.filter((perm) => !validPermissions.includes(perm));
+  if (invalidPermissions.length > 0) {
+    throw new AppError(`Invalid permissions: ${invalidPermissions.join(', ')}`, 400);
+  }
+
+  user.permissions = permissions;
+  await user.save({ validateBeforeSave: false });
+
+  logger.info(`Admin permissions updated for ${user.email} by ${req.user.email}`);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Admin permissions updated successfully',
+    data: {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+      },
+    },
+  });
+});
+
+// @desc    Get admin permissions
+// @route   GET /api/v1/admin/users/:id/permissions
+// @access  Private/Admin
+export const getAdminPermissions = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.params.id).select('name email role permissions');
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (user.role !== 'admin') {
+    throw new AppError('Only admin users have permissions', 400);
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions || [],
+      },
+    },
+  });
+});
+
+// @desc    Get all available permissions
+// @route   GET /api/v1/admin/permissions/available
+// @access  Private/Admin
+export const getAvailablePermissions = asyncHandler(async (req, res, next) => {
+  const availablePermissions = [
+    { id: 'manage_users', label: 'Manage Website Users', category: 'Users', description: 'Create, edit, and manage customer accounts' },
+    { id: 'manage_sales_reps', label: 'Manage Sales Reps', category: 'Staff', description: 'Manage sales representatives and their assignments' },
+    { id: 'manage_vendors', label: 'Manage Vendors', category: 'Partners', description: 'Manage vendor partnerships and services' },
+    { id: 'manage_admins', label: 'Manage Admins', category: 'System', description: 'Create and manage administrator accounts' },
+    { id: 'view_reports', label: 'View Reports', category: 'Analytics', description: 'Access business reports and analytics' },
+    { id: 'manage_billing', label: 'Manage Billing', category: 'Finance', description: 'Handle billing and payment operations' },
+    { id: 'system_settings', label: 'System Settings', category: 'System', description: 'Configure system-wide settings' },
+    { id: 'audit_log', label: 'View Audit Logs', category: 'System', description: 'View system audit logs and activity' },
+  ];
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      permissions: availablePermissions,
     },
   });
 });

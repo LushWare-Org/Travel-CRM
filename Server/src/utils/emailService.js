@@ -4,11 +4,40 @@ import logger from '../config/logger.js';
 
 class EmailService {
   constructor() {
-    this.transporter = nodemailer.createTransport(emailConfig);
+    this.transporter = null;
+    this.verificationAttempted = false;
+  }
+
+  getTransporter() {
+    if (!this.transporter) {
+      this.transporter = nodemailer.createTransport(emailConfig);
+    }
+    return this.transporter;
+  }
+
+  async verifyConnection() {
+    if (this.verificationAttempted) {
+      return;
+    }
+    this.verificationAttempted = true;
+    
+    try {
+      const transporter = this.getTransporter();
+      await transporter.verify();
+      logger.info('Email service connected successfully');
+    } catch (error) {
+      logger.error(`Email service verification failed: ${error.message}`);
+    }
   }
 
   async sendEmail(options) {
     try {
+      // Validate email configuration
+      if (!emailConfig.from || !emailConfig.host || !emailConfig.port) {
+        throw new Error('Email configuration is incomplete. Check EMAIL_HOST, EMAIL_PORT, and EMAIL_FROM in .env');
+      }
+
+      const transporter = this.getTransporter();
       const mailOptions = {
         from: emailConfig.from,
         to: options.to,
@@ -17,11 +46,15 @@ class EmailService {
         html: options.html,
       };
 
-      const info = await this.transporter.sendMail(mailOptions);
-      logger.info(`Email sent: ${info.messageId}`);
+      const info = await transporter.sendMail(mailOptions);
+      logger.info(`Email sent successfully: ${info.messageId} to ${options.to}`);
       return info;
     } catch (error) {
-      logger.error(`Error sending email: ${error.message}`);
+      logger.error(`Error sending email to ${options.to}: ${error.message}`, {
+        code: error.code,
+        command: error.command,
+        response: error.response,
+      });
       throw error;
     }
   }

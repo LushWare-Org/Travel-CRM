@@ -4,9 +4,10 @@ import AppError from '../utils/appError.js';
 /**
  * Validation middleware that handles both Joi schemas and express-validator arrays
  * @param {Object|Array} schema - Joi validation schema or express-validator array
+ * @param {string} location - Request location to validate ('body', 'query', 'params'), defaults to 'body'
  * @returns {Function} Express middleware function
  */
-export const validate = (schema) => {
+export const validateRequest = (schema, location = 'body') => {
   // Check if it's an express-validator array (array of functions)
   if (Array.isArray(schema) && schema.length > 0 && typeof schema[0] === 'function') {
     // Handle express-validator
@@ -36,7 +37,10 @@ export const validate = (schema) => {
       return next(new AppError('Invalid validation schema', 500));
     }
 
-    const { error, value } = schema.validate(req.body, {
+    // Determine which request property to validate based on location
+    const source = location === 'query' ? req.query : location === 'params' ? req.params : req.body;
+
+    const { error, value } = schema.validate(source, {
       abortEarly: false,
       stripUnknown: true,
     });
@@ -50,10 +54,26 @@ export const validate = (schema) => {
       return next(new AppError('Validation failed', 400, formattedErrors));
     }
 
-    // Replace request body with validated value
-    req.body = value;
+    // Replace the appropriate request property with validated value
+    if (location === 'query') {
+      req.query = value;
+    } else if (location === 'params') {
+      req.params = value;
+    } else {
+      req.body = value;
+    }
+
     return next();
   };
+};
+
+/**
+ * Validation middleware that handles both Joi schemas and express-validator arrays
+ * @param {Object|Array} schema - Joi validation schema or express-validator array
+ * @returns {Function} Express middleware function
+ */
+export const validate = (schema) => {
+  return validateRequest(schema, 'body');
 };
 
 /**
