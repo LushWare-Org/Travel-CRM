@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Send, Calculator, Eye } from 'lucide-react';
+import { X, Plus, Trash2, Save, Send, Calculator, Eye, FileText, ToggleLeft, ToggleRight } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { quotationAPI, packageAPI } from '../../../services/api';
+import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 
 const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
@@ -14,6 +14,10 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [currentQuotation, setCurrentQuotation] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDetailedMode, setIsDetailedMode] = useState(false);
+  const [detectedPackage, setDetectedPackage] = useState(null);
+  const [detectedPackageType, setDetectedPackageType] = useState(null); // 'package', 'customized', 'manual'
+  const [loadingItinerary, setLoadingItinerary] = useState(false);
   
   const [formData, setFormData] = useState({
     lead: lead?._id || lead?.id,
@@ -43,6 +47,9 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   useEffect(() => {
     if (isOpen && lead) {
+      // Auto-detect package type from lead
+      detectPackageType();
+      
       // Reset form with lead data
       const leadPackageId = lead.package?._id || lead.package || '';
       setFormData(prev => ({
@@ -56,15 +63,128 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       // Fetch existing quotations for this lead
       fetchExistingQuotations();
       
-      // If lead has a package but no quotation exists yet, load package data
-      if (leadPackageId && existingQuotations.length === 0) {
-        // Wait a bit for packages to load, then add package price
-        setTimeout(() => {
-          loadPackageData(leadPackageId);
-        }, 500);
+      // For manual itineraries, load simplified day items even in non-detailed mode
+      if (lead.manualItinerary?._id || lead.manualItinerary) {
+        loadManualItinerarySimple();
       }
     }
   }, [isOpen, lead]);
+
+  // Load manual itinerary with simplified day descriptions (for non-detailed mode)
+  const loadManualItinerarySimple = async () => {
+    if (!lead) return;
+    
+    try {
+      const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
+      if (manualResponse.success || manualResponse.status === 'success') {
+        const manualItinerary = manualResponse.data || manualResponse;
+        if (manualItinerary?.days && Array.isArray(manualItinerary.days)) {
+          // Create simplified items for each day
+          const simplifiedItems = manualItinerary.days.map((day, index) => ({
+            description: `Day ${day.dayNumber || index + 1}`,
+            category: 'other',
+            quantity: 1,
+            unitPrice: 0,
+            totalPrice: 0,
+            notes: '',
+          }));
+          
+          // Keep package item if exists, then add simplified day items
+          setFormData(prev => {
+            const existingPackageItem = prev.items.find(item => item.category === 'package');
+            const newItems = existingPackageItem ? [existingPackageItem, ...simplifiedItems] : simplifiedItems;
+            return { ...prev, items: newItems };
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading manual itinerary:', error);
+    }
+  };
+
+  // Auto-detect package type from lead
+  const detectPackageType = async () => {
+    if (!lead) return;
+
+    // Check for customized package first
+    if (lead.customizedPackage?._id || lead.customizedPackage) {
+      const packageId = lead.customizedPackage._id || lead.customizedPackage;
+      setDetectedPackageType('customized');
+      try {
+        const response = await customizedPackageAPI.getById(packageId);
+        if (response.success || response.status === 'success') {
+          setDetectedPackage(response.data || response);
+          // Auto-populate package price
+          if (response.data?.price || response.price) {
+            const pkg = response.data || response;
+            addPackageItem(pkg.name, pkg.price, 'customized');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading customized package:', error);
+      }
+      return;
+    }
+
+    // Check for regular package
+    if (lead.package?._id || lead.package || lead.packageName) {
+      const packageId = lead.package?._id || lead.package;
+      setDetectedPackageType('package');
+      if (packageId) {
+        try {
+          const response = await packageAPI.getById(packageId);
+          if (response.success || response.status === 'success') {
+            const pkg = response.data || response;
+            setDetectedPackage(pkg);
+            // Auto-populate package price
+            if (pkg.price) {
+              addPackageItem(pkg.name, pkg.price, 'package');
+            }
+          }
+        } catch (error) {
+          console.error('Error loading package:', error);
+        }
+      }
+      return;
+    }
+
+    // Check for manual itinerary
+    if (lead.manualItinerary?._id || lead.manualItinerary) {
+      setDetectedPackageType('manual');
+      setDetectedPackage({ type: 'manual', name: 'Manual Itinerary' });
+    }
+  };
+
+  // Add package item to quotation
+  const addPackageItem = (packageName, price, type = 'package') => {
+    const packageItem = {
+      description: `${packageName} ${type === 'customized' ? '(Customized)' : ''} Package`,
+      category: 'package',
+      quantity: 1,
+      unitPrice: price,
+      totalPrice: price,
+      notes: type === 'customized' ? 'Customized package' : '',
+    };
+
+    setFormData(prev => {
+      // Check if package item already exists
+      const existingIndex = prev.items.findIndex(item => 
+        item.category === 'package' || 
+        item.description?.toLowerCase().includes('package')
+      );
+
+      if (existingIndex >= 0) {
+        // Update existing package item
+        const updatedItems = [...prev.items];
+        updatedItems[existingIndex] = packageItem;
+        return { ...prev, items: updatedItems };
+      } else {
+        // Add new package item at the beginning, or as first item if no items exist
+        const currentItems = prev.items && prev.items.length > 0 ? prev.items : [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, notes: '' }];
+        return { ...prev, items: [packageItem, ...currentItems.filter(item => item.category !== 'package')] };
+      }
+    });
+  };
 
   const fetchPackages = async () => {
     try {
@@ -162,86 +282,197 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     setShowPDFPreview(true);
   };
 
-  const loadPackageData = async (packageId) => {
+  const loadPackageData = async (packageId, packageType = 'package') => {
     if (!packageId) return;
     
     try {
-      // Fetch package details
-      const response = await packageAPI.getById(packageId);
+      let response;
+      if (packageType === 'customized') {
+        response = await customizedPackageAPI.getById(packageId);
+      } else {
+        response = await packageAPI.getById(packageId);
+      }
       
       if (response.success || response.status === 'success' || response.data) {
         const pkg = response.data || response;
         
         // If package has a price, add it as an item
         if (pkg.price && pkg.price > 0) {
-          // Check if package item already exists
-          const existingPackageItem = formData.items.find(item => 
-            item.description?.toLowerCase().includes(pkg.name?.toLowerCase()) ||
-            item.category === 'package'
-          );
-          
-          if (existingPackageItem) {
-            // Update existing package item
-            const updatedItems = formData.items.map(item => {
-              if (item.description?.toLowerCase().includes(pkg.name?.toLowerCase()) ||
-                  item.category === 'package') {
-                const newTotalPrice = pkg.price * (item.quantity || 1);
-                return {
-                  ...item,
-                  description: `${pkg.name} Package`,
-                  unitPrice: pkg.price,
-                  quantity: item.quantity || 1,
-                  totalPrice: newTotalPrice, // Ensure totalPrice is calculated
-                  category: 'package',
-                };
-              }
-              return item;
-            });
-            
-            // Calculate new subtotal (including package price)
-            const newSubtotal = updatedItems.reduce((sum, item) => {
-              const itemTotal = item.totalPrice || (item.quantity || 0) * (item.unitPrice || 0);
-              return sum + itemTotal;
-            }, 0);
-            
-            setFormData(prev => ({
-              ...prev,
-              items: updatedItems,
-            }));
-            toast.success(`Package price updated. Subtotal: ${newSubtotal.toFixed(2)}`);
-          } else {
-            // Add new package item at the beginning of the items list
-            const packageItem = {
-              description: `${pkg.name} Package`,
-              category: 'package',
-              quantity: 1,
-              unitPrice: pkg.price,
-              totalPrice: pkg.price * 1, // Ensure totalPrice is calculated (quantity * unitPrice)
-              notes: pkg.description ? pkg.description.substring(0, 100) : '',
-            };
-            
-            setFormData(prev => ({
-              ...prev,
-              items: [packageItem, ...prev.items], // Add package item at the top
-            }));
-            
-            // Calculate and show updated subtotal (including package price)
-            const newItems = [packageItem, ...prev.items];
-            const newSubtotal = newItems.reduce((sum, item) => {
-              const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null
-                ? item.totalPrice
-                : (item.quantity || 0) * (item.unitPrice || 0);
-              return sum + itemTotal;
-            }, 0);
-            toast.success(`Package price (${pkg.price.toFixed(2)}) added to items. Subtotal: ${newSubtotal.toFixed(2)}`);
-          }
+          addPackageItem(pkg.name, pkg.price, packageType === 'customized' ? 'customized' : 'package');
+          toast.success(`Package price (${pkg.price.toFixed(2)}) added to items`);
         } else {
-          toast.info('This package has no price set');
+          toast('This package has no price set', { icon: 'ℹ️' });
         }
       }
     } catch (error) {
       console.error('Error loading package:', error);
       toast.error('Failed to load package data');
+    }
+  };
+
+  // Load itinerary and extract items for detailed mode
+  const loadDetailedItems = async () => {
+    if (!lead) return;
+
+    setLoadingItinerary(true);
+    try {
+      let itineraryData = null;
+
+      // Get itinerary based on package type
+      if (detectedPackageType === 'customized' && lead.customizedPackage) {
+        const packageId = lead.customizedPackage._id || lead.customizedPackage;
+        // Fetch itinerary using package ID (not itinerary ID)
+        const itineraryResponse = await packageAPI.getItineraryByPackage(packageId);
+        if (itineraryResponse.success || itineraryResponse.status === 'success') {
+          itineraryData = itineraryResponse.data || itineraryResponse;
+        }
+      } else if (detectedPackageType === 'package' && lead.package) {
+        const packageId = lead.package._id || lead.package;
+        // Fetch itinerary using package ID (not itinerary ID)
+        const itineraryResponse = await packageAPI.getItineraryByPackage(packageId);
+        if (itineraryResponse.success || itineraryResponse.status === 'success') {
+          itineraryData = itineraryResponse.data || itineraryResponse;
+        }
+      } else if (detectedPackageType === 'manual' && lead.manualItinerary) {
+        const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
+        if (manualResponse.success || manualResponse.status === 'success') {
+          const manualItinerary = manualResponse.data || manualResponse;
+          if (manualItinerary?.days) {
+            itineraryData = { days: manualItinerary.days };
+          }
+        }
+      }
+
+      if (itineraryData && itineraryData.days && Array.isArray(itineraryData.days)) {
+        extractItemsFromItinerary(itineraryData.days);
+      } else {
+        toast('No itinerary data found for detailed quotation', { icon: 'ℹ️' });
+      }
+    } catch (error) {
+      console.error('Error loading itinerary:', error);
+      toast.error('Failed to load itinerary data');
+    } finally {
+      setLoadingItinerary(false);
+    }
+  };
+
+  // Extract items from itinerary days
+  const extractItemsFromItinerary = (days) => {
+    const extractedItems = [];
+    
+    days.forEach((day, dayIndex) => {
+      // Accommodation
+      if (day.accommodation?.name) {
+        extractedItems.push({
+          description: `Day ${day.dayNumber || dayIndex + 1}: ${day.accommodation.name} - ${day.accommodation.type || 'Accommodation'}`,
+          category: 'accommodation',
+          quantity: 1,
+          unitPrice: 0, // User can enter price
+          totalPrice: 0,
+          notes: day.accommodation.address || '',
+        });
+      }
+
+      // Transport
+      if (day.transport) {
+        extractedItems.push({
+          description: `Day ${day.dayNumber || dayIndex + 1}: ${day.transport} Transportation`,
+          category: 'transportation',
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+          notes: '',
+        });
+      }
+
+      // Meals
+      const meals = [];
+      if (day.meals?.breakfast) meals.push('Breakfast');
+      if (day.meals?.lunch) meals.push('Lunch');
+      if (day.meals?.dinner) meals.push('Dinner');
+      if (meals.length > 0) {
+        extractedItems.push({
+          description: `Day ${day.dayNumber || dayIndex + 1}: Meals (${meals.join(', ')})`,
+          category: 'food',
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+          notes: '',
+        });
+      }
+
+      // Activities
+      if (day.activities && Array.isArray(day.activities) && day.activities.length > 0) {
+        day.activities.forEach((activity, actIndex) => {
+          extractedItems.push({
+            description: `Day ${day.dayNumber || dayIndex + 1}: ${activity}`,
+            category: 'activity',
+            quantity: 1,
+            unitPrice: 0,
+            totalPrice: 0,
+            notes: '',
+          });
+        });
+      }
+
+      // Places
+      if (day.places && Array.isArray(day.places) && day.places.length > 0) {
+        day.places.forEach((place) => {
+          extractedItems.push({
+            description: `Day ${day.dayNumber || dayIndex + 1}: ${place.name || 'Place visit'}`,
+            category: 'activity',
+            quantity: 1,
+            unitPrice: 0,
+            totalPrice: 0,
+            notes: place.description || '',
+          });
+        });
+      }
+    });
+
+    // Keep existing package item if it exists, then add extracted items
+    setFormData(prev => {
+      const existingPackageItem = prev.items.find(item => item.category === 'package');
+      const newItems = existingPackageItem ? [existingPackageItem, ...extractedItems] : extractedItems;
+      
+      if (extractedItems.length > 0) {
+        return { ...prev, items: newItems };
+      }
+      return prev;
+    });
+
+    if (extractedItems.length > 0) {
+      toast.success(`Extracted ${extractedItems.length} items from itinerary`);
+    } else {
+      toast('No items found in itinerary', { icon: 'ℹ️' });
+    }
+  };
+
+  // Toggle detailed mode
+  const handleToggleDetailedMode = async () => {
+    // Prevent rapid toggling when already loading
+    if (loadingItinerary) {
+      return;
+    }
+
+    const newMode = !isDetailedMode;
+    setIsDetailedMode(newMode);
+    
+    if (newMode) {
+      // Load detailed items when enabling detailed mode
+      await loadDetailedItems();
+    } else {
+      // When disabling detailed mode for manual itineraries, restore simplified day items
+      if (detectedPackageType === 'manual') {
+        await loadManualItinerarySimple();
+      } else {
+        // For packages/customized packages, keep only package item
+        const packageItem = formData.items.find(item => item.category === 'package');
+        setFormData(prev => ({
+          ...prev,
+          items: packageItem ? [packageItem] : prev.items.slice(0, 1),
+        }));
+      }
     }
   };
 
@@ -254,6 +485,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       const qty = field === 'quantity' ? parseFloat(value) || 0 : newItems[index].quantity || 0;
       const price = field === 'unitPrice' ? parseFloat(value) || 0 : newItems[index].unitPrice || 0;
       newItems[index].totalPrice = qty * price;
+    } else if (field === 'totalPrice') {
+      // When totalPrice is changed directly, update unitPrice and quantity to match
+      const totalPrice = parseFloat(value) || 0;
+      newItems[index].totalPrice = totalPrice;
+      newItems[index].unitPrice = totalPrice;
+      newItems[index].quantity = 1;
     }
     
     setFormData({ ...formData, items: newItems });
@@ -286,9 +523,14 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const calculateTotals = () => {
-    // Calculate subtotal from all items (including package items)
+    // When in detailed mode, exclude package items from calculation
+    const itemsToCalculate = isDetailedMode 
+      ? formData.items.filter(item => item.category !== 'package')
+      : formData.items;
+    
+    // Calculate subtotal from all items (excluding package items in detailed mode)
     // Use totalPrice if available, otherwise calculate from quantity * unitPrice
-    const subtotal = formData.items.reduce((sum, item) => {
+    const subtotal = itemsToCalculate.reduce((sum, item) => {
       const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null 
         ? item.totalPrice 
         : (item.quantity || 0) * (item.unitPrice || 0);
@@ -311,19 +553,37 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const handleSubmit = async (status = 'send') => {
-    if (!formData.items.some(item => item.description.trim())) {
+    // When in detailed mode, exclude package items from submission
+    const itemsToSubmit = isDetailedMode 
+      ? formData.items.filter(item => item.category !== 'package')
+      : formData.items;
+    
+    if (!itemsToSubmit.some(item => item.description.trim())) {
       toast.error('Please add at least one item with description');
       return;
     }
 
     const totals = calculateTotals();
     
+    // Prepare payload and filter out empty strings
     const payload = {
       ...formData,
+      items: itemsToSubmit, // Use filtered items (without package items in detailed mode)
       ...totals,
       validUntil: new Date(formData.validUntil).toISOString(),
       status: status === 'send' ? 'sent' : 'draft',
     };
+
+    // Remove empty strings from ObjectId fields (Mongoose can't cast empty strings)
+    if (payload.package === '' || !payload.package) {
+      delete payload.package;
+    }
+    if (payload.quotation === '' || !payload.quotation) {
+      delete payload.quotation;
+    }
+    if (payload.lead === '' || !payload.lead) {
+      delete payload.lead;
+    }
 
     try {
       setLoading(true);
@@ -394,38 +654,73 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
-            {/* Package Selection */}
+            {/* Package Detection & Detailed Mode Toggle */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Package (Optional)
+                  Detected Package
                 </label>
-                <select
-                  value={formData.package}
-                  onChange={(e) => {
-                    const packageId = e.target.value;
-                    setFormData({ ...formData, package: packageId });
-                    if (packageId) {
-                      loadPackageData(packageId);
-                    } else {
-                      // Remove package item when package is deselected
-                      setFormData(prev => ({
-                        ...prev,
-                        items: prev.items.filter(item => item.category !== 'package'),
-                      }));
-                    }
-                  }}
-                  disabled={loadingPackages}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="">{loadingPackages ? 'Loading...' : 'No Package'}</option>
-                  {packages.map((pkg) => (
-                    <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
-                      {pkg.name} {pkg.price ? `(${pkg.price.toFixed(2)})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <div className="px-3 py-2 border border-gray-300 rounded bg-gray-50">
+                  {detectedPackageType === 'customized' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-purple-700">
+                        ✨ Customized Package: {detectedPackage?.name || 'N/A'}
+                      </span>
+                    </div>
+                  )}
+                  {detectedPackageType === 'package' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">
+                        📦 Package: {detectedPackage?.name || 'N/A'}
+                      </span>
+                    </div>
+                  )}
+                  {detectedPackageType === 'manual' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-blue-700">
+                        📋 Manual Itinerary
+                      </span>
+                    </div>
+                  )}
+                  {!detectedPackageType && (
+                    <span className="text-sm text-gray-500">No package detected</span>
+                  )}
+                </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Detailed Quotation
+                </label>
+                <button
+                  type="button"
+                  onClick={handleToggleDetailedMode}
+                  disabled={loadingItinerary || !detectedPackageType}
+                  className={`w-full px-3 py-2 border rounded flex items-center justify-center gap-2 transition-colors ${
+                    isDetailedMode
+                      ? 'bg-green-100 border-green-500 text-green-700'
+                      : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                  } ${loadingItinerary || !detectedPackageType ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isDetailedMode ? (
+                    <>
+                      <ToggleRight className="w-5 h-5" />
+                      <span>Detailed Mode ON</span>
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="w-5 h-5" />
+                      <span>Detailed Mode OFF</span>
+                    </>
+                  )}
+                </button>
+                {loadingItinerary && (
+                  <p className="text-xs text-gray-500 mt-1">Loading itinerary...</p>
+                )}
+              </div>
+            </div>
+
+            {/* Valid Until */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Valid Until
@@ -457,76 +752,67 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   <thead>
                     <tr className="bg-gray-50 border-b">
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Category</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Qty</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Unit Price</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Total</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Price</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {formData.items.map((item, index) => (
-                      <tr key={index} className="border-b">
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                            placeholder="Item description"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <select
-                            value={item.category}
-                            onChange={(e) => handleItemChange(index, 'category', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          >
-                            <option value="accommodation">Accommodation</option>
-                            <option value="transportation">Transportation</option>
-                            <option value="activity">Activity</option>
-                            <option value="food">Food</option>
-                            <option value="guide">Guide</option>
-                            <option value="insurance">Insurance</option>
-                            <option value="visa">Visa</option>
-                            <option value="other">Other</option>
-                          </select>
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                            min="1"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={item.unitPrice}
-                            onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
-                            min="0"
-                            step="0.01"
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className="font-medium">
-                            {item.totalPrice.toFixed(2)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <button
-                            onClick={() => removeItem(index)}
-                            className="text-red-600 hover:text-red-800"
-                            disabled={formData.items.length === 1}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {formData.items
+                      .map((item, originalIndex) => ({
+                        item,
+                        originalIndex,
+                        shouldShow: !isDetailedMode || item.category !== 'package'
+                      }))
+                      .filter(({ shouldShow }) => shouldShow)
+                      .map(({ item, originalIndex }) => {
+                        // Calculate price from unitPrice * quantity or use totalPrice
+                        const displayPrice = item.totalPrice !== undefined && item.totalPrice !== null 
+                          ? item.totalPrice 
+                          : (item.quantity || 1) * (item.unitPrice || 0);
+                        
+                        return (
+                          <tr key={originalIndex} className="border-b">
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                placeholder="Item description"
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                value={displayPrice || ''}
+                                onChange={(e) => {
+                                  const price = parseFloat(e.target.value) || 0;
+                                  const newItems = [...formData.items];
+                                  newItems[originalIndex] = {
+                                    ...newItems[originalIndex],
+                                    totalPrice: price,
+                                    unitPrice: price,
+                                    quantity: 1,
+                                  };
+                                  setFormData({ ...formData, items: newItems });
+                                }}
+                                min="0"
+                                step="0.01"
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <button
+                                onClick={() => removeItem(originalIndex)}
+                                className="text-red-600 hover:text-red-800"
+                                disabled={formData.items.filter(i => !isDetailedMode || i.category !== 'package').length === 1}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>

@@ -1,19 +1,12 @@
 import mongoose from 'mongoose';
 
-const itinerarySchema = new mongoose.Schema(
+const manualItinerarySchema = new mongoose.Schema(
   {
-    package: {
+    lead: {
       type: mongoose.Schema.Types.ObjectId,
-      refPath: 'packageModel',
+      ref: 'Lead',
       required: true,
-      unique: false, // Changed to false since both Package and CustomizedPackage can have itineraries
       index: true,
-    },
-    packageModel: {
-      type: String,
-      required: true,
-      enum: ['Package', 'CustomizedPackage'],
-      default: 'Package',
     },
     days: [
       {
@@ -174,11 +167,12 @@ const itinerarySchema = new mongoose.Schema(
 );
 
 // Indexes for better query performance
-itinerarySchema.index({ status: 1, createdAt: -1 });
-itinerarySchema.index({ createdBy: 1 });
+manualItinerarySchema.index({ lead: 1, createdAt: -1 });
+manualItinerarySchema.index({ status: 1, createdAt: -1 });
+manualItinerarySchema.index({ createdBy: 1 });
 
 // Pre-save middleware to calculate metadata
-itinerarySchema.pre('save', function calculateMetadata(next) {
+manualItinerarySchema.pre('save', function calculateMetadata(next) {
   if (this.isModified('days')) {
     let totalActivities = 0;
     let totalLocations = 0;
@@ -216,12 +210,12 @@ itinerarySchema.pre('save', function calculateMetadata(next) {
 });
 
 // Virtual for total days
-itinerarySchema.virtual('totalDays').get(function getTotalDays() {
+manualItinerarySchema.virtual('totalDays').get(function getTotalDays() {
   return this.days.length;
 });
 
 // Virtual for completion percentage (based on required fields)
-itinerarySchema.virtual('completionPercentage').get(function getCompletionPercentage() {
+manualItinerarySchema.virtual('completionPercentage').get(function getCompletionPercentage() {
   if (!this.days || this.days.length === 0) return 0;
 
   let totalFields = 0;
@@ -239,4 +233,5 @@ itinerarySchema.virtual('completionPercentage').get(function getCompletionPercen
   return Math.round((filledFields / totalFields) * 100);
 });
 
-export default mongoose.model('Itinerary', itinerarySchema);
+export default mongoose.model('ManualItinerary', manualItinerarySchema);
+
