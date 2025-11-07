@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Send, Calculator, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { X, Plus, Trash2, Save, Calculator, Eye, Download, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { invoiceAPI, quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
@@ -14,10 +14,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isDetailedMode, setIsDetailedMode] = useState(false);
   const [detectedPackage, setDetectedPackage] = useState(null);
   const [detectedPackageType, setDetectedPackageType] = useState(null); // 'package', 'customized', 'manual'
-  const [loadingItinerary, setLoadingItinerary] = useState(false);
 
   const [formData, setFormData] = useState({
     lead: lead?._id || lead?.id,
@@ -46,9 +44,51 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     paymentTerms: '',
     paymentInstructions: '',
   });
+  const [quotationMode, setQuotationMode] = useState('summary');
+  const isDetailedMode = quotationMode === 'detailed';
+  const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const formatCurrency = (amount) => {
+    if (amount === null || amount === undefined) {
+      return '0.00';
+    }
+    const value = Number(amount) || 0;
+    return value.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const formatDateLabel = (dateValue) => {
+    if (!dateValue) return 'N/A';
+    try {
+      return new Date(dateValue).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch (error) {
+      return 'N/A';
+    }
+  };
+
+  const getModeLabel = (mode) => (mode === 'detailed' ? 'Detailed' : 'Non Detailed');
+
+  const handleDownloadQuotationPDF = async (quotationId) => {
+    if (!quotationId) return;
+    try {
+      await quotationAPI.downloadPDF(quotationId);
+      toast.success('Quotation PDF downloaded');
+    } catch (error) {
+      console.error('Error downloading quotation PDF:', error);
+      toast.error('Failed to download quotation PDF');
+    }
+  };
 
   useEffect(() => {
     if (isOpen && lead) {
+      setQuotationMode('summary');
       // Auto-detect package type from lead
       detectPackageType();
       
@@ -58,6 +98,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         lead: lead._id || lead.id,
         package: lead.package?._id || lead.package || '',
       }));
+
+      setSendEmailAddress(lead?.email || lead?.customer?.email || '');
       
       // Fetch quotations
       fetchQuotations();
@@ -267,6 +309,14 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             paymentTerms: latestInvoice.paymentTerms || '',
             paymentInstructions: latestInvoice.paymentInstructions || '',
           });
+        setQuotationMode((latestInvoice.quotation && latestInvoice.quotation.mode) ? latestInvoice.quotation.mode : 'summary');
+
+        setSendEmailAddress(
+          latestInvoice.customer?.email ||
+            latestInvoice.lead?.email ||
+            lead?.email ||
+            '',
+        );
           
           setCurrentInvoiceId(latestInvoice._id || latestInvoice.id);
           
@@ -278,6 +328,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         } else {
           setIsEditing(false);
           setCurrentInvoice(null);
+        setQuotationMode('summary');
         }
       }
     } catch (error) {
@@ -287,180 +338,36 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
-  const handlePreviewPDF = (invoiceId) => {
-    setCurrentInvoiceId(invoiceId);
-    setShowPDFPreview(true);
-  };
+  const handleSendInvoiceEmail = async () => {
+    const targetId =
+      currentInvoiceId || currentInvoice?._id || currentInvoice?.id || null;
 
-  // Load itinerary and extract items for detailed mode
-  const loadDetailedItems = async () => {
-    if (!lead) return;
-
-    setLoadingItinerary(true);
-    try {
-      let itineraryData = null;
-
-      // Get itinerary based on package type
-      if (detectedPackageType === 'customized' && lead.customizedPackage) {
-        const packageId = lead.customizedPackage._id || lead.customizedPackage;
-        // Fetch itinerary using package ID (not itinerary ID)
-        const itineraryResponse = await packageAPI.getItineraryByPackage(packageId);
-        if (itineraryResponse.success || itineraryResponse.status === 'success') {
-          itineraryData = itineraryResponse.data || itineraryResponse;
-        }
-      } else if (detectedPackageType === 'package' && lead.package) {
-        const packageId = lead.package._id || lead.package;
-        // Fetch itinerary using package ID (not itinerary ID)
-        const itineraryResponse = await packageAPI.getItineraryByPackage(packageId);
-        if (itineraryResponse.success || itineraryResponse.status === 'success') {
-          itineraryData = itineraryResponse.data || itineraryResponse;
-        }
-      } else if (detectedPackageType === 'manual' && lead.manualItinerary) {
-        const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
-        if (manualResponse.success || manualResponse.status === 'success') {
-          const manualItinerary = manualResponse.data || manualResponse;
-          if (manualItinerary?.days) {
-            itineraryData = { days: manualItinerary.days };
-          }
-        }
-      }
-
-      if (itineraryData && itineraryData.days && Array.isArray(itineraryData.days)) {
-        extractItemsFromItinerary(itineraryData.days);
-      } else {
-        toast('No itinerary data found for detailed invoice', { icon: 'ℹ️' });
-      }
-    } catch (error) {
-      console.error('Error loading itinerary:', error);
-      toast.error('Failed to load itinerary data');
-    } finally {
-      setLoadingItinerary(false);
-    }
-  };
-
-  // Extract items from itinerary days
-  const extractItemsFromItinerary = (days) => {
-    const extractedItems = [];
-    
-    days.forEach((day, dayIndex) => {
-      // Accommodation
-      if (day.accommodation?.name) {
-        extractedItems.push({
-          description: `Day ${day.dayNumber || dayIndex + 1}: ${day.accommodation.name} - ${day.accommodation.type || 'Accommodation'}`,
-          category: 'accommodation',
-          quantity: 1,
-          unitPrice: 0, // User can enter price
-          totalPrice: 0,
-          taxRate: 0,
-          notes: day.accommodation.address || '',
-        });
-      }
-
-      // Transport
-      if (day.transport) {
-        extractedItems.push({
-          description: `Day ${day.dayNumber || dayIndex + 1}: ${day.transport} Transportation`,
-          category: 'transportation',
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
-          taxRate: 0,
-          notes: '',
-        });
-      }
-
-      // Meals
-      const meals = [];
-      if (day.meals?.breakfast) meals.push('Breakfast');
-      if (day.meals?.lunch) meals.push('Lunch');
-      if (day.meals?.dinner) meals.push('Dinner');
-      if (meals.length > 0) {
-        extractedItems.push({
-          description: `Day ${day.dayNumber || dayIndex + 1}: Meals (${meals.join(', ')})`,
-          category: 'food',
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
-          taxRate: 0,
-          notes: '',
-        });
-      }
-
-      // Activities
-      if (day.activities && Array.isArray(day.activities) && day.activities.length > 0) {
-        day.activities.forEach((activity, actIndex) => {
-          extractedItems.push({
-            description: `Day ${day.dayNumber || dayIndex + 1}: ${activity}`,
-            category: 'activity',
-            quantity: 1,
-            unitPrice: 0,
-            totalPrice: 0,
-            taxRate: 0,
-            notes: '',
-          });
-        });
-      }
-
-      // Places
-      if (day.places && Array.isArray(day.places) && day.places.length > 0) {
-        day.places.forEach((place) => {
-          extractedItems.push({
-            description: `Day ${day.dayNumber || dayIndex + 1}: ${place.name || 'Place visit'}`,
-            category: 'activity',
-            quantity: 1,
-            unitPrice: 0,
-            totalPrice: 0,
-            taxRate: 0,
-            notes: place.description || '',
-          });
-        });
-      }
-    });
-
-    // Keep existing package item if it exists, then add extracted items
-    setFormData(prev => {
-      const existingPackageItem = prev.items.find(item => item.category === 'package');
-      const newItems = existingPackageItem ? [existingPackageItem, ...extractedItems] : extractedItems;
-      
-      if (extractedItems.length > 0) {
-        return { ...prev, items: newItems };
-      }
-      return prev;
-    });
-
-    if (extractedItems.length > 0) {
-      toast.success(`Extracted ${extractedItems.length} items from itinerary`);
-    } else {
-      toast('No items found in itinerary', { icon: 'ℹ️' });
-    }
-  };
-
-  // Toggle detailed mode
-  const handleToggleDetailedMode = async () => {
-    // Prevent rapid toggling when already loading
-    if (loadingItinerary) {
+    if (!targetId) {
+      toast.error('Please save the invoice before sending the email');
       return;
     }
 
-    const newMode = !isDetailedMode;
-    setIsDetailedMode(newMode);
-    
-    if (newMode) {
-      // Load detailed items when enabling detailed mode
-      await loadDetailedItems();
-    } else {
-      // When disabling detailed mode for manual itineraries, restore simplified day items
-      if (detectedPackageType === 'manual') {
-        await loadManualItinerarySimple();
-      } else {
-        // For packages/customized packages, keep only package item
-        const packageItem = formData.items.find(item => item.category === 'package');
-        setFormData(prev => ({
-          ...prev,
-          items: packageItem ? [packageItem] : prev.items.slice(0, 1),
-        }));
-      }
+    const trimmedEmail = sendEmailAddress.trim();
+    if (!trimmedEmail) {
+      toast.error('Please provide a recipient email address');
+      return;
     }
+
+    try {
+      setSendingEmail(true);
+      await invoiceAPI.send(targetId, { email: trimmedEmail });
+      toast.success('Invoice emailed successfully');
+      await fetchExistingInvoices();
+    } catch (error) {
+      toast.error(error.message || 'Failed to send invoice email');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handlePreviewPDF = (invoiceId) => {
+    setCurrentInvoiceId(invoiceId);
+    setShowPDFPreview(true);
   };
 
   const loadQuotationData = async (quotationId) => {
@@ -494,6 +401,9 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           terms: quote.terms !== undefined ? quote.terms : prev.terms,
           paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms,
         }));
+
+        const quoteMode = quote.mode || 'summary';
+        setQuotationMode(quoteMode);
         
         toast.success('Quotation data refreshed successfully');
       }
@@ -679,68 +589,69 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
-            {/* Package Detection & Detailed Mode Toggle */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Detected Package
-                </label>
-                <div className="px-3 py-2 border border-gray-300 rounded bg-gray-50">
-                  {detectedPackageType === 'customized' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-purple-700">
-                        ✨ Customized Package: {detectedPackage?.name || 'N/A'}
-                      </span>
-                    </div>
-                  )}
-                  {detectedPackageType === 'package' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700">
-                        📦 Package: {detectedPackage?.name || 'N/A'}
-                      </span>
-                    </div>
-                  )}
-                  {detectedPackageType === 'manual' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-blue-700">
-                        📋 Manual Itinerary
-                      </span>
-                    </div>
-                  )}
-                  {!detectedPackageType && (
-                    <span className="text-sm text-gray-500">No package detected</span>
-                  )}
-                </div>
+            {/* Package & Mode Information */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Detected Package
+              </label>
+              <div className="px-3 py-2 border border-gray-300 rounded bg-gray-50">
+                {detectedPackageType === 'customized' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-purple-700">
+                      ✨ Customized Package: {detectedPackage?.name || 'N/A'}
+                    </span>
+                  </div>
+                )}
+                {detectedPackageType === 'package' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      📦 Package: {detectedPackage?.name || 'N/A'}
+                    </span>
+                  </div>
+                )}
+                {detectedPackageType === 'manual' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-blue-700">
+                      📋 Manual Itinerary
+                    </span>
+                  </div>
+                )}
+                {!detectedPackageType && (
+                  <span className="text-sm text-gray-500">No package detected</span>
+                )}
               </div>
-              <div>
+              <p className="text-xs text-gray-500 mt-2">
+                Quotation mode: <span className="font-semibold text-gray-700">{getModeLabel(quotationMode)}</span>
+                {!formData.quotation && ' (no quotation selected)'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Detailed Invoice
+                  Recipient Email
                 </label>
+                <input
+                  type="email"
+                  value={sendEmailAddress}
+                  onChange={(e) => setSendEmailAddress(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  We will email the invoice PDF to this address using the configured mail server.
+                </p>
+              </div>
+              <div className="flex items-end">
                 <button
                   type="button"
-                  onClick={handleToggleDetailedMode}
-                  disabled={loadingItinerary || !detectedPackageType}
-                  className={`w-full px-3 py-2 border rounded flex items-center justify-center gap-2 transition-colors ${
-                    isDetailedMode
-                      ? 'bg-purple-100 border-purple-500 text-purple-700'
-                      : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
-                  } ${loadingItinerary || !detectedPackageType ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={handleSendInvoiceEmail}
+                  disabled={sendingEmail || !sendEmailAddress.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white rounded hover:from-purple-700 hover:to-fuchsia-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isDetailedMode ? (
-                    <>
-                      <ToggleRight className="w-5 h-5" />
-                      <span>Detailed Mode ON</span>
-                    </>
-                  ) : (
-                    <>
-                      <ToggleLeft className="w-5 h-5" />
-                      <span>Detailed Mode OFF</span>
-                    </>
-                  )}
+                  <Send className="w-4 h-4" />
+                  {sendingEmail ? 'Sending…' : 'Send Email'}
                 </button>
-                {loadingItinerary && (
-                  <p className="text-xs text-gray-500 mt-1">Loading itinerary...</p>
-                )}
               </div>
             </div>
 
@@ -756,6 +667,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     onChange={(e) => {
                       setFormData({ ...formData, quotation: e.target.value });
                       if (e.target.value) {
+                        setQuotationMode('summary');
                         loadQuotationData(e.target.value);
                       } else {
                         // Reset items if no quotation selected
@@ -772,6 +684,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             notes: '',
                           }],
                         }));
+                        setQuotationMode('summary');
                       }
                     }}
                     disabled={loadingQuotations}
@@ -780,7 +693,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     <option value="">{loadingQuotations ? 'Loading...' : 'No Quotation'}</option>
                     {quotations.map((quote) => (
                       <option key={quote._id || quote.id} value={quote._id || quote.id}>
-                        {quote.quotationNumber || quote._id} - {quote.totalAmount?.toFixed(2) || '0.00'}
+                        {`${quote.quotationNumber || (quote._id || '')} • ${getModeLabel(quote.mode)} • INR ${formatCurrency(quote.totalAmount || 0)} • ${formatDateLabel(quote.issueDate || quote.createdAt)}`}
                       </option>
                     ))}
                   </select>
@@ -797,6 +710,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       🔄
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadQuotationPDF(formData.quotation)}
+                    disabled={!formData.quotation}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    title="Download selected quotation PDF"
+                  >
+                    <Download className="w-4 h-4" />
+                    PDF
+                  </button>
                 </div>
               </div>
             )}
@@ -1077,12 +1000,12 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               Cancel
             </button>
             <button
-              onClick={() => handleSubmit('send')}
+              onClick={() => handleSubmit()}
               disabled={loading}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              {isEditing ? 'Update Invoice' : 'Save & Send Invoice'}
+              {isEditing ? 'Update Invoice' : 'Save Invoice'}
             </button>
           </div>
         </div>

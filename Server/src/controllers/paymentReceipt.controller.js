@@ -3,6 +3,7 @@ import PaymentReceipt from '../models/paymentReceipt.model.js';
 import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import emailService from '../utils/emailService.js';
 import { APIFeatures } from '../utils/apiFeatures.js';
 
 /**
@@ -227,27 +228,53 @@ export const reconcilePaymentReceipt = asyncHandler(async (req, res) => {
  * @access  Private (Admin, Staff)
  */
 export const sendPaymentReceipt = asyncHandler(async (req, res, next) => {
-  const receipt = await PaymentReceipt.findById(req.params.id);
+  const receiptDoc = await PaymentReceipt.findById(req.params.id)
+    .populate('lead', 'name email phone')
+    .populate({ path: 'invoice', populate: { path: 'lead', select: 'name email phone' } });
 
-  if (!receipt) {
+  if (!receiptDoc) {
     return next(new AppError('Payment receipt not found', 404));
   }
 
-  if (receipt.receiptStatus === 'cancelled') {
+  if (receiptDoc.receiptStatus === 'cancelled') {
     return next(new AppError('Cannot send cancelled payment receipt', 400));
   }
 
-  receipt.sentAt = new Date();
-  receipt.emailSent = true;
-  await receipt.save();
+  const receipt = receiptDoc.toObject({ virtuals: true });
+  const invoice = receiptDoc.invoice ? receiptDoc.invoice.toObject({ virtuals: true }) : null;
 
-  // TODO: Send email with receipt
-  // await emailService.sendPaymentReceipt(receipt);
+  const recipientEmail = (req.body?.email || receipt.customer?.email || receipt.lead?.email || invoice?.customer?.email || '').trim();
+
+  if (!recipientEmail) {
+    return next(new AppError('No recipient email found for this receipt', 400));
+  }
+
+  try {
+    const { generateReceiptPDF } = await import('../utils/billingPDFGenerator.js');
+    const pdfPath = await generateReceiptPDF(receiptDoc, receiptDoc.invoice, receiptDoc.lead);
+
+    await emailService.sendReceiptEmail({
+      receipt,
+      invoice,
+      recipientEmail,
+      pdfPath,
+    });
+
+    await fs.promises.unlink(pdfPath).catch(() => {});
+  } catch (error) {
+    return next(new AppError(`Error sending payment receipt email: ${error.message}`, 500));
+  }
+
+  receiptDoc.sentAt = new Date();
+  receiptDoc.emailSent = true;
+  await receiptDoc.save();
+
+  const updatedReceipt = receiptDoc.toObject({ virtuals: true });
 
   res.status(200).json({
     success: true,
     message: 'Payment receipt sent successfully',
-    data: receipt,
+    data: updatedReceipt,
   });
 });
 

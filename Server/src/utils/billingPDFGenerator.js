@@ -94,7 +94,8 @@ export function generateQuotationPDF(quotation, lead) {
         .fillColor(COLORS.gray700)
         .text(`Quotation #: ${quotation.quotationNumber || 'N/A'}`, 380, yPos + 20)
         .text(`Date: ${new Date(quotation.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 35)
-        .text(`Valid Until: ${new Date(quotation.validUntil).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 50);
+        .text(`Valid Until: ${new Date(quotation.validUntil).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 50)
+        .text(`Mode: ${quotation.mode === 'detailed' ? 'Detailed' : 'Non Detailed'}`, 380, yPos + 65);
 
       // ===== CUSTOMER INFO =====
       yPos = 220;

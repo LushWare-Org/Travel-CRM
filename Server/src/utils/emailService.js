@@ -44,6 +44,7 @@ class EmailService {
         subject: options.subject,
         text: options.text,
         html: options.html,
+        attachments: options.attachments || [],
       };
 
       const info = await transporter.sendMail(mailOptions);
@@ -204,29 +205,152 @@ class EmailService {
     });
   }
 
-  async sendInvoice(user, invoice) {
-    const subject = `Invoice #${invoice.invoiceNumber}`;
-    const html = `
-      <h1>Invoice</h1>
-      <p>Dear ${user.name},</p>
-      <p>Please find your invoice attached.</p>
-      <h2>Invoice Details:</h2>
+  formatCurrency(amount) {
+    if (amount === null || amount === undefined) return '0.00';
+    return Number(amount).toLocaleString('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  formatDate(date) {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }
+
+  async sendQuotationEmail({ quotation, recipientEmail, pdfPath }) {
+    const customerName = quotation.customer?.name || quotation.lead?.name || 'Customer';
+    const quotationNumber = quotation.quotationNumber || quotation._id;
+    const subject = quotationNumber
+      ? `Trip Sky Way Quotation - ${quotationNumber}`
+      : 'Trip Sky Way Quotation';
+
+    const totalsSection = `
       <ul>
-        <li><strong>Invoice Number:</strong> ${invoice.invoiceNumber}</li>
-        <li><strong>Date:</strong> ${new Date(invoice.createdAt).toLocaleDateString()}</li>
-        <li><strong>Total Amount:</strong> $${invoice.totalAmount}</li>
-        <li><strong>Status:</strong> ${invoice.status}</li>
+        <li><strong>Total Amount:</strong> ${this.formatCurrency(quotation.totalAmount)}</li>
+        <li><strong>Valid Until:</strong> ${this.formatDate(quotation.validUntil)}</li>
+        <li><strong>Status:</strong> ${quotation.status?.toUpperCase() || 'DRAFT'}</li>
       </ul>
-      <p>Thank you for your business!</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
     `;
 
+    const html = `
+      <p>Dear ${customerName},</p>
+      <p>Thank you for considering Trip Sky Way. Please find your quotation attached.</p>
+      <h3>Quotation Summary</h3>
+      ${totalsSection}
+      <p>If you have any questions or would like to proceed, simply reply to this email.</p>
+      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    `;
+
+    const text = `Dear ${customerName},\n\nPlease find your quotation attached.\nTotal Amount: ${this.formatCurrency(
+      quotation.totalAmount,
+    )}\nValid Until: ${this.formatDate(quotation.validUntil)}\n`; 
+
     return this.sendEmail({
-      to: user.email,
+      to: recipientEmail,
       subject,
       html,
+      text,
+      attachments: pdfPath
+        ? [
+            {
+              filename: `quotation-${quotationNumber}.pdf`,
+              path: pdfPath,
+            },
+          ]
+        : [],
+    });
+  }
+
+  async sendInvoiceEmail({ invoice, recipientEmail, pdfPath }) {
+    const customerName = invoice.customer?.name || invoice.lead?.name || 'Customer';
+    const invoiceNumber = invoice.invoiceNumber || invoice._id;
+    const subject = invoiceNumber
+      ? `Trip Sky Way Invoice - ${invoiceNumber}`
+      : 'Trip Sky Way Invoice';
+
+    const html = `
+      <p>Dear ${customerName},</p>
+      <p>Thank you for choosing Trip Sky Way. Please find your invoice attached.</p>
+      <h3>Invoice Summary</h3>
+      <ul>
+        <li><strong>Invoice Number:</strong> ${invoiceNumber}</li>
+        <li><strong>Issue Date:</strong> ${this.formatDate(invoice.issueDate || invoice.createdAt)}</li>
+        <li><strong>Due Date:</strong> ${this.formatDate(invoice.dueDate)}</li>
+        <li><strong>Total Amount:</strong> ${this.formatCurrency(invoice.totalAmount)}</li>
+        <li><strong>Status:</strong> ${invoice.status?.toUpperCase() || 'DRAFT'}</li>
+      </ul>
+      <p>Please review the attached invoice and let us know if you have any questions.</p>
+      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    `;
+
+    const text = `Dear ${customerName},\n\nPlease find your invoice attached.\nInvoice Number: ${invoiceNumber}\nTotal Amount: ${this.formatCurrency(
+      invoice.totalAmount,
+    )}\nDue Date: ${this.formatDate(invoice.dueDate)}\n`;
+
+    return this.sendEmail({
+      to: recipientEmail,
+      subject,
+      html,
+      text,
+      attachments: pdfPath
+        ? [
+            {
+              filename: `invoice-${invoiceNumber}.pdf`,
+              path: pdfPath,
+            },
+          ]
+        : [],
+    });
+  }
+
+  async sendReceiptEmail({ receipt, invoice, recipientEmail, pdfPath }) {
+    const customerName = receipt.customer?.name || receipt.lead?.name || 'Customer';
+    const receiptNumber = receipt.receiptNumber || receipt._id;
+    const subject = receiptNumber
+      ? `Trip Sky Way Payment Receipt - ${receiptNumber}`
+      : 'Trip Sky Way Payment Receipt';
+
+    const html = `
+      <p>Dear ${customerName},</p>
+      <p>Thank you for your payment. Please find your receipt attached for your records.</p>
+      <h3>Receipt Summary</h3>
+      <ul>
+        <li><strong>Receipt Number:</strong> ${receiptNumber}</li>
+        <li><strong>Payment Date:</strong> ${this.formatDate(receipt.paymentDate)}</li>
+        <li><strong>Amount:</strong> ${this.formatCurrency(receipt.amount)}</li>
+        ${invoice ? `<li><strong>Invoice:</strong> ${invoice.invoiceNumber}</li>` : ''}
+        <li><strong>Status:</strong> ${receipt.receiptStatus?.replace(/-/g, ' ').toUpperCase() || 'PAID'}</li>
+      </ul>
+      <p>If you have any questions, please reach out to us.</p>
+      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    `;
+
+    const text = `Dear ${customerName},\n\nThank you for your payment of ${this.formatCurrency(
+      receipt.amount,
+    )}. Your receipt is attached.\nReceipt Number: ${receiptNumber}\nPayment Date: ${this.formatDate(
+      receipt.paymentDate,
+    )}\n`;
+
+    return this.sendEmail({
+      to: recipientEmail,
+      subject,
+      html,
+      text,
+      attachments: pdfPath
+        ? [
+            {
+              filename: `receipt-${receiptNumber}.pdf`,
+              path: pdfPath,
+            },
+          ]
+        : [],
     });
   }
 }

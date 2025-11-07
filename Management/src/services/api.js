@@ -333,9 +333,9 @@ export const quotationAPI = {
     const api = new ApiService();
     return api.put(`/billing/quotations/${quotationId}`, payload);
   },
-  send: async (quotationId) => {
+  send: async (quotationId, payload = {}) => {
     const api = new ApiService();
-    return api.post(`/billing/quotations/${quotationId}/send`);
+    return api.post(`/billing/quotations/${quotationId}/send`, payload);
   },
   downloadPDF: async (quotationId) => {
     const url = `${API_BASE_URL}/billing/quotations/${quotationId}/pdf`;
@@ -376,9 +376,9 @@ export const invoiceAPI = {
     const api = new ApiService();
     return api.put(`/billing/invoices/${invoiceId}`, payload);
   },
-  send: async (invoiceId) => {
+  send: async (invoiceId, payload = {}) => {
     const api = new ApiService();
-    return api.post(`/billing/invoices/${invoiceId}/send`);
+    return api.post(`/billing/invoices/${invoiceId}/send`, payload);
   },
   downloadPDF: async (invoiceId) => {
     const url = `${API_BASE_URL}/billing/invoices/${invoiceId}/pdf`;
@@ -419,9 +419,9 @@ export const receiptAPI = {
     const api = new ApiService();
     return api.put(`/billing/receipts/${receiptId}`, payload);
   },
-  send: async (receiptId) => {
+  send: async (receiptId, payload = {}) => {
     const api = new ApiService();
-    return api.post(`/billing/receipts/${receiptId}/send`);
+    return api.post(`/billing/receipts/${receiptId}/send`, payload);
   },
   downloadPDF: async (receiptId) => {
     const url = `${API_BASE_URL}/billing/receipts/${receiptId}/pdf`;

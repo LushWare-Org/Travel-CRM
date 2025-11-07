@@ -4,6 +4,22 @@ import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { APIFeatures } from '../utils/apiFeatures.js';
+import emailService from '../utils/emailService.js';
+
+const formatQuotationForResponse = (quotationDoc) => {
+  if (!quotationDoc) {
+    return quotationDoc;
+  }
+
+  const quotation =
+    typeof quotationDoc.toObject === 'function'
+      ? quotationDoc.toObject({ virtuals: true })
+      : { ...quotationDoc };
+
+  quotation.issueDate = quotation.issueDate || quotation.createdAt;
+
+  return quotation;
+};
 
 /**
  * @desc    Get all quotations
@@ -20,7 +36,8 @@ export const getAllQuotations = asyncHandler(async (req, res) => {
     .limitFields()
     .paginate();
 
-  const quotations = await features.query;
+  const quotationDocs = await features.query;
+  const quotations = quotationDocs.map((quotation) => formatQuotationForResponse(quotation));
   const total = await Quotation.countDocuments();
 
   res.status(200).json({
@@ -37,15 +54,17 @@ export const getAllQuotations = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const getQuotationById = asyncHandler(async (req, res, next) => {
-  const quotation = await Quotation.findById(req.params.id)
+  const quotationDoc = await Quotation.findById(req.params.id)
     .populate('lead', 'name email phone status destination')
     .populate('package', 'name description price')
     .populate('createdBy', 'name email')
     .populate('convertedToInvoice');
 
-  if (!quotation) {
+  if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
   }
+
+  const quotation = formatQuotationForResponse(quotationDoc);
 
   res.status(200).json({
     success: true,
@@ -59,10 +78,12 @@ export const getQuotationById = asyncHandler(async (req, res, next) => {
  * @access  Private
  */
 export const getQuotationsByLeadId = asyncHandler(async (req, res) => {
-  const quotations = await Quotation.find({ lead: req.params.leadId })
+  const quotationDocs = await Quotation.find({ lead: req.params.leadId })
     .populate('createdBy', 'name email')
     .populate('convertedToInvoice')
     .sort({ createdAt: -1 });
+
+  const quotations = quotationDocs.map((quotation) => formatQuotationForResponse(quotation));
 
   res.status(200).json({
     success: true,
@@ -77,7 +98,8 @@ export const getQuotationsByLeadId = asyncHandler(async (req, res) => {
  * @access  Private (Admin, Staff)
  */
 export const createQuotation = asyncHandler(async (req, res) => {
-  const quotation = await BillingService.createQuotation(req.body, req.user.id);
+  const quotationDoc = await BillingService.createQuotation(req.body, req.user.id);
+  const quotation = formatQuotationForResponse(quotationDoc);
 
   res.status(201).json({
     success: true,
@@ -92,36 +114,38 @@ export const createQuotation = asyncHandler(async (req, res) => {
  * @access  Private (Admin, Staff)
  */
 export const updateQuotation = asyncHandler(async (req, res, next) => {
-  const quotation = await Quotation.findById(req.params.id);
+  const quotationDoc = await Quotation.findById(req.params.id);
 
-  if (!quotation) {
+  if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
   }
 
-  if (quotation.status === 'converted') {
+  if (quotationDoc.status === 'converted') {
     return next(new AppError('Cannot update converted quotation', 400));
   }
 
   // Track revision history
-  if (quotation.status !== 'draft') {
-    quotation.revisionHistory.push({
-      version: quotation.version,
+  if (quotationDoc.status !== 'draft') {
+    quotationDoc.revisionHistory.push({
+      version: quotationDoc.version,
       modifiedBy: req.user.id,
       changes: req.body.changes || 'Updated quotation',
     });
-    quotation.version += 1;
+    quotationDoc.version += 1;
   }
 
-  quotation.lastModifiedBy = req.user.id;
+  quotationDoc.lastModifiedBy = req.user.id;
 
   // Update fields
   Object.keys(req.body).forEach((key) => {
     if (req.body[key] !== undefined && key !== 'quotationNumber' && key !== 'lead') {
-      quotation[key] = req.body[key];
+      quotationDoc[key] = req.body[key];
     }
   });
 
-  await quotation.save();
+  await quotationDoc.save();
+
+  const quotation = formatQuotationForResponse(quotationDoc);
 
   res.status(200).json({
     success: true,
@@ -136,17 +160,17 @@ export const updateQuotation = asyncHandler(async (req, res, next) => {
  * @access  Private (Admin)
  */
 export const deleteQuotation = asyncHandler(async (req, res, next) => {
-  const quotation = await Quotation.findById(req.params.id);
+  const quotationDoc = await Quotation.findById(req.params.id);
 
-  if (!quotation) {
+  if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
   }
 
-  if (quotation.status === 'converted') {
+  if (quotationDoc.status === 'converted') {
     return next(new AppError('Cannot delete converted quotation', 400));
   }
 
-  await quotation.deleteOne();
+  await quotationDoc.deleteOne();
 
   res.status(200).json({
     success: true,
@@ -161,27 +185,50 @@ export const deleteQuotation = asyncHandler(async (req, res, next) => {
  * @access  Private (Admin, Staff)
  */
 export const sendQuotation = asyncHandler(async (req, res, next) => {
-  const quotation = await Quotation.findById(req.params.id);
+  const quotationDoc = await Quotation.findById(req.params.id)
+    .populate('lead', 'name email phone');
 
-  if (!quotation) {
+  if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
   }
 
-  if (quotation.status === 'converted') {
+  if (quotationDoc.status === 'converted') {
     return next(new AppError('Quotation has already been converted', 400));
   }
 
-  quotation.status = 'sent';
-  quotation.sentAt = new Date();
-  await quotation.save();
+  const quotation = formatQuotationForResponse(quotationDoc);
 
-  // TODO: Send email with quotation
-  // await emailService.sendQuotation(quotation);
+  const recipientEmail = (req.body?.email || quotation.customer?.email || quotation.lead?.email || '').trim();
+
+  if (!recipientEmail) {
+    return next(new AppError('No recipient email found for this quotation', 400));
+  }
+
+  try {
+    const { generateQuotationPDF } = await import('../utils/billingPDFGenerator.js');
+    const pdfPath = await generateQuotationPDF(quotationDoc, quotationDoc.lead);
+
+    await emailService.sendQuotationEmail({
+      quotation,
+      recipientEmail,
+      pdfPath,
+    });
+
+    await fs.promises.unlink(pdfPath).catch(() => {});
+  } catch (error) {
+    return next(new AppError(`Error sending quotation email: ${error.message}`, 500));
+  }
+
+  quotationDoc.status = 'sent';
+  quotationDoc.sentAt = new Date();
+  await quotationDoc.save();
+
+  const updatedQuotation = formatQuotationForResponse(quotationDoc);
 
   res.status(200).json({
     success: true,
     message: 'Quotation sent successfully',
-    data: quotation,
+    data: updatedQuotation,
   });
 });
 
@@ -191,17 +238,19 @@ export const sendQuotation = asyncHandler(async (req, res, next) => {
  * @access  Public
  */
 export const markQuotationViewed = asyncHandler(async (req, res, next) => {
-  const quotation = await Quotation.findById(req.params.id);
+  const quotationDoc = await Quotation.findById(req.params.id);
 
-  if (!quotation) {
+  if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
   }
 
-  if (quotation.status === 'sent') {
-    quotation.status = 'viewed';
-    quotation.viewedAt = new Date();
-    await quotation.save();
+  if (quotationDoc.status === 'sent') {
+    quotationDoc.status = 'viewed';
+    quotationDoc.viewedAt = new Date();
+    await quotationDoc.save();
   }
+
+  const quotation = formatQuotationForResponse(quotationDoc);
 
   res.status(200).json({
     success: true,
@@ -216,19 +265,21 @@ export const markQuotationViewed = asyncHandler(async (req, res, next) => {
  * @access  Private
  */
 export const acceptQuotation = asyncHandler(async (req, res, next) => {
-  const quotation = await Quotation.findById(req.params.id);
+  const quotationDoc = await Quotation.findById(req.params.id);
 
-  if (!quotation) {
+  if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
   }
 
-  if (quotation.isExpired) {
+  if (quotationDoc.isExpired) {
     return next(new AppError('Quotation has expired', 400));
   }
 
-  quotation.status = 'accepted';
-  quotation.acceptedAt = new Date();
-  await quotation.save();
+  quotationDoc.status = 'accepted';
+  quotationDoc.acceptedAt = new Date();
+  await quotationDoc.save();
+
+  const quotation = formatQuotationForResponse(quotationDoc);
 
   res.status(200).json({
     success: true,
@@ -243,16 +294,18 @@ export const acceptQuotation = asyncHandler(async (req, res, next) => {
  * @access  Private
  */
 export const rejectQuotation = asyncHandler(async (req, res, next) => {
-  const quotation = await Quotation.findById(req.params.id);
+  const quotationDoc = await Quotation.findById(req.params.id);
 
-  if (!quotation) {
+  if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
   }
 
-  quotation.status = 'rejected';
-  quotation.rejectedAt = new Date();
-  quotation.rejectionReason = req.body.reason;
-  await quotation.save();
+  quotationDoc.status = 'rejected';
+  quotationDoc.rejectedAt = new Date();
+  quotationDoc.rejectionReason = req.body.reason;
+  await quotationDoc.save();
+
+  const quotation = formatQuotationForResponse(quotationDoc);
 
   res.status(200).json({
     success: true,

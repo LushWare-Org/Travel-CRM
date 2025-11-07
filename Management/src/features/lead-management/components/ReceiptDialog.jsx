@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save, DollarSign, Eye } from 'lucide-react';
+import { X, Save, DollarSign, Eye, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
@@ -15,6 +15,8 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const [formData, setFormData] = useState({
     lead: lead?._id || lead?.id,
@@ -48,6 +50,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         ...prev,
         lead: lead._id || lead.id,
       }));
+      setSendEmailAddress(lead?.email || lead?.customer?.email || '');
       // Fetch invoices first, then receipts (receipts need invoices loaded)
       fetchInvoices().then(() => {
         // Fetch existing receipts for this lead after invoices are loaded
@@ -117,6 +120,13 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           });
           
           setCurrentReceiptId(latestReceipt._id || latestReceipt.id);
+
+          setSendEmailAddress(
+            latestReceipt.customer?.email ||
+              latestReceipt.lead?.email ||
+              lead?.email ||
+              '',
+          );
           
           // Load invoice details if invoice is set
           if (latestReceipt.invoice) {
@@ -138,6 +148,33 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       console.error('Error fetching existing receipts:', error);
     } finally {
       setLoadingExisting(false);
+    }
+  };
+
+  const handleSendReceiptEmail = async () => {
+    const targetId =
+      currentReceiptId || currentReceipt?._id || currentReceipt?.id || null;
+
+    if (!targetId) {
+      toast.error('Please save the receipt before sending the email');
+      return;
+    }
+
+    const trimmedEmail = sendEmailAddress.trim();
+    if (!trimmedEmail) {
+      toast.error('Please provide a recipient email address');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      await receiptAPI.send(targetId, { email: trimmedEmail });
+      toast.success('Receipt emailed successfully');
+      await fetchExistingReceipts();
+    } catch (error) {
+      toast.error(error.message || 'Failed to send receipt email');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -356,6 +393,35 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 </div>
               </div>
             )}
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Recipient Email
+                </label>
+                <input
+                  type="email"
+                  value={sendEmailAddress}
+                  onChange={(e) => setSendEmailAddress(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  The receipt PDF will be emailed to this address after saving.
+                </p>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={handleSendReceiptEmail}
+                  disabled={sendingEmail || !sendEmailAddress.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded hover:from-orange-700 hover:to-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                  {sendingEmail ? 'Sending…' : 'Send Email'}
+                </button>
+              </div>
+            </div>
 
             {/* Payment Details */}
             <div className="grid grid-cols-2 gap-4">

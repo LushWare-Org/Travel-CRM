@@ -297,7 +297,7 @@ const BillingInvoicing = () => {
                         <td className="py-3 px-4 text-right">
                           <span className="font-bold text-gray-900">{formatCurrency(quotation.totalAmount)}</span>
                         </td>
-                        <td className="py-3 px-4 text-gray-700">{formatDate(quotation.issueDate)}</td>
+                        <td className="py-3 px-4 text-gray-700">{formatDate(quotation.issueDate || quotation.createdAt)}</td>
                         <td className="py-3 px-4 text-gray-700">{formatDate(quotation.validUntil)}</td>
                         <td className="py-3 px-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -398,7 +398,7 @@ const BillingInvoicing = () => {
                         <td className="py-3 px-4 text-right">
                           <span className="text-gray-700">{formatCurrency(invoice.outstandingAmount)}</span>
                         </td>
-                        <td className="py-3 px-4 text-gray-700">{formatDate(invoice.issueDate)}</td>
+                        <td className="py-3 px-4 text-gray-700">{formatDate(invoice.createdAt)}</td>
                         <td className="py-3 px-4 text-gray-700">{formatDate(invoice.dueDate)}</td>
                         <td className="py-3 px-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -577,7 +577,7 @@ const BillingInvoicing = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500 font-medium mb-1">
-                    Issue Date: {formatDate(selectedQuotation.issueDate)}
+                    Issue Date: {formatDate(selectedQuotation.issueDate || selectedQuotation.createdAt)}
                   </p>
                   <p className="text-xs text-gray-500 font-medium mb-1">
                     Valid Until: {formatDate(selectedQuotation.validUntil)}
@@ -668,7 +668,7 @@ const BillingInvoicing = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500 font-medium mb-1">
-                    Issue Date: {formatDate(selectedInvoice.issueDate)}
+                    Issue Date: {formatDate(selectedInvoice.createdAt)}
                   </p>
                   <p className="text-xs text-gray-500 font-medium mb-1">
                     Due Date: {formatDate(selectedInvoice.dueDate)}
