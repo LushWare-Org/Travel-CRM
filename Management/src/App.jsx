@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { Toaster } from "react-hot-toast";
 import Sidebar from "./pages/Sidebar";
 import Dashboard from "./pages/Dashboard";
+import Analytics from "./pages/Analytics";
 import LeadManagement from "./pages/LeadManagement";
 import ItineraryGeneration from "./pages/ItineraryGeneration";
 import BillingInvoicing from "./pages/BillingInvoicing";
@@ -60,6 +61,7 @@ function AppContent() {
               <div className="flex-1 overflow-auto">
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/analytics" element={<Analytics />} />
                   <Route path="/leads" element={<LeadManagement />} />
                   <Route path="/itineraries" element={<ItineraryGeneration />} />
                   <Route path="/billing" element={<BillingInvoicing />} />
