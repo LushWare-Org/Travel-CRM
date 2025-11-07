@@ -10,12 +10,16 @@ const UserFormDialog = ({
   children,
   submitLabel = 'Save',
   submitColor = 'blue',
-  isLoading = false
+  isLoading = false,
+  isSubmitting = false
 }) => {
   if (!isOpen) return null;
 
+  const isProcessing = isLoading || isSubmitting;
+
   const colorClasses = {
     blue: 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400',
+    cyan: 'bg-cyan-600 hover:bg-cyan-700 disabled:bg-cyan-400',
     green: 'bg-green-600 hover:bg-green-700 disabled:bg-green-400',
     purple: 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400',
     indigo: 'bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400'
@@ -44,16 +48,16 @@ const UserFormDialog = ({
             <button
               onClick={onClose}
               className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50 text-base"
-              disabled={isLoading}
+              disabled={isProcessing}
             >
               Cancel
             </button>
             <button
               onClick={onSubmit}
-              disabled={isLoading}
-              className={`flex-1 px-4 py-3 text-white rounded-lg transition-colors font-semibold disabled:cursor-not-allowed text-base shadow-md hover:shadow-lg ${colorClasses[submitColor]} disabled:shadow-none`}
+              disabled={isProcessing}
+              className={`flex-1 px-4 py-3 text-white rounded-lg transition-colors font-semibold disabled:cursor-not-allowed text-base shadow-md hover:shadow-lg ${colorClasses[submitColor] || colorClasses.blue} disabled:shadow-none`}
             >
-              {isLoading ? 'Processing...' : submitLabel}
+              {isProcessing ? 'Processing...' : submitLabel}
             </button>
           </div>
         </div>
