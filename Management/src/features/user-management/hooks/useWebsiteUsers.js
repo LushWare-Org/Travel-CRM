@@ -89,8 +89,17 @@ export const useWebsiteUsers = () => {
       const response = await websiteUserService.createUser(apiData);
 
       if (response.status === 'success') {
-        // Refresh user list
-        await fetchUsers({ page: 1 });
+        // Reset filters and refresh user list
+        const resetFilters = {
+          search: '',
+          isActive: undefined,
+          isEmailVerified: undefined,
+          page: 1,
+          limit: 10,
+        };
+        setFilters(resetFilters);
+        // Fetch with reset filters
+        await fetchUsers({ ...resetFilters, page: 1 });
         return response.data;
       } else {
         throw new Error('Failed to create user');
@@ -129,8 +138,16 @@ export const useWebsiteUsers = () => {
       const response = await websiteUserService.updateUser(userId, updateData);
 
       if (response.status === 'success') {
-        // Refresh user list
-        await fetchUsers();
+        // Reset filters and refresh user list
+        const resetFilters = {
+          search: '',
+          isActive: undefined,
+          isEmailVerified: undefined,
+          page: 1,
+          limit: 10,
+        };
+        setFilters(resetFilters);
+        await fetchUsers(resetFilters);
         return response.data;
       } else {
         throw new Error('Failed to update user');
@@ -153,8 +170,16 @@ export const useWebsiteUsers = () => {
       const response = await websiteUserService.deleteUser(userId);
 
       if (response.status === 'success') {
-        // Refresh user list
-        await fetchUsers();
+        // Reset filters and refresh user list
+        const resetFilters = {
+          search: '',
+          isActive: undefined,
+          isEmailVerified: undefined,
+          page: 1,
+          limit: 10,
+        };
+        setFilters(resetFilters);
+        await fetchUsers(resetFilters);
         return response;
       } else {
         throw new Error('Failed to delete user');

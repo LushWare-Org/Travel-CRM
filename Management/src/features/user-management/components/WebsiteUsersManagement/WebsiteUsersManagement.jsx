@@ -86,6 +86,9 @@ const WebsiteUsersManagement = () => {
       await createUser(formData);
       setShowNewUserDialog(false);
       resetForm();
+      // Clear search and filters after successful user creation
+      setSearchTerm('');
+      setFilterStatus('all');
     } catch (err) {
       setFormError(err.message || 'Failed to create user');
     } finally {
@@ -108,6 +111,9 @@ const WebsiteUsersManagement = () => {
       setShowEditUserDialog(false);
       setSelectedUser(null);
       resetForm();
+      // Clear search and filters after successful update
+      setSearchTerm('');
+      setFilterStatus('all');
     } catch (err) {
       setFormError(err.message || 'Failed to update user');
     } finally {
@@ -127,6 +133,9 @@ const WebsiteUsersManagement = () => {
       setShowDeleteConfirm(false);
       setUserToDelete(null);
       setSelectedUser(null);
+      // Clear search and filters after successful deletion
+      setSearchTerm('');
+      setFilterStatus('all');
     } catch (err) {
       setFormError(err.message || 'Failed to delete user');
     } finally {
