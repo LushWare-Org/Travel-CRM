@@ -1,6 +1,19 @@
 import { useState } from "react";
-import { TimeRangeFilter, StatCard, ChartContainer } from "../Common";
+import {
+  TimeRangeFilter,
+  StatCard,
+  ChartContainer,
+  LineChartComponent,
+  BarChartComponent,
+  PieChartComponent,
+} from "../Common";
 import { Users, UserCheck, TrendingUp, DollarSign } from "lucide-react";
+import {
+  userGrowthData,
+  salesRepPerformanceData,
+  revenueByRepData,
+  userTypeDistributionData,
+} from "../../utils/userAnalyticsData";
 
 /**
  * UserAnalytics Component
@@ -8,6 +21,19 @@ import { Users, UserCheck, TrendingUp, DollarSign } from "lucide-react";
  */
 const UserAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+
+  // Line chart configuration
+  const userGrowthLines = [
+    { dataKey: "newUsers", stroke: "#3b82f6", name: "New Users" },
+    { dataKey: "purchased", stroke: "#10b981", name: "Users Purchased" },
+    { dataKey: "salesReps", stroke: "#f59e0b", name: "Sales Reps Active" },
+  ];
+
+  // Bar chart configuration
+  const salesRepBars = [
+    { dataKey: "sales", fill: "#3b82f6", name: "Sales" },
+    { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -57,36 +83,60 @@ const UserAnalytics = () => {
         />
       </div>
 
-      {/* Charts Section - Placeholder for Phase 2 */}
+      {/* User Growth Trend Chart */}
       <ChartContainer
         title="User Growth Trend"
-        description="New users acquired over time"
+        description="New users, purchases, and sales rep activity over time"
       >
-        <div className="h-96 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-          <p className="text-gray-600">Chart coming in Phase 2</p>
-        </div>
+        <LineChartComponent
+          data={userGrowthData}
+          lines={userGrowthLines}
+          xAxisKey="month"
+          height={350}
+        />
       </ChartContainer>
 
-      {/* Additional breakdown charts - Placeholder */}
+      {/* Additional breakdown charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Sales Rep Performance"
-          description="Sales by each representative"
+          description="Sales count and conversion rates by representative"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <BarChartComponent
+            data={salesRepPerformanceData}
+            bars={salesRepBars}
+            xAxisKey="rep"
+            height={320}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+          />
         </ChartContainer>
 
         <ChartContainer
           title="Revenue by Sales Rep"
           description="Revenue earned by each representative"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <BarChartComponent
+            data={revenueByRepData}
+            bars={[{ dataKey: "revenue", fill: "#8b5cf6", name: "Revenue" }]}
+            xAxisKey="rep"
+            height={320}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+          />
         </ChartContainer>
       </div>
+
+      <ChartContainer
+        title="User Type Distribution"
+        description="Breakdown of website users, registered users, and converted users"
+      >
+        <PieChartComponent
+          data={userTypeDistributionData}
+          dataKey="value"
+          nameKey="name"
+          height={300}
+          colors={["#3b82f6", "#10b981", "#f59e0b"]}
+        />
+      </ChartContainer>
     </div>
   );
 };

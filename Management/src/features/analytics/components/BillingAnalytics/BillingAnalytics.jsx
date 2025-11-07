@@ -1,6 +1,19 @@
 import { useState } from "react";
-import { TimeRangeFilter, StatCard, ChartContainer } from "../Common";
+import {
+  TimeRangeFilter,
+  StatCard,
+  ChartContainer,
+  AreaChartComponent,
+  PieChartComponent,
+  BarChartComponent,
+} from "../Common";
 import { DollarSign, Wallet, TrendingUp, AlertCircle } from "lucide-react";
+import {
+  revenueData,
+  paymentStatusData,
+  outstandingTrendData,
+  invoiceBreakdownData,
+} from "../../utils/billingAnalyticsData";
 
 /**
  * BillingAnalytics Component
@@ -8,6 +21,23 @@ import { DollarSign, Wallet, TrendingUp, AlertCircle } from "lucide-react";
  */
 const BillingAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+
+  // Area chart configuration
+  const revenueAreas = [
+    {
+      dataKey: "revenue",
+      fill: "#3b82f6",
+      stroke: "#1e40af",
+      name: "Actual Revenue",
+    },
+    { dataKey: "target", fill: "#e5e7eb", stroke: "#9ca3af", name: "Target" },
+  ];
+
+  // Bar chart configuration
+  const invoiceBars = [
+    { dataKey: "revenue", fill: "#3b82f6", name: "Revenue" },
+    { dataKey: "invoices", fill: "#10b981", name: "Invoices" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -59,36 +89,66 @@ const BillingAnalytics = () => {
         />
       </div>
 
-      {/* Charts Section - Placeholder for Phase 2 */}
+      {/* Revenue Trend Chart */}
       <ChartContainer
         title="Revenue Trend"
-        description="Daily, weekly, monthly, and annual revenue comparison"
+        description="Monthly revenue comparison with targets"
       >
-        <div className="h-96 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-          <p className="text-gray-600">Chart coming in Phase 2</p>
-        </div>
+        <AreaChartComponent
+          data={revenueData}
+          areas={revenueAreas}
+          xAxisKey="month"
+          height={350}
+        />
       </ChartContainer>
 
-      {/* Additional breakdown charts - Placeholder */}
+      {/* Additional breakdown charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Payment Status Overview"
           description="Paid vs Outstanding invoices"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <PieChartComponent
+            data={paymentStatusData}
+            dataKey="value"
+            nameKey="name"
+            height={320}
+            colors={["#10b981", "#f59e0b", "#ef4444"]}
+          />
         </ChartContainer>
 
         <ChartContainer
           title="Outstanding Amounts Trend"
-          description="Pending payments over time"
+          description="Pending payments and pending leads over time"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <AreaChartComponent
+            data={outstandingTrendData}
+            areas={[
+              {
+                dataKey: "outstanding",
+                fill: "#ef4444",
+                stroke: "#991b1b",
+                name: "Outstanding ($)",
+              },
+            ]}
+            xAxisKey="month"
+            height={320}
+          />
         </ChartContainer>
       </div>
+
+      <ChartContainer
+        title="Invoice Breakdown by Category"
+        description="Revenue and invoices by service category"
+      >
+        <BarChartComponent
+          data={invoiceBreakdownData}
+          bars={invoiceBars}
+          xAxisKey="category"
+          height={300}
+          margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+        />
+      </ChartContainer>
     </div>
   );
 };

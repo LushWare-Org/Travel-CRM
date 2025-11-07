@@ -1,6 +1,20 @@
 import { useState } from "react";
-import { TimeRangeFilter, StatCard, ChartContainer } from "../Common";
+import {
+  TimeRangeFilter,
+  StatCard,
+  ChartContainer,
+  LineChartComponent,
+  BarChartComponent,
+  PieChartComponent,
+} from "../Common";
 import { MapPin, ShoppingCart, TrendingUp, Home } from "lucide-react";
+import {
+  itineraryTrendData,
+  topItinerariesData,
+  destinationPerformanceData,
+  activityPreferenceData,
+  hotelPreferenceData,
+} from "../../utils/itineraryAnalyticsData";
 
 /**
  * ItineraryAnalytics Component
@@ -8,6 +22,19 @@ import { MapPin, ShoppingCart, TrendingUp, Home } from "lucide-react";
  */
 const ItineraryAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+
+  // Line chart configuration
+  const itineraryLines = [
+    { dataKey: "inquiries", stroke: "#3b82f6", name: "Inquiries" },
+    { dataKey: "purchases", stroke: "#10b981", name: "Purchases" },
+    { dataKey: "hotels", stroke: "#f59e0b", name: "Hotels Booked" },
+  ];
+
+  // Bar chart configuration for destinations
+  const destinationBars = [
+    { dataKey: "inquiries", fill: "#3b82f6", name: "Inquiries" },
+    { dataKey: "purchases", fill: "#10b981", name: "Purchases" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -56,53 +83,83 @@ const ItineraryAnalytics = () => {
         />
       </div>
 
-      {/* Charts Section - Placeholder for Phase 2 */}
+      {/* Itinerary Trend Chart */}
       <ChartContainer
-        title="Most Inquired Itineraries"
-        description="Top packages by inquiry count"
+        title="Itinerary Performance Trend"
+        description="Monthly inquiries, purchases, and hotel bookings"
       >
-        <div className="h-96 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-          <p className="text-gray-600">Chart coming in Phase 2</p>
-        </div>
+        <LineChartComponent
+          data={itineraryTrendData}
+          lines={itineraryLines}
+          xAxisKey="month"
+          height={350}
+        />
       </ChartContainer>
 
-      {/* Additional breakdown charts - Placeholder */}
+      {/* Additional breakdown charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Destination Performance"
           description="Most inquired vs purchased destinations"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <BarChartComponent
+            data={destinationPerformanceData}
+            bars={destinationBars}
+            xAxisKey="destination"
+            height={320}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+          />
         </ChartContainer>
 
         <ChartContainer
-          title="Activity Trends"
+          title="Activity Preferences"
           description="Most inquired and purchased activities"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <PieChartComponent
+            data={activityPreferenceData}
+            dataKey="value"
+            nameKey="name"
+            height={320}
+            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]}
+          />
         </ChartContainer>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Hotels & Resorts Preference"
-          description="Most booked accommodations"
+          description="Most booked accommodation types"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <PieChartComponent
+            data={hotelPreferenceData}
+            dataKey="value"
+            nameKey="name"
+            height={320}
+            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]}
+          />
         </ChartContainer>
 
         <ChartContainer
-          title="Inquiry vs Purchase Ratio"
-          description="Conversion analysis for packages"
+          title="Top Itineraries"
+          description="Most inquired and purchased packages"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {topItinerariesData.map((itinerary, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">{itinerary.name}</p>
+                  <p className="text-xs text-gray-600">Rating: {itinerary.rating}★</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-blue-600">{itinerary.inquiries}</p>
+                  <p className="text-xs text-gray-600">inquiries</p>
+                </div>
+                <div className="ml-4 text-right">
+                  <p className="text-sm font-bold text-green-600">{itinerary.purchases}</p>
+                  <p className="text-xs text-gray-600">purchased</p>
+                </div>
+              </div>
+            ))}
           </div>
         </ChartContainer>
       </div>

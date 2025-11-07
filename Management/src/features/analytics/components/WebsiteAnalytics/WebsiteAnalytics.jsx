@@ -1,6 +1,21 @@
 import { useState } from "react";
-import { TimeRangeFilter, StatCard, ChartContainer } from "../Common";
+import {
+  TimeRangeFilter,
+  StatCard,
+  ChartContainer,
+  LineChartComponent,
+  BarChartComponent,
+  PieChartComponent,
+} from "../Common";
 import { Search, MapPin, Home, TrendingUp } from "lucide-react";
+import {
+  searchTrendData,
+  topDestinationSearchesData,
+  activitySearchData,
+  hotelSearchData,
+  durationSearchData,
+  priceRangeSearchData,
+} from "../../utils/websiteAnalyticsData";
 
 /**
  * WebsiteAnalytics Component
@@ -8,6 +23,24 @@ import { Search, MapPin, Home, TrendingUp } from "lucide-react";
  */
 const WebsiteAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+
+  // Line chart configuration
+  const searchLines = [
+    { dataKey: "searches", stroke: "#3b82f6", name: "Searches" },
+    { dataKey: "clicks", stroke: "#10b981", name: "Clicks" },
+    { dataKey: "bookings", stroke: "#f59e0b", name: "Bookings" },
+  ];
+
+  // Bar chart configuration
+  const destinationBars = [
+    { dataKey: "searches", fill: "#3b82f6", name: "Searches" },
+    { dataKey: "conversions", fill: "#10b981", name: "Conversions" },
+  ];
+
+  const durationBars = [
+    { dataKey: "searches", fill: "#3b82f6", name: "Searches" },
+    { dataKey: "bookings", fill: "#10b981", name: "Bookings" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -56,56 +89,87 @@ const WebsiteAnalytics = () => {
         />
       </div>
 
-      {/* Charts Section - Placeholder for Phase 2 */}
+      {/* Search Trend Chart */}
       <ChartContainer
-        title="Most Searched Destinations"
-        description="Top destinations by search volume"
+        title="Search & Booking Trends"
+        description="Monthly search volume, clicks, and bookings"
       >
-        <div className="h-96 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-          <p className="text-gray-600">Chart coming in Phase 2</p>
-        </div>
+        <LineChartComponent
+          data={searchTrendData}
+          lines={searchLines}
+          xAxisKey="month"
+          height={350}
+        />
       </ChartContainer>
 
-      {/* Additional breakdown charts - Placeholder */}
+      {/* Additional breakdown charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
-          title="Activity Search Trends"
-          description="Most searched activities"
+          title="Most Searched Destinations"
+          description="Top destinations by search volume and conversion"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <BarChartComponent
+            data={topDestinationSearchesData}
+            bars={destinationBars}
+            xAxisKey="destination"
+            height={320}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+          />
         </ChartContainer>
 
+        <ChartContainer
+          title="Activity Search Trends"
+          description="Most searched activities by customers"
+        >
+          <PieChartComponent
+            data={activitySearchData}
+            dataKey="value"
+            nameKey="name"
+            height={320}
+            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]}
+          />
+        </ChartContainer>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Hotel Search Patterns"
           description="Most searched hotels and resorts"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <PieChartComponent
+            data={hotelSearchData}
+            dataKey="value"
+            nameKey="name"
+            height={320}
+            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]}
+          />
         </ChartContainer>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Package Duration Preferences"
-          description="Most searched day lengths for packages"
+          description="Search volume and bookings by package duration"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
-        </ChartContainer>
-
-        <ChartContainer
-          title="Price Range Searches"
-          description="Most searched price ranges"
-        >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <BarChartComponent
+            data={durationSearchData}
+            bars={durationBars}
+            xAxisKey="duration"
+            height={320}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+          />
         </ChartContainer>
       </div>
+
+      <ChartContainer
+        title="Price Range Search Distribution"
+        description="Most searched price ranges for packages"
+      >
+        <BarChartComponent
+          data={priceRangeSearchData}
+          bars={[{ dataKey: "searches", fill: "#8b5cf6", name: "Searches" }]}
+          xAxisKey="range"
+          height={300}
+        />
+      </ChartContainer>
     </div>
   );
 };

@@ -1,6 +1,21 @@
 import { useState } from "react";
-import { TimeRangeFilter, StatCard, ChartContainer } from "../Common";
+import {
+  TimeRangeFilter,
+  StatCard,
+  ChartContainer,
+  LineChartComponent,
+  PieChartComponent,
+  BarChartComponent,
+} from "../Common";
 import { BarChart3, TrendingUp, Users, Target } from "lucide-react";
+import {
+  leadTrendData,
+  leadByCategoryData,
+  leadByStatusData,
+  leadByCountryData,
+  leadByPriceRangeData,
+  leadByDestinationData,
+} from "../../utils/leadAnalyticsData";
 
 /**
  * LeadAnalytics Component
@@ -8,6 +23,20 @@ import { BarChart3, TrendingUp, Users, Target } from "lucide-react";
  */
 const LeadAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+
+  // Line chart configuration
+  const leadLineChartLines = [
+    { dataKey: "new", stroke: "#3b82f6", name: "New Leads" },
+    { dataKey: "contacted", stroke: "#10b981", name: "Contacted" },
+    { dataKey: "interested", stroke: "#f59e0b", name: "Interested" },
+    { dataKey: "converted", stroke: "#8b5cf6", name: "Converted" },
+  ];
+
+  // Bar chart configuration
+  const leadByCountryBars = [
+    { dataKey: "leads", fill: "#3b82f6", name: "Leads" },
+    { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -56,56 +85,88 @@ const LeadAnalytics = () => {
         />
       </div>
 
-      {/* Charts Section - Placeholder for Phase 2 */}
+      {/* Lead Conversion Funnel Chart */}
       <ChartContainer
         title="Lead Conversion Funnel"
         description="Track lead progression through sales stages"
       >
-        <div className="h-96 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-          <p className="text-gray-600">Chart coming in Phase 2</p>
-        </div>
+        <LineChartComponent
+          data={leadTrendData}
+          lines={leadLineChartLines}
+          xAxisKey="month"
+          height={350}
+        />
       </ChartContainer>
 
-      {/* Additional breakdown charts - Placeholder */}
+      {/* Additional breakdown charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Leads by Category"
           description="Distribution of leads across categories"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <PieChartComponent
+            data={leadByCategoryData}
+            dataKey="value"
+            nameKey="name"
+            height={350}
+            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"]}
+          />
         </ChartContainer>
 
         <ChartContainer
           title="Leads by Status"
           description="Breakdown of leads by current status"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <PieChartComponent
+            data={leadByStatusData}
+            dataKey="value"
+            nameKey="name"
+            height={350}
+            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]}
+          />
         </ChartContainer>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartContainer
           title="Top Countries"
-          description="Leads by origin country"
+          description="Leads by origin country and conversion rates"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <BarChartComponent
+            data={leadByCountryData}
+            bars={leadByCountryBars}
+            xAxisKey="country"
+            height={300}
+          />
         </ChartContainer>
 
         <ChartContainer
           title="Price Range Distribution"
           description="Lead distribution by price range"
         >
-          <div className="h-80 flex items-center justify-center bg-gray-50 rounded border border-gray-200">
-            <p className="text-gray-600">Chart coming in Phase 2</p>
-          </div>
+          <BarChartComponent
+            data={leadByPriceRangeData}
+            bars={[{ dataKey: "value", fill: "#8b5cf6", name: "Leads" }]}
+            xAxisKey="range"
+            height={300}
+          />
         </ChartContainer>
       </div>
+
+      <ChartContainer
+        title="Top Destinations"
+        description="Leads by destination and conversion rates"
+      >
+        <BarChartComponent
+          data={leadByDestinationData}
+          bars={[
+            { dataKey: "leads", fill: "#3b82f6", name: "Leads" },
+            { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
+          ]}
+          xAxisKey="destination"
+          height={300}
+        />
+      </ChartContainer>
     </div>
   );
 };
