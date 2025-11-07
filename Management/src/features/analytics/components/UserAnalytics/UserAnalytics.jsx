@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   TimeRangeFilter,
   StatCard,
@@ -9,7 +9,9 @@ import {
 } from "../Common";
 import { Users, UserCheck, TrendingUp, DollarSign } from "lucide-react";
 import {
-  userGrowthData,
+  getUserGrowthByTimeRange,
+  getAggregatedUserStats,
+  getSalesRepStats,
   salesRepPerformanceData,
   revenueByRepData,
   userTypeDistributionData,
@@ -17,10 +19,41 @@ import {
 
 /**
  * UserAnalytics Component
- * Displays user and sales representative statistics
+ * Displays user and sales representative statistics with time range filtering
  */
 const UserAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+
+  // Compute data based on selected time range
+  const currentUserGrowthData = useMemo(() => getUserGrowthByTimeRange(timeRange), [timeRange]);
+  const userStats = useMemo(() => getAggregatedUserStats(timeRange), [timeRange]);
+  const salesStats = useMemo(() => getSalesRepStats(timeRange), [timeRange]);
+
+  // Get x-axis key based on time range
+  const getXAxisKey = () => {
+    switch (timeRange) {
+      case "weekly":
+        return "week";
+      case "yearly":
+        return "year";
+      case "monthly":
+      default:
+        return "month";
+    }
+  };
+
+  // Get time range label for display
+  const getTimeRangeLabel = () => {
+    switch (timeRange) {
+      case "weekly":
+        return "Last 12 weeks";
+      case "yearly":
+        return "Last 5 years";
+      case "monthly":
+      default:
+        return "Last 6 months";
+    }
+  };
 
   // Line chart configuration
   const userGrowthLines = [
@@ -51,47 +84,51 @@ const UserAnalytics = () => {
         <StatCard
           icon={Users}
           label="New Users"
-          value="342"
-          trend="+8%"
-          trendDirection="up"
+          value={userStats.totalNewUsers.toString()}
+          trend={`${userStats.usersTrend > 0 ? "+" : ""}${userStats.usersTrend}%`}
+          trendDirection={userStats.usersTrend >= 0 ? "up" : "down"}
           color="blue"
+          subtitle={getTimeRangeLabel()}
         />
         <StatCard
           icon={UserCheck}
           label="Users Purchased"
-          value="128"
-          trend="+12%"
-          trendDirection="up"
+          value={userStats.totalPurchased.toString()}
+          trend={`${userStats.purchasedTrend > 0 ? "+" : ""}${userStats.purchasedTrend}%`}
+          trendDirection={userStats.purchasedTrend >= 0 ? "up" : "down"}
           color="green"
+          subtitle={`${userStats.conversionRate}% conversion`}
         />
         <StatCard
           icon={TrendingUp}
           label="Successful Sales"
-          value="98"
-          trend="+5%"
+          value={salesStats.totalSales.toString()}
+          trend={`Avg: ${salesStats.avgConversion}%`}
           trendDirection="up"
           color="purple"
+          subtitle="Conversion Rate"
         />
         <StatCard
           icon={DollarSign}
           label="Revenue/Rep Avg"
-          value="$4,250"
-          trend="+15%"
+          value={`$${(salesStats.avgRevenuePerRep / 1000).toFixed(1)}k`}
+          trend={`Top: ${salesStats.topPerformer}`}
           trendDirection="up"
           unit="USD"
           color="orange"
+          subtitle={`$${(salesStats.topPerformerRevenue / 1000).toFixed(0)}k`}
         />
       </div>
 
       {/* User Growth Trend Chart */}
       <ChartContainer
         title="User Growth Trend"
-        description="New users, purchases, and sales rep activity over time"
+        description={`New users, purchases, and sales rep activity - ${getTimeRangeLabel()}`}
       >
         <LineChartComponent
-          data={userGrowthData}
+          data={currentUserGrowthData}
           lines={userGrowthLines}
-          xAxisKey="month"
+          xAxisKey={getXAxisKey()}
           height={350}
         />
       </ChartContainer>
@@ -137,6 +174,29 @@ const UserAnalytics = () => {
           colors={["#3b82f6", "#10b981", "#f59e0b"]}
         />
       </ChartContainer>
+
+      {/* Summary Stats Section */}
+      <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Period Summary ({getTimeRangeLabel()})</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded border border-gray-200">
+            <p className="text-sm text-gray-600">Total New Users</p>
+            <p className="text-2xl font-bold text-gray-900">{userStats.totalNewUsers}</p>
+          </div>
+          <div className="bg-white p-4 rounded border border-gray-200">
+            <p className="text-sm text-gray-600">Total Purchases</p>
+            <p className="text-2xl font-bold text-gray-900">{userStats.totalPurchased}</p>
+          </div>
+          <div className="bg-white p-4 rounded border border-gray-200">
+            <p className="text-sm text-gray-600">Conversion Rate</p>
+            <p className="text-2xl font-bold text-gray-900">{userStats.conversionRate}%</p>
+          </div>
+          <div className="bg-white p-4 rounded border border-gray-200">
+            <p className="text-sm text-gray-600">Avg Sales Reps</p>
+            <p className="text-2xl font-bold text-gray-900">{userStats.avgSalesReps}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
