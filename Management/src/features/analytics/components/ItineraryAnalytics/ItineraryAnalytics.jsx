@@ -115,13 +115,23 @@ const ItineraryAnalytics = () => {
           title="Activity Preferences"
           description="Most inquired and purchased activities"
         >
-          <PieChartComponent
-            data={activityPreferenceData}
-            dataKey="value"
-            nameKey="name"
-            height={320}
-            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]}
-          />
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {activityPreferenceData.map((activity, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">{activity.name}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-blue-600">{activity.inquiries}</p>
+                  <p className="text-xs text-gray-600">inquiries</p>
+                </div>
+                <div className="ml-4 text-right">
+                  <p className="text-sm font-bold text-green-600">{activity.purchases}</p>
+                  <p className="text-xs text-gray-600">purchased</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </ChartContainer>
       </div>
 
@@ -130,13 +140,23 @@ const ItineraryAnalytics = () => {
           title="Hotels & Resorts Preference"
           description="Most booked accommodation types"
         >
-          <PieChartComponent
-            data={hotelPreferenceData}
-            dataKey="value"
-            nameKey="name"
-            height={320}
-            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]}
-          />
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {hotelPreferenceData.map((hotel, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">{hotel.name}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-blue-600">{hotel.inquiries}</p>
+                  <p className="text-xs text-gray-600">inquiries</p>
+                </div>
+                <div className="ml-4 text-right">
+                  <p className="text-sm font-bold text-green-600">{hotel.purchases}</p>
+                  <p className="text-xs text-gray-600">booked</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </ChartContainer>
 
         <ChartContainer

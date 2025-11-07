@@ -28,16 +28,16 @@ export const destinationPerformanceData = [
 ];
 
 export const activityPreferenceData = [
-  { name: "Beach Activities", value: 285 },
-  { name: "Adventure Sports", value: 198 },
-  { name: "Cultural Tours", value: 215 },
-  { name: "Water Sports", value: 125 },
-  { name: "Wildlife Safari", value: 165 },
+  { name: "Beach Activities", inquiries: 285, purchases: 162 },
+  { name: "Adventure Sports", inquiries: 198, purchases: 98 },
+  { name: "Cultural Tours", inquiries: 215, purchases: 145 },
+  { name: "Water Sports", inquiries: 125, purchases: 72 },
+  { name: "Wildlife Safari", inquiries: 165, purchases: 88 },
 ];
 
 export const hotelPreferenceData = [
-  { name: "Luxury 5-Star", value: 142 },
-  { name: "Mid-Range 4-Star", value: 235 },
-  { name: "Budget 3-Star", value: 185 },
-  { name: "Resorts", value: 128 },
+  { name: "Luxury 5-Star", inquiries: 142, purchases: 98 },
+  { name: "Mid-Range 4-Star", inquiries: 235, purchases: 165 },
+  { name: "Budget 3-Star", inquiries: 185, purchases: 128 },
+  { name: "Resorts", inquiries: 128, purchases: 92 },
 ];
