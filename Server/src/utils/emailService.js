@@ -143,6 +143,8 @@ class EmailService {
       <h1>Welcome to Trip Sky Way!</h1>
       <p>Dear ${user.name},</p>
       <p>An account has been created for you as a <strong>${roleDisplay}</strong>.</p>
+      ${role === 'vendor' && user.businessName ? `<p><strong>Business:</strong> ${user.businessName}</p>` : ''}
+      ${role === 'vendor' && user.serviceType ? `<p><strong>Service Type:</strong> ${user.serviceType}</p>` : ''}
       <h2>Your Login Credentials:</h2>
       <ul>
         <li><strong>Email:</strong> ${user.email}</li>
@@ -151,6 +153,7 @@ class EmailService {
       <p><strong>Important:</strong> You must change this temporary password on your first login for security reasons.</p>
       <a href="${loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Login Now</a>
       <br><br>
+      ${role === 'vendor' ? '<p><strong>Note:</strong> Your account is currently under verification. You will be notified once your account is verified and you can start offering your services.</p>' : ''}
       <p>If you have any questions, please contact the administrator.</p>
       <br>
       <p>Best regards,</p>
@@ -351,6 +354,56 @@ class EmailService {
             },
           ]
         : [],
+    });
+  }
+
+  async sendVendorStatusUpdate(vendor, status) {
+    let subject = '';
+    let message = '';
+    let actionRequired = '';
+
+    switch (status) {
+      case 'verified':
+        subject = 'Your Vendor Account Has Been Verified!';
+        message = 'Congratulations! Your vendor account has been verified and approved.';
+        actionRequired = 'You can now start offering your services on our platform. Log in to your dashboard to manage your offerings.';
+        break;
+      case 'suspended':
+        subject = 'Your Vendor Account Has Been Suspended';
+        message = 'Your vendor account has been temporarily suspended.';
+        actionRequired = 'Please contact the administrator for more details and to resolve any issues.';
+        break;
+      case 'rejected':
+        subject = 'Vendor Account Application Status';
+        message = 'Unfortunately, your vendor account application has been rejected.';
+        actionRequired = 'If you believe this is an error, please contact our support team for clarification.';
+        break;
+      default:
+        subject = 'Vendor Account Status Update';
+        message = `Your vendor account status has been updated to: ${status}`;
+        actionRequired = 'Please check your dashboard for more details.';
+    }
+
+    const loginUrl = `${process.env.CLIENT_URL}/login`;
+    const html = `
+      <h1>Vendor Account Status Update</h1>
+      <p>Dear ${vendor.name},</p>
+      ${vendor.businessName ? `<p><strong>Business:</strong> ${vendor.businessName}</p>` : ''}
+      <p>${message}</p>
+      <p><strong>New Status:</strong> ${status.replace('_', ' ').toUpperCase()}</p>
+      <p>${actionRequired}</p>
+      ${status === 'verified' ? `<a href="${loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Access Your Dashboard</a>` : ''}
+      <br><br>
+      <p>If you have any questions, please contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The Trip Sky Way Team</p>
+    `;
+
+    return this.sendEmail({
+      to: vendor.email,
+      subject,
+      html,
     });
   }
 }

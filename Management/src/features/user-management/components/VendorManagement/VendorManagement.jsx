@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Plus, Edit, Trash, Building2, CheckCircle, AlertCircle, Copy, Mail } from 'lucide-react';
 import { 
   UserTableHeader, 
@@ -10,67 +10,23 @@ import {
 } from '../Common';
 import { VENDOR_VERIFICATION_COLORS, VENDOR_TYPE_COLORS } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
+import vendorService from '../../../../services/vendor.service';
 import VendorTable from './VendorTable';
 
-const VENDOR_TYPES = ['Hotel', 'Travel Agent', 'Resort', 'Restaurant', 'Car Rental', 'Tour Operator', 'Airline', 'Other'];
+const VENDOR_TYPES = ['hotel', 'transport', 'activity', 'restaurant', 'guide', 'other'];
+const VENDOR_TYPE_LABELS = {
+  hotel: 'Hotel',
+  transport: 'Transportation',
+  activity: 'Activity',
+  restaurant: 'Restaurant',
+  guide: 'Tour Guide',
+  other: 'Other'
+};
 
 const VendorManagement = () => {
-  const [vendors, setVendors] = useState([
-    {
-      id: 1,
-      name: 'Paradise Resort',
-      type: 'Resort',
-      email: 'contact@paradiseresort.com',
-      phone: '+1-555-1111',
-      location: 'Maldives',
-      verificationStatus: 'verified',
-      accountStatus: 'verified',
-      createdAt: '2024-02-01',
-      invitationSentAt: '2024-02-01',
-      firstLoginAt: '2024-02-02',
-      rating: 4.8,
-      partneredSince: '2024-02-01',
-      contactPerson: 'Ahmed Hassan',
-      passwordExpireDate: '2025-02-01',
-      twoFactorEnabled: true
-    },
-    {
-      id: 2,
-      name: 'City Hotel Chain',
-      type: 'Hotel',
-      email: 'biz@cityhotel.com',
-      phone: '+1-555-2222',
-      location: 'Multiple Cities',
-      verificationStatus: 'verified',
-      accountStatus: 'verified',
-      createdAt: '2024-01-15',
-      invitationSentAt: '2024-01-15',
-      firstLoginAt: '2024-01-16',
-      rating: 4.5,
-      partneredSince: '2024-01-15',
-      contactPerson: 'Maria Garcia',
-      passwordExpireDate: '2025-01-15',
-      twoFactorEnabled: false
-    },
-    {
-      id: 3,
-      name: 'Adventure Tours Co',
-      type: 'Tour Operator',
-      email: 'info@adventuretours.com',
-      phone: '+1-555-3333',
-      location: 'Nepal',
-      verificationStatus: 'pending',
-      accountStatus: 'pending_first_login',
-      createdAt: '2024-10-01',
-      invitationSentAt: '2024-10-01',
-      firstLoginAt: null,
-      rating: 0,
-      partneredSince: null,
-      contactPerson: 'Raj Patel',
-      passwordExpireDate: null,
-      twoFactorEnabled: false
-    }
-  ]);
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -81,347 +37,377 @@ const VendorManagement = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showResendInviteConfirm, setShowResendInviteConfirm] = useState(false);
   const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
+  const [showStatusUpdateConfirm, setShowStatusUpdateConfirm] = useState(false);
+  const [showRatingUpdateConfirm, setShowRatingUpdateConfirm] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [vendorToDelete, setVendorToDelete] = useState(null);
   const [vendorToResendInvite, setVendorToResendInvite] = useState(null);
   const [vendorToResetPassword, setVendorToResetPassword] = useState(null);
+  const [vendorStatusUpdate, setVendorStatusUpdate] = useState(null);
+  const [vendorRatingUpdate, setVendorRatingUpdate] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
 
   const [formData, setFormData] = useState({
     name: '',
-    type: '',
     email: '',
     phone: '',
-    location: '',
-    contactPerson: '',
-    description: ''
+    businessName: '',
+    serviceType: '',
+    businessRegistrationNumber: '',
+    taxIdentificationNumber: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: ''
+    },
+    contactPerson: {
+      name: '',
+      phone: '',
+      email: '',
+      designation: ''
+    },
+    bankDetails: {
+      accountName: '',
+      accountNumber: '',
+      bankName: '',
+      branchName: '',
+      ifscCode: '',
+      swiftCode: ''
+    }
   });
 
   const ITEMS_PER_PAGE = 10;
 
-  // 🔐 Generate secure temporary password
-  const generateTemporaryPassword = () => {
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const symbols = '!@#$%^&*';
-    
-    const allChars = uppercase + lowercase + numbers + symbols;
-    let password = '';
-    
-    // Ensure at least one of each type
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += symbols[Math.floor(Math.random() * symbols.length)];
-    
-    // Fill rest randomly to make 12 characters
-    for (let i = password.length; i < 12; i++) {
-      password += allChars[Math.floor(Math.random() * allChars.length)];
+  // Load vendors on component mount
+  useEffect(() => {
+    loadVendors();
+  }, []);
+
+  // Load vendors from API
+  const loadVendors = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = {
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        search: searchTerm || undefined,
+        vendorStatus: filterStatus !== 'all' ? filterStatus : undefined,
+        serviceType: filterType !== 'all' ? filterType : undefined,
+        sort: '-createdAt'
+      };
+      
+      // Remove undefined values
+      Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+      
+      const response = await vendorService.getAllVendors(params);
+      
+      if (response.status === 'success' && response.data) {
+        setVendors(response.data.vendors || response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading vendors:', err);
+      setError(err.userMessage || err.message || 'Failed to load vendors');
+    } finally {
+      setLoading(false);
     }
-    
-    // Shuffle password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
-  };
-
-  // 📧 Simulate sending invitation email
-  const sendInvitationEmail = (vendor, tempPassword) => {
-    console.log(`📧 Invitation email sent to ${vendor.email}`);
-    console.log(`
-      ╔════════════════════════════════════════════════════════════╗
-      ║         VENDOR PARTNER ACCOUNT INVITATION EMAIL            ║
-      ╚════════════════════════════════════════════════════════════╝
-      
-      To: ${vendor.email}
-      Subject: Welcome to Trip Sky Way - Vendor Partner Account
-      
-      ─────────────────────────────────────────────────────────────
-      
-      Dear ${vendor.contactPerson},
-      
-      Welcome to Trip Sky Way! Your vendor partner account has been
-      created and is ready for activation.
-      
-      🏢 BUSINESS DETAILS:
-      ├─ Business Name: ${vendor.name}
-      ├─ Type: ${vendor.type}
-      └─ Location: ${vendor.location}
-      
-      📋 ACCOUNT DETAILS:
-      ├─ Email: ${vendor.email}
-      ├─ Temporary Password: ${tempPassword}
-      └─ Invitation Link: https://tripskiway.com/auth/invite/${vendor.id}
-      
-      🔐 FIRST LOGIN INSTRUCTIONS:
-      1. Click the invitation link above (expires in 48 hours)
-      2. Enter your email and temporary password
-      3. You MUST create a new permanent password
-      4. Complete business verification steps
-      5. Your account will be activated after admin review
-      
-      ⏰ IMPORTANT: Temporary password expires in 48 hours
-      
-      PASSWORD REQUIREMENTS:
-      ├─ Minimum 12 characters
-      ├─ At least one uppercase letter (A-Z)
-      ├─ At least one lowercase letter (a-z)
-      ├─ At least one number (0-9)
-      └─ At least one special character (!@#$%^&*)
-      
-      📊 NEXT STEPS:
-      After first login, you can:
-      ├─ Manage your inventory/services
-      ├─ View bookings and reservations
-      ├─ Access reporting and analytics
-      ├─ Manage pricing and availability
-      └─ Track commissions and payments
-      
-      ✅ ACCOUNT VERIFICATION:
-      Your account is currently pending verification. Our team will
-      review your business details within 24-48 hours.
-      
-      If you have any questions or didn't request this account,
-      please contact support@tripskiway.com immediately.
-      
-      Best regards,
-      Trip Sky Way Partner Team
-      https://tripskiway.com/partner-support
-      
-      ─────────────────────────────────────────────────────────────
-    `);
-  };
-
-  // 📧 Simulate sending password reset email
-  const sendPasswordResetEmail = (vendor, tempPassword) => {
-    console.log(`📧 Password reset email sent to ${vendor.email}`);
-    console.log(`
-      ╔════════════════════════════════════════════════════════════╗
-      ║           PASSWORD RESET REQUEST                           ║
-      ╚════════════════════════════════════════════════════════════╝
-      
-      To: ${vendor.email}
-      Subject: Password Reset - Trip Sky Way Vendor Account
-      
-      ─────────────────────────────────────────────────────────────
-      
-      Dear ${vendor.contactPerson},
-      
-      A password reset has been initiated for your vendor account.
-      
-      🔑 NEW TEMPORARY PASSWORD: ${tempPassword}
-      🔗 Reset Link: https://tripskiway.com/auth/reset/${vendor.id}
-      
-      ⏰ This temporary password expires in 48 hours
-      
-      PASSWORD REQUIREMENTS:
-      ├─ Minimum 12 characters
-      ├─ At least one uppercase letter
-      ├─ At least one lowercase letter
-      ├─ At least one number
-      └─ At least one special character
-      
-      If you did not request this password reset, please contact
-      support@tripskiway.com immediately.
-      
-      Best regards,
-      Trip Sky Way Partner Team
-      
-      ─────────────────────────────────────────────────────────────
-    `);
-  };
-
-  const filteredVendors = useMemo(() => {
-    return vendors.filter(vendor => {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
-        vendor.name.toLowerCase().includes(searchLower) ||
-        vendor.email.toLowerCase().includes(searchLower) ||
-        vendor.location.toLowerCase().includes(searchLower);
-      
-      const matchesStatus = filterStatus === 'all' || vendor.verificationStatus === filterStatus;
-      const matchesType = filterType === 'all' || vendor.type === filterType;
-      
-      return matchesSearch && matchesStatus && matchesType;
-    });
-  }, [vendors, searchTerm, filterStatus, filterType]);
-
-  const paginatedData = useMemo(() => {
-    return paginateArray(filteredVendors, currentPage, ITEMS_PER_PAGE);
-  }, [filteredVendors, currentPage]);
-
-  const stats = useMemo(() => ({
-    total: vendors.length,
-    verified: vendors.filter(v => v.verificationStatus === 'verified').length,
-    pending: vendors.filter(v => v.verificationStatus === 'pending').length,
-    rejected: vendors.filter(v => v.verificationStatus === 'rejected').length,
-    avgRating: vendors.filter(v => v.rating > 0).length > 0 
-      ? (vendors.filter(v => v.rating > 0).reduce((sum, v) => sum + v.rating, 0) / vendors.filter(v => v.rating > 0).length).toFixed(1)
-      : 0
-  }), [vendors]);
+  }, [currentPage, searchTerm, filterStatus, filterType]);
 
   const resetForm = () => {
     setFormData({
       name: '',
-      type: '',
       email: '',
       phone: '',
-      location: '',
-      contactPerson: '',
-      description: ''
+      businessName: '',
+      serviceType: '',
+      businessRegistrationNumber: '',
+      taxIdentificationNumber: '',
+      address: {
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: ''
+      },
+      contactPerson: {
+        name: '',
+        phone: '',
+        email: '',
+        designation: ''
+      },
+      bankDetails: {
+        accountName: '',
+        accountNumber: '',
+        bankName: '',
+        branchName: '',
+        ifscCode: '',
+        swiftCode: ''
+      }
     });
+    setValidationErrors({});
+    setError(null);
   };
 
-  const handleAddVendor = () => {
-    if (formData.name && formData.type && formData.email && formData.location) {
-      const tempPassword = generateTemporaryPassword();
+  const handleAddVendor = async () => {
+    // Validate form data
+    const validation = vendorService.validateVendorData(formData);
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors);
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Clear validation errors if all valid
+    setValidationErrors({});
+
+    try {
+      setActionLoading(true);
+      const response = await vendorService.createVendor(formData);
       
-      const newVendor = {
-        id: Math.max(...vendors.map(v => v.id), 0) + 1,
-        ...formData,
-        verificationStatus: 'pending',
-        accountStatus: 'pending_first_login',
-        createdAt: new Date().toISOString().split('T')[0],
-        invitationSentAt: new Date().toISOString().split('T')[0],
-        firstLoginAt: null,
-        rating: 0,
-        partneredSince: null,
-        passwordExpireDate: null,
-        twoFactorEnabled: false
+      if (response.status === 'success') {
+        setShowNewVendorDialog(false);
+        setSuccessMessage(`✅ Invitation sent to ${formData.email}`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        resetForm();
+        setValidationErrors({});
+        loadVendors();
+      }
+    } catch (err) {
+      console.error('Error creating vendor:', err);
+      
+      // Extract validation errors from backend if available
+      if (err.validationErrors) {
+        // Convert validation errors object to field-specific errors
+        const backendErrors = {};
+        Object.entries(err.validationErrors).forEach(([field, messages]) => {
+          backendErrors[field] = Array.isArray(messages) ? messages[0] : messages;
+        });
+        setValidationErrors(backendErrors);
+      }
+      
+      setError(err.userMessage || err.message || 'Failed to create vendor');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditVendor = async () => {
+    if (!selectedVendor) return;
+
+    try {
+      setActionLoading(true);
+      // Only send changed fields for update
+      const updateData = {
+        businessName: formData.businessName,
+        serviceType: formData.serviceType,
+        businessRegistrationNumber: formData.businessRegistrationNumber,
+        taxIdentificationNumber: formData.taxIdentificationNumber,
+        address: formData.address,
+        contactPerson: formData.contactPerson,
+        bankDetails: formData.bankDetails
       };
+
+      const response = await vendorService.updateVendor(selectedVendor._id, updateData);
       
-      // Send invitation email
-      sendInvitationEmail(newVendor, tempPassword);
-      
-      setVendors([...vendors, newVendor]);
-      setShowNewVendorDialog(false);
-      setSuccessMessage(`✅ Invitation sent to ${formData.email}`);
-      setTimeout(() => setSuccessMessage(''), 5000);
-      resetForm();
+      if (response.status === 'success') {
+        setSelectedVendor(null);
+        setShowEditVendorDialog(false);
+        setSuccessMessage('✅ Vendor updated successfully');
+        setTimeout(() => setSuccessMessage(''), 5000);
+        resetForm();
+        loadVendors();
+      }
+    } catch (err) {
+      console.error('Error updating vendor:', err);
+      setError(err.userMessage || err.message || 'Failed to update vendor');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleEditVendor = () => {
-    if (selectedVendor && formData.name && formData.type && formData.email) {
-      setVendors(vendors.map(v => 
-        v.id === selectedVendor.id 
-          ? {
-              ...v,
-              name: formData.name,
-              type: formData.type,
-              email: formData.email,
-              phone: formData.phone,
-              location: formData.location,
-              contactPerson: formData.contactPerson
-            }
-          : v
-      ));
-      setSelectedVendor(null);
-      setShowEditVendorDialog(false);
-      setSuccessMessage('✅ Vendor updated successfully');
-      setTimeout(() => setSuccessMessage(''), 5000);
-      resetForm();
+  // Handle verification/rejection
+  const handleVerifyVendor = async (vendor) => {
+    try {
+      setActionLoading(true);
+      const response = await vendorService.updateVendorStatus(vendor._id, 'verified');
+      
+      if (response.status === 'success') {
+        setSuccessMessage(`✅ Vendor verified successfully`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        loadVendors();
+      }
+    } catch (err) {
+      console.error('Error verifying vendor:', err);
+      setError(err.userMessage || err.message || 'Failed to verify vendor');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  // 🔄 Resend invitation to pending vendor
+  const handleRejectVendor = async (vendor) => {
+    try {
+      setActionLoading(true);
+      const response = await vendorService.updateVendorStatus(vendor._id, 'rejected', 'Rejected by admin');
+      
+      if (response.status === 'success') {
+        setSuccessMessage(`✅ Vendor rejected`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        loadVendors();
+      }
+    } catch (err) {
+      console.error('Error rejecting vendor:', err);
+      setError(err.userMessage || err.message || 'Failed to reject vendor');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle resend invitation
   const handleResendInvitation = (vendor) => {
     setVendorToResendInvite(vendor);
     setShowResendInviteConfirm(true);
   };
 
-  const confirmResendInvitation = () => {
-    const tempPassword = generateTemporaryPassword();
-    sendInvitationEmail(vendorToResendInvite, tempPassword);
-    
-    setVendors(vendors.map(v => 
-      v.id === vendorToResendInvite.id 
-        ? { ...v, invitationSentAt: new Date().toISOString().split('T')[0] }
-        : v
-    ));
-    
-    setSuccessMessage(`✅ Invitation resent to ${vendorToResendInvite.email}`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-    setShowResendInviteConfirm(false);
-    setVendorToResendInvite(null);
+  const confirmResendInvitation = async () => {
+    if (!vendorToResendInvite) return;
+
+    try {
+      setActionLoading(true);
+      // The backend will send the invitation email
+      const response = await vendorService.resetVendorPassword(vendorToResendInvite._id);
+      
+      if (response.status === 'success') {
+        setSuccessMessage(`✅ Invitation resent to ${vendorToResendInvite.email}`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        loadVendors();
+        setShowResendInviteConfirm(false);
+        setVendorToResendInvite(null);
+      }
+    } catch (err) {
+      console.error('Error resending invitation:', err);
+      setError(err.userMessage || err.message || 'Failed to resend invitation');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  // 🔑 Force password reset
+  // Handle password reset
   const handleForcePasswordReset = (vendor) => {
     setVendorToResetPassword(vendor);
     setShowPasswordResetConfirm(true);
   };
 
-  const confirmPasswordReset = () => {
-    const tempPassword = generateTemporaryPassword();
-    sendPasswordResetEmail(vendorToResetPassword, tempPassword);
-    
-    setVendors(vendors.map(v => 
-      v.id === vendorToResetPassword.id 
-        ? { ...v, accountStatus: 'pending_password_reset' }
-        : v
-    ));
-    
-    setSuccessMessage(`✅ Password reset link sent to ${vendorToResetPassword.email}`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-    setShowPasswordResetConfirm(false);
-    setVendorToResetPassword(null);
+  const confirmPasswordReset = async () => {
+    if (!vendorToResetPassword) return;
+
+    try {
+      setActionLoading(true);
+      const response = await vendorService.resetVendorPassword(vendorToResetPassword._id);
+      
+      if (response.status === 'success') {
+        setSuccessMessage(`✅ Password reset link sent to ${vendorToResetPassword.email}`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        loadVendors();
+        setShowPasswordResetConfirm(false);
+        setVendorToResetPassword(null);
+      }
+    } catch (err) {
+      console.error('Error resetting password:', err);
+      setError(err.userMessage || err.message || 'Failed to reset password');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
+  // Handle delete vendor
   const handleDeleteVendor = (vendor) => {
     setVendorToDelete(vendor);
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
-    setVendors(vendors.filter(v => v.id !== vendorToDelete.id));
-    setShowDeleteConfirm(false);
-    setVendorToDelete(null);
-    setSelectedVendor(null);
-    setSuccessMessage(`✅ Vendor deleted successfully`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-  };
+  const confirmDelete = async () => {
+    if (!vendorToDelete) return;
 
-  const handleVerifyVendor = (vendor) => {
-    setVendors(vendors.map(v =>
-      v.id === vendor.id
-        ? { ...v, verificationStatus: 'verified', accountStatus: 'verified', partneredSince: new Date().toISOString().split('T')[0] }
-        : v
-    ));
-    setSuccessMessage(`✅ Vendor verified successfully`);
-    setTimeout(() => setSuccessMessage(''), 5000);
-  };
-
-  const handleRejectVendor = (vendor) => {
-    setVendors(vendors.map(v =>
-      v.id === vendor.id
-        ? { ...v, verificationStatus: 'rejected', accountStatus: 'rejected' }
-        : v
-    ));
-    setSuccessMessage(`✅ Vendor rejected`);
-    setTimeout(() => setSuccessMessage(''), 5000);
+    try {
+      setActionLoading(true);
+      const response = await vendorService.deleteVendor(vendorToDelete._id);
+      
+      if (response.status === 'success') {
+        setShowDeleteConfirm(false);
+        setVendorToDelete(null);
+        setSelectedVendor(null);
+        setSuccessMessage(`✅ Vendor deleted successfully`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+        loadVendors();
+      }
+    } catch (err) {
+      console.error('Error deleting vendor:', err);
+      setError(err.userMessage || err.message || 'Failed to delete vendor');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const openEditDialog = (vendor) => {
     setSelectedVendor(vendor);
     setFormData({
-      name: vendor.name,
-      type: vendor.type,
-      email: vendor.email,
-      phone: vendor.phone,
-      location: vendor.location,
-      contactPerson: vendor.contactPerson,
-      description: ''
+      name: vendor.name || '',
+      email: vendor.email || '',
+      phone: vendor.phone || '',
+      businessName: vendor.businessName || '',
+      serviceType: vendor.serviceType || '',
+      businessRegistrationNumber: vendor.businessRegistrationNumber || '',
+      taxIdentificationNumber: vendor.taxIdentificationNumber || '',
+      address: vendor.address || {
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        country: ''
+      },
+      contactPerson: vendor.contactPerson || {
+        name: '',
+        phone: '',
+        email: '',
+        designation: ''
+      },
+      bankDetails: vendor.bankDetails || {
+        accountName: '',
+        accountNumber: '',
+        bankName: '',
+        branchName: '',
+        ifscCode: '',
+        swiftCode: ''
+      }
     });
     setShowEditVendorDialog(true);
   };
 
   return (
     <div className="space-y-6">
-      {/* Success Message */}
+      {/* Error Message - Positioned above modals */}
+      {error && (
+        <div className="fixed top-4 left-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 z-[60] shadow-lg max-w-md">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <p className="text-red-800 font-medium text-sm">{error}</p>
+          <button 
+            onClick={() => setError(null)}
+            className="ml-auto text-red-600 hover:text-red-800 flex-shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Success Message - Positioned above modals */}
       {successMessage && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <p className="text-green-800 font-medium">{successMessage}</p>
+        <div className="fixed top-4 left-4 right-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 z-[60] shadow-lg max-w-md">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-green-800 font-medium text-sm">{successMessage}</p>
         </div>
       )}
 
@@ -436,7 +422,8 @@ const VendorManagement = () => {
             resetForm();
             setShowNewVendorDialog(true);
           }}
-          className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-teal-600 text-white rounded-lg hover:from-indigo-700 hover:to-teal-700 transition-colors font-medium flex items-center gap-2"
+          disabled={actionLoading}
+          className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-teal-600 text-white rounded-lg hover:from-indigo-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Add Vendor
@@ -457,11 +444,13 @@ const VendorManagement = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <StatsCard label="Total Vendors" value={stats.total} icon={Building2} color="indigo" />
-        <StatsCard label="Verified" value={stats.verified} icon={CheckCircle} color="green" />
-        <StatsCard label="Pending" value={stats.pending} icon={AlertCircle} color="yellow" />
-        <StatsCard label="Rejected" value={stats.rejected} icon={AlertCircle} color="red" />
-        <StatsCard label="Avg. Rating" value={stats.avgRating} icon={Building2} color="purple" />
+        <StatsCard label="Total Vendors" value={vendors.length} icon={Building2} color="indigo" />
+        <StatsCard label="Verified" value={vendors.filter(v => v.vendorStatus === 'verified').length} icon={CheckCircle} color="green" />
+        <StatsCard label="Pending" value={vendors.filter(v => v.vendorStatus === 'pending_verification').length} icon={AlertCircle} color="yellow" />
+        <StatsCard label="Rejected" value={vendors.filter(v => v.vendorStatus === 'rejected').length} icon={AlertCircle} color="red" />
+        <StatsCard label="Avg. Rating" value={vendors.filter(v => v.rating > 0).length > 0 
+          ? (vendors.filter(v => v.rating > 0).reduce((sum, v) => sum + v.rating, 0) / vendors.filter(v => v.rating > 0).length).toFixed(1)
+          : '0'} icon={Building2} color="purple" />
       </div>
 
       {/* Filters */}
@@ -478,13 +467,13 @@ const VendorManagement = () => {
           >
             <option value="all">All Vendors</option>
             <option value="verified">Verified</option>
-            <option value="pending">Pending Review</option>
+            <option value="pending_verification">Pending Review</option>
             <option value="rejected">Rejected</option>
             <option value="suspended">Suspended</option>
           </select>
         </div>
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Vendor Type</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Service Type</label>
           <select
             value={filterType}
             onChange={(e) => {
@@ -495,7 +484,7 @@ const VendorManagement = () => {
           >
             <option value="all">All Types</option>
             {VENDOR_TYPES.map(type => (
-              <option key={type} value={type}>{type}</option>
+              <option key={type} value={type}>{VENDOR_TYPE_LABELS[type]}</option>
             ))}
           </select>
         </div>
@@ -504,29 +493,40 @@ const VendorManagement = () => {
       {/* Table Section */}
       <UserTableHeader
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={(value) => {
+          setSearchTerm(value);
+          setCurrentPage(1);
+        }}
         onFilterClick={() => {}}
         title="Vendors List"
         subtitle="Manage partner relationships and verify vendors"
       />
 
-      <VendorTable
-        vendors={paginatedData.data}
-        onEdit={openEditDialog}
-        onDelete={handleDeleteVendor}
-        onVerify={handleVerifyVendor}
-        onReject={handleRejectVendor}
-        onResendInvite={handleResendInvitation}
-        onForcePasswordReset={handleForcePasswordReset}
-      />
-
-      <Pagination
-        currentPage={currentPage}
-        totalPages={paginatedData.pages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={ITEMS_PER_PAGE}
-        totalItems={filteredVendors.length}
-      />
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-gray-600 text-lg">Loading vendors...</div>
+        </div>
+      ) : (
+        <>
+          <VendorTable
+            vendors={vendors}
+            onEdit={openEditDialog}
+            onDelete={handleDeleteVendor}
+            onVerify={handleVerifyVendor}
+            onReject={handleRejectVendor}
+            onResendInvite={handleResendInvitation}
+            onForcePasswordReset={handleForcePasswordReset}
+          />
+          
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(vendors.length / ITEMS_PER_PAGE)}
+            onPageChange={setCurrentPage}
+            itemsPerPage={ITEMS_PER_PAGE}
+            totalItems={vendors.length}
+          />
+        </>
+      )}
 
       {/* Add Vendor Dialog */}
       <UserFormDialog
@@ -540,8 +540,29 @@ const VendorManagement = () => {
         subtitle="Register a new partner (hotel, travel agent, service provider, etc.)"
         submitLabel="Register & Send Invitation"
         submitColor="indigo"
+        isLoading={actionLoading}
       >
         <div className="space-y-4">
+          {/* Validation Error Summary */}
+          {Object.keys(validationErrors).length > 0 && (
+            <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+              <p className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                Please fix the following errors:
+              </p>
+              <ul className="space-y-2">
+                {Object.entries(validationErrors).map(([field, error]) => (
+                  <li key={field} className="text-sm text-red-800 flex items-start gap-2">
+                    <span className="text-red-600 font-bold mt-0.5">•</span>
+                    <span>
+                      <strong>{field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}:</strong> {error}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* What Happens Next */}
           <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
             <p className="text-xs font-semibold text-indigo-900">WHAT HAPPENS NEXT:</p>
@@ -555,80 +576,227 @@ const VendorManagement = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Business Name" required>
+            <FormGroup label="Name" required error={validationErrors.name}>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Paradise Resort"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.name 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Contact Person Name"
               />
             </FormGroup>
-            <FormGroup label="Vendor Type" required>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Select Type</option>
-                {['Hotel', 'Travel Agent', 'Resort', 'Restaurant', 'Car Rental', 'Tour Operator', 'Airline', 'Other'].map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-            </FormGroup>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Email" required>
+            <FormGroup label="Email" required error={validationErrors.email}>
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.email 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
                 placeholder="contact@vendor.com"
-              />
-            </FormGroup>
-            <FormGroup label="Phone" required>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="+1-555-0000"
               />
             </FormGroup>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Location" required>
+            <FormGroup label="Phone" required error={validationErrors.phone}>
               <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="City, Country"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.phone 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="+1-555-0000"
               />
             </FormGroup>
-            <FormGroup label="Contact Person">
+            <FormGroup label="Business Name" required error={validationErrors.businessName}>
               <input
                 type="text"
-                value={formData.contactPerson}
-                onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Primary Contact Name"
+                value={formData.businessName}
+                onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.businessName 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Business/Company Name"
               />
             </FormGroup>
           </div>
 
-          <FormGroup label="Description">
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Brief description of services offered"
-              rows="3"
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Service Type" required error={validationErrors.serviceType}>
+              <select
+                value={formData.serviceType}
+                onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.serviceType 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+              >
+                <option value="">Select Type</option>
+                {VENDOR_TYPES.map(type => (
+                  <option key={type} value={type}>{VENDOR_TYPE_LABELS[type]}</option>
+                ))}
+              </select>
+            </FormGroup>
+            <FormGroup label="Registration Number" required error={validationErrors.businessRegistrationNumber}>
+              <input
+                type="text"
+                value={formData.businessRegistrationNumber}
+                onChange={(e) => setFormData({ ...formData, businessRegistrationNumber: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.businessRegistrationNumber 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Business Reg. Number"
+              />
+            </FormGroup>
+          </div>
+
+          <FormGroup label="Tax Identification Number" required error={validationErrors.taxIdentificationNumber}>
+            <input
+              type="text"
+              value={formData.taxIdentificationNumber}
+              onChange={(e) => setFormData({ ...formData, taxIdentificationNumber: e.target.value })}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                validationErrors.taxIdentificationNumber 
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
+              placeholder="Tax ID"
             />
           </FormGroup>
+
+          {/* Address Section */}
+          <div className="border-t pt-4">
+            <p className="font-semibold text-gray-700 mb-3">Address Information</p>
+            <FormGroup label="Street Address">
+              <input
+                type="text"
+                value={formData.address.street}
+                onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Street address"
+              />
+            </FormGroup>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="City">
+                <input
+                  type="text"
+                  value={formData.address.city}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="City"
+                />
+              </FormGroup>
+              <FormGroup label="State">
+                <input
+                  type="text"
+                  value={formData.address.state}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="State"
+                />
+              </FormGroup>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="ZIP Code">
+                <input
+                  type="text"
+                  value={formData.address.zipCode}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, zipCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="ZIP Code"
+                />
+              </FormGroup>
+              <FormGroup label="Country">
+                <input
+                  type="text"
+                  value={formData.address.country}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, country: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Country"
+                />
+              </FormGroup>
+            </div>
+          </div>
+
+          {/* Bank Details Section */}
+          <div className="border-t pt-4">
+            <p className="font-semibold text-gray-700 mb-3">Bank Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="Account Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.accountName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, accountName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Account Holder Name"
+                />
+              </FormGroup>
+              <FormGroup label="Account Number">
+                <input
+                  type="text"
+                  value={formData.bankDetails.accountNumber}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, accountNumber: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Account Number"
+                />
+              </FormGroup>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="Bank Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.bankName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, bankName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Bank Name"
+                />
+              </FormGroup>
+              <FormGroup label="Branch Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.branchName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, branchName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Branch Name"
+                />
+              </FormGroup>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="IFSC Code">
+                <input
+                  type="text"
+                  value={formData.bankDetails.ifscCode}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, ifscCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="IFSC Code"
+                />
+              </FormGroup>
+              <FormGroup label="SWIFT Code (International)">
+                <input
+                  type="text"
+                  value={formData.bankDetails.swiftCode}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, swiftCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="SWIFT Code"
+                />
+              </FormGroup>
+            </div>
+          </div>
 
           <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
             <p className="text-xs font-semibold text-green-900 mb-2">🔐 Account Security</p>
@@ -655,63 +823,83 @@ const VendorManagement = () => {
         subtitle="Update vendor information"
         submitLabel="Update Vendor"
         submitColor="indigo"
+        isLoading={actionLoading}
       >
         <div className="space-y-4">
+          <FormGroup label="Business Name" required>
+            <input
+              type="text"
+              value={formData.businessName}
+              onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </FormGroup>
+
           <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Business Name" required>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </FormGroup>
-            <FormGroup label="Vendor Type" required>
+            <FormGroup label="Service Type" required>
               <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                value={formData.serviceType}
+                onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {VENDOR_TYPES.map(type => (
-                  <option key={type} value={type}>{type}</option>
+                  <option key={type} value={type}>{VENDOR_TYPE_LABELS[type]}</option>
                 ))}
               </select>
             </FormGroup>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Email" required>
+            <FormGroup label="Registration Number" required>
               <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </FormGroup>
-            <FormGroup label="Phone" required>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                type="text"
+                value={formData.businessRegistrationNumber}
+                onChange={(e) => setFormData({ ...formData, businessRegistrationNumber: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Location" required>
+          <FormGroup label="Tax ID" required>
+            <input
+              type="text"
+              value={formData.taxIdentificationNumber}
+              onChange={(e) => setFormData({ ...formData, taxIdentificationNumber: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </FormGroup>
+
+          {/* Contact Person */}
+          <div className="border-t pt-4">
+            <p className="font-semibold text-gray-700 mb-3">Contact Person</p>
+            <FormGroup label="Contact Name">
               <input
                 type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                value={formData.contactPerson.name}
+                onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, name: e.target.value } })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </FormGroup>
-            <FormGroup label="Contact Person">
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="Contact Phone">
+                <input
+                  type="tel"
+                  value={formData.contactPerson.phone}
+                  onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, phone: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </FormGroup>
+              <FormGroup label="Contact Email">
+                <input
+                  type="email"
+                  value={formData.contactPerson.email}
+                  onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, email: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </FormGroup>
+            </div>
+            <FormGroup label="Designation">
               <input
                 type="text"
-                value={formData.contactPerson}
-                onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                value={formData.contactPerson.designation}
+                onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, designation: e.target.value } })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </FormGroup>
@@ -728,10 +916,11 @@ const VendorManagement = () => {
         }}
         onConfirm={confirmDelete}
         title="Delete Vendor"
-        description={`Are you sure you want to delete ${vendorToDelete?.name}? This action cannot be undone.`}
+        description={`Are you sure you want to delete ${vendorToDelete?.businessName}? This action cannot be undone.`}
         confirmLabel="Delete"
         cancelLabel="Cancel"
         isDangerous={true}
+        isLoading={actionLoading}
       />
 
       {/* Resend Invitation Dialog */}
@@ -746,6 +935,7 @@ const VendorManagement = () => {
         description={`Resend invitation email to ${vendorToResendInvite?.email}? They will receive a new temporary password and invitation link.`}
         confirmLabel="Resend"
         cancelLabel="Cancel"
+        isLoading={actionLoading}
       />
 
       {/* Password Reset Dialog */}
@@ -760,6 +950,7 @@ const VendorManagement = () => {
         description={`Send password reset email to ${vendorToResetPassword?.email}? They will receive a new temporary password and must create a permanent one.`}
         confirmLabel="Send Reset Email"
         cancelLabel="Cancel"
+        isLoading={actionLoading}
       />
     </div>
   );

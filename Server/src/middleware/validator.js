@@ -32,38 +32,41 @@ export const validateRequest = (schema, location = 'body') => {
   }
 
   // Handle Joi schema
-  return (req, res, next) => {
-    if (!schema || typeof schema.validate !== 'function') {
+  return async (req, res, next) => {
+    if (!schema || typeof schema.validateAsync !== 'function') {
       return next(new AppError('Invalid validation schema', 500));
     }
 
     // Determine which request property to validate based on location
     const source = location === 'query' ? req.query : location === 'params' ? req.params : req.body;
 
-    const { error, value } = schema.validate(source, {
-      abortEarly: false,
-      stripUnknown: true,
-    });
+    try {
+      const value = await schema.validateAsync(source, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
 
-    if (error) {
-      const formattedErrors = error.details.map((detail) => ({
-        field: detail.path.join('.'),
-        message: detail.message,
-      }));
+      // Replace the appropriate request property with validated value
+      if (location === 'query') {
+        req.query = value;
+      } else if (location === 'params') {
+        req.params = value;
+      } else {
+        req.body = value;
+      }
 
-      return next(new AppError('Validation failed', 400, formattedErrors));
+      return next();
+    } catch (error) {
+      if (error.details) {
+        const formattedErrors = error.details.map((detail) => ({
+          field: detail.path.join('.'),
+          message: detail.message,
+        }));
+        return next(new AppError('Validation failed', 400, formattedErrors));
+      }
+
+      return next(new AppError(error.message, 400));
     }
-
-    // Replace the appropriate request property with validated value
-    if (location === 'query') {
-      req.query = value;
-    } else if (location === 'params') {
-      req.params = value;
-    } else {
-      req.body = value;
-    }
-
-    return next();
   };
 };
 

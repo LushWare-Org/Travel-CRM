@@ -62,12 +62,21 @@ class ApiService {
         // Extract detailed error information
         let errorMessage = data.message || data.error?.message || `HTTP error! status: ${response.status}`;
         
+        // Log full error response for debugging
+        console.log('Full error response:', data);
+        
         // Include validation errors if available
         if (data.error?.errors && Array.isArray(data.error.errors)) {
           const validationErrors = data.error.errors.map(err => `${err.field}: ${err.message}`).join('; ');
           errorMessage = `${errorMessage} - ${validationErrors}`;
         } else if (data.error?.details && Array.isArray(data.error.details)) {
           const validationErrors = data.error.details.map(err => `${err.field}: ${err.message}`).join('; ');
+          errorMessage = `${errorMessage} - ${validationErrors}`;
+        } else if (data.details?.validation) {
+          // Handle new error format from backend
+          const validationErrors = Object.entries(data.details.validation)
+            .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+            .join('; ');
           errorMessage = `${errorMessage} - ${validationErrors}`;
         }
         
