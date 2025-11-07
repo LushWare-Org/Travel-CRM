@@ -23,10 +23,10 @@ const email = Joi.string()
   });
 
 const phone = Joi.string()
-  .regex(/^[0-9]{10}$/)
+  .regex(/^[\+]?[0-9]{7,15}$/)
   .required()
   .messages({
-    'string.pattern.base': 'Phone number must be exactly 10 digits',
+    'string.pattern.base': 'Phone number must be between 7-15 digits (can include + prefix)',
     'any.required': 'Phone number is required',
   });
 
@@ -71,8 +71,8 @@ export const updateSalesRepSchema = Joi.object().keys({
   email: Joi.string().email().lowercase().optional().messages({
     'string.email': 'Please provide a valid email address',
   }),
-  phone: Joi.string().regex(/^[0-9]{10}$/).optional().messages({
-    'string.pattern.base': 'Phone number must be exactly 10 digits',
+  phone: Joi.string().regex(/^[\+]?[0-9]{7,15}$/).optional().messages({
+    'string.pattern.base': 'Phone number must be between 7-15 digits (can include + prefix)',
   }),
   commissionRate: Joi.number().min(0).max(100).optional().messages({
     'number.min': 'Commission rate cannot be less than 0%',

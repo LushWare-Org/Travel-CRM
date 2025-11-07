@@ -313,8 +313,8 @@ class SalesRepService {
 
     if (!data.phone) {
       errors.phone = 'Phone is required';
-    } else if (!/^[0-9]{10}$/.test(data.phone.replace(/\D/g, ''))) {
-      errors.phone = 'Phone number must be exactly 10 digits';
+    } else if (!/^[\+]?[0-9]{7,15}$/.test(data.phone.replace(/\D/g, '') === '' ? '+' + data.phone : data.phone)) {
+      errors.phone = 'Phone number must be between 7-15 digits (can include + prefix)';
     }
 
     if (data.commissionRate !== undefined) {
