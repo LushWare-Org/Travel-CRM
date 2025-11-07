@@ -30,12 +30,21 @@ class BillingService {
       };
     }
 
+    if (!Array.isArray(data.items)) {
+      data.items = [];
+    }
+
+    data.mode = data.mode === 'detailed' ? 'detailed' : 'summary';
+
     // Set default valid until (30 days from now)
     if (!data.validUntil) {
       data.validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     }
 
     data.createdBy = userId;
+    if (!data.issueDate) {
+      data.issueDate = new Date();
+    }
 
     const quotation = await Quotation.create(data);
 

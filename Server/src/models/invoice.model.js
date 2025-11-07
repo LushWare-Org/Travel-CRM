@@ -178,6 +178,10 @@ const invoiceSchema = new mongoose.Schema(
     ],
     pdfUrl: String,
     sentAt: Date,
+    emailSent: {
+      type: Boolean,
+      default: false,
+    },
     viewedAt: Date,
     remindersSent: {
       type: Number,

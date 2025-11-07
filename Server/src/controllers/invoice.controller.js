@@ -4,6 +4,22 @@ import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { APIFeatures } from '../utils/apiFeatures.js';
+import emailService from '../utils/emailService.js';
+
+const formatInvoiceForResponse = (invoiceDoc) => {
+  if (!invoiceDoc) {
+    return invoiceDoc;
+  }
+
+  const invoice =
+    typeof invoiceDoc.toObject === 'function'
+      ? invoiceDoc.toObject({ virtuals: true })
+      : { ...invoiceDoc };
+
+  invoice.issueDate = invoice.createdAt || invoice.issueDate;
+
+  return invoice;
+};
 
 /**
  * @desc    Get all invoices
@@ -23,7 +39,8 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
     .limitFields()
     .paginate();
 
-  const invoices = await features.query;
+  const invoiceDocs = await features.query;
+  const invoices = invoiceDocs.map((invoice) => formatInvoiceForResponse(invoice));
   const total = await Invoice.countDocuments();
 
   res.status(200).json({
@@ -40,7 +57,7 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const getInvoiceById = asyncHandler(async (req, res, next) => {
-  const invoice = await Invoice.findById(req.params.id)
+  const invoiceDoc = await Invoice.findById(req.params.id)
     .populate('lead', 'name email phone status destination')
     .populate('quotation', 'quotationNumber')
     .populate('booking')
@@ -48,9 +65,11 @@ export const getInvoiceById = asyncHandler(async (req, res, next) => {
     .populate('creditNotes')
     .populate('createdBy', 'name email');
 
-  if (!invoice) {
+  if (!invoiceDoc) {
     return next(new AppError('Invoice not found', 404));
   }
+
+  const invoice = formatInvoiceForResponse(invoiceDoc);
 
   res.status(200).json({
     success: true,
@@ -64,11 +83,13 @@ export const getInvoiceById = asyncHandler(async (req, res, next) => {
  * @access  Private
  */
 export const getInvoiceByLeadId = asyncHandler(async (req, res, next) => {
-  const invoices = await Invoice.find({ lead: req.params.leadId })
+  const invoiceDocs = await Invoice.find({ lead: req.params.leadId })
     .populate('quotation', 'quotationNumber')
     .populate('createdBy', 'name email')
     .populate('payments')
     .sort({ createdAt: -1 });
+
+  const invoices = invoiceDocs.map((invoice) => formatInvoiceForResponse(invoice));
 
   res.status(200).json({
     success: true,
@@ -104,7 +125,8 @@ export const createInvoice = asyncHandler(async (req, res, next) => {
 
   req.body.createdBy = req.user.id;
 
-  const invoice = await Invoice.create(req.body);
+  const invoiceDoc = await Invoice.create(req.body);
+  const invoice = formatInvoiceForResponse(invoiceDoc);
 
   res.status(201).json({
     success: true,
@@ -119,60 +141,62 @@ export const createInvoice = asyncHandler(async (req, res, next) => {
  * @access  Private (Admin, Staff)
  */
 export const updateInvoice = asyncHandler(async (req, res, next) => {
-  const invoice = await Invoice.findById(req.params.id);
+  const invoiceDoc = await Invoice.findById(req.params.id);
 
-  if (!invoice) {
+  if (!invoiceDoc) {
     return next(new AppError('Invoice not found', 404));
   }
 
   // Allow updating paid invoices (forms are always-editable)
   // Only prevent updating cancelled invoices
-  if (invoice.status === 'cancelled') {
+  if (invoiceDoc.status === 'cancelled') {
     return next(new AppError('Cannot update cancelled invoice', 400));
   }
 
   // Preserve payment information if invoice was already paid
-  const existingPaidAmount = invoice.paidAmount || 0;
-  const existingPayments = invoice.payments || [];
-  const existingPaymentStatus = invoice.paymentStatus;
+  const existingPaidAmount = invoiceDoc.paidAmount || 0;
+  const existingPayments = invoiceDoc.payments || [];
+  const existingPaymentStatus = invoiceDoc.paymentStatus;
 
-  invoice.lastModifiedBy = req.user.id;
+  invoiceDoc.lastModifiedBy = req.user.id;
 
   // Update fields
   Object.keys(req.body).forEach((key) => {
     if (req.body[key] !== undefined && key !== 'invoiceNumber' && key !== 'lead') {
-      invoice[key] = req.body[key];
+      invoiceDoc[key] = req.body[key];
     }
   });
 
   // Recalculate outstanding amount based on new total, preserving existing payments
-  invoice.outstandingAmount = invoice.totalAmount - existingPaidAmount;
+  invoiceDoc.outstandingAmount = invoiceDoc.totalAmount - existingPaidAmount;
 
   // Update payment status based on existing payments
   if (existingPaidAmount === 0) {
-    invoice.paymentStatus = 'unpaid';
-  } else if (existingPaidAmount >= invoice.totalAmount) {
-    invoice.paymentStatus = 'paid';
-    if (!invoice.paidDate) invoice.paidDate = new Date();
+    invoiceDoc.paymentStatus = 'unpaid';
+  } else if (existingPaidAmount >= invoiceDoc.totalAmount) {
+    invoiceDoc.paymentStatus = 'paid';
+    if (!invoiceDoc.paidDate) invoiceDoc.paidDate = new Date();
   } else {
-    invoice.paymentStatus = 'partial';
+    invoiceDoc.paymentStatus = 'partial';
   }
 
   // Update status based on payment
-  if (invoice.paymentStatus === 'paid' && invoice.status !== 'cancelled') {
-    invoice.status = 'paid';
-  } else if (invoice.paymentStatus === 'partial' && invoice.status === 'sent') {
-    invoice.status = 'partial';
+  if (invoiceDoc.paymentStatus === 'paid' && invoiceDoc.status !== 'cancelled') {
+    invoiceDoc.status = 'paid';
+  } else if (invoiceDoc.paymentStatus === 'partial' && invoiceDoc.status === 'sent') {
+    invoiceDoc.status = 'partial';
   }
 
   // Preserve existing payments
-  invoice.payments = existingPayments;
+  invoiceDoc.payments = existingPayments;
 
-  await invoice.save();
+  await invoiceDoc.save();
 
-  await invoice.populate('lead', 'name email phone');
-  await invoice.populate('quotation', 'quotationNumber totalAmount');
-  await invoice.populate('customer');
+  await invoiceDoc.populate('lead', 'name email phone');
+  await invoiceDoc.populate('quotation', 'quotationNumber totalAmount');
+  await invoiceDoc.populate('customer');
+
+  const invoice = formatInvoiceForResponse(invoiceDoc);
 
   res.status(200).json({
     success: true,
@@ -187,26 +211,28 @@ export const updateInvoice = asyncHandler(async (req, res, next) => {
  * @access  Private (Admin)
  */
 export const cancelInvoice = asyncHandler(async (req, res, next) => {
-  const invoice = await Invoice.findById(req.params.id);
+  const invoiceDoc = await Invoice.findById(req.params.id);
 
-  if (!invoice) {
+  if (!invoiceDoc) {
     return next(new AppError('Invoice not found', 404));
   }
 
-  if (invoice.status === 'paid') {
+  if (invoiceDoc.status === 'paid') {
     return next(new AppError('Cannot cancel paid invoice. Create a credit note instead.', 400));
   }
 
-  if (invoice.status === 'cancelled') {
+  if (invoiceDoc.status === 'cancelled') {
     return next(new AppError('Invoice is already cancelled', 400));
   }
 
-  invoice.status = 'cancelled';
-  invoice.cancelledAt = new Date();
-  invoice.cancellationReason = req.body.reason;
-  invoice.cancelledBy = req.user.id;
+  invoiceDoc.status = 'cancelled';
+  invoiceDoc.cancelledAt = new Date();
+  invoiceDoc.cancellationReason = req.body.reason;
+  invoiceDoc.cancelledBy = req.user.id;
 
-  await invoice.save();
+  await invoiceDoc.save();
+
+  const invoice = formatInvoiceForResponse(invoiceDoc);
 
   res.status(200).json({
     success: true,
@@ -221,27 +247,51 @@ export const cancelInvoice = asyncHandler(async (req, res, next) => {
  * @access  Private (Admin, Staff)
  */
 export const sendInvoice = asyncHandler(async (req, res, next) => {
-  const invoice = await Invoice.findById(req.params.id);
+  const invoiceDoc = await Invoice.findById(req.params.id)
+    .populate('lead', 'name email phone')
+    .populate('quotation');
 
-  if (!invoice) {
+  if (!invoiceDoc) {
     return next(new AppError('Invoice not found', 404));
   }
 
-  if (invoice.status === 'cancelled') {
+  if (invoiceDoc.status === 'cancelled') {
     return next(new AppError('Cannot send cancelled invoice', 400));
   }
 
-  invoice.status = 'sent';
-  invoice.sentAt = new Date();
-  await invoice.save();
+  const invoice = formatInvoiceForResponse(invoiceDoc);
 
-  // TODO: Send email with invoice
-  // await emailService.sendInvoice(invoice);
+  const recipientEmail = (req.body?.email || invoice.customer?.email || invoice.lead?.email || '').trim();
+
+  if (!recipientEmail) {
+    return next(new AppError('No recipient email found for this invoice', 400));
+  }
+
+  try {
+    const { generateInvoicePDF } = await import('../utils/billingPDFGenerator.js');
+    const pdfPath = await generateInvoicePDF(invoiceDoc, invoiceDoc.lead);
+
+    await emailService.sendInvoiceEmail({
+      invoice,
+      recipientEmail,
+      pdfPath,
+    });
+
+    await fs.promises.unlink(pdfPath).catch(() => {});
+  } catch (error) {
+    return next(new AppError(`Error sending invoice email: ${error.message}`, 500));
+  }
+
+  invoiceDoc.status = 'sent';
+  invoiceDoc.sentAt = new Date();
+  await invoiceDoc.save();
+
+  const updatedInvoice = formatInvoiceForResponse(invoiceDoc);
 
   res.status(200).json({
     success: true,
     message: 'Invoice sent successfully',
-    data: invoice,
+    data: updatedInvoice,
   });
 });
 
@@ -251,17 +301,19 @@ export const sendInvoice = asyncHandler(async (req, res, next) => {
  * @access  Public
  */
 export const markInvoiceViewed = asyncHandler(async (req, res, next) => {
-  const invoice = await Invoice.findById(req.params.id);
+  const invoiceDoc = await Invoice.findById(req.params.id);
 
-  if (!invoice) {
+  if (!invoiceDoc) {
     return next(new AppError('Invoice not found', 404));
   }
 
-  if (invoice.status === 'sent') {
-    invoice.status = 'viewed';
-    invoice.viewedAt = new Date();
-    await invoice.save();
+  if (invoiceDoc.status === 'sent') {
+    invoiceDoc.status = 'viewed';
+    invoiceDoc.viewedAt = new Date();
+    await invoiceDoc.save();
   }
+
+  const invoice = formatInvoiceForResponse(invoiceDoc);
 
   res.status(200).json({
     success: true,
@@ -276,23 +328,25 @@ export const markInvoiceViewed = asyncHandler(async (req, res, next) => {
  * @access  Private (Admin, Staff)
  */
 export const sendPaymentReminder = asyncHandler(async (req, res, next) => {
-  const invoice = await Invoice.findById(req.params.id);
+  const invoiceDoc = await Invoice.findById(req.params.id);
 
-  if (!invoice) {
+  if (!invoiceDoc) {
     return next(new AppError('Invoice not found', 404));
   }
 
-  if (invoice.status === 'paid') {
+  if (invoiceDoc.status === 'paid') {
     return next(new AppError('Invoice is already paid', 400));
   }
 
-  if (invoice.status === 'cancelled') {
+  if (invoiceDoc.status === 'cancelled') {
     return next(new AppError('Cannot send reminder for cancelled invoice', 400));
   }
 
-  invoice.remindersSent += 1;
-  invoice.lastReminderSent = new Date();
-  await invoice.save();
+  invoiceDoc.remindersSent += 1;
+  invoiceDoc.lastReminderSent = new Date();
+  await invoiceDoc.save();
+
+  const invoice = formatInvoiceForResponse(invoiceDoc);
 
   // TODO: Send reminder email
   // await emailService.sendPaymentReminder(invoice);

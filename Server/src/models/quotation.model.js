@@ -34,40 +34,48 @@ const quotationSchema = new mongoose.Schema(
       enum: ['standard', 'custom', 'package-based'],
       default: 'standard',
     },
+    mode: {
+      type: String,
+      enum: ['summary', 'detailed'],
+      default: 'summary',
+    },
     package: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Package',
     },
-    items: [
-      {
-        description: {
-          type: String,
-          required: true,
+    items: {
+      type: [
+        {
+          description: {
+            type: String,
+            required: true,
+          },
+          category: {
+            type: String,
+            enum: ['accommodation', 'transportation', 'activity', 'food', 'guide', 'insurance', 'visa', 'package', 'other'],
+            default: 'other',
+          },
+          quantity: {
+            type: Number,
+            required: true,
+            min: 1,
+            default: 1,
+          },
+          unitPrice: {
+            type: Number,
+            required: true,
+            min: 0,
+          },
+          totalPrice: {
+            type: Number,
+            required: true,
+            min: 0,
+          },
+          notes: String,
         },
-        category: {
-          type: String,
-          enum: ['accommodation', 'transportation', 'activity', 'food', 'guide', 'insurance', 'visa', 'package', 'other'],
-          default: 'other',
-        },
-        quantity: {
-          type: Number,
-          required: true,
-          min: 1,
-          default: 1,
-        },
-        unitPrice: {
-          type: Number,
-          required: true,
-          min: 0,
-        },
-        totalPrice: {
-          type: Number,
-          required: true,
-          min: 0,
-        },
-        notes: String,
-      },
-    ],
+      ],
+      default: [],
+    },
     subtotal: {
       type: Number,
       required: true,
@@ -120,6 +128,10 @@ const quotationSchema = new mongoose.Schema(
       default: 'draft',
       index: true,
     },
+    issueDate: {
+      type: Date,
+      default: Date.now,
+    },
     validUntil: {
       type: Date,
       required: true,
@@ -135,6 +147,10 @@ const quotationSchema = new mongoose.Schema(
     },
     pdfUrl: String,
     sentAt: Date,
+    emailSent: {
+      type: Boolean,
+      default: false,
+    },
     viewedAt: Date,
     acceptedAt: Date,
     rejectedAt: Date,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Send, Calculator, Eye, FileText, ToggleLeft, ToggleRight } from 'lucide-react';
+import { X, Plus, Trash2, Save, Calculator, Eye, ToggleLeft, ToggleRight, Download, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
@@ -18,11 +18,15 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [detectedPackage, setDetectedPackage] = useState(null);
   const [detectedPackageType, setDetectedPackageType] = useState(null); // 'package', 'customized', 'manual'
   const [loadingItinerary, setLoadingItinerary] = useState(false);
+  const [hasInitializedNew, setHasInitializedNew] = useState(false);
+  const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
+  const [sendingEmail, setSendingEmail] = useState(false);
   
-  const [formData, setFormData] = useState({
-    lead: lead?._id || lead?.id,
-    package: '',
+  const buildDefaultFormData = (leadData) => ({
+    lead: leadData?._id || leadData?.id || '',
+    package: leadData?.package?._id || leadData?.package || '',
     type: 'standard',
+    mode: 'summary',
     items: [
       {
         description: '',
@@ -45,29 +49,67 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     excludedServices: [],
   });
 
-  useEffect(() => {
-    if (isOpen && lead) {
-      // Auto-detect package type from lead
-      detectPackageType();
-      
-      // Reset form with lead data
-      const leadPackageId = lead.package?._id || lead.package || '';
-      setFormData(prev => ({
-        ...prev,
-        lead: lead._id || lead.id,
-        package: leadPackageId,
-      }));
-      
-      // Fetch packages
-      fetchPackages();
-      // Fetch existing quotations for this lead
-      fetchExistingQuotations();
-      
-      // For manual itineraries, load simplified day items even in non-detailed mode
-      if (lead.manualItinerary?._id || lead.manualItinerary) {
-        loadManualItinerarySimple();
-      }
+  const [formData, setFormData] = useState(buildDefaultFormData(lead));
+  const [selectedQuotationId, setSelectedQuotationId] = useState(null);
+
+  const formatCurrency = (amount) => {
+    if (amount === null || amount === undefined) {
+      return '0.00';
     }
+    const value = Number(amount) || 0;
+    return value.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const formatDateLabel = (dateValue) => {
+    if (!dateValue) return 'N/A';
+    try {
+      return new Date(dateValue).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch (error) {
+      return 'N/A';
+    }
+  };
+
+  const getModeLabel = (mode) => (mode === 'detailed' ? 'Detailed' : 'Non Detailed');
+
+  const handleDownloadExistingQuotation = async (quotationId) => {
+    if (!quotationId || quotationId === 'new') {
+      return;
+    }
+    try {
+      await quotationAPI.downloadPDF(quotationId);
+      toast.success('Quotation PDF downloaded');
+    } catch (error) {
+      console.error('Error downloading quotation PDF:', error);
+      toast.error('Failed to download quotation PDF');
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen || !lead) {
+      return;
+    }
+
+    setExistingQuotations([]);
+    setCurrentQuotation(null);
+    setCurrentQuotationId(null);
+    setIsEditing(false);
+    setIsDetailedMode(false);
+    setDetectedPackage(null);
+    setDetectedPackageType(null);
+    setFormData(buildDefaultFormData(lead));
+    setSelectedQuotationId(null);
+    setHasInitializedNew(false);
+
+    fetchPackages();
+    detectPackageType();
+    fetchExistingQuotations(true);
   }, [isOpen, lead]);
 
   // Load manual itinerary with simplified day descriptions (for non-detailed mode)
@@ -99,6 +141,108 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       }
     } catch (error) {
       console.error('Error loading manual itinerary:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen || !lead) {
+      return;
+    }
+
+    if (selectedQuotationId === null) {
+      return;
+    }
+
+    if (selectedQuotationId === 'new') {
+      if (!hasInitializedNew) {
+        resetToNewQuotation();
+        setHasInitializedNew(true);
+      }
+      return;
+    }
+
+    setHasInitializedNew(false);
+
+    const selectedQuote = existingQuotations.find(
+      (quotation) => (quotation._id || quotation.id) === selectedQuotationId,
+    );
+
+    if (!selectedQuote) {
+      setSelectedQuotationId('new');
+      return;
+    }
+
+    setCurrentQuotation(selectedQuote);
+    setCurrentQuotationId(selectedQuote._id || selectedQuote.id);
+    setIsEditing(true);
+    setIsDetailedMode((selectedQuote.mode || 'summary') === 'detailed');
+
+    setFormData({
+      lead: lead._id || lead.id,
+      package: selectedQuote.package?._id || selectedQuote.package || '',
+      type: selectedQuote.type || 'standard',
+      mode: selectedQuote.mode || 'summary',
+      items: selectedQuote.items?.length > 0
+        ? selectedQuote.items.map((item) => ({
+            description: item.description || '',
+            category: item.category || 'other',
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0,
+            totalPrice: item.totalPrice || 0,
+            notes: item.notes || '',
+          }))
+        : buildDefaultFormData(lead).items,
+      taxRate: selectedQuote.taxRate || 0,
+      discountType: selectedQuote.discountType || 'none',
+      discountValue: selectedQuote.discountValue || 0,
+      serviceChargeRate: selectedQuote.serviceChargeRate || 0,
+      validUntil: selectedQuote.validUntil
+        ? new Date(selectedQuote.validUntil).toISOString().split('T')[0]
+        : buildDefaultFormData(lead).validUntil,
+      notes: selectedQuote.notes || '',
+      terms: selectedQuote.terms || '',
+      paymentTerms: selectedQuote.paymentTerms || '',
+      includedServices: selectedQuote.includedServices || [],
+      excludedServices: selectedQuote.excludedServices || [],
+    });
+
+    setSendEmailAddress(
+      selectedQuote.customer?.email ||
+        selectedQuote.lead?.email ||
+        lead?.email ||
+        '',
+    );
+
+    if (selectedQuote.package) {
+      const packageId = selectedQuote.package._id || selectedQuote.package;
+      const hasPackageItem = selectedQuote.items?.some(
+        (item) =>
+          item.category === 'package' ||
+          item.description?.toLowerCase().includes('package'),
+      );
+
+      if (!hasPackageItem) {
+        setTimeout(() => loadPackageData(packageId), 100);
+      }
+    }
+  }, [selectedQuotationId, existingQuotations, isOpen, lead, currentQuotation, isEditing]);
+
+  const resetToNewQuotation = () => {
+    if (!lead) return;
+
+    setFormData(buildDefaultFormData(lead));
+    setCurrentQuotation(null);
+    setCurrentQuotationId(null);
+    setIsEditing(false);
+    setIsDetailedMode(false);
+    setDetectedPackage(null);
+    setDetectedPackageType(null);
+    setSendEmailAddress(lead?.email || lead?.customer?.email || '');
+
+    detectPackageType();
+
+    if (lead.manualItinerary?._id || lead.manualItinerary) {
+      loadManualItinerarySimple();
     }
   };
 
@@ -201,7 +345,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
-  const fetchExistingQuotations = async () => {
+  const fetchExistingQuotations = async (initialize = false, targetQuotationId = null) => {
     if (!lead?._id && !lead?.id) return;
     try {
       setLoadingExisting(true);
@@ -210,70 +354,79 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         const quotesData = response.data?.quotations || response.data?.data || response.data || [];
         const quotesArray = Array.isArray(quotesData) ? quotesData : [];
         setExistingQuotations(quotesArray);
-        
-        // Load the most recent quotation into form for editing
-        if (quotesArray.length > 0) {
-          const latestQuote = quotesArray[0]; // Most recent first
-          setCurrentQuotation(latestQuote);
-          setIsEditing(true);
-          
-          // Populate form with existing quotation data
-          setFormData({
-            lead: lead._id || lead.id,
-            package: latestQuote.package?._id || latestQuote.package || '',
-            type: latestQuote.type || 'standard',
-            items: latestQuote.items?.length > 0 ? latestQuote.items.map(item => ({
-              description: item.description || '',
-              category: item.category || 'other',
-              quantity: item.quantity || 1,
-              unitPrice: item.unitPrice || 0,
-              totalPrice: item.totalPrice || 0,
-              notes: item.notes || '',
-            })) : [{
-              description: '',
-              category: 'other',
-              quantity: 1,
-              unitPrice: 0,
-              totalPrice: 0,
-              notes: '',
-            }],
-            taxRate: latestQuote.taxRate || 0,
-            discountType: latestQuote.discountType || 'none',
-            discountValue: latestQuote.discountValue || 0,
-            serviceChargeRate: latestQuote.serviceChargeRate || 0,
-            validUntil: latestQuote.validUntil ? new Date(latestQuote.validUntil).toISOString().split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            notes: latestQuote.notes || '',
-            terms: latestQuote.terms || '',
-            paymentTerms: latestQuote.paymentTerms || '',
-            includedServices: latestQuote.includedServices || [],
-            excludedServices: latestQuote.excludedServices || [],
-          });
-          
-          setCurrentQuotationId(latestQuote._id || latestQuote.id);
-          
-          // If quotation has a package, ensure package price is in items
-          if (latestQuote.package) {
-            const packageId = latestQuote.package._id || latestQuote.package;
-            // Check if package item already exists in items
-            const hasPackageItem = latestQuote.items?.some(item => 
-              item.category === 'package' || 
-              item.description?.toLowerCase().includes('package')
-            );
-            
-            // If no package item exists, load package data to add it
-            if (!hasPackageItem) {
-              setTimeout(() => loadPackageData(packageId), 100);
-            }
+        setSelectedQuotationId((prev) => {
+          const ids = quotesArray.map((q) => q._id || q.id);
+
+          if (targetQuotationId && ids.includes(targetQuotationId)) {
+            return targetQuotationId;
           }
-        } else {
-          setIsEditing(false);
-          setCurrentQuotation(null);
-        }
+
+          if (initialize) {
+            if (quotesArray.length === 0) {
+              return 'new';
+            }
+
+            if (prev && prev !== 'new' && ids.includes(prev)) {
+              return prev;
+            }
+
+            return ids[0];
+          }
+
+          if (prev === 'new') {
+            return 'new';
+          }
+
+          if (prev && ids.includes(prev)) {
+            return prev;
+          }
+
+          if (!prev) {
+            return quotesArray.length > 0 ? ids[0] : 'new';
+          }
+
+          return quotesArray.length > 0 ? ids[0] : 'new';
+        });
       }
     } catch (error) {
       console.error('Error fetching existing quotations:', error);
+      if (initialize) {
+        setSelectedQuotationId('new');
+      }
+      if (targetQuotationId) {
+        setSelectedQuotationId('new');
+      }
     } finally {
       setLoadingExisting(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    const targetId =
+      (selectedQuotationId && selectedQuotationId !== 'new')
+        ? selectedQuotationId
+        : currentQuotationId;
+
+    if (!targetId) {
+      toast.error('Please save the quotation before sending the email');
+      return;
+    }
+
+    const trimmedEmail = sendEmailAddress.trim();
+    if (!trimmedEmail) {
+      toast.error('Please provide a recipient email address');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      await quotationAPI.send(targetId, { email: trimmedEmail });
+      toast.success('Quotation emailed successfully');
+      await fetchExistingQuotations(false, targetId);
+    } catch (error) {
+      toast.error(error.message || 'Failed to send quotation email');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -457,6 +610,10 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     const newMode = !isDetailedMode;
     setIsDetailedMode(newMode);
+    setFormData((prev) => ({
+      ...prev,
+      mode: newMode ? 'detailed' : 'summary',
+    }));
     
     if (newMode) {
       // Load detailed items when enabling detailed mode
@@ -564,10 +721,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
 
     const totals = calculateTotals();
+    const quotationMode = isDetailedMode ? 'detailed' : 'summary';
     
     // Prepare payload and filter out empty strings
     const payload = {
       ...formData,
+      mode: quotationMode,
       items: itemsToSubmit, // Use filtered items (without package items in detailed mode)
       ...totals,
       validUntil: new Date(formData.validUntil).toISOString(),
@@ -587,38 +746,37 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     try {
       setLoading(true);
-      let response;
-      
-      // Update existing quotation if editing, otherwise create new
-      if (isEditing && currentQuotation) {
-        const quotationId = currentQuotation._id || currentQuotation.id;
-        response = await quotationAPI.update(quotationId, payload);
-        setCurrentQuotationId(quotationId);
-      } else {
-        response = await quotationAPI.create(payload);
-        if (response.success || response.status === 'success') {
-          const quotationId = response.data?._id || response.data?.id;
-          setCurrentQuotationId(quotationId);
-        }
-      }
-      
+      const response = await quotationAPI.create(payload);
+
       if (response.success || response.status === 'success') {
-        toast.success(`Quotation ${isEditing ? 'updated' : 'created'} successfully!`);
-        
-        // Show PDF preview after successful save
-        if (currentQuotationId || (response.data?._id || response.data?.id)) {
-          const idToPreview = currentQuotationId || (response.data?._id || response.data?.id);
-          setCurrentQuotationId(idToPreview);
+        const createdQuotation = response.data?.data || response.data;
+        const newQuotationId = createdQuotation?._id || createdQuotation?.id;
+
+        toast.success('Quotation saved successfully!');
+
+        if (createdQuotation) {
+          setCurrentQuotation(createdQuotation);
+          setCurrentQuotationId(newQuotationId || null);
+        }
+
+        setIsEditing(false);
+        setHasInitializedNew(false);
+
+        await fetchExistingQuotations(false, newQuotationId || null);
+
+        if (newQuotationId) {
+          setSelectedQuotationId(newQuotationId);
+          setCurrentQuotationId(newQuotationId);
           setShowPDFPreview(true);
         } else {
           onSuccess?.();
           onClose();
         }
       } else {
-        toast.error(response.message || `Failed to ${isEditing ? 'update' : 'create'} quotation`);
+        toast.error(response.message || 'Failed to save quotation');
       }
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEditing ? 'update' : 'create'} quotation`);
+      toast.error(error.message || 'Failed to save quotation');
     } finally {
       setLoading(false);
     }
@@ -654,6 +812,76 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
+            {(loadingExisting || existingQuotations.length > 0) && (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Existing Quotations
+                  </label>
+                  <select
+                    value={selectedQuotationId}
+                    onChange={(e) => setSelectedQuotationId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                    disabled={loadingExisting}
+                  >
+                    <option value="new">Create New Quotation</option>
+                    {existingQuotations.map((quotation) => {
+                      const quotationId = quotation._id || quotation.id;
+                      return (
+                        <option key={quotationId} value={quotationId}>
+                          {`${quotation.quotationNumber || quotationId} • ${getModeLabel(quotation.mode)} • INR ${formatCurrency(quotation.totalAmount || 0)} • ${formatDateLabel(quotation.createdAt)}`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {loadingExisting && (
+                    <p className="text-xs text-gray-500 mt-1">Loading quotations...</p>
+                  )}
+                </div>
+                <div className="flex items-end justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadExistingQuotation(selectedQuotationId)}
+                    disabled={selectedQuotationId === 'new'}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    title="Download selected quotation PDF"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download PDF
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Recipient Email
+                </label>
+                <input
+                  type="email"
+                  value={sendEmailAddress}
+                  onChange={(e) => setSendEmailAddress(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  We will send the quotation PDF to this address using the configured mail server.
+                </p>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={handleSendEmail}
+                  disabled={sendingEmail || !sendEmailAddress.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded hover:from-green-700 hover:to-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                  {sendingEmail ? 'Sending…' : 'Send Email'}
+                </button>
+              </div>
+            </div>
+
             {/* Package Detection & Detailed Mode Toggle */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -716,6 +944,10 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 {loadingItinerary && (
                   <p className="text-xs text-gray-500 mt-1">Loading itinerary...</p>
                 )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Current mode: <span className="font-semibold text-gray-700">{getModeLabel(formData.mode)}</span>
+                  {currentQuotation && ' (loaded from selected quotation)'}
+                </p>
               </div>
             </div>
 
@@ -965,12 +1197,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               Cancel
             </button>
             <button
-              onClick={() => handleSubmit('send')}
+              onClick={() => handleSubmit('save')}
               disabled={loading}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              {isEditing ? 'Update Quotation' : 'Save & Send Quotation'}
+              Save Quotation
             </button>
           </div>
         </div>
