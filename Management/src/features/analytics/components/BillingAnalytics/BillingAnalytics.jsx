@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   TimeRangeFilter,
   StatCard,
@@ -9,18 +9,54 @@ import {
 } from "../Common";
 import { DollarSign, Wallet, TrendingUp, AlertCircle } from "lucide-react";
 import {
-  revenueData,
+  getRevenueData,
+  getOutstandingData,
+  getAggregatedStats,
   paymentStatusData,
-  outstandingTrendData,
   invoiceBreakdownData,
 } from "../../utils/billingAnalyticsData";
 
 /**
  * BillingAnalytics Component
- * Displays revenue and billing statistics
+ * Displays revenue and billing statistics with support for multiple time ranges
+ * Includes: daily, weekly, monthly, and annual metrics
  */
 const BillingAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+
+  // Compute data based on selected time range
+  const currentRevenueData = useMemo(() => getRevenueData(timeRange), [timeRange]);
+  const currentOutstandingData = useMemo(() => getOutstandingData(timeRange), [timeRange]);
+  const stats = useMemo(() => getAggregatedStats(timeRange), [timeRange]);
+
+  // Format currency values
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  // Calculate trend percentages
+  const calculateTrend = (current, previous) => {
+    if (!previous) return 0;
+    return (((current - previous) / previous) * 100).toFixed(1);
+  };
+
+  // Get current and previous values for trend calculation
+  const getLastTwoValues = (data, key) => {
+    if (data.length < 2) return { current: 0, previous: 0 };
+    const previous = data[data.length - 2][key] || 0;
+    const current = data[data.length - 1][key] || 0;
+    return { current, previous };
+  };
+
+  const revenueTrend = getLastTwoValues(currentRevenueData, "revenue");
+  const outstandingTrend = getLastTwoValues(currentOutstandingData, "outstanding");
+  const potentialRevenueTrend = getLastTwoValues(currentRevenueData, "potentialRevenue");
+  const pendingLeadsTrend = getLastTwoValues(currentOutstandingData, "pendingLeads");
 
   // Area chart configuration
   const revenueAreas = [
@@ -55,36 +91,36 @@ const BillingAnalytics = () => {
         <StatCard
           icon={DollarSign}
           label="Total Revenue"
-          value="$94,500"
-          trend="+23%"
-          trendDirection="up"
+          value={formatCurrency(stats.totalRevenue)}
+          trend={`${calculateTrend(revenueTrend.current, revenueTrend.previous)}%`}
+          trendDirection={revenueTrend.current >= revenueTrend.previous ? "up" : "down"}
           unit="USD"
           color="green"
         />
         <StatCard
           icon={Wallet}
           label="Outstanding Amount"
-          value="$12,340"
-          trend="-5%"
-          trendDirection="down"
+          value={formatCurrency(stats.totalOutstanding)}
+          trend={`${calculateTrend(outstandingTrend.current, outstandingTrend.previous)}%`}
+          trendDirection={outstandingTrend.current <= outstandingTrend.previous ? "down" : "up"}
           unit="USD"
           color="orange"
         />
         <StatCard
           icon={TrendingUp}
           label="Potential Revenue"
-          value="$45,000"
-          trend="+18%"
-          trendDirection="up"
+          value={formatCurrency(stats.totalPotentialRevenue)}
+          trend={`${calculateTrend(potentialRevenueTrend.current, potentialRevenueTrend.previous)}%`}
+          trendDirection={potentialRevenueTrend.current >= potentialRevenueTrend.previous ? "up" : "down"}
           unit="USD"
           color="purple"
         />
         <StatCard
           icon={AlertCircle}
           label="Pending Invoices"
-          value="24"
-          trend="-3"
-          trendDirection="down"
+          value={stats.pendingInvoices}
+          trend={`${pendingLeadsTrend.current - pendingLeadsTrend.previous}`}
+          trendDirection={pendingLeadsTrend.current <= pendingLeadsTrend.previous ? "down" : "up"}
           color="blue"
         />
       </div>
@@ -92,12 +128,12 @@ const BillingAnalytics = () => {
       {/* Revenue Trend Chart */}
       <ChartContainer
         title="Revenue Trend"
-        description="Monthly revenue comparison with targets"
+        description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} revenue comparison with targets`}
       >
         <AreaChartComponent
-          data={revenueData}
+          data={currentRevenueData}
           areas={revenueAreas}
-          xAxisKey="month"
+          xAxisKey={timeRange === "annual" ? "year" : timeRange === "daily" ? "label" : "month"}
           height={350}
         />
       </ChartContainer>
@@ -119,10 +155,10 @@ const BillingAnalytics = () => {
 
         <ChartContainer
           title="Outstanding Amounts Trend"
-          description="Pending payments and pending leads over time"
+          description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} pending payments and potential revenues`}
         >
           <AreaChartComponent
-            data={outstandingTrendData}
+            data={currentOutstandingData}
             areas={[
               {
                 dataKey: "outstanding",
@@ -130,8 +166,14 @@ const BillingAnalytics = () => {
                 stroke: "#991b1b",
                 name: "Outstanding ($)",
               },
+              {
+                dataKey: "potentialRevenue",
+                fill: "#8b5cf6",
+                stroke: "#6d28d9",
+                name: "Potential Revenue ($)",
+              },
             ]}
-            xAxisKey="month"
+            xAxisKey={timeRange === "annual" ? "year" : timeRange === "daily" ? "label" : "month"}
             height={320}
           />
         </ChartContainer>
