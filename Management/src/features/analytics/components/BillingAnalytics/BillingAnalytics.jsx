@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   TimeRangeFilter,
   StatCard,
@@ -8,13 +8,7 @@ import {
   BarChartComponent,
 } from "../Common";
 import { DollarSign, Wallet, TrendingUp, AlertCircle } from "lucide-react";
-import {
-  getRevenueData,
-  getOutstandingData,
-  getAggregatedStats,
-  paymentStatusData,
-  invoiceBreakdownData,
-} from "../../utils/billingAnalyticsData";
+import { analyticsAPI } from "../../../../services/api";
 
 /**
  * BillingAnalytics Component
@@ -23,40 +17,98 @@ import {
  */
 const BillingAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalOutstanding: 0,
+    totalPotentialRevenue: 0,
+    pendingInvoices: 0,
+  });
+  const [revenueTrendData, setRevenueTrendData] = useState([]);
+  const [outstandingTrendData, setOutstandingTrendData] = useState([]);
+  const [paymentStatusData, setPaymentStatusData] = useState([]);
+  const [invoiceBreakdownData, setInvoiceBreakdownData] = useState([]);
 
-  // Compute data based on selected time range
-  const currentRevenueData = useMemo(() => getRevenueData(timeRange), [timeRange]);
-  const currentOutstandingData = useMemo(() => getOutstandingData(timeRange), [timeRange]);
-  const stats = useMemo(() => getAggregatedStats(timeRange), [timeRange]);
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      }),
+    []
+  );
 
-  // Format currency values
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  const formatCurrency = (value) => currencyFormatter.format(value || 0);
 
-  // Calculate trend percentages
   const calculateTrend = (current, previous) => {
-    if (!previous) return 0;
+    if (!previous || previous === 0) {
+      return current ? "100.0" : "0.0";
+    }
     return (((current - previous) / previous) * 100).toFixed(1);
   };
 
-  // Get current and previous values for trend calculation
   const getLastTwoValues = (data, key) => {
-    if (data.length < 2) return { current: 0, previous: 0 };
-    const previous = data[data.length - 2][key] || 0;
-    const current = data[data.length - 1][key] || 0;
+    if (!data || data.length < 2) {
+      return { current: 0, previous: 0 };
+    }
+    const previous = data[data.length - 2]?.[key] || 0;
+    const current = data[data.length - 1]?.[key] || 0;
     return { current, previous };
   };
 
-  const revenueTrend = getLastTwoValues(currentRevenueData, "revenue");
-  const outstandingTrend = getLastTwoValues(currentOutstandingData, "outstanding");
-  const potentialRevenueTrend = getLastTwoValues(currentRevenueData, "potentialRevenue");
-  const pendingLeadsTrend = getLastTwoValues(currentOutstandingData, "pendingLeads");
+  useEffect(() => {
+    const fetchBillingAnalytics = async () => {
+      setLoading(true);
+      setErrorMessage("");
+      try {
+        const response = await analyticsAPI.getBillingOverview({ timeRange });
+        const payload = response?.data || {};
+        setStats({
+          totalRevenue: payload?.stats?.totalRevenue || 0,
+          totalOutstanding: payload?.stats?.totalOutstanding || 0,
+          totalPotentialRevenue: payload?.stats?.totalPotentialRevenue || 0,
+          pendingInvoices: payload?.stats?.pendingInvoices || 0,
+        });
+        setRevenueTrendData(payload?.revenueTrend || []);
+        setOutstandingTrendData(payload?.outstandingTrend || []);
+        setPaymentStatusData(
+          (payload?.paymentStatusDistribution || []).map((item) => ({
+            ...item,
+            name: item?.name || item?.status || "Unknown",
+            value: item?.totalAmount || 0,
+          }))
+        );
+        setInvoiceBreakdownData(payload?.invoiceCategoryBreakdown || []);
+      } catch (error) {
+        console.error("Failed to load billing analytics", error);
+        setErrorMessage(error.message || "Failed to load billing analytics data.");
+        setStats({
+          totalRevenue: 0,
+          totalOutstanding: 0,
+          totalPotentialRevenue: 0,
+          pendingInvoices: 0,
+        });
+        setRevenueTrendData([]);
+        setOutstandingTrendData([]);
+        setPaymentStatusData([]);
+        setInvoiceBreakdownData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBillingAnalytics();
+  }, [timeRange]);
+
+  const revenueTrend = getLastTwoValues(revenueTrendData, "revenue");
+  const outstandingTrend = getLastTwoValues(outstandingTrendData, "outstanding");
+  const potentialRevenueTrend = getLastTwoValues(revenueTrendData, "target");
+  const pendingInvoicesTrend = outstandingTrendData.length
+    ? outstandingTrendData[outstandingTrendData.length - 1]?.outstanding -
+      (outstandingTrendData[outstandingTrendData.length - 2]?.outstanding || 0)
+    : 0;
 
   // Area chart configuration
   const revenueAreas = [
@@ -94,7 +146,6 @@ const BillingAnalytics = () => {
           value={formatCurrency(stats.totalRevenue)}
           trend={`${calculateTrend(revenueTrend.current, revenueTrend.previous)}%`}
           trendDirection={revenueTrend.current >= revenueTrend.previous ? "up" : "down"}
-          unit="USD"
           color="green"
         />
         <StatCard
@@ -103,7 +154,6 @@ const BillingAnalytics = () => {
           value={formatCurrency(stats.totalOutstanding)}
           trend={`${calculateTrend(outstandingTrend.current, outstandingTrend.previous)}%`}
           trendDirection={outstandingTrend.current <= outstandingTrend.previous ? "down" : "up"}
-          unit="USD"
           color="orange"
         />
         <StatCard
@@ -112,15 +162,14 @@ const BillingAnalytics = () => {
           value={formatCurrency(stats.totalPotentialRevenue)}
           trend={`${calculateTrend(potentialRevenueTrend.current, potentialRevenueTrend.previous)}%`}
           trendDirection={potentialRevenueTrend.current >= potentialRevenueTrend.previous ? "up" : "down"}
-          unit="USD"
           color="purple"
         />
         <StatCard
           icon={AlertCircle}
           label="Pending Invoices"
           value={stats.pendingInvoices}
-          trend={`${pendingLeadsTrend.current - pendingLeadsTrend.previous}`}
-          trendDirection={pendingLeadsTrend.current <= pendingLeadsTrend.previous ? "down" : "up"}
+          trend={`${pendingInvoicesTrend > 0 ? `+${pendingInvoicesTrend}` : pendingInvoicesTrend}`}
+          trendDirection={pendingInvoicesTrend <= 0 ? "down" : "up"}
           color="blue"
         />
       </div>
@@ -130,12 +179,17 @@ const BillingAnalytics = () => {
         title="Revenue Trend"
         description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} revenue comparison with targets`}
       >
-        <AreaChartComponent
-          data={currentRevenueData}
-          areas={revenueAreas}
-          xAxisKey={timeRange === "annual" ? "year" : timeRange === "daily" ? "label" : "month"}
-          height={350}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center h-[350px] text-gray-500">
+            Loading revenue trend...
+          </div>
+        ) : revenueTrendData.length > 0 ? (
+          <AreaChartComponent data={revenueTrendData} areas={revenueAreas} xAxisKey="label" height={350} />
+        ) : (
+          <div className="flex items-center justify-center h-[350px] text-gray-500">
+            {errorMessage || "No revenue data available for the selected range."}
+          </div>
+        )}
       </ChartContainer>
 
       {/* Additional breakdown charts */}
@@ -144,38 +198,66 @@ const BillingAnalytics = () => {
           title="Payment Status Overview"
           description="Paid vs Outstanding invoices"
         >
-          <PieChartComponent
-            data={paymentStatusData}
-            dataKey="value"
-            nameKey="name"
-            height={320}
-            colors={["#10b981", "#f59e0b", "#ef4444"]}
-          />
+          {loading ? (
+            <div className="flex items-center justify-center h-[320px] text-gray-500">
+              Loading payment status data...
+            </div>
+          ) : paymentStatusData.some((item) => item.value > 0) ? (
+            <PieChartComponent
+              data={paymentStatusData}
+              dataKey="value"
+              nameKey="name"
+              height={320}
+              colors={["#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#8b5cf6"]}
+              legendProps={false}
+              pieProps={{
+                innerRadius: 70,
+                outerRadius: 110,
+                cx: "45%",
+                cy: "50%",
+                label: ({ name, value }) => (value > 0 ? `${name}: ${formatCurrency(value)}` : ""),
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[320px] text-gray-500">
+              {errorMessage || "No payment status data available for the selected range."}
+            </div>
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Outstanding Amounts Trend"
           description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} pending payments and potential revenues`}
         >
-          <AreaChartComponent
-            data={currentOutstandingData}
-            areas={[
-              {
-                dataKey: "outstanding",
-                fill: "#ef4444",
-                stroke: "#991b1b",
-                name: "Outstanding ($)",
-              },
-              {
-                dataKey: "potentialRevenue",
-                fill: "#8b5cf6",
-                stroke: "#6d28d9",
-                name: "Potential Revenue ($)",
-              },
-            ]}
-            xAxisKey={timeRange === "annual" ? "year" : timeRange === "daily" ? "label" : "month"}
-            height={320}
-          />
+          {loading ? (
+            <div className="flex items-center justify-center h-[320px] text-gray-500">
+              Loading outstanding data...
+            </div>
+          ) : outstandingTrendData.length > 0 ? (
+            <AreaChartComponent
+              data={outstandingTrendData}
+              areas={[
+                {
+                  dataKey: "outstanding",
+                  fill: "#ef4444",
+                  stroke: "#991b1b",
+                  name: "Outstanding (₹)",
+                },
+                {
+                  dataKey: "potentialRevenue",
+                  fill: "#8b5cf6",
+                  stroke: "#6d28d9",
+                  name: "Potential Revenue (₹)",
+                },
+              ]}
+              xAxisKey="label"
+              height={320}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[320px] text-gray-500">
+              {errorMessage || "No outstanding data available for the selected range."}
+            </div>
+          )}
         </ChartContainer>
       </div>
 
@@ -183,13 +265,26 @@ const BillingAnalytics = () => {
         title="Invoice Breakdown by Category"
         description="Revenue and invoices by service category"
       >
-        <BarChartComponent
-          data={invoiceBreakdownData}
-          bars={invoiceBars}
-          xAxisKey="category"
-          height={300}
-          margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px] text-gray-500">
+            Loading invoice breakdown...
+          </div>
+        ) : invoiceBreakdownData.length > 0 ? (
+          <BarChartComponent
+            data={invoiceBreakdownData}
+            bars={[
+              { dataKey: "revenue", fill: "#3b82f6", name: "Revenue" },
+              { dataKey: "invoices", fill: "#10b981", name: "Invoices" },
+            ]}
+            xAxisKey="name"
+            height={300}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-[300px] text-gray-500">
+            {errorMessage || "No invoice category data available for the selected range."}
+          </div>
+        )}
       </ChartContainer>
     </div>
   );

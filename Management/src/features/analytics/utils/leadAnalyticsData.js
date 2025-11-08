@@ -38,11 +38,11 @@ export const leadByCountryData = [
 ];
 
 export const leadByPriceRangeData = [
-  { range: "$1K-$5K", value: 156 },
-  { range: "$5K-$10K", value: 234 },
-  { range: "$10K-$20K", value: 328 },
-  { range: "$20K-$50K", value: 412 },
-  { range: "$50K+", value: 118 },
+  { range: "₹50K-₹2L", value: 156 },
+  { range: "₹2L-₹5L", value: 234 },
+  { range: "₹5L-₹10L", value: 328 },
+  { range: "₹10L-₹25L", value: 412 },
+  { range: "₹25L+", value: 118 },
 ];
 
 export const leadByDestinationData = [
