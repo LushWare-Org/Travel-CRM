@@ -320,6 +320,18 @@ export const manualItineraryAPI = {
   },
 };
 
+// Analytics API Methods
+export const analyticsAPI = {
+  getLeadOverview: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/leads/overview', params);
+  },
+  getBillingOverview: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/billing/overview', params);
+  },
+};
+
 // Billing/Quotation API Methods
 export const quotationAPI = {
   getAll: async (params = {}) => {

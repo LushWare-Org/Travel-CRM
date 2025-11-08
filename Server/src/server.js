@@ -41,6 +41,7 @@ import paymentRoutes from './routes/payment.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
 
 // Billing Module Routes
 import quotationRoutes from './routes/quotation.routes.js';
@@ -112,6 +113,7 @@ app.use(`/api/${API_VERSION}/payments`, paymentRoutes);
 app.use(`/api/${API_VERSION}/notifications`, notificationRoutes);
 app.use(`/api/${API_VERSION}/dashboard`, dashboardRoutes);
 app.use(`/api/${API_VERSION}/upload`, uploadRoutes);
+app.use(`/api/${API_VERSION}/analytics`, analyticsRoutes);
 
 // Billing Module Routes
 app.use(`/api/${API_VERSION}/billing/quotations`, quotationRoutes);
