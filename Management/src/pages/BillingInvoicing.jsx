@@ -271,6 +271,7 @@ const BillingInvoicing = () => {
                     <tr className="border-b border-gray-200 bg-gray-50">
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Quotation Number</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Customer</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Lead ID</th>
                       <th className="text-right py-3 px-4 font-semibold text-gray-700">Total Amount</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Issue Date</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Valid Until</th>
@@ -293,6 +294,9 @@ const BillingInvoicing = () => {
                               {quotation.customer?.email || quotation.lead?.email || ''}
                             </p>
                           </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700">
+                          {quotation.lead?._id || quotation.lead?.id || quotation.lead || 'N/A'}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <span className="font-bold text-gray-900">{formatCurrency(quotation.totalAmount)}</span>
@@ -364,6 +368,7 @@ const BillingInvoicing = () => {
                     <tr className="border-b border-gray-200 bg-gray-50">
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Invoice Number</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Customer</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Lead ID</th>
                       <th className="text-right py-3 px-4 font-semibold text-gray-700">Total Amount</th>
                       <th className="text-right py-3 px-4 font-semibold text-gray-700">Paid Amount</th>
                       <th className="text-right py-3 px-4 font-semibold text-gray-700">Outstanding</th>
@@ -388,6 +393,9 @@ const BillingInvoicing = () => {
                               {invoice.customer?.email || invoice.lead?.email || ''}
                             </p>
                           </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700">
+                          {invoice.lead?._id || invoice.lead?.id || invoice.lead || 'N/A'}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <span className="font-bold text-gray-900">{formatCurrency(invoice.totalAmount)}</span>
@@ -464,6 +472,7 @@ const BillingInvoicing = () => {
                     <tr className="border-b border-gray-200 bg-gray-50">
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Receipt Number</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Customer</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Lead ID</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Invoice Number</th>
                       <th className="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment Method</th>
@@ -487,6 +496,9 @@ const BillingInvoicing = () => {
                               {receipt.customer?.email || receipt.lead?.email || ''}
                             </p>
                           </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700">
+                          {receipt.lead?._id || receipt.lead?.id || receipt.lead || 'N/A'}
                         </td>
                         <td className="py-3 px-4">
                           <span className="text-gray-700">

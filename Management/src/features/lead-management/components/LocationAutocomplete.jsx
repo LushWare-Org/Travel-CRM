@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, Loader2, X } from 'lucide-react';
 
-const LocationAutocomplete = ({ value, onChange, placeholder = "e.g., Colombo, Sri Lanka" }) => {
+const LocationAutocomplete = ({
+  value,
+  onChange,
+  placeholder = "e.g., Colombo, Sri Lanka",
+  onSelect,
+}) => {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -122,6 +127,9 @@ const LocationAutocomplete = ({ value, onChange, placeholder = "e.g., Colombo, S
     setSuggestions([]);
     setShowSuggestions(false);
     onChange(suggestion.displayName);
+    if (onSelect) {
+      onSelect(suggestion.displayName);
+    }
     setSelectedIndex(-1);
   };
 

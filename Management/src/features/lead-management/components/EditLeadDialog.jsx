@@ -2,19 +2,22 @@ import { useState, useEffect } from 'react';
 import { X, Mail, Phone, Save, Loader2, Edit, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
-import { leadAPI, packageAPI, manualItineraryAPI } from '../../../services/api';
+import { leadAPI, packageAPI, manualItineraryAPI, customizedPackageAPI } from '../../../services/api';
 import { PackageFormModal, NewEditPackageForm } from '../../../features/itinerary/components';
 import { useImageUpload } from '../../../features/itinerary/hooks';
 import { uploadPackageImages } from '../../../services/cloudinaryService';
 import LocationAutocomplete from './LocationAutocomplete';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
-import LocationAutocompleteMulti from './LocationAutocompleteMulti';
+import DestinationSelector from '../../itinerary/components/DestinationSelector';
 import { createDefaultDay } from '../../itinerary/types/index.js';
 
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
+  const [customPackageId, setCustomPackageId] = useState(
+    lead?.customizedPackage?._id || lead?.customizedPackage || null,
+  );
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
   const [editPackageData, setEditPackageData] = useState(null);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
@@ -39,12 +42,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     status: "new",
   });
 
+  const formatCustomizedLabel = (baseName = '', sequence = 1) => {
+    const cleanBase = `${baseName}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+    return sequence > 1 ? `${cleanBase} (Customized-${sequence})` : `${cleanBase} (Customized)`;
+  };
+
   // Fetch packages when dialog opens
   useEffect(() => {
     if (isOpen) {
       fetchPackages();
     }
-  }, [isOpen]);
+  }, [isOpen, customPackageId]);
 
   const fetchPackages = async () => {
     try {
@@ -53,7 +61,38 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
-        packagesList = packagesList.filter(pkg => pkg.isActive !== false);
+        packagesList = packagesList.filter((pkg) => pkg.isActive !== false);
+
+        if (customPackageId) {
+          try {
+            const customResponse = await customizedPackageAPI.getById(customPackageId);
+            if (customResponse && (customResponse.success === true || customResponse.status === 'success')) {
+              const customData = customResponse.data?.data || customResponse.data || customResponse;
+              if (customData) {
+                const customId = customData._id || customData.id;
+                const sequence = customData.customizationSequence || 1;
+                const baseName = `${customData.name || ''}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim() || (customData.baseName || customData.name);
+                const formattedName = sequence > 1 ? `${baseName} (Customized-${sequence})` : `${baseName} (Customized)`;
+                const customOption = {
+                  ...customData,
+                  _id: customId,
+                  id: customId,
+                  name: formattedName,
+                  baseName,
+                  customizationSequence: sequence,
+                  isCustomizedPackage: true,
+                };
+                packagesList = [
+                  customOption,
+                  ...packagesList.filter((pkg) => (pkg._id || pkg.id) !== customId),
+                ];
+              }
+            }
+          } catch (customError) {
+            console.error('Error fetching customized package:', customError);
+          }
+        }
+
         setPackages(packagesList);
       } else {
         setPackages([]);
@@ -69,21 +108,45 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   // Initialize form when lead changes
   useEffect(() => {
     if (lead) {
+      const primaryPackageId = lead.package?._id || lead.package || '';
+      const customizedId = lead.customizedPackage?._id || lead.customizedPackage || '';
+      const defaultPackageId = primaryPackageId || customizedId || '';
+      let defaultPackageName =
+        lead.packageName ||
+        lead.package?.name ||
+        lead.customizedPackage?.name ||
+        '';
+
+      if (customizedId) {
+        const sequence =
+          lead.customizedPackage?.customizationSequence ||
+          lead.customizationSequence ||
+          lead.customizedPackage?.sequence ||
+          1;
+        const baseName = lead.customizedPackage?.baseName || defaultPackageName;
+        defaultPackageName = formatCustomizedLabel(baseName, sequence);
+      } else if (primaryPackageId && defaultPackageName.includes('(Customized')) {
+        const baseName = defaultPackageName.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+        defaultPackageName = baseName;
+      }
+
+      setCustomPackageId(customizedId || null);
+
       setFormData({
-        name: lead.name || "",
-        email: lead.email || "",
-        phone: lead.phone || "",
-        city: lead.city || "",
-        whatsapp: lead.whatsapp || "",
-        salesRep: lead.salesRep || lead.adviser || "",
-        assignedTo: lead.assignedTo?._id || lead.assignedTo || "",
-        destination: lead.destination || "",
-        platform: lead.platform || "",
-        travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : "",
-        time: lead.time || "",
-        package: lead.package?._id || lead.package || "",
-        packageName: lead.packageName || lead.package?.name || "",
-        status: lead.status || "new",
+        name: lead.name || '',
+        email: lead.email || '',
+        phone: lead.phone || '',
+        city: lead.city || '',
+        whatsapp: lead.whatsapp || '',
+        salesRep: lead.salesRep || lead.adviser || '',
+        assignedTo: lead.assignedTo?._id || lead.assignedTo || '',
+        destination: lead.destination || '',
+        platform: lead.platform || '',
+        travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
+        time: lead.time || '',
+        package: defaultPackageId,
+        packageName: defaultPackageName,
+        status: lead.status || 'new',
       });
 
       // Load manual itinerary if exists
@@ -175,10 +238,22 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       return;
     }
 
-    // Show confirmation dialog (Phase 6: UI/UX refinement)
-    const result = await Swal.fire({
-      title: 'Customize Package?',
-      html: `
+    const selectedPackageId = formData.package;
+    const isCustomizedSelected =
+      !!customPackageId && selectedPackageId === customPackageId;
+
+    const confirmationHtml = isCustomizedSelected
+      ? `
+        <div class="text-left">
+          <p class="mb-2"><strong>This will update the existing customized package.</strong></p>
+          <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
+            <li>Changes will be applied to the current customized package</li>
+            <li>The lead will keep the same customized package reference</li>
+            <li>You can modify all details including itinerary days</li>
+          </ul>
+        </div>
+      `
+      : `
         <div class="text-left">
           <p class="mb-2"><strong>This will create a new customized package.</strong></p>
           <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
@@ -187,7 +262,12 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             <li>You can modify all details including itinerary days</li>
           </ul>
         </div>
-      `,
+      `;
+
+    // Show confirmation dialog (Phase 6: UI/UX refinement)
+    const result = await Swal.fire({
+      title: 'Customize Package?',
+      html: confirmationHtml,
       icon: 'info',
       showCancelButton: true,
       confirmButtonColor: '#9333ea',
@@ -202,17 +282,18 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     }
 
     try {
-      // Fetch the package data
-      const response = await packageAPI.getById(formData.package);
-      if (response.success && response.data) {
-        const pkg = response.data;
-        
-        // Fetch itinerary if it exists
+      const response = isCustomizedSelected
+        ? await customizedPackageAPI.getById(selectedPackageId)
+        : await packageAPI.getById(selectedPackageId);
+
+      const pkg = response?.data?.data || response?.data || response;
+
+      if (response?.success && pkg) {
         let days = [];
-        if (pkg.itinerary?._id || pkg.itinerary) {
-          // Get itinerary days if available
-          days = pkg.itinerary.days || [];
-        } else if (pkg.days) {
+        
+        if (pkg.itinerary?.days) {
+          days = pkg.itinerary.days;
+        } else if (Array.isArray(pkg.days)) {
           days = pkg.days;
         }
 
@@ -232,15 +313,39 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
         // Prepare package data for editing (remove _id so it creates a new one)
         // Store original package ID for tracking
-        const originalPackageId = pkg._id || pkg.id;
+        const originalPackageId =
+          (pkg.originalPackage && (pkg.originalPackage._id || pkg.originalPackage.id || pkg.originalPackage)) ||
+          pkg.originalPackageId ||
+          pkg.originalPackage?._id ||
+          pkg._id ||
+          pkg.id;
+
+        const sequence =
+          pkg.customizationSequence ||
+          pkg.sequence ||
+          (isCustomizedSelected ? lead.customizedPackage?.customizationSequence : 1) ||
+          1;
+        const baseName =
+          pkg.baseName ||
+          `${pkg.name || ''}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim() ||
+          pkg.name ||
+          'Customized Package';
+
+        const displayName = isCustomizedSelected
+          ? formatCustomizedLabel(baseName, sequence)
+          : `${baseName} (Customized)`;
+
         const editData = {
           ...pkg,
-          _id: undefined, // Remove ID so it creates a new package
+          _id: undefined, // Remove ID so it creates a new package unless we explicitly update
           id: undefined,
-          name: `${pkg.name} (Customized)`, // Add indicator
+          name: displayName,
           days: [...days],
           images: [...formattedImages],
           originalPackageId: originalPackageId, // Store for later use in save
+          existingPackageId: selectedPackageId,
+          baseName,
+          customizationSequence: sequence,
         };
 
         setEditPackageData(editData);
@@ -289,12 +394,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         return;
       }
 
-      // Validate required fields
       const requiredFields = {
         name: 'Package Name',
         category: 'Category',
         destination: 'Destination',
-        description: 'Description'
+        description: 'Description',
       };
 
       const missingFields = Object.entries(requiredFields)
@@ -306,10 +410,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         return;
       }
 
-      // Clean up days data
       const cleanDays = (updatedPackageData.days || [])
-        .filter(day => day.title && day.description)
-        .map(day => {
+        .filter((day) => day.title && day.description)
+        .map((day) => {
           const cleanDay = { ...day };
           if (!cleanDay.transport || cleanDay.transport === '') {
             delete cleanDay.transport;
@@ -318,7 +421,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
               delete cleanDay.accommodation.type;
             }
-            const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
+            const hasValidData = Object.values(cleanDay.accommodation).some((v) => v && v !== '');
             if (!hasValidData) {
               delete cleanDay.accommodation;
             }
@@ -326,58 +429,132 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           return cleanDay;
         });
 
-      // Filter valid images
-      const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
+      const validImages = images.filter((img) => !img.isTemp && img.url && img.public_id);
 
-      // Prepare data for NEW package creation (not updating original)
-      // Phase 5: Add versioning/tracking fields
-      const originalPackageId = updatedPackageData.originalPackageId || formData.package;
-      const newPackageData = {
+      const originalPackageRef =
+        updatedPackageData.originalPackageId ||
+        updatedPackageData.originalPackage?._id ||
+        updatedPackageData.originalPackage ||
+        editPackageData?.originalPackageId ||
+        editPackageData?.originalPackage?._id ||
+        editPackageData?.originalPackage ||
+        formData.package ||
+        customPackageId;
+
+      const baseName =
+        updatedPackageData.baseName ||
+        editPackageData?.baseName ||
+        updatedPackageData.name ||
+        editPackageData?.name ||
+        'Customized Package';
+      const sanitizedBaseName = `${baseName}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+
+      const basePayload = {
         ...updatedPackageData,
-        _id: undefined, // Ensure it's a new package
+        _id: undefined,
         id: undefined,
-        originalPackageId: undefined, // Remove from data before sending
+        existingPackageId: undefined,
+        originalPackageId: undefined,
         price: parseFloat(updatedPackageData.price) || 0,
         duration: parseInt(updatedPackageData.duration, 10) || 1,
         maxGroupSize: parseInt(updatedPackageData.maxGroupSize, 10) || 10,
         days: cleanDays,
         images: validImages,
-        // Phase 5: Add tracking fields
-        customizedForLead: lead._id || lead.id,
-        originalPackage: originalPackageId,
-        customizedBy: undefined, // Will be set by backend from req.user
-        customizationNotes: `Customized from package "${updatedPackageData.name?.replace(' (Customized)', '') || 'Original'}" for lead "${lead.name || lead._id}"`,
+        baseName: sanitizedBaseName,
       };
+      basePayload.name = sanitizedBaseName;
 
-      // Create NEW package (not updating the original)
-      const response = await packageAPI.create(newPackageData);
+      const customizedForLead = lead._id || lead.id;
+      const isUpdatingExistingCustom =
+        !!customPackageId &&
+        (editPackageData?.existingPackageId === customPackageId ||
+          formData.package === customPackageId);
 
-      if (response.success && response.data) {
-        const newPackage = response.data;
-        
-        // Update lead to point to the new customized package
-        await leadAPI.updateLead(lead._id || lead.id, {
-          customizedPackage: newPackage._id || newPackage.id,
-          packageName: newPackage.name,
-          // Keep package field for backward compatibility
-          package: null, // Clear regular package reference
-        });
+      if (isUpdatingExistingCustom) {
+        const updatePayload = {
+          ...basePayload,
+          customizedForLead,
+        };
+        updatePayload.customizationSequence =
+          editPackageData?.customizationSequence || lead.customizedPackage?.customizationSequence || 1;
 
-        // Update local form data
-        setFormData(prev => ({
-          ...prev,
-          package: newPackage._id || newPackage.id,
-          packageName: newPackage.name,
-        }));
+        if (originalPackageRef) {
+          updatePayload.originalPackage = originalPackageRef;
+        }
 
-        setShowEditPackageDialog(false);
-        setEditPackageData(null);
-        setImages([]);
-        
-        Swal.fire('Success', 'Package customized and saved! A new package has been created.', 'success');
-        onSuccess?.(); // Refresh leads
+        if (!updatePayload.customizationNotes) {
+          updatePayload.customizationNotes = `Customized for lead "${lead.name || customizedForLead}"`;
+        }
+
+        const response = await customizedPackageAPI.update(customPackageId, updatePayload);
+
+        if (response?.success && response.data) {
+          const updatedPackage = response.data.data || response.data;
+          const updatedPackageId = updatedPackage._id || updatedPackage.id;
+
+          await leadAPI.updateLead(lead._id || lead.id, {
+            customizedPackage: updatedPackageId,
+            packageName: updatedPackage.name,
+            package: null,
+          });
+
+          setCustomPackageId(updatedPackageId);
+          setFormData((prev) => ({
+            ...prev,
+            package: updatedPackageId,
+            packageName: updatedPackage.name,
+          }));
+
+          setShowEditPackageDialog(false);
+          setEditPackageData(null);
+          setImages([]);
+
+          Swal.fire('Success', 'Customized package updated successfully!', 'success');
+        await fetchPackages();
+        onSuccess?.();
+        } else {
+          Swal.fire('Error', response?.message || 'Failed to update customized package', 'error');
+        }
       } else {
-        Swal.fire('Error', response.message || 'Failed to create customized package', 'error');
+        const creationPayload = {
+          ...basePayload,
+          customizedForLead,
+          originalPackage: originalPackageRef,
+          customizedBy: undefined,
+          customizationNotes:
+            basePayload.customizationNotes ||
+            `Customized from package "${updatedPackageData.name?.replace(' (Customized)', '') || 'Original'}" for lead "${lead.name || customizedForLead}"`,
+        };
+
+        const response = await packageAPI.create(creationPayload);
+
+        if (response.success && response.data) {
+          const newPackage = response.data;
+          const newPackageId = newPackage._id || newPackage.id;
+
+          await leadAPI.updateLead(lead._id || lead.id, {
+            customizedPackage: newPackageId,
+            packageName: newPackage.name,
+            package: null,
+          });
+
+          setCustomPackageId(newPackageId);
+          setFormData((prev) => ({
+            ...prev,
+            package: newPackageId,
+            packageName: newPackage.name,
+          }));
+
+          setShowEditPackageDialog(false);
+          setEditPackageData(null);
+          setImages([]);
+
+          Swal.fire('Success', 'Package customized and saved! A new package has been created.', 'success');
+        await fetchPackages();
+        onSuccess?.();
+        } else {
+          Swal.fire('Error', response.message || 'Failed to create customized package', 'error');
+        }
       }
     } catch (error) {
       console.error('Error saving customized package:', error);
@@ -386,6 +563,29 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   };
 
   if (!isOpen || !lead) return null;
+
+  const isEditingExistingCustomizedPackage =
+    !!customPackageId && formData.package === customPackageId;
+
+  const packageModalSubtitle = isEditingExistingCustomizedPackage ? (
+    <div className="space-y-1 mt-2">
+      <p className="text-sm font-semibold text-purple-700">✏️ UPDATING EXISTING CUSTOMIZED PACKAGE</p>
+      <ul className="text-xs text-gray-600 list-disc list-inside space-y-0.5">
+        <li>The current customized package will be updated in place</li>
+        <li>The lead will keep the same customized package reference</li>
+        <li>You can modify all details including itinerary, price, and inclusions</li>
+      </ul>
+    </div>
+  ) : (
+    <div className="space-y-1 mt-2">
+      <p className="text-sm font-semibold text-purple-700">⚠️ NEW PACKAGE WILL BE CREATED</p>
+      <ul className="text-xs text-gray-600 list-disc list-inside space-y-0.5">
+        <li>The original package will remain unchanged</li>
+        <li>This lead will be linked to the new customized package</li>
+        <li>You can modify all details including itinerary, price, and inclusions</li>
+      </ul>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -491,11 +691,22 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
-                  {packages.map((pkg) => (
-                    <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
-                      {pkg.name || 'Unnamed Package'}
-                    </option>
-                  ))}
+                  {packages.map((pkg) => {
+                    const optionId = pkg._id || pkg.id;
+                    const baseName =
+                      pkg.baseName ||
+                      `${pkg.name || 'Unnamed Package'}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+                    const sequence = pkg.customizationSequence || pkg.sequence || 0;
+                    let label = baseName || 'Unnamed Package';
+                    if (pkg.customizedForLead || pkg.isCustomizedPackage) {
+                      label = sequence > 1 ? `${label} (Customized-${sequence})` : `${label} (Customized)`;
+                    }
+                    return (
+                      <option key={optionId} value={optionId}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
                 {formData.package && (
                   <button
@@ -515,11 +726,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Destination</label>
-              <input
-                type="text"
+              <DestinationSelector
                 value={formData.destination}
-                onChange={(e) => setFormData({...formData, destination: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(event) =>
+                  setFormData({ ...formData, destination: event.target.value })
+                }
               />
             </div>
           </div>
@@ -631,8 +842,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     setItineraryDays(renumberedDays);
                   }}
                   destination={formData.destination}
-                  useLocationAutocomplete={true}
-                  LocationAutocompleteComponent={LocationAutocompleteMulti}
                 />
               </div>
             )}
@@ -681,16 +890,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         <PackageFormModal
           isOpen={showEditPackageDialog}
           title="Customize Package & Itinerary"
-          subtitle={
-            <div className="space-y-1 mt-2">
-              <p className="text-sm font-semibold text-purple-700">⚠️ NEW PACKAGE WILL BE CREATED</p>
-              <ul className="text-xs text-gray-600 list-disc list-inside space-y-0.5">
-                <li>The original package will remain unchanged</li>
-                <li>This lead will be linked to the new customized package</li>
-                <li>You can modify all details including itinerary, price, and inclusions</li>
-              </ul>
-            </div>
-          }
+          subtitle={packageModalSubtitle}
           onClose={() => {
             setShowEditPackageDialog(false);
             setEditPackageData(null);
