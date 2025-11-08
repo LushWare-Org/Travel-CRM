@@ -86,6 +86,61 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     lastLogin: Date,
+    // Vendor-specific fields
+    businessName: {
+      type: String,
+      trim: true,
+    },
+    serviceType: {
+      type: String,
+      enum: ['hotel', 'transport', 'activity', 'restaurant', 'guide', 'other'],
+    },
+    businessRegistrationNumber: {
+      type: String,
+      trim: true,
+      sparse: true,
+      unique: true,
+    },
+    taxIdentificationNumber: {
+      type: String,
+      trim: true,
+    },
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String,
+    },
+    contactPerson: {
+      name: String,
+      phone: String,
+      email: String,
+      designation: String,
+    },
+    bankDetails: {
+      accountName: String,
+      accountNumber: String,
+      bankName: String,
+      branchName: String,
+      ifscCode: String,
+      swiftCode: String,
+    },
+    rating: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 0,
+    },
+    totalBookings: {
+      type: Number,
+      default: 0,
+    },
+    vendorStatus: {
+      type: String,
+      enum: ['pending_verification', 'verified', 'suspended', 'rejected'],
+      default: 'pending_verification',
+    },
   },
   {
     timestamps: true,

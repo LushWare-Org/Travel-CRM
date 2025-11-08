@@ -63,6 +63,7 @@ export const globalErrorHandler = (err, req, res, next) => {
     method: req.method,
     userId: req.user?.id || 'anonymous',
     statusCode,
+    errors: err.errors,
   });
 
   // Handle specific error types
@@ -75,7 +76,23 @@ export const globalErrorHandler = (err, req, res, next) => {
     details = { field };
   }
 
-  // Validation error
+  // Validation error (from AppError with errors array)
+  if (err.errors && Array.isArray(err.errors)) {
+    statusCode = 400;
+    status = 'fail';
+    message = 'Validation failed';
+    details = {
+      validation: err.errors.reduce((acc, error) => {
+        if (!acc[error.field]) {
+          acc[error.field] = [];
+        }
+        acc[error.field].push(error.message);
+        return acc;
+      }, {}),
+    };
+  }
+
+  // Validation error (from mongoose validation)
   if (err.name === 'ValidationError') {
     statusCode = 400;
     status = 'fail';

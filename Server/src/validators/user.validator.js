@@ -23,9 +23,9 @@ export const createUserSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   phone: Joi.string()
-    .pattern(/^[0-9]{10}$/)
+    .pattern(/^[\+]?[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid 10-digit phone number',
+      'string.pattern.base': 'Please provide a valid phone number (7-15 digits, can include + prefix)',
     }),
   password: Joi.string()
     .min(6)
@@ -58,9 +58,9 @@ export const updateUserSchema = Joi.object({
       'string.max': 'Name cannot exceed 50 characters',
     }),
   phone: Joi.string()
-    .pattern(/^[0-9]{10}$/)
+    .pattern(/^[\+]?[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid 10-digit phone number',
+      'string.pattern.base': 'Please provide a valid phone number (7-15 digits, can include + prefix)',
     }),
   email: Joi.string()
     .email()

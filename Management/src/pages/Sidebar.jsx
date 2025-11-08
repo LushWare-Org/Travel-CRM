@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut } from "lucide-react";
+import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut, BarChart3 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 
@@ -13,6 +13,7 @@ const Sidebar = () => {
 
   const navigationItems = [
     { icon: Home, label: "Dashboard", path: "/" },
+    { icon: BarChart3, label: "Analytics", path: "/analytics" },
     { icon: Users, label: "Lead Management", path: "/leads" },
     { icon: MapPin, label: "Itineraries", path: "/itineraries" },
     { icon: DollarSign, label: "Billing", path: "/billing" },

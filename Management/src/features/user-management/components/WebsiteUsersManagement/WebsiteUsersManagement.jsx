@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Edit, Trash, Users, UserCheck, UserX } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Edit, Trash, Users, UserCheck, UserX, AlertCircle } from 'lucide-react';
 import { 
   UserTableHeader, 
   Pagination, 
@@ -9,149 +9,115 @@ import {
   FormGroup 
 } from '../Common';
 import { STATUS_COLORS } from '../../utils/constants';
-import { filterUsers, paginateArray } from '../../utils/helpers';
 import WebsiteUsersTable from './WebsiteUsersTable';
+import useWebsiteUsers from '../../hooks/useWebsiteUsers';
 
 const WebsiteUsersManagement = () => {
-  const [websiteUsers, setWebsiteUsers] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@example.com',
-      phone: '+1-555-1111',
-      status: 'active',
-      createdAt: '2024-01-10',
-      lastLogin: '2024-10-22',
-      bookings: 3,
-      totalSpent: 5400
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      phone: '+1-555-2222',
-      status: 'active',
-      createdAt: '2024-02-15',
-      lastLogin: '2024-10-20',
-      bookings: 1,
-      totalSpent: 1200
-    },
-    {
-      id: 3,
-      name: 'Robert Wilson',
-      email: 'robert@example.com',
-      phone: '+1-555-3333',
-      status: 'inactive',
-      createdAt: '2024-03-20',
-      lastLogin: '2024-08-10',
-      bookings: 0,
-      totalSpent: 0
-    },
-    {
-      id: 4,
-      name: 'Alice Johnson',
-      email: 'alice@example.com',
-      phone: '+1-555-4444',
-      status: 'active',
-      createdAt: '2024-04-05',
-      lastLogin: '2024-10-21',
-      bookings: 5,
-      totalSpent: 12300
-    }
-  ]);
+  const {
+    users,
+    loading,
+    error,
+    pagination,
+    filters,
+    createUser,
+    updateUser,
+    deleteUser,
+    toggleUserStatus,
+    searchUsers,
+    changePage,
+    clearError,
+  } = useWebsiteUsers();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
   const [showNewUserDialog, setShowNewUserDialog] = useState(false);
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
+    password: '',
     status: 'active'
   });
 
-  const ITEMS_PER_PAGE = 10;
+  // Calculate stats from all users
+  const stats = {
+    total: pagination?.totalUsers || 0,
+    active: users.filter(u => u.status === 'active').length,
+    inactive: users.filter(u => u.status === 'inactive').length,
+    totalRevenue: users.reduce((sum, user) => sum + (user.totalSpent || 0), 0),
+    totalBookings: users.reduce((sum, user) => sum + (user.bookings || 0), 0),
+    avgSpent: users.length > 0 ? (users.reduce((sum, user) => sum + (user.totalSpent || 0), 0) / users.length).toFixed(2) : 0
+  };
 
-  const filteredUsers = useMemo(() => {
-    return websiteUsers.filter(user => {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
-        user.name.toLowerCase().includes(searchLower) ||
-        user.email.toLowerCase().includes(searchLower) ||
-        user.phone.includes(searchTerm);
-      
-      const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-      
-      return matchesSearch && matchesStatus;
-    });
-  }, [websiteUsers, searchTerm, filterStatus]);
-
-  const paginatedData = useMemo(() => {
-    return paginateArray(filteredUsers, currentPage, ITEMS_PER_PAGE);
-  }, [filteredUsers, currentPage]);
-
-  const stats = useMemo(() => {
-    const totalRevenue = websiteUsers.reduce((sum, user) => sum + user.totalSpent, 0);
-    const totalBookings = websiteUsers.reduce((sum, user) => sum + user.bookings, 0);
-    const avgSpent = websiteUsers.length > 0 ? (totalRevenue / websiteUsers.length).toFixed(2) : 0;
-
-    return {
-      total: websiteUsers.length,
-      active: websiteUsers.filter(u => u.status === 'active').length,
-      inactive: websiteUsers.filter(u => u.status === 'inactive').length,
-      totalRevenue,
-      totalBookings,
-      avgSpent
-    };
-  }, [websiteUsers]);
+  // Filter users based on status
+  const filteredUsers = filterStatus === 'all'
+    ? users
+    : users.filter(u => u.status === filterStatus);
 
   const resetForm = () => {
     setFormData({
       name: '',
       email: '',
       phone: '',
+      password: '',
       status: 'active'
     });
+    setFormError('');
   };
 
-  const handleAddUser = () => {
-    if (formData.name && formData.email && formData.phone) {
-      const newUser = {
-        id: Math.max(...websiteUsers.map(u => u.id), 0) + 1,
-        ...formData,
-        createdAt: new Date().toISOString().split('T')[0],
-        lastLogin: null,
-        bookings: 0,
-        totalSpent: 0
-      };
-      setWebsiteUsers([...websiteUsers, newUser]);
+  const handleAddUser = async () => {
+    setFormError('');
+    
+    // Validation
+    if (!formData.name || !formData.email || !formData.phone || !formData.password) {
+      setFormError('All fields are required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createUser(formData);
       setShowNewUserDialog(false);
       resetForm();
+      // Clear search and filters after successful user creation
+      setSearchTerm('');
+      setFilterStatus('all');
+    } catch (err) {
+      setFormError(err.message || 'Failed to create user');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleEditUser = () => {
-    if (selectedUser && formData.name && formData.email && formData.phone) {
-      setWebsiteUsers(websiteUsers.map(u => 
-        u.id === selectedUser.id 
-          ? {
-              ...u,
-              name: formData.name,
-              email: formData.email,
-              phone: formData.phone,
-              status: formData.status
-            }
-          : u
-      ));
-      setSelectedUser(null);
+  const handleEditUser = async () => {
+    setFormError('');
+    
+    // Validation
+    if (!formData.name || !formData.email || !formData.phone) {
+      setFormError('Name, email, and phone are required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await updateUser(selectedUser.id, formData);
       setShowEditUserDialog(false);
+      setSelectedUser(null);
       resetForm();
+      // Clear search and filters after successful update
+      setSearchTerm('');
+      setFilterStatus('all');
+    } catch (err) {
+      setFormError(err.message || 'Failed to update user');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -160,19 +126,29 @@ const WebsiteUsersManagement = () => {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
-    setWebsiteUsers(websiteUsers.filter(u => u.id !== userToDelete.id));
-    setShowDeleteConfirm(false);
-    setUserToDelete(null);
-    setSelectedUser(null);
+  const confirmDelete = async () => {
+    setIsSubmitting(true);
+    try {
+      await deleteUser(userToDelete.id);
+      setShowDeleteConfirm(false);
+      setUserToDelete(null);
+      setSelectedUser(null);
+      // Clear search and filters after successful deletion
+      setSearchTerm('');
+      setFilterStatus('all');
+    } catch (err) {
+      setFormError(err.message || 'Failed to delete user');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleToggleStatus = (user) => {
-    setWebsiteUsers(websiteUsers.map(u =>
-      u.id === user.id
-        ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' }
-        : u
-    ));
+  const handleToggleStatus = async (user) => {
+    try {
+      await toggleUserStatus(user.id, user.status);
+    } catch (err) {
+      setFormError(err.message || 'Failed to toggle user status');
+    }
   };
 
   const openEditDialog = (user) => {
@@ -181,13 +157,40 @@ const WebsiteUsersManagement = () => {
       name: user.name,
       email: user.email,
       phone: user.phone,
-      status: user.status
+      status: user.status,
+      password: '' // Don't show password in edit
     });
     setShowEditUserDialog(true);
   };
 
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+    searchUsers(value);
+  };
+
+  const handleFilterStatusChange = (value) => {
+    setFilterStatus(value);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 p-4 rounded-lg flex gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-red-900">Error</h3>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+          </div>
+          <button
+            onClick={clearError}
+            className="text-red-600 hover:text-red-900 font-medium text-sm"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -199,7 +202,8 @@ const WebsiteUsersManagement = () => {
             resetForm();
             setShowNewUserDialog(true);
           }}
-          className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition-colors font-medium flex items-center gap-2"
+          disabled={loading}
+          className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />
           Add User
@@ -232,11 +236,9 @@ const WebsiteUsersManagement = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">User Status</label>
           <select
             value={filterStatus}
-            onChange={(e) => {
-              setFilterStatus(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            onChange={(e) => handleFilterStatusChange(e.target.value)}
+            disabled={loading}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
           >
             <option value="all">All Users</option>
             <option value="active">Active</option>
@@ -248,26 +250,37 @@ const WebsiteUsersManagement = () => {
       {/* Table Section */}
       <UserTableHeader
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={handleSearchChange}
         onFilterClick={() => {}}
         title="Users List"
-        subtitle="Monitor user activity and manage accounts"
+        subtitle={loading ? 'Loading users...' : `Showing ${filteredUsers.length} users`}
+        disabled={loading}
       />
 
-      <WebsiteUsersTable
-        users={paginatedData.data}
-        onEdit={openEditDialog}
-        onDelete={handleDeleteUser}
-        onToggleStatus={handleToggleStatus}
-      />
+      {loading && !users.length ? (
+        <div className="text-center py-12 text-gray-500">
+          <p className="text-lg">Loading users...</p>
+        </div>
+      ) : (
+        <>
+          <WebsiteUsersTable
+            users={filteredUsers}
+            onEdit={openEditDialog}
+            onDelete={handleDeleteUser}
+            onToggleStatus={handleToggleStatus}
+            loading={loading}
+          />
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={paginatedData.pages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={ITEMS_PER_PAGE}
-        totalItems={filteredUsers.length}
-      />
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            onPageChange={changePage}
+            itemsPerPage={pagination.usersPerPage}
+            totalItems={pagination.totalUsers}
+            disabled={loading}
+          />
+        </>
+      )}
 
       {/* Add User Dialog */}
       <UserFormDialog
@@ -281,15 +294,23 @@ const WebsiteUsersManagement = () => {
         subtitle="Register a new platform user"
         submitLabel="Create User"
         submitColor="cyan"
+        isSubmitting={isSubmitting}
       >
         <div className="space-y-4">
+          {formError && (
+            <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+              <p className="text-sm text-red-700">{formError}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
                 placeholder="John Doe"
               />
             </FormGroup>
@@ -298,7 +319,8 @@ const WebsiteUsersManagement = () => {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
                 placeholder="john@example.com"
               />
             </FormGroup>
@@ -310,19 +332,20 @@ const WebsiteUsersManagement = () => {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
                 placeholder="+1-555-0000"
               />
             </FormGroup>
-            <FormGroup label="Initial Status" required>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+            <FormGroup label="Password" required>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                placeholder="Minimum 6 characters"
+              />
             </FormGroup>
           </div>
 
@@ -349,15 +372,23 @@ const WebsiteUsersManagement = () => {
         subtitle="Update user information"
         submitLabel="Update User"
         submitColor="cyan"
+        isSubmitting={isSubmitting}
       >
         <div className="space-y-4">
+          {formError && (
+            <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+              <p className="text-sm text-red-700">{formError}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
               />
             </FormGroup>
             <FormGroup label="Email" required>
@@ -365,7 +396,8 @@ const WebsiteUsersManagement = () => {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
               />
             </FormGroup>
           </div>
@@ -376,14 +408,16 @@ const WebsiteUsersManagement = () => {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
               />
             </FormGroup>
             <FormGroup label="Status" required>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -406,6 +440,7 @@ const WebsiteUsersManagement = () => {
         confirmLabel="Delete"
         cancelLabel="Cancel"
         isDangerous={true}
+        isSubmitting={isSubmitting}
       />
     </div>
   );
