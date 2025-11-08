@@ -492,6 +492,10 @@ export const customizedPackageAPI = {
     const api = new ApiService();
     return api.get(`/itineraries/package/${packageId}`);
   },
+  update: async (id, payload) => {
+    const api = new ApiService();
+    return api.put(`/customized-packages/${id}`, payload);
+  },
 };
 
 export default new ApiService();

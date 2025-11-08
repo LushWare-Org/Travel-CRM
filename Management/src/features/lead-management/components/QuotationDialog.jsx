@@ -301,8 +301,9 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   // Add package item to quotation
   const addPackageItem = (packageName, price, type = 'package') => {
+    const cleanName = `${packageName}`.trim();
     const packageItem = {
-      description: `${packageName} ${type === 'customized' ? '(Customized)' : ''} Package`,
+      description: `${cleanName} Package`,
       category: 'package',
       quantity: 1,
       unitPrice: price,

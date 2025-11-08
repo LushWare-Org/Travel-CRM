@@ -7,6 +7,12 @@ import mongoose from 'mongoose';
  */
 const customizedPackageSchema = new mongoose.Schema(
   {
+    customizationSequence: {
+      type: Number,
+      default: 1,
+      min: [1, 'Customization sequence must be at least 1'],
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Please provide a package name'],

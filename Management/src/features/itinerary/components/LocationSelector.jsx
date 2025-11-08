@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Plus, X, MapPin, Search } from 'lucide-react';
 import { getLocationsForDestination, ALL_LOCATIONS } from '../utils/locations';
+import LocationAutocomplete from '../../lead-management/components/LocationAutocomplete';
 
 const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
   const [showSelector, setShowSelector] = useState(false);
@@ -53,13 +54,6 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddCustomLocation();
-    }
-  };
-
   return (
     <div className="space-y-3">
       {/* Selected Locations */}
@@ -103,20 +97,26 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
               Add Custom Location
             </label>
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={customLocation}
-                onChange={(e) => setCustomLocation(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type custom location name..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-              />
+              <div className="flex-1 min-w-0">
+                <LocationAutocomplete
+                  value={customLocation}
+                  onChange={(value) => setCustomLocation(value)}
+                  onSelect={(value) => {
+                    if (value && !locationsArray.includes(value)) {
+                      onChange([...locationsArray, value]);
+                      setCustomLocation('');
+                    }
+                  }}
+                  placeholder="Type custom location name..."
+                />
+              </div>
               <button
                 type="button"
                 onClick={handleAddCustomLocation}
                 disabled={!customLocation.trim()}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
               >
+                <Plus size={14} />
                 Add
               </button>
             </div>

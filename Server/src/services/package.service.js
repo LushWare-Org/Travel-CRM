@@ -11,6 +11,12 @@ import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import logger from '../config/logger.js';
 
+const formatCustomizedName = (baseName = '', sequence = 1) => {
+  const cleanBase = `${baseName}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+  const suffix = sequence > 1 ? `(Customized-${sequence})` : `(Customized)`;
+  return `${cleanBase} ${suffix}`.trim();
+};
+
 class PackageService {
   /**
    * Create a new package
@@ -53,7 +59,24 @@ class PackageService {
         }
 
         // Create customized package in separate collection
-        const newCustomizedPackage = await CustomizedPackage.create(packagePayload);
+        // Determine sequence number
+        let sequence = 1;
+        if (pkgData.customizedForLead && pkgData.originalPackage) {
+          const existingCount = await CustomizedPackage.countDocuments({
+            customizedForLead: pkgData.customizedForLead,
+            originalPackage: pkgData.originalPackage,
+          });
+          sequence = existingCount + 1;
+        }
+
+        const customizedNameSource = pkgData.name || pkgData.baseName || packagePayload.name;
+        const finalName = formatCustomizedName(customizedNameSource, sequence);
+
+        const newCustomizedPackage = await CustomizedPackage.create({
+          ...packagePayload,
+          name: finalName,
+          customizationSequence: sequence,
+        });
 
         // Create itinerary if days are provided and valid
         if (days && Array.isArray(days) && days.length > 0) {

@@ -1,6 +1,9 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
-import { getCustomizedPackageById } from '../controllers/customizedPackage.controller.js';
+import {
+  getCustomizedPackageById,
+  updateCustomizedPackage,
+} from '../controllers/customizedPackage.controller.js';
 
 const router = express.Router();
 
@@ -8,7 +11,10 @@ const router = express.Router();
 router.use(protect);
 
 // Get customized package by ID
-router.get('/:id', authorize('admin', 'salesRep'), getCustomizedPackageById);
+router
+  .route('/:id')
+  .get(authorize('admin', 'salesRep'), getCustomizedPackageById)
+  .put(authorize('admin', 'salesRep'), updateCustomizedPackage);
 
 export default router;
 
