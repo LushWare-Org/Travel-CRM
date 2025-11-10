@@ -1,11 +1,11 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
+import { getLeadAnalyticsOverview } from '../controllers/leadAnalytics.controller.js';
+import { getBillingAnalyticsOverview } from '../controllers/billingAnalytics.controller.js';
 import {
-  getLeadAnalyticsOverview,
-  getBillingAnalyticsOverview,
   getUserAnalyticsOverview,
   getSalesRepPerformanceAnalytics,
-} from '../controllers/analytics.controller.js';
+} from '../controllers/userAnalytics.controller.js';
 
 const router = express.Router();
 

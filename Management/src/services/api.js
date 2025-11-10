@@ -37,7 +37,7 @@ class ApiService {
       const contentType = response.headers.get('content-type');
       let data;
       
-      if (contentType && contentType.includes('application/json')) {
+      if (contentType && typeof contentType === 'string' && contentType.includes('application/json')) {
         data = await response.json();
       } else {
         // Handle non-JSON responses (like rate limit errors)
