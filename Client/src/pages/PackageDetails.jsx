@@ -473,7 +473,7 @@ export default function PackageDetails() {
                   onClick={() => navigate(`/itinerary/edit/${pkg.id}`)}
                   className="w-full mt-3 border-2 border-yellow-500 text-yellow-700 py-4 rounded-xl font-semibold hover:bg-yellow-50 hover:border-yellow-600 transition-all flex items-center justify-center gap-2"
                 >
-                  Edit Itinerary
+                  Customize Package
                 </button>
               </div>
 
