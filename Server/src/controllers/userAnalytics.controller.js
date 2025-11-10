@@ -170,11 +170,108 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
     ? (((totalNewUsers - previousNewUsers) / previousNewUsers) * 100).toFixed(1)
     : 0;
 
+  // Get comprehensive user type distribution by role
+  const roleBreakdown = await User.aggregate([
+    {
+      $group: {
+        _id: '$role',
+        totalCount: { $sum: 1 },
+        activeCount: {
+          $sum: { $cond: ['$isActive', 1, 0] },
+        },
+        inactiveCount: {
+          $sum: { $cond: ['$isActive', 0, 1] },
+        },
+        emailVerifiedCount: {
+          $sum: { $cond: ['$isEmailVerified', 1, 0] },
+        },
+      },
+    },
+    {
+      $project: {
+        role: '$_id',
+        total: '$totalCount',
+        active: '$activeCount',
+        inactive: '$inactiveCount',
+        emailVerified: '$emailVerifiedCount',
+        _id: 0,
+      },
+    },
+  ]);
+
+  // Build user type distribution with all roles
   const userTypeDistribution = [
-    { name: 'Customers', value: totalActiveUsers },
-    { name: 'Sales Reps', value: totalSalesReps },
-    { name: 'Email Verified', value: totalEmailVerified },
-  ];
+    {
+      name: 'Customers',
+      value: roleBreakdown.find((r) => r.role === 'customer')?.total || 0,
+      role: 'customer',
+      active: roleBreakdown.find((r) => r.role === 'customer')?.active || 0,
+      inactive: roleBreakdown.find((r) => r.role === 'customer')?.inactive || 0,
+      emailVerified: roleBreakdown.find((r) => r.role === 'customer')?.emailVerified || 0,
+    },
+    {
+      name: 'Sales Representatives',
+      value: roleBreakdown.find((r) => r.role === 'salesRep')?.total || 0,
+      role: 'salesRep',
+      active: roleBreakdown.find((r) => r.role === 'salesRep')?.active || 0,
+      inactive: roleBreakdown.find((r) => r.role === 'salesRep')?.inactive || 0,
+      emailVerified: roleBreakdown.find((r) => r.role === 'salesRep')?.emailVerified || 0,
+    },
+    {
+      name: 'Vendors',
+      value: roleBreakdown.find((r) => r.role === 'vendor')?.total || 0,
+      role: 'vendor',
+      active: roleBreakdown.find((r) => r.role === 'vendor')?.active || 0,
+      inactive: roleBreakdown.find((r) => r.role === 'vendor')?.inactive || 0,
+      emailVerified: roleBreakdown.find((r) => r.role === 'vendor')?.emailVerified || 0,
+    },
+    {
+      name: 'Administrators',
+      value: roleBreakdown.find((r) => r.role === 'admin')?.total || 0,
+      role: 'admin',
+      active: roleBreakdown.find((r) => r.role === 'admin')?.active || 0,
+      inactive: roleBreakdown.find((r) => r.role === 'admin')?.inactive || 0,
+      emailVerified: roleBreakdown.find((r) => r.role === 'admin')?.emailVerified || 0,
+    },
+  ].filter((item) => item.value > 0); // Only include roles that have users
+
+  // Get user status distribution (Active vs Inactive)
+  const userStatusDistribution = await User.aggregate([
+    {
+      $group: {
+        _id: '$isActive',
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        status: {
+          $cond: ['$_id', 'Active', 'Inactive'],
+        },
+        value: '$count',
+        _id: 0,
+      },
+    },
+  ]);
+
+  // Get email verification status distribution
+  const emailVerificationDistribution = await User.aggregate([
+    {
+      $group: {
+        _id: '$isEmailVerified',
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        status: {
+          $cond: ['$_id', 'Email Verified', 'Email Not Verified'],
+        },
+        value: '$count',
+        _id: 0,
+      },
+    },
+  ]);
 
   return res.status(200).json({
     success: true,
@@ -195,6 +292,8 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
       roleDistribution,
       topPerformers,
       userTypeDistribution,
+      userStatusDistribution,
+      emailVerificationDistribution,
     },
   });
 });

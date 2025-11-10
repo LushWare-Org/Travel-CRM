@@ -45,6 +45,8 @@ const UserAnalytics = () => {
       revenue: rep.revenue,
     }));
   const userTypeDistributionData = data?.userTypeDistribution || [];
+  const userStatusDistributionData = data?.userStatusDistribution || [];
+  const emailVerificationDistributionData = data?.emailVerificationDistribution || [];
 
   // Get x-axis key based on time range
   const getXAxisKey = () => {
@@ -218,17 +220,50 @@ const UserAnalytics = () => {
           {userTypeDistributionData.length > 0 && (
             <ChartContainer
               title="User Type Distribution"
-              description="Breakdown of website users, registered users, and converted users"
+              description="Breakdown of users by role (Customers, Sales Reps, Vendors, Admins)"
             >
               <PieChartComponent
                 data={userTypeDistributionData}
                 dataKey="value"
                 nameKey="name"
                 height={300}
-                colors={["#3b82f6", "#10b981", "#f59e0b"]}
+                colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]}
               />
             </ChartContainer>
           )}
+
+          {/* Additional Distribution Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {userStatusDistributionData.length > 0 && (
+              <ChartContainer
+                title="User Status Distribution"
+                description="Active vs Inactive users across all roles"
+              >
+                <PieChartComponent
+                  data={userStatusDistributionData}
+                  dataKey="value"
+                  nameKey="status"
+                  height={300}
+                  colors={["#10b981", "#ef4444"]}
+                />
+              </ChartContainer>
+            )}
+
+            {emailVerificationDistributionData.length > 0 && (
+              <ChartContainer
+                title="Email Verification Status"
+                description="Users with verified and unverified email addresses"
+              >
+                <PieChartComponent
+                  data={emailVerificationDistributionData}
+                  dataKey="value"
+                  nameKey="status"
+                  height={300}
+                  colors={["#3b82f6", "#9ca3af"]}
+                />
+              </ChartContainer>
+            )}
+          </div>
 
           {/* Summary Stats Section */}
           <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
