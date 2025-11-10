@@ -112,6 +112,23 @@ const packageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    customizedForLead: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Lead',
+    },
+    originalPackage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Package',
+    },
+    customizedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    customizationNotes: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'Customization notes cannot exceed 500 characters'],
+    },
   },
   {
     timestamps: true,
@@ -120,19 +137,58 @@ const packageSchema = new mongoose.Schema(
   },
 );
 
-// Create slug from name
-packageSchema.pre('save', function createSlug(next) {
+// Create slug from name with uniqueness handling
+packageSchema.pre('save', async function createSlug(next) {
   if (this.isModified('name')) {
-    this.slug = slugify(this.name, { lower: true });
+    let slug = slugify(this.name, { lower: true });
+    
+    // For new documents, check for slug conflicts
+    if (this.isNew) {
+      let existingCount = await this.constructor.countDocuments({ slug });
+      if (existingCount > 0) {
+        // Append timestamp to make slug unique
+        slug = `${slug}-${Date.now()}`;
+      }
+    }
+    
+    this.slug = slug;
   }
   next();
 });
 
-// Virtual for reviews
-packageSchema.virtual('reviews', {
-  ref: 'Review',
-  foreignField: 'package',
-  localField: '_id',
+// Virtual for reviews (commented out until Review model is created)
+// packageSchema.virtual('reviews', {
+//   ref: 'Review',
+//   foreignField: 'package',
+//   localField: '_id',
+// });
+
+// Indexes for better query performance
+packageSchema.index({ slug: 1 }, { unique: true });
+packageSchema.index({ category: 1 });
+packageSchema.index({ destination: 1 });
+packageSchema.index({ isActive: 1 });
+packageSchema.index({ isFeatured: 1 });
+packageSchema.index({ createdBy: 1 });
+packageSchema.index({ price: 1 });
+packageSchema.index({ duration: 1 });
+packageSchema.index({ rating: -1 });
+packageSchema.index({ bookings: -1 });
+packageSchema.index({ createdAt: -1 });
+packageSchema.index({ customizedForLead: 1 });
+packageSchema.index({ originalPackage: 1 });
+
+// Text index for full-text search
+packageSchema.index({
+  name: 'text',
+  description: 'text',
+  destination: 'text',
+  highlights: 'text',
 });
+
+// Compound indexes for common queries
+packageSchema.index({ isActive: 1, category: 1 });
+packageSchema.index({ isActive: 1, isFeatured: 1 });
+packageSchema.index({ isActive: 1, price: 1 });
 
 export default mongoose.model('Package', packageSchema);

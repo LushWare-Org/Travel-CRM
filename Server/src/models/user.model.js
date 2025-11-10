@@ -33,8 +33,28 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['customer', 'staff', 'admin'],
+      enum: ['customer', 'salesRep', 'vendor', 'admin'],
       default: 'customer',
+    },
+    permissions: {
+      type: [String],
+      default: [],
+      validate: {
+        validator(permissionsArray) {
+          const validPermissions = [
+            'manage_users',
+            'manage_sales_reps',
+            'manage_vendors',
+            'manage_admins',
+            'view_reports',
+            'manage_billing',
+            'system_settings',
+            'audit_log',
+          ];
+          return permissionsArray.every((perm) => validPermissions.includes(perm));
+        },
+        message: 'Invalid permission specified',
+      },
     },
     avatar: {
       public_id: String,
@@ -48,11 +68,79 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isTempPassword: {
+      type: Boolean,
+      default: false,
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+    passwordChangedAt: Date,
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
     emailVerificationToken: String,
     emailVerificationExpire: Date,
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     lastLogin: Date,
+    // Vendor-specific fields
+    businessName: {
+      type: String,
+      trim: true,
+    },
+    serviceType: {
+      type: String,
+      enum: ['hotel', 'transport', 'activity', 'restaurant', 'guide', 'other'],
+    },
+    businessRegistrationNumber: {
+      type: String,
+      trim: true,
+      sparse: true,
+      unique: true,
+    },
+    taxIdentificationNumber: {
+      type: String,
+      trim: true,
+    },
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String,
+    },
+    contactPerson: {
+      name: String,
+      phone: String,
+      email: String,
+      designation: String,
+    },
+    bankDetails: {
+      accountName: String,
+      accountNumber: String,
+      bankName: String,
+      branchName: String,
+      ifscCode: String,
+      swiftCode: String,
+    },
+    rating: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 0,
+    },
+    totalBookings: {
+      type: Number,
+      default: 0,
+    },
+    vendorStatus: {
+      type: String,
+      enum: ['pending_verification', 'verified', 'suspended', 'rejected'],
+      default: 'pending_verification',
+    },
   },
   {
     timestamps: true,
@@ -72,6 +160,15 @@ userSchema.pre('save', async function hashPassword(next) {
 // Compare password
 userSchema.methods.matchPassword = async function matchPassword(enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
+};
+
+// Check if password changed after token was issued
+userSchema.methods.changedPasswordAfter = function changedPasswordAfter(JWTTimestamp) {
+  if (this.passwordChangedAt) {
+    const changedTimestamp = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
+    return JWTTimestamp < changedTimestamp;
+  }
+  return false;
 };
 
 // Generate JWT token

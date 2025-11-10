@@ -15,6 +15,11 @@ on:
     paths:
       - 'Server/**'
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 env:
   NODE_VERSION: '18.x'
   NPM_VERSION: '9.x'
@@ -267,25 +272,6 @@ jobs:
             exit 1
           fi
           echo "✅ CI Pipeline PASSED"
-
-      - name: 📬 Create GitHub Check Run
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const conclusion = '${{ needs.lint.result }}' === 'failure' || 
-                             '${{ needs.test.result }}' === 'failure' ||
-                             '${{ needs.build.result }}' === 'failure' ? 'failure' : 'success';
-            
-            github.rest.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'Server CI Pipeline',
-              head_sha: context.sha,
-              status: 'completed',
-              conclusion: conclusion,
-              details_url: context.serverUrl + '/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId
-            });
 
   # Notification Job
   notify:

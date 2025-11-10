@@ -1,8 +1,11 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import User from '../models/user.model.js';
+import Settings from '../models/settings.model.js';
 import Package from '../models/package.model.js';
 import Itinerary from '../models/itinerary.model.js';
+import { seedLeadStatuses } from './seedLeadStatus.js';
+import { seedLeads } from './seedLeads.js';
 
 dotenv.config();
 
@@ -18,11 +21,38 @@ const users = [
     isEmailVerified: true,
   },
   {
-    name: 'Staff Member',
-    email: 'staff@tripskyway.com',
-    password: 'Staff@123456',
-    role: 'staff',
+    name: 'Amal',
+    email: 'amal@tripskyway.com',
+    password: 'Sales@123456',
+    role: 'salesRep',
     phone: '9876543211',
+    isActive: true,
+    isEmailVerified: true,
+  },
+  {
+    name: 'Kamal',
+    email: 'kamal@tripskyway.com',
+    password: 'Sales@123456',
+    role: 'salesRep',
+    phone: '9876543213',
+    isActive: true,
+    isEmailVerified: true,
+  },
+  {
+    name: 'Nimal',
+    email: 'nimal@tripskyway.com',
+    password: 'Sales@123456',
+    role: 'salesRep',
+    phone: '9876543214',
+    isActive: true,
+    isEmailVerified: true,
+  },
+  {
+    name: 'Sunil',
+    email: 'sunil@tripskyway.com',
+    password: 'Sales@123456',
+    role: 'salesRep',
+    phone: '9876543215',
     isActive: true,
     isEmailVerified: true,
   },
@@ -177,6 +207,7 @@ const seedDatabase = async () => {
 
     // Clear existing data
     await User.deleteMany({});
+    await Settings.deleteMany({});
     await Package.deleteMany({});
     await Itinerary.deleteMany({});
     console.log('✓ Cleared existing data');
@@ -195,6 +226,18 @@ const seedDatabase = async () => {
     const createdPackages = await Package.create(packagesWithCreator);
     console.log(`✓ Created ${createdPackages.length} packages`);
 
+    // Initialize Settings (default manual mode)
+    await Settings.create({ assignmentMode: 'manual', autoStrategy: 'round_robin' });
+    console.log('✓ Initialized settings');
+
+    // Seed Lead Status Options
+    console.log('\n--- Seeding Lead Status Options ---');
+    await seedLeadStatuses();
+
+    // Seed Sample Leads
+    console.log('\n--- Seeding Sample Leads ---');
+    await seedLeads();
+
     console.log('\n========================================');
     console.log('  Database Seeded Successfully! ✅');
     console.log('========================================\n');
@@ -203,9 +246,9 @@ const seedDatabase = async () => {
     console.log('Admin Account:');
     console.log('  Email: admin@tripskyway.com');
     console.log('  Password: Admin@123456\n');
-    console.log('Staff Account:');
-    console.log('  Email: staff@tripskyway.com');
-    console.log('  Password: Staff@123456\n');
+    console.log('Sales Rep Account:');
+    console.log('  Email: sales@tripskyway.com');
+    console.log('  Password: Sales@123456\n');
     console.log('Customer Account:');
     console.log('  Email: customer@example.com');
     console.log('  Password: Customer@123\n');
@@ -217,4 +260,42 @@ const seedDatabase = async () => {
   }
 };
 
+/**
+ * Reset Admin Password Utility
+ * Use this to reset admin@tripskyway.com password back to original
+ * Run with: node resetAdminPassword.js
+ */
+export const resetAdminPassword = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✓ Connected to MongoDB');
+
+    const admin = await User.findOne({ email: 'admin@tripskyway.com' });
+    
+    if (!admin) {
+      console.error('❌ Admin user not found');
+      process.exit(1);
+    }
+
+    // Reset password and clear temporary flags
+    admin.password = 'Admin@123456';
+    admin.isTempPassword = false;
+    admin.mustChangePassword = false;
+    admin.passwordChangedAt = Date.now();
+    
+    await admin.save();
+
+    console.log('✅ Admin password reset successfully!');
+    console.log('\n✓ Email: admin@tripskyway.com');
+    console.log('✓ Password: Admin@123456');
+    console.log('\nYou can now log in to the admin panel.\n');
+
+    process.exit(0);
+  } catch (error) {
+    console.error('Error resetting admin password:', error);
+    process.exit(1);
+  }
+};
+
 seedDatabase();
+

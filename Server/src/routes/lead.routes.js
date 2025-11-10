@@ -1,19 +1,63 @@
 import express from 'express';
-// import { protect, authorize } from '../middleware/auth.js';
-// Controllers will be implemented later
+import {
+  createLead,
+  getLeads,
+  getLead,
+  updateLead,
+  deleteLead,
+  addRemark,
+  getLeadRemarks,
+  assignLead,
+  unassignLead,
+  getLeadsByStatus,
+  getMyLeads,
+  getLeadStats,
+  searchLeads,
+  setLeadItinerary,
+  getLeadItinerary,
+  downloadLeadItineraryPDF,
+} from '../controllers/lead.controller.js';
+import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Lead routes
-// router.post('/', createLead);
-// router.get('/', protect, authorize('admin', 'staff'), getLeads);
-// router.get('/:id', protect, authorize('admin', 'staff'), getLead);
-// router.put('/:id', protect, authorize('admin', 'staff'), updateLead);
-// router.patch('/:id/assign', protect, authorize('admin'), assignLead);
+// All routes require authentication
+router.use(protect);
 
-// Placeholder route
-router.get('/', (req, res) => {
-  res.json({ message: 'Lead routes - To be implemented' });
-});
+// Lead routes
+router.route('/').post(authorize('admin', 'salesRep'), createLead).get(authorize('admin', 'salesRep'), getLeads);
+
+router
+  .route('/:id')
+  .get(authorize('admin', 'salesRep'), getLead)
+  .put(authorize('admin', 'salesRep'), updateLead)
+  .delete(authorize('admin'), deleteLead);
+
+// Remarks routes
+router.route('/:id/remarks').post(authorize('admin', 'salesRep'), addRemark).get(authorize('admin', 'salesRep'), getLeadRemarks);
+
+// Assignment routes
+router.route('/:id/assign').patch(authorize('admin'), assignLead);
+router.route('/:id/unassign').patch(authorize('admin'), unassignLead);
+
+// Status routes
+router.route('/status/:status').get(authorize('admin', 'salesRep'), getLeadsByStatus);
+
+// Itinerary routes
+router.route('/:id/itinerary')
+  .get(authorize('admin', 'salesRep'), getLeadItinerary)
+  .put(authorize('admin', 'salesRep'), setLeadItinerary);
+
+router.route('/:id/itinerary/pdf')
+  .get(authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
+
+// My leads (assigned to current user)
+router.route('/my-leads').get(authorize('salesRep'), getMyLeads);
+
+// Stats (admin only)
+router.route('/stats').get(authorize('admin'), getLeadStats);
+
+// Search
+router.route('/search').get(authorize('admin', 'salesRep'), searchLeads);
 
 export default router;
