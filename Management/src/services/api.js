@@ -330,6 +330,14 @@ export const analyticsAPI = {
     const api = new ApiService();
     return api.get('/analytics/billing/overview', params);
   },
+  getUserOverview: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/users/overview', params);
+  },
+  getSalesRepPerformance: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/sales-reps/performance', params);
+  },
 };
 
 // Billing/Quotation API Methods
