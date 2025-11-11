@@ -987,19 +987,19 @@ function buildPDFDocument(pkg, images) {
     let pageNumber = 1;
 
     const palette = {
-      background: [247, 234, 220],
-      secondaryBackground: [255, 248, 239],
-      primaryText: [77, 53, 34],
-      secondaryText: [120, 94, 74],
-      mutedText: [146, 125, 107],
-      accent: [205, 143, 96],
-      accentDark: [167, 110, 73],
-      badgeBg: [205, 143, 96],
+      background: [249, 250, 251],
+      secondaryBackground: [209, 213, 219],
+      primaryText: [31, 41, 55],
+      secondaryText: [75, 85, 99],
+      mutedText: [107, 114, 128],
+      accent: [234, 88, 12],
+      accentDark: [234, 179, 8],
+      badgeBg: [234, 88, 12],
       badgeText: [255, 255, 255],
-      cardBg: [255, 245, 233],
-      cardBorder: [228, 200, 167],
-      pillBg: [237, 223, 207],
-      timeline: [214, 180, 135],
+      cardBg: [245, 245, 245],
+      cardBorder: [156, 163, 175],
+      pillBg: [209, 213, 219],
+      timeline: [0, 0, 0],
     };
 
     const sectionGap = 1; // minimal spacing between stacked sections
@@ -1018,7 +1018,7 @@ function buildPDFDocument(pkg, images) {
 
     const applyPageBackground = () => {
       doc.setFillColor(...palette.background);
-      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      doc.rect(0, 0, pageWidth, pageHeight, 'F')
     };
 
     const addFooter = () => {
@@ -1601,30 +1601,60 @@ function buildPDFDocument(pkg, images) {
     }
 
     // Title overlay
-    const overlayHeight = 32;
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(255, 255, 255);
-    doc.roundedRect(
-      heroX + 26,
-      heroY + heroHeight - overlayHeight - 8,
-      contentWidth - 52,
-      overlayHeight,
-      8,
-      8,
-      'F',
+    const overlayHeight = 34;
+    const overlayWidth = contentWidth - 52;
+    const overlayX = heroX + 0;
+    const overlayY = heroY + heroHeight - overlayHeight + 1;
+
+    // Main card
+    doc.setFillColor(
+      palette.cardBg[0],
+      palette.cardBg[1],
+      palette.cardBg[2],
+      220,
     );
+    doc.setDrawColor(255, 255, 255);
+    doc.roundedRect(overlayX, overlayY, overlayWidth, overlayHeight, 10, 10, 'F');
+
+    // Flatten left corners
+    doc.setFillColor(
+      palette.cardBg[0],
+      palette.cardBg[1],
+      palette.cardBg[2],
+      220,
+    );
+    doc.rect(overlayX, overlayY, 12, overlayHeight, 'F');
+
+    // Accent bar
+    const accentWidth = 4;
+    doc.setFillColor(...palette.accent);
+    doc.rect(overlayX, overlayY, accentWidth, overlayHeight, 'F');
+
+    // Destination text
+    const overlayContentX = overlayX + accentWidth + 12;
+    const overlayContentY = overlayY + 16;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(18);
-    doc.setTextColor(...palette.primaryText);
-    doc.text(destinationTitle.toUpperCase(), pageWidth / 2, heroY + heroHeight - 22, {
-      align: 'center',
-    });
+    doc.setTextColor(255, 255, 255);
+    doc.text(destinationTitle.toUpperCase(), overlayContentX, overlayContentY);
+
+    // Subtitle/tagline
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(...palette.mutedText);
-    doc.text(durationText.toUpperCase(), pageWidth / 2, heroY + heroHeight - 10, {
-      align: 'center',
-    });
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text(
+      pkg.category ? `${pkg.category.toUpperCase()} COLLECTION` : 'CURATED ESCAPE',
+      overlayContentX,
+      overlayY + overlayHeight - 13,
+    );
+
+    // Duration text
+    const durationLabel = durationText.toUpperCase();
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...palette.primaryText);
+    doc.setTextColor(255, 255, 255);
+    doc.text(durationLabel, overlayContentX, overlayY + overlayHeight - 8);
 
     yPos = heroY + heroHeight + 12;
 
@@ -1638,9 +1668,8 @@ function buildPDFDocument(pkg, images) {
     // Investment / quick facts card (rescaled and repositioned)
     const investmentHeight = 60;
     ensureSpace(investmentHeight);
-    doc.setFillColor(...palette.secondaryBackground);
     doc.setDrawColor(...palette.cardBorder);
-    doc.roundedRect(margin, yPos, contentWidth, investmentHeight, 9, 9, 'FD');
+    doc.roundedRect(margin, yPos, contentWidth, investmentHeight, 9, 9, 'S');
 
     const leftColumnX = margin + 14;
     const leftColumnWidth = contentWidth * 0.44;
@@ -1649,7 +1678,7 @@ function buildPDFDocument(pkg, images) {
 
     doc.setFont(undefined, 'bold');
     doc.setFontSize(14);
-    doc.setTextColor(...palette.accentDark);
+    doc.setTextColor(...palette.accent);
     doc.text('Investment Overview', leftColumnX, yPos + 18);
 
     doc.setFont(undefined, 'bold');
@@ -1673,10 +1702,6 @@ function buildPDFDocument(pkg, images) {
       },
     );
 
-    doc.setDrawColor(...palette.cardBorder);
-    doc.setLineWidth(0.35);
-    doc.line(rightColumnX - 12, yPos + 14, rightColumnX - 12, yPos + investmentHeight - 14);
-
     const detailSections = [
       {
         label: 'Group Size',
@@ -1693,10 +1718,10 @@ function buildPDFDocument(pkg, images) {
     ];
 
     let detailY = yPos + 20;
-    detailSections.forEach((section, index) => {
+    detailSections.forEach((section) => {
       doc.setFont(undefined, 'bold');
       doc.setFontSize(11.5);
-      doc.setTextColor(...palette.accentDark);
+      doc.setTextColor(...palette.accent);
       doc.text(section.label.toUpperCase(), rightColumnX, detailY);
 
       doc.setFont(undefined, 'normal');
@@ -1706,12 +1731,6 @@ function buildPDFDocument(pkg, images) {
       doc.text(lines, rightColumnX, detailY + 9);
 
       detailY += lines.length * 5 + 18;
-
-      if (index !== detailSections.length - 1) {
-        doc.setDrawColor(...palette.cardBorder);
-        doc.setLineWidth(0.25);
-        doc.line(rightColumnX, detailY - 6, rightColumnX + rightColumnWidth - 6, detailY - 6);
-      }
     });
 
     yPos += investmentHeight;
