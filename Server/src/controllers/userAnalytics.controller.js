@@ -5,6 +5,8 @@
 
 import User from '../models/user.model.js';
 import Lead from '../models/lead.model.js';
+import Booking from '../models/booking.model.js';
+import Invoice from '../models/invoice.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import {
   clampTimeRange,
@@ -63,11 +65,31 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
     salesRepTrendMap.set(key, item);
   });
 
-  // Build trend data combining users and sales reps
+  // Get booking conversion data (actual purchases)
+  const bookingTrendAggregation = await Booking.aggregate([
+    { $match: { createdAt: { $gte: startDate }, bookingStatus: { $ne: 'cancelled' } } },
+    {
+      $group: {
+        _id: groupId,
+        purchasedCount: { $sum: 1 },
+        totalRevenue: { $sum: '$totalAmount' },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+  ]);
+
+  const bookingTrendMap = new Map();
+  bookingTrendAggregation.forEach((item) => {
+    const key = buildTrendKey(timeRange, item._id);
+    bookingTrendMap.set(key, item);
+  });
+
+  // Build trend data combining users, purchases, and sales reps
   const trendData = buckets.map((bucket) => {
     const key = buildBucketKey(timeRange, bucket);
     const userItem = userTrendMap.get(key);
     const repItem = salesRepTrendMap.get(key);
+    const bookingItem = bookingTrendMap.get(key);
 
     return {
       label: bucket.label,
@@ -75,8 +97,9 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
       week: bucket.label,
       year: bucket.label,
       newUsers: userItem?.newUsers || 0,
-      purchased: 0, // This field requires invoice/booking data which is not directly available
+      purchased: bookingItem?.purchasedCount || 0,
       salesReps: repItem?.salesReps || 0,
+      revenue: bookingItem?.totalRevenue || 0,
     };
   });
 
@@ -91,65 +114,37 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
     isActive: true,
   });
 
-  const totalEmailVerified = await User.countDocuments({
-    role: 'customer',
-    isEmailVerified: true,
+  // Get actual purchase data from bookings (more accurate than email verification)
+  const totalPurchases = await Booking.countDocuments({
+    bookingStatus: { $ne: 'cancelled' },
+    createdAt: { $gte: startDate },
   });
+
+  const totalRevenue = await Booking.aggregate([
+    {
+      $match: {
+        bookingStatus: { $ne: 'cancelled' },
+        createdAt: { $gte: startDate },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$totalAmount' },
+      },
+    },
+  ]);
+
+  const conversionRate = totalNewUsers > 0 
+    ? ((totalPurchases / totalNewUsers) * 100).toFixed(1) 
+    : 0;
 
   const totalSalesReps = await User.countDocuments({
     role: 'salesRep',
     isActive: true,
   });
 
-  // Calculate conversion rate (customers who made purchases - we'll estimate as email verified)
-  const conversionRate = totalActiveUsers > 0 
-    ? ((totalEmailVerified / totalActiveUsers) * 100).toFixed(1) 
-    : 0;
-
-  // Get role distribution
-  const roleDistribution = await User.aggregate([
-    { $match: { isActive: true } },
-    {
-      $group: {
-        _id: '$role',
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-
-  // Get sales rep stats
-  const salesRepStats = await User.aggregate([
-    { $match: { role: 'salesRep', isActive: true } },
-    {
-      $facet: {
-        stats: [
-          {
-            $group: {
-              _id: null,
-              totalSales: { $sum: 1 },
-              avgActiveSalesReps: { $avg: 1 },
-            },
-          },
-        ],
-        topPerformers: [
-          { $sort: { createdAt: -1 } },
-          { $limit: 5 },
-          {
-            $project: {
-              _id: 1,
-              name: 1,
-              email: 1,
-            },
-          },
-        ],
-      },
-    },
-  ]);
-
-  const stats = salesRepStats[0]?.stats[0] || {};
-  const topPerformers = salesRepStats[0]?.topPerformers || [];
-
-  // Calculate trends
+  // Calculate trend for users
   const previousBucketStartDate = new Date(startDate);
   if (timeRange === 'daily') {
     previousBucketStartDate.setDate(previousBucketStartDate.getDate() - 7);
@@ -280,7 +275,8 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
       generatedAt: new Date().toISOString(),
       stats: {
         totalNewUsers,
-        totalPurchased: totalEmailVerified, // Using email verified as proxy for purchased
+        totalPurchased: totalPurchases,
+        totalRevenue: totalRevenue[0]?.total || 0,
         totalActiveUsers,
         totalSalesReps,
         conversionRate,
@@ -289,8 +285,6 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
         purchasedTrend: conversionRate,
       },
       trend: trendData,
-      roleDistribution,
-      topPerformers,
       userTypeDistribution,
       userStatusDistribution,
       emailVerificationDistribution,
@@ -320,29 +314,59 @@ export const getSalesRepPerformanceAnalytics = asyncHandler(async (req, res) => 
     startDate.setFullYear(startDate.getFullYear() - 5);
   }
 
-  // Get sales reps with their lead counts
+  // Get all active sales reps
   const salesReps = await User.find({
     role: 'salesRep',
     isActive: true,
   }).select('_id name email createdAt');
 
-  // Get lead counts for each sales rep
+  // Get comprehensive sales rep performance data
   const salesRepPerformance = await Promise.all(
     salesReps.map(async (rep) => {
+      // Get leads assigned to this sales rep
       const totalLeads = await Lead.countDocuments({
-        salesRep: rep.name, // Using name field as leads use salesRep string field
+        assignedTo: rep._id,
         createdAt: { $gte: startDate },
       });
 
+      // Get converted leads
       const convertedLeads = await Lead.countDocuments({
-        salesRep: rep.name,
+        assignedTo: rep._id,
         status: 'converted',
         createdAt: { $gte: startDate },
       });
 
+      // Get conversion rate
       const conversion = totalLeads > 0 
         ? Math.round((convertedLeads / totalLeads) * 100) 
         : 0;
+
+      // Get revenue from bookings linked to leads assigned to this rep
+      const revenueData = await Booking.aggregate([
+        {
+          $lookup: {
+            from: 'leads',
+            localField: 'user',
+            foreignField: 'assignedTo',
+            as: 'lead',
+          },
+        },
+        {
+          $match: {
+            bookingStatus: { $ne: 'cancelled' },
+            createdAt: { $gte: startDate },
+            'lead.assignedTo': rep._id,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: '$totalAmount' },
+          },
+        },
+      ]);
+
+      const revenue = revenueData[0]?.totalRevenue || 0;
 
       return {
         _id: rep._id,
@@ -351,16 +375,28 @@ export const getSalesRepPerformanceAnalytics = asyncHandler(async (req, res) => 
         sales: totalLeads,
         convertedLeads,
         conversion,
-        revenue: 0, // Revenue calculation would require invoice data
+        revenue,
       };
     })
   );
 
-  // Sort by number of sales
-  const performanceByLeads = [...salesRepPerformance].sort((a, b) => b.sales - a.sales);
+  // Sort by conversion first, then by sales
+  const performanceByLeads = [...salesRepPerformance].sort((a, b) => {
+    if (b.conversion !== a.conversion) {
+      return b.conversion - a.conversion;
+    }
+    return b.sales - a.sales;
+  });
   
   // Get top performers
   const topPerformers = performanceByLeads.slice(0, limit);
+
+  // Calculate overall stats
+  const avgConversion = salesRepPerformance.length > 0
+    ? (salesRepPerformance.reduce((sum, rep) => sum + rep.conversion, 0) / salesRepPerformance.length).toFixed(1)
+    : 0;
+
+  const totalRevenue = salesRepPerformance.reduce((sum, rep) => sum + rep.revenue, 0);
 
   return res.status(200).json({
     success: true,
@@ -368,13 +404,15 @@ export const getSalesRepPerformanceAnalytics = asyncHandler(async (req, res) => 
       timeRange,
       generatedAt: new Date().toISOString(),
       performance: topPerformers,
-      revenueRanking: topPerformers,
+      revenueRanking: [...topPerformers].sort((a, b) => b.revenue - a.revenue),
       stats: {
         totalSalesReps: salesReps.length,
-        avgConversion: (
-          salesRepPerformance.reduce((sum, rep) => sum + rep.conversion, 0) / 
-          (salesRepPerformance.length || 1)
-        ).toFixed(1),
+        activeSalesReps: salesRepPerformance.filter(rep => rep.sales > 0).length,
+        avgConversion,
+        totalLeads: salesRepPerformance.reduce((sum, rep) => sum + rep.sales, 0),
+        totalConvertedLeads: salesRepPerformance.reduce((sum, rep) => sum + rep.convertedLeads, 0),
+        totalRevenue,
+        avgRevenuePerRep: salesReps.length > 0 ? (totalRevenue / salesReps.length).toFixed(2) : 0,
         topPerformer: topPerformers[0]?.name || 'N/A',
         topPerformerRevenue: topPerformers[0]?.revenue || 0,
       },
