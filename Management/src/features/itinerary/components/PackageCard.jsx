@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { STATUS_COLORS, CATEGORY_COLORS } from '../utils/constants';
+import { formatPriceINR } from '../utils/helpers';
 
 const PackageCard = ({
   pkg,
@@ -30,6 +31,8 @@ const PackageCard = ({
   if (!pkg || typeof pkg !== 'object') {
     return null;
   }
+
+  const formattedPrice = formatPriceINR(pkg.price);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
@@ -102,7 +105,7 @@ const PackageCard = ({
             <span className="text-sm font-semibold">{pkg.rating || 0}</span>
             <span className="text-xs text-gray-500">({pkg.reviews || 0})</span>
           </div>
-          <div className="text-lg font-bold text-blue-600">{pkg.price || 'Contact us'}</div>
+          <div className="text-lg font-bold text-blue-600">{formattedPrice || 'Contact us'}</div>
         </div>
 
         {/* Bookings */}

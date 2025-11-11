@@ -5,9 +5,12 @@
 
 import { Star } from 'lucide-react';
 import ItineraryDisplay from './ItineraryDisplay';
+import { formatPriceINR } from '../utils/helpers';
 
 const PackageDetailsModal = ({ pkg, onClose }) => {
   if (!pkg) return null;
+
+  const formattedPrice = formatPriceINR(pkg.price);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -45,9 +48,7 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Price</label>
-              <p className="text-sm font-bold text-blue-600 mt-1">
-                ${typeof pkg.price === 'number' ? pkg.price.toFixed(2) : pkg.price || 'N/A'}
-              </p>
+              <p className="text-sm font-bold text-blue-600 mt-1">{formattedPrice || 'N/A'}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Max Group Size</label>
