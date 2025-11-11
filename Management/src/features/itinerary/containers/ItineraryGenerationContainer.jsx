@@ -19,10 +19,11 @@ import {
   PackageDetailsModal,
   PackageFormModal,
   NewEditPackageForm,
+  PackagePDFPreviewDialog,
 } from '../components';
 
 // Services
-import { generateAndDownloadPDF } from '../services/pdfService';
+import { createPackagePdfBlob } from '../services/pdfService';
 import { uploadPackageImages } from '../../../services/cloudinaryService';
 import ApiService from '../services/apiService';
 
@@ -47,6 +48,13 @@ const ItineraryGenerationContainer = () => {
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
   const [editPackageData, setEditPackageData] = useState(null);
   const [isUploadingImages, setIsUploadingImages] = useState(false); // Track upload state
+  const [pdfPreviewData, setPdfPreviewData] = useState({
+    isOpen: false,
+    blob: null,
+    fileName: '',
+    packageData: null,
+  });
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(
@@ -414,24 +422,35 @@ const ItineraryGenerationContainer = () => {
 
   const handleDownloadPackage = async (pkg) => {
     try {
-      Swal.fire({
-        title: 'Generating PDF',
-        html: 'Please wait while we prepare your itinerary PDF...',
-        allowOutsideClick: false,
-        didOpen: async () => {
-          Swal.showLoading();
-          try {
-            await generateAndDownloadPDF(pkg);
-          } catch (error) {
-            console.error('Error generating PDF:', error);
-            Swal.hideLoading();
-            Swal.fire('Error', 'Failed to generate PDF. Please try again.', 'error');
-          }
-        }
+      setPdfPreviewData({
+        isOpen: true,
+        blob: null,
+        fileName: '',
+        packageData: pkg,
+      });
+      setIsGeneratingPdf(true);
+
+      const { blob, fileName, packageData } = await createPackagePdfBlob(pkg, {
+        fetchLatest: true,
+      });
+
+      setPdfPreviewData({
+        isOpen: true,
+        blob,
+        fileName,
+        packageData,
       });
     } catch (error) {
-      console.error('Error in handleDownloadPackage:', error);
-      Swal.fire('Error', 'Failed to prepare PDF download', 'error');
+      console.error('Error generating package PDF:', error);
+      setPdfPreviewData({
+        isOpen: false,
+        blob: null,
+        fileName: '',
+        packageData: null,
+      });
+      Swal.fire('Error', 'Failed to generate PDF preview. Please try again.', 'error');
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -661,6 +680,22 @@ const ItineraryGenerationContainer = () => {
             />
           )}
         </PackageFormModal>
+
+        <PackagePDFPreviewDialog
+          isOpen={pdfPreviewData.isOpen}
+          onClose={() =>
+            setPdfPreviewData({
+              isOpen: false,
+              blob: null,
+              fileName: '',
+              packageData: null,
+            })
+          }
+          pdfBlob={pdfPreviewData.blob}
+          fileName={pdfPreviewData.fileName}
+          packageData={pdfPreviewData.packageData}
+          isGenerating={!pdfPreviewData.blob && isGeneratingPdf}
+        />
       </div>
     </div>
   );

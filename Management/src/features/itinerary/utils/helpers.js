@@ -112,3 +112,36 @@ export const calculatePackageStats = (packages) => {
       : 0,
   };
 };
+
+/**
+ * Format price value into Indian Rupees currency
+ * @param {number|string} value - Price value to format
+ * @returns {string} - Formatted currency string or empty string
+ */
+export const formatPriceINR = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+
+  let numericValue;
+
+  if (typeof value === 'number') {
+    numericValue = value;
+  } else if (typeof value === 'string') {
+    const cleaned = value.replace(/[^0-9.-]/g, '');
+    numericValue = cleaned ? Number(cleaned) : Number.NaN;
+  }
+
+  if (!Number.isFinite(numericValue)) {
+    return typeof value === 'string' ? value : '';
+  }
+
+  const hasDecimals = !Number.isInteger(numericValue);
+
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0,
+  }).format(numericValue);
+};

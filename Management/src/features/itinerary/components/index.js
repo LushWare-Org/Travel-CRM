@@ -15,6 +15,7 @@ export { default as PackageCard } from './PackageCard';
 // Modal Components
 export { default as PackageDetailsModal } from './PackageDetailsModal';
 export { default as PackageFormModal } from './modal/PackageFormModal';
+export { default as PackagePDFPreviewDialog } from './PackagePDFPreviewDialog';
 
 // Itinerary Components
 export { default as ItineraryDisplay } from './ItineraryDisplay';
