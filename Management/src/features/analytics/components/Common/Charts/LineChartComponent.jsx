@@ -12,6 +12,7 @@ import {
 /**
  * LineChartComponent
  * Reusable line chart for trend analysis
+ * Displays connected lines between data points
  */
 const LineChartComponent = ({
   data,
@@ -41,6 +42,7 @@ const LineChartComponent = ({
             dataKey={line.dataKey}
             stroke={line.stroke}
             strokeWidth={2}
+            connectNulls={true}
             dot={{ fill: line.stroke, r: 4 }}
             activeDot={{ r: 6 }}
             name={line.name}
