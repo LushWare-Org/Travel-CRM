@@ -30,23 +30,205 @@ export const getLeadAnalyticsOverview = asyncHandler(async (req, res) => {
 
   const groupId = buildGroupId(timeRange);
 
-  const trendAggregation = await Lead.aggregate([
-    { $match: { createdAt: { $gte: startDate } } },
-    {
-      $group: {
-        _id: groupId,
-        total: { $sum: 1 },
-        ...TREND_STATUSES.reduce((acc, status) => {
-          acc[status] = {
-            $sum: {
-              $cond: [{ $eq: ['$status', status] }, 1, 0],
-            },
-          };
-          return acc;
-        }, {}),
+  // OPTIMIZATION 1: Get trend data and status counts in parallel
+  const [trendAggregation, statusCounts, detailedAggregation] = await Promise.all([
+    // Query 1: Trend data (fast - no lookups)
+    Lead.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      {
+        $group: {
+          _id: groupId,
+          total: { $sum: 1 },
+          ...TREND_STATUSES.reduce((acc, status) => {
+            acc[status] = {
+              $sum: {
+                $cond: [{ $eq: ['$status', status] }, 1, 0],
+              },
+            };
+            return acc;
+          }, {}),
+        },
       },
-    },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    ]),
+
+    // Query 2: Status counts (fast - no lookups)
+    Lead.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+
+    // Query 3: Detailed analytics with optimized lookups
+    Lead.aggregate([
+      // OPTIMIZATION 2: Only do lookups if fields exist (reduce document processing)
+      {
+        $lookup: {
+          from: 'customizedpackages',
+          localField: 'customizedPackage',
+          foreignField: '_id',
+          as: 'customizedPackage',
+          pipeline: [
+            { $project: { category: 1, price: 1, destination: 1 } },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'packages',
+          localField: 'package',
+          foreignField: '_id',
+          as: 'package',
+          pipeline: [
+            { $project: { category: 1, price: 1, destination: 1 } },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'manualitineraries',
+          localField: '_id',
+          foreignField: 'lead',
+          as: 'manualItinerary',
+          pipeline: [
+            { $project: { days: 1 } },
+            { $limit: 1 }, // Only get the first itinerary
+          ],
+        },
+      },
+      {
+        $addFields: {
+          customizedDoc: { $arrayElemAt: ['$customizedPackage', 0] },
+          packageDoc: { $arrayElemAt: ['$package', 0] },
+          manualDoc: { $arrayElemAt: ['$manualItinerary', 0] },
+        },
+      },
+      {
+        $addFields: {
+          leadCategory: {
+            $ifNull: [
+              '$customizedDoc.category',
+              { $ifNull: ['$packageDoc.category', 'other'] },
+            ],
+          },
+          // OPTIMIZATION 3: Simplified price calculation
+          effectivePrice: {
+            $cond: [
+              { $and: ['$customizedDoc.price', { $gt: ['$customizedDoc.price', 0] }] },
+              '$customizedDoc.price',
+              {
+                $cond: [
+                  { $and: ['$packageDoc.price', { $gt: ['$packageDoc.price', 0] }] },
+                  '$packageDoc.price',
+                  {
+                    $cond: [
+                      { $and: ['$quoteAmount', { $gt: ['$quoteAmount', 0] }] },
+                      '$quoteAmount',
+                      null,
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          // OPTIMIZATION 4: Simplified destination extraction
+          effectiveDestination: {
+            $ifNull: [
+              '$destination',
+              {
+                $ifNull: [
+                  '$customizedDoc.destination',
+                  { $ifNull: ['$packageDoc.destination', ''] },
+                ],
+              },
+            ],
+          },
+          effectiveOrigin: { $ifNull: ['$fromCountry', '$destinationCountry'] },
+          isConverted: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+        },
+      },
+      {
+        $facet: {
+          // Category distribution
+          categoryCounts: [
+            {
+              $group: {
+                _id: '$leadCategory',
+                count: { $sum: 1 },
+              },
+            },
+          ],
+          // Price ranges
+          priceRanges: [
+            {
+              $project: {
+                priceBucket: {
+                  $switch: {
+                    branches: [
+                      { case: { $and: [{ $gte: ['$effectivePrice', 50000] }, { $lt: ['$effectivePrice', 200000] }] }, then: '₹50K-₹2L' },
+                      { case: { $and: [{ $gte: ['$effectivePrice', 200000] }, { $lt: ['$effectivePrice', 500000] }] }, then: '₹2L-₹5L' },
+                      { case: { $and: [{ $gte: ['$effectivePrice', 500000] }, { $lt: ['$effectivePrice', 1000000] }] }, then: '₹5L-₹10L' },
+                      { case: { $and: [{ $gte: ['$effectivePrice', 1000000] }, { $lt: ['$effectivePrice', 2500000] }] }, then: '₹10L-₹25L' },
+                      { case: { $gte: ['$effectivePrice', 2500000] }, then: '₹25L+' },
+                    ],
+                    default: {
+                      $cond: [
+                        { $and: ['$effectivePrice', { $gt: ['$effectivePrice', 0] }] },
+                        'Below ₹50K',
+                        'Unspecified',
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+            {
+              $group: {
+                _id: '$priceBucket',
+                count: { $sum: 1 },
+              },
+            },
+          ],
+          // Top destinations
+          topDestinations: [
+            {
+              $match: {
+                effectiveDestination: { $nin: [null, ''] },
+              },
+            },
+            {
+              $group: {
+                _id: '$effectiveDestination',
+                leads: { $sum: 1 },
+                converted: { $sum: '$isConverted' },
+              },
+            },
+            { $sort: { leads: -1 } },
+            { $limit: 10 },
+          ],
+          // Top countries
+          topCountries: [
+            {
+              $match: {
+                effectiveOrigin: { $nin: [null, ''] },
+              },
+            },
+            {
+              $group: {
+                _id: '$effectiveOrigin',
+                leads: { $sum: 1 },
+                converted: { $sum: '$isConverted' },
+              },
+            },
+            { $sort: { leads: -1 } },
+            { $limit: 10 },
+          ],
+        },
+      },
+    ]),
   ]);
 
   const trendMap = new Map();
@@ -66,15 +248,6 @@ export const getLeadAnalyticsOverview = asyncHandler(async (req, res) => {
     });
     return trendEntry;
   });
-
-  const statusCounts = await Lead.aggregate([
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-      },
-    },
-  ]);
 
   const totalsByStatus = statusCounts.reduce((acc, item) => {
     if (item?._id) {
@@ -99,222 +272,6 @@ export const getLeadAnalyticsOverview = asyncHandler(async (req, res) => {
     value: totalsByStatus[status] || 0,
     status,
   }));
-
-  const detailedAggregation = await Lead.aggregate([
-    {
-      $lookup: {
-        from: 'customizedpackages',
-        localField: 'customizedPackage',
-        foreignField: '_id',
-        as: 'customizedPackage',
-      },
-    },
-    {
-      $lookup: {
-        from: 'packages',
-        localField: 'package',
-        foreignField: '_id',
-        as: 'package',
-      },
-    },
-    {
-      $lookup: {
-        from: 'manualitineraries',
-        localField: '_id',
-        foreignField: 'lead',
-        as: 'manualItinerary',
-      },
-    },
-    {
-      $addFields: {
-        customizedDoc: { $arrayElemAt: ['$customizedPackage', 0] },
-        packageDoc: { $arrayElemAt: ['$package', 0] },
-        manualDoc: { $arrayElemAt: ['$manualItinerary', 0] },
-      },
-    },
-    {
-      $addFields: {
-        leadCategory: {
-          $ifNull: [
-            '$customizedDoc.category',
-            { $ifNull: ['$packageDoc.category', 'other'] },
-          ],
-        },
-        effectivePrice: {
-          $cond: [
-            { $and: ['$customizedDoc.price', { $gt: ['$customizedDoc.price', 0] }] },
-            '$customizedDoc.price',
-            {
-              $cond: [
-                { $and: ['$packageDoc.price', { $gt: ['$packageDoc.price', 0] }] },
-                '$packageDoc.price',
-                {
-                  $cond: [
-                    { $and: ['$quoteAmount', { $gt: ['$quoteAmount', 0] }] },
-                    '$quoteAmount',
-                    null,
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        effectiveDestination: {
-          $ifNull: [
-            '$destination',
-            {
-              $ifNull: [
-                '$customizedDoc.destination',
-                {
-                  $ifNull: [
-                    '$packageDoc.destination',
-                    {
-                      $let: {
-                        vars: {
-                          flattenedLocations: {
-                            $reduce: {
-                              input: { $ifNull: ['$manualDoc.days', []] },
-                              initialValue: [],
-                              in: {
-                                $concatArrays: [
-                                  '$$value',
-                                  {
-                                    $filter: {
-                                      input: { $ifNull: ['$$this.locations', []] },
-                                      as: 'loc',
-                                      cond: { $ne: ['$$loc', ''] },
-                                    },
-                                  },
-                                ],
-                              },
-                            },
-                          },
-                        },
-                        in: {
-                          $arrayElemAt: ['$$flattenedLocations', 0],
-                        },
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        effectiveOrigin: { $ifNull: ['$fromCountry', '$destinationCountry'] },
-        isConverted: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
-      },
-    },
-    {
-      $facet: {
-        categoryCounts: [
-          {
-            $group: {
-              _id: '$leadCategory',
-              count: { $sum: 1 },
-            },
-          },
-        ],
-        priceRanges: [
-          {
-            $project: {
-              priceBucket: {
-                $switch: {
-                  branches: [
-                    {
-                      case: {
-                        $and: [
-                          { $gte: ['$effectivePrice', 50000] },
-                          { $lt: ['$effectivePrice', 200000] },
-                        ],
-                      },
-                      then: '₹50K-₹2L',
-                    },
-                    {
-                      case: {
-                        $and: [
-                          { $gte: ['$effectivePrice', 200000] },
-                          { $lt: ['$effectivePrice', 500000] },
-                        ],
-                      },
-                      then: '₹2L-₹5L',
-                    },
-                    {
-                      case: {
-                        $and: [
-                          { $gte: ['$effectivePrice', 500000] },
-                          { $lt: ['$effectivePrice', 1000000] },
-                        ],
-                      },
-                      then: '₹5L-₹10L',
-                    },
-                    {
-                      case: {
-                        $and: [
-                          { $gte: ['$effectivePrice', 1000000] },
-                          { $lt: ['$effectivePrice', 2500000] },
-                        ],
-                      },
-                      then: '₹10L-₹25L',
-                    },
-                    {
-                      case: { $gte: ['$effectivePrice', 2500000] },
-                      then: '₹25L+',
-                    },
-                  ],
-                  default: {
-                    $cond: [
-                      { $and: ['$effectivePrice', { $gt: ['$effectivePrice', 0] }] },
-                      'Below ₹50K',
-                      'Unspecified',
-                    ],
-                  },
-                },
-              },
-            },
-          },
-          {
-            $group: {
-              _id: '$priceBucket',
-              count: { $sum: 1 },
-            },
-          },
-        ],
-        topDestinations: [
-          {
-            $group: {
-              _id: '$effectiveDestination',
-              leads: { $sum: 1 },
-              converted: { $sum: '$isConverted' },
-            },
-          },
-          {
-            $match: {
-              _id: { $nin: [null, ''] },
-            },
-          },
-          { $sort: { leads: -1 } },
-          { $limit: 10 },
-        ],
-        topCountries: [
-          {
-            $group: {
-              _id: '$effectiveOrigin',
-              leads: { $sum: 1 },
-              converted: { $sum: '$isConverted' },
-            },
-          },
-          {
-            $match: {
-              _id: { $nin: [null, ''] },
-            },
-          },
-          { $sort: { leads: -1 } },
-          { $limit: 10 },
-        ],
-      },
-    },
-  ]);
 
   const detailed = detailedAggregation?.[0] || {};
 
