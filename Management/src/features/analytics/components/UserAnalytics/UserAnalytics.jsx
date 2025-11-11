@@ -51,22 +51,26 @@ const UserAnalytics = () => {
   // Get x-axis key based on time range
   const getXAxisKey = () => {
     switch (timeRange) {
+      case "daily":
+        return "label";  // Use full label for daily (e.g., "Nov 5")
       case "weekly":
-        return "week";
-      case "yearly":
-        return "year";
+        return "label";  // Use full label for weekly (e.g., "W44 25")
+      case "annual":
+        return "label";  // Use full label for annual (e.g., "2025")
       case "monthly":
       default:
-        return "month";
+        return "label";  // Use full label for all (already contains formatted date)
     }
   };
 
   // Get time range label for display
   const getTimeRangeLabel = () => {
     switch (timeRange) {
+      case "daily":
+        return "Last 7 days";
       case "weekly":
         return "Last 12 weeks";
-      case "yearly":
+      case "annual":
         return "Last 5 years";
       case "monthly":
       default:

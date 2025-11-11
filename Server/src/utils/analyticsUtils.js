@@ -97,22 +97,27 @@ export const getISOWeek = (date) => {
 export const buildTimeBuckets = (range) => {
   const { MONTH_NAMES } = CONSTANTS;
   const now = new Date();
+  now.setHours(23, 59, 59, 999); // Set to end of today
   const buckets = [];
 
   if (range === 'daily') {
+    // Last 7 days including today
     for (let i = 6; i >= 0; i -= 1) {
       const date = new Date(now);
       date.setDate(now.getDate() - i);
+      date.setHours(0, 0, 0, 0);
       buckets.push({
         label: `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}`,
         year: date.getFullYear(),
         month: date.getMonth() + 1,
         day: date.getDate(),
-        start: new Date(date.getFullYear(), date.getMonth(), date.getDate()),
+        start: new Date(date),
+        end: new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1),
       });
     }
   } else if (range === 'weekly') {
-    for (let i = 7; i >= 0; i -= 1) {
+    // Last 12 weeks including current week
+    for (let i = 11; i >= 0; i -= 1) {
       const date = new Date(now);
       date.setDate(now.getDate() - i * 7);
       const { week, year } = getISOWeek(date);
@@ -120,24 +125,28 @@ export const buildTimeBuckets = (range) => {
       const day = weekDate.getDay();
       const diff = weekDate.getDate() - day + (day === 0 ? -6 : 1);
       weekDate.setDate(diff);
+      weekDate.setHours(0, 0, 0, 0);
       buckets.push({
         label: `W${week} ${String(year).slice(-2)}`,
         isoWeek: week,
         isoWeekYear: year,
-        start: new Date(weekDate.getFullYear(), weekDate.getMonth(), weekDate.getDate()),
+        start: new Date(weekDate),
+        end: new Date(weekDate.getFullYear(), weekDate.getMonth(), weekDate.getDate() + 7),
       });
     }
   } else if (range === 'annual') {
+    // Last 5 years including current year
     for (let i = 4; i >= 0; i -= 1) {
       const year = now.getFullYear() - i;
       buckets.push({
         label: `${year}`,
         year,
         start: new Date(year, 0, 1),
+        end: new Date(year + 1, 0, 1),
       });
     }
   } else {
-    // monthly default
+    // monthly default - last 6 months including current month
     for (let i = 5; i >= 0; i -= 1) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       buckets.push({
@@ -145,6 +154,7 @@ export const buildTimeBuckets = (range) => {
         year: date.getFullYear(),
         month: date.getMonth() + 1,
         start: new Date(date.getFullYear(), date.getMonth(), 1),
+        end: new Date(date.getFullYear(), date.getMonth() + 1, 1),
       });
     }
   }
@@ -185,15 +195,15 @@ export const buildGroupId = (range) => {
  */
 export const buildTrendKey = (range, id) => {
   if (range === 'daily') {
-    return `${id.year}-${id.month}-${id.day}`;
+    return `${id.year}-${String(id.month).padStart(2, '0')}-${String(id.day).padStart(2, '0')}`;
   }
   if (range === 'weekly') {
-    return `${id.isoWeekYear}-${id.isoWeek}`;
+    return `${id.isoWeekYear}-${String(id.isoWeek).padStart(2, '0')}`;
   }
   if (range === 'annual') {
     return `${id.year}`;
   }
-  return `${id.year}-${id.month}`;
+  return `${id.year}-${String(id.month).padStart(2, '0')}`;
 };
 
 /**
@@ -201,13 +211,13 @@ export const buildTrendKey = (range, id) => {
  */
 export const buildBucketKey = (range, bucket) => {
   if (range === 'daily') {
-    return `${bucket.year}-${bucket.month}-${bucket.day}`;
+    return `${bucket.year}-${String(bucket.month).padStart(2, '0')}-${String(bucket.day).padStart(2, '0')}`;
   }
   if (range === 'weekly') {
-    return `${bucket.isoWeekYear}-${bucket.isoWeek}`;
+    return `${bucket.isoWeekYear}-${String(bucket.isoWeek).padStart(2, '0')}`;
   }
   if (range === 'annual') {
     return `${bucket.year}`;
   }
-  return `${bucket.year}-${bucket.month}`;
+  return `${bucket.year}-${String(bucket.month).padStart(2, '0')}`;
 };

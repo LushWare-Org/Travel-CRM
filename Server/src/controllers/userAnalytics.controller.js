@@ -26,19 +26,20 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
   const timeRange = clampTimeRange(req.query.timeRange);
   const buckets = buildTimeBuckets(timeRange);
   const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
+  const endDate = buckets[buckets.length - 1]?.end ? new Date(buckets[buckets.length - 1].end) : new Date();
 
   const groupId = buildGroupId(timeRange);
 
   // Get user creation trend
   const userTrendAggregation = await User.aggregate([
-    { $match: { createdAt: { $gte: startDate }, role: 'customer' } },
+    { $match: { createdAt: { $gte: startDate, $lte: endDate }, role: 'customer' } },
     {
       $group: {
         _id: groupId,
         newUsers: { $sum: 1 },
       },
     },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1, '_id.isoWeekYear': 1 } },
   ]);
 
   const userTrendMap = new Map();
@@ -49,14 +50,14 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
 
   // Get sales reps by role
   const salesRepTrendAggregation = await User.aggregate([
-    { $match: { createdAt: { $gte: startDate }, role: 'salesRep', isActive: true } },
+    { $match: { createdAt: { $gte: startDate, $lte: endDate }, role: 'salesRep', isActive: true } },
     {
       $group: {
         _id: groupId,
         salesReps: { $sum: 1 },
       },
     },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1, '_id.isoWeekYear': 1 } },
   ]);
 
   const salesRepTrendMap = new Map();
@@ -67,7 +68,7 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
 
   // Get booking conversion data (actual purchases)
   const bookingTrendAggregation = await Booking.aggregate([
-    { $match: { createdAt: { $gte: startDate }, bookingStatus: { $ne: 'cancelled' } } },
+    { $match: { createdAt: { $gte: startDate, $lte: endDate }, bookingStatus: { $ne: 'cancelled' } } },
     {
       $group: {
         _id: groupId,
@@ -75,7 +76,7 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
         totalRevenue: { $sum: '$totalAmount' },
       },
     },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1, '_id.isoWeekYear': 1 } },
   ]);
 
   const bookingTrendMap = new Map();
@@ -105,7 +106,7 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
 
   // Get overall user stats
   const totalNewUsers = await User.countDocuments({
-    createdAt: { $gte: startDate },
+    createdAt: { $gte: startDate, $lte: endDate },
     role: 'customer',
   });
 
@@ -117,14 +118,14 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
   // Get actual purchase data from bookings (more accurate than email verification)
   const totalPurchases = await Booking.countDocuments({
     bookingStatus: { $ne: 'cancelled' },
-    createdAt: { $gte: startDate },
+    createdAt: { $gte: startDate, $lte: endDate },
   });
 
   const totalRevenue = await Booking.aggregate([
     {
       $match: {
         bookingStatus: { $ne: 'cancelled' },
-        createdAt: { $gte: startDate },
+        createdAt: { $gte: startDate, $lte: endDate },
       },
     },
     {
@@ -144,17 +145,10 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
     isActive: true,
   });
 
-  // Calculate trend for users
+  // Calculate trend for users (compare with previous period)
   const previousBucketStartDate = new Date(startDate);
-  if (timeRange === 'daily') {
-    previousBucketStartDate.setDate(previousBucketStartDate.getDate() - 7);
-  } else if (timeRange === 'weekly') {
-    previousBucketStartDate.setDate(previousBucketStartDate.getDate() - 49);
-  } else if (timeRange === 'monthly') {
-    previousBucketStartDate.setMonth(previousBucketStartDate.getMonth() - 6);
-  } else if (timeRange === 'annual') {
-    previousBucketStartDate.setFullYear(previousBucketStartDate.getFullYear() - 5);
-  }
+  const periodLength = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+  previousBucketStartDate.setDate(previousBucketStartDate.getDate() - periodLength);
 
   const previousNewUsers = await User.countDocuments({
     createdAt: { $gte: previousBucketStartDate, $lt: startDate },
@@ -302,17 +296,9 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
 export const getSalesRepPerformanceAnalytics = asyncHandler(async (req, res) => {
   const timeRange = clampTimeRange(req.query.timeRange);
   const limit = Math.min(parseInt(req.query.limit, 10) || 5, 20);
-  const startDate = new Date();
-
-  if (timeRange === 'daily') {
-    startDate.setDate(startDate.getDate() - 7);
-  } else if (timeRange === 'weekly') {
-    startDate.setDate(startDate.getDate() - 56);
-  } else if (timeRange === 'monthly') {
-    startDate.setMonth(startDate.getMonth() - 6);
-  } else if (timeRange === 'annual') {
-    startDate.setFullYear(startDate.getFullYear() - 5);
-  }
+  const buckets = buildTimeBuckets(timeRange);
+  const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
+  const endDate = buckets[buckets.length - 1]?.end ? new Date(buckets[buckets.length - 1].end) : new Date();
 
   // Get all active sales reps
   const salesReps = await User.find({
@@ -326,14 +312,14 @@ export const getSalesRepPerformanceAnalytics = asyncHandler(async (req, res) => 
       // Get leads assigned to this sales rep
       const totalLeads = await Lead.countDocuments({
         assignedTo: rep._id,
-        createdAt: { $gte: startDate },
+        createdAt: { $gte: startDate, $lte: endDate },
       });
 
       // Get converted leads
       const convertedLeads = await Lead.countDocuments({
         assignedTo: rep._id,
         status: 'converted',
-        createdAt: { $gte: startDate },
+        createdAt: { $gte: startDate, $lte: endDate },
       });
 
       // Get conversion rate
@@ -354,7 +340,7 @@ export const getSalesRepPerformanceAnalytics = asyncHandler(async (req, res) => 
         {
           $match: {
             bookingStatus: { $ne: 'cancelled' },
-            createdAt: { $gte: startDate },
+            createdAt: { $gte: startDate, $lte: endDate },
             'lead.assignedTo': rep._id,
           },
         },
