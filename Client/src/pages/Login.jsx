@@ -44,13 +44,13 @@ export default function AuthPage() {
         await login(formData.email, formData.password);
         
         // Update toast to success
-        toast.success('Login successful! Redirecting...', { id: toastId });
+        toast.success('Login successful! Welcome back!', { id: toastId });
         
         // Clear form
         setFormData({ name: '', email: '', password: '', confirmPassword: '', phone: '', phoneCountry: 'US' });
         
-        // Redirect after brief delay
-        setTimeout(() => navigate('/'), 1000);
+        // Redirect immediately to home page
+        navigate('/');
       } else {
         // Validate registration
         if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
@@ -102,13 +102,13 @@ export default function AuthPage() {
         );
         
         // Update toast to success
-        toast.success('Registration successful! Redirecting...', { id: toastId });
+        toast.success('Registration successful! Please sign in with your credentials.', { id: toastId });
         
         // Clear form
         setFormData({ name: '', email: '', password: '', confirmPassword: '', phone: '', phoneCountry: 'US' });
         
-        // Redirect after brief delay
-        setTimeout(() => navigate('/'), 1000);
+        // Switch to login tab instead of redirecting to home
+        setIsLoginMode(true);
       }
     } catch (err) {
       const errorMessage = err.message || (isLoginMode ? 'Login failed' : 'Registration failed');

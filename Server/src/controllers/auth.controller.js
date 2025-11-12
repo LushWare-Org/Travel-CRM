@@ -48,12 +48,21 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
 // @access  Public
 export const register = asyncHandler(async (req, res, next) => {
   const {
-    name, email, phone, password,
+    name, email, phone, phoneCountry, password,
   } = req.body;
+
+  // Validate required fields
+  if (!name || !email || !password) {
+    logger.error('Registration attempt with missing required fields');
+    throw new AppError('Please provide name, email, and password', 400);
+  }
+
+  logger.info(`Registration attempt for email: ${email}`);
 
   // Check if user already exists
   const existingUser = await User.findOne({ email });
   if (existingUser) {
+    logger.warn(`Registration failed: User already exists with email: ${email}`);
     throw new AppError('User with this email already exists', 400);
   }
 
@@ -62,9 +71,12 @@ export const register = asyncHandler(async (req, res, next) => {
     name,
     email,
     phone,
+    phoneCountry,
     password,
     role: 'customer', // Force customer role for public registration
   });
+
+  logger.info(`User created successfully: ${user.email}, id: ${user._id}`);
 
   // Generate email verification token
   const verificationToken = user.getEmailVerificationToken();
@@ -80,6 +92,7 @@ export const register = asyncHandler(async (req, res, next) => {
     .sendWelcomeEmail(user)
     .catch((err) => logger.error(`Failed to send welcome email: ${err.message}`));
 
+  logger.info(`Registration successful for user: ${email}`);
   sendTokenResponse(user, 201, res, 'Registration successful. Please check your email to verify your account.');
 });
 
@@ -89,26 +102,43 @@ export const register = asyncHandler(async (req, res, next) => {
 export const login = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
 
+  // Validate input
+  if (!email || !password) {
+    logger.error('Login attempt with missing credentials');
+    throw new AppError('Please provide email and password', 400);
+  }
+
+  logger.info(`Login attempt for email: ${email}`);
+
   // Get user with password
   const user = await User.findOne({ email }).select('+password');
 
   if (!user) {
+    logger.warn(`Login failed: User not found for email: ${email}`);
     throw new AppError('Invalid credentials', 401);
   }
+
+  logger.info(`User found: ${user.email}, role: ${user.role}, isActive: ${user.isActive}`);
 
   // Check if password matches
   const isPasswordMatch = await user.matchPassword(password);
+  
   if (!isPasswordMatch) {
+    logger.warn(`Login failed: Invalid password for email: ${email}`);
     throw new AppError('Invalid credentials', 401);
   }
 
+  logger.info(`Password matched for user: ${email}`);
+
   // Check if account is active
   if (!user.isActive) {
+    logger.warn(`Login failed: Account inactive for email: ${email}`);
     throw new AppError('Your account has been deactivated. Please contact support.', 403);
   }
 
   // Check if user must change password (for staff created by admin)
   if (user.mustChangePassword) {
+    logger.info(`User must change password: ${email}`);
     return res.status(200).json({
       status: 'success',
       message: 'Password change required',
@@ -120,6 +150,7 @@ export const login = asyncHandler(async (req, res, next) => {
     });
   }
 
+  logger.info(`Login successful for user: ${email}`);
   sendTokenResponse(user, 200, res, 'Login successful');
 });
 
@@ -386,12 +417,13 @@ export const resetTempPassword = asyncHandler(async (req, res, next) => {
 // @route   PUT /api/v1/auth/profile
 // @access  Private
 export const updateProfile = asyncHandler(async (req, res, next) => {
-  const { name, phone } = req.body;
+  const { name, phone, phoneCountry } = req.body;
 
   const user = await User.findById(req.user.id);
 
   if (name) user.name = name;
-  if (phone) user.phone = phone;
+  if (phone !== undefined) user.phone = phone;
+  if (phoneCountry) user.phoneCountry = phoneCountry;
 
   await user.save();
 
