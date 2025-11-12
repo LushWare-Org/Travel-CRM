@@ -23,11 +23,6 @@ async function makeRequest(endpoint, options = {}) {
   };
 
   try {
-    console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
-    if (options.body) {
-      console.log(`[API Request Body]:`, JSON.parse(options.body));
-    }
-
     const response = await fetch(url, config);
     const data = await response.json();
 

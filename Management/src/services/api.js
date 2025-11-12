@@ -37,7 +37,7 @@ class ApiService {
       const contentType = response.headers.get('content-type');
       let data;
       
-      if (contentType && contentType.includes('application/json')) {
+      if (contentType && typeof contentType === 'string' && contentType.includes('application/json')) {
         data = await response.json();
       } else {
         // Handle non-JSON responses (like rate limit errors)
@@ -329,6 +329,47 @@ export const analyticsAPI = {
   getBillingOverview: async (params = {}) => {
     const api = new ApiService();
     return api.get('/analytics/billing/overview', params);
+  },
+  getUserOverview: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/users/overview', params);
+  },
+  getSalesRepPerformance: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/sales-reps/performance', params);
+  },
+  // Itinerary Analytics
+  getItineraryComprehensive: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries', params);
+  },
+  getItineraryOverview: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/overview', params);
+  },
+  getMostInquired: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/most-inquired', params);
+  },
+  getDestinationPerformance: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/destination-performance', params);
+  },
+  getActivityPreferences: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/activity-preferences', params);
+  },
+  getHotelPreferences: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/hotel-preferences', params);
+  },
+  getItineraryTrends: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/trends', params);
+  },
+  getCompletionStats: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/completion-stats', params);
   },
 };
 
