@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import authService from '../services/authService';
 
 // Create the context
@@ -40,11 +41,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Register function
-  const register = useCallback(async (name, email, password, confirmPassword, phone = '') => {
+  const register = useCallback(async (name, email, password, confirmPassword, phone = '', phoneCountry = 'US') => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await authService.register(name, email, password, confirmPassword, phone);
+      const response = await authService.register(name, email, password, confirmPassword, phone, phoneCountry);
       setToken(response.data.token);
       setUser(response.data.user);
       setIsAuthenticated(true);
@@ -86,8 +87,10 @@ export function AuthProvider({ children }) {
       setUser(null);
       setIsAuthenticated(false);
       setError(null);
+      toast.success('Logged out successfully', { duration: 2000 });
     } catch (err) {
       console.error('Logout error:', err);
+      toast.error('Logout failed', { duration: 3000 });
     } finally {
       setIsLoading(false);
     }
@@ -100,10 +103,12 @@ export function AuthProvider({ children }) {
     try {
       const response = await authService.updateProfile(profileData);
       setUser(response.data.user);
+      toast.success('Profile updated successfully', { duration: 3000 });
       return response;
     } catch (err) {
       const errorMessage = err.message || 'Profile update failed';
       setError(errorMessage);
+      toast.error(errorMessage, { duration: 4000 });
       throw err;
     } finally {
       setIsLoading(false);
@@ -116,10 +121,12 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       const response = await authService.changePassword(currentPassword, newPassword, confirmPassword);
+      toast.success('Password changed successfully', { duration: 3000 });
       return response;
     } catch (err) {
       const errorMessage = err.message || 'Password change failed';
       setError(errorMessage);
+      toast.error(errorMessage, { duration: 4000 });
       throw err;
     } finally {
       setIsLoading(false);
@@ -132,10 +139,12 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       const response = await authService.forgotPassword(email);
+      toast.success('Password reset email sent! Check your inbox.', { duration: 4000 });
       return response;
     } catch (err) {
       const errorMessage = err.message || 'Failed to request password reset';
       setError(errorMessage);
+      toast.error(errorMessage, { duration: 4000 });
       throw err;
     } finally {
       setIsLoading(false);
@@ -151,10 +160,12 @@ export function AuthProvider({ children }) {
       setToken(response.data.token);
       setUser(response.data.user);
       setIsAuthenticated(true);
+      toast.success('Password reset successful! You are now logged in.', { duration: 3000 });
       return response;
     } catch (err) {
       const errorMessage = err.message || 'Password reset failed';
       setError(errorMessage);
+      toast.error(errorMessage, { duration: 4000 });
       throw err;
     } finally {
       setIsLoading(false);
@@ -170,10 +181,12 @@ export function AuthProvider({ children }) {
       if (user) {
         setUser({ ...user, isEmailVerified: true });
       }
+      toast.success('Email verified successfully!', { duration: 3000 });
       return response;
     } catch (err) {
       const errorMessage = err.message || 'Email verification failed';
       setError(errorMessage);
+      toast.error(errorMessage, { duration: 4000 });
       throw err;
     } finally {
       setIsLoading(false);
@@ -186,10 +199,12 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       const response = await authService.resendVerification();
+      toast.success('Verification email sent! Check your inbox.', { duration: 4000 });
       return response;
     } catch (err) {
       const errorMessage = err.message || 'Failed to resend verification email';
       setError(errorMessage);
+      toast.error(errorMessage, { duration: 4000 });
       throw err;
     } finally {
       setIsLoading(false);

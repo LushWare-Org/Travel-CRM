@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Eye, EyeOff, Plane, ArrowRight, Shield, Globe, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Plane, ArrowRight, Shield, Globe, AlertCircle, CheckCircle, Phone } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { parsePhoneNumber } from 'libphonenumber-js';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function AuthPage() {
@@ -17,7 +19,8 @@ export default function AuthPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    phone: ''
+    phone: '',
+    phoneCountry: 'US' // Default to US
   });
 
   const handleSubmit = async (e) => {
@@ -30,40 +33,90 @@ export default function AuthPage() {
       if (isLoginMode) {
         if (!formData.email || !formData.password) {
           setError('Please fill in all fields');
+          toast.error('Please fill in all fields');
           return;
         }
+        
+        // Show loading toast
+        const toastId = toast.loading('Signing in...');
+        
         // Login
         await login(formData.email, formData.password);
-        setSuccessMessage('Login successful! Redirecting...');
-        setTimeout(() => navigate('/'), 1500);
+        
+        // Update toast to success
+        toast.success('Login successful! Redirecting...', { id: toastId });
+        
+        // Clear form
+        setFormData({ name: '', email: '', password: '', confirmPassword: '', phone: '', phoneCountry: 'US' });
+        
+        // Redirect after brief delay
+        setTimeout(() => navigate('/'), 1000);
       } else {
         // Validate registration
         if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-          setError('Please fill in all fields');
+          setError('Please fill in all required fields');
+          toast.error('Please fill in all required fields');
           return;
         }
         if (formData.password.length < 6) {
           setError('Password must be at least 6 characters');
+          toast.error('Password must be at least 6 characters');
           return;
         }
         if (formData.password !== formData.confirmPassword) {
           setError('Passwords do not match');
+          toast.error('Passwords do not match');
+          return;
+        }
+        
+        // Validate phone if provided
+        if (formData.phone && !validatePhone(formData.phone, formData.phoneCountry)) {
+          setError('Please provide a valid phone number');
+          toast.error('Please provide a valid phone number');
           return;
         }
 
+        // Show loading toast
+        const toastId = toast.loading('Creating your account...');
+        
+        // Get formatted phone if provided
+        let phoneData = {};
+        if (formData.phone) {
+          const phoneParsed = getPhoneE164(formData.phone, formData.phoneCountry);
+          if (phoneParsed) {
+            phoneData = {
+              phone: phoneParsed.e164,
+              phoneCountry: phoneParsed.countryCode
+            };
+          }
+        }
+        
         // Register
         await register(
           formData.name,
           formData.email,
           formData.password,
           formData.confirmPassword,
-          formData.phone
+          phoneData.phone || formData.phone,
+          phoneData.phoneCountry || formData.phoneCountry
         );
-        setSuccessMessage('Registration successful! Redirecting...');
-        setTimeout(() => navigate('/'), 1500);
+        
+        // Update toast to success
+        toast.success('Registration successful! Redirecting...', { id: toastId });
+        
+        // Clear form
+        setFormData({ name: '', email: '', password: '', confirmPassword: '', phone: '', phoneCountry: 'US' });
+        
+        // Redirect after brief delay
+        setTimeout(() => navigate('/'), 1000);
       }
     } catch (err) {
-      setError(err.message || (isLoginMode ? 'Login failed' : 'Registration failed'));
+      const errorMessage = err.message || (isLoginMode ? 'Login failed' : 'Registration failed');
+      setError(errorMessage);
+      toast.error(errorMessage, {
+        duration: 4000,
+        icon: '❌',
+      });
     }
   };
 
@@ -71,6 +124,39 @@ export default function AuthPage() {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
+  };
+
+  // Validate phone number
+  const validatePhone = (phone, countryCode) => {
+    if (!phone) return true; // Phone is optional for login
+    
+    try {
+      // Try to parse the phone number
+      const parsed = parsePhoneNumber(phone, countryCode);
+      if (!parsed) return false;
+      
+      // Check if it's valid
+      return parsed.isValid();
+    } catch (err) {
+      return false;
+    }
+  };
+
+  // Format phone to E.164 format for API
+  const getPhoneE164 = (phone, countryCode) => {
+    try {
+      const parsed = parsePhoneNumber(phone, countryCode);
+      if (parsed && parsed.isValid()) {
+        return {
+          formatted: parsed.formatInternational(),
+          e164: parsed.format('E.164'),
+          countryCode: parsed.country
+        };
+      }
+    } catch (err) {
+      return null;
+    }
+    return null;
   };
 
   const switchMode = () => {
@@ -82,7 +168,8 @@ export default function AuthPage() {
       email: '',
       password: '',
       confirmPassword: '',
-      phone: ''
+      phone: '',
+      phoneCountry: 'US'
     });
   };
 
@@ -290,16 +377,65 @@ export default function AuthPage() {
 
                   <div className="transform transition-all duration-300">
                     <label className="block text-sm font-bold text-gray-700 mb-2">Phone Number (Optional)</label>
-                    <div className="relative group">
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        placeholder="+1 (555) 000-0000"
-                        className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
-                        disabled={isLoading}
-                      />
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-1">
+                          <label className="block text-xs font-semibold text-gray-600 mb-2">Country</label>
+                          <select
+                            name="phoneCountry"
+                            value={formData.phoneCountry}
+                            onChange={handleChange}
+                            className="w-full px-3 py-3 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50 text-sm"
+                            disabled={isLoading}
+                          >
+                            <option value="US">🇺🇸 United States</option>
+                            <option value="GB">🇬🇧 United Kingdom</option>
+                            <option value="CA">🇨🇦 Canada</option>
+                            <option value="AU">🇦🇺 Australia</option>
+                            <option value="IN">🇮🇳 India</option>
+                            <option value="LK">🇱🇰 Sri Lanka</option>
+                            <option value="SG">🇸🇬 Singapore</option>
+                            <option value="MY">🇲🇾 Malaysia</option>
+                            <option value="TH">🇹🇭 Thailand</option>
+                            <option value="JP">🇯🇵 Japan</option>
+                            <option value="AE">🇦🇪 UAE</option>
+                            <option value="FR">🇫🇷 France</option>
+                            <option value="DE">🇩🇪 Germany</option>
+                            <option value="IT">🇮🇹 Italy</option>
+                            <option value="ES">🇪🇸 Spain</option>
+                            <option value="MV">🇲🇻 Maldives</option>
+                            <option value="NZ">🇳🇿 New Zealand</option>
+                            <option value="ZA">🇿🇦 South Africa</option>
+                          </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-600 mb-2">Phone Number</label>
+                          <div className="relative group">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                            <input
+                              type="tel"
+                              name="phone"
+                              value={formData.phone}
+                              onChange={handleChange}
+                              placeholder="123 456 7890"
+                              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50 text-sm"
+                              disabled={isLoading}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {formData.phone && validatePhone(formData.phone, formData.phoneCountry) ? (
+                              <span className="text-green-600 flex items-center">
+                                ✓ Valid: {getPhoneE164(formData.phone, formData.phoneCountry)?.formatted}
+                              </span>
+                            ) : formData.phone ? (
+                              <span className="text-red-600">✗ Invalid phone number</span>
+                            ) : (
+                              <span>Enter phone with local format (e.g., 123-456-7890)</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </>

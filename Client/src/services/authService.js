@@ -47,15 +47,17 @@ const authService = {
    * @param {string} email - Email address
    * @param {string} password - Password
    * @param {string} confirmPassword - Confirm password
-   * @param {string} phone - Phone number (optional)
+   * @param {string} phone - Phone number in E.164 format (optional)
+   * @param {string} phoneCountry - Country code (ISO 3166-1 alpha-2)
    * @returns {Promise} Response with user data and token
    */
-  register: async (name, email, password, confirmPassword, phone = '') => {
+  register: async (name, email, password, confirmPassword, phone = '', phoneCountry = 'US') => {
     try {
       const response = await apiClient.post('/register', {
         name,
         email,
         phone,
+        phoneCountry,
         password,
         confirmPassword,
       });
