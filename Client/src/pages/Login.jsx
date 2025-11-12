@@ -1,23 +1,89 @@
 import { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, Plane, ArrowRight, Shield, Globe, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Mail, Lock, User, Eye, EyeOff, Plane, ArrowRight, Shield, Globe, AlertCircle, CheckCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
+  const navigate = useNavigate();
+  const { login, register, isLoading } = useAuth();
+  
+  const [isLoginMode, setIsLoginMode] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    phone: ''
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      // Validate form
+      if (isLoginMode) {
+        if (!formData.email || !formData.password) {
+          setError('Please fill in all fields');
+          return;
+        }
+        // Login
+        await login(formData.email, formData.password);
+        setSuccessMessage('Login successful! Redirecting...');
+        setTimeout(() => navigate('/'), 1500);
+      } else {
+        // Validate registration
+        if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+          setError('Please fill in all fields');
+          return;
+        }
+        if (formData.password.length < 6) {
+          setError('Password must be at least 6 characters');
+          return;
+        }
+        if (formData.password !== formData.confirmPassword) {
+          setError('Passwords do not match');
+          return;
+        }
+
+        // Register
+        await register(
+          formData.name,
+          formData.email,
+          formData.password,
+          formData.confirmPassword,
+          formData.phone
+        );
+        setSuccessMessage('Registration successful! Redirecting...');
+        setTimeout(() => navigate('/'), 1500);
+      }
+    } catch (err) {
+      setError(err.message || (isLoginMode ? 'Login failed' : 'Registration failed'));
+    }
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setError('');
+  };
+
+  const switchMode = () => {
+    setIsLoginMode(!isLoginMode);
+    setError('');
+    setSuccessMessage('');
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      phone: ''
+    });
   };
 
   return (
@@ -42,10 +108,10 @@ export default function AuthPage() {
             </div>
             <div className="mb-16">
               <h1 className="text-3xl font-bold text-white mb-6 leading-tight">
-                {isLogin ? 'Welcome Back!' : 'Start Your Journey'}
+                {isLoginMode ? 'Welcome Back!' : 'Start Your Journey'}
               </h1>
               <p className="text-white/80 text-lg leading-relaxed max-w-md">
-                {isLogin 
+                {isLoginMode 
                   ? 'Continue your adventure with us. Log in to explore exclusive travel experiences around the world.'
                   : 'Join thousands of travelers discovering amazing destinations with personalized itineraries and expert guidance.'}
               </p>
@@ -79,9 +145,10 @@ export default function AuthPage() {
           <div className="max-w-md mx-auto w-full">
             <div className="flex bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-1.5 mb-10 shadow-inner">
               <button
-                onClick={() => setIsLogin(true)}
+                onClick={switchMode}
+                type="button"
                 className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
-                  isLogin
+                  isLoginMode
                     ? 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white shadow-lg transform scale-105'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
@@ -89,9 +156,10 @@ export default function AuthPage() {
                 Login
               </button>
               <button
-                onClick={() => setIsLogin(false)}
+                onClick={switchMode}
+                type="button"
                 className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
-                  !isLogin
+                  !isLoginMode
                     ? 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white shadow-lg transform scale-105'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
@@ -103,18 +171,34 @@ export default function AuthPage() {
             {/* Form Header */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {isLogin ? 'Sign in to your account' : 'Create your account'}
+                {isLoginMode ? 'Sign in to your account' : 'Create your account'}
               </h2>
               <p className="text-gray-600 text-sm">
-                {isLogin 
+                {isLoginMode 
                   ? 'Enter your credentials to access your account' 
                   : 'Fill in the details below to get started'}
               </p>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {successMessage && (
+              <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-green-700">{successMessage}</p>
+              </div>
+            )}
+
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {!isLogin ? (
+              {!isLoginMode ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="transform transition-all duration-300">
@@ -127,7 +211,8 @@ export default function AuthPage() {
                           value={formData.name}
                           onChange={handleChange}
                           placeholder="John Doe"
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
+                          disabled={isLoading}
                           required
                         />
                       </div>
@@ -143,7 +228,8 @@ export default function AuthPage() {
                           value={formData.email}
                           onChange={handleChange}
                           placeholder="you@example.com"
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
+                          disabled={isLoading}
                           required
                         />
                       </div>
@@ -161,13 +247,15 @@ export default function AuthPage() {
                           value={formData.password}
                           onChange={handleChange}
                           placeholder="••••••••"
-                          className="w-full pl-12 pr-14 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300"
+                          className="w-full pl-12 pr-14 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
+                          disabled={isLoading}
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors p-1"
+                          disabled={isLoading}
                         >
                           {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
@@ -179,15 +267,39 @@ export default function AuthPage() {
                       <div className="relative group">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
                         <input
-                          type={showPassword ? 'text' : 'password'}
+                          type={showConfirmPassword ? 'text' : 'password'}
                           name="confirmPassword"
                           value={formData.confirmPassword}
                           onChange={handleChange}
                           placeholder="••••••••"
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300"
+                          className="w-full pl-12 pr-14 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
+                          disabled={isLoading}
                           required
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors p-1"
+                          disabled={isLoading}
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="transform transition-all duration-300">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Phone Number (Optional)</label>
+                    <div className="relative group">
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="+1 (555) 000-0000"
+                        className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
+                        disabled={isLoading}
+                      />
                     </div>
                   </div>
                 </>
@@ -203,7 +315,8 @@ export default function AuthPage() {
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="you@example.com"
-                        className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300"
+                        className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
+                        disabled={isLoading}
                         required
                       />
                     </div>
@@ -219,13 +332,15 @@ export default function AuthPage() {
                         value={formData.password}
                         onChange={handleChange}
                         placeholder="••••••••"
-                        className="w-full pl-12 pr-14 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300"
+                        className="w-full pl-12 pr-14 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300 disabled:bg-gray-50"
+                        disabled={isLoading}
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors p-1"
+                        disabled={isLoading}
                       >
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
@@ -234,12 +349,13 @@ export default function AuthPage() {
                 </>
               )}
 
-              {isLogin && (
+              {isLoginMode && (
                 <div className="flex items-center justify-between">
                   <label className="flex items-center space-x-2 cursor-pointer group">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                      className="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer disabled:opacity-50"
+                      disabled={isLoading}
                     />
                     <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">Remember me</span>
                   </label>
@@ -251,22 +367,33 @@ export default function AuthPage() {
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-orange-600 via-orange-500 to-yellow-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center space-x-2 group mt-8"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-orange-600 via-orange-500 to-yellow-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center space-x-2 group mt-8 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>{isLoginMode ? 'Signing In...' : 'Creating Account...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{isLoginMode ? 'Sign In' : 'Create Account'}</span>
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
+                  </>
+                )}
               </button>
             </form>
 
             {/* Footer */}
             <div className="mt-8 text-center">
               <p className="text-sm text-gray-600">
-                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                {isLoginMode ? "Don't have an account? " : "Already have an account? "}
                 <button
-                  onClick={() => setIsLogin(!isLogin)}
+                  onClick={switchMode}
+                  type="button"
                   className="font-bold text-orange-600 hover:text-orange-700 transition-colors"
                 >
-                  {isLogin ? 'Sign up' : 'Sign in'}
+                  {isLoginMode ? 'Sign up' : 'Sign in'}
                 </button>
               </p>
             </div>
