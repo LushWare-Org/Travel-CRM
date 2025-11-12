@@ -7,8 +7,14 @@ import {
   BarChartComponent,
   PieChartComponent,
 } from "../Common";
-import { MapPin, ShoppingCart, TrendingUp, Home, AlertCircle, Loader } from "lucide-react";
-import { useItineraryAnalytics } from "../../hooks/useItineraryAnalytics";
+import { MapPin, ShoppingCart, TrendingUp, Home } from "lucide-react";
+import {
+  itineraryTrendData,
+  topItinerariesData,
+  destinationPerformanceData,
+  activityPreferenceData,
+  hotelPreferenceData,
+} from "../../utils/itineraryAnalyticsData";
 
 /**
  * ItineraryAnalytics Component
@@ -16,7 +22,6 @@ import { useItineraryAnalytics } from "../../hooks/useItineraryAnalytics";
  */
 const ItineraryAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
-  const { data, loading, error, refetch } = useItineraryAnalytics(timeRange);
 
   // Line chart configuration
   const itineraryLines = [
@@ -30,52 +35,6 @@ const ItineraryAnalytics = () => {
     { dataKey: "inquiries", fill: "#3b82f6", name: "Inquiries" },
     { dataKey: "purchases", fill: "#10b981", name: "Purchases" },
   ];
-
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Itinerary Analytics</h2>
-            <p className="text-gray-600 mt-1">Most inquired and purchased packages and destinations</p>
-          </div>
-          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
-        </div>
-        <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg border border-gray-200">
-          <Loader className="w-8 h-8 text-blue-600 animate-spin" />
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Itinerary Analytics</h2>
-            <p className="text-gray-600 mt-1">Most inquired and purchased packages and destinations</p>
-          </div>
-          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
-        </div>
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-red-900">Error loading analytics</p>
-            <p className="text-sm text-red-700">{error}</p>
-            <button
-              onClick={refetch}
-              className="mt-2 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -93,7 +52,7 @@ const ItineraryAnalytics = () => {
         <StatCard
           icon={MapPin}
           label="Total Itineraries"
-          value={data?.overview?.stats?.totalItineraries?.toString() || "0"}
+          value="156"
           trend="+12%"
           trendDirection="up"
           color="blue"
@@ -101,7 +60,7 @@ const ItineraryAnalytics = () => {
         <StatCard
           icon={TrendingUp}
           label="Most Inquired"
-          value={data?.overview?.stats?.totalInquiries?.toString() || "0"}
+          value="24"
           trend="+8%"
           trendDirection="up"
           color="green"
@@ -109,7 +68,7 @@ const ItineraryAnalytics = () => {
         <StatCard
           icon={ShoppingCart}
           label="Most Purchased"
-          value={data?.overview?.stats?.totalPurchases?.toString() || "0"}
+          value="18"
           trend="+5%"
           trendDirection="up"
           color="purple"
@@ -117,7 +76,7 @@ const ItineraryAnalytics = () => {
         <StatCard
           icon={Home}
           label="Popular Hotels"
-          value={data?.overview?.stats?.totalHotels?.toString() || "0"}
+          value="42"
           trend="+3%"
           trendDirection="up"
           color="orange"
@@ -130,7 +89,7 @@ const ItineraryAnalytics = () => {
         description="Monthly inquiries, purchases, and hotel bookings"
       >
         <LineChartComponent
-          data={data?.overview?.trend || []}
+          data={itineraryTrendData}
           lines={itineraryLines}
           xAxisKey="month"
           height={350}
@@ -144,7 +103,7 @@ const ItineraryAnalytics = () => {
           description="Most inquired vs purchased destinations"
         >
           <BarChartComponent
-            data={data?.destinationPerformance || []}
+            data={destinationPerformanceData}
             bars={destinationBars}
             xAxisKey="destination"
             height={320}
@@ -157,7 +116,7 @@ const ItineraryAnalytics = () => {
           description="Most inquired and purchased activities"
         >
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {(data?.activityPreferences || []).map((activity, idx) => (
+            {activityPreferenceData.map((activity, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-900">{activity.name}</p>
@@ -172,9 +131,6 @@ const ItineraryAnalytics = () => {
                 </div>
               </div>
             ))}
-            {(!data?.activityPreferences || data.activityPreferences.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No activity data available</p>
-            )}
           </div>
         </ChartContainer>
       </div>
@@ -185,7 +141,7 @@ const ItineraryAnalytics = () => {
           description="Most booked accommodation types"
         >
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {(data?.hotelPreferences || []).map((hotel, idx) => (
+            {hotelPreferenceData.map((hotel, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-900">{hotel.name}</p>
@@ -200,9 +156,6 @@ const ItineraryAnalytics = () => {
                 </div>
               </div>
             ))}
-            {(!data?.hotelPreferences || data.hotelPreferences.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No hotel data available</p>
-            )}
           </div>
         </ChartContainer>
 
@@ -211,7 +164,7 @@ const ItineraryAnalytics = () => {
           description="Most inquired and purchased packages"
         >
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {(data?.mostInquired || []).map((itinerary, idx) => (
+            {topItinerariesData.map((itinerary, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-gray-900">{itinerary.name}</p>
@@ -227,9 +180,6 @@ const ItineraryAnalytics = () => {
                 </div>
               </div>
             ))}
-            {(!data?.mostInquired || data.mostInquired.length === 0) && (
-              <p className="text-center text-gray-500 py-8">No itinerary data available</p>
-            )}
           </div>
         </ChartContainer>
       </div>

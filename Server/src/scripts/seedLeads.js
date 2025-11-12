@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import User from '../models/user.model.js';
 import Lead from '../models/lead.model.js';
-import Itinerary from '../models/itinerary.model.js';
 
 dotenv.config();
 
@@ -17,9 +16,6 @@ export const seedLeads = async () => {
     const users = await User.find({});
     const adminUser = users.find((u) => u.role === 'admin');
     const salesRepUser = users.find((u) => u.role === 'salesRep');
-
-    // Get itineraries for assignment
-    const itineraries = await Itinerary.find({}).limit(5);
 
     // Sales rep names (these should NOT match any customer names)
     const salesReps = ['Sarah Johnson', 'Mike Chen', 'Lisa Anderson', 'David Brown'];

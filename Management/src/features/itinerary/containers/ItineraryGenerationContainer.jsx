@@ -107,6 +107,10 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleEditPackage = (pkg) => {
+    console.log('[DEBUG] Edit package clicked. Package object:', pkg);
+    console.log('[DEBUG] Package _id:', pkg._id, 'Package id:', pkg.id);
+    console.log('[DEBUG] Package images:', pkg.images);
+    
     // Extract days from itinerary if present
     const days = pkg.days || pkg.itinerary?.days || [];
     
@@ -132,6 +136,9 @@ const ItineraryGenerationContainer = () => {
       images: [...formattedImages],
     };
     
+    console.log('[DEBUG] Edit data prepared:', editData);
+    console.log('[DEBUG] Formatted images:', formattedImages);
+    
     setEditPackageData(editData);
     setShowEditPackageDialog(true);
     setImages(formattedImages); // Use formatted images, not raw pkg.images
@@ -147,6 +154,9 @@ const ItineraryGenerationContainer = () => {
 
       // Filter out any temporary images (safety check)
       const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
+      
+      console.log('[DEBUG] handleSaveNewPackage - All images:', images);
+      console.log('[DEBUG] handleSaveNewPackage - Valid images:', validImages);
 
       // Validate required fields with detailed checks
       const validationErrors = [];
@@ -231,6 +241,12 @@ const ItineraryGenerationContainer = () => {
       delete sanitizedData._v;
       delete sanitizedData.__v;
 
+      console.log('[DEBUG] ==> SAVING PACKAGE <==');
+      console.log('[DEBUG] Valid images to save:', validImages);
+      console.log('[DEBUG] Images count:', validImages?.length);
+      console.log('[DEBUG] First image:', validImages?.[0]);
+      console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
+
       // Call API to save package
       const response = await ApiService.createPackage(sanitizedData);
 
@@ -245,11 +261,23 @@ const ItineraryGenerationContainer = () => {
         Swal.fire('Error', response.message || 'Failed to create package', 'error');
       }
     } catch (error) {
+      console.error('Error creating package:', error);
+      
       // Show detailed validation errors if available
       if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
         const errorList = error.errors
           .map((err) => `• ${err.param || err.field}: ${err.msg}`)
           .join('\n');
+        
+        console.log('%c=== VALIDATION ERRORS ===', 'color: red; font-weight: bold; font-size: 14px;');
+        error.errors.forEach((err, idx) => {
+          console.log(`%c❌ Error ${idx + 1}:`, 'color: red; font-weight: bold;');
+          console.log('   Field:', err.param || err.field || 'unknown');
+          console.log('   Message:', err.msg || err.message || 'No message');
+          console.log('   Value received:', err.value);
+          console.log('   Type:', typeof err.value);
+          console.log('   Location:', err.location || 'body');
+        });
         
         Swal.fire('Validation Error', `Please fix the following:\n\n${errorList}`, 'error');
       } else {
@@ -268,7 +296,14 @@ const ItineraryGenerationContainer = () => {
 
       // Filter out any temporary images (safety check)
       const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
+      
+      console.log('[DEBUG] handleSaveEditPackage - All images:', images);
+      console.log('[DEBUG] handleSaveEditPackage - Valid images:', validImages);
 
+      console.log('[DEBUG] handleSaveEditPackage called');
+      console.log('[DEBUG] formData received:', formData);
+      console.log('[DEBUG] formData._id:', formData._id, 'formData.id:', formData.id);
+      
       // Validate required fields with detailed checks
       const validationErrors = [];
 
@@ -311,11 +346,13 @@ const ItineraryGenerationContainer = () => {
       }
 
       if (!formData._id && !formData.id) {
+        console.error('[DEBUG] No ID found in formData!');
         Swal.fire('Error', 'Package ID is missing', 'error');
         return;
       }
 
       const packageId = formData._id || formData.id;
+      console.log('[DEBUG] Using packageId:', packageId);
       
       // Clean up days data - remove invalid enum values and incomplete days
       const cleanDays = (formData.days || [])
@@ -360,6 +397,11 @@ const ItineraryGenerationContainer = () => {
       delete sanitizedData.createdAt;
       delete sanitizedData.createdBy;
       delete sanitizedData.slug; // Let backend regenerate if needed
+
+      console.log('[DEBUG] ==> UPDATING PACKAGE <==');
+      console.log('[DEBUG] Valid images to save:', validImages);
+      console.log('[DEBUG] Images count:', validImages?.length);
+      console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
       
       const response = await ApiService.updatePackage(packageId, sanitizedData);
 
@@ -373,6 +415,7 @@ const ItineraryGenerationContainer = () => {
         Swal.fire('Error', response.message || 'Failed to update package', 'error');
       }
     } catch (error) {
+      console.error('[Container] Error updating package:', error);
       Swal.fire('Error', error.message || 'Failed to update package', 'error');
     }
   };
@@ -504,10 +547,14 @@ const ItineraryGenerationContainer = () => {
     setImages((prev) => [...prev, ...tempImages]);
 
     try {
+      console.log('[DEBUG] Starting upload for', fileArray.length, 'files');
+      
       // Upload all images to Cloudinary - now returns full image objects
       const uploadedImages = await uploadPackageImages(files, (progress) => {
-        // Progress tracking
+        console.log(`Upload progress: ${progress.current}/${progress.total}`);
       });
+
+      console.log('[DEBUG] Uploaded images from Cloudinary:', uploadedImages);
 
       // Replace temporary image objects with actual Cloudinary image objects
       setImages((prev) => {
@@ -515,6 +562,7 @@ const ItineraryGenerationContainer = () => {
         const withoutTemp = prev.filter(img => !img.isTemp);
         // Add all uploaded images
         const finalImages = [...withoutTemp, ...uploadedImages];
+        console.log('[DEBUG] Final images state after upload:', finalImages);
         return finalImages;
       });
       
@@ -523,6 +571,9 @@ const ItineraryGenerationContainer = () => {
 
       Swal.fire('Success', `${uploadedImages.length} image(s) uploaded successfully!`, 'success');
     } catch (error) {
+      console.error('[DEBUG] Upload error:', error);
+      console.error('[DEBUG] Error message:', error.message);
+      console.error('[DEBUG] Error stack:', error.stack);
       
       // Remove temporary images on error
       setImages((prev) => prev.filter(img => !img.isTemp));

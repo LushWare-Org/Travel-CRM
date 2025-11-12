@@ -23,24 +23,7 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      // Accepts international format: +1 (234) 567-8900 or +1234567890
-      match: [
-        /^\+?[1-9]\d{1,14}$/,
-        'Please provide a valid international phone number (E.164 format)',
-      ],
-      sparse: true,
-    },
-    phoneCountry: {
-      type: String,
-      // ISO 3166-1 alpha-2 country code
-      match: [/^[A-Z]{2}$/, 'Please provide a valid country code'],
-      sparse: true,
-    },
-    phoneE164: {
-      type: String,
-      // Stores the normalized E.164 format for consistent lookups
-      sparse: true,
-      unique: true,
+      match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit phone number'],
     },
     password: {
       type: String,
@@ -167,22 +150,16 @@ const userSchema = new mongoose.Schema(
 // Hash password before saving
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) {
-    return next();
+    next();
   }
 
-  console.log(`Hashing password for user: ${this.email}`);
   const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS, 10) || 12);
   this.password = await bcrypt.hash(this.password, salt);
-  console.log(`Password hashed successfully for user: ${this.email}`);
-  next();
 });
 
 // Compare password
 userSchema.methods.matchPassword = async function matchPassword(enteredPassword) {
-  console.log(`Comparing password for user: ${this.email}`);
-  const isMatch = await bcrypt.compare(enteredPassword, this.password);
-  console.log(`Password match result for ${this.email}:`, isMatch);
-  return isMatch;
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
 // Check if password changed after token was issued

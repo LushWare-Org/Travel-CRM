@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './contexts/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
 import Header from './pages/Header';
 import Footer from './pages/Footer';
 import Home from './pages/Home';
@@ -76,56 +73,10 @@ function ScrollToTop() {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Toaster
-          position="top-right"
-          reverseOrder={false}
-          gutter={8}
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-              style: {
-                background: '#10b981',
-                color: '#fff',
-              },
-              iconTheme: {
-                primary: '#fff',
-                secondary: '#10b981',
-              },
-            },
-            error: {
-              duration: 4000,
-              style: {
-                background: '#ef4444',
-                color: '#fff',
-              },
-              iconTheme: {
-                primary: '#fff',
-                secondary: '#ef4444',
-              },
-            },
-            loading: {
-              style: {
-                background: '#3b82f6',
-                color: '#fff',
-              },
-              iconTheme: {
-                primary: '#fff',
-                secondary: '#3b82f6',
-              },
-            },
-          }}
-        />
-        <ScrollToTop />
-        <AppContent />
-      </BrowserRouter>
-    </AuthProvider>
+    <BrowserRouter>
+      <ScrollToTop />
+      <AppContent />
+    </BrowserRouter>
   );
 }
 export default App;

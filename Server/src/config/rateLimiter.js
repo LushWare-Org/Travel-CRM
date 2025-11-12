@@ -1,16 +1,12 @@
 import rateLimit from 'express-rate-limit';
 
-// Check if rate limiting should be disabled (in development or via env var)
 const isRateLimitingDisabled =
   process.env.RATE_LIMIT_ENABLED === 'false' || process.env.NODE_ENV === 'development';
 
-// No-op middleware that just passes through (disables rate limiting)
 const noopMiddleware = (req, res, next) => next();
 
-// Factory function to create limiters or noop based on config
 const createLimiter = (options) => (isRateLimitingDisabled ? noopMiddleware : rateLimit(options));
 
-// General API rate limiter (disabled in development)
 export const limiter = createLimiter({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100, // Limit each IP
