@@ -1,14 +1,34 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Star, Clock, DollarSign, Filter, X, SlidersHorizontal, Grid, List, Heart, ArrowRight, Globe, Compass, Sun, ChevronRight } from 'lucide-react';
-import { mockDestinations, mockPackages } from '../data/mockData';
+import {
+  Search,
+  MapPin,
+  Star,
+  Clock,
+  IndianRupee,
+  Filter,
+  X,
+  SlidersHorizontal,
+  Grid,
+  List,
+  Heart,
+  ArrowRight,
+  Globe,
+  Compass,
+  Sun,
+  ChevronRight,
+} from 'lucide-react';
+import { fetchPackages } from '../utils/packageApi';
+import { formatCurrency } from '../utils/currency';
+
+const FALLBACK_IMAGE = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
 const filterOptions = {
-  regions: ['All', 'Asia', 'Europe', 'Middle East', 'Oceania'],
+  regions: ['All', 'Asia', 'Europe', 'Middle East', 'Oceania', 'Africa', 'Americas'],
   priceRanges: [
     { label: 'Budget', min: 0, max: 1500 },
     { label: 'Mid-Range', min: 1500, max: 2500 },
-    { label: 'Luxury', min: 2500, max: 5000 }
+    { label: 'Luxury', min: 2500, max: 5000 },
   ],
   activities: ['Beach', 'Mountains', 'Culture', 'Adventure', 'Luxury', 'Food', 'Shopping', 'Nature', 'Romance'],
   ratings: [4.9, 4.8, 4.7, 4.5, 4.0],
@@ -16,8 +36,7 @@ const filterOptions = {
 
 export default function DestinationsInternational() {
   const navigate = useNavigate();
-  const internationalDestinations = mockDestinations.filter(d => d.country !== 'India');
-
+  const [destinations, setDestinations] = useState([]);
   const [filteredDestinations, setFilteredDestinations] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,105 +49,105 @@ export default function DestinationsInternational() {
   const [showFilters, setShowFilters] = useState(true);
   const [favorites, setFavorites] = useState([]);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    fetchPackages({ limit: 100 })
+      .then(({ destinations: dest }) => {
+        if (!isMounted) return;
+        const international = dest.filter((d) => d.type !== 'domestic');
+        setDestinations(international);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err.message || 'Failed to load destinations');
+        setDestinations([]);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const preparedDestinations = useMemo(() => (
+    destinations.map((dest) => ({
+      ...dest,
+      price: dest.price || 0,
+      rating: dest.rating || 0,
+      reviews: dest.reviews || 0,
+      duration: dest.durationLabel || '',
+      packagesCount: dest.packagesCount || 0,
+      activities: dest.activities || [],
+      country: dest.country || dest.region || 'Worldwide',
+    }))
+  ), [destinations]);
 
   const countriesByRegion = useMemo(() => {
     const map = {};
-    internationalDestinations.forEach(dest => {
-      if (!map[dest.region]) map[dest.region] = new Set();
-      map[dest.region].add(dest.country);
+    preparedDestinations.forEach((dest) => {
+      const region = dest.region || 'Other';
+      if (!map[region]) map[region] = new Set();
+      if (dest.country) {
+        map[region].add(dest.country);
+      }
     });
     return Object.fromEntries(
       Object.entries(map).map(([region, countries]) => [
         region,
-        Array.from(countries).sort()
-      ])
+        Array.from(countries).sort(),
+      ]),
     );
-  }, []);
-
-  // Destinations
-  const enrichedDestinations = internationalDestinations.map(dest => {
-    const packages = mockPackages.filter(p => p.destination_id === dest.id);
-    const avgRating = packages.length > 0
-      ? (packages.reduce((sum, p) => sum + p.rating, 0) / packages.length).toFixed(1)
-      : 4.5;
-    const reviews = packages.reduce((sum, p) => sum + p.reviews_count, 0);
-    const minPrice = packages.length > 0 ? Math.min(...packages.map(p => p.price_from)) : 999;
-    const duration = packages.length > 0 
-      ? `${Math.min(...packages.map(p => p.duration_days))}D/${Math.min(...packages.map(p => p.duration_days)) - 1}N` 
-      : '5D/4N';
-
-    const inferredActivities = new Set();
-    packages.forEach(p => {
-      p.highlights.forEach(h => {
-        if (h.includes('Beach') || h.includes('Island') || h.includes('Sea')) inferredActivities.add('Beach');
-        if (h.includes('Mountain') || h.includes('Hill') || h.includes('Trekking')) inferredActivities.add('Mountains');
-        if (h.includes('Culture') || h.includes('Temple') || h.includes('Heritage') || h.includes('Palace')) inferredActivities.add('Culture');
-        if (h.includes('Adventure') || h.includes('Safari') || h.includes('Skydiving') || h.includes('Water Sports')) inferredActivities.add('Adventure');
-        if (h.includes('Luxury') || h.includes('Spa') || h.includes('Villa') || h.includes('5-Star')) inferredActivities.add('Luxury');
-        if (h.includes('Food') || h.includes('Cuisine') || h.includes('Cooking')) inferredActivities.add('Food');
-        if (h.includes('Shopping') || h.includes('Market') || h.includes('Mall')) inferredActivities.add('Shopping');
-        if (h.includes('Nature') || h.includes('Wildlife') || h.includes('Backwaters')) inferredActivities.add('Nature');
-        if (h.includes('Honeymoon') || h.includes('Romance') || h.includes('Candlelight')) inferredActivities.add('Romance');
-      });
-    });
-
-    return {
-      ...dest,
-      rating: parseFloat(avgRating),
-      reviews,
-      price: minPrice,
-      duration,
-      packages: packages.length,
-      activities: Array.from(inferredActivities || []),
-      tags: dest.popular ? ['Trending'] : []
-    };
-  });
+  }, [preparedDestinations]);
 
   useEffect(() => {
-    let filtered = [...enrichedDestinations];
+    let filtered = [...preparedDestinations];
 
-    // Search
     if (searchQuery) {
-      filtered = filtered.filter(dest =>
-        dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dest.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dest.description.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((dest) => (
+        dest.name?.toLowerCase().includes(q)
+        || dest.country?.toLowerCase().includes(q)
+        || dest.description?.toLowerCase().includes(q)
+      ));
     }
 
-    // Region
     if (!selectedRegions.includes('All')) {
-      filtered = filtered.filter(dest => selectedRegions.includes(dest.region));
+      filtered = filtered.filter((dest) => selectedRegions.includes(dest.region));
     }
 
-    // Countries
     if (selectedCountries.length > 0) {
-      filtered = filtered.filter(dest => selectedCountries.includes(dest.country));
+      filtered = filtered.filter((dest) => selectedCountries.includes(dest.country));
     }
 
-    // Activities
     if (selectedActivities.length > 0) {
-      filtered = filtered.filter(dest =>
-        selectedActivities.some(act => dest.activities.includes(act))
+      filtered = filtered.filter((dest) =>
+        selectedActivities.some((activity) => dest.activities.includes(activity)),
       );
     }
 
-    // Price
     if (selectedPriceRange) {
-      filtered = filtered.filter(dest =>
-        dest.price >= selectedPriceRange.min && dest.price <= selectedPriceRange.max
-      );
+      filtered = filtered.filter((dest) => (
+        dest.price >= selectedPriceRange.min
+        && dest.price <= selectedPriceRange.max
+      ));
     }
 
-    // Rating
     if (minRating > 0) {
-      filtered = filtered.filter(dest => dest.rating >= minRating);
+      filtered = filtered.filter((dest) => dest.rating >= minRating);
     }
 
-    // Sorting
     switch (sortBy) {
       case 'popularity':
-        filtered.sort((a, b) => b.packages - a.packages);
+        filtered.sort((a, b) => b.packagesCount - a.packagesCount);
         break;
       case 'price-low':
         filtered.sort((a, b) => a.price - b.price);
@@ -142,18 +161,62 @@ export default function DestinationsInternational() {
       case 'name':
         filtered.sort((a, b) => a.name.localeCompare(b.name));
         break;
+      default:
+        break;
     }
 
     setFilteredDestinations(filtered);
 
-  let count = 0;
-  if (!selectedRegions.includes('All')) count += selectedRegions.length;
-  if (selectedCountries.length > 0) count += selectedCountries.length;
+    let count = 0;
+    if (!selectedRegions.includes('All')) count += selectedRegions.length;
+    if (selectedCountries.length > 0) count += selectedCountries.length;
     if (selectedActivities.length > 0) count += selectedActivities.length;
-    if (selectedPriceRange) count++;
-    if (minRating > 0) count++;
+    if (selectedPriceRange) count += 1;
+    if (minRating > 0) count += 1;
     setActiveFiltersCount(count);
-  }, [searchQuery, selectedRegions, selectedCountries, selectedActivities, selectedPriceRange, minRating, sortBy]);
+  }, [preparedDestinations, searchQuery, selectedRegions, selectedCountries, selectedActivities, selectedPriceRange, minRating, sortBy]);
+
+  const toggleActivity = (activity) => {
+    setSelectedActivities((prev) => (
+      prev.includes(activity)
+        ? prev.filter((item) => item !== activity)
+        : [...prev, activity]
+    ));
+  };
+
+  const toggleCountry = (country) => {
+    setSelectedCountries((prev) => (
+      prev.includes(country)
+        ? prev.filter((item) => item !== country)
+        : [...prev, country]
+    ));
+  };
+
+  const toggleRegion = (region) => {
+    if (region === 'All') {
+      setSelectedRegions(['All']);
+      setSelectedCountries([]);
+      return;
+    }
+
+    setSelectedRegions((prev) => {
+      const next = new Set(prev.filter((item) => item !== 'All'));
+      if (next.has(region)) {
+        next.delete(region);
+      } else {
+        next.add(region);
+      }
+      return next.size === 0 ? ['All'] : Array.from(next);
+    });
+  };
+
+  const toggleFavorite = (id) => {
+    setFavorites((prev) => (
+      prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
+    ));
+  };
 
   const clearAllFilters = () => {
     setSearchQuery('');
@@ -164,44 +227,34 @@ export default function DestinationsInternational() {
     setMinRating(0);
   };
 
-  const toggleActivity = (act) => {
-    setSelectedActivities(prev =>
-      prev.includes(act) ? prev.filter(a => a !== act) : [...prev, act]
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" />
+      </div>
     );
-  };
+  }
 
-  const toggleCountry = (country) => {
-    setSelectedCountries(prev =>
-      prev.includes(country) ? prev.filter(c => c !== country) : [...prev, country]
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load destinations</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
     );
-  };
-
-  const toggleRegion = (region) => {
-    if (region === 'All') {
-      setSelectedRegions(['All']);
-      setSelectedCountries([]);
-      return;
-    }
-
-    setSelectedRegions(prev => {
-      const current = new Set(prev.filter(r => r !== 'All'));
-      if (current.has(region)) {
-        current.delete(region);
-      } else {
-        current.add(region);
-      }
-      const arr = Array.from(current);
-      return arr.length === 0 ? ['All'] : arr;
-    });
-  };
-
-  const toggleFavorite = (id) => {
-    setFavorites(prev => prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]);
-  };
+  }
 
   return (
     <div className="min-h-screen font-sans bg-white">
-       {/* Hero */}
       <div className="relative h-[40vh] overflow-hidden bg-black/90">
         <div className="absolute inset-0">
           <video
@@ -212,23 +265,23 @@ export default function DestinationsInternational() {
           >
           </video>
         </div>
-        <div className="absolute inset-0 bg-black/50 "></div>
+        <div className="absolute inset-0 bg-black/50" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center text-white px-4">
           <h1 className="text-5xl md:text-6xl font-bold mb-4 text-center">
             Discover Your Next <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-orange-300">Adventure</span>
           </h1>
           <p className="text-xl text-white/90 max-w-2xl text-center mb-8">
-            Explore {internationalDestinations.length} incredible international destinations
+            Explore {destinations.length} incredible international destinations
           </p>
         </div>
       </div>
+
       <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Toolbar */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 sticky top-55 z-40">
+        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 sticky top-16 z-40">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => setShowFilters(!showFilters)}
+                onClick={() => setShowFilters((prev) => !prev)}
                 className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 <SlidersHorizontal className="w-4 h-4" />
@@ -239,9 +292,11 @@ export default function DestinationsInternational() {
                   </span>
                 )}
               </button>
-
               {activeFiltersCount > 0 && (
-                <button onClick={clearAllFilters} className="text-sm text-gray-600 hover:text-orange-600 font-medium flex items-center space-x-1">
+                <button
+                  onClick={clearAllFilters}
+                  className="text-sm text-gray-600 hover:text-orange-600 font-medium flex items-center space-x-1"
+                >
                   <X className="w-4 h-4" />
                   <span>Clear all</span>
                 </button>
@@ -260,16 +315,20 @@ export default function DestinationsInternational() {
                 <option value="rating">Highest Rated</option>
                 <option value="name">Name (A-Z)</option>
               </select>
-
               <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
-                <button onClick={() => setViewMode('grid')} className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : ''}`}>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : ''}`}
+                >
                   <Grid className="w-5 h-5" />
                 </button>
-                <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : ''}`}>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : ''}`}
+                >
                   <List className="w-5 h-5" />
                 </button>
               </div>
-
               <div className="text-gray-600 font-medium">
                 {filteredDestinations.length} destinations
               </div>
@@ -280,12 +339,13 @@ export default function DestinationsInternational() {
         <div className="flex gap-6">
           {showFilters && (
             <div className="w-80 flex-shrink-0">
-              <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-38 h-[calc(180vh-10rem)] overflow-y-auto">
+              <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-38 h-[calc(160vh-12rem)] overflow-y-auto">
                 <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
                   <Filter className="w-5 h-5 text-orange-600" />
                   <span>Filter Destinations</span>
                 </h3>
-                <div className="mb-4">
+
+                <div className="mb-6">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -298,14 +358,13 @@ export default function DestinationsInternational() {
                   </div>
                 </div>
 
-                {/* Region Filter */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center space-x-2">
                     <Globe className="w-4 h-4 text-gray-600" />
                     <span>Region</span>
                   </h4>
                   <div className="space-y-1">
-                    {filterOptions.regions.map(region => (
+                    {filterOptions.regions.map((region) => (
                       <div key={region}>
                         <button
                           onClick={() => toggleRegion(region)}
@@ -316,44 +375,46 @@ export default function DestinationsInternational() {
                           }`}
                         >
                           <span className="font-medium">{region}</span>
-                          <ChevronRight className={`w-4 h-4 transition-transform ${selectedRegions.includes(region) ? 'translate-x-1' : ''}`} />
+                          <ChevronRight
+                            className={`w-4 h-4 transition-transform ${selectedRegions.includes(region) ? 'translate-x-1 text-white' : 'text-gray-400 group-hover:text-orange-500'}`}
+                          />
                         </button>
-
-                        {/* Show countries under the region only when that region is selected */}
-                        {region !== 'All' && selectedRegions.includes(region) && countriesByRegion[region] && (
-                          <div className="mt-2 ml-4 space-y-1 pl-2 border-l-2 border-orange-200">
-                            {countriesByRegion[region].map(country => (
-                              <label
-                                key={country}
-                                className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCountries.includes(country)}
-                                  onChange={() => toggleCountry(country)}
-                                  className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                                />
-                                <span className="text-gray-700">{country}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
+                        {region !== 'All'
+                          && selectedRegions.includes(region)
+                          && countriesByRegion[region]
+                          && (
+                            <div className="mt-2 ml-4 space-y-1 pl-2 border-l-2 border-orange-200">
+                              {countriesByRegion[region].map((country) => (
+                                <label
+                                  key={country}
+                                  className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCountries.includes(country)}
+                                    onChange={() => toggleCountry(country)}
+                                    className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                                  />
+                                  <span className="text-gray-700">{country}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Price Range */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-gray-600" />
+                    <IndianRupee className="w-4 h-4 text-gray-600" />
                     <span>Price Range</span>
                   </h4>
                   <div className="space-y-2">
-                    {filterOptions.priceRanges.map(range => (
+                    {filterOptions.priceRanges.map((range) => (
                       <button
                         key={range.label}
-                        onClick={() => setSelectedPriceRange(selectedPriceRange?.label === range.label ? null : range)}
+                        onClick={() => setSelectedPriceRange((prev) => (prev?.label === range.label ? null : range))}
                         className={`w-full text-left px-4 py-2 rounded-lg transition-all flex items-center justify-between cursor-pointer ${
                           selectedPriceRange?.label === range.label
                             ? 'bg-green-50 border-2 border-green-500 text-green-900'
@@ -361,54 +422,56 @@ export default function DestinationsInternational() {
                         }`}
                       >
                         <span>{range.label}</span>
-                        <span className="text-sm">${range.min} - ${range.max}</span>
+                        <span className="text-sm">
+                          {range.max === Infinity
+                            ? `${formatCurrency(range.min)}+`
+                            : `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`}
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Activities */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center space-x-2">
                     <Compass className="w-4 h-4 text-gray-600" />
                     <span>Activities</span>
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {filterOptions.activities.map(act => (
+                    {filterOptions.activities.map((activity) => (
                       <button
-                        key={act}
-                        onClick={() => toggleActivity(act)}
+                        key={activity}
+                        onClick={() => toggleActivity(activity)}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
-                          selectedActivities.includes(act)
-                            ? 'bg-blue-600 text-white shadow-md'
+                          selectedActivities.includes(activity)
+                            ? 'bg-gradient-to-r from-orange-600 to-yellow-500 text-white shadow-md'
                             : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                         }`}
                       >
-                        {act}
+                        {activity}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Rating */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center space-x-2">
                     <Star className="w-4 h-4 text-gray-600" />
                     <span>Minimum Rating</span>
                   </h4>
                   <div className="space-y-2">
-                    {filterOptions.ratings.map(r => (
+                    {filterOptions.ratings.map((ratingValue) => (
                       <button
-                        key={r}
-                        onClick={() => setMinRating(minRating === r ? 0 : r)}
+                        key={ratingValue}
+                        onClick={() => setMinRating((prev) => (prev === ratingValue ? 0 : ratingValue))}
                         className={`w-full text-left px-4 py-2 rounded-lg transition-all flex items-center space-x-2 cursor-pointer ${
-                          minRating === r
+                          minRating === ratingValue
                             ? 'bg-yellow-50 border-2 border-yellow-500'
                             : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
                         }`}
                       >
                         <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                        <span>{r}+ & above</span>
+                        <span>{ratingValue}+ & above</span>
                       </button>
                     ))}
                   </div>
@@ -417,34 +480,39 @@ export default function DestinationsInternational() {
             </div>
           )}
 
-          {/* Destinations */}
           <div className="flex-1">
             {filteredDestinations.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-4">
-                  <Search className="w-10 h-10 text-gray-400" />
+              <div className="text-center py-20 bg-gray-50 rounded-2xl">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-200 rounded-full mb-4">
+                  <Filter className="w-10 h-10 text-gray-400" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">No destinations found</h3>
                 <p className="text-gray-600 mb-4">Try adjusting your filters</p>
-                <button onClick={clearAllFilters} className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
-                  Clear all filters
+                <button
+                  onClick={clearAllFilters}
+                  className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                >
+                  Clear filters
                 </button>
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredDestinations.map(dest => (
+                {filteredDestinations.map((dest) => (
                   <div
                     key={dest.id}
-                    onClick={() => navigate(`/packages?country=${dest.slug_country}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?country=${dest.slug_country}`); }}
+                    onClick={() => navigate(`/packages?destination=${dest.slug}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?destination=${dest.slug}`); }}
                     role="button"
                     tabIndex={0}
                     className="group bg-white rounded-2xl overflow-hidden border border-gray-200 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer"
                   >
                     <div className="relative h-64 overflow-hidden">
-                      <img src={dest.image_url} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
-
+                      <img
+                        src={dest.image_url || FALLBACK_IMAGE}
+                        alt={dest.name}
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                       <div className="absolute bottom-4 left-4 right-4">
                         <div className="flex items-center space-x-2 text-white">
                           <MapPin className="w-5 h-5" />
@@ -455,7 +523,6 @@ export default function DestinationsInternational() {
 
                     <div className="p-5">
                       <p className="text-gray-600 text-sm mb-4 line-clamp-2">{dest.description}</p>
-
                       <div className="grid grid-cols-3 gap-3 mb-4">
                         <div className="text-center p-2 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-center space-x-1 mb-1">
@@ -473,19 +540,18 @@ export default function DestinationsInternational() {
                         </div>
                         <div className="text-center p-2 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-center mb-1">
-                            <span className="font-bold text-gray-900">{dest.packages}</span>
+                            <span className="font-bold text-gray-900">{dest.packagesCount}</span>
                           </div>
                           <p className="text-xs text-gray-500">Packages</p>
                         </div>
                       </div>
-
                       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Starting from</p>
-                          <p className="text-2xl font-bold text-gray-900">${dest.price}</p>
+                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(dest.price)}</p>
                         </div>
                         <Link
-                          to={`/packages?country=${dest.slug_country}`}
+                          to={`/packages?destination=${dest.slug}`}
                           onClick={(e) => e.stopPropagation()}
                           className="px-6 py-2.5 bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
                         >
@@ -498,59 +564,82 @@ export default function DestinationsInternational() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredDestinations.map(dest => (
+              <div className="space-y-6">
+                {filteredDestinations.map((dest) => (
                   <div
                     key={dest.id}
-                    onClick={() => navigate(`/packages?country=${dest.slug_country}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?country=${dest.slug_country}`); }}
+                    onClick={() => navigate(`/packages?destination=${dest.slug}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?destination=${dest.slug}`); }}
                     role="button"
                     tabIndex={0}
                     className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-300 cursor-pointer"
                   >
-                    <div className="flex flex-col md:flex-row">
-                      <div className="relative md:w-80 h-64 md:h-auto flex-shrink-0 overflow-hidden">
-                        <img src={dest.image_url} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent"></div>
+                    <div className="flex flex-col lg:flex-row">
+                      <div className="relative lg:w-96 h-64 lg:h-auto overflow-hidden flex-shrink-0">
+                        <img
+                          src={dest.image_url || FALLBACK_IMAGE}
+                          alt={dest.name}
+                          className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
+                        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-semibold text-orange-600">
+                          {dest.region || 'Global'}
+                        </div>
                       </div>
-
-                      <div className="flex-1 p-6">
-                        <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 p-6 lg:p-8">
+                        <div className="flex items-start justify-between mb-4">
                           <div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">
                               {dest.name}, {dest.country}
                             </h3>
-                            <div className="flex items-center space-x-4 text-sm text-gray-600">
-                              <div className="flex items-center space-x-1">
-                                <MapPin className="w-4 h-4" />
-                                <span>{dest.region}</span>
-                              </div>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {dest.activities.slice(0, 4).map((activity) => (
+                                <span key={activity} className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
+                                  {activity}
+                                </span>
+                              ))}
+                              {dest.activities.length > 4 && (
+                                <span className="text-xs text-gray-500">+{dest.activities.length - 4} more</span>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center space-x-1 bg-yellow-50 px-3 py-1.5 rounded-lg">
-                            <Star className="w-5 h-5 fill-yellow-500 text-yellow-500" />
-                            <span className="font-bold text-gray-900">{dest.rating}</span>
-                            <span className="text-gray-500 text-sm">({dest.reviews})</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(dest.id);
+                            }}
+                            className={`p-2 rounded-full border transition-all ${favorites.includes(dest.id) ? 'bg-red-50 border-red-200 text-red-500' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-red-400'}`}
+                          >
+                            <Heart className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        <p className="text-gray-600 mb-5 leading-relaxed">{dest.description}</p>
+
+                        <div className="flex flex-wrap gap-6 text-sm text-gray-600 mb-6">
+                          <div className="flex items-center space-x-2">
+                            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                            <span className="font-semibold">{dest.rating}</span>
+                            <span className="text-gray-400">({dest.reviews} reviews)</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4" />
+                            <span>{dest.duration || 'Flexible'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Sun className="w-4 h-4" />
+                            <span>{dest.packagesCount} curated packages</span>
                           </div>
                         </div>
 
-                        <p className="text-gray-600 mb-4 leading-relaxed">{dest.description}</p>
                         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                          <div className="flex items-center space-x-6">
-                            <div>
-                              <p className="text-xs text-gray-500 mb-1">Starting from</p>
-                              <p className="text-3xl font-bold text-gray-900">${dest.price}</p>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              <div className="flex items-center space-x-1 mb-1">
-                                <Clock className="w-4 h-4" />
-                                <span className="font-semibold">{dest.duration}</span>
-                              </div>
-                              <div>{dest.packages} packages available</div>
-                            </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Starting Price</p>
+                            <p className="text-3xl font-bold text-gray-900">{formatCurrency(dest.price)}</p>
                           </div>
                           <Link
-                            to={`/packages?country=${dest.slug_country}`}
+                            to={`/packages?destination=${dest.slug}`}
                             onClick={(e) => e.stopPropagation()}
                             className="px-8 py-3 bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
                           >

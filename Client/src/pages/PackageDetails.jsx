@@ -3,90 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, Star, MapPin, Check, X, Calendar, Users, Download, ChevronLeft, ChevronRight, XCircle, Shield, Award, Heart, Share2, FileText, Map, CheckCircle } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { fetchPackageById } from '../utils/packageApi';
+import { formatCurrency } from '../utils/currency';
 
-const mockDestinations = [
-  { id: 1, name: 'Bali', country: 'Indonesia' },
-  { id: 2, name: 'Paris', country: 'France' }
-];
-
-const mockPackages = [
-  {
-    id: 1,
-    title: 'Ultimate Bali Adventure',
-    description: 'Experience the magic of Bali with our comprehensive tour package. From pristine beaches to ancient temples, lush rice terraces to vibrant markets, this journey offers an authentic taste of Indonesian paradise. Immerse yourself in local culture, savor traditional cuisine, and create unforgettable memories in one of the world\'s most enchanting destinations.',
-    destination_id: 1,
-    duration_days: 7,
-    price_from: 1299,
-    rating: 4.8,
-    reviews_count: 156,
-    category: 'adventure',
-    images: [
-      'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1600',
-      'https://images.unsplash.com/photo-1559628376-f3fe5f782a2e?w=1600',
-      'https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=1600',
-      'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=1600'
-    ],
-    highlights: [
-      'Private beach resort accommodation',
-      'Traditional Balinese cooking class',
-      'Sunrise trek to Mount Batur',
-      'Ubud rice terrace exploration',
-      'Sacred monkey forest visit',
-      'Sunset dinner cruise'
-    ],
-    itinerary: [
-      { title: 'Arrival & Beach Welcome', description: 'Arrive in Bali and transfer to your beachfront resort. Enjoy a welcome dinner with ocean views and relax after your journey.' },
-      { title: 'Ubud Cultural Experience', description: 'Visit the sacred monkey forest, explore traditional art markets, and take a cooking class to learn authentic Balinese cuisine.' },
-      { title: 'Mount Batur Sunrise Trek', description: 'Early morning trek to watch the sunrise from the summit. Return for breakfast and spa relaxation at the resort.' },
-      { title: 'Rice Terraces & Waterfalls', description: 'Explore the famous Tegalalang rice terraces and visit the stunning Tegenungan waterfall. Evening free for shopping.' },
-      { title: 'Temple & Beach Day', description: 'Visit the iconic Tanah Lot temple and spend the afternoon at Seminyak beach with water sports activities.' },
-      { title: 'Island Exploration', description: 'Full day boat trip to nearby Nusa Penida island for snorkeling, cliff views, and pristine beaches.' },
-      { title: 'Departure', description: 'Final morning at leisure, spa treatment, and transfer to airport. Farewell Bali!' }
-    ],
-    inclusions: [
-      'Airport transfers in private vehicle',
-      '6 nights accommodation in 4-star resort',
-      'Daily breakfast and 4 dinners',
-      'All entrance fees and activities',
-      'English-speaking tour guide',
-      'Travel insurance coverage'
-    ],
-    exclusions: [
-      'International flights',
-      'Personal expenses and souvenirs',
-      'Meals not mentioned in itinerary',
-      'Optional activities',
-      'Tips and gratuities'
-    ]
-  }
-];
-
-const mockReviews = [
-  {
-    id: 1,
-    package_id: 1,
-    user_name: 'Sarah Johnson',
-    rating: 5,
-    comment: 'Absolutely incredible experience! The organization was flawless and every detail was taken care of. Our guide was knowledgeable and friendly. Highly recommend!',
-    created_at: '2024-10-15'
-  },
-  {
-    id: 2,
-    package_id: 1,
-    user_name: 'Michael Chen',
-    rating: 5,
-    comment: 'Best vacation ever! The sunrise trek was breathtaking and the cooking class was so much fun. Great value for money.',
-    created_at: '2024-09-28'
-  },
-  {
-    id: 3,
-    package_id: 1,
-    user_name: 'Emma Williams',
-    rating: 4,
-    comment: 'Wonderful trip overall. Accommodation was beautiful and activities were well-planned. Only minor issue was some timing delays.',
-    created_at: '2024-09-10'
-  }
-];
+const FALLBACK_IMG = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
 export default function PackageDetails() {
   const { id } = useParams();
@@ -98,6 +18,8 @@ export default function PackageDetails() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', travelers: 2, date: '', message: '',
   });
@@ -105,13 +27,39 @@ export default function PackageDetails() {
   const pdfRef = useRef(null);
 
   useEffect(() => {
-    if (id) {
-      const packageData = mockPackages.find((p) => p.id === parseInt(id));
-      if (packageData) {
+    if (!id) return;
+
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    fetchPackageById(id)
+      .then((packageData) => {
+        if (!isMounted) return;
         setPkg(packageData);
-        setReviews(mockReviews.filter((r) => r.package_id === parseInt(id)));
-      }
-    }
+        const fetchedReviews = Array.isArray(packageData?.raw?.reviews)
+          ? packageData.raw.reviews.map((review) => ({
+              id: review._id || review.id,
+              user_name: review.author?.name || review.user?.name || 'Traveler',
+              rating: review.rating || 0,
+              comment: review.comment || '',
+              created_at: review.createdAt || review.created_at || new Date().toISOString(),
+            }))
+          : [];
+        setReviews(fetchedReviews);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err.message || 'Unable to load package details');
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   const heroImages = pkg?.images || [];
@@ -128,7 +76,7 @@ export default function PackageDetails() {
     return () => clearInterval(idt);
   }, [heroImages.length, lightboxOpen, isHovered]);
 
-  const pkgDestination = pkg ? mockDestinations.find((d) => d.id === pkg.destination_id) : null;
+  const pkgDestination = pkg?.destination || null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -155,11 +103,49 @@ export default function PackageDetails() {
     { id: 'reviews', label: 'Reviews', icon: Star },
   ];
 
-  if (!pkg) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-500"></div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+        <div className="max-w-md text-center bg-white rounded-2xl shadow-lg p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load package</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/packages')}
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
+          >
+            Browse packages
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pkg) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center bg-white rounded-2xl shadow-lg p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Package not found</h2>
+          <p className="text-gray-600 mb-6">The package you're looking for may have been removed.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/packages')}
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
+          >
+            Explore packages
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -168,7 +154,7 @@ export default function PackageDetails() {
         <div ref={pdfRef} className="p-10 bg-white">
           <h1 className="text-3xl font-bold mb-4">{pkg.title}</h1>
           <p className="mb-4">{pkg.description}</p>
-          <p><strong>Duration:</strong> {pkg.duration_days} Days | <strong>From:</strong> ${pkg.price_from}</p>
+          <p><strong>Duration:</strong> {pkg.duration_days} Days | <strong>From:</strong> {formatCurrency(pkg.price_from)}</p>
           <h2 className="text-xl font-bold mt-6 mb-2">Itinerary</h2>
           {pkg.itinerary?.map((day, i) => (
             <div key={i} className="mb-3">
@@ -422,6 +408,9 @@ export default function PackageDetails() {
                         <p className="text-sm text-gray-500">{pkg.reviews_count} reviews</p>
                       </div>
                     </div>
+                    {reviews.length === 0 && (
+                      <p className="text-gray-600">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
+                    )}
                     {reviews.map((r) => (
                       <div key={r.id} className="border-b border-gray-200 pb-6 last:border-0">
                         <div className="flex justify-between items-start mb-3">
@@ -451,7 +440,7 @@ export default function PackageDetails() {
                 <div className="mb-6">
                   <p className="text-sm text-gray-600 mb-1">Starting from</p>
                   <div className="flex items-baseline gap-2">
-                    <p className="text-5xl font-bold text-gray-900">${pkg.price_from}</p>
+                    <p className="text-5xl font-bold text-gray-900">{formatCurrency(pkg.price_from)}</p>
                     <span className="text-gray-500 font-medium">/person</span>
                   </div>
                 </div>

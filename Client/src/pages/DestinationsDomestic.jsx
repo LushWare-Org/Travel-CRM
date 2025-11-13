@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Star, Clock, DollarSign, Filter, X, SlidersHorizontal, Grid, List, Heart, ArrowRight, Globe, Compass, Sun, ChevronRight } from 'lucide-react';
-import { mockDestinations, mockPackages } from '../data/mockData';
+import { Search, MapPin, Star, Clock, IndianRupee, Filter, X, SlidersHorizontal, Grid, List, Heart, ArrowRight, Globe, Compass, Sun, ChevronRight } from 'lucide-react';
+import { fetchPackages } from '../utils/packageApi';
+import { formatCurrency } from '../utils/currency';
+
+const FALLBACK_IMAGE = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
 const filterOptions = {
   priceRanges: [
@@ -15,7 +18,6 @@ const filterOptions = {
 
 export default function DestinationsDomestic() {
   const navigate = useNavigate();
-  const domesticDestinations = mockDestinations.filter(d => d.country === 'India');
   const [filteredDestinations, setFilteredDestinations] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,49 +28,53 @@ export default function DestinationsDomestic() {
   const [sortBy, setSortBy] = useState('popularity');
   const [showFilters, setShowFilters] = useState(true);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
-
-  const allDestinationNames = useMemo(() => {
-    return domesticDestinations.map(d => d.name).sort();
-  }, []);
-
-  const enrichedDestinations = domesticDestinations.map(dest => {
-    const packages = mockPackages.filter(p => p.destination_id === dest.id);
-    const avgRating = packages.length > 0
-      ? (packages.reduce((sum, p) => sum + p.rating, 0) / packages.length).toFixed(1)
-      : 4.5;
-    const reviews = packages.reduce((sum, p) => sum + p.reviews_count, 0);
-    const minPrice = packages.length > 0 ? Math.min(...packages.map(p => p.price_from)) : 399;
-    const duration = packages.length > 0
-      ? `${Math.min(...packages.map(p => p.duration_days))}D/${Math.min(...packages.map(p => p.duration_days)) - 1}N`
-      : '4D/3N';
-    const inferredActivities = new Set();
-    packages.forEach(p => {
-      p.highlights.forEach(h => {
-        if (h.includes('Beach') || h.includes('Island') || h.includes('Sea')) inferredActivities.add('Beach');
-        if (h.includes('Mountain') || h.includes('Hill') || h.includes('Trekking')) inferredActivities.add('Mountains');
-        if (h.includes('Culture') || h.includes('Temple') || h.includes('Heritage') || h.includes('Palace')) inferredActivities.add('Culture');
-        if (h.includes('Adventure') || h.includes('Safari') || h.includes('Skydiving') || h.includes('Water Sports')) inferredActivities.add('Adventure');
-        if (h.includes('Luxury') || h.includes('Spa') || h.includes('Villa') || h.includes('5-Star')) inferredActivities.add('Luxury');
-        if (h.includes('Food') || h.includes('Cuisine') || h.includes('Cooking')) inferredActivities.add('Food');
-        if (h.includes('Shopping') || h.includes('Market') || h.includes('Mall')) inferredActivities.add('Shopping');
-        if (h.includes('Nature') || h.includes('Wildlife') || h.includes('Backwaters')) inferredActivities.add('Nature');
-        if (h.includes('Honeymoon') || h.includes('Romance') || h.includes('Candlelight')) inferredActivities.add('Romance');
-      });
-    });
-    return {
-      ...dest,
-      rating: parseFloat(avgRating),
-      reviews,
-      price: minPrice,
-      duration,
-      packages: packages.length,
-      activities: Array.from(inferredActivities || []),
-      tags: dest.popular ? ['Trending'] : []
-    };
-  });
+  const [destinations, setDestinations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    let filtered = [...enrichedDestinations];
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    fetchPackages({ limit: 100 })
+      .then(({ destinations: dest }) => {
+        if (!isMounted) return;
+        setDestinations(dest.filter((d) => d.type === 'domestic'));
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err.message || 'Failed to load destinations');
+        setDestinations([]);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const allDestinationNames = useMemo(() => {
+    return destinations.map((d) => d.name).filter(Boolean).sort();
+  }, [destinations]);
+
+  const preparedDestinations = useMemo(() => (
+    destinations.map((dest) => ({
+      ...dest,
+      price: dest.price || 0,
+      rating: dest.rating || 0,
+      reviews: dest.reviews || 0,
+      duration: dest.durationLabel || '',
+      packagesCount: dest.packagesCount || 0,
+      activities: dest.activities || [],
+    }))
+  ), [destinations]);
+
+  useEffect(() => {
+    let filtered = [...preparedDestinations];
     if (searchQuery) {
       filtered = filtered.filter(dest =>
         dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -93,7 +99,7 @@ export default function DestinationsDomestic() {
     }
     switch (sortBy) {
       case 'popularity':
-        filtered.sort((a, b) => b.packages - a.packages);
+        filtered.sort((a, b) => b.packagesCount - a.packagesCount);
         break;
       case 'price-low':
         filtered.sort((a, b) => a.price - b.price);
@@ -115,7 +121,7 @@ export default function DestinationsDomestic() {
     if (selectedPriceRange) count++;
     if (minRating > 0) count++;
     setActiveFiltersCount(count);
-  }, [searchQuery, selectedDestinations, selectedActivities, selectedPriceRange, minRating, sortBy]);
+  }, [searchQuery, selectedDestinations, selectedActivities, selectedPriceRange, minRating, sortBy, preparedDestinations]);
 
   const clearAllFilters = () => {
     setSearchQuery('');
@@ -137,6 +143,32 @@ export default function DestinationsDomestic() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load domestic destinations</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen font-sans bg-white">
        {/* Hero */}
@@ -156,7 +188,7 @@ export default function DestinationsDomestic() {
             Discover Your Next <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-orange-300">Adventure</span>
           </h1>
           <p className="text-xl text-white/90 max-w-2xl text-center mb-8">
-            Explore {domesticDestinations.length} incredible local destinations
+            Explore {destinations.length} incredible local destinations
           </p>
         </div>
       </div>
@@ -253,7 +285,7 @@ export default function DestinationsDomestic() {
                 </div>
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-gray-600" />
+                    <IndianRupee className="w-4 h-4 text-gray-600" />
                     <span>Price Range</span>
                   </h4>
                   <div className="space-y-2">
@@ -268,7 +300,11 @@ export default function DestinationsDomestic() {
                         }`}
                       >
                         <span>{range.label}</span>
-                        <span className="text-sm">${range.min} - ${range.max}</span>
+                        <span className="text-sm">
+                          {range.max === Infinity
+                            ? `${formatCurrency(range.min)}+`
+                            : `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -336,14 +372,14 @@ export default function DestinationsDomestic() {
                 {filteredDestinations.map(dest => (
                   <div
                     key={dest.id}
-                    onClick={() => navigate(`/packages?state=${dest.slug_state}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?state=${dest.slug_state}`); }}
+                    onClick={() => navigate(`/packages?destination=${dest.slug}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?destination=${dest.slug}`); }}
                     role="button"
                     tabIndex={0}
                     className="group bg-white rounded-2xl overflow-hidden border border-gray-200 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer"
                   >
                     <div className="relative h-64 overflow-hidden">
-                      <img src={dest.image_url} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
+                      <img src={dest.image_url || FALLBACK_IMAGE} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
                       <div className="absolute bottom-4 left-4 right-4">
                         <div className="flex items-center space-x-2 text-white">
@@ -371,7 +407,7 @@ export default function DestinationsDomestic() {
                         </div>
                         <div className="text-center p-2 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-center mb-1">
-                            <span className="font-bold text-gray-900">{dest.packages}</span>
+                            <span className="font-bold text-gray-900">{dest.packagesCount}</span>
                           </div>
                           <p className="text-xs text-gray-500">Packages</p>
                         </div>
@@ -379,10 +415,10 @@ export default function DestinationsDomestic() {
                       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Starting from</p>
-                          <p className="text-2xl font-bold text-gray-900">${dest.price}</p>
+                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(dest.price)}</p>
                         </div>
                         <Link
-                          to={`/packages?state=${dest.slug_state}`}
+                          to={`/packages?destination=${dest.slug}`}
                           onClick={(e) => e.stopPropagation()}
                           className="px-6 py-2.5 bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
                         >
@@ -399,15 +435,15 @@ export default function DestinationsDomestic() {
                 {filteredDestinations.map(dest => (
                   <div
                     key={dest.id}
-                    onClick={() => navigate(`/packages?state=${dest.slug_state}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?state=${dest.slug_state}`); }}
+                    onClick={() => navigate(`/packages?destination=${dest.slug}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?destination=${dest.slug}`); }}
                     role="button"
                     tabIndex={0}
                     className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-300 cursor-pointer"
                   >
                     <div className="flex flex-col md:flex-row">
                       <div className="relative md:w-80 h-64 md:h-auto flex-shrink-0 overflow-hidden">
-                        <img src={dest.image_url} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
+                        <img src={dest.image_url || FALLBACK_IMAGE} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent"></div>
                       </div>
                       <div className="flex-1 p-6">
@@ -434,18 +470,18 @@ export default function DestinationsDomestic() {
                           <div className="flex items-center space-x-6">
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Starting from</p>
-                              <p className="text-3xl font-bold text-gray-900">${dest.price}</p>
+                              <p className="text-3xl font-bold text-gray-900">{formatCurrency(dest.price)}</p>
                             </div>
                             <div className="text-sm text-gray-600">
                               <div className="flex items-center space-x-1 mb-1">
                                 <Clock className="w-4 h-4" />
                                 <span className="font-semibold">{dest.duration}</span>
                               </div>
-                              <div>{dest.packages} packages available</div>
+                              <div>{dest.packagesCount} packages available</div>
                             </div>
                           </div>
                           <Link
-                            to={`/packages?state=${dest.slug_state}`}
+                            to={`/packages?destination=${dest.slug}`}
                             onClick={(e) => e.stopPropagation()}
                             className="px-8 py-3 bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
                           >

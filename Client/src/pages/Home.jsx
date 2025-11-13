@@ -1,9 +1,13 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Clock, Star, TrendingUp, Heart, Users, Calendar, Search, ArrowRight, CheckCircle, Quote, Globe, Shield, ChevronRight, ChevronDown, Check, Play, ChevronLeft, Sparkles, CreditCard, Plane, FileText, Wallet } from 'lucide-react';
 import FAQSection from './Landing/FAQ';
 import KeyPartnersSection from './Landing/KeyPartners';
-import { mockDestinations as dataDestinations, mockPackages as dataPackages } from '../data/mockData';
+import { fetchPackages } from '../utils/packageApi';
+import { createSlug } from '../utils/packageTransform';
+import { formatCurrency } from '../utils/currency';
+
+const FALLBACK_IMAGE = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
 const experiences = [
   { title: 'Adventure Tours', count: '1,200+', color: 'from-orange-500 to-red-500' },
@@ -11,10 +15,6 @@ const experiences = [
   { title: 'Cultural Trips', count: '800+', color: 'from-purple-500 to-pink-500' },
   { title: 'Luxury Escapes', count: '600+', color: 'from-amber-500 to-yellow-500' }
 ];
-
-const mockDestinations = dataDestinations || [];
-const mockLocalDestinations = mockDestinations.filter(d => d.country === 'India' || d.region === 'India' || d.state);
-const mockPackages = (dataPackages || []).map(p => ({ ...p, destination: mockDestinations.find(d => d.id === p.destination_id) }));
 
 const testimonials = [
   { name: 'Sarah Johnson', location: 'New York', rating: 5, text: 'Absolutely wonderful experience! The trip was perfectly planned and exceeded all expectations.' },
@@ -43,85 +43,22 @@ const dealData = [
   { destination: 'Santorini Escape', subtitle: 'Romantic Sunset Villa', image: 'https://i.postimg.cc/tCd6qS95/pexels-photo-1285625.jpg', originalPrice: 2999, discountPrice: 1999, discount: 33, duration: '6 Days / 5 Nights', inclusions: ['Cave Suite', 'Wine Tours', 'Private Cruise', 'Breakfast'], validUntil: 'December 31, 2025', savings: 1000 },
 ];
 
-const recentItineraries = [
-  {
-    id: 1,
-    packageName: 'Overwater Honeymoon',
-    location: 'Maldives',
-    image: 'https://i.postimg.cc/vHSsVM8W/pexels-photo-3155666.jpg',
-    duration: '7D/6N',
-    price: 2999,
-    pax: 2,
-    bookedAgo: '2 hours ago',
-    traveler: { name: 'Sarah Johnson', from: 'New York, USA' },
-  },
-  {
-    id: 2,
-    packageName: 'Swiss Alps Ski & Stay',
-    location: 'Switzerland',
-    image: 'https://i.postimg.cc/7ZgJsCTT/pexels-photo-2662116.jpg',
-    duration: '8D/7N',
-    price: 3499,
-    pax: 2,
-    bookedAgo: '5 hours ago',
-    traveler: { name: 'Michael Chen', from: 'Singapore' },
-  },
-  {
-    id: 3,
-    packageName: 'Bali Cultural Retreat',
-    location: 'Indonesia',
-    image: 'https://i.postimg.cc/vmrk3dyn/pexels-photo-2166559.jpg',
-    duration: '6D/5N',
-    price: 1899,
-    pax: 1,
-    bookedAgo: '8 hours ago',
-    traveler: { name: 'Emma Williams', from: 'London, UK' },
-  },
-  {
-    id: 4,
-    packageName: 'Santorini Sunset Villa',
-    location: 'Greece',
-    image: 'https://i.postimg.cc/tCd6qS95/pexels-photo-1285625.jpg',
-    duration: '5D/4N',
-    price: 2499,
-    pax: 2,
-    bookedAgo: '12 hours ago',
-    traveler: { name: 'Raj Patel', from: 'Mumbai, India' },
-  },
-  {
-    id: 5,
-    packageName: 'Dubai Desert & City Luxe',
-    location: 'UAE',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-    duration: '5D/4N',
-    price: 2799,
-    pax: 1,
-    bookedAgo: '1 hour ago',
-    traveler: { name: 'Lisa Anderson', from: 'Sydney, Australia' },
-  },
-  {
-    id: 6,
-    packageName: 'Thailand Island Hopper',
-    location: 'Thailand',
-    image: 'https://i.postimg.cc/yxmz4zh3/pexels-photo-1007426.jpg',
-    duration: '7D/6N',
-    price: 899,
-    pax: 3,
-    bookedAgo: '3 hours ago',
-    traveler: { name: 'David Martinez', from: 'Toronto, Canada' },
-  },
-];
+function RecentlyBookedSlider({ items = [] }) {
+  if (!items.length) return null;
 
-function RecentlyBookedSlider() {
-  const total = recentItineraries.length;
-  const cardsPerView = 4;
-  const combined = [...recentItineraries, ...recentItineraries];
+  const cardsPerView = Math.min(4, items.length);
+  const total = items.length;
+  const combined = [...items, ...items];
   const [slideIdx, setSlideIdx] = useState(0);
   const [enableTransition, setEnableTransition] = useState(true);
   const animatingRef = useRef(false);
 
   useEffect(() => {
-    if (total < cardsPerView) return;
+    if (total <= cardsPerView) {
+      setEnableTransition(false);
+      setSlideIdx(0);
+      return;
+    }
     setEnableTransition(false);
     setSlideIdx(0);
     animatingRef.current = false;
@@ -133,7 +70,7 @@ function RecentlyBookedSlider() {
       setSlideIdx((i) => i + 1);
     }, 4000);
     return () => clearInterval(id);
-  }, [total]);
+  }, [total, cardsPerView]);
 
   const onTransitionEnd = () => {
     if (slideIdx >= total) {
@@ -147,28 +84,37 @@ function RecentlyBookedSlider() {
   };
 
   const goPrev = () => {
+    if (total <= cardsPerView) return;
     setEnableTransition(true);
     animatingRef.current = true;
     setSlideIdx((i) => (i <= 0 ? total - 1 : i - 1));
   };
 
   const goNext = () => {
+    if (total <= cardsPerView) return;
     setEnableTransition(true);
     animatingRef.current = true;
     setSlideIdx((i) => i + 1);
   };
 
-  const widthPct = 100 / cardsPerView;
+  const widthPct = cardsPerView > 0 ? 100 / cardsPerView : 100;
+  const showControls = total > cardsPerView;
 
-  const formatDurationString = (s) => {
-    if (!s) return '';
-    const dn = s.match(/(\d+)\s*[Dd]\s*\/\s*(\d+)\s*[Nn]/);
+  const formatDurationString = (value) => {
+    if (!value) return '';
+    const dn = value.match(/(\d+)\s*[Dd]\s*\/\s*(\d+)\s*[Nn]/);
     if (dn) return `${dn[1]} Days / ${dn[2]} Nights`;
-    const d = s.match(/(\d+)\s*[Dd]/);
-    const n = s.match(/(\d+)\s*[Nn]/);
+    const d = value.match(/(\d+)\s*[Dd]/);
+    const n = value.match(/(\d+)\s*[Nn]/);
     if (d && n) return `${d[1]} Days / ${n[1]} Nights`;
-    if (/days|day|nights|night/i.test(s)) return s;
-    return s;
+    if (/days|day|nights|night/i.test(value)) return value;
+    return value;
+  };
+
+  const paxLabel = (pax) => {
+    if (!pax || pax <= 1) return 'Per Person';
+    if (pax === 2) return 'Per Couple';
+    return `${pax} Travelers`;
   };
 
   return (
@@ -185,64 +131,76 @@ function RecentlyBookedSlider() {
           </p>
         </div>
         <div className="relative">
-          <button onClick={goPrev} className="absolute -left-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-all duration-300 border border-gray-200">
-            <ChevronLeft className="w-6 h-6 text-gray-700" />
-          </button>
-          <button onClick={goNext} className="absolute -right-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-all duration-300 border border-gray-200">
-            <ChevronRight className="w-6 h-6 text-gray-700" />
-          </button>
+          {showControls && (
+            <>
+              <button onClick={goPrev} className="absolute -left-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-all duration-300 border border-gray-200">
+                <ChevronLeft className="w-6 h-6 text-gray-700" />
+              </button>
+              <button onClick={goNext} className="absolute -right-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-all duration-300 border border-gray-200">
+                <ChevronRight className="w-6 h-6 text-gray-700" />
+              </button>
+            </>
+          )}
           <div className="overflow-hidden">
             <div onTransitionEnd={onTransitionEnd} className={`flex ${enableTransition ? 'transition-transform duration-700 ease-in-out' : ''}`} style={{ transform: `translateX(-${slideIdx * widthPct}%)` }}>
-              {combined.map((item, idx) => (
-                <div key={`${item.id}-${idx}`} className="flex-shrink-0 px-3" style={{ width: `${widthPct}%` }}>
-                  <div className="group relative bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-full border border-gray-100">
-                    <div className="relative h-64 overflow-hidden">
-                      <img src={item.image} alt={item.packageName} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#001d3d]/80 via-[#001d3d]/40 to-transparent" />
-                      <div className="absolute top-3 right-3">
-                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
-                          {item.bookedAgo}
-                        </div>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 p-4">
-                        <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-lg px-3 py-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center flex-shrink-0">
-                            <span className="text-white font-bold text-xs">{item.traveler.name.charAt(0)}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-semibold truncate">{item.traveler.name}</p>
-                            <p className="text-white/80 text-xs truncate">from {item.traveler.from}</p>
+              {combined.map((item, idx) => {
+                const travelerName = item.traveler?.name || 'Traveler';
+                const travelerFrom = item.traveler?.from || 'Worldwide';
+                const travelerInitial = travelerName.charAt(0);
+                return (
+                  <div key={`${item.id}-${idx}`} className="flex-shrink-0 px-3" style={{ width: `${widthPct}%` }}>
+                    <div className="group relative bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-full border border-gray-100">
+                      <div className="relative h-64 overflow-hidden">
+                        <img src={item.image || FALLBACK_IMAGE} alt={item.packageName} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#001d3d]/80 via-[#001d3d]/40 to-transparent" />
+                        <div className="absolute top-3 right-3">
+                          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
+                            {item.bookedAgo}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-white">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                        <div className="sm:pr-4 flex-1 min-w-0">
-                          <h3 className="text-[#001d3d] font-bold text-lg mb-3 line-clamp-2 leading-tight font-poppins">{item.packageName}</h3>
-                          <div className="text-sm text-gray-600">
-                            <div className="flex items-center space-x-2">
-                              <Clock className="w-4 h-4 text-gray-400" />
-                              <span className="font-medium">{formatDurationString(item.duration)}</span>
+                        <div className="absolute bottom-0 left-0 right-0 p-4">
+                          <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-lg px-3 py-2">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center flex-shrink-0">
+                              <span className="text-white font-bold text-xs">{travelerInitial}</span>
                             </div>
-                            <div className="mt-1">{item.pax === 2 ? 'Per Couple' : 'Per Person'}</div>
-                          </div>
-                        </div>
-                        <div className="mt-3 sm:mt-0 sm:ml-4 flex-shrink-0 text-right">
-                          <div className="text-2xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent font-poppins">
-                            ${item.price}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-sm font-semibold truncate">{travelerName}</p>
+                              <p className="text-white/80 text-xs truncate">from {travelerFrom}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <div className="mt-4">
-                        <button className="w-full bg-gradient-to-r from-orange-500 to-yellow-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:shadow-lg transform hover:scale-[1.02] transition-all duration-300 font-opensans">
-                          View Details
-                        </button>
+                      <div className="p-4 bg-white">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                          <div className="sm:pr-4 flex-1 min-w-0">
+                            <h3 className="text-[#001d3d] font-bold text-lg mb-3 line-clamp-2 leading-tight font-poppins">{item.packageName}</h3>
+                            <div className="text-sm text-gray-600">
+                              <div className="flex items-center space-x-2">
+                                <Clock className="w-4 h-4 text-gray-400" />
+                                <span className="font-medium">{formatDurationString(item.duration)}</span>
+                              </div>
+                              <div className="mt-1">{paxLabel(item.pax)}</div>
+                            </div>
+                          </div>
+                          <div className="mt-3 sm:mt-0 sm:ml-4 flex-shrink-0 text-right">
+                            <div className="text-2xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent font-poppins">
+                              {formatCurrency(item.price)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <Link
+                            to={item.slug ? `/package/${item.slug}` : `/package/${item.id}`}
+                            className="w-full block text-center bg-gradient-to-r from-orange-500 to-yellow-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:shadow-lg transform hover:scale-[1.02] transition-all duration-300 font-opensans"
+                          >
+                            View Details
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -251,16 +209,22 @@ function RecentlyBookedSlider() {
   );
 }
 
-function DealSlider() {
-  const total = dealData.length;
-  const cardsPerView = 3;
-  const combined = [...dealData, ...dealData];
+function DealSlider({ deals = [] }) {
+  if (!deals.length) return null;
+
+  const cardsPerView = Math.min(3, deals.length);
+  const total = deals.length;
+  const combined = [...deals, ...deals];
   const [slideIdx, setSlideIdx] = useState(0);
   const [enableTransition, setEnableTransition] = useState(true);
   const animatingRef = useRef(false);
 
   useEffect(() => {
-    if (total < cardsPerView) return;
+    if (total <= cardsPerView) {
+      setEnableTransition(false);
+      setSlideIdx(0);
+      return;
+    }
     setEnableTransition(false);
     setSlideIdx(0);
     animatingRef.current = false;
@@ -272,7 +236,7 @@ function DealSlider() {
       setSlideIdx((i) => i + 1);
     }, 4000);
     return () => clearInterval(id);
-  }, [total]);
+  }, [total, cardsPerView]);
 
   const onTransitionEnd = () => {
     if (slideIdx >= total) {
@@ -285,25 +249,44 @@ function DealSlider() {
     }
   };
 
-  const goPrev = () => { setEnableTransition(true); animatingRef.current = true; setSlideIdx(i => i - 1); };
-  const goNext = () => { setEnableTransition(true); animatingRef.current = true; setSlideIdx(i => i + 1); };
-  const widthPct = 100 / cardsPerView;
+  const goPrev = () => {
+    if (total <= cardsPerView) return;
+    setEnableTransition(true);
+    animatingRef.current = true;
+    setSlideIdx((i) => (i <= 0 ? total - 1 : i - 1));
+  };
+
+  const goNext = () => {
+    if (total <= cardsPerView) return;
+    setEnableTransition(true);
+    animatingRef.current = true;
+    setSlideIdx((i) => i + 1);
+  };
+
+  const widthPct = cardsPerView > 0 ? 100 / cardsPerView : 100;
+  const showControls = total > cardsPerView;
+
+  const formatPrice = (value) => formatCurrency(value);
 
   return (
     <div className="relative font-opensans">
-      <button onClick={goPrev} className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all">
-        <ChevronLeft className="w-6 h-6 text-gray-800" />
-      </button>
-      <button onClick={goNext} className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all">
-        <ChevronRight className="w-6 h-6 text-gray-800" />
-      </button>
+      {showControls && (
+        <>
+          <button onClick={goPrev} className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all">
+            <ChevronLeft className="w-6 h-6 text-gray-800" />
+          </button>
+          <button onClick={goNext} className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all">
+            <ChevronRight className="w-6 h-6 text-gray-800" />
+          </button>
+        </>
+      )}
       <div className="overflow-hidden">
         <div onTransitionEnd={onTransitionEnd} className={`flex ${enableTransition ? 'transition-transform duration-700 ease-linear' : ''}`} style={{ transform: `translateX(-${slideIdx * widthPct}%)` }}>
           {combined.map((deal, idx) => (
-            <div key={idx} className="w-1/3 flex-shrink-0 px-3">
+            <div key={`${deal.id}-${idx}`} className="w-1/3 flex-shrink-0 px-3">
               <div className="bg-white rounded-2xl overflow-hidden border border-gray-200 hover:shadow-2xl hover:border-orange-300 transition-all duration-300 h-full">
                 <div className="relative h-56 overflow-hidden group">
-                  <img src={deal.image} alt={deal.destination} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
+                  <img src={deal.image || FALLBACK_IMAGE} alt={deal.destination} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                   <div className="absolute top-4 right-4 z-10">
                     <div className="relative">
@@ -324,11 +307,12 @@ function DealSlider() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-baseline space-x-2">
                         <span className="text-3xl font-black bg-gradient-to-r from-orange-600 to-yellow-600 bg-clip-text text-transparent font-poppins">
-                          ${deal.discountPrice}
+                          {formatPrice(deal.discountPrice)}
                         </span>
+                        <span className="text-sm text-gray-400 line-through">{formatPrice(deal.originalPrice)}</span>
                       </div>
                       <div className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">
-                        Save ${deal.savings}
+                        Save {formatPrice(deal.savings)}
                       </div>
                     </div>
                     <div className="flex items-center space-x-3 text-xs text-gray-600">
@@ -342,7 +326,7 @@ function DealSlider() {
                   </div>
                   <div className="mb-4">
                     <div className="grid grid-cols-2 gap-2">
-                      {deal.inclusions.map((item, i) => (
+                      {deal.inclusions?.slice(0, 4).map((item, i) => (
                         <div key={i} className="flex items-start space-x-1.5">
                           <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0 mt-0.5" />
                           <span className="text-xs text-gray-700 font-medium leading-tight">{item}</span>
@@ -356,7 +340,10 @@ function DealSlider() {
                       <div className="text-xs text-gray-900 font-bold">Valid Till: {deal.validUntil}</div>
                     </div>
                   </div>
-                  <Link to="/customize" className="w-full group relative overflow-hidden bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 block font-opensans">
+                  <Link
+                    to={deal.slug ? `/package/${deal.slug}` : `/package/${deal.id}`}
+                    className="w-full group relative overflow-hidden bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-300 block font-opensans text-center"
+                  >
                     <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     <div className="relative px-4 py-3 flex items-center justify-center space-x-2">
                       <span>Book Now</span>
@@ -382,7 +369,7 @@ function InternationalSlider({ destinations, activeRegion }) {
     return regionVal === active;
   });
   const total = filtered.length;
-  const cardsPerView = Math.min(4);
+  const cardsPerView = Math.min(4, total || 1);
   const combined = [...filtered, ...filtered];
   const [slideIdx, setSlideIdx] = useState(0);
   const [enableTransition, setEnableTransition] = useState(true);
@@ -429,13 +416,13 @@ function InternationalSlider({ destinations, activeRegion }) {
         <div onTransitionEnd={onTransitionEnd} className={`flex ${enableTransition ? 'transition-transform duration-700 ease-linear' : ''}`} style={{ transform: `translateX(-${slideIdx * widthPct}%)` }}>
               {combined.map((dest, idx) => (
             <div key={`${dest.id}-${idx}`} className="flex-shrink-0 px-3" style={{ width: `${widthPct}%` }}>
-              <Link to={`/packages?country=${dest.slug_country}`} className="group relative overflow-hidden rounded-2xl aspect-[3/4] hover:shadow-2xl transition-all duration-300 block">
-                <img src={dest.image_url} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
+              <Link to={`/packages?destination=${dest.slug}`} className="group relative overflow-hidden rounded-2xl aspect-[3/4] hover:shadow-2xl transition-all duration-300 block">
+                <img src={dest.image_url || FALLBACK_IMAGE} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <div className="flex items-center space-x-2 text-white/80 text-sm mb-2">
                     <MapPin className="w-4 h-4" />
-                    <span>{dest.state || dest.country || dest.region}</span>
+                    <span>{dest.country || dest.region}</span>
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-2 font-poppins">{dest.name}</h3>
                   <p className="text-white/80 text-sm line-clamp-2">{dest.description}</p>
@@ -499,13 +486,13 @@ function LocalSlider({ destinations }) {
         <div onTransitionEnd={onTransitionEnd} className={`flex ${enableTransition ? 'transition-transform duration-700 ease-linear' : ''}`} style={{ transform: `translateX(-${slideIdx * widthPct}%)` }}>
               {combined.map((dest, idx) => (
             <div key={`${dest.id}-${idx}`} className="flex-shrink-0 px-3" style={{ width: `${widthPct}%` }}>
-              <Link to={`/packages?state=${dest.slug_state}`} className="group relative overflow-hidden rounded-2xl aspect-[3/4] hover:shadow-2xl transition-all duration-300 block">
-                <img src={dest.image_url} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
+              <Link to={`/packages?destination=${dest.slug}`} className="group relative overflow-hidden rounded-2xl aspect-[3/4] hover:shadow-2xl transition-all duration-300 block">
+                <img src={dest.image_url || FALLBACK_IMAGE} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <div className="flex items-center space-x-2 text-white/80 text-sm mb-2">
                     <MapPin className="w-4 h-4" />
-                    <span>{dest.state || dest.country || dest.region}</span>
+                    <span>{dest.country || dest.region}</span>
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-2 font-poppins">{dest.name}</h3>
                   <p className="text-white/80 text-sm line-clamp-2">{dest.description}</p>
@@ -523,6 +510,8 @@ export default function Home() {
   const [destinations, setDestinations] = useState([]);
   const [localDestinations, setLocalDestinations] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [visible, setVisible] = useState(3);
@@ -548,11 +537,125 @@ export default function Home() {
     requestAnimationFrame(step);
   };
 
+  const formatTimeAgo = (date) => {
+    if (!date || Number.isNaN(date?.getTime?.())) return 'Just now';
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs <= 0) return 'Just now';
+
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes} min${diffMinutes > 1 ? 's' : ''} ago`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 30) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffMonths < 12) return `${diffMonths} mo${diffMonths > 1 ? 's' : ''} ago`;
+
+    const diffYears = Math.floor(diffMonths / 12);
+    return `${diffYears} yr${diffYears > 1 ? 's' : ''} ago`;
+  };
+
   useEffect(() => {
-    setDestinations((mockDestinations || []).filter(d => d.country !== 'India'));
-    setLocalDestinations(mockLocalDestinations);
-    setPackages(mockPackages);
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    fetchPackages({ limit: 100 })
+      .then(({ packages: pkg, destinations: dest }) => {
+        if (!isMounted) return;
+        const sortedDestinations = dest
+          .slice()
+          .sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
+        setPackages(pkg);
+        setDestinations(sortedDestinations.filter((d) => d.type !== 'domestic'));
+        setLocalDestinations(sortedDestinations.filter((d) => d.type === 'domestic'));
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err.message || 'Failed to load travel data');
+        setPackages([]);
+        setDestinations([]);
+        setLocalDestinations([]);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const featuredPackages = useMemo(() => {
+    if (!packages.length) return [];
+    const featured = packages.filter((pkg) => pkg.isFeatured);
+    const pool = featured.length ? featured : packages;
+    return pool.slice(0, 6);
+  }, [packages]);
+
+  const dealItems = useMemo(() => {
+    const priced = packages.filter((pkg) => typeof pkg.price_from === 'number' && pkg.price_from > 0);
+    if (!priced.length) return [];
+
+    return priced
+      .slice()
+      .sort((a, b) => a.price_from - b.price_from)
+      .slice(0, 6)
+      .map((pkg) => {
+        const original = Math.max(Math.round(pkg.price_from * 1.2), pkg.price_from);
+        const savings = original - pkg.price_from;
+        const discount = original > 0 ? Math.round((savings / original) * 100) : 0;
+        return {
+          id: pkg.id,
+          destination: pkg.destination?.name || pkg.title,
+          subtitle: pkg.category
+            ? `${pkg.category.charAt(0).toUpperCase()}${pkg.category.slice(1)} experience`
+            : 'Limited-time offer',
+          image: pkg.image_url || pkg.images?.[0] || FALLBACK_IMAGE,
+          originalPrice: original,
+          discountPrice: pkg.price_from,
+          discount: Math.min(Math.max(discount, 5), 60),
+          duration: pkg.duration_days
+            ? `${pkg.duration_days} Days / ${Math.max(pkg.duration_days - 1, 1)} Nights`
+            : '',
+          inclusions: (pkg.inclusions && pkg.inclusions.length > 0
+            ? pkg.inclusions.slice(0, 4)
+            : ['Personalized planning', 'Support throughout', 'Curated experiences', 'Flexible payments']),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          savings: Math.max(savings, 0),
+          slug: pkg.slug,
+        };
+      });
+  }, [packages]);
+
+  const recentItems = useMemo(() => {
+    if (!packages.length) return [];
+    return packages
+      .slice()
+      .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0))
+      .slice(0, 8)
+      .map((pkg, index) => ({
+        id: pkg.id || index,
+        packageName: pkg.title || 'Custom itinerary',
+        location: pkg.destination?.name || pkg.destinationRaw || 'Worldwide',
+        image: pkg.image_url || pkg.images?.[0] || FALLBACK_IMAGE,
+        duration: pkg.duration_days ? `${pkg.duration_days}D/${Math.max(pkg.duration_days - 1, 1)}N` : '',
+        price: pkg.price_from || 0,
+        pax: pkg.raw?.maxGroupSize || pkg.maxGroupSize || 2,
+        bookedAgo: formatTimeAgo(pkg.createdAt),
+        traveler: {
+          name: `Traveler ${index + 1}`,
+          from: pkg.destination?.country || 'Global',
+        },
+        slug: pkg.slug,
+      }));
+  }, [packages]);
 
   useEffect(() => {
     if (!statsRef.current) return;
@@ -634,6 +737,32 @@ export default function Home() {
       </span>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="max-w-md text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">We couldn’t load travel experiences</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen with-fixed-header font-opensans">
@@ -776,11 +905,11 @@ export default function Home() {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-poppins">Deals of the Month</h2>
             <p className="text-lg text-gray-600">Exclusive offers you won't find anywhere else</p>
           </div>
-          <DealSlider />
+          <DealSlider deals={dealItems} />
         </div>
       </section>
 
-      <RecentlyBookedSlider />
+      <RecentlyBookedSlider items={recentItems} />
 
       {/* INTERNATIONAL DESTINATIONS */}
       <section className="py-16 bg-white relative overflow-hidden font-opensans">
@@ -846,14 +975,18 @@ export default function Home() {
               Handpicked experiences for unforgettable journeys
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {packages.slice(0, 6).map((pkg) => (
+          {featuredPackages.length === 0 ? (
+            <div className="text-center py-12 text-gray-600 bg-white rounded-2xl border border-gray-100">
+              <p>No packages available yet. Please check back soon.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {featuredPackages.map((pkg) => (
               <Link key={pkg.id} to={`/package/${pkg.id}`} className="group bg-white rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
                 <div className="relative overflow-hidden aspect-[4/3]">
-                  {/* prefer pkg.image_url, fallback to first image in pkg.images (from mockData.js) */}
-                  <img src={pkg.image_url || pkg.images?.[0]} alt={pkg.title} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
+                  <img src={pkg.image_url || pkg.images?.[0] || FALLBACK_IMAGE} alt={pkg.title} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
                   <div className="absolute top-4 left-4 bg-white rounded-full px-3 py-1 text-xs font-semibold text-gray-900">
-                    {pkg.category.charAt(0).toUpperCase() + pkg.category.slice(1)}
+                    {pkg.category ? pkg.category.charAt(0).toUpperCase() + pkg.category.slice(1) : 'Experience'}
                   </div>
                 </div>
                 <div className="p-6">
@@ -877,7 +1010,9 @@ export default function Home() {
                   <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                     <div>
                       <div className="text-sm text-gray-500">Starting from</div>
-                      <div className="text-2xl font-bold text-gray-900 font-poppins">${pkg.price_from}</div>
+                      <div className="text-2xl font-bold text-gray-900 font-poppins">
+                        {formatCurrency(pkg.price_from)}
+                      </div>
                     </div>
                     <button className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg font-semibold hover:shadow-lg transition-shadow font-opensans">
                       View Details
@@ -886,7 +1021,8 @@ export default function Home() {
                 </div>
               </Link>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       </section>
 

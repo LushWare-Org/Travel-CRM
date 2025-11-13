@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Star, Clock, DollarSign, Filter, X, SlidersHorizontal, Grid, List, ArrowRight, Compass, Sun, Users } from 'lucide-react';
-import { mockDestinations, mockPackages } from '../data/mockData';
+import { Star, Clock, IndianRupee, Filter, X, SlidersHorizontal, Grid, List, ArrowRight, Compass, Sun, Users } from 'lucide-react';
+import { fetchPackages } from '../utils/packageApi';
+import { createSlug } from '../utils/packageTransform';
+import { formatCurrency } from '../utils/currency';
 
 const filterOptions = {
   priceRanges: [
@@ -24,7 +26,13 @@ export default function PackagesPage() {
   const navigate = useNavigate();
   const stateSlug = searchParams.get('state');
   const countrySlug = searchParams.get('country');
+  const destinationQuery = searchParams.get('destination');
+  const destinationParam = (destinationQuery || stateSlug || countrySlug || '').toLowerCase();
 
+  const [packagesData, setPackagesData] = useState([]);
+  const [destinations, setDestinations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
   const [selectedActivities, setSelectedActivities] = useState([]);
   const [selectedPriceRange, setSelectedPriceRange] = useState(null);
@@ -34,41 +42,70 @@ export default function PackagesPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
 
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+    fetchPackages({ limit: 100 })
+      .then(({ packages, destinations: dest }) => {
+        if (!isMounted) return;
+        setPackagesData(packages);
+        setDestinations(dest);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setError(err.message || 'Failed to load packages');
+        setPackagesData([]);
+        setDestinations([]);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const selectedDestination = useMemo(() => {
-    if (stateSlug) {
-      return mockDestinations.find(d => d.slug_state === stateSlug && d.country === 'India');
-    }
-    if (countrySlug) {
-      return mockDestinations.find(d => d.slug_country === countrySlug && d.country !== 'India');
-    }
-    return null;
-  }, [stateSlug, countrySlug]);
+    if (!destinationParam) return null;
+    const slugCandidate = createSlug(destinationParam);
+    const match = destinations.find((dest) => {
+      const slug = dest.slug?.toLowerCase();
+      const id = dest.id?.toLowerCase();
+      const nameSlug = dest.nameSlug?.toLowerCase();
+      const countrySlug = dest.countrySlug?.toLowerCase();
+      return (
+        (slug && slug === destinationParam) ||
+        (slug && slug === slugCandidate) ||
+        (id && (id === destinationParam || id === slugCandidate)) ||
+        (nameSlug && (nameSlug === destinationParam || nameSlug === slugCandidate)) ||
+        (countrySlug && (countrySlug === destinationParam || countrySlug === slugCandidate))
+      );
+    });
+    return match || null;
+  }, [destinationParam, destinations]);
 
   // Filter packages by destination
   const destinationPackages = useMemo(() => {
-    if (!selectedDestination) return [];
-    return mockPackages.filter(p => p.destination_id === selectedDestination.id);
-  }, [selectedDestination]);
+    if (selectedDestination) {
+      return packagesData.filter(
+        (pkg) => pkg.destination?.key === selectedDestination.id
+          || pkg.destination?.slug === selectedDestination.slug
+          || pkg.destination?.nameSlug === selectedDestination.nameSlug,
+      );
+    }
+    return packagesData;
+  }, [packagesData, selectedDestination]);
 
   const enrichedPackages = useMemo(() => {
-    return destinationPackages.map(pkg => {
-      const inferredActivities = new Set();
-      pkg.highlights.forEach(h => {
-        if (h.includes('Beach') || h.includes('Island') || h.includes('Sea')) inferredActivities.add('Beach');
-        if (h.includes('Mountain') || h.includes('Hill') || h.includes('Trekking')) inferredActivities.add('Mountains');
-        if (h.includes('Culture') || h.includes('Temple') || h.includes('Heritage') || h.includes('Palace')) inferredActivities.add('Culture');
-        if (h.includes('Adventure') || h.includes('Safari') || h.includes('Skydiving') || h.includes('Water Sports')) inferredActivities.add('Adventure');
-        if (h.includes('Luxury') || h.includes('Spa') || h.includes('Villa') || h.includes('5-Star')) inferredActivities.add('Luxury');
-        if (h.includes('Food') || h.includes('Cuisine') || h.includes('Cooking')) inferredActivities.add('Food');
-        if (h.includes('Shopping') || h.includes('Market') || h.includes('Mall')) inferredActivities.add('Shopping');
-        if (h.includes('Nature') || h.includes('Wildlife') || h.includes('Backwaters')) inferredActivities.add('Nature');
-        if (h.includes('Honeymoon') || h.includes('Romance') || h.includes('Candlelight')) inferredActivities.add('Honeymoon');
-        if (h.includes('Family') || h.includes('Kids')) inferredActivities.add('Family');
-      });
+    return destinationPackages.map((pkg) => {
+      const nights = Math.max(pkg.duration_days - 1, 1);
       return {
         ...pkg,
-        activities: Array.from(inferredActivities),
-        durationLabel: `${pkg.duration_days}D/${pkg.duration_days - 1}N`
+        activities: pkg.activities || [],
+        durationLabel: pkg.duration_days ? `${pkg.duration_days}D/${nights}N` : '',
       };
     });
   }, [destinationPackages]);
@@ -145,19 +182,36 @@ export default function PackagesPage() {
     );
   };
 
-  if (!selectedDestination) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Destination Not Found</h2>
-          <p className="text-gray-600 mb-4">Please select a valid destination.</p>
-          <Link to="/" className="text-orange-600 hover:underline font-medium">
-            Go Back Home
-          </Link>
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">We ran into an issue</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+          >
+            Try again
+          </button>
         </div>
       </div>
     );
   }
+
+  const destinationLabel = selectedDestination?.name || 'All Destinations';
+  const destinationTypeLabel = selectedDestination
+    ? selectedDestination.type === 'domestic' ? 'Domestic' : 'International'
+    : 'Curated';
 
   return (
     <div className="min-h-screen font-sans bg-white">
@@ -175,10 +229,13 @@ export default function PackagesPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent"></div>
         <div className="relative z-10 h-full flex flex-col items-center justify-center text-white px-4">
           <h1 className="text-5xl md:text-6xl font-bold mb-8 text-center">
-            {selectedDestination.name} <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-orange-300"> Holiday Packages</span>
+            {destinationLabel}{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-orange-300">
+              Holiday Packages
+            </span>
           </h1>
           <p className="text-xl text-white/90 max-w-2xl text-center mb-8">
-            {selectedDestination.country === 'India' ? 'Domestic' : 'International'} • {filteredPackages.length} packages available
+            {destinationTypeLabel} • {filteredPackages.length} packages available
           </p>
         </div>
       </div>
@@ -243,7 +300,7 @@ export default function PackagesPage() {
                 {/* Price Range */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-gray-600" />
+                    <IndianRupee className="w-4 h-4 text-gray-600" />
                     <span>Price Range</span>
                   </h4>
                   <div className="space-y-2">
@@ -259,7 +316,9 @@ export default function PackagesPage() {
                       >
                         <span>{range.label}</span>
                         <span className="text-sm">
-                          {range.max === Infinity ? `$${range.min}+` : `$${range.min} - $${range.max}`}
+                          {range.max === Infinity
+                            ? `${formatCurrency(range.min)}+`
+                            : `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`}
                         </span>
                       </button>
                     ))}
@@ -405,7 +464,7 @@ export default function PackagesPage() {
                       <div className="flex items-center justify-between pt-3 border-t border-gray-200">
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Starting from</p>
-                          <p className="text-2xl font-bold text-gray-900">${pkg.price_from}</p>
+                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(pkg.price_from)}</p>
                         </div>
                         <Link
                           to={`/package/${pkg.id}`}
@@ -482,7 +541,7 @@ export default function PackagesPage() {
                         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                           <div>
                             <p className="text-xs text-gray-500 mb-1">Starting Price</p>
-                            <p className="text-3xl font-bold text-gray-900">${pkg.price_from}</p>
+                            <p className="text-3xl font-bold text-gray-900">{formatCurrency(pkg.price_from)}</p>
                           </div>
                           <Link
                             to={`/package/${pkg.id}`}
