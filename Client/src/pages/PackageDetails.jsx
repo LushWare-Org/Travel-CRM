@@ -4,6 +4,7 @@ import { Clock, Star, MapPin, Check, X, Calendar, Users, Download, ChevronLeft, 
 import { fetchPackageById } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
 import { generateManagementPDF } from '../utils/managementPdfBridge';
+import { submitBookingRequest } from '../utils/bookingApi';
 
 const FALLBACK_IMG = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
@@ -23,6 +24,7 @@ export default function PackageDetails() {
     name: '', email: '', phone: '', travelers: 2, date: '', message: '',
   });
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -76,11 +78,41 @@ export default function PackageDetails() {
 
   const pkgDestination = pkg?.destination || null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert('Booking request submitted successfully! We\'ll contact you within 24 hours.');
-    setShowBookingForm(false);
-    setFormData({ name: '', email: '', phone: '', travelers: 2, date: '', message: '' });
+    if (!pkg) return;
+
+    setIsSubmittingBooking(true);
+    try {
+      await submitBookingRequest({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        travelers: Number(formData.travelers) || 1,
+        travelDate: formData.date,
+        message: formData.message,
+        packageId: pkg.id || pkg._id || pkg?.raw?._id,
+      });
+
+      alert('Booking request submitted successfully! We\'ll contact you within 24 hours.');
+      setShowBookingForm(false);
+      setFormData({ name: '', email: '', phone: '', travelers: 2, date: '', message: '' });
+      setPkg((prevPkg) => {
+        if (!prevPkg) return prevPkg;
+        const updatedBookings = (prevPkg.bookings || 0) + 1;
+        return {
+          ...prevPkg,
+          bookings: updatedBookings,
+          raw: prevPkg.raw
+            ? { ...prevPkg.raw, bookings: (prevPkg.raw.bookings || 0) + 1 }
+            : prevPkg.raw,
+        };
+      });
+    } catch (err) {
+      alert(err.message || 'Unable to submit your booking request right now. Please try again.');
+    } finally {
+      setIsSubmittingBooking(false);
+    }
   };
 
   const downloadPDF = async () => {
@@ -469,8 +501,16 @@ export default function PackageDetails() {
                       <input type="date" required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                     </div>
                     <textarea placeholder="Special requests or questions..." rows={4} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all resize-none" value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} />
-                    <button type="submit" className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl hover:from-yellow-600 hover:to-orange-600 transition-all">
-                      Send Inquiry
+                    <button
+                      type="submit"
+                      disabled={isSubmittingBooking}
+                      className={`w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg transition-all ${
+                        isSubmittingBooking
+                          ? 'opacity-70 cursor-not-allowed'
+                          : 'hover:shadow-xl hover:from-yellow-600 hover:to-orange-600'
+                      }`}
+                    >
+                      {isSubmittingBooking ? 'Submitting...' : 'Send Inquiry'}
                     </button>
                   </form>
                 </div>
