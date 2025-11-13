@@ -1,10 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, Star, MapPin, Check, X, Calendar, Users, Download, ChevronLeft, ChevronRight, XCircle, Shield, Award, Heart, Share2, FileText, Map, CheckCircle } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import { fetchPackageById } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
+import { generateManagementPDF } from '../utils/managementPdfBridge';
 
 const FALLBACK_IMG = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
@@ -23,8 +22,7 @@ export default function PackageDetails() {
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', travelers: 2, date: '', message: '',
   });
-
-  const pdfRef = useRef(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -86,14 +84,19 @@ export default function PackageDetails() {
   };
 
   const downloadPDF = async () => {
-    const element = pdfRef.current;
-    const canvas = await html2canvas(element, { scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const width = pdf.internal.pageSize.getWidth();
-    const height = (canvas.height * width) / canvas.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-    pdf.save(`${pkg.title.replace(/ /g, '_')}.pdf`);
+    if (!pkg) {
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      await generateManagementPDF(pkg.raw || pkg);
+    } catch (error) {
+      console.error('Failed to generate itinerary PDF via management service.', error);
+      window.alert('Unable to generate the itinerary PDF right now. Please try again later.');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const tabs = [
@@ -149,24 +152,6 @@ export default function PackageDetails() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Hidden PDF Content */}
-      <div className="hidden">
-        <div ref={pdfRef} className="p-10 bg-white">
-          <h1 className="text-3xl font-bold mb-4">{pkg.title}</h1>
-          <p className="mb-4">{pkg.description}</p>
-          <p><strong>Duration:</strong> {pkg.duration_days} Days | <strong>From:</strong> {formatCurrency(pkg.price_from)}</p>
-          <h2 className="text-xl font-bold mt-6 mb-2">Itinerary</h2>
-          {pkg.itinerary?.map((day, i) => (
-            <div key={i} className="mb-3">
-              <strong>Day {i + 1}: {day.title}</strong>
-              <p>{day.description}</p>
-            </div>
-          ))}
-          <h2 className="text-xl font-bold mt-6 mb-2">Inclusions</h2>
-          <ul>{pkg.inclusions?.map((inc, i) => <li key={i}>Checkmark {inc}</li>)}</ul>
-        </div>
-      </div>
-
       {/* Hero Section */}
       <div
         className="relative h-[70vh] overflow-hidden"
@@ -453,10 +438,16 @@ export default function PackageDetails() {
                 </button>
                 <button
                   onClick={downloadPDF}
-                  className="w-full mt-3 border-2 border-gray-300 text-gray-700 py-4 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center justify-center gap-2"
+                  disabled={isDownloading}
+                  aria-busy={isDownloading}
+                  className={`w-full mt-3 border-2 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                    isDownloading
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                  }`}
                 >
-                  <Download className="w-5 h-5" />
-                  Download Itinerary
+                  <Download className={`w-5 h-5 ${isDownloading ? 'animate-pulse' : ''}`} />
+                  {isDownloading ? 'Preparing PDF...' : 'Download Itinerary'}
                 </button>
                 <button
                   onClick={() => navigate(`/itinerary/edit/${pkg.id}`)}
