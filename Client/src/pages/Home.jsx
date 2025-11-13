@@ -520,6 +520,14 @@ export default function Home() {
   const [satisfactionPct, setSatisfactionPct] = useState(0);
   const [assurancePct, setAssurancePct] = useState(0);
   const [activeRegion, setActiveRegion] = useState('asia');
+  const [searchFilters, setSearchFilters] = useState({
+    destination: '',
+    when: '',
+    travelers: '',
+  });
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchPerformed, setSearchPerformed] = useState(false);
+  const resultsRef = useRef(null);
   const statsRef = useRef(null);
   const whyRef = useRef(null);
   const videoRef = useRef(null);
@@ -738,6 +746,44 @@ export default function Home() {
     );
   };
 
+  const handleSearch = () => {
+    if (!packages.length) {
+      setSearchResults([]);
+      setSearchPerformed(true);
+      return;
+    }
+
+    const travelerThresholds = {
+      '1': 1,
+      '2': 2,
+      '3-4': 4,
+      '5-6': 6,
+      '7+': 7,
+    };
+
+    const filtered = packages.filter((pkg) => {
+      const destinationName = (pkg.destination?.name || pkg.destinationRaw || pkg.title || '').toLowerCase();
+      const selectedDestination = searchFilters.destination.toLowerCase();
+      const matchesDestination = !selectedDestination
+        || destinationName.includes(selectedDestination)
+        || pkg.destination?.country?.toLowerCase().includes(selectedDestination);
+
+      const maxGroupSize = pkg.maxGroupSize || pkg.raw?.maxGroupSize || 0;
+      const requiredSize = travelerThresholds[searchFilters.travelers] || 0;
+      const matchesTravelers = !requiredSize || maxGroupSize === 0 || maxGroupSize >= requiredSize;
+
+      const matchesWhen = !searchFilters.when; // Placeholder for future scheduling logic
+
+      return matchesDestination && matchesTravelers && matchesWhen;
+    });
+
+    setSearchResults(filtered.slice(0, 12));
+    setSearchPerformed(true);
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -790,18 +836,31 @@ export default function Home() {
                       <MapPin className="w-5 h-5 text-orange-600 flex-shrink-0" />
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 block mb-1">Where do you want to go?</label>
-                        <select className="w-full outline-none text-gray-900 font-medium bg-transparent rounded-md px-2 py-2 cursor-pointer appearance-none focus:ring-2 focus:ring-orange-200 relative z-50">
+                        <select
+                          value={searchFilters.destination}
+                          onChange={(e) => setSearchFilters((prev) => ({ ...prev, destination: e.target.value }))}
+                          className="w-full outline-none text-gray-900 font-medium bg-transparent rounded-md px-2 py-2 cursor-pointer appearance-none focus:ring-2 focus:ring-orange-200 relative z-50"
+                        >
                           <option value="">Select destination</option>
-                          <option value="maldives">Maldives</option>
-                          <option value="bali">Bali</option>
-                          <option value="switzerland">Switzerland</option>
-                          <option value="paris">Paris</option>
-                          <option value="dubai">Dubai</option>
-                          <option value="santorini">Santorini</option>
-                          <option value="thailand">Thailand</option>
-                          <option value="kashmir">Kashmir</option>
-                          <option value="kerala">Kerala</option>
-                          <option value="goa">Goa</option>
+                          {destinations.concat(localDestinations).slice(0, 50).map((dest) => (
+                            <option key={dest.id} value={dest.name.toLowerCase()}>
+                              {dest.name}
+                            </option>
+                          ))}
+                          {!destinations.length && !localDestinations.length && (
+                            <>
+                              <option value="maldives">Maldives</option>
+                              <option value="bali">Bali</option>
+                              <option value="switzerland">Switzerland</option>
+                              <option value="paris">Paris</option>
+                              <option value="dubai">Dubai</option>
+                              <option value="santorini">Santorini</option>
+                              <option value="thailand">Thailand</option>
+                              <option value="kashmir">Kashmir</option>
+                              <option value="kerala">Kerala</option>
+                              <option value="goa">Goa</option>
+                            </>
+                          )}
                         </select>
                       </div>
                     </div>
@@ -811,7 +870,11 @@ export default function Home() {
                       <Calendar className="w-5 h-5 text-orange-600 flex-shrink-0" />
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 block mb-1">When</label>
-                        <select className="w-full outline-none text-gray-900 font-medium bg-transparent rounded-md px-3 py-2 cursor-pointer appearance-none pr-8 focus:ring-2 focus:ring-orange-200 relative z-50">
+                        <select
+                          value={searchFilters.when}
+                          onChange={(e) => setSearchFilters((prev) => ({ ...prev, when: e.target.value }))}
+                          className="w-full outline-none text-gray-900 font-medium bg-transparent rounded-md px-3 py-2 cursor-pointer appearance-none pr-8 focus:ring-2 focus:ring-orange-200 relative z-50"
+                        >
                           <option value="">Select dates</option>
                           <option value="this-week">This Week</option>
                           <option value="next-week">Next Week</option>
@@ -827,7 +890,11 @@ export default function Home() {
                       <Users className="w-5 h-5 text-orange-600 flex-shrink-0" />
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 block mb-1">Travelers</label>
-                        <select className="w-full outline-none text-gray-900 font-medium bg-transparent rounded-md px-3 py-2 cursor-pointer appearance-none pr-8 focus:ring-2 focus:ring-orange-200 relative z-50">
+                        <select
+                          value={searchFilters.travelers}
+                          onChange={(e) => setSearchFilters((prev) => ({ ...prev, travelers: e.target.value }))}
+                          className="w-full outline-none text-gray-900 font-medium bg-transparent rounded-md px-3 py-2 cursor-pointer appearance-none pr-8 focus:ring-2 focus:ring-orange-200 relative z-50"
+                        >
                           <option value="">How many?</option>
                           <option value="1">1 Person</option>
                           <option value="2">2 People</option>
@@ -838,7 +905,11 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <button className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-xl hover:from-orange-500 hover:to-yellow-500 transform hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-2 font-opensans">
+                  <button
+                    type="button"
+                    onClick={handleSearch}
+                    className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-xl hover:from-orange-500 hover:to-yellow-500 transform hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-2 font-opensans"
+                  >
                     <Search className="w-5 h-5" />
                     <span>Search</span>
                   </button>
@@ -848,6 +919,97 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* SEARCH RESULTS */}
+      {searchPerformed && (
+        <section ref={resultsRef} className="py-12 bg-white font-opensans">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl md:text-3xl font-bold text-gray-900 font-poppins">
+                  Search Results
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {searchResults.length
+                    ? `Found ${searchResults.length} package${searchResults.length > 1 ? 's' : ''} matching your preferences`
+                    : 'No packages found. Try adjusting your destination or filters.'}
+                </p>
+              </div>
+              {searchResults.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchPerformed(false);
+                    setSearchResults([]);
+                  }}
+                  className="text-sm font-semibold text-orange-600 hover:text-orange-700"
+                >
+                  Clear results
+                </button>
+              )}
+            </div>
+
+            {searchResults.length === 0 ? (
+              <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-10 text-center">
+                <p className="text-gray-700 font-medium">Try a different destination or traveler count to see available itineraries.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {searchResults.map((pkg) => (
+                  <Link
+                    key={pkg.id || pkg._id}
+                    to={`/package/${pkg.id || pkg._id}`}
+                    className="group bg-white rounded-2xl overflow-hidden shadow hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+                  >
+                    <div className="relative">
+                      <img
+                        src={pkg.image_url || pkg.images?.[0] || FALLBACK_IMAGE}
+                        alt={pkg.title}
+                        className="w-full h-56 object-cover transform group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-gray-900">
+                        {pkg.category ? pkg.category.charAt(0).toUpperCase() + pkg.category.slice(1) : 'Getaway'}
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2 font-poppins group-hover:text-orange-600 transition-colors">
+                          {pkg.title}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {pkg.destination?.name || pkg.destinationRaw || 'Worldwide'}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-4 h-4" />
+                          <span>{pkg.duration_days || '?'} Days</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4" />
+                          <span>{pkg.maxGroupSize || pkg.raw?.maxGroupSize || 'Flexible'} Pax</span>
+                        </div>
+                      </div>
+                      <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-gray-500">Starting from</p>
+                          <p className="text-xl font-bold text-gray-900 font-poppins">
+                            {formatCurrency(pkg.price_from || 0)}
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center space-x-1 text-sm text-orange-600 font-semibold">
+                          View Details
+                          <ArrowRight className="w-4 h-4" />
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* STATS SECTION */}
       <div className="relative -mt-5 z-30 pb-8">

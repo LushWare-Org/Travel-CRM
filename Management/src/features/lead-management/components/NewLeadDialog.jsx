@@ -17,6 +17,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     name: "",
     email: "",
     phone: "",
+    numberOfTravelers: 1,
     city: "",
     whatsapp: "",
     salesRep: "",
@@ -111,6 +112,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         time: formData.time || undefined,
         package: formData.package || undefined,
         packageName: formData.packageName || undefined,
+        numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
         remarks: formData.remarks.filter((r) => r.text.trim() !== "").map(r => ({
           text: r.text.trim(),
           date: r.date || new Date().toISOString().split("T")[0]
@@ -139,6 +141,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         name: "",
         email: "",
         phone: "",
+        numberOfTravelers: 1,
         city: "",
         whatsapp: "",
         salesRep: "",
@@ -201,6 +204,26 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="+1-555-0000"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Number of Travelers</label>
+              <input
+                type="number"
+                min="1"
+                value={formData.numberOfTravelers}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., 2"
               />
             </div>
           </div>

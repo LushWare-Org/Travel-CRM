@@ -94,9 +94,9 @@ export default function PackageDetails() {
         packageId: pkg.id || pkg._id || pkg?.raw?._id,
       });
 
-      alert('Booking request submitted successfully! We\'ll contact you within 24 hours.');
-      setShowBookingForm(false);
-      setFormData({ name: '', email: '', phone: '', travelers: 2, date: '', message: '' });
+    alert('Booking request submitted successfully! We\'ll contact you within 24 hours.');
+    setShowBookingForm(false);
+    setFormData({ name: '', email: '', phone: '', travelers: 2, date: '', message: '' });
       setPkg((prevPkg) => {
         if (!prevPkg) return prevPkg;
         const updatedBookings = (prevPkg.bookings || 0) + 1;
@@ -482,7 +482,7 @@ export default function PackageDetails() {
                   {isDownloading ? 'Preparing PDF...' : 'Download Itinerary'}
                 </button>
                 <button
-                  onClick={() => navigate(`/itinerary/edit/${pkg.id}`)}
+                  onClick={() => navigate(`/package/${pkg.id}/customize`)}
                   className="w-full mt-3 border-2 border-yellow-500 text-yellow-700 py-4 rounded-xl font-semibold hover:bg-yellow-50 hover:border-yellow-600 transition-all flex items-center justify-center gap-2"
                 >
                   Customize Package

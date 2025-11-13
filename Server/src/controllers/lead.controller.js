@@ -12,9 +12,26 @@ import { generateItineraryPDF, generateLeadItineraryPDF } from '../utils/pdfGene
 // @desc    Create a new lead
 // @route   POST /api/v1/leads
 // @access  Private (Admin, SalesRep)
+const parseTravelerCount = (value, defaultValue = undefined) => {
+  if (value === null || value === undefined || value === '') {
+    return defaultValue;
+  }
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed >= 1) {
+    return Math.floor(parsed);
+  }
+  return defaultValue;
+};
+
 export const createLead = asyncHandler(async (req, res, next) => {
   // Add user who created the lead
   req.body.createdBy = req.user._id;
+  const travelerCount = parseTravelerCount(req.body.numberOfTravelers, undefined);
+  if (travelerCount !== undefined) {
+    req.body.numberOfTravelers = travelerCount;
+  } else {
+    delete req.body.numberOfTravelers;
+  }
 
   // Add status history
   if (req.body.status) {
@@ -153,6 +170,15 @@ export const updateLead = asyncHandler(async (req, res, next) => {
 
   if (!lead) {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'numberOfTravelers')) {
+    const travelerCount = parseTravelerCount(req.body.numberOfTravelers, null);
+    if (travelerCount === null) {
+      delete req.body.numberOfTravelers;
+    } else {
+      req.body.numberOfTravelers = travelerCount;
+    }
   }
 
   // Check if status changed and add to history

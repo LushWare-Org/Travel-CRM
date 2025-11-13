@@ -29,6 +29,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     name: "",
     email: "",
     phone: "",
+    numberOfTravelers: 1,
     city: "",
     whatsapp: "",
     salesRep: "",
@@ -136,6 +137,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         name: lead.name || '',
         email: lead.email || '',
         phone: lead.phone || '',
+        numberOfTravelers: lead.numberOfTravelers || 1,
         city: lead.city || '',
         whatsapp: lead.whatsapp || '',
         salesRep: lead.salesRep || lead.adviser || '',
@@ -187,6 +189,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         name: formData.name?.trim() || undefined,
         email: formData.email?.trim() || undefined,
         phone: formData.phone?.trim() || undefined,
+        numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
         city: formData.city || undefined,
         whatsapp: formData.whatsapp || undefined,
         salesRep: formData.salesRep || undefined,
@@ -617,6 +620,25 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Number of Travelers</label>
+              <input
+                type="number"
+                min="1"
+                value={formData.numberOfTravelers}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({
+                    ...formData,
+                    numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
+                  });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
