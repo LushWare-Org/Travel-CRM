@@ -393,7 +393,7 @@ export function generateInvoicePDF(invoice, lead) {
       doc.pipe(stream);
 
       // ===== HEADER =====
-      const headerHeight = 28;
+      const headerHeight = 48;
       const headerY = 8;
       const headerX = 50; // Left margin for content
       const headerWidth = 495; // Content width
@@ -435,16 +435,15 @@ export function generateInvoicePDF(invoice, lead) {
         .fontSize(8.5)
         .font('Helvetica')
         .fillColor('rgb(210, 210, 210)')
-        .text('Curating inspired journeys', cursorX, headerY + 21);
+        .text('Curating inspired journeys', cursorX, headerY + 30);
 
-      // Document Type as white text in header (right aligned, properly positioned)
+      // Document Type as white text in header (positioned from left edge)
+      const invoiceTextX = headerX + headerWidth - 80; // X position - decrease this value to move left, increase to move right
       doc
         .fillColor(COLORS.white)
-        .fontSize(14)
+        .fontSize(9)
         .font('Helvetica-Bold')
-        .text('INVOICE', headerX + headerWidth - 14, headerY + 14, {
-          align: 'right',
-        });
+        .text('INVOICE', invoiceTextX, headerY + 22);
 
       // ===== COMPANY INFO =====
       let yPos = 120;
@@ -469,9 +468,7 @@ export function generateInvoicePDF(invoice, lead) {
         .fillColor(rgbToHex(PALETTE.secondaryText))
         .text(`Invoice #: ${invoice.invoiceNumber || 'N/A'}`, 380, yPos + 20)
         .text(`Issue Date: ${new Date(invoice.issueDate || invoice.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 35)
-        .text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 50)
-        .fillColor(invoice.status === 'paid' ? COLORS.success : invoice.status === 'overdue' ? COLORS.error : COLORS.warning)
-        .text(`Status: ${(invoice.status || 'draft').toUpperCase()}`, 380, yPos + 65);
+        .text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 50);
 
       // ===== CUSTOMER INFO =====
       yPos = 220;
@@ -714,7 +711,7 @@ export function generateReceiptPDF(receipt, invoice, lead) {
       doc.pipe(stream);
 
       // ===== HEADER =====
-      const headerHeight = 28;
+      const headerHeight = 48;
       const headerY = 8;
       const headerX = 50; // Left margin for content
       const headerWidth = 495; // Content width
@@ -756,16 +753,15 @@ export function generateReceiptPDF(receipt, invoice, lead) {
         .fontSize(8.5)
         .font('Helvetica')
         .fillColor('rgb(210, 210, 210)')
-        .text('Curating inspired journeys', cursorX, headerY + 21);
+        .text('Curating inspired journeys', cursorX, headerY + 30);
 
-      // Document Type as white text in header (right aligned, properly positioned)
+      // Document Type as white text in header (positioned from left edge)
+      const receiptTextX = headerX + headerWidth - 80; // X position - decrease this value to move left, increase to move right
       doc
         .fillColor(COLORS.white)
-        .fontSize(14)
+        .fontSize(9)
         .font('Helvetica-Bold')
-        .text('RECEIPT', headerX + headerWidth - 14, headerY + 14, {
-          align: 'right',
-        });
+        .text('RECEIPT', receiptTextX, headerY + 22);
 
       // ===== COMPANY INFO =====
       let yPos = 120;
@@ -789,9 +785,7 @@ export function generateReceiptPDF(receipt, invoice, lead) {
         .fontSize(10)
         .fillColor(rgbToHex(PALETTE.secondaryText))
         .text(`Receipt #: ${receipt.receiptNumber || 'N/A'}`, 380, yPos + 20)
-        .text(`Date: ${new Date(receipt.paymentDate || receipt.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 35)
-        .fillColor(receipt.receiptStatus === 'paid-in-full' ? COLORS.success : COLORS.warning)
-        .text(`Status: ${(receipt.receiptStatus || 'partial-payment').toUpperCase().replace(/-/g, ' ')}`, 380, yPos + 50);
+        .text(`Date: ${new Date(receipt.paymentDate || receipt.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 380, yPos + 35);
 
       // ===== CUSTOMER INFO =====
       yPos = 220;
