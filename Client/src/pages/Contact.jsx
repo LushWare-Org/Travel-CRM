@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Globe, MessageSquare, Calendar, User, ArrowRight, Sparkles, Heart, Shield, Award } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Globe, MessageSquare, Calendar, User, ArrowRight, Sparkles, Heart, Shield, Award, Loader2, Check } from 'lucide-react';
+import { submitContactForm } from '../utils/contactApi';
+import DestinationSelector from '../components/DestinationSelector';
+import LocationSelector from '../components/LocationSelector';
 
 export default function ContactUs() {
   const [formData, setFormData] = useState({
@@ -9,9 +12,12 @@ export default function ContactUs() {
     subject: '',
     message: '',
     travelDate: '',
-    destination: ''
   });
+  const [selectedDest, setSelectedDest] = useState(null);
+  const [selectedLocations, setSelectedLocations] = useState([]);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [activeContact, setActiveContact] = useState(0);
 
   const contactMethods = [
@@ -45,9 +51,58 @@ export default function ContactUs() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 5000);
+  const handleDestinationChange = (destination) => {
+    setSelectedDest(destination);
+    // Clear locations when destination changes
+    setSelectedLocations([]);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.name.trim() || !formData.email.trim() || !formData.subject.trim() || !formData.message.trim()) {
+      setError('Please fill in all required fields (Name, Email, Subject, and Message).');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined,
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
+        travelDate: formData.travelDate || undefined,
+        destination: selectedDest?.label || selectedDest?.value || selectedDest || undefined,
+        destinationCountry: selectedDest?.value || undefined,
+        locations: selectedLocations.length > 0 ? selectedLocations.join(', ') : undefined,
+      };
+
+      await submitContactForm(payload);
+      
+      setSubmitted(true);
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        subject: '',
+        message: '',
+        travelDate: '',
+      });
+      setSelectedDest(null);
+      setSelectedLocations([]);
+      setTimeout(() => setSubmitted(false), 5000);
+    } catch (err) {
+      console.error('Error submitting contact form:', err);
+      setError(err.message || 'Failed to send message. Please try again later.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -142,7 +197,12 @@ export default function ContactUs() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {error && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                      <p className="text-red-700 text-sm font-medium">{error}</p>
+                    </div>
+                  )}
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="group">
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -221,23 +281,11 @@ export default function ContactUs() {
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Destination
                       </label>
-                      <div className="relative">
-                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-600 transition-colors" />
-                        <select
-                          name="destination"
-                          value={formData.destination}
-                          onChange={handleChange}
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-600 focus:ring-2 focus:ring-orange-200 transition-all outline-none text-gray-900 appearance-none bg-white"
-                        >
-                          <option value="">Select destination</option>
-                          <option value="maldives">Maldives</option>
-                          <option value="bali">Bali</option>
-                          <option value="switzerland">Switzerland</option>
-                          <option value="paris">Paris</option>
-                          <option value="dubai">Dubai</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
+                      <DestinationSelector
+                        value={selectedDest}
+                        onChange={handleDestinationChange}
+                        placeholder="Choose your destination..."
+                      />
                     </div>
 
                     <div className="group">
@@ -259,6 +307,33 @@ export default function ContactUs() {
                     </div>
                   </div>
 
+                  {/* Show selected destination confirmation */}
+                  {selectedDest && (
+                    <div className="p-4 bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-xl">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center">
+                          <Check className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-lg">{selectedDest.label || selectedDest.value || selectedDest}</p>
+                          <p className="text-sm text-gray-600">Destination selected</p>
+                        </div>
+                      </div>
+                      
+                      {/* Location Selector */}
+                      <div className="mt-4">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Specific Locations (Optional)
+                        </label>
+                        <LocationSelector
+                          locations={selectedLocations}
+                          onChange={setSelectedLocations}
+                          destination={selectedDest}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="group">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Your Message *
@@ -275,16 +350,26 @@ export default function ContactUs() {
                   </div>
 
                   <button
-                    onClick={handleSubmit}
-                    className="w-full group relative overflow-hidden bg-gradient-to-r from-orange-600 to-yellow-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all duration-300"
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full group relative overflow-hidden bg-gradient-to-r from-orange-600 to-yellow-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     <div className="relative px-8 py-5 flex items-center justify-center space-x-3">
-                      <span>Send Message</span>
-                      <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Send Message</span>
+                          <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                        </>
+                      )}
                     </div>
                   </button>
-                </div>
+                </form>
               )}
             </div>
           </div>
@@ -316,8 +401,8 @@ export default function ContactUs() {
                 </div>
               </div>
             </div>
-            </div>
-           </div>
+          </div>
+        </div>
       </div>
     </div>
   );

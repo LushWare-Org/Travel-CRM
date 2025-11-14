@@ -16,12 +16,16 @@ import {
   setLeadItinerary,
   getLeadItinerary,
   downloadLeadItineraryPDF,
+  createWebsiteContactLead,
 } from '../controllers/lead.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require authentication
+// Public route (no authentication required)
+router.post('/website-contact', createWebsiteContactLead);
+
+// All routes below require authentication
 router.use(protect);
 
 // Lead routes

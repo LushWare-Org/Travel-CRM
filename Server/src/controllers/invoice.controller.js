@@ -1,5 +1,6 @@
 import fs from 'fs';
 import Invoice from '../models/invoice.model.js';
+import Lead from '../models/lead.model.js';
 import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
@@ -27,8 +28,19 @@ const formatInvoiceForResponse = (invoiceDoc) => {
  * @access  Private
  */
 export const getAllInvoices = asyncHandler(async (req, res) => {
+  // Build base query - filter by lead assignedTo for sales reps
+  let baseQuery = Invoice.find();
+  
+  // If user is a sales rep, only show invoices for leads assigned to them
+  if (req.user.role === 'salesRep') {
+    const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
+    const leadIds = assignedLeadIds.map((lead) => lead._id);
+    baseQuery = baseQuery.where('lead').in(leadIds);
+  }
+  // Admin can see all invoices (no filter)
+
   const features = new APIFeatures(
-    Invoice.find()
+    baseQuery
       .populate('lead', 'name email phone status')
       .populate('quotation', 'quotationNumber')
       .populate('createdBy', 'name email'),
@@ -41,7 +53,15 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
 
   const invoiceDocs = await features.query;
   const invoices = invoiceDocs.map((invoice) => formatInvoiceForResponse(invoice));
-  const total = await Invoice.countDocuments();
+  
+  // Get total count with same filter
+  let countQuery = Invoice.find();
+  if (req.user.role === 'salesRep') {
+    const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
+    const leadIds = assignedLeadIds.map((lead) => lead._id);
+    countQuery = countQuery.where('lead').in(leadIds);
+  }
+  const total = await countQuery.countDocuments();
 
   res.status(200).json({
     success: true,
@@ -58,7 +78,7 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
  */
 export const getInvoiceById = asyncHandler(async (req, res, next) => {
   const invoiceDoc = await Invoice.findById(req.params.id)
-    .populate('lead', 'name email phone status destination')
+    .populate('lead', 'name email phone status destination assignedTo')
     .populate('quotation', 'quotationNumber')
     .populate('booking')
     .populate('payments')
@@ -67,6 +87,11 @@ export const getInvoiceById = asyncHandler(async (req, res, next) => {
 
   if (!invoiceDoc) {
     return next(new AppError('Invoice not found', 404));
+  }
+
+  // Check permissions - sales rep can only access invoices for leads assigned to them
+  if (req.user.role === 'salesRep' && invoiceDoc.lead?.assignedTo?.toString() !== req.user._id.toString()) {
+    return next(new AppError('Not authorized to access this invoice', 403));
   }
 
   const invoice = formatInvoiceForResponse(invoiceDoc);
@@ -83,6 +108,17 @@ export const getInvoiceById = asyncHandler(async (req, res, next) => {
  * @access  Private
  */
 export const getInvoiceByLeadId = asyncHandler(async (req, res, next) => {
+  // Check permissions - sales rep can only access invoices for leads assigned to them
+  if (req.user.role === 'salesRep') {
+    const lead = await Lead.findById(req.params.leadId).select('assignedTo');
+    if (!lead) {
+      return next(new AppError('Lead not found', 404));
+    }
+    if (lead.assignedTo?.toString() !== req.user._id.toString()) {
+      return next(new AppError('Not authorized to access invoices for this lead', 403));
+    }
+  }
+
   const invoiceDocs = await Invoice.find({ lead: req.params.leadId })
     .populate('quotation', 'quotationNumber')
     .populate('createdBy', 'name email')

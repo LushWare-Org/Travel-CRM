@@ -1,5 +1,6 @@
 import fs from 'fs';
 import PaymentReceipt from '../models/paymentReceipt.model.js';
+import Lead from '../models/lead.model.js';
 import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
@@ -12,8 +13,19 @@ import { APIFeatures } from '../utils/apiFeatures.js';
  * @access  Private
  */
 export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
+  // Build base query - filter by lead assignedTo for sales reps
+  let baseQuery = PaymentReceipt.find();
+  
+  // If user is a sales rep, only show receipts for leads assigned to them
+  if (req.user.role === 'salesRep') {
+    const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
+    const leadIds = assignedLeadIds.map((lead) => lead._id);
+    baseQuery = baseQuery.where('lead').in(leadIds);
+  }
+  // Admin can see all receipts (no filter)
+
   const features = new APIFeatures(
-    PaymentReceipt.find()
+    baseQuery
       .populate('lead', 'name email phone')
       .populate('invoice', 'invoiceNumber totalAmount')
       .populate('createdBy', 'name email'),
@@ -25,7 +37,15 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
     .paginate();
 
   const receipts = await features.query;
-  const total = await PaymentReceipt.countDocuments();
+  
+  // Get total count with same filter
+  let countQuery = PaymentReceipt.find();
+  if (req.user.role === 'salesRep') {
+    const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
+    const leadIds = assignedLeadIds.map((lead) => lead._id);
+    countQuery = countQuery.where('lead').in(leadIds);
+  }
+  const total = await countQuery.countDocuments();
 
   res.status(200).json({
     success: true,
@@ -42,7 +62,7 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
  */
 export const getPaymentReceiptById = asyncHandler(async (req, res, next) => {
   const receipt = await PaymentReceipt.findById(req.params.id)
-    .populate('lead', 'name email phone status')
+    .populate('lead', 'name email phone status assignedTo')
     .populate('invoice', 'invoiceNumber totalAmount paidAmount outstandingAmount')
     .populate('createdBy', 'name email')
     .populate('verifiedBy', 'name email')
@@ -50,6 +70,11 @@ export const getPaymentReceiptById = asyncHandler(async (req, res, next) => {
 
   if (!receipt) {
     return next(new AppError('Payment receipt not found', 404));
+  }
+
+  // Check permissions - sales rep can only access receipts for leads assigned to them
+  if (req.user.role === 'salesRep' && receipt.lead?.assignedTo?.toString() !== req.user._id.toString()) {
+    return next(new AppError('Not authorized to access this receipt', 403));
   }
 
   res.status(200).json({
@@ -63,7 +88,18 @@ export const getPaymentReceiptById = asyncHandler(async (req, res, next) => {
  * @route   GET /api/v1/billing/receipts/lead/:leadId
  * @access  Private
  */
-export const getPaymentReceiptsByLeadId = asyncHandler(async (req, res) => {
+export const getPaymentReceiptsByLeadId = asyncHandler(async (req, res, next) => {
+  // Check permissions - sales rep can only access receipts for leads assigned to them
+  if (req.user.role === 'salesRep') {
+    const lead = await Lead.findById(req.params.leadId).select('assignedTo');
+    if (!lead) {
+      return next(new AppError('Lead not found', 404));
+    }
+    if (lead.assignedTo?.toString() !== req.user._id.toString()) {
+      return next(new AppError('Not authorized to access receipts for this lead', 403));
+    }
+  }
+
   const receipts = await PaymentReceipt.find({ lead: req.params.leadId })
     .populate('invoice', 'invoiceNumber totalAmount')
     .populate('createdBy', 'name email')

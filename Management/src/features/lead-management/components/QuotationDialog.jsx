@@ -27,16 +27,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     package: leadData?.package?._id || leadData?.package || '',
     type: 'standard',
     mode: 'summary',
-    items: [
-      {
-        description: '',
-        category: 'other',
-        quantity: 1,
-        unitPrice: 0,
-        totalPrice: 0,
-        notes: '',
-      },
-    ],
+    items: [], // Start with empty array - items will be added when package is detected or manually added
     taxRate: 0,
     discountType: 'none',
     discountValue: 0,
@@ -132,9 +123,17 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           }));
           
           // Keep package item if exists, then add simplified day items
+          // Also remove any blank/empty items
           setFormData(prev => {
             const existingPackageItem = prev.items.find(item => item.category === 'package');
-            const newItems = existingPackageItem ? [existingPackageItem, ...simplifiedItems] : simplifiedItems;
+            // Filter out blank items (empty descriptions) before adding simplified items
+            const cleanExistingItems = prev.items.filter(item => 
+              item.category === 'package' || 
+              (item.description && item.description.trim() !== '')
+            );
+            const newItems = existingPackageItem 
+              ? [existingPackageItem, ...simplifiedItems] 
+              : [...cleanExistingItems.filter(item => item.category !== 'package'), ...simplifiedItems];
             return { ...prev, items: newItems };
           });
         }
@@ -319,13 +318,20 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       );
 
       if (existingIndex >= 0) {
-        // Update existing package item
+        // Update existing package item and remove empty items
         const updatedItems = [...prev.items];
         updatedItems[existingIndex] = packageItem;
-        return { ...prev, items: updatedItems };
+        // Filter out empty items (items with no description or empty description)
+        const cleanedItems = updatedItems.filter(item => 
+          (item.description && item.description.trim() !== '') ||
+          item.category === 'package'
+        );
+        return { ...prev, items: cleanedItems.length > 0 ? cleanedItems : [packageItem] };
       } else {
-        // Add new package item at the beginning, or as first item if no items exist
-        const currentItems = prev.items && prev.items.length > 0 ? prev.items : [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, notes: '' }];
+        // Add new package item and remove empty items
+        const currentItems = prev.items && prev.items.length > 0 
+          ? prev.items.filter(item => item.description && item.description.trim() !== '')
+          : [];
         return { ...prev, items: [packageItem, ...currentItems.filter(item => item.category !== 'package')] };
       }
     });
@@ -585,14 +591,23 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     });
 
     // Keep existing package item if it exists, then add extracted items
+    // Also remove any blank/empty items
     setFormData(prev => {
       const existingPackageItem = prev.items.find(item => item.category === 'package');
-      const newItems = existingPackageItem ? [existingPackageItem, ...extractedItems] : extractedItems;
+      // Filter out blank items (empty descriptions) before adding extracted items
+      const cleanExistingItems = prev.items.filter(item => 
+        item.category === 'package' || 
+        (item.description && item.description.trim() !== '')
+      );
+      const newItems = existingPackageItem 
+        ? [existingPackageItem, ...extractedItems] 
+        : [...cleanExistingItems.filter(item => item.category !== 'package'), ...extractedItems];
       
       if (extractedItems.length > 0) {
         return { ...prev, items: newItems };
       }
-      return prev;
+      // If no extracted items, still remove blank entries
+      return { ...prev, items: existingPackageItem ? [existingPackageItem] : cleanExistingItems };
     });
 
     if (extractedItems.length > 0) {
@@ -624,11 +639,11 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       if (detectedPackageType === 'manual') {
         await loadManualItinerarySimple();
       } else {
-        // For packages/customized packages, keep only package item
+        // For packages/customized packages, keep only package item (remove all other items including blank ones)
         const packageItem = formData.items.find(item => item.category === 'package');
         setFormData(prev => ({
           ...prev,
-          items: packageItem ? [packageItem] : prev.items.slice(0, 1),
+          items: packageItem ? [packageItem] : prev.items.filter(item => item.description && item.description.trim() !== '').slice(0, 1),
         }));
       }
     }
@@ -672,11 +687,21 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const removeItem = (index) => {
-    if (formData.items.length > 1) {
+    const itemsWithDescription = formData.items.filter(item => 
+      item.description && item.description.trim() !== ''
+    );
+    
+    // Allow removal if there's more than one item with a description
+    if (itemsWithDescription.length > 1) {
       const newItems = formData.items.filter((_, i) => i !== index);
-      setFormData({ ...formData, items: newItems });
+      // Filter out any remaining blank items after removal
+      const cleanedItems = newItems.filter(item => 
+        (item.description && item.description.trim() !== '') ||
+        item.category === 'package'
+      );
+      setFormData({ ...formData, items: cleanedItems.length > 0 ? cleanedItems : [] });
     } else {
-      toast.error('At least one item is required');
+      toast.error('At least one item with description is required');
     }
   };
 
@@ -712,11 +737,16 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const handleSubmit = async (status = 'send') => {
     // When in detailed mode, exclude package items from submission
-    const itemsToSubmit = isDetailedMode 
+    let itemsToSubmit = isDetailedMode 
       ? formData.items.filter(item => item.category !== 'package')
       : formData.items;
     
-    if (!itemsToSubmit.some(item => item.description.trim())) {
+    // Filter out blank/empty items (items with no description or empty description)
+    itemsToSubmit = itemsToSubmit.filter(item => 
+      item.description && item.description.trim() !== ''
+    );
+    
+    if (itemsToSubmit.length === 0) {
       toast.error('Please add at least one item with description');
       return;
     }
@@ -728,7 +758,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     const payload = {
       ...formData,
       mode: quotationMode,
-      items: itemsToSubmit, // Use filtered items (without package items in detailed mode)
+      items: itemsToSubmit, // Use filtered items (without blank entries and without package items in detailed mode)
       ...totals,
       validUntil: new Date(formData.validUntil).toISOString(),
       status: status === 'send' ? 'sent' : 'draft',
@@ -994,7 +1024,8 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       .map((item, originalIndex) => ({
                         item,
                         originalIndex,
-                        shouldShow: !isDetailedMode || item.category !== 'package'
+                        shouldShow: (!isDetailedMode || item.category !== 'package') && 
+                                   (item.description && item.description.trim() !== '' || item.category === 'package')
                       }))
                       .filter(({ shouldShow }) => shouldShow)
                       .map(({ item, originalIndex }) => {
@@ -1038,7 +1069,10 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                               <button
                                 onClick={() => removeItem(originalIndex)}
                                 className="text-red-600 hover:text-red-800"
-                                disabled={formData.items.filter(i => !isDetailedMode || i.category !== 'package').length === 1}
+                                disabled={formData.items.filter(i => 
+                                  (i.description && i.description.trim() !== '') && 
+                                  (!isDetailedMode || i.category !== 'package')
+                                ).length <= 1}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1048,6 +1082,14 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       })}
                   </tbody>
                 </table>
+                {formData.items.filter(item => 
+                  (!isDetailedMode || item.category !== 'package') && 
+                  (item.description && item.description.trim() !== '' || item.category === 'package')
+                ).length === 0 && (
+                  <div className="text-center py-8 text-gray-500 text-sm border-t">
+                    No items added yet. Package price will appear here when detected, or click "Add Item" to add manually.
+                  </div>
+                )}
               </div>
             </div>
 

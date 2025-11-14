@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import DestinationsInternational from './pages/DestinationsInternational';
 import DestinationsDomestic from './pages/DestinationsDomestic';
 import PackageDetails from './pages/PackageDetails';
+import CustomizePackage from './pages/CustomizePackage';
 import Packages from './pages/Packages';
 import AboutUs from './pages/About';
 import Contact from './pages/Contact';
@@ -55,6 +56,7 @@ function AppContent() {
           <Route path="/about" element={<AboutUs />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/package/:id" element={<PackageDetails />} />
+          <Route path="/package/:id/customize" element={<CustomizePackage />} />
           <Route path="/login" element={<Login />} />
         </Routes>
       </div>
