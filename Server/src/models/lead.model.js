@@ -52,6 +52,7 @@ const leadSchema = new mongoose.Schema(
     },
     destination: String,
     travelDate: Date,
+    endDate: Date,
     package: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Package',

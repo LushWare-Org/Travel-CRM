@@ -12,3 +12,4 @@ export const formatCurrency = (value) => {
   return INR_FORMATTER.format(numeric);
 };
 
+

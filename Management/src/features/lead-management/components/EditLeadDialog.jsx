@@ -37,6 +37,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     destination: "",
     platform: "",
     travelDate: "",
+    endDate: "",
     time: "",
     package: "",
     packageName: "",
@@ -145,6 +146,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         destination: lead.destination || '',
         platform: lead.platform || '',
         travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
+        endDate: lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
         time: lead.time || '',
         package: defaultPackageId,
         packageName: defaultPackageName,
@@ -197,6 +199,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         destination: formData.destination || undefined,
         platform: formData.platform || undefined,
         travelDate: formData.travelDate || undefined,
+        endDate: formData.endDate || undefined,
         time: formData.time || undefined,
         package: formData.package || null,
         packageName: formData.packageName || null,
@@ -778,7 +781,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Travel Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Travel Date (Start)</label>
               <input
                 type="date"
                 value={formData.travelDate}
@@ -787,12 +790,25 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                min={formData.travelDate || undefined}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
               <input
                 type="text"
                 value={formData.time}
                 onChange={(e) => setFormData({...formData, time: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., 10:30 AM or 14:00"
               />
             </div>
           </div>

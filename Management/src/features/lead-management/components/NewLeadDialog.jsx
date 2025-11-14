@@ -25,6 +25,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     destination: "",
     platform: "",
     travelDate: "",
+    endDate: "",
     time: "",
     package: "",
     packageName: "",
@@ -109,6 +110,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         platform: formData.platform || "Manual Entry",
         source: "manual",
         travelDate: formData.travelDate || undefined,
+        endDate: formData.endDate || undefined,
         time: formData.time || undefined,
         package: formData.package || undefined,
         packageName: formData.packageName || undefined,
@@ -149,6 +151,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         destination: "",
         platform: "",
         travelDate: "",
+        endDate: "",
         time: "",
         package: "",
         packageName: "",
@@ -347,7 +350,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Travel Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Travel Date (Start)</label>
               <input
                 type="date"
                 value={formData.travelDate}
@@ -355,6 +358,18 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                min={formData.travelDate || undefined}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
               <input

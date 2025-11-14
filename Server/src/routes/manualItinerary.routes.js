@@ -3,12 +3,16 @@ import {
   createOrUpdateManualItinerary,
   getManualItineraryByLead,
   deleteManualItinerary,
+  createWebsiteManualItinerary,
 } from '../controllers/manualItinerary.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require authentication
+// Public route (no authentication required)
+router.post('/website', createWebsiteManualItinerary);
+
+// All routes below require authentication
 router.use(protect);
 
 // Create or update manual itinerary for a lead

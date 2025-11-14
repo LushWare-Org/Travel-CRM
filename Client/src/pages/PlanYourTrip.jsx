@@ -3,69 +3,56 @@ import {
   MapPin,
   Calendar,
   Users,
-  DollarSign,
   Zap,
   ChevronRight,
   ChevronLeft,
   Check,
   Clock,
-  Wallet,
-  CreditCard,
-  Sparkles,
-  Globe,
+  Plus,
+  Trash2,
+  Plane,
+  Car,
+  Ship,
+  Train,
+  Coffee,
+  UtensilsCrossed,
+  Bed,
+  Loader2,
 } from "lucide-react";
+import { submitManualItineraryRequest } from "../utils/manualItineraryApi";
+import DestinationSelector from "../components/DestinationSelector";
+import LocationSelector from "../components/LocationSelector";
+import ActivitySelector from "../components/ActivitySelector";
 
-const international = [
-  { id: 1, name: "Maldives", country: "Maldives", region: "Asia" },
-  { id: 2, name: "Bali", country: "Indonesia", region: "Asia" },
-  { id: 3, name: "Switzerland", country: "Switzerland", region: "Europe" },
-  { id: 4, name: "Paris", country: "France", region: "Europe" },
-  { id: 5, name: "Dubai", country: "UAE", region: "Middle East" },
-  { id: 6, name: "Santorini", country: "Greece", region: "Europe" },
-  { id: 7, name: "Thailand", country: "Thailand", region: "Asia" },
-  { id: 8, name: "New Zealand", country: "New Zealand", region: "Oceania" },
+const transportOptions = [
+  { value: "flight", label: "Flight", icon: Plane },
+  { value: "train", label: "Train", icon: Train },
+  { value: "bus", label: "Bus", icon: Car },
+  { value: "car", label: "Car", icon: Car },
+  { value: "boat", label: "Boat", icon: Ship },
+  { value: "walk", label: "Walk", icon: Car },
+  { value: "other", label: "Other", icon: Car },
 ];
 
-const local = [
-  { id: 101, name: "Kashmir", state: "Jammu & Kashmir", region: "North India" },
-  { id: 102, name: "Kerala", state: "Kerala", region: "South India" },
-  { id: 103, name: "Goa", state: "Goa", region: "West India" },
-  { id: 104, name: "Rajasthan", state: "Rajasthan", region: "North India" },
-  { id: 105, name: "Himachal Pradesh", state: "Himachal Pradesh", region: "North India" },
-  { id: 106, name: "Andaman", state: "Andaman & Nicobar", region: "Bay of Bengal" },
-  { id: 107, name: "Ladakh", state: "Ladakh", region: "North India" },
-  { id: 108, name: "Uttarakhand", state: "Uttarakhand", region: "North India" },
-];
-
-const activities = [
-  "Beach & Relaxation",
-  "Adventure & Trekking",
-  "Cultural Exploration",
-  "Wildlife Safari",
-  "Food & Culinary",
-  "Romantic Getaway",
-  "Family Vacation",
-  "Luxury Experience",
-];
-
-const budgetOptions = [
-  { label: "Budget", range: "$500 - $1,500", icon: Wallet },
-  { label: "Mid-Range", range: "$1,500 - $3,500", icon: CreditCard },
-  { label: "Premium", range: "$3,500 - $7,000", icon: Sparkles },
-  { label: "Luxury", range: "$7,000+", icon: Globe },
+const accommodationTypes = [
+  { value: "hotel", label: "Hotel" },
+  { value: "resort", label: "Resort" },
+  { value: "guesthouse", label: "Guesthouse" },
+  { value: "homestay", label: "Homestay" },
+  { value: "camp", label: "Camp" },
+  { value: "other", label: "Other" },
 ];
 
 export default function PlanYourTrip() {
   const [step, setStep] = useState(1);
-  const [destTab, setDestTab] = useState("intl");
   const [selectedDest, setSelectedDest] = useState(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [travelers, setTravelers] = useState(2);
   const [selectedActivities, setSelectedActivities] = useState([]);
-  const [budget, setBudget] = useState("");
-  const [accommodation, setAccommodation] = useState("4-star");
-  const [mealPlan, setMealPlan] = useState("breakfast");
+  // Default preferences (not shown in UI, but used for generating default values)
+  const defaultAccommodation = "4-star";
+  const defaultMealPlan = "breakfast";
   const [specialRequest, setSpecialRequest] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -73,6 +60,9 @@ export default function PlanYourTrip() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showCal, setShowCal] = useState(false);
   const [validationMsg, setValidationMsg] = useState('');
+  const [itineraryDays, setItineraryDays] = useState([]);
+  const [currentDayIndex, setCurrentDayIndex] = useState(0); // Index of currently visible day (0-based)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const duration =
     startDate && endDate
@@ -82,10 +72,120 @@ export default function PlanYourTrip() {
         )
       : 0;
 
+  // Clear itinerary days when duration becomes 0 or decreases
+  useEffect(() => {
+    if (duration === 0) {
+      setItineraryDays([]);
+      setCurrentDayIndex(0);
+    } else {
+      // If duration decreases, remove extra days
+      setItineraryDays(prev => {
+        if (prev.length > duration) {
+          const trimmed = prev.slice(0, duration);
+          // Adjust current day index if needed
+          setCurrentDayIndex(currentIdx => {
+            const maxIndex = Math.max(0, trimmed.length - 1);
+            return currentIdx > maxIndex ? maxIndex : currentIdx;
+          });
+          return trimmed;
+        }
+        return prev;
+      });
+    }
+  }, [duration]);
+
+  // Handle adding a new day
+  const handleAddDay = () => {
+    const nextDayNumber = itineraryDays.length + 1;
+    if (nextDayNumber <= duration) {
+      const newDay = {
+        dayNumber: nextDayNumber,
+        title: `Day ${nextDayNumber}`,
+        description: '',
+        locations: [],
+        activities: [],
+        accommodation: {
+          name: '',
+          type: defaultAccommodation === '3-star' ? 'hotel' : defaultAccommodation === '4-star' ? 'hotel' : defaultAccommodation === '5-star' ? 'resort' : defaultAccommodation === 'boutique' ? 'guesthouse' : defaultAccommodation === 'villa' ? 'other' : 'hotel',
+          rating: defaultAccommodation === '3-star' ? 3 : defaultAccommodation === '4-star' ? 4 : defaultAccommodation === '5-star' ? 5 : 0,
+          address: '',
+          contactNumber: '',
+        },
+        meals: {
+          breakfast: defaultMealPlan === 'breakfast' || defaultMealPlan === 'half-board' || defaultMealPlan === 'full-board' || defaultMealPlan === 'all-inclusive',
+          lunch: defaultMealPlan === 'half-board' || defaultMealPlan === 'full-board' || defaultMealPlan === 'all-inclusive',
+          dinner: defaultMealPlan === 'full-board' || defaultMealPlan === 'all-inclusive',
+        },
+        transport: '',
+        places: [],
+        notes: '',
+      };
+      setItineraryDays([...itineraryDays, newDay]);
+      setCurrentDayIndex(itineraryDays.length); // Show the newly added day
+      // Scroll to top of the form section
+      setTimeout(() => {
+        const formElement = document.querySelector('[data-itinerary-form]');
+        if (formElement) {
+          formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  };
+
+  // Handle removing a day
+  const handleRemoveDay = (dayNumber) => {
+    const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
+    // Renumber remaining days
+    const renumberedDays = filteredDays.map((day, index) => ({
+      ...day,
+      dayNumber: index + 1,
+    }));
+    setItineraryDays(renumberedDays);
+    // Adjust current day index if needed
+    if (currentDayIndex >= renumberedDays.length) {
+      setCurrentDayIndex(Math.max(0, renumberedDays.length - 1));
+    }
+  };
+
+  // Handle switching to a different day
+  const handleGoToDay = (index) => {
+    setCurrentDayIndex(index);
+  };
+
   const progress = (step / 4) * 100;
 
+  const handleDayChange = (dayNumber, field, value) => {
+    setItineraryDays(prev =>
+      prev.map(day =>
+        day.dayNumber === dayNumber
+          ? { ...day, [field]: value }
+          : day
+      )
+    );
+  };
+
+  const handleDayNestedChange = (dayNumber, parentField, childField, value) => {
+    setItineraryDays(prev =>
+      prev.map(day =>
+        day.dayNumber === dayNumber
+          ? {
+              ...day,
+              [parentField]: {
+                ...day[parentField],
+                [childField]: value,
+              },
+            }
+          : day
+      )
+    );
+  };
+
+  const handleDestinationChange = (destination) => {
+    setSelectedDest(destination);
+    setValidationMsg('');
+  };
+
   const next = () => {
-    console.log('PlanYourTrip.next called', { step, selectedDest, startDate, endDate, name, email, phone });
     // validations
     if (step === 1 && !selectedDest) {
       setValidationMsg('Please choose a destination before continuing.');
@@ -95,6 +195,10 @@ export default function PlanYourTrip() {
       setValidationMsg('Please select travel dates before continuing.');
       return;
     }
+    if (step === 3 && duration === 0) {
+      setValidationMsg('Please select valid travel dates first.');
+      return;
+    }
     if (step === 4 && (!name || !email || !phone)) {
       setValidationMsg('Please fill in your name, email and phone to submit.');
       return;
@@ -102,12 +206,76 @@ export default function PlanYourTrip() {
     setValidationMsg('');
     if (step < 4) setStep(step + 1);
     else {
-      console.log('All validations passed, showing success modal');
-      setShowSuccess(true);
+      handleSubmit();
     }
   };
 
   const back = () => step > 1 && setStep(step - 1);
+
+  const handleSubmit = async () => {
+    if (!name || !email || !phone) {
+      setValidationMsg('Please fill in your name, email and phone to submit.');
+      return;
+    }
+
+    if (duration === 0 || itineraryDays.length === 0) {
+      setValidationMsg('Please complete the itinerary planning first.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setValidationMsg('');
+
+    try {
+      // Extract destination info
+      const destinationName = selectedDest?.label || selectedDest || '';
+      const destinationValue = selectedDest?.value || selectedDest || '';
+      
+      const payload = {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        destination: destinationName,
+        destinationCountry: destinationValue,
+        region: '',
+        travelDate: startDate,
+        endDate: endDate,
+        numberOfTravelers: travelers,
+        budget: '',
+        message: specialRequest.trim() || '',
+        days: itineraryDays.map(day => ({
+          dayNumber: day.dayNumber,
+          title: day.title || `Day ${day.dayNumber}`,
+          description: day.description || '',
+          locations: day.locations || [],
+          activities: day.activities || [],
+          accommodation: day.accommodation || {
+            name: '',
+            type: 'hotel',
+            rating: 0,
+            address: '',
+            contactNumber: '',
+          },
+          meals: day.meals || {
+            breakfast: false,
+            lunch: false,
+            dinner: false,
+          },
+          transport: day.transport || '',
+          places: day.places || [],
+          notes: day.notes || '',
+        })),
+      };
+
+      await submitManualItineraryRequest(payload);
+      setShowSuccess(true);
+    } catch (error) {
+      console.error('Failed to submit manual itinerary:', error);
+      setValidationMsg(error.message || 'Failed to submit your itinerary request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // --- Date Range Calendar ---
   function DateRangeCalendar({ initialStart, initialEnd, onChange, onClose }) {
@@ -250,7 +418,7 @@ export default function PlanYourTrip() {
                         {s}
                       </div>
                       <div className="mt-2 text-xs text-center text-gray-600 font-medium whitespace-nowrap">
-                        {['Destination', 'Dates & Travelers', 'Preferences', 'Contact Info'][idx]}
+                        {['Destination', 'Dates & Travelers', 'Plan Itinerary', 'Contact Info'][idx]}
                       </div>
                     </div>
                     {s < 4 && (
@@ -277,51 +445,30 @@ export default function PlanYourTrip() {
                 </h2>
               </div>
 
-              {/* Tabs */}
-              <div className="flex gap-2 mb-6 border-b border-gray-200">
-                {["intl", "local"].map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setDestTab(t)}
-                    className={`px-6 py-2 font-semibold transition-all ${
-                      destTab === t
-                        ? "text-orange-600 border-b-2 border-orange-600"
-                        : "text-gray-500 hover:text-gray-800"
-                    }`}
-                  >
-                    {t === "intl" ? "International" : "Local (India)"}
-                  </button>
-                ))}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Select or type your destination
+                </label>
+                <DestinationSelector
+                  value={selectedDest}
+                  onChange={handleDestinationChange}
+                  placeholder="Choose your destination..."
+                />
               </div>
 
-              {/* Destination List */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
-                {(destTab === "intl" ? international : local).map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => setSelectedDest(d)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${
-                      selectedDest?.id === d.id
-                        ? "border-orange-500 bg-orange-50"
-                        : "border-gray-200 hover:border-orange-300"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-900">{d.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {d.country || d.state} • {d.region}
-                        </p>
-                      </div>
-                      {selectedDest?.id === d.id && (
-                        <Check className="w-5 h-5 text-orange-600" />
-                      )}
+              {selectedDest && (
+                <div className="mt-4 p-4 bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center">
+                      <Check className="w-6 h-6 text-white" />
                     </div>
-                  </button>
-                ))}
-              </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-lg">{selectedDest.label || selectedDest}</p>
+                      <p className="text-sm text-gray-600">Destination selected</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -409,112 +556,302 @@ export default function PlanYourTrip() {
             </div>
           )}
 
-          {/* ==== STEP 3 : Preferences ==== */}
+          {/* ==== STEP 3 : Day-by-Day Itinerary ==== */}
           {step === 3 && (
-            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 space-y-8">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                  <Zap className="w-7 h-7 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 font-poppins">
-                  Customize Your Trip
-                </h2>
-              </div>
-
-              {/* Activities */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Interests</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {activities.map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      onClick={() =>
-                        setSelectedActivities((prev) =>
-                          prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
-                        )
-                      }
-                      className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                        selectedActivities.includes(a)
-                          ? "border-orange-500 bg-orange-50 text-orange-700"
-                          : "border-gray-200 hover:border-orange-300"
-                      }`}
-                    >
-                      {a}
-                    </button>
-                  ))}
+            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                    <Zap className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 font-poppins">
+                      Plan Your Itinerary
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {duration} Days / {duration - 1} Nights in {selectedDest?.label || selectedDest || 'destination'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Budget */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <DollarSign className="w-5 h-5 mr-1" /> Budget per person
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {budgetOptions.map((b) => {
-                    const Icon = b.icon;
-                    return (
+              {duration === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                  <p className="text-gray-600 mb-2">Please select travel dates first</p>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="text-orange-600 hover:text-orange-700 font-semibold"
+                  >
+                    Go to Dates & Travelers →
+                  </button>
+                </div>
+              ) : itineraryDays.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                  <p className="text-gray-600 mb-4">Start planning your itinerary</p>
+                  <button
+                    type="button"
+                    onClick={handleAddDay}
+                    className="px-6 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all font-semibold shadow-md flex items-center gap-2 mx-auto"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add Day 1
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6" data-itinerary-form>
+                  {/* Navigation and Progress - Only show if more than one day */}
+                  {itineraryDays.length > 1 && (
+                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
                       <button
-                        key={b.label}
                         type="button"
-                        onClick={() => setBudget(b.label)}
-                        className={`p-5 rounded-xl border-2 transition-all ${
-                          budget === b.label
-                            ? "border-orange-500 bg-gradient-to-br from-orange-50 to-yellow-50"
-                            : "border-gray-200 hover:border-orange-300"
-                        }`}
+                        onClick={() => setCurrentDayIndex(prev => Math.max(0, prev - 1))}
+                        disabled={currentDayIndex === 0}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        <Icon
-                          className={`w-8 h-8 mx-auto mb-2 ${
-                            budget === b.label ? "text-orange-600" : "text-gray-400"
-                          }`}
-                        />
-                        <div className="font-semibold">{b.label}</div>
-                        <div className="text-xs text-gray-600">{b.range}</div>
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      <p className="text-sm font-medium text-gray-700">
+                        Day {itineraryDays[currentDayIndex].dayNumber} of {itineraryDays.length} ({duration} total)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentDayIndex(prev => Math.min(itineraryDays.length - 1, prev + 1))}
+                        disabled={currentDayIndex === itineraryDays.length - 1}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
 
-              {/* Accommodation & Meals */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Accommodation</label>
-                  <select
-                    value={accommodation}
-                    onChange={(e) => setAccommodation(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value="3-star">3-Star Comfort</option>
-                    <option value="4-star">4-Star Premium</option>
-                    <option value="5-star">5-Star Luxury</option>
-                    <option value="boutique">Boutique Stay</option>
-                    <option value="villa">Private Villa</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Meal Plan</label>
-                  <select
-                    value={mealPlan}
-                    onChange={(e) => setMealPlan(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value="breakfast">Breakfast Only</option>
-                    <option value="half-board">Half Board</option>
-                    <option value="full-board">Full Board</option>
-                    <option value="all-inclusive">All Inclusive</option>
-                  </select>
-                </div>
-              </div>
+                  {/* Progress Indicator - Show when only one day */}
+                  {itineraryDays.length === 1 && (
+                    <div className="mb-4 p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
+                      <p className="text-sm font-medium text-gray-700 text-center">
+                        Day 1 of {duration} {duration > 1 && '(Click "Add Day 2" below to add more days)'}
+                      </p>
+                    </div>
+                  )}
 
+                  {/* Current Day Form - Only show one day at a time */}
+                  {itineraryDays[currentDayIndex] && (
+                    <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                      {/* Day Header */}
+                      <div className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-6 py-4 flex items-center justify-between">
+                        <h3 className="font-bold text-lg font-poppins">
+                          Day {itineraryDays[currentDayIndex].dayNumber}
+                        </h3>
+                        {itineraryDays.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDay(itineraryDays[currentDayIndex].dayNumber)}
+                            className="p-2 hover:bg-red-500 rounded-lg transition-colors"
+                            title="Remove this day"
+                          >
+                            <Trash2 className="w-5 h-5 text-white" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Day Content */}
+                      <div className="p-6 space-y-4 bg-white">
+                        {/* Title */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Day Title *
+                          </label>
+                          <input
+                            type="text"
+                            value={itineraryDays[currentDayIndex].title || ''}
+                            onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'title', e.target.value)}
+                            placeholder={`e.g., Arrival in ${selectedDest?.label || selectedDest || 'destination'}`}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            required
+                          />
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Description *
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={itineraryDays[currentDayIndex].description || ''}
+                            onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'description', e.target.value)}
+                            placeholder="Describe what you'd like to do on this day..."
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                            required
+                          />
+                        </div>
+
+                        {/* Locations */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Locations to Visit
+                          </label>
+                          <LocationSelector
+                            locations={itineraryDays[currentDayIndex].locations || []}
+                            onChange={(locations) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'locations', locations)}
+                            destination={selectedDest}
+                          />
+                        </div>
+
+                        {/* Activities */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Activities
+                          </label>
+                          <ActivitySelector
+                            activities={itineraryDays[currentDayIndex].activities || []}
+                            onChange={(activities) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'activities', activities)}
+                          />
+                        </div>
+
+                        {/* Accommodation */}
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Accommodation Name
+                            </label>
+                            <input
+                              type="text"
+                              value={itineraryDays[currentDayIndex].accommodation?.name || ''}
+                              onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'accommodation', 'name', e.target.value)}
+                              placeholder="e.g., Grand Hotel"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Accommodation Type
+                            </label>
+                            <select
+                              value={itineraryDays[currentDayIndex].accommodation?.type || 'hotel'}
+                              onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'accommodation', 'type', e.target.value)}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            >
+                              {accommodationTypes.map(type => (
+                                <option key={type.value} value={type.value}>{type.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Meals */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Meals Included
+                          </label>
+                          <div className="flex gap-4">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={itineraryDays[currentDayIndex].meals?.breakfast || false}
+                                onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'meals', 'breakfast', e.target.checked)}
+                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                              />
+                              <span className="text-sm text-gray-700 flex items-center gap-1">
+                                <Coffee className="w-4 h-4" /> Breakfast
+                              </span>
+                            </label>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={itineraryDays[currentDayIndex].meals?.lunch || false}
+                                onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'meals', 'lunch', e.target.checked)}
+                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                              />
+                              <span className="text-sm text-gray-700 flex items-center gap-1">
+                                <UtensilsCrossed className="w-4 h-4" /> Lunch
+                              </span>
+                            </label>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={itineraryDays[currentDayIndex].meals?.dinner || false}
+                                onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'meals', 'dinner', e.target.checked)}
+                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                              />
+                              <span className="text-sm text-gray-700 flex items-center gap-1">
+                                <UtensilsCrossed className="w-4 h-4" /> Dinner
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Transport */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Transport
+                          </label>
+                          <select
+                            value={itineraryDays[currentDayIndex].transport || ''}
+                            onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'transport', e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          >
+                            <option value="">Select transport</option>
+                            {transportOptions.map(opt => {
+                              const Icon = opt.icon;
+                              return (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Day Notes */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Day Notes
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={itineraryDays[currentDayIndex].notes || ''}
+                            onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'notes', e.target.value)}
+                            placeholder="Any special requests or notes for this day..."
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Add Day Button */}
+                  {itineraryDays.length < duration && (
+                    <div className="flex justify-center pt-4">
+                      <button
+                        type="button"
+                        onClick={handleAddDay}
+                        className="px-6 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all font-semibold shadow-md flex items-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Add Day {itineraryDays.length + 1}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Info message when all days are added */}
+                  {itineraryDays.length === duration && duration > 0 && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+                      <p className="text-green-700 text-sm font-medium text-center">
+                        ✓ All {duration} days have been added to your itinerary
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Special Requests */}
               <div>
-                <label className="block text-sm font-semibold mb-2">Special Requests</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Overall Special Requests</label>
                 <textarea
                   value={specialRequest}
                   onChange={(e) => setSpecialRequest(e.target.value)}
-                  placeholder="Anniversary, dietary needs, etc."
+                  placeholder="Anniversary, dietary needs, accessibility requirements, etc."
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                   rows={3}
                 />
@@ -577,7 +914,7 @@ export default function PlanYourTrip() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
                       <div>
                         <div className="text-xs text-gray-500">Destination</div>
-                        <div className="font-semibold">{selectedDest?.name || '—'}</div>
+                        <div className="font-semibold">{selectedDest?.label || selectedDest || '—'}</div>
                       </div>
 
                       <div>
@@ -595,33 +932,25 @@ export default function PlanYourTrip() {
                         <div className="font-semibold">{travelers}</div>
                       </div>
 
-                      <div>
-                        <div className="text-xs text-gray-500">Budget</div>
-                        <div className="font-semibold">{budget || 'Not selected'}</div>
+                      <div className="sm:col-span-2">
+                        <div className="text-xs text-gray-500">Itinerary Days</div>
+                        <div className="font-semibold">{itineraryDays.length} days planned</div>
                       </div>
-
-                      <div>
-                        <div className="text-xs text-gray-500">Accommodation</div>
-                        <div className="font-semibold">{accommodation}</div>
-                      </div>
-
-                      <div>
-                        <div className="text-xs text-gray-500">Meal Plan</div>
-                        <div className="font-semibold">{mealPlan}</div>
-                      </div>
-
                       <div className="sm:col-span-2">
                         <div className="text-xs text-gray-500">Special Requests</div>
                         <div className="font-semibold">{specialRequest || '—'}</div>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <div className="text-xs text-gray-500">Interests</div>
-                        <div className="font-semibold">{selectedActivities.length ? selectedActivities.join(', ') : 'None selected'}</div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ==== Validation Message ==== */}
+          {validationMsg && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-red-700 text-sm font-medium">{validationMsg}</p>
             </div>
           )}
 
@@ -631,7 +960,8 @@ export default function PlanYourTrip() {
               <button
                 type="button"
                 onClick={back}
-                className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 flex items-center justify-center space-x-2"
+                disabled={isSubmitting}
+                className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-5 h-5" />
                 <span>Back</span>
@@ -640,19 +970,34 @@ export default function PlanYourTrip() {
             <button
               type="button"
               onClick={next}
-              aria-disabled={
+              disabled={
+                isSubmitting ||
                 (step === 1 && !selectedDest) ||
                 (step === 2 && (!startDate || !endDate)) ||
+                (step === 3 && duration === 0) ||
                 (step === 4 && (!name || !email || !phone))
               }
               className={`flex-1 px-6 py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all ${
-                (step === 1 && !selectedDest) || (step === 2 && (!startDate || !endDate)) || (step === 4 && (!name || !email || !phone))
+                isSubmitting ||
+                (step === 1 && !selectedDest) ||
+                (step === 2 && (!startDate || !endDate)) ||
+                (step === 3 && duration === 0) ||
+                (step === 4 && (!name || !email || !phone))
                   ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                   : 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white hover:shadow-xl transform hover:scale-[1.02]'
               }`}
             >
-              <span>{step === 4 ? "Get My Plan" : "Next"}</span>
-              {step < 4 && <ChevronRight className="w-5 h-5" />}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Submitting...</span>
+                </>
+              ) : (
+                <>
+                  <span>{step === 4 ? "Submit Itinerary" : "Next"}</span>
+                  {step < 4 && <ChevronRight className="w-5 h-5" />}
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -670,7 +1015,7 @@ export default function PlanYourTrip() {
                 Successfully Submitted!
               </h3>
               <p className="text-sm text-gray-500 mb-6">
-                Your trip request has been submitted successfully. We'll contact you soon at {email}.
+                Your manual itinerary request has been submitted successfully! Our travel experts will review your itinerary and contact you soon at {email}.
               </p>
               <button
                 onClick={() => {
@@ -681,11 +1026,12 @@ export default function PlanYourTrip() {
                   setEndDate('');
                   setTravelers(2);
                   setSelectedActivities([]);
-                  setBudget('');
                   setName('');
                   setEmail('');
                   setPhone('');
                   setSpecialRequest('');
+                  setItineraryDays([]);
+                  setValidationMsg('');
                 }}
                 className="w-full px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700"
               >

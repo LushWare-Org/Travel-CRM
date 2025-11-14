@@ -144,6 +144,7 @@ const LeadTable = ({
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">Destination</th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Platform</th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Travel Date</th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">End Date</th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[100px]">Time</th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Remarks</th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[140px]">Created Date/Time</th>
@@ -185,6 +186,7 @@ const LeadTable = ({
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.destination || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.platform || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : 'N/A'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.time || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm border-r border-gray-200" onClick={(e) => { e.stopPropagation(); }}>
                     <button

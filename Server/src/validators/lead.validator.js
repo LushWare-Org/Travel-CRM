@@ -77,6 +77,11 @@ export const createLeadSchema = Joi.object({
     .messages({
       'date.base': 'Travel date must be a valid date',
     }),
+  endDate: Joi.date()
+    .allow(null)
+    .messages({
+      'date.base': 'End date must be a valid date',
+    }),
   leadDateTime: Joi.date()
     .default(Date.now)
     .messages({
@@ -187,6 +192,7 @@ export const updateLeadSchema = Joi.object({
       'any.only': 'Platform must be one of: Manual Entry, Website Form, Paid Package, Social Media, Phone Call, Email, Referral, Walk-in',
     }),
   travelDate: Joi.date().allow(null),
+  endDate: Joi.date().allow(null),
   leadDateTime: Joi.date(),
   time: Joi.string().trim().allow('', null),
   numberOfTravelers: Joi.number().integer().min(1).allow(null),
