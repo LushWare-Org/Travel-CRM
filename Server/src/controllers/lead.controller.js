@@ -106,8 +106,17 @@ export const createLead = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/leads
 // @access  Private (Admin, SalesRep)
 export const getLeads = asyncHandler(async (req, res, next) => {
+  // Build base query - filter by assignedTo for sales reps
+  let baseQuery = Lead.find();
+  
+  // If user is a sales rep, only show leads assigned to them
+  if (req.user.role === 'salesRep') {
+    baseQuery = baseQuery.where('assignedTo').equals(req.user._id);
+  }
+  // Admin can see all leads (no filter)
+
   const features = new APIFeatures(
-    Lead.find()
+    baseQuery
       .populate('assignedTo', 'name email role')
       .populate('currentItinerary')
       .populate('package', 'name customizedForLead originalPackage customizedBy')
@@ -133,9 +142,13 @@ export const getLeads = asyncHandler(async (req, res, next) => {
   // Execute query
   const leads = await features.query;
 
-  // Get pagination metadata
+  // Get pagination metadata - apply same filter for count
+  let countQuery = Lead.find();
+  if (req.user.role === 'salesRep') {
+    countQuery = countQuery.where('assignedTo').equals(req.user._id);
+  }
   const queryCopy = { ...req.query };
-  const featuresForCount = new APIFeatures(Lead.find(), queryCopy);
+  const featuresForCount = new APIFeatures(countQuery, queryCopy);
   featuresForCount.search(['name', 'email', 'phone', 'city', 'destination', 'salesRep', 'adviser']);
   featuresForCount.filter();
   const totalQuery = featuresForCount.query;
@@ -163,6 +176,11 @@ export const getLead = asyncHandler(async (req, res, next) => {
 
   if (!lead) {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
+  }
+
+  // Check permissions - sales rep can only access leads assigned to them
+  if (req.user.role === 'salesRep' && lead.assignedTo?.toString() !== req.user._id.toString()) {
+    throw new AppError('Not authorized to access this lead', 403);
   }
 
   res.status(200).json({
