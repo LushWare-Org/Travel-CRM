@@ -251,14 +251,14 @@ const UserAnalytics = () => {
       {/* User Status Distribution Pie Chart */}
       <ChartContainer
         title="User Status Distribution"
-        description="Active vs Inactive users and verification status"
+        description="Website users, registered users, and converted users"
       >
         <PieChartComponent
-          data={analyticsData?.statusDistribution || userTypeDistributionData}
+          data={analyticsData?.userStatusDistribution || userTypeDistributionData}
           dataKey="value"
           nameKey="name"
           height={300}
-          colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]}
+          colors={["#3b82f6", "#10b981", "#f59e0b"]}
         />
       </ChartContainer>
 

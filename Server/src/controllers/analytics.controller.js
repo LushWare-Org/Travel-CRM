@@ -930,19 +930,8 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
     }));
 
     // 4. Users with Bookings (Conversion)
-    const usersWithBookings = await Booking.aggregate([
-      {
-        $group: {
-          _id: '$userId',
-        },
-      },
-      {
-        $count: 'count',
-      },
-    ]);
-
-    const bookingConversion = usersWithBookings.length > 0 ? usersWithBookings[0].count : 0;
-    const conversionRate = totalUsers > 0 ? ((bookingConversion / totalUsers) * 100).toFixed(2) : 0;
+    const usersWithBookings = await Booking.countDocuments();
+    const conversionRate = totalUsers > 0 ? ((usersWithBookings / totalUsers) * 100).toFixed(2) : 0;
 
     // 5. Average Users Per Time Period
     const avgNewUsersPerPeriod = trendData.length > 0
@@ -963,7 +952,7 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
       inactiveUsers,
       verifiedUsers,
       unverifiedUsers: totalUsers - verifiedUsers,
-      usersWithBookings: bookingConversion,
+      usersWithBookings,
       conversionRate,
       avgNewUsersPerPeriod,
     };
@@ -973,6 +962,32 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
+    // 8. User Status Distribution - Proper categorization
+    // Website Users = All registered users in the system
+    // Registered Users = Email verified users (actively engaged)
+    // Converted Users = Users with bookings (made a purchase/booking)
+    const userStatusDistribution = [
+      { 
+        name: 'Website Users', 
+        value: totalUsers,
+        description: 'All registered users in the system',
+        color: '#3b82f6'
+      },
+      { 
+        name: 'Registered Users', 
+        value: verifiedUsers,
+        description: 'Users with verified email',
+        color: '#10b981'
+      },
+      { 
+        name: 'Converted Users', 
+        value: usersWithBookings,
+        description: 'Users with bookings',
+        color: '#f59e0b'
+      },
+    ];
+
+    // Additional distribution for active/inactive status
     const statusDistribution = [
       { name: 'Active', value: activeUsers, status: 'active' },
       { name: 'Inactive', value: inactiveUsers, status: 'inactive' },
@@ -990,6 +1005,7 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
         roleDistribution,
         topRoles,
         statusDistribution,
+        userStatusDistribution,
       },
     });
   } catch (error) {
