@@ -8,6 +8,7 @@ import Package from '../models/package.model.js';
 import User from '../models/user.model.js';
 import packageService from '../services/package.service.js';
 import { assignSalesRepIfNeeded } from '../services/assignment.service.js';
+import emailService from '../utils/emailService.js';
 import logger from '../config/logger.js';
 
 const normalizePhone = (phone) => {
@@ -114,12 +115,13 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
     }
 
     let assignedSalesRepId = null;
+    let assignmentResult = null;
     try {
-      const { assigned, salesRepId } = await assignSalesRepIfNeeded(leadPayload);
-      if (assigned && salesRepId) {
-        assignedSalesRepId = salesRepId;
+      assignmentResult = await assignSalesRepIfNeeded(leadPayload);
+      if (assignmentResult.assigned && assignmentResult.salesRepId) {
+        assignedSalesRepId = assignmentResult.salesRepId;
         if (!leadPayload.salesRep) {
-          const rep = await User.findById(salesRepId).select('name');
+          const rep = assignmentResult.salesRep || await User.findById(assignmentResult.salesRepId).select('name');
           if (rep?.name) {
             leadPayload.salesRep = rep.name;
           }
@@ -143,20 +145,51 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
       assignedTo: assignedSalesRepId || undefined,
     });
 
-    const session = await mongoose.startSession();
-    try {
-      session.startTransaction();
-      const lead = await Lead.create([leadPayload], { session });
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+        const lead = await Lead.create([leadPayload], { session });
+        const newLead = lead[0];
 
-      await packageService.incrementBookings(pkg._id);
-      await session.commitTransaction();
+        await packageService.incrementBookings(pkg._id);
+        await session.commitTransaction();
 
-      logger.info(`Website booking created for package ${pkg._id} by ${sanitizedEmail}`);
+        // Send assignment email notification if a sales rep was assigned
+        if (newLead.assignedTo && assignmentResult?.assigned) {
+          try {
+            const salesRep = assignmentResult.salesRep || await User.findById(newLead.assignedTo).select('name email').lean();
+            if (salesRep && salesRep.email) {
+              logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${newLead._id} (from booking)`);
+              
+              emailService
+                .sendLeadAssignmentEmail({
+                  salesRep,
+                  lead: newLead.toObject(),
+                  assignedBy: null,
+                  assignmentMode: 'auto',
+                })
+                .then(() => {
+                  logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email}`);
+                })
+                .catch((err) => {
+                  logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
+                  logger.error(`Email error details:`, err);
+                });
+            } else {
+              logger.warn(`⚠️  Cannot send assignment email: sales rep ${newLead.assignedTo} has no email address`);
+            }
+          } catch (error) {
+            logger.error(`Error preparing lead assignment email: ${error.message}`);
+            logger.error(`Error stack:`, error.stack);
+          }
+        }
 
-      res.status(201).json({
-        success: true,
-        message: 'Booking request submitted successfully',
-        data: {
+        logger.info(`Website booking created for package ${pkg._id} by ${sanitizedEmail}`);
+
+        res.status(201).json({
+          success: true,
+          message: 'Booking request submitted successfully',
+          data: {
           bookingId: booking._id,
           leadId: lead[0]?._id,
           salesRepId: assignedSalesRepId || null,

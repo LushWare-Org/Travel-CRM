@@ -406,6 +406,95 @@ class EmailService {
       html,
     });
   }
+
+  async sendLeadAssignmentEmail({ salesRep, lead, assignedBy, assignmentMode }) {
+    // Validate email configuration before attempting to send
+    if (!emailConfig.from || !emailConfig.host || !emailConfig.port) {
+      const error = new Error('Email configuration is incomplete. Cannot send lead assignment email.');
+      logger.error(`❌ ${error.message}`, {
+        hasFrom: !!emailConfig.from,
+        hasHost: !!emailConfig.host,
+        hasPort: !!emailConfig.port,
+        salesRepEmail: salesRep?.email,
+        leadId: lead?._id || lead?.id,
+      });
+      throw error;
+    }
+
+    if (!salesRep || !salesRep.email) {
+      const error = new Error('Sales rep email is missing. Cannot send lead assignment email.');
+      logger.error(`❌ ${error.message}`, { salesRep, leadId: lead?._id || lead?.id });
+      throw error;
+    }
+
+    const managementUrl = `${process.env.MANAGEMENT_URL || process.env.CLIENT_URL || 'http://localhost:3001'}`;
+    const leadUrl = `${managementUrl}/leads/${lead._id || lead.id}`;
+    const subject = `New Lead Assigned: ${lead.name || 'Lead'}`;
+    
+    const assignmentType = assignmentMode === 'auto' ? 'automatically assigned' : 'manually assigned';
+    const assignedByText = assignedBy ? ` by ${assignedBy.name || 'an administrator'}` : '';
+    
+    logger.info(`Preparing lead assignment email for ${salesRep.email}`, {
+      leadId: lead._id || lead.id,
+      leadName: lead.name,
+      assignmentMode,
+    });
+    
+    const leadDetails = `
+      <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #333;">Lead Details</h3>
+        <ul style="list-style: none; padding: 0;">
+          ${lead.name ? `<li style="margin: 8px 0;"><strong>Name:</strong> ${lead.name}</li>` : ''}
+          ${lead.email ? `<li style="margin: 8px 0;"><strong>Email:</strong> ${lead.email}</li>` : ''}
+          ${lead.phone ? `<li style="margin: 8px 0;"><strong>Phone:</strong> ${lead.phone}</li>` : ''}
+          ${lead.destination ? `<li style="margin: 8px 0;"><strong>Destination:</strong> ${lead.destination}</li>` : ''}
+          ${lead.travelDate ? `<li style="margin: 8px 0;"><strong>Travel Date:</strong> ${this.formatDate(lead.travelDate)}</li>` : ''}
+          ${lead.endDate ? `<li style="margin: 8px 0;"><strong>End Date:</strong> ${this.formatDate(lead.endDate)}</li>` : ''}
+          ${lead.numberOfTravelers ? `<li style="margin: 8px 0;"><strong>Number of Travelers:</strong> ${lead.numberOfTravelers}</li>` : ''}
+          ${lead.status ? `<li style="margin: 8px 0;"><strong>Status:</strong> ${lead.status.toUpperCase()}</li>` : ''}
+          ${lead.priority ? `<li style="margin: 8px 0;"><strong>Priority:</strong> ${lead.priority.toUpperCase()}</li>` : ''}
+          ${lead.source ? `<li style="margin: 8px 0;"><strong>Source:</strong> ${lead.source}</li>` : ''}
+        </ul>
+        ${lead.message ? `<p style="margin-top: 15px;"><strong>Message:</strong><br/>${lead.message}</p>` : ''}
+        ${lead.remarks && lead.remarks.length > 0 ? `
+          <div style="margin-top: 15px;">
+            <strong>Remarks:</strong>
+            <ul style="margin: 8px 0; padding-left: 20px;">
+              ${lead.remarks.slice(-3).map(remark => `<li>${remark.text || remark} - ${this.formatDate(remark.date || new Date())}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    const html = `
+      <h1 style="color: #333;">New Lead Assigned to You</h1>
+      <p>Dear ${salesRep.name},</p>
+      <p>A new lead has been ${assignmentType}${assignedByText}.</p>
+      ${leadDetails}
+      <p><strong>Next Steps:</strong></p>
+      <ul>
+        <li>Review the lead details above</li>
+        <li>Contact the lead as soon as possible</li>
+        <li>Update the lead status in your dashboard</li>
+      </ul>
+      <a href="${leadUrl}" style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0;">View Lead in Dashboard</a>
+      <br><br>
+      <p>If you have any questions or need assistance, please contact the administrator.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The Trip Sky Way Team</p>
+    `;
+
+    const text = `Dear ${salesRep.name},\n\nA new lead has been ${assignmentType}${assignedByText}.\n\nLead Details:\n${lead.name ? `Name: ${lead.name}\n` : ''}${lead.email ? `Email: ${lead.email}\n` : ''}${lead.phone ? `Phone: ${lead.phone}\n` : ''}${lead.destination ? `Destination: ${lead.destination}\n` : ''}${lead.travelDate ? `Travel Date: ${this.formatDate(lead.travelDate)}\n` : ''}${lead.status ? `Status: ${lead.status.toUpperCase()}\n` : ''}\nView lead in dashboard: ${leadUrl}\n\nBest regards,\nThe Trip Sky Way Team`;
+
+    return this.sendEmail({
+      to: salesRep.email,
+      subject,
+      html,
+      text,
+    });
+  }
 }
 
 export default new EmailService();

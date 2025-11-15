@@ -10,6 +10,7 @@ import User from '../models/user.model.js';
 import Booking from '../models/booking.model.js';
 import { assignSalesRepIfNeeded } from '../services/assignment.service.js';
 import packageService from '../services/package.service.js';
+import emailService from '../utils/emailService.js';
 import logger from '../config/logger.js';
 
 const formatCustomizedName = (baseName = '', sequence = 1) => {
@@ -54,7 +55,7 @@ export const updateCustomizedPackage = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
   const userRole = req.user.role;
   const isOwner = customizedPackage.customizedBy?.toString() === userId.toString();
-  const isAuthorized = isOwner || ['admin', 'salesRep', 'staff', 'superAdmin'].includes(userRole);
+  const isAuthorized = isOwner || ['admin', 'salesRep', 'staff'].includes(userRole);
 
   if (!isAuthorized) {
     return next(new AppError('Not authorized to update this customized package', 403));
@@ -247,7 +248,7 @@ const buildCustomizationNotes = ({
 };
 
 const findFallbackStaffUser = async () => {
-  const roles = ['salesRep', 'admin', 'staff', 'superAdmin'];
+  const roles = ['salesRep', 'admin', 'staff'];
   return User.findOne({ role: { $in: roles }, isActive: true }).sort({ createdAt: 1 }).select('_id');
 };
 
@@ -349,12 +350,13 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
   };
 
   let assignedSalesRepId = null;
+  let assignmentResult = null;
   try {
-    const { assigned, salesRepId } = await assignSalesRepIfNeeded(leadPayload);
-    if (assigned && salesRepId) {
-      assignedSalesRepId = salesRepId;
+    assignmentResult = await assignSalesRepIfNeeded(leadPayload);
+    if (assignmentResult.assigned && assignmentResult.salesRepId) {
+      assignedSalesRepId = assignmentResult.salesRepId;
       if (!leadPayload.salesRep) {
-        const rep = await User.findById(salesRepId).select('name');
+        const rep = assignmentResult.salesRep || await User.findById(assignmentResult.salesRepId).select('name');
         if (rep?.name) {
           leadPayload.salesRep = rep.name;
         }
@@ -492,6 +494,36 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
     await packageService.incrementBookings(pkg._id);
 
     await session.commitTransaction();
+
+    // Send assignment email notification if a sales rep was assigned
+    if (lead.assignedTo && assignmentResult?.assigned) {
+      try {
+        const salesRep = assignmentResult.salesRep || await User.findById(lead.assignedTo).select('name email').lean();
+        if (salesRep && salesRep.email) {
+          logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${lead._id} (from customization)`);
+          
+          emailService
+            .sendLeadAssignmentEmail({
+              salesRep,
+              lead: lead.toObject(),
+              assignedBy: null,
+              assignmentMode: 'auto',
+            })
+            .then(() => {
+              logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email}`);
+            })
+            .catch((err) => {
+              logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
+              logger.error(`Email error details:`, err);
+            });
+        } else {
+          logger.warn(`⚠️  Cannot send assignment email: sales rep ${lead.assignedTo} has no email address`);
+        }
+      } catch (error) {
+        logger.error(`Error preparing lead assignment email: ${error.message}`);
+        logger.error(`Error stack:`, error.stack);
+      }
+    }
 
     res.status(201).json({
       success: true,

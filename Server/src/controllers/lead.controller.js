@@ -8,6 +8,8 @@ import { assignSalesRepIfNeeded } from '../services/assignment.service.js';
 import Itinerary from '../models/itinerary.model.js';
 import mongoose from 'mongoose';
 import { generateItineraryPDF, generateLeadItineraryPDF } from '../utils/pdfGenerator.js';
+import emailService from '../utils/emailService.js';
+import logger from '../config/logger.js';
 
 // @desc    Create a new lead
 // @route   POST /api/v1/leads
@@ -59,8 +61,9 @@ export const createLead = asyncHandler(async (req, res, next) => {
     }
   }
 
+  let assignmentResult = null;
   if (!isManualMode) {
-    await assignSalesRepIfNeeded(req.body);
+    assignmentResult = await assignSalesRepIfNeeded(req.body);
     if (req.body.assignedTo) {
       const rep = await User.findById(req.body.assignedTo).select('name');
       if (rep) req.body.salesRep = rep.name;
@@ -95,6 +98,39 @@ export const createLead = asyncHandler(async (req, res, next) => {
   }
 
   const lead = await Lead.create(req.body);
+
+  // Send assignment email notification if a sales rep was assigned
+  if (lead.assignedTo) {
+    try {
+      const salesRep = assignmentResult?.salesRep || await User.findById(lead.assignedTo).select('name email').lean();
+      const assignedBy = isManualMode && req.body.assignedBy ? await User.findById(req.body.assignedBy).select('name').lean() : null;
+      
+      if (salesRep && salesRep.email) {
+        logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${lead._id}`);
+        
+        emailService
+          .sendLeadAssignmentEmail({
+            salesRep,
+            lead: lead.toObject(),
+            assignedBy,
+            assignmentMode: lead.assignmentMode || (isManualMode ? 'manual' : 'auto'),
+          })
+          .then(() => {
+            logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email}`);
+          })
+          .catch((err) => {
+            logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
+            logger.error(`Email error details:`, err);
+          });
+      } else {
+        logger.warn(`⚠️  Cannot send assignment email: sales rep ${lead.assignedTo} has no email address`);
+      }
+    } catch (error) {
+      logger.error(`Error preparing lead assignment email: ${error.message}`);
+      logger.error(`Error stack:`, error.stack);
+      // Don't block the response if email fails
+    }
+  }
 
   res.status(201).json({
     success: true,
@@ -267,12 +303,82 @@ export const updateLead = asyncHandler(async (req, res, next) => {
     throw new AppError('Not authorized to update this lead', 403);
   }
 
+  // Track assignment change before update
+  const previousAssignedTo = lead.assignedTo?.toString() || null;
+  const newAssignedTo = req.body.assignedTo ? req.body.assignedTo.toString() : null;
+
+  logger.info(`Update lead assignment check: previousAssignedTo=${previousAssignedTo}, newAssignedTo=${newAssignedTo}, leadId=${lead._id}`);
+
+  // Update salesRep name if assignedTo is being changed
+  if (req.body.assignedTo !== undefined && req.body.assignedTo !== null && req.body.assignedTo !== '') {
+    const rep = await User.findById(req.body.assignedTo).select('name email').lean();
+    if (rep) {
+      req.body.salesRep = rep.name;
+      logger.info(`Found sales rep for assignment: ${rep.name} (${rep.email})`);
+    } else {
+      logger.warn(`⚠️  Sales rep ${req.body.assignedTo} not found`);
+    }
+    if (!req.body.assignedBy && req.user.role === 'admin') {
+      req.body.assignedBy = req.user._id;
+    }
+    if (!req.body.assignmentMode) {
+      req.body.assignmentMode = 'manual';
+    }
+  } else if (req.body.assignedTo === null || req.body.assignedTo === '') {
+    // Unassigning - clear sales rep
+    req.body.salesRep = undefined;
+    logger.info(`Unassigning lead ${lead._id} from sales rep`);
+  }
+
   lead = await Lead.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
   })
     .populate('assignedTo', 'name email role')
     .populate('currentItinerary');
+
+  // Send assignment email notification if a new sales rep was assigned (different from previous)
+  if (newAssignedTo && newAssignedTo !== previousAssignedTo) {
+    try {
+      const salesRep = await User.findById(newAssignedTo).select('name email').lean();
+      logger.info(`Assignment email check: salesRep=${salesRep?._id}, email=${salesRep?.email}`);
+      
+      if (salesRep && salesRep.email) {
+        const assignedBy = req.body.assignedBy ? await User.findById(req.body.assignedBy).select('name').lean() : null;
+        logger.info(`📧 Sending lead assignment email to ${salesRep.email} for lead ${lead._id} (via update)`);
+        
+        emailService
+          .sendLeadAssignmentEmail({
+            salesRep,
+            lead: lead.toObject(),
+            assignedBy,
+            assignmentMode: lead.assignmentMode || 'manual',
+          })
+          .then(() => {
+            logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email} for lead ${lead._id}`);
+          })
+          .catch((err) => {
+            logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
+            logger.error(`Email error details:`, err);
+            if (err.stack) {
+              logger.error(`Error stack:`, err.stack);
+            }
+          });
+      } else {
+        logger.warn(`⚠️  Cannot send assignment email: sales rep ${newAssignedTo} has no email address (found: ${!!salesRep})`);
+      }
+    } catch (error) {
+      logger.error(`Error preparing lead assignment email: ${error.message}`);
+      logger.error(`Error stack:`, error.stack);
+      // Don't block the response if email fails
+    }
+  } else {
+    if (!newAssignedTo) {
+      logger.info(`ℹ️  Email not sent: No assignedTo in update request`);
+    } else if (newAssignedTo === previousAssignedTo) {
+      logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
+    }
+  }
 
   res.status(200).json({
     success: true,
@@ -356,13 +462,78 @@ export const assignLead = asyncHandler(async (req, res, next) => {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
   }
 
-  lead.assignedTo = req.body.assignedTo;
-  lead.assignedBy = req.user._id;
-  lead.assignmentMode = 'manual';
-  // Mirror salesRep name for UI
-  const rep = await User.findById(req.body.assignedTo).select('name');
-  if (rep) {
-    lead.salesRep = rep.name;
+  const previousAssignedTo = lead.assignedTo?.toString();
+  const newAssignedTo = req.body.assignedTo?.toString();
+
+  // Check if assigning to a new sales rep (different from current)
+  if (!req.body.assignedTo) {
+    // Unassigning - clear assignment
+    lead.assignedTo = undefined;
+    lead.assignedBy = req.user._id;
+    lead.assignmentMode = 'manual';
+    lead.salesRep = undefined;
+  } else {
+    // Assigning to a sales rep
+    lead.assignedTo = req.body.assignedTo;
+    lead.assignedBy = req.user._id;
+    lead.assignmentMode = 'manual';
+    
+    // Get sales rep details for email and UI
+    const rep = await User.findById(req.body.assignedTo).select('name email').lean();
+    if (rep) {
+      lead.salesRep = rep.name;
+      
+      await lead.save();
+      const updatedLead = await Lead.findById(req.params.id).populate('assignedTo', 'name email role');
+
+      // Send assignment email notification if a new sales rep was assigned (different from previous)
+      logger.info(`Assignment check: newAssignedTo=${newAssignedTo}, previousAssignedTo=${previousAssignedTo}, rep=${rep?._id}, repEmail=${rep?.email}`);
+      
+      if (newAssignedTo && newAssignedTo !== previousAssignedTo && rep && rep.email) {
+        try {
+          const assignedBy = await User.findById(req.user._id).select('name').lean();
+          logger.info(`📧 Sending lead assignment email to ${rep.email} for lead ${lead._id} (manually assigned)`);
+          
+          emailService
+            .sendLeadAssignmentEmail({
+              salesRep: rep,
+              lead: updatedLead.toObject(),
+              assignedBy,
+              assignmentMode: 'manual',
+            })
+            .then(() => {
+              logger.info(`✅ Lead assignment email sent successfully to ${rep.email} for lead ${lead._id}`);
+            })
+            .catch((err) => {
+              logger.error(`❌ Failed to send lead assignment email to ${rep.email}: ${err.message}`);
+              logger.error(`Email error details:`, err);
+              if (err.stack) {
+                logger.error(`Error stack:`, err.stack);
+              }
+            });
+        } catch (error) {
+          logger.error(`Error preparing lead assignment email: ${error.message}`);
+          logger.error(`Error stack:`, error.stack);
+          // Don't block the response if email fails
+        }
+      } else {
+        if (!newAssignedTo) {
+          logger.warn(`⚠️  Email not sent: No assignedTo provided in request`);
+        } else if (newAssignedTo === previousAssignedTo) {
+          logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
+        } else if (!rep) {
+          logger.warn(`⚠️  Email not sent: Sales rep ${newAssignedTo} not found`);
+        } else if (!rep.email) {
+          logger.warn(`⚠️  Email not sent: Sales rep ${rep.name} (${newAssignedTo}) has no email address`);
+        }
+      }
+      
+      res.status(200).json({
+        success: true,
+        data: updatedLead,
+      });
+      return;
+    }
   }
 
   await lead.save();
