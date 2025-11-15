@@ -166,11 +166,11 @@ export const createStaffSchema = Joi.object({
       'string.pattern.base': 'Please provide a valid 10-digit phone number',
     }),
   role: Joi.string()
-    .valid('salesRep', 'vendor', 'admin')
+    .valid('salesRep', 'vendor', 'admin', 'superAdmin')
     .required()
     .messages({
       'string.empty': 'Role is required',
-      'any.only': 'Role must be either salesRep, vendor, or admin',
+      'any.only': 'Role must be either salesRep, vendor, admin, or superAdmin',
     }),
   permissions: Joi.array()
     .items(
@@ -188,6 +188,10 @@ export const createStaffSchema = Joi.object({
     .messages({
       'array.base': 'Permissions must be an array',
       'any.only': 'Invalid permission specified',
+    }),
+  isSuperAdmin: Joi.boolean()
+    .messages({
+      'boolean.base': 'isSuperAdmin must be a boolean value',
     }),
 });
 

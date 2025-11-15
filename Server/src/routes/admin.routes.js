@@ -27,7 +27,7 @@ const router = express.Router();
 
 // All routes require authentication and admin role
 router.use(protect);
-router.use(authorize('admin'));
+router.use(authorize('admin', 'superAdmin'));
 
 // Dashboard stats
 router.get('/stats', getDashboardStats);

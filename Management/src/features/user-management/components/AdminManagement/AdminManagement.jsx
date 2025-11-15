@@ -35,7 +35,8 @@ const AdminManagement = () => {
     email: '',
     phone: '',
     permissions: [],
-    twoFactorEnabled: false
+    twoFactorEnabled: false,
+    isSuperAdmin: false
   });
 
   const ITEMS_PER_PAGE = 10;
@@ -82,7 +83,9 @@ const AdminManagement = () => {
           firstLoginAt: admin.lastLogin,
           isEmailVerified: admin.isEmailVerified,
           isTempPassword: admin.isTempPassword,
-          mustChangePassword: admin.mustChangePassword
+          mustChangePassword: admin.mustChangePassword,
+          isSuperAdmin: admin.isSuperAdmin || false,
+          role: admin.role || 'admin'
         }));
         setAdmins(transformedAdmins);
       } else {
@@ -216,7 +219,8 @@ const AdminManagement = () => {
       email: '',
       phone: '',
       permissions: [],
-      twoFactorEnabled: false
+      twoFactorEnabled: false,
+      isSuperAdmin: false
     });
   };
 
@@ -246,8 +250,18 @@ const AdminManagement = () => {
         email: formData.email,
         phone: phoneDigitsOnly, // Send only digits
         password: tempPassword,
-        role: 'admin',
-        permissions: formData.permissions || [] // ✅ Include permissions
+        role: formData.isSuperAdmin ? 'superAdmin' : 'admin',
+        isSuperAdmin: formData.isSuperAdmin,
+        permissions: formData.isSuperAdmin ? [
+          'manage_users',
+          'manage_sales_reps',
+          'manage_vendors',
+          'manage_admins',
+          'view_reports',
+          'manage_billing',
+          'system_settings',
+          'audit_log',
+        ] : (formData.permissions || []) // ✅ Include permissions
       });
 
       if (response.status === 'success') {
@@ -288,17 +302,11 @@ const AdminManagement = () => {
           firstLoginAt: userData.lastLogin || null,
           isEmailVerified: isEmailVerified,
           isTempPassword: isTempPassword,
-          mustChangePassword: mustChangePassword
+          mustChangePassword: mustChangePassword,
+          isSuperAdmin: formData.isSuperAdmin || userData.isSuperAdmin || false,
+          role: formData.isSuperAdmin ? 'superAdmin' : (userData.role || 'admin')
         };
 
-        // Log email details AFTER creating the object (so email is defined)
-        console.log(`📧 Email sent to ${newAdmin.email}`);
-        console.log(`Temporary Password: ${tempPassword}`);
-
-        // Update state with new admin
-        setAdmins(prev => [...prev, newAdmin]);
-        setShowNewAdminDialog(false);
-        setSearchTerm(''); // Clear search bar after creation
         setSuccessMessage(`✅ Admin created! Invitation sent to ${newAdmin.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
@@ -338,7 +346,7 @@ const AdminManagement = () => {
         name: formData.name,
         email: formData.email,
         phone: phoneDigitsOnly, // Send only digits
-        role: 'admin'
+        role: formData.isSuperAdmin ? 'superAdmin' : 'admin'
       });
 
       // Only update permissions if NOT editing own account
@@ -357,7 +365,9 @@ const AdminManagement = () => {
                 email: formData.email,
                 phone: phoneDigitsOnly,
                 permissions: isEditingSelf ? a.permissions : (formData.permissions || []), // Keep old permissions if editing self
-                twoFactorEnabled: formData.twoFactorEnabled
+                twoFactorEnabled: formData.twoFactorEnabled,
+                isSuperAdmin: a.isSuperAdmin, // Don't change super admin status from edit dialog
+                role: a.role // Don't change role from edit dialog
               }
             : a
         ));
@@ -474,6 +484,13 @@ const AdminManagement = () => {
       setIsSubmitting(true);
       setError(null);
 
+      // Check if trying to delete a super admin
+      if (adminToDelete.isSuperAdmin || adminToDelete.role === 'superAdmin') {
+        setError('🔒 Security Policy: Super admin accounts cannot be deleted for security reasons.');
+        setShowDeleteConfirm(false);
+        return;
+      }
+
       // Delete admin via API
       const response = await adminService.deleteUser(adminToDelete.id);
 
@@ -500,7 +517,8 @@ const AdminManagement = () => {
       email: admin.email,
       phone: admin.phone,
       permissions: admin.permissions || [],
-      twoFactorEnabled: admin.twoFactorEnabled || false
+      twoFactorEnabled: admin.twoFactorEnabled || false,
+      isSuperAdmin: admin.isSuperAdmin || false
     });
     setShowEditAdminDialog(true);
   };
@@ -684,7 +702,8 @@ const AdminManagement = () => {
                     type="checkbox"
                     checked={formData.permissions.includes(perm.id)}
                     onChange={() => togglePermission(perm.id)}
-                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    disabled={formData.isSuperAdmin}
+                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 disabled:opacity-50"
                   />
                   <div>
                     <span className="text-gray-900">{perm.label}</span>
@@ -693,7 +712,41 @@ const AdminManagement = () => {
                 </label>
               ))}
             </div>
+            {formData.isSuperAdmin && (
+              <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded mt-2">
+                💡 Super Admins automatically have all permissions
+              </p>
+            )}
           </div>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer p-3 bg-amber-50 rounded-lg border border-amber-200 hover:bg-amber-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={formData.isSuperAdmin}
+              onChange={(e) => {
+                setFormData({ 
+                  ...formData, 
+                  isSuperAdmin: e.target.checked,
+                  // If making super admin, auto-select all permissions
+                  permissions: e.target.checked ? [
+                    'manage_users',
+                    'manage_sales_reps',
+                    'manage_vendors',
+                    'manage_admins',
+                    'view_reports',
+                    'manage_billing',
+                    'system_settings',
+                    'audit_log',
+                  ] : formData.permissions
+                });
+              }}
+              className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+            />
+            <div>
+              <span className="text-gray-900 font-medium">👑 Make Super Admin</span>
+              <p className="text-xs text-gray-600">Super Admins have all permissions and cannot be deleted</p>
+            </div>
+          </label>
 
           <label className="flex items-center gap-2 text-sm cursor-pointer p-3 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
             <input

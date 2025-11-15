@@ -13,12 +13,17 @@ const generateTempPassword = () => crypto.randomBytes(8).toString('hex'); // 16 
 // @access  Private/Admin
 export const createStaff = asyncHandler(async (req, res, next) => {
   const {
-    name, email, phone, role, permissions,
+    name, email, phone, role, permissions, isSuperAdmin,
   } = req.body;
 
   // Validate role
-  if (!['salesRep', 'vendor', 'admin'].includes(role)) {
-    throw new AppError('Invalid role. Only salesRep, vendor, and admin can be created through this endpoint', 400);
+  if (!['salesRep', 'vendor', 'admin', 'superAdmin'].includes(role)) {
+    throw new AppError('Invalid role. Only salesRep, vendor, admin, and superAdmin can be created through this endpoint', 400);
+  }
+
+  // Only current super admin can create another super admin
+  if ((role === 'superAdmin' || isSuperAdmin) && !req.user.isSuperAdmin) {
+    throw new AppError('Only super admins can create other super admins', 403);
   }
 
   // Check if user already exists
@@ -36,8 +41,18 @@ export const createStaff = asyncHandler(async (req, res, next) => {
     email,
     phone,
     password: tempPassword,
-    role,
-    permissions: role === 'admin' && permissions ? permissions : [], // Only apply permissions to admins
+    role: role === 'superAdmin' ? 'superAdmin' : role,
+    isSuperAdmin: role === 'superAdmin' || isSuperAdmin === true,
+    permissions: (role === 'admin' || role === 'superAdmin') && permissions ? permissions : (role === 'superAdmin' ? [
+      'manage_users',
+      'manage_sales_reps',
+      'manage_vendors',
+      'manage_admins',
+      'view_reports',
+      'manage_billing',
+      'system_settings',
+      'audit_log',
+    ] : []),
     isTempPassword: true,
     mustChangePassword: true,
     isEmailVerified: true, // Staff accounts are pre-verified
@@ -180,9 +195,9 @@ export const updateUserStatus = asyncHandler(async (req, res, next) => {
     throw new AppError('You cannot deactivate your own account', 400);
   }
 
-  // Prevent deactivating other admins
-  if (user.role === 'admin') {
-    throw new AppError('Cannot deactivate admin accounts', 403);
+  // Prevent deactivating admins and super admins
+  if (user.role === 'admin' || user.role === 'superAdmin' || user.isSuperAdmin) {
+    throw new AppError('Cannot deactivate admin/super admin accounts', 403);
   }
 
   user.isActive = isActive;
@@ -215,8 +230,8 @@ export const resetUserPassword = asyncHandler(async (req, res, next) => {
   }
 
   // Prevent resetting other admin passwords
-  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString()) {
-    throw new AppError('Cannot reset other admin passwords', 403);
+  if ((user.role === 'admin' || user.role === 'superAdmin' || user.isSuperAdmin) && user._id.toString() !== req.user.id.toString()) {
+    throw new AppError('Cannot reset other admin/super admin passwords', 403);
   }
 
   // Generate new temporary password
@@ -264,8 +279,8 @@ export const updateUser = asyncHandler(async (req, res, next) => {
   }
 
   // Prevent updating admin details (except self)
-  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString()) {
-    throw new AppError('Cannot update other admin accounts', 403);
+  if ((user.role === 'admin' || user.role === 'superAdmin' || user.isSuperAdmin) && user._id.toString() !== req.user.id.toString()) {
+    throw new AppError('Cannot update other admin/super admin accounts', 403);
   }
 
   // Check if email is being changed and if it's already taken
@@ -309,6 +324,11 @@ export const deleteUser = asyncHandler(async (req, res, next) => {
     throw new AppError('You cannot delete your own account', 400);
   }
 
+  // Prevent deleting super admin accounts (by anyone)
+  if (user.role === 'superAdmin' || user.isSuperAdmin) {
+    throw new AppError('Cannot delete super admin accounts', 403);
+  }
+
   // Prevent deleting other admins
   if (user.role === 'admin') {
     throw new AppError('Cannot delete admin accounts', 403);
@@ -335,6 +355,7 @@ export const getDashboardStats = asyncHandler(async (req, res, next) => {
   const salesRepCount = await User.countDocuments({ role: 'salesRep' });
   const vendorCount = await User.countDocuments({ role: 'vendor' });
   const adminCount = await User.countDocuments({ role: 'admin' });
+  const superAdminCount = await User.countDocuments({ role: 'superAdmin' });
   const unverifiedEmails = await User.countDocuments({ isEmailVerified: false });
 
   // Get recent users (last 30 days)
@@ -355,6 +376,7 @@ export const getDashboardStats = asyncHandler(async (req, res, next) => {
           salesRep: salesRepCount,
           vendor: vendorCount,
           admin: adminCount,
+          superAdmin: superAdminCount,
         },
       },
     },
@@ -378,13 +400,18 @@ export const updateAdminPermissions = asyncHandler(async (req, res, next) => {
   }
 
   // Only admins can have permissions
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'superAdmin' && !user.isSuperAdmin) {
     throw new AppError('Permissions can only be assigned to admin users', 400);
   }
 
   // Prevent modifying own permissions
   if (user._id.toString() === req.user.id.toString()) {
     throw new AppError('You cannot modify your own permissions', 400);
+  }
+
+  // Prevent modifying super admin permissions (only super admin can modify super admin)
+  if ((user.role === 'superAdmin' || user.isSuperAdmin) && !req.user.isSuperAdmin) {
+    throw new AppError('Only super admins can modify super admin permissions', 403);
   }
 
   const validPermissions = [
@@ -428,13 +455,13 @@ export const updateAdminPermissions = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/admin/users/:id/permissions
 // @access  Private/Admin
 export const getAdminPermissions = asyncHandler(async (req, res, next) => {
-  const user = await User.findById(req.params.id).select('name email role permissions');
+  const user = await User.findById(req.params.id).select('name email role isSuperAdmin permissions');
 
   if (!user) {
     throw new AppError('User not found', 404);
   }
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'superAdmin' && !user.isSuperAdmin) {
     throw new AppError('Only admin users have permissions', 400);
   }
 
@@ -446,7 +473,17 @@ export const getAdminPermissions = asyncHandler(async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        permissions: user.permissions || [],
+        isSuperAdmin: user.isSuperAdmin || false,
+        permissions: user.permissions || (user.isSuperAdmin ? [
+          'manage_users',
+          'manage_sales_reps',
+          'manage_vendors',
+          'manage_admins',
+          'view_reports',
+          'manage_billing',
+          'system_settings',
+          'audit_log',
+        ] : []),
       },
     },
   });
