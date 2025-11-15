@@ -4,7 +4,7 @@ import {
   LeadAnalytics,
   BillingAnalytics,
   UserAnalytics,
-  ItineraryAnalytics,
+  PackageAnalytics,
   WebsiteAnalytics,
 } from "./components";
 
@@ -19,7 +19,7 @@ const AnalyticsPage = () => {
     { id: "leads", label: "Lead Analytics", component: LeadAnalytics },
     { id: "billing", label: "Billing Analytics", component: BillingAnalytics },
     { id: "users", label: "User Analytics", component: UserAnalytics },
-    { id: "itineraries", label: "Package Analytics", component: ItineraryAnalytics },
+    { id: "itineraries", label: "Package Analytics", component: PackageAnalytics },
     { id: "website", label: "Website Analytics", component: WebsiteAnalytics },
   ];
 
