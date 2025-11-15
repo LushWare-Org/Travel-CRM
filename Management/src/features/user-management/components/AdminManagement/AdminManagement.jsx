@@ -70,6 +70,8 @@ const AdminManagement = () => {
           name: admin.name,
           email: admin.email,
           phone: admin.phone || '',
+          role: admin.role,
+          isSuperAdmin: admin.isSuperAdmin || false,
           status: admin.isActive ? 'active' : 'inactive',
           // Use mustChangePassword flag to determine account status
           accountStatus: admin.mustChangePassword ? 'pending_password_reset' : (admin.isEmailVerified ? 'verified' : 'pending_first_login'),
@@ -82,7 +84,8 @@ const AdminManagement = () => {
           firstLoginAt: admin.lastLogin,
           isEmailVerified: admin.isEmailVerified,
           isTempPassword: admin.isTempPassword,
-          mustChangePassword: admin.mustChangePassword
+          mustChangePassword: admin.mustChangePassword,
+          canBeDeleted: admin.canBeDeleted !== false // Default to true if not set
         }));
         setAdmins(transformedAdmins);
       } else {
