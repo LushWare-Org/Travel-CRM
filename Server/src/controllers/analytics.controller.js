@@ -835,4 +835,171 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Get User Analytics Overview
+ * Returns comprehensive user management analytics including growth trends, user distribution by role, and activity metrics
+ * @route GET /api/v1/analytics/users/overview
+ * @access Private/Admin
+ * @query timeRange - 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
+ */
+export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
+  const User = (await import('../models/user.model.js')).default;
+  const Booking = (await import('../models/booking.model.js')).default;
+  
+  const timeRange = clampTimeRange(req.query.timeRange);
+  const buckets = buildTimeBuckets(timeRange);
+  const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
+
+  const groupId = buildGroupId(timeRange);
+
+  try {
+    // 1. User Growth Trend
+    const userGrowthAggregation = await User.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      {
+        $group: {
+          _id: groupId,
+          totalNewUsers: { $sum: 1 },
+          activeUsers: {
+            $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] },
+          },
+          verifiedUsers: {
+            $sum: { $cond: [{ $eq: ['$isEmailVerified', true] }, 1, 0] },
+          },
+          adminUsers: {
+            $sum: { $cond: [{ $eq: ['$role', 'admin'] }, 1, 0] },
+          },
+          vendorUsers: {
+            $sum: { $cond: [{ $eq: ['$role', 'vendor'] }, 1, 0] },
+          },
+          salesRepUsers: {
+            $sum: { $cond: [{ $eq: ['$role', 'salesRep'] }, 1, 0] },
+          },
+          customerUsers: {
+            $sum: { $cond: [{ $eq: ['$role', 'customer'] }, 1, 0] },
+          },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    ]);
+
+    // Build trend data map
+    const trendMap = new Map();
+    userGrowthAggregation.forEach((item) => {
+      const key = buildTrendKey(timeRange, item._id);
+      trendMap.set(key, item);
+    });
+
+    // Fill in missing buckets
+    const trendData = buckets.map((bucket) => {
+      const key = buildBucketKey(timeRange, bucket);
+      const data = trendMap.get(key) || {
+        totalNewUsers: 0,
+        activeUsers: 0,
+        verifiedUsers: 0,
+        adminUsers: 0,
+        vendorUsers: 0,
+        salesRepUsers: 0,
+        customerUsers: 0,
+      };
+      return {
+        label: bucket.label,
+        ...data,
+      };
+    });
+
+    // 2. Overall User Statistics
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ isActive: true });
+    const verifiedUsers = await User.countDocuments({ isEmailVerified: true });
+    const inactiveUsers = totalUsers - activeUsers;
+
+    // 3. Users by Role
+    const usersByRole = await User.aggregate([
+      {
+        $group: {
+          _id: '$role',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const roleDistribution = usersByRole.map((item) => ({
+      role: item._id || 'unassigned',
+      count: item.count,
+    }));
+
+    // 4. Users with Bookings (Conversion)
+    const usersWithBookings = await Booking.aggregate([
+      {
+        $group: {
+          _id: '$userId',
+        },
+      },
+      {
+        $count: 'count',
+      },
+    ]);
+
+    const bookingConversion = usersWithBookings.length > 0 ? usersWithBookings[0].count : 0;
+    const conversionRate = totalUsers > 0 ? ((bookingConversion / totalUsers) * 100).toFixed(2) : 0;
+
+    // 5. Average Users Per Time Period
+    const avgNewUsersPerPeriod = trendData.length > 0
+      ? Math.round(trendData.reduce((sum, item) => sum + item.totalNewUsers, 0) / trendData.length)
+      : 0;
+
+    // 6. New Users This Period (Last item in trend data)
+    const currentPeriod = trendData[trendData.length - 1] || {};
+    const previousPeriod = trendData[trendData.length - 2] || {};
+
+    const newUsersTrend = previousPeriod.totalNewUsers
+      ? ((currentPeriod.totalNewUsers - previousPeriod.totalNewUsers) / previousPeriod.totalNewUsers * 100).toFixed(1)
+      : 0;
+
+    const stats = {
+      totalUsers,
+      activeUsers,
+      inactiveUsers,
+      verifiedUsers,
+      unverifiedUsers: totalUsers - verifiedUsers,
+      usersWithBookings: bookingConversion,
+      conversionRate,
+      avgNewUsersPerPeriod,
+    };
+
+    // 7. Top performing roles (by count)
+    const topRoles = roleDistribution
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    const statusDistribution = [
+      { name: 'Active', value: activeUsers, status: 'active' },
+      { name: 'Inactive', value: inactiveUsers, status: 'inactive' },
+      { name: 'Verified', value: verifiedUsers, status: 'verified' },
+      { name: 'Unverified', value: totalUsers - verifiedUsers, status: 'unverified' },
+    ];
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        timeRange,
+        generatedAt: new Date().toISOString(),
+        stats,
+        trendData,
+        roleDistribution,
+        topRoles,
+        statusDistribution,
+      },
+    });
+  } catch (error) {
+    console.error('User analytics error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching user analytics',
+      error: error.message,
+    });
+  }
+});
+
 
