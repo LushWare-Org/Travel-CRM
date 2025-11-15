@@ -41,7 +41,8 @@
     "react-router-dom": "^6.30.0",
     "react-select": "^5.10.2",
     "recharts": "^2.15.3",
-    "sweetalert2": "^11.26.3"
+    "sweetalert2": "^11.26.3",
+    "wouter": "^3.7.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
