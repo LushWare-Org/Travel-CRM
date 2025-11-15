@@ -2,6 +2,7 @@ import Lead from '../models/lead.model.js';
 import Invoice from '../models/invoice.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { COUNTRY_NAMES, normalizeString } from '../utils/countryUtils.js';
+import ItineraryAnalyticsService from '../services/itineraryAnalytics.service.js';
 
 const STATUS_LABELS = {
   new: 'New',
@@ -784,6 +785,54 @@ export const getBillingAnalyticsOverview = asyncHandler(async (req, res) => {
       invoiceCategoryBreakdown,
     },
   });
+});
+
+/**
+ * Get Package Analytics Overview
+ * Returns comprehensive analytics for packages including trends, performance metrics
+ */
+export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
+  const { timeRange = 'monthly' } = req.query;
+
+  try {
+    // Get analytics overview from service
+    const overview = await ItineraryAnalyticsService.getAnalyticsOverview({
+      timeRange: timeRange || 'monthly',
+    });
+
+    // Get most inquired packages
+    const mostInquired = await ItineraryAnalyticsService.getMostInquired(5);
+
+    // Get destination performance
+    const destinationPerformance = await ItineraryAnalyticsService.getDestinationPerformance(5);
+
+    // Get activity preferences
+    const activityPreferences = await ItineraryAnalyticsService.getActivityPreferences(5);
+
+    // Get hotel preferences
+    const hotelPreferences = await ItineraryAnalyticsService.getHotelPreferences(4);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        timeRange,
+        generatedAt: new Date().toISOString(),
+        stats: overview.stats,
+        trend: overview.trend,
+        mostInquired,
+        destinationPerformance,
+        activityPreferences,
+        hotelPreferences,
+      },
+    });
+  } catch (error) {
+    console.error('Package analytics error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching package analytics',
+      error: error.message,
+    });
+  }
 });
 
 

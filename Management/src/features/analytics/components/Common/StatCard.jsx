@@ -11,7 +11,8 @@ const StatCard = ({
   trend, 
   trendDirection = "up",
   unit = "",
-  color = "blue" 
+  color = "blue",
+  loading = false
 }) => {
   const colorClasses = {
     blue: "bg-blue-500",
@@ -35,18 +36,28 @@ const StatCard = ({
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-sm font-medium text-gray-600">{label}</h3>
         <div className={`${colorClasses[color]} p-2 rounded-lg`}>
-          <Icon className="w-5 h-5 text-white" />
+          {loading ? (
+            <div className="w-5 h-5 bg-white rounded-full animate-pulse" />
+          ) : (
+            <Icon className="w-5 h-5 text-white" />
+          )}
         </div>
       </div>
       
       <div className="mb-3">
         <p className="text-2xl font-bold text-gray-900">
-          {value}
-          {unit && <span className="text-lg ml-1">{unit}</span>}
+          {loading ? (
+            <span className="inline-block w-16 h-8 bg-gray-200 rounded animate-pulse" />
+          ) : (
+            <>
+              {value}
+              {unit && <span className="text-lg ml-1">{unit}</span>}
+            </>
+          )}
         </p>
       </div>
       
-      {trend && (
+      {trend && !loading && (
         <div className={`flex items-center gap-1 ${trendClasses[trendDirection]}`}>
           <TrendIcon className="w-4 h-4" />
           <span className="text-xs font-semibold">{trend}</span>
