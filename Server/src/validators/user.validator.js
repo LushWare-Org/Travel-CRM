@@ -47,11 +47,11 @@ export const createUserSchema = Joi.object({
       'string.max': 'Password cannot exceed 128 characters',
     }),
   role: Joi.string()
-    .valid('customer', 'salesRep', 'vendor', 'admin')
+    .valid('customer', 'salesRep', 'vendor', 'admin', 'superAdmin')
     .required()
     .messages({
       'string.empty': 'Role is required',
-      'any.only': 'Role must be one of: customer, salesRep, vendor, admin',
+      'any.only': 'Role must be one of: customer, salesRep, vendor, admin, superAdmin',
     }),
 }).unknown(false);
 
@@ -87,9 +87,9 @@ export const updateUserSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   role: Joi.string()
-    .valid('customer', 'salesRep', 'vendor', 'admin')
+    .valid('customer', 'salesRep', 'vendor', 'admin', 'superAdmin')
     .messages({
-      'any.only': 'Role must be one of: customer, salesRep, vendor, admin',
+      'any.only': 'Role must be one of: customer, salesRep, vendor, admin, superAdmin',
     }),
   isActive: Joi.boolean()
     .messages({
@@ -131,11 +131,11 @@ export const updatePasswordSchema = Joi.object({
  */
 export const assignRoleSchema = Joi.object({
   role: Joi.string()
-    .valid('customer', 'salesRep', 'vendor', 'admin')
+    .valid('customer', 'salesRep', 'vendor', 'admin', 'superAdmin')
     .required()
     .messages({
       'string.empty': 'Role is required',
-      'any.only': 'Role must be one of: customer, salesRep, vendor, admin',
+      'any.only': 'Role must be one of: customer, salesRep, vendor, admin, superAdmin',
     }),
 }).unknown(false);
 
@@ -156,11 +156,11 @@ export const toggleStatusSchema = Joi.object({
  */
 export const getRoleParamSchema = Joi.object({
   role: Joi.string()
-    .valid('customer', 'salesRep', 'vendor', 'admin')
+    .valid('customer', 'salesRep', 'vendor', 'admin', 'superAdmin')
     .required()
     .messages({
       'string.empty': 'Role is required',
-      'any.only': 'Role must be one of: customer, salesRep, vendor, admin',
+      'any.only': 'Role must be one of: customer, salesRep, vendor, admin, superAdmin',
     }),
 }).unknown(false);
 
@@ -193,9 +193,9 @@ export const userQuerySchema = Joi.object({
       'string.base': 'Search must be a string',
     }),
   role: Joi.string()
-    .valid('customer', 'salesRep', 'vendor', 'admin')
+    .valid('customer', 'salesRep', 'vendor', 'admin', 'superAdmin')
     .messages({
-      'any.only': 'Role must be one of: customer, salesRep, vendor, admin',
+      'any.only': 'Role must be one of: customer, salesRep, vendor, admin, superAdmin',
     }),
   isActive: Joi.boolean()
     .messages({
