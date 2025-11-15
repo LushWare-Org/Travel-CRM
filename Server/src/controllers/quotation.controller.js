@@ -1,5 +1,6 @@
 import fs from 'fs';
 import Quotation from '../models/quotation.model.js';
+import Lead from '../models/lead.model.js';
 import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
@@ -27,8 +28,19 @@ const formatQuotationForResponse = (quotationDoc) => {
  * @access  Private
  */
 export const getAllQuotations = asyncHandler(async (req, res) => {
+  // Build base query - filter by lead assignedTo for sales reps
+  let baseQuery = Quotation.find();
+  
+  // If user is a sales rep, only show quotations for leads assigned to them
+  if (req.user.role === 'salesRep') {
+    const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
+    const leadIds = assignedLeadIds.map((lead) => lead._id);
+    baseQuery = baseQuery.where('lead').in(leadIds);
+  }
+  // Admin can see all quotations (no filter)
+
   const features = new APIFeatures(
-    Quotation.find().populate('lead', 'name email phone status').populate('createdBy', 'name email'),
+    baseQuery.populate('lead', 'name email phone status').populate('createdBy', 'name email'),
     req.query,
   )
     .filter()
@@ -38,7 +50,15 @@ export const getAllQuotations = asyncHandler(async (req, res) => {
 
   const quotationDocs = await features.query;
   const quotations = quotationDocs.map((quotation) => formatQuotationForResponse(quotation));
-  const total = await Quotation.countDocuments();
+  
+  // Get total count with same filter
+  let countQuery = Quotation.find();
+  if (req.user.role === 'salesRep') {
+    const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
+    const leadIds = assignedLeadIds.map((lead) => lead._id);
+    countQuery = countQuery.where('lead').in(leadIds);
+  }
+  const total = await countQuery.countDocuments();
 
   res.status(200).json({
     success: true,
@@ -55,13 +75,18 @@ export const getAllQuotations = asyncHandler(async (req, res) => {
  */
 export const getQuotationById = asyncHandler(async (req, res, next) => {
   const quotationDoc = await Quotation.findById(req.params.id)
-    .populate('lead', 'name email phone status destination')
+    .populate('lead', 'name email phone status destination assignedTo')
     .populate('package', 'name description price')
     .populate('createdBy', 'name email')
     .populate('convertedToInvoice');
 
   if (!quotationDoc) {
     return next(new AppError('Quotation not found', 404));
+  }
+
+  // Check permissions - sales rep can only access quotations for leads assigned to them
+  if (req.user.role === 'salesRep' && quotationDoc.lead?.assignedTo?.toString() !== req.user._id.toString()) {
+    return next(new AppError('Not authorized to access this quotation', 403));
   }
 
   const quotation = formatQuotationForResponse(quotationDoc);
@@ -77,7 +102,18 @@ export const getQuotationById = asyncHandler(async (req, res, next) => {
  * @route   GET /api/v1/billing/quotations/lead/:leadId
  * @access  Private
  */
-export const getQuotationsByLeadId = asyncHandler(async (req, res) => {
+export const getQuotationsByLeadId = asyncHandler(async (req, res, next) => {
+  // Check permissions - sales rep can only access quotations for leads assigned to them
+  if (req.user.role === 'salesRep') {
+    const lead = await Lead.findById(req.params.leadId).select('assignedTo');
+    if (!lead) {
+      return next(new AppError('Lead not found', 404));
+    }
+    if (lead.assignedTo?.toString() !== req.user._id.toString()) {
+      return next(new AppError('Not authorized to access quotations for this lead', 403));
+    }
+  }
+
   const quotationDocs = await Quotation.find({ lead: req.params.leadId })
     .populate('createdBy', 'name email')
     .populate('convertedToInvoice')

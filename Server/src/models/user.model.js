@@ -168,22 +168,16 @@ const userSchema = new mongoose.Schema(
 // Hash password before saving
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) {
-    return next();
+    next();
   }
 
-  console.log(`Hashing password for user: ${this.email}`);
   const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS, 10) || 12);
   this.password = await bcrypt.hash(this.password, salt);
-  console.log(`Password hashed successfully for user: ${this.email}`);
-  next();
 });
 
 // Compare password
 userSchema.methods.matchPassword = async function matchPassword(enteredPassword) {
-  console.log(`Comparing password for user: ${this.email}`);
-  const isMatch = await bcrypt.compare(enteredPassword, this.password);
-  console.log(`Password match result for ${this.email}:`, isMatch);
-  return isMatch;
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
 // Check if password changed after token was issued

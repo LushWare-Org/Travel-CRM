@@ -12,9 +12,26 @@ import { generateItineraryPDF, generateLeadItineraryPDF } from '../utils/pdfGene
 // @desc    Create a new lead
 // @route   POST /api/v1/leads
 // @access  Private (Admin, SalesRep)
+const parseTravelerCount = (value, defaultValue = undefined) => {
+  if (value === null || value === undefined || value === '') {
+    return defaultValue;
+  }
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed >= 1) {
+    return Math.floor(parsed);
+  }
+  return defaultValue;
+};
+
 export const createLead = asyncHandler(async (req, res, next) => {
   // Add user who created the lead
   req.body.createdBy = req.user._id;
+  const travelerCount = parseTravelerCount(req.body.numberOfTravelers, undefined);
+  if (travelerCount !== undefined) {
+    req.body.numberOfTravelers = travelerCount;
+  } else {
+    delete req.body.numberOfTravelers;
+  }
 
   // Add status history
   if (req.body.status) {
@@ -68,6 +85,15 @@ export const createLead = asyncHandler(async (req, res, next) => {
     }
   }
 
+  // Validate endDate >= travelDate if both are provided
+  if (req.body.travelDate && req.body.endDate) {
+    const travelDate = new Date(req.body.travelDate);
+    const endDate = new Date(req.body.endDate);
+    if (endDate < travelDate) {
+      return next(new AppError('End date must be greater than or equal to travel date', 400));
+    }
+  }
+
   const lead = await Lead.create(req.body);
 
   res.status(201).json({
@@ -80,8 +106,17 @@ export const createLead = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/leads
 // @access  Private (Admin, SalesRep)
 export const getLeads = asyncHandler(async (req, res, next) => {
+  // Build base query - filter by assignedTo for sales reps
+  let baseQuery = Lead.find();
+  
+  // If user is a sales rep, only show leads assigned to them
+  if (req.user.role === 'salesRep') {
+    baseQuery = baseQuery.where('assignedTo').equals(req.user._id);
+  }
+  // Admin can see all leads (no filter)
+
   const features = new APIFeatures(
-    Lead.find()
+    baseQuery
       .populate('assignedTo', 'name email role')
       .populate('currentItinerary')
       .populate('package', 'name customizedForLead originalPackage customizedBy')
@@ -107,9 +142,13 @@ export const getLeads = asyncHandler(async (req, res, next) => {
   // Execute query
   const leads = await features.query;
 
-  // Get pagination metadata
+  // Get pagination metadata - apply same filter for count
+  let countQuery = Lead.find();
+  if (req.user.role === 'salesRep') {
+    countQuery = countQuery.where('assignedTo').equals(req.user._id);
+  }
   const queryCopy = { ...req.query };
-  const featuresForCount = new APIFeatures(Lead.find(), queryCopy);
+  const featuresForCount = new APIFeatures(countQuery, queryCopy);
   featuresForCount.search(['name', 'email', 'phone', 'city', 'destination', 'salesRep', 'adviser']);
   featuresForCount.filter();
   const totalQuery = featuresForCount.query;
@@ -139,6 +178,11 @@ export const getLead = asyncHandler(async (req, res, next) => {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
   }
 
+  // Check permissions - sales rep can only access leads assigned to them
+  if (req.user.role === 'salesRep' && lead.assignedTo?.toString() !== req.user._id.toString()) {
+    throw new AppError('Not authorized to access this lead', 403);
+  }
+
   res.status(200).json({
     success: true,
     data: lead,
@@ -153,6 +197,15 @@ export const updateLead = asyncHandler(async (req, res, next) => {
 
   if (!lead) {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, 'numberOfTravelers')) {
+    const travelerCount = parseTravelerCount(req.body.numberOfTravelers, null);
+    if (travelerCount === null) {
+      delete req.body.numberOfTravelers;
+    } else {
+      req.body.numberOfTravelers = travelerCount;
+    }
   }
 
   // Check if status changed and add to history
@@ -194,6 +247,18 @@ export const updateLead = asyncHandler(async (req, res, next) => {
       }
     } else if (!req.body.package) {
       req.body.packageName = null;
+    }
+  }
+
+  // Validate endDate >= travelDate if both are provided
+  const travelDateToCheck = req.body.travelDate !== undefined ? req.body.travelDate : lead.travelDate;
+  const endDateToCheck = req.body.endDate !== undefined ? req.body.endDate : lead.endDate;
+  
+  if (travelDateToCheck && endDateToCheck) {
+    const travelDate = new Date(travelDateToCheck);
+    const endDate = new Date(endDateToCheck);
+    if (endDate < travelDate) {
+      return next(new AppError('End date must be greater than or equal to travel date', 400));
     }
   }
 
@@ -480,6 +545,151 @@ export const setLeadItinerary = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: itinerary });
 });
 
+// @desc    Create lead from website contact form (public endpoint)
+// @route   POST /api/v1/leads/website-contact
+// @access  Public (No authentication required)
+export const createWebsiteContactLead = asyncHandler(async (req, res, next) => {
+  const {
+    name,
+    email,
+    phone,
+    subject,
+    message,
+    travelDate,
+    destination,
+    destinationCountry,
+    locations,
+  } = req.body || {};
+
+  if (!email) {
+    return next(new AppError('Email is required', 400));
+  }
+
+  if (!name || !name.trim()) {
+    return next(new AppError('Name is required', 400));
+  }
+
+  if (!subject || !subject.trim()) {
+    return next(new AppError('Subject is required', 400));
+  }
+
+  if (!message || !message.trim()) {
+    return next(new AppError('Message is required', 400));
+  }
+
+  const sanitizedEmail = String(email).trim().toLowerCase();
+  const sanitizedName = String(name).trim();
+  
+  // Normalize phone number (remove non-digits)
+  const normalizePhone = (phoneNum) => {
+    if (!phoneNum) return undefined;
+    const digits = String(phoneNum).replace(/\D/g, '');
+    if (digits.length >= 10) {
+      return digits;
+    }
+    return undefined;
+  };
+
+  const normalizedPhone = normalizePhone(phone);
+
+  // Parse travel date if provided
+  const parsedTravelDate = travelDate ? new Date(travelDate) : null;
+  if (travelDate && (!parsedTravelDate || Number.isNaN(parsedTravelDate.getTime()))) {
+    return next(new AppError('Invalid travel date format', 400));
+  }
+
+  // Find or create user
+  let user = await User.findOne({ email: sanitizedEmail });
+  if (!user) {
+    const crypto = await import('crypto');
+    const randomPassword = crypto.randomBytes(12).toString('hex');
+    user = await User.create({
+      name: sanitizedName,
+      email: sanitizedEmail,
+      phone: normalizedPhone,
+      password: randomPassword,
+      role: 'customer',
+      isTempPassword: true,
+      mustChangePassword: true,
+    });
+  } else {
+    let shouldUpdateUser = false;
+    if (!user.phone && normalizedPhone) {
+      user.phone = normalizedPhone;
+      shouldUpdateUser = true;
+    }
+    if (!user.name && sanitizedName) {
+      user.name = sanitizedName;
+      shouldUpdateUser = true;
+    }
+    if (shouldUpdateUser) {
+      await user.save();
+    }
+  }
+
+  // Prepare lead payload - only include fields that are provided
+  const leadPayload = {
+    name: sanitizedName,
+    email: sanitizedEmail,
+    phone: normalizedPhone || undefined,
+    whatsapp: normalizedPhone || undefined,
+    source: 'website',
+    platform: 'Website Form', // Must match enum values in lead model
+    destination: destination?.trim() || undefined,
+    destinationCountry: destinationCountry?.trim() || undefined,
+    travelDate: parsedTravelDate || undefined,
+    numberOfTravelers: undefined, // Not collected in contact form
+    budget: undefined, // Not collected in contact form
+    message: message?.trim() || (locations?.trim() ? `Locations: ${locations.trim()}` : undefined),
+    status: 'new',
+    tags: ['website-contact-form'],
+  };
+
+  // Add remarks with subject, message, and locations
+  const remarkText = [
+    `Contact Form: ${subject.trim()}`,
+    message?.trim() ? `Message: ${message.trim()}` : '',
+    locations?.trim() ? `Locations: ${locations.trim()}` : '',
+  ].filter(Boolean).join(' | ');
+  
+  leadPayload.remarks = [
+    {
+      text: remarkText,
+      date: new Date(),
+      addedBy: null,
+    },
+  ];
+
+  // Auto-assign sales rep if enabled
+  let assignedSalesRepId = null;
+  try {
+    const { assigned, salesRepId } = await assignSalesRepIfNeeded(leadPayload);
+    if (assigned && salesRepId) {
+      assignedSalesRepId = salesRepId;
+      leadPayload.assignedTo = salesRepId;
+      const rep = await User.findById(salesRepId).select('name');
+      if (rep?.name) {
+        leadPayload.salesRep = rep.name;
+      }
+    }
+  } catch (assignmentError) {
+    // Log warning but don't fail the lead creation
+    console.warn(`Sales rep auto-assignment failed for website contact lead: ${assignmentError.message}`);
+  }
+
+  // Create lead
+  const lead = await Lead.create(leadPayload);
+
+  res.status(201).json({
+    success: true,
+    message: 'Contact form submitted successfully',
+    data: {
+      leadId: lead._id,
+      salesRepId: assignedSalesRepId || null,
+    },
+  });
+});
+
 // @desc    Get a lead's current itinerary
 // @route   GET /api/v1/leads/:id/itinerary
 // @access  Private (Admin, SalesRep)
@@ -546,4 +756,5 @@ export default {
   setLeadItinerary,
   getLeadItinerary,
   downloadLeadItineraryPDF,
+  createWebsiteContactLead,
 };

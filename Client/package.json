@@ -29,7 +29,6 @@
     "json2csv": "^6.0.0-alpha.2",
     "jspdf": "^3.0.3",
     "leaflet": "^1.9.4",
-    "libphonenumber-js": "^1.12.26",
     "lodash": "^4.17.21",
     "lucide-react": "^0.487.0",
     "qrcode": "^1.5.4",
@@ -44,7 +43,8 @@
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.30.0",
     "react-select": "^5.10.2",
-    "recharts": "^2.15.3"
+    "recharts": "^2.15.3",
+    "sweetalert2": "^11.14.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

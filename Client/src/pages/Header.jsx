@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, ChevronDown, Phone, Mail, MapPin, Search } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { headerInternational, headerDomestic } from '../data/mockData';
+import { fetchPackages } from '../utils/packageApi';
+
+const MAX_NAV_ITEMS = 12;
 
 export default function Header({ currentPage, onNavigate }) {
   const [scrollY, setScrollY] = useState(0);
   const isScrolled = scrollY > 50;
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [internationalMenu, setInternationalMenu] = useState([]);
+  const [domesticMenu, setDomesticMenu] = useState([]);
   const location = useLocation();
   const pathname = location.pathname;
 
@@ -16,10 +20,40 @@ export default function Header({ currentPage, onNavigate }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    fetchPackages({ limit: 100 })
+      .then(({ destinations }) => {
+        if (!isMounted) return;
+        const sorted = destinations.slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
+        setInternationalMenu(
+          sorted
+            .filter((dest) => dest.type !== 'domestic')
+            .slice(0, MAX_NAV_ITEMS)
+            .map((dest) => ({ id: dest.id, name: dest.name, slug: dest.slug }))
+        );
+        setDomesticMenu(
+          sorted
+            .filter((dest) => dest.type === 'domestic')
+            .slice(0, MAX_NAV_ITEMS)
+            .map((dest) => ({ id: dest.id, name: dest.name, slug: dest.slug }))
+        );
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setInternationalMenu([]);
+        setDomesticMenu([]);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const navItems = [
     { name: 'Home', page: 'home' },
-    { name: 'International Destinations', page: 'destinations-international', dropdown: headerInternational },
-    { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: headerDomestic },
+    { name: 'International Destinations', page: 'destinations-international', dropdown: internationalMenu },
+    { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: domesticMenu },
     { name: 'About Us', page: 'about' },
     { name: 'Contact', page: 'contact' },
     { name: 'Login', page: 'login' },
@@ -65,11 +99,10 @@ export default function Header({ currentPage, onNavigate }) {
                       <div className="px-3">
                         <div className={`grid ${getColumnClass(item.dropdown.length)} gap-1`}>
                           {item.dropdown.map(sub => {
-                            const qKey = item.page.includes('domestic') ? 'state' : 'country';
                             const qVal = sub.slug;
-                            const url = `/packages?${qKey}=${qVal}`;
+                            const url = `/packages?destination=${qVal}`;
                             return (
-                              <a key={sub.id} href={url} onClick={e => { e.preventDefault(); onNavigate('packages', `${qKey}=${qVal}`); setActiveDropdown(null); }}
+                              <a key={sub.id} href={url} onClick={e => { e.preventDefault(); onNavigate('packages', `destination=${qVal}`); setActiveDropdown(null); }}
                                  className="px-3 py-2 text-left text-sm text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-colors block rounded-md whitespace-nowrap">
                                 {sub.name}
                               </a>
