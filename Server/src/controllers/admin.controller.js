@@ -268,6 +268,11 @@ export const updateUser = asyncHandler(async (req, res, next) => {
     throw new AppError('Cannot update other admin accounts', 403);
   }
 
+  // Prevent updating superAdmin details (only superAdmin themselves can update)
+  if ((user.role === 'superAdmin' || user.isSuperAdmin) && user._id.toString() !== req.user.id.toString()) {
+    throw new AppError('Only the super admin can update their own details', 403);
+  }
+
   // Check if email is being changed and if it's already taken
   if (email && email !== user.email) {
     const existingUser = await User.findOne({ email });
@@ -312,6 +317,16 @@ export const deleteUser = asyncHandler(async (req, res, next) => {
   // Prevent deleting other admins
   if (user.role === 'admin') {
     throw new AppError('Cannot delete admin accounts', 403);
+  }
+
+  // Prevent deleting superAdmins
+  if (user.role === 'superAdmin' || user.isSuperAdmin) {
+    throw new AppError('Super admin accounts cannot be deleted. Only super admins can demote themselves.', 403);
+  }
+
+  // Check if user has canBeDeleted flag set to false
+  if (!user.canBeDeleted) {
+    throw new AppError('This user account cannot be deleted', 403);
   }
 
   await user.deleteOne();
@@ -471,6 +486,169 @@ export const getAvailablePermissions = asyncHandler(async (req, res, next) => {
     status: 'success',
     data: {
       permissions: availablePermissions,
+    },
+  });
+});
+
+// ============================================
+// SUPER ADMIN MANAGEMENT ENDPOINTS
+// ============================================
+
+// @desc    Promote admin to super admin (superAdmin only)
+// @route   POST /api/v1/admin/super/promote
+// @access  Private/SuperAdmin
+export const promoteSuperAdmin = asyncHandler(async (req, res, next) => {
+  const { userId, email } = req.body;
+
+  // Find user to promote
+  let userToPromote = null;
+  if (userId) {
+    userToPromote = await User.findById(userId);
+  } else if (email) {
+    userToPromote = await User.findOne({ email: email.toLowerCase() });
+  }
+
+  if (!userToPromote) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Can only promote admins to superAdmin
+  if (userToPromote.role !== 'admin') {
+    throw new AppError('Only admin users can be promoted to super admin', 400);
+  }
+
+  // Check if already a superAdmin
+  if (userToPromote.role === 'superAdmin') {
+    throw new AppError('User is already a super admin', 400);
+  }
+
+  // Update user to superAdmin
+  userToPromote.role = 'superAdmin';
+  userToPromote.isSuperAdmin = true;
+  userToPromote.canBeDeleted = false;
+  // SuperAdmins automatically get all permissions
+  userToPromote.permissions = [
+    'manage_users',
+    'manage_sales_reps',
+    'manage_vendors',
+    'manage_admins',
+    'view_reports',
+    'manage_billing',
+    'system_settings',
+    'audit_log',
+  ];
+
+  await userToPromote.save();
+
+  logger.info(`User ${userToPromote.email} promoted to super admin by ${req.user.email}`);
+
+  res.status(200).json({
+    status: 'success',
+    message: `${userToPromote.name} has been promoted to Super Admin with all permissions`,
+    data: {
+      user: {
+        id: userToPromote._id,
+        name: userToPromote.name,
+        email: userToPromote.email,
+        role: userToPromote.role,
+        isSuperAdmin: userToPromote.isSuperAdmin,
+        permissions: userToPromote.permissions,
+      },
+    },
+  });
+});
+
+// @desc    Demote super admin to admin (superAdmin only)
+// @route   POST /api/v1/admin/super/demote
+// @access  Private/SuperAdmin
+export const demoteSuperAdmin = asyncHandler(async (req, res, next) => {
+  const { userId, newRole = 'admin' } = req.body;
+
+  const userToDemote = await User.findById(userId);
+
+  if (!userToDemote) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Can only demote superAdmins
+  if (userToDemote.role !== 'superAdmin') {
+    throw new AppError('Only super admin users can be demoted', 400);
+  }
+
+  // Prevent demoting yourself
+  if (userToDemote._id.toString() === req.user.id.toString()) {
+    throw new AppError('You cannot demote yourself. Please contact another super admin.', 400);
+  }
+
+  // Update user role
+  userToDemote.role = newRole;
+  userToDemote.isSuperAdmin = false;
+  userToDemote.canBeDeleted = true;
+  // Clear permissions for non-admin roles
+  userToDemote.permissions = newRole === 'admin' ? [] : [];
+
+  await userToDemote.save();
+
+  logger.info(`User ${userToDemote.email} demoted from super admin to ${newRole} by ${req.user.email}`);
+
+  res.status(200).json({
+    status: 'success',
+    message: `${userToDemote.name} has been demoted to ${newRole}`,
+    data: {
+      user: {
+        id: userToDemote._id,
+        name: userToDemote.name,
+        email: userToDemote.email,
+        role: userToDemote.role,
+        isSuperAdmin: userToDemote.isSuperAdmin,
+        permissions: userToDemote.permissions,
+      },
+    },
+  });
+});
+
+// @desc    Get super admin info (current super admin)
+// @route   GET /api/v1/admin/super/info
+// @access  Private/SuperAdmin
+export const getSuperAdminInfo = asyncHandler(async (req, res, next) => {
+  // Verify that the current user is a superAdmin
+  if (req.user.role !== 'superAdmin') {
+    throw new AppError('Only super admin can access this information', 403);
+  }
+
+  const superAdmins = await User.find({ role: 'superAdmin' }).select(
+    'id name email phone isSuperAdmin createdAt lastLogin isActive',
+  );
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      currentUser: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+        isSuperAdmin: req.user.isSuperAdmin,
+        permissions: req.user.permissions,
+      },
+      allSuperAdmins: superAdmins,
+    },
+  });
+});
+
+// @desc    Get super admin count and list
+// @route   GET /api/v1/admin/super/list
+// @access  Private/SuperAdmin
+export const listSuperAdmins = asyncHandler(async (req, res, next) => {
+  const superAdmins = await User.find({ role: 'superAdmin' })
+    .select('name email phone isActive createdAt lastLogin')
+    .sort({ createdAt: 1 });
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      count: superAdmins.length,
+      superAdmins,
     },
   });
 });

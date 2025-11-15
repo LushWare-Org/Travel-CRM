@@ -51,8 +51,20 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['customer', 'salesRep', 'vendor', 'admin'],
+      enum: ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'],
       default: 'customer',
+    },
+    isSuperAdmin: {
+      type: Boolean,
+      default: false,
+      // Only superAdmins can have this flag set to true
+      validate: {
+        validator(value) {
+          // If isSuperAdmin is true, role must be 'superAdmin'
+          return !value || this.role === 'superAdmin';
+        },
+        message: 'Only users with superAdmin role can have isSuperAdmin flag set to true',
+      },
     },
     permissions: {
       type: [String],
@@ -158,6 +170,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ['pending_verification', 'verified', 'suspended', 'rejected'],
       default: 'pending_verification',
+    },
+    canBeDeleted: {
+      type: Boolean,
+      default: true,
+      // SuperAdmin cannot be deleted
     },
   },
   {
