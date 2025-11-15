@@ -17,10 +17,10 @@ import {
 } from "../../utils/itineraryAnalyticsData";
 
 /**
- * ItineraryAnalytics Component
- * Displays itinerary and booking statistics
+ * PackageAnalytics Component
+ * Displays package and booking statistics
  */
-const ItineraryAnalytics = () => {
+const PackageAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
 
   // Line chart configuration
@@ -41,7 +41,7 @@ const ItineraryAnalytics = () => {
       {/* Header with Time Range Filter */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Itinerary Analytics</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Package Analytics</h2>
           <p className="text-gray-600 mt-1">Most inquired and purchased packages and destinations</p>
         </div>
         <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
@@ -51,7 +51,7 @@ const ItineraryAnalytics = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           icon={MapPin}
-          label="Total Itineraries"
+          label="Total Packages"
           value="156"
           trend="+12%"
           trendDirection="up"
@@ -83,9 +83,9 @@ const ItineraryAnalytics = () => {
         />
       </div>
 
-      {/* Itinerary Trend Chart */}
+      {/* Package Trend Chart */}
       <ChartContainer
-        title="Itinerary Performance Trend"
+        title="Package Performance Trend"
         description="Monthly inquiries, purchases, and hotel bookings"
       >
         <LineChartComponent
@@ -160,7 +160,7 @@ const ItineraryAnalytics = () => {
         </ChartContainer>
 
         <ChartContainer
-          title="Top Itineraries"
+          title="Top Packages"
           description="Most inquired and purchased packages"
         >
           <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -187,4 +187,4 @@ const ItineraryAnalytics = () => {
   );
 };
 
-export default ItineraryAnalytics;
+export default PackageAnalytics;

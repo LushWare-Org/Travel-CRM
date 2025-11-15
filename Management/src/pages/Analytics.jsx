@@ -18,7 +18,7 @@ const Analytics = () => {
     { id: "leads", label: "Lead Analytics", component: LeadAnalytics },
     { id: "billing", label: "Billing Analytics", component: BillingAnalytics },
     { id: "users", label: "User Analytics", component: UserAnalytics },
-    { id: "itineraries", label: "Itinerary Analytics", component: ItineraryAnalytics },
+    { id: "itineraries", label: "Package Analytics", component: ItineraryAnalytics },
     { id: "website", label: "Website Analytics", component: WebsiteAnalytics },
   ];
 
