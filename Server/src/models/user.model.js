@@ -32,9 +32,10 @@ const userSchema = new mongoose.Schema(
     },
     phoneCountry: {
       type: String,
-      // ISO 3166-1 alpha-2 country code
+      // ISO 3166-1 alpha-2 country code (e.g., 'US', 'LK', 'IN')
       match: [/^[A-Z]{2}$/, 'Please provide a valid country code'],
       sparse: true,
+      default: 'US', // Default to US
     },
     phoneE164: {
       type: String,

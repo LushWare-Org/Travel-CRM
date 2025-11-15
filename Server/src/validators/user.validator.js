@@ -2,6 +2,7 @@ import Joi from 'joi';
 
 /**
  * Create user validation schema (admin creating users)
+ * Supports international phone numbers with country codes
  */
 export const createUserSchema = Joi.object({
   name: Joi.string()
@@ -23,9 +24,18 @@ export const createUserSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   phone: Joi.string()
-    .pattern(/^[\+]?[0-9]{7,15}$/)
+    .pattern(/^\+?[1-9]\d{1,14}$/)
+    .required()
     .messages({
-      'string.pattern.base': 'Please provide a valid phone number (7-15 digits, can include + prefix)',
+      'string.empty': 'Phone number is required',
+      'string.pattern.base': 'Please provide a valid international phone number (e.g., +94768952480 or +1-555-0000)',
+    }),
+  phoneCountry: Joi.string()
+    .length(2)
+    .uppercase()
+    .optional()
+    .messages({
+      'string.length': 'Country code must be 2 characters',
     }),
   password: Joi.string()
     .min(6)
@@ -47,6 +57,7 @@ export const createUserSchema = Joi.object({
 
 /**
  * Update user validation schema
+ * Supports international phone numbers with country codes
  */
 export const updateUserSchema = Joi.object({
   name: Joi.string()
@@ -58,9 +69,16 @@ export const updateUserSchema = Joi.object({
       'string.max': 'Name cannot exceed 50 characters',
     }),
   phone: Joi.string()
-    .pattern(/^[\+]?[0-9]{7,15}$/)
+    .pattern(/^\+?[1-9]\d{1,14}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid phone number (7-15 digits, can include + prefix)',
+      'string.pattern.base': 'Please provide a valid international phone number (e.g., +94768952480 or +1-555-0000)',
+    }),
+  phoneCountry: Joi.string()
+    .length(2)
+    .uppercase()
+    .optional()
+    .messages({
+      'string.length': 'Country code must be 2 characters',
     }),
   email: Joi.string()
     .email()
