@@ -61,7 +61,7 @@ export async function assignSalesRepIfNeeded(leadDraft) {
   leadDraft.assignedTo = chosen._id;
   leadDraft.assignmentMode = 'auto';
   leadDraft.assignedBy = null;
-  return { assigned: true, salesRepId: chosen._id };
+  return { assigned: true, salesRepId: chosen._id, salesRep: chosen };
 }
 
 export default { assignSalesRepIfNeeded };

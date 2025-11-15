@@ -165,6 +165,14 @@ const userSchema = new mongoose.Schema(
   },
 );
 
+// Normalize role: convert 'superAdmin' to 'admin' (legacy support)
+userSchema.pre('save', function normalizeRole(next) {
+  if (this.role === 'superAdmin') {
+    this.role = 'admin';
+  }
+  next();
+});
+
 // Hash password before saving
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) {

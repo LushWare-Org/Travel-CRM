@@ -23,14 +23,15 @@ export const limiter = createLimiter({
 });
 
 export const authLimiter = createLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login requests per windowMs
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes (configurable via AUTH_RATE_LIMIT_WINDOW_MS)
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS, 10) || 10, // Limit each IP to 10 login requests per windowMs (configurable via AUTH_RATE_LIMIT_MAX_ATTEMPTS)
   message: 'Too many login attempts, please try again after 15 minutes.',
-  skipSuccessfulRequests: true,
+  skipSuccessfulRequests: true, // Only count failed login attempts
   handler: (req, res) => {
+    const windowMinutes = Math.round((parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000) / (60 * 1000));
     res.status(429).json({
       success: false,
-      message: 'Too many login attempts, please try again after 15 minutes.',
+      message: `Too many login attempts, please try again after ${windowMinutes} minutes.`,
       error: 'Rate limit exceeded',
     });
   },
