@@ -330,6 +330,35 @@ export const analyticsAPI = {
     const api = new ApiService();
     return api.get('/analytics/billing/overview', params);
   },
+  // Itinerary Analytics
+  getItineraryOverview: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/overview', params);
+  },
+  getMostInquiredItineraries: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/most-inquired', params);
+  },
+  getDestinationPerformance: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/destination-performance', params);
+  },
+  getActivityPreferences: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/activity-preferences', params);
+  },
+  getHotelPreferences: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/hotel-preferences', params);
+  },
+  getItineraryTrends: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/trends', params);
+  },
+  getItineraryCompletionStats: async () => {
+    const api = new ApiService();
+    return api.get('/analytics/itineraries/completion-stats');
+  },
 };
 
 // Billing/Quotation API Methods
