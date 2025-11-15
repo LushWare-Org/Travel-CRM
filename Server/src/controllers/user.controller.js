@@ -336,11 +336,31 @@ export const updateUser = asyncHandler(async (req, res, next) => {
     // Admin-only fields
     if (req.user.role === 'admin' || req.user.role === 'superAdmin') {
       if (role) {
-        const validRoles = ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'];
-        if (!validRoles.includes(role)) {
-          return next(new AppError(`Invalid role: ${role}`, 400));
+        // Prevent downgrading superAdmin through regular update - must use demote endpoint
+        if (user.role === 'superAdmin' || user.isSuperAdmin) {
+          return next(new AppError('Cannot modify superAdmin role through this endpoint. Use /admin/super/demote instead.', 403));
         }
+
+        // Prevent assigning superAdmin through regular update - must use promote endpoint
+        if (role === 'superAdmin') {
+          return next(new AppError('Cannot assign superAdmin role through this endpoint. Use /admin/super/promote instead.', 403));
+        }
+
+        const validRoles = ['customer', 'salesRep', 'vendor', 'admin'];
+        if (!validRoles.includes(role)) {
+          return next(new AppError(`Invalid role: ${role}. Use dedicated endpoints for superAdmin operations.`, 400));
+        }
+        
+        const oldRole = user.role;
         user.role = role;
+        
+        // Clear superAdmin flags when changing role
+        if (oldRole === 'admin') {
+          user.isSuperAdmin = false;
+          user.permissions = [];
+        } else if (role === 'admin') {
+          user.isSuperAdmin = false;
+        }
       }
 
       if (typeof isActive === 'boolean') {
@@ -608,13 +628,14 @@ export const getUsersByRole = asyncHandler(async (req, res, next) => {
  * @desc    Assign or update user role
  * @route   PATCH /api/v1/users/:id/role
  * @access  Private/Admin
+ * @note    Use /admin/super/promote for promoting to superAdmin instead
  */
 export const assignUserRole = asyncHandler(async (req, res, next) => {
   const { role } = req.body;
-  const validRoles = ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'];
+  const validRoles = ['customer', 'salesRep', 'vendor', 'admin']; // Exclude superAdmin - use promote endpoint
 
   if (!validRoles.includes(role)) {
-    return next(new AppError(`Invalid role. Valid roles are: ${validRoles.join(', ')}`, 400));
+    return next(new AppError(`Invalid role. Valid roles are: ${validRoles.join(', ')}. Use /admin/super/promote for superAdmin.`, 400));
   }
 
   let user = await User.findById(req.params.id);
@@ -623,8 +644,23 @@ export const assignUserRole = asyncHandler(async (req, res, next) => {
     return next(new AppError('User not found', 404));
   }
 
+  // Prevent downgrading superAdmin through this endpoint
+  if (user.role === 'superAdmin' || user.isSuperAdmin) {
+    return next(new AppError('Cannot modify superAdmin role through this endpoint. Use /admin/super/demote instead.', 403));
+  }
+
   const oldRole = user.role;
   user.role = role;
+  
+  // Reset superAdmin flags and adjust permissions when changing role
+  if (oldRole === 'admin') {
+    user.isSuperAdmin = false;
+    user.permissions = [];
+  } else if (role === 'admin') {
+    // If promoting to admin but not superAdmin, clear the flag
+    user.isSuperAdmin = false;
+  }
+  
   await user.save();
 
   logger.info(`User role updated: ${user.email} (${oldRole} -> ${role})`);
@@ -636,6 +672,7 @@ export const assignUserRole = asyncHandler(async (req, res, next) => {
       id: user._id,
       email: user.email,
       role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
     },
   });
 });

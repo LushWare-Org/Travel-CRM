@@ -192,6 +192,30 @@ userSchema.pre('save', async function hashPassword(next) {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
+// Ensure consistency between role and isSuperAdmin fields
+userSchema.pre('save', function ensureRoleConsistency(next) {
+  // If role is changed away from superAdmin, reset isSuperAdmin flag
+  if (this.isModified('role') && this.role !== 'superAdmin' && this.isSuperAdmin) {
+    this.isSuperAdmin = false;
+    // Also clear permissions if not an admin
+    if (this.role !== 'admin') {
+      this.permissions = [];
+    }
+  }
+  
+  // If trying to set isSuperAdmin true, ensure role is superAdmin
+  if (this.isModified('isSuperAdmin') && this.isSuperAdmin && this.role !== 'superAdmin') {
+    this.role = 'superAdmin';
+  }
+  
+  // If demoting from superAdmin to admin, ensure canBeDeleted is true
+  if (this.isModified('role') && this.role !== 'superAdmin' && !this.isModified('canBeDeleted')) {
+    this.canBeDeleted = true;
+  }
+  
+  next();
+});
+
 // Compare password
 userSchema.methods.matchPassword = async function matchPassword(enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
