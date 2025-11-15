@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   TimeRangeFilter,
   StatCard,
@@ -8,6 +8,7 @@ import {
   PieChartComponent,
 } from "../Common";
 import { Users, UserCheck, TrendingUp, DollarSign } from "lucide-react";
+import AnalyticsService from "../../../../services/analytics.service";
 import {
   getUserGrowthByTimeRange,
   getAggregatedUserStats,
@@ -20,14 +21,76 @@ import {
 /**
  * UserAnalytics Component
  * Displays user and sales representative statistics with time range filtering
+ * Fetches real data from backend API
  */
 const UserAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch analytics data from backend
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const data = await AnalyticsService.getUserAnalyticsOverview(timeRange);
+        setAnalyticsData(data);
+      } catch (err) {
+        console.error('Error fetching user analytics:', err);
+        setError(err.message || 'Failed to fetch analytics data');
+        // Fallback to mock data
+        setAnalyticsData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [timeRange]);
 
   // Compute data based on selected time range
-  const currentUserGrowthData = useMemo(() => getUserGrowthByTimeRange(timeRange), [timeRange]);
-  const userStats = useMemo(() => getAggregatedUserStats(timeRange), [timeRange]);
-  const salesStats = useMemo(() => getSalesRepStats(timeRange), [timeRange]);
+  const currentUserGrowthData = useMemo(() => {
+    if (analyticsData?.trendData) {
+      return analyticsData.trendData.map(item => ({
+        ...item,
+        month: item.label,
+        week: item.label,
+        year: item.label,
+        newUsers: item.totalNewUsers,
+        purchased: item.activeUsers, // Using activeUsers as proxy for "purchased"
+        salesReps: item.adminUsers, // Using adminUsers for sales rep count
+      }));
+    }
+    return getUserGrowthByTimeRange(timeRange);
+  }, [analyticsData, timeRange]);
+
+  const userStats = useMemo(() => {
+    if (analyticsData?.stats) {
+      const { stats } = analyticsData;
+      const totalNewUsers = analyticsData.trendData
+        ? analyticsData.trendData.reduce((sum, item) => sum + item.totalNewUsers, 0)
+        : stats.totalUsers;
+      
+      return {
+        totalNewUsers,
+        totalPurchased: stats.usersWithBookings || 0,
+        avgSalesReps: 0,
+        conversionRate: parseFloat(stats.conversionRate) || 0,
+        usersTrend: 0,
+        purchasedTrend: 0,
+        lastPeriodNewUsers: 0,
+        lastPeriodPurchased: 0,
+      };
+    }
+    return getAggregatedUserStats(timeRange);
+  }, [analyticsData, timeRange]);
+
+  const salesStats = useMemo(() => {
+    return getSalesRepStats(timeRange);
+  }, [timeRange]);
 
   // Get x-axis key based on time range
   const getXAxisKey = () => {
@@ -68,6 +131,29 @@ const UserAnalytics = () => {
     { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
   ];
 
+  // Render loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">User Management Analytics</h2>
+            <p className="text-gray-600 mt-1">User growth and sales performance metrics</p>
+          </div>
+          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-600">Loading analytics data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render error state
+  if (error) {
+    console.warn('Analytics API error, falling back to mock data:', error);
+  }
+
   return (
     <div className="space-y-6">
       {/* Header with Time Range Filter */}
@@ -83,47 +169,47 @@ const UserAnalytics = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           icon={Users}
-          label="New Users"
-          value={userStats.totalNewUsers.toString()}
+          label="Total Users"
+          value={analyticsData?.stats?.totalUsers?.toString() || "0"}
           trend={`${userStats.usersTrend > 0 ? "+" : ""}${userStats.usersTrend}%`}
           trendDirection={userStats.usersTrend >= 0 ? "up" : "down"}
           color="blue"
-          subtitle={getTimeRangeLabel()}
+          subtitle={`${analyticsData?.stats?.activeUsers || 0} Active`}
         />
         <StatCard
           icon={UserCheck}
-          label="Users Purchased"
-          value={userStats.totalPurchased.toString()}
+          label="Users with Bookings"
+          value={analyticsData?.stats?.usersWithBookings?.toString() || "0"}
           trend={`${userStats.purchasedTrend > 0 ? "+" : ""}${userStats.purchasedTrend}%`}
           trendDirection={userStats.purchasedTrend >= 0 ? "up" : "down"}
           color="green"
-          subtitle={`${userStats.conversionRate}% conversion`}
+          subtitle={`${analyticsData?.stats?.conversionRate || 0}% conversion`}
         />
         <StatCard
           icon={TrendingUp}
-          label="Successful Sales"
-          value={salesStats.totalSales.toString()}
-          trend={`Avg: ${salesStats.avgConversion}%`}
+          label="Verified Users"
+          value={analyticsData?.stats?.verifiedUsers?.toString() || "0"}
+          trend={`+${analyticsData?.stats?.verifiedUsers || 0}`}
           trendDirection="up"
           color="purple"
-          subtitle="Conversion Rate"
+          subtitle="Email Verified"
         />
         <StatCard
           icon={DollarSign}
-          label="Revenue/Rep Avg"
-          value={`$${(salesStats.avgRevenuePerRep / 1000).toFixed(1)}k`}
-          trend={`Top: ${salesStats.topPerformer}`}
+          label="User Roles"
+          value={analyticsData?.roleDistribution?.length?.toString() || "4"}
+          trend={`Total: ${analyticsData?.stats?.totalUsers || 0}`}
           trendDirection="up"
-          unit="USD"
+          unit="Roles"
           color="orange"
-          subtitle={`$${(salesStats.topPerformerRevenue / 1000).toFixed(0)}k`}
+          subtitle="Active Roles"
         />
       </div>
 
       {/* User Growth Trend Chart */}
       <ChartContainer
         title="User Growth Trend"
-        description={`New users, purchases, and sales rep activity - ${getTimeRangeLabel()}`}
+        description={`New users and activity metrics - ${getTimeRangeLabel()}`}
       >
         <LineChartComponent
           data={currentUserGrowthData}
@@ -149,25 +235,26 @@ const UserAnalytics = () => {
         </ChartContainer>
 
         <ChartContainer
-          title="Revenue by Sales Rep"
-          description="Revenue earned by each representative"
+          title="User Distribution by Role"
+          description="Breakdown of users by role"
         >
           <BarChartComponent
-            data={revenueByRepData}
-            bars={[{ dataKey: "revenue", fill: "#8b5cf6", name: "Revenue" }]}
-            xAxisKey="rep"
+            data={analyticsData?.roleDistribution || []}
+            bars={[{ dataKey: "count", fill: "#8b5cf6", name: "Count" }]}
+            xAxisKey="role"
             height={320}
             margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
           />
         </ChartContainer>
       </div>
 
+      {/* User Status Distribution Pie Chart */}
       <ChartContainer
-        title="User Type Distribution"
-        description="Breakdown of website users, registered users, and converted users"
+        title="User Status Distribution"
+        description="Website users, registered users, and converted users"
       >
         <PieChartComponent
-          data={userTypeDistributionData}
+          data={analyticsData?.userStatusDistribution || userTypeDistributionData}
           dataKey="value"
           nameKey="name"
           height={300}
@@ -177,26 +264,44 @@ const UserAnalytics = () => {
 
       {/* Summary Stats Section */}
       <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Period Summary ({getTimeRangeLabel()})</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">User Statistics Summary ({getTimeRangeLabel()})</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded border border-gray-200">
-            <p className="text-sm text-gray-600">Total New Users</p>
-            <p className="text-2xl font-bold text-gray-900">{userStats.totalNewUsers}</p>
+            <p className="text-sm text-gray-600">Total Users</p>
+            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.totalUsers || 0}</p>
           </div>
           <div className="bg-white p-4 rounded border border-gray-200">
-            <p className="text-sm text-gray-600">Total Purchases</p>
-            <p className="text-2xl font-bold text-gray-900">{userStats.totalPurchased}</p>
+            <p className="text-sm text-gray-600">Active Users</p>
+            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.activeUsers || 0}</p>
           </div>
           <div className="bg-white p-4 rounded border border-gray-200">
             <p className="text-sm text-gray-600">Conversion Rate</p>
-            <p className="text-2xl font-bold text-gray-900">{userStats.conversionRate}%</p>
+            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.conversionRate || 0}%</p>
           </div>
           <div className="bg-white p-4 rounded border border-gray-200">
-            <p className="text-sm text-gray-600">Avg Sales Reps</p>
-            <p className="text-2xl font-bold text-gray-900">{userStats.avgSalesReps}</p>
+            <p className="text-sm text-gray-600">Verified Users</p>
+            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.verifiedUsers || 0}</p>
           </div>
         </div>
       </div>
+
+      {/* Role Details Section */}
+      {analyticsData?.topRoles && analyticsData.topRoles.length > 0 && (
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Top User Roles</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {analyticsData.topRoles.map((role, index) => (
+              <div key={index} className="p-4 bg-gray-50 rounded border border-gray-200">
+                <p className="text-sm text-gray-600 capitalize">{role.role}</p>
+                <p className="text-2xl font-bold text-gray-900">{role.count}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {((role.count / analyticsData.stats.totalUsers) * 100).toFixed(1)}% of total
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

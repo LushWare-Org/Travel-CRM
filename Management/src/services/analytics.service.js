@@ -63,6 +63,27 @@ class AnalyticsService {
       throw error;
     }
   }
+
+  /**
+   * Get User Analytics Overview
+   */
+  static async getUserAnalyticsOverview(timeRange = 'monthly') {
+    try {
+      const response = await ApiService.fetch(
+        `/analytics/users/overview?timeRange=${timeRange}`,
+        { method: 'GET' }
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch user analytics');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user analytics:', error);
+      throw error;
+    }
+  }
 }
 
 export default AnalyticsService;
