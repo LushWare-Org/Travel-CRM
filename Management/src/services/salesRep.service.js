@@ -57,7 +57,8 @@ class SalesRepService {
    * @param {Object} salesRepData - Sales rep data
    * @param {string} salesRepData.name - Sales rep name (required)
    * @param {string} salesRepData.email - Sales rep email (required)
-   * @param {string} salesRepData.phone - Sales rep phone (required)
+   * @param {string} salesRepData.phone - Sales rep phone in E.164 format (required)
+   * @param {string} salesRepData.phoneCountry - Country code for phone (required)
    * @param {number} salesRepData.commissionRate - Commission rate (0-100, default: 10)
    * @returns {Promise<Object>} Created sales rep
    */
@@ -77,7 +78,8 @@ class SalesRepService {
    * @param {Object} updateData - Data to update
    * @param {string} updateData.name - Sales rep name
    * @param {string} updateData.email - Email address
-   * @param {string} updateData.phone - Phone number
+   * @param {string} updateData.phone - Phone number in E.164 format
+   * @param {string} updateData.phoneCountry - Country code for phone
    * @param {number} updateData.commissionRate - Commission rate
    * @returns {Promise<Object>} Updated sales rep
    */

@@ -161,12 +161,6 @@ export const createSalesRep = asyncHandler(async (req, res, next) => {
       return next(new AppError('Email already in use', 400));
     }
 
-    // Validate phone format
-    const phoneDigitsOnly = phone.replace(/\D/g, '');
-    if (phoneDigitsOnly.length !== 10) {
-      return next(new AppError('Phone number must be exactly 10 digits', 400));
-    }
-
     // Validate commission rate
     if (commissionRate < 0 || commissionRate > 100) {
       return next(new AppError('Commission rate must be between 0 and 100', 400));
@@ -179,7 +173,8 @@ export const createSalesRep = asyncHandler(async (req, res, next) => {
     const newSalesRep = await User.create({
       name: name.trim(),
       email: email.toLowerCase(),
-      phone: phoneDigitsOnly,
+      phone: phone,
+      phoneCountry: req.body.phoneCountry || 'US',
       password: tempPassword,
       role: 'salesRep',
       createdBy: req.user.id,
@@ -275,11 +270,11 @@ export const updateSalesRep = asyncHandler(async (req, res, next) => {
     if (name) salesRep.name = name.trim();
 
     if (phone) {
-      const phoneDigitsOnly = phone.replace(/\D/g, '');
-      if (phoneDigitsOnly.length !== 10) {
-        return next(new AppError('Phone number must be exactly 10 digits', 400));
-      }
-      salesRep.phone = phoneDigitsOnly;
+      salesRep.phone = phone;
+    }
+
+    if (req.body.phoneCountry) {
+      salesRep.phoneCountry = req.body.phoneCountry;
     }
 
     if (commissionRate !== undefined) {
