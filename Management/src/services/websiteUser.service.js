@@ -81,7 +81,8 @@ class WebsiteUserService {
    * @param {Object} userData - User data
    * @param {string} userData.name - User name (required)
    * @param {string} userData.email - User email (required)
-   * @param {string} userData.phone - User phone number
+   * @param {string} userData.phone - User phone number in E.164 format (e.g., +94768952480)
+   * @param {string} userData.phoneCountry - ISO 3166-1 alpha-2 country code (e.g., 'LK', 'US')
    * @param {string} userData.password - User password (required)
    * @returns {Promise<Object>} Created user
    */
@@ -90,7 +91,8 @@ class WebsiteUserService {
       const response = await this.api.post('/users', {
         name: userData.name,
         email: userData.email,
-        phone: userData.phone,
+        phone: userData.phone, // Should be in E.164 format
+        phoneCountry: userData.phoneCountry || 'US', // ISO country code
         password: userData.password,
         role: 'customer', // Always create as customer role
       });
@@ -106,14 +108,21 @@ class WebsiteUserService {
    * @param {string} userId - User ID
    * @param {Object} updateData - Data to update
    * @param {string} updateData.name - User name
-   * @param {string} updateData.phone - Phone number
+   * @param {string} updateData.phone - Phone number in E.164 format
+   * @param {string} updateData.phoneCountry - ISO country code
    * @param {string} updateData.email - Email address
-   * @param {boolean} updateData.isActive - Active status
+   * @param {string} updateData.status - Active status
    * @returns {Promise<Object>} Updated user
    */
   async updateUser(userId, updateData) {
     try {
-      const response = await this.api.put(`/users/${userId}`, updateData);
+      const response = await this.api.put(`/users/${userId}`, {
+        name: updateData.name,
+        email: updateData.email,
+        phone: updateData.phone,
+        phoneCountry: updateData.phoneCountry,
+        isActive: updateData.status === 'active'
+      });
       return response;
     } catch (error) {
       console.error(`Error updating user ${userId}:`, error);
@@ -279,15 +288,18 @@ class WebsiteUserService {
   }
 
   /**
-   * Validate phone number format (10 digits)
-   * @param {string} phone - Phone to validate
+   * Validate phone number format (E.164 format)
+   * Accepts E.164 formatted international numbers
+   * @param {string} phone - Phone to validate (E.164 format, e.g., +94768952480)
    * @returns {boolean} Is valid phone
    */
   isValidPhone(phone) {
-    // Remove all non-digit characters
-    const digitsOnly = phone.replace(/\D/g, '');
-    // Check if it's exactly 10 digits
-    return digitsOnly.length === 10;
+    if (!phone) return false;
+    // E.164 format: +<country_code><number>
+    // Pattern: + followed by 1-3 digit country code + 4-14 digit number
+    // Total: 1 + 1-3 + 4-14 = 6-18 characters
+    const e164Pattern = /^\+?[1-9]\d{1,14}$/;
+    return e164Pattern.test(phone);
   }
 
   /**
@@ -315,7 +327,7 @@ class WebsiteUserService {
 
     // Phone validation
     if (userData.phone && !this.isValidPhone(userData.phone)) {
-      errors.phone = 'Phone must be 10 digits';
+      errors.phone = 'Invalid phone number format. Please use E.164 format (e.g., +94768952480)';
     }
 
     // Password validation (only for new users)

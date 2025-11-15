@@ -23,7 +23,25 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit phone number'],
+      // Accepts international format: +1 (234) 567-8900 or +1234567890
+      match: [
+        /^\+?[1-9]\d{1,14}$/,
+        'Please provide a valid international phone number (E.164 format)',
+      ],
+      sparse: true,
+    },
+    phoneCountry: {
+      type: String,
+      // ISO 3166-1 alpha-2 country code (e.g., 'US', 'LK', 'IN')
+      match: [/^[A-Z]{2}$/, 'Please provide a valid country code'],
+      sparse: true,
+      default: 'US', // Default to US
+    },
+    phoneE164: {
+      type: String,
+      // Stores the normalized E.164 format for consistent lookups
+      sparse: true,
+      unique: true,
     },
     password: {
       type: String,

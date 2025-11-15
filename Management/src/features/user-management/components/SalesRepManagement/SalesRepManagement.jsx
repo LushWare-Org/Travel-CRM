@@ -13,6 +13,7 @@ import { STATUS_COLORS } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import SalesRepTable from './SalesRepTable';
 import salesRepService from '../../../../services/salesRep.service';
+import { validatePhone, formatPhoneToE164, getPhonePlaceholder, COUNTRIES } from '../../utils/phoneUtils';
 
 const SalesRepManagement = () => {
   const isInitialMount = useRef(true);
@@ -44,6 +45,7 @@ const SalesRepManagement = () => {
     name: '',
     email: '',
     phone: '',
+    phoneCountry: 'US',
     commissionRate: 10,
     targetLeads: 50
   });
@@ -175,6 +177,7 @@ const SalesRepManagement = () => {
       name: rep.name,
       email: rep.email,
       phone: rep.phone,
+      phoneCountry: rep.phoneCountry || 'US',
       commissionRate: rep.commissionRate,
       targetLeads: 50
     });
@@ -207,6 +210,12 @@ const SalesRepManagement = () => {
       return;
     }
 
+    // Validate phone number with country code
+    if (!validatePhone(formData.phone, formData.phoneCountry)) {
+      toast.error(`Invalid phone number for ${formData.phoneCountry}. Please enter a valid number.`);
+      return;
+    }
+
     if (formData.commissionRate < 0 || formData.commissionRate > 100) {
       toast.error('Commission rate must be between 0 and 100');
       return;
@@ -219,7 +228,8 @@ const SalesRepManagement = () => {
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        phone: formatPhoneToE164(formData.phone, formData.phoneCountry)?.e164,
+        phoneCountry: formData.phoneCountry,
         commissionRate: formData.commissionRate
       };
 
@@ -262,6 +272,12 @@ const SalesRepManagement = () => {
       return;
     }
 
+    // Validate phone number with country code
+    if (!validatePhone(formData.phone, formData.phoneCountry)) {
+      toast.error(`Invalid phone number for ${formData.phoneCountry}. Please enter a valid number.`);
+      return;
+    }
+
     if (formData.commissionRate < 0 || formData.commissionRate > 100) {
       toast.error('Commission rate must be between 0 and 100');
       return;
@@ -274,7 +290,8 @@ const SalesRepManagement = () => {
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        phone: formatPhoneToE164(formData.phone, formData.phoneCountry)?.e164,
+        phoneCountry: formData.phoneCountry,
         commissionRate: formData.commissionRate
       };
 
@@ -555,17 +572,33 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
+          <FormGroup label="Country Code" required>
+            <select
+              value={formData.phoneCountry}
+              onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              {COUNTRIES.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.flag} {country.name} ({country.code})
+                </option>
+              ))}
+            </select>
+          </FormGroup>
+
+          <FormGroup label="Phone" required>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              placeholder={getPhonePlaceholder(formData.phoneCountry)}
+            />
+          </FormGroup>
+
           <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Phone" required>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                placeholder="+1-555-0000"
-              />
-            </FormGroup>
             <FormGroup label="Commission Rate (%)" required>
               <input
                 type="number"
@@ -628,16 +661,33 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
+          <FormGroup label="Country Code" required>
+            <select
+              value={formData.phoneCountry}
+              onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              {COUNTRIES.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.flag} {country.name} ({country.code})
+                </option>
+              ))}
+            </select>
+          </FormGroup>
+
+          <FormGroup label="Phone" required>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              disabled={isSubmitting}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              placeholder={getPhonePlaceholder(formData.phoneCountry)}
+            />
+          </FormGroup>
+
           <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Phone" required>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              />
-            </FormGroup>
             <FormGroup label="Commission Rate (%)" required>
               <input
                 type="number"
