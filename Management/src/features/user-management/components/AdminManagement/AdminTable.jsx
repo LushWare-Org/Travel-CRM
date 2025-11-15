@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit, Trash, Mail, RotateCcw, CheckCircle, Clock } from 'lucide-react';
+import { Edit, Trash, Mail, RotateCcw, CheckCircle, Clock, Crown, Shield } from 'lucide-react';
 import { STATUS_COLORS } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 
@@ -67,8 +67,20 @@ const AdminTable = ({ admins, onEdit, onDelete, onSelectAdmin, onResendInvite, o
             {admins.map((admin, index) => (
               <tr key={admin.id || admin._id || `admin-${index}-${admin.email}`} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4">
-                  <p className="font-medium text-gray-900">{admin.name || '—'}</p>
-                  <p className="text-xs text-gray-500">{admin.phone || '—'}</p>
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <p className="font-medium text-gray-900 flex items-center gap-2">
+                        {admin.name || '—'}
+                        {admin.isSuperAdmin && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full">
+                            <Crown className="w-3 h-3" />
+                            Super Admin
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">{admin.phone || '—'}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">{admin.email || '—'}</td>
                 <td className="px-6 py-4">
@@ -99,38 +111,47 @@ const AdminTable = ({ admins, onEdit, onDelete, onSelectAdmin, onResendInvite, o
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
-                    {admin.status === 'invited' && (
-                      <button
-                        onClick={() => onResendInvite(admin)}
-                        title="Resend Invitation"
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <Mail className="w-4 h-4" />
-                      </button>
+                    {admin.isSuperAdmin ? (
+                      <>
+                        <span className="text-xs text-amber-600 font-semibold px-2 py-1 bg-amber-50 rounded">Protected Account</span>
+                      </>
+                    ) : (
+                      <>
+                        {admin.status === 'invited' && (
+                          <button
+                            onClick={() => onResendInvite(admin)}
+                            title="Resend Invitation"
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </button>
+                        )}
+                        {(admin.status === 'password_reset_required' || admin.status === 'active') && (
+                          <button
+                            onClick={() => onForcePasswordReset(admin)}
+                            title="Force Password Reset"
+                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onEdit(admin)}
+                          title="Edit Admin"
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(admin)}
+                          title="Delete Admin"
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          disabled={!admin.canBeDeleted}
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
-                    {(admin.status === 'password_reset_required' || admin.status === 'active') && (
-                      <button
-                        onClick={() => onForcePasswordReset(admin)}
-                        title="Force Password Reset"
-                        className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onEdit(admin)}
-                      title="Edit Admin"
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(admin)}
-                      title="Delete Admin"
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash className="w-4 h-4" />
-                    </button>
                   </div>
                 </td>
               </tr>

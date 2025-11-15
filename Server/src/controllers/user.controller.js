@@ -27,7 +27,7 @@ export const getAllUsers = asyncHandler(async (req, res, next) => {
 
     // Role filter
     if (req.query.role) {
-      const validRoles = ['customer', 'salesRep', 'vendor', 'admin'];
+      const validRoles = ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'];
       if (!validRoles.includes(req.query.role)) {
         return next(new AppError(`Invalid role: ${req.query.role}`, 400));
       }
@@ -195,15 +195,15 @@ export const createUser = asyncHandler(async (req, res, next) => {
     }
 
     // Validate role
-    const validRoles = ['customer', 'salesRep', 'vendor', 'admin'];
+    const validRoles = ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'];
     const userRole = role || 'customer';
     if (!validRoles.includes(userRole)) {
       return next(new AppError(`Invalid role: ${userRole}`, 400));
     }
 
     // Prevent non-admins from creating admin users
-    if (userRole === 'admin' && req.user.role !== 'admin') {
-      logger.warn(`Non-admin attempted to create admin user: ${req.user.email}`);
+    if ((userRole === 'admin' || userRole === 'superAdmin') && req.user.role !== 'admin' && req.user.role !== 'superAdmin') {
+      logger.warn(`Non-admin attempted to create admin/superAdmin user: ${req.user.email}`);
       return next(new AppError('Only admins can create admin users', 403));
     }
 
@@ -334,9 +334,9 @@ export const updateUser = asyncHandler(async (req, res, next) => {
     }
 
     // Admin-only fields
-    if (req.user.role === 'admin') {
+    if (req.user.role === 'admin' || req.user.role === 'superAdmin') {
       if (role) {
-        const validRoles = ['customer', 'salesRep', 'vendor', 'admin'];
+        const validRoles = ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'];
         if (!validRoles.includes(role)) {
           return next(new AppError(`Invalid role: ${role}`, 400));
         }
@@ -581,7 +581,7 @@ export const toggleUserStatus = asyncHandler(async (req, res, next) => {
  */
 export const getUsersByRole = asyncHandler(async (req, res, next) => {
   const { role } = req.params;
-  const validRoles = ['customer', 'salesRep', 'vendor', 'admin'];
+  const validRoles = ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'];
 
   if (!validRoles.includes(role)) {
     return next(new AppError(`Invalid role. Valid roles are: ${validRoles.join(', ')}`, 400));
@@ -611,7 +611,7 @@ export const getUsersByRole = asyncHandler(async (req, res, next) => {
  */
 export const assignUserRole = asyncHandler(async (req, res, next) => {
   const { role } = req.body;
-  const validRoles = ['customer', 'salesRep', 'vendor', 'admin'];
+  const validRoles = ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'];
 
   if (!validRoles.includes(role)) {
     return next(new AppError(`Invalid role. Valid roles are: ${validRoles.join(', ')}`, 400));

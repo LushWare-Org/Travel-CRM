@@ -11,7 +11,6 @@ const customizedPackageSchema = new mongoose.Schema(
       type: Number,
       default: 1,
       min: [1, 'Customization sequence must be at least 1'],
-      index: true,
     },
     name: {
       type: String,
@@ -122,13 +121,11 @@ const customizedPackageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Lead',
       required: true,
-      index: true,
     },
     originalPackage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Package',
       required: true,
-      index: true,
     },
     customizedBy: {
       type: mongoose.Schema.Types.ObjectId,

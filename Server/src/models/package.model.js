@@ -11,7 +11,6 @@ const packageSchema = new mongoose.Schema(
     },
     slug: {
       type: String,
-      unique: true,
     },
     description: {
       type: String,
@@ -164,7 +163,7 @@ packageSchema.pre('save', async function createSlug(next) {
 // });
 
 // Indexes for better query performance
-packageSchema.index({ slug: 1 }, { unique: true });
+packageSchema.index({ slug: 1 }, { unique: true, sparse: true });
 packageSchema.index({ category: 1 });
 packageSchema.index({ destination: 1 });
 packageSchema.index({ isActive: 1 });

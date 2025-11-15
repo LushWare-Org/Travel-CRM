@@ -226,20 +226,45 @@ class AdminService {
   }
 
   /**
-   * Get all admins
+   * Get all admin users (including super admins)
    * @param {Object} params - Query parameters
    * @returns {Promise<Object>} Admin users list
    */
   async getAllAdmins(params = {}) {
     try {
-      const defaultParams = {
-        role: 'admin',
-        limit: 100,
-        page: 1,
-        ...params
+      // Fetch admins and superAdmins separately, then combine them
+      const [adminsResponse, superAdminsResponse] = await Promise.all([
+        this.api.get('/users', {
+          role: 'admin',
+          limit: 100,
+          page: 1,
+          ...params
+        }),
+        this.api.get('/users', {
+          role: 'superAdmin',
+          limit: 100,
+          page: 1,
+          ...params
+        })
+      ]);
+
+      // Combine both responses
+      const adminsData = Array.isArray(adminsResponse.data) 
+        ? adminsResponse.data 
+        : (adminsResponse.data?.users || []);
+      
+      const superAdminsData = Array.isArray(superAdminsResponse.data) 
+        ? superAdminsResponse.data 
+        : (superAdminsResponse.data?.users || []);
+
+      // Merge and return
+      return {
+        status: 'success',
+        data: {
+          users: [...superAdminsData, ...adminsData], // Super admins first
+          pagination: adminsResponse.data?.pagination || { total: adminsData.length + superAdminsData.length }
+        }
       };
-      const response = await this.api.get('/users', defaultParams);
-      return response;
     } catch (error) {
       console.error('Error fetching admins:', error);
       throw error;

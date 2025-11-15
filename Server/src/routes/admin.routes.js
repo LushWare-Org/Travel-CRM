@@ -11,6 +11,10 @@ import {
   updateAdminPermissions,
   getAdminPermissions,
   getAvailablePermissions,
+  promoteSuperAdmin,
+  demoteSuperAdmin,
+  getSuperAdminInfo,
+  listSuperAdmins,
 } from '../controllers/admin.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
@@ -19,6 +23,8 @@ import {
   updateUserStatusSchema, 
   updateProfileSchema,
   updatePermissionsSchema,
+  promoteSuperAdminSchema,
+  demoteSuperAdminSchema,
 } from '../validators/auth.validator.js';
 import { getSettings, updateSettings } from '../controllers/settings.controller.js';
 import { updateSettingsSchema } from '../validators/settings.validator.js';
@@ -27,7 +33,7 @@ const router = express.Router();
 
 // All routes require authentication and admin role
 router.use(protect);
-router.use(authorize('admin'));
+router.use(authorize('admin', 'superAdmin'));
 
 // Dashboard stats
 router.get('/stats', getDashboardStats);
@@ -56,5 +62,23 @@ router.post('/users/:id/reset-password', resetUserPassword);
 router.route('/users/:id/permissions')
   .get(getAdminPermissions)
   .patch(validate(updatePermissionsSchema), updateAdminPermissions);
+
+// ============================================
+// SUPER ADMIN MANAGEMENT ROUTES
+// ============================================
+// Only superAdmin can access these routes
+router.use(authorize('superAdmin'));
+
+// Get current superAdmin info
+router.get('/super/info', getSuperAdminInfo);
+
+// List all superAdmins
+router.get('/super/list', listSuperAdmins);
+
+// Promote admin to superAdmin
+router.post('/super/promote', validate(promoteSuperAdminSchema), promoteSuperAdmin);
+
+// Demote superAdmin to admin
+router.post('/super/demote', validate(demoteSuperAdminSchema), demoteSuperAdmin);
 
 export default router;
