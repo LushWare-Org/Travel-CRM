@@ -10,6 +10,7 @@ import {
 } from '../Common';
 import { STATUS_COLORS, ROLE_COLORS, ADMIN_PERMISSIONS_LIST } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
+import { formatPhoneToE164, COUNTRIES } from '../../utils/phoneUtils';
 import AdminTable from './AdminTable';
 import adminService from '../../../../services/admin.service';
 
@@ -34,6 +35,7 @@ const AdminManagement = () => {
     name: '',
     email: '',
     phone: '',
+    countryCode: 'US',
     permissions: [],
     twoFactorEnabled: false
   });
@@ -218,6 +220,7 @@ const AdminManagement = () => {
       name: '',
       email: '',
       phone: '',
+      countryCode: 'US',
       permissions: [],
       twoFactorEnabled: false
     });
@@ -229,10 +232,10 @@ const AdminManagement = () => {
       return;
     }
 
-    // Validate phone format (must be 10 digits)
-    const phoneDigitsOnly = formData.phone.replace(/\D/g, '');
-    if (phoneDigitsOnly.length !== 10) {
-      setError('Phone number must be exactly 10 digits');
+    // Format phone to E.164 format
+    const phoneFormatted = formatPhoneToE164(formData.phone, formData.countryCode);
+    if (!phoneFormatted) {
+      setError(`Invalid phone number for ${formData.countryCode}. Please check the format.`);
       return;
     }
 
@@ -247,7 +250,7 @@ const AdminManagement = () => {
       const response = await adminService.createAdmin({
         name: formData.name,
         email: formData.email,
-        phone: phoneDigitsOnly, // Send only digits
+        phone: phoneFormatted.e164, // Send E.164 formatted phone
         password: tempPassword,
         role: 'admin',
         permissions: formData.permissions || [] // ✅ Include permissions
@@ -279,7 +282,7 @@ const AdminManagement = () => {
           id: userData._id || userData.id,
           name: userData.name || formData.name,
           email: userData.email || formData.email,
-          phone: userData.phone || phoneDigitsOnly,
+          phone: userData.phone || phoneFormatted.e164,
           status: 'active',
           accountStatus: accountStatus,
           createdAt: userData.createdAt || new Date().toISOString(),
@@ -320,10 +323,10 @@ const AdminManagement = () => {
       return;
     }
 
-    // Validate phone format (must be 10 digits)
-    const phoneDigitsOnly = formData.phone.replace(/\D/g, '');
-    if (phoneDigitsOnly.length !== 10) {
-      setError('Phone number must be exactly 10 digits');
+    // Format phone to E.164 format
+    const phoneFormatted = formatPhoneToE164(formData.phone, formData.countryCode);
+    if (!phoneFormatted) {
+      setError(`Invalid phone number for ${formData.countryCode}. Please check the format.`);
       return;
     }
 
@@ -340,7 +343,7 @@ const AdminManagement = () => {
       const response = await adminService.updateAdmin(selectedAdmin.id, {
         name: formData.name,
         email: formData.email,
-        phone: phoneDigitsOnly, // Send only digits
+        phone: phoneFormatted.e164, // Send E.164 formatted phone
         role: 'admin'
       });
 
@@ -358,7 +361,7 @@ const AdminManagement = () => {
                 ...a,
                 name: formData.name,
                 email: formData.email,
-                phone: phoneDigitsOnly,
+                phone: phoneFormatted.e164,
                 permissions: isEditingSelf ? a.permissions : (formData.permissions || []), // Keep old permissions if editing self
                 twoFactorEnabled: formData.twoFactorEnabled
               }
@@ -501,7 +504,8 @@ const AdminManagement = () => {
     setFormData({
       name: admin.name,
       email: admin.email,
-      phone: admin.phone,
+      phone: admin.phone || '',
+      countryCode: 'US', // Default country code when editing
       permissions: admin.permissions || [],
       twoFactorEnabled: admin.twoFactorEnabled || false
     });
@@ -668,14 +672,27 @@ const AdminManagement = () => {
           </div>
 
           <FormGroup label="Phone Number" required>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="1234567890"
-            />
-            <p className="text-xs text-gray-500 mt-1">Enter 10-digit phone number without spaces or dashes</p>
+            <div className="flex gap-2">
+              <select
+                value={formData.countryCode}
+                onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.code} value={country.code}>
+                    {country.flag} {country.callingCode} {country.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter phone number"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Select country and enter phone number (with or without country code)</p>
           </FormGroup>
 
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -748,13 +765,27 @@ const AdminManagement = () => {
           </div>
 
           <FormGroup label="Phone Number" required>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">Enter 10-digit phone number</p>
+            <div className="flex gap-2">
+              <select
+                value={formData.countryCode}
+                onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.code} value={country.code}>
+                    {country.flag} {country.callingCode} {country.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter phone number"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Select country and enter phone number</p>
           </FormGroup>
 
           <div className="bg-gray-50 p-4 rounded-lg">
