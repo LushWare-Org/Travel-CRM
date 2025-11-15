@@ -14,8 +14,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} Analytics overview data
    */
   getOverview: async (params = {}) => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries/overview', params);
+    return ApiService.get('/analytics/itineraries/overview', params);
   },
 
   /**
@@ -25,8 +24,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} Most inquired itineraries
    */
   getMostInquired: async (params = {}) => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries/most-inquired', params);
+    return ApiService.get('/analytics/itineraries/most-inquired', params);
   },
 
   /**
@@ -36,8 +34,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} Destination performance data
    */
   getDestinationPerformance: async (params = {}) => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries/destination-performance', params);
+    return ApiService.get('/analytics/itineraries/destination-performance', params);
   },
 
   /**
@@ -47,8 +44,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} Activity preference data
    */
   getActivityPreferences: async (params = {}) => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries/activity-preferences', params);
+    return ApiService.get('/analytics/itineraries/activity-preferences', params);
   },
 
   /**
@@ -58,8 +54,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} Hotel preference data
    */
   getHotelPreferences: async (params = {}) => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries/hotel-preferences', params);
+    return ApiService.get('/analytics/itineraries/hotel-preferences', params);
   },
 
   /**
@@ -69,8 +64,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} Trend data
    */
   getTrends: async (params = {}) => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries/trends', params);
+    return ApiService.get('/analytics/itineraries/trends', params);
   },
 
   /**
@@ -78,8 +72,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} Completion statistics
    */
   getCompletionStats: async () => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries/completion-stats');
+    return ApiService.get('/analytics/itineraries/completion-stats');
   },
 
   /**
@@ -91,8 +84,7 @@ const ItineraryAnalyticsService = {
    * @returns {Promise<Object>} All analytics data
    */
   getComprehensive: async (params = {}) => {
-    const api = new ApiService();
-    return api.get('/analytics/itineraries', params);
+    return ApiService.get('/analytics/itineraries', params);
   },
 };
 
