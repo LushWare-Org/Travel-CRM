@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import ItineraryAnalyticsService from '../../services/itineraryAnalytics.service.js';
+import ItineraryAnalyticsService from '../../../services/itineraryAnalytics.service';
 
 /**
  * Custom hook for fetching itinerary analytics data
