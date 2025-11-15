@@ -23,11 +23,20 @@ const email = Joi.string()
   });
 
 const phone = Joi.string()
-  .regex(/^[\+]?[0-9]{7,15}$/)
+  .regex(/^\+?[1-9]\d{1,14}$/)
   .required()
   .messages({
-    'string.pattern.base': 'Phone number must be between 7-15 digits (can include + prefix)',
+    'string.pattern.base': 'Phone number must be in E.164 format (e.g., +94768952480)',
     'any.required': 'Phone number is required',
+  });
+
+const phoneCountry = Joi.string()
+  .length(2)
+  .uppercase()
+  .required()
+  .messages({
+    'string.length': 'Country code must be 2 characters',
+    'any.required': 'Country code is required',
   });
 
 const name = Joi.string()
@@ -56,6 +65,7 @@ export const createSalesRepSchema = Joi.object().keys({
   name,
   email: email,
   phone,
+  phoneCountry,
   commissionRate,
   targetLeads: Joi.number().min(1).optional().messages({
     'number.min': 'Target leads must be at least 1',
@@ -71,8 +81,11 @@ export const updateSalesRepSchema = Joi.object().keys({
   email: Joi.string().email().lowercase().optional().messages({
     'string.email': 'Please provide a valid email address',
   }),
-  phone: Joi.string().regex(/^[\+]?[0-9]{7,15}$/).optional().messages({
-    'string.pattern.base': 'Phone number must be between 7-15 digits (can include + prefix)',
+  phone: Joi.string().regex(/^\+?[1-9]\d{1,14}$/).optional().messages({
+    'string.pattern.base': 'Phone number must be in E.164 format (e.g., +94768952480)',
+  }),
+  phoneCountry: Joi.string().length(2).uppercase().optional().messages({
+    'string.length': 'Country code must be 2 characters',
   }),
   commissionRate: Joi.number().min(0).max(100).optional().messages({
     'number.min': 'Commission rate cannot be less than 0%',

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash, Users, UserCheck, UserX, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash, Users, UserCheck, UserX, AlertCircle, Globe } from 'lucide-react';
 import { 
   UserTableHeader, 
   Pagination, 
@@ -11,6 +11,7 @@ import {
 import { STATUS_COLORS } from '../../utils/constants';
 import WebsiteUsersTable from './WebsiteUsersTable';
 import useWebsiteUsers from '../../hooks/useWebsiteUsers';
+import { validatePhone, formatPhoneToE164, getPhonePlaceholder, COUNTRIES } from '../../utils/phoneUtils';
 
 const WebsiteUsersManagement = () => {
   const {
@@ -42,6 +43,7 @@ const WebsiteUsersManagement = () => {
     name: '',
     email: '',
     phone: '',
+    phoneCountry: 'US', // Default to US
     password: '',
     status: 'active'
   });
@@ -66,6 +68,7 @@ const WebsiteUsersManagement = () => {
       name: '',
       email: '',
       phone: '',
+      phoneCountry: 'US',
       password: '',
       status: 'active'
     });
@@ -81,9 +84,30 @@ const WebsiteUsersManagement = () => {
       return;
     }
 
+    // Validate phone number format
+    if (!validatePhone(formData.phone, formData.phoneCountry)) {
+      setFormError(`Please provide a valid phone number for ${formData.phoneCountry}`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await createUser(formData);
+      // Format phone to E.164 for API
+      const phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
+      
+      if (!phoneData) {
+        setFormError('Failed to format phone number. Please check the input.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const dataToSend = {
+        ...formData,
+        phone: phoneData.e164,
+        phoneCountry: phoneData.countryCode
+      };
+
+      await createUser(dataToSend);
       setShowNewUserDialog(false);
       resetForm();
       // Clear search and filters after successful user creation
@@ -105,9 +129,30 @@ const WebsiteUsersManagement = () => {
       return;
     }
 
+    // Validate phone number format
+    if (!validatePhone(formData.phone, formData.phoneCountry)) {
+      setFormError(`Please provide a valid phone number for ${formData.phoneCountry}`);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await updateUser(selectedUser.id, formData);
+      // Format phone to E.164 for API
+      const phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
+      
+      if (!phoneData) {
+        setFormError('Failed to format phone number. Please check the input.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const dataToSend = {
+        ...formData,
+        phone: phoneData.e164,
+        phoneCountry: phoneData.countryCode
+      };
+
+      await updateUser(selectedUser.id, dataToSend);
       setShowEditUserDialog(false);
       setSelectedUser(null);
       resetForm();
@@ -157,6 +202,7 @@ const WebsiteUsersManagement = () => {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      phoneCountry: user.phoneCountry || 'US',
       status: user.status,
       password: '' // Don't show password in edit
     });
@@ -328,14 +374,29 @@ const WebsiteUsersManagement = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Phone" required>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-                placeholder="+1-555-0000"
-              />
+              <div className="flex gap-2">
+                <select
+                  value={formData.phoneCountry}
+                  onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                  disabled={isSubmitting}
+                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                >
+                  {COUNTRIES.map(country => (
+                    <option key={country.code} value={country.code}>
+                      {country.flag} {country.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  disabled={isSubmitting}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                  placeholder={getPhonePlaceholder(formData.phoneCountry)}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
             </FormGroup>
             <FormGroup label="Password" required>
               <input
@@ -404,13 +465,29 @@ const WebsiteUsersManagement = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Phone" required>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-              />
+              <div className="flex gap-2">
+                <select
+                  value={formData.phoneCountry}
+                  onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                  disabled={isSubmitting}
+                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                >
+                  {COUNTRIES.map(country => (
+                    <option key={country.code} value={country.code}>
+                      {country.flag} {country.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  disabled={isSubmitting}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                  placeholder={getPhonePlaceholder(formData.phoneCountry)}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
             </FormGroup>
             <FormGroup label="Status" required>
               <select

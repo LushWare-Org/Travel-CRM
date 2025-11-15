@@ -77,11 +77,12 @@ export const useWebsiteUsers = () => {
         throw new Error(Object.values(validation.errors)[0]);
       }
 
-      // Transform to API format (cleans phone number, sets role, etc.)
+      // Transform to API format
       const apiData = {
         name: userData.name,
         email: userData.email,
-        phone: userData.phone.replace(/\D/g, ''), // Send only digits
+        phone: userData.phone, // Already in E.164 format from frontend
+        phoneCountry: userData.phoneCountry, // ISO country code
         password: userData.password,
         role: 'customer', // Always customer role
       };
@@ -127,7 +128,8 @@ export const useWebsiteUsers = () => {
 
       const updateData = {
         name: userData.name,
-        phone: userData.phone,
+        phone: userData.phone, // E.164 format from frontend
+        phoneCountry: userData.phoneCountry, // ISO country code
         email: userData.email,
       };
 
