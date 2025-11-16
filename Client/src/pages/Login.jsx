@@ -1,19 +1,53 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, Plane, ArrowRight, Shield, Globe, Sparkles } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function AuthPage() {
+  const navigate = useNavigate();
+  const { login, register } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
+    setError('');
+    setIsSubmitting(true);
+    try {
+      if (isLogin) {
+        await login({
+          email: formData.email.trim(),
+          password: formData.password,
+        });
+      } else {
+        if (formData.password !== formData.confirmPassword) {
+          setError('Passwords do not match');
+          setIsSubmitting(false);
+          return;
+        }
+        await register({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+        });
+      }
+      navigate('/');
+    } catch (err) {
+      setError(err.message || 'Unable to process request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -134,6 +168,24 @@ export default function AuthPage() {
                     </div>
 
                     <div className="transform transition-all duration-300">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Phone Number</label>
+                      <div className="relative group">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          placeholder="10-digit mobile number"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all duration-300 hover:border-gray-300"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+                    <div className="transform transition-all duration-300">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Email Address</label>
                       <div className="relative group">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-hover:text-orange-500 transition-colors" />
@@ -148,9 +200,7 @@ export default function AuthPage() {
                         />
                       </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="transform transition-all duration-300">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Password</label>
                       <div className="relative group">
@@ -249,12 +299,19 @@ export default function AuthPage() {
                 </div>
               )}
 
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                  {error}
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-orange-600 via-orange-500 to-yellow-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center space-x-2 group mt-8"
+                className="w-full bg-gradient-to-r from-orange-600 via-orange-500 to-yellow-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center space-x-2 group mt-8 disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={isSubmitting}
               >
-                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
+                <span>{isSubmitting ? (isLogin ? 'Signing In...' : 'Creating Account...') : (isLogin ? 'Sign In' : 'Create Account')}</span>
+                {!isSubmitting && <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />}
               </button>
             </form>
 
