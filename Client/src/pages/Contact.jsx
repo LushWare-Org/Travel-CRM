@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Globe, MessageSquare, Calendar, User, ArrowRight, Sparkles, Heart, Shield, Award, Loader2, Check } from 'lucide-react';
 import { submitContactForm } from '../utils/contactApi';
 import DestinationSelector from '../components/DestinationSelector';
 import LocationSelector from '../components/LocationSelector';
+import { useAuth } from '../context/AuthContext';
 
 export default function ContactUs() {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -19,6 +21,18 @@ export default function ContactUs() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [activeContact, setActiveContact] = useState(0);
+
+  // Prefill contact details for logged-in users
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || user.name || '',
+        email: prev.email || user.email || '',
+        phone: prev.phone || user.phone || '',
+      }));
+    }
+  }, [user]);
 
   const contactMethods = [
     {

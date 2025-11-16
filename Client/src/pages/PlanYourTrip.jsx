@@ -23,6 +23,7 @@ import { submitManualItineraryRequest } from "../utils/manualItineraryApi";
 import DestinationSelector from "../components/DestinationSelector";
 import LocationSelector from "../components/LocationSelector";
 import ActivitySelector from "../components/ActivitySelector";
+import { useAuth } from "../context/AuthContext";
 
 const transportOptions = [
   { value: "flight", label: "Flight", icon: Plane },
@@ -44,6 +45,7 @@ const accommodationTypes = [
 ];
 
 export default function PlanYourTrip() {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [selectedDest, setSelectedDest] = useState(null);
   const [startDate, setStartDate] = useState("");
@@ -63,6 +65,15 @@ export default function PlanYourTrip() {
   const [itineraryDays, setItineraryDays] = useState([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0); // Index of currently visible day (0-based)
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Prefill contact details for logged-in users
+  useEffect(() => {
+    if (user) {
+      setName((prev) => prev || user.name || "");
+      setEmail((prev) => prev || user.email || "");
+      setPhone((prev) => prev || user.phone || "");
+    }
+  }, [user]);
 
   const duration =
     startDate && endDate

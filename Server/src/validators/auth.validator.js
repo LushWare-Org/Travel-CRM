@@ -21,11 +21,9 @@ export const registerSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   phone: Joi.string()
-    .pattern(/^\+?[1-9]\d{1,14}$/)
-    .required()
+    .pattern(/^[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid international phone number (E.164 format)',
-      'string.empty': 'Phone number is required',
+      'string.pattern.base': 'Please provide a valid phone number (digits only)',
     }),
   password: Joi.string()
     .min(6)
@@ -130,9 +128,9 @@ export const updateProfileSchema = Joi.object({
       'string.max': 'Name cannot exceed 50 characters',
     }),
   phone: Joi.string()
-    .pattern(/^\+?[1-9]\d{1,14}$/)
+    .pattern(/^[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid international phone number (E.164 format)',
+      'string.pattern.base': 'Please provide a valid phone number (digits only)',
     }),
   email: Joi.string()
     .email()
@@ -163,16 +161,9 @@ export const createStaffSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   phone: Joi.string()
-    .pattern(/^\+?[1-9]\d{1,14}$/)
-    .required()
+    .pattern(/^[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid international phone number (E.164 format)',
-      'string.empty': 'Phone number is required',
-    }),
-  password: Joi.string()
-    .optional()
-    .messages({
-      'string.base': 'Password must be a string',
+      'string.pattern.base': 'Please provide a valid phone number (digits only)',
     }),
   role: Joi.string()
     .valid('salesRep', 'vendor', 'admin')

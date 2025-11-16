@@ -12,6 +12,7 @@ import AboutUs from './pages/About';
 import Contact from './pages/Contact';
 import Login from './pages/Login';
 import PlanYourTrip from './pages/PlanYourTrip';
+import { AuthProvider } from './context/AuthContext';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -77,7 +78,9 @@ function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </BrowserRouter>
   );
 }
