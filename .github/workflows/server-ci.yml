@@ -1,0 +1,304 @@
+name: 🚀 Server CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'Server/**'
+      - '.github/workflows/server-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'Server/**'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '18.x'
+  NPM_VERSION: '9.x'
+
+jobs:
+  # Job 1: Lint and Code Quality Check
+  lint:
+    name: 🔍 Lint & Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'Server/package-lock.json'
+
+      - name: 📚 Install dependencies
+        working-directory: ./Server
+        run: npm ci
+
+      - name: 🔍 Run ESLint
+        working-directory: ./Server
+        run: npm run lint
+        continue-on-error: false
+
+      - name: 💾 Cache lint results
+        uses: actions/cache@v3
+        with:
+          path: |
+            Server/.eslintcache
+          key: lint-cache-${{ github.run_id }}
+
+  # Job 2: Unit Tests and Coverage
+  test:
+    name: 🧪 Unit Tests & Coverage
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'Server/package-lock.json'
+
+      - name: 📚 Install dependencies
+        working-directory: ./Server
+        run: npm ci
+
+      - name: 🧪 Run tests with coverage
+        working-directory: ./Server
+        run: npm run test
+        env:
+          NODE_ENV: test
+
+      - name: 📊 Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./Server/coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: 📈 Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: ./Server/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 💾 Cache test results
+        uses: actions/cache@v3
+        with:
+          path: |
+            Server/coverage
+          key: test-cache-${{ github.run_id }}
+
+  # Job 3: Build Check
+  build:
+    name: 🏗️ Build Check
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'Server/package-lock.json'
+
+      - name: 📚 Install dependencies
+        working-directory: ./Server
+        run: npm ci
+
+      - name: 🔨 Build check (syntax validation)
+        working-directory: ./Server
+        run: |
+          node -c src/server.js
+          echo "✅ Build check passed - No syntax errors"
+
+  # Job 4: Security Vulnerability Check
+  security:
+    name: 🔐 Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'Server/package-lock.json'
+
+      - name: 📚 Install dependencies
+        working-directory: ./Server
+        run: npm ci
+
+      - name: 🔐 Run npm audit
+        working-directory: ./Server
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: 🔍 Check for known vulnerabilities (snyk)
+        working-directory: ./Server
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "$SNYK_TOKEN" ]; then
+            npm install -g snyk
+            snyk auth $SNYK_TOKEN
+            snyk test --severity-threshold=high || true
+          else
+            echo "⚠️ Skipping Snyk scan - SNYK_TOKEN not configured"
+          fi
+        continue-on-error: true
+
+  # Job 5: Dependency Check
+  dependencies:
+    name: 📦 Dependency Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'Server/package-lock.json'
+
+      - name: 📚 Install dependencies
+        working-directory: ./Server
+        run: npm ci
+
+      - name: 📋 Check for outdated dependencies
+        working-directory: ./Server
+        run: npm outdated || true
+
+  # Job 6: Environment Configuration Check
+  env-check:
+    name: ⚙️ Environment Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ✅ Verify .env.example exists
+        run: |
+          if [ ! -f "Server/.env.example" ]; then
+            echo "❌ .env.example file not found"
+            exit 1
+          fi
+          echo "✅ .env.example file exists"
+
+      - name: 📋 Validate environment variables
+        working-directory: ./Server
+        run: |
+          echo "📋 Checking required environment variables in .env.example..."
+          REQUIRED_VARS=(
+            "NODE_ENV"
+            "PORT"
+            "MONGODB_URI"
+            "JWT_SECRET"
+            "JWT_EXPIRES_IN"
+            "EMAIL_HOST"
+            "STRIPE_SECRET_KEY"
+            "RAZORPAY_KEY_ID"
+            "CLOUDINARY_CLOUD_NAME"
+            "CLIENT_URL"
+            "MANAGEMENT_URL"
+          )
+          
+          for var in "${REQUIRED_VARS[@]}"; do
+            if grep -q "^$var=" .env.example; then
+              echo "✅ $var found"
+            else
+              echo "❌ $var not found in .env.example"
+              exit 1
+            fi
+          done
+
+  # Final Status Check
+  ci-status:
+    name: ✅ CI Pipeline Status
+    runs-on: ubuntu-latest
+    needs: [lint, test, build, security, dependencies, env-check]
+    if: always()
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ✅ Check CI Status
+        run: |
+          echo "🎉 CI Pipeline Execution Summary"
+          echo "================================="
+          echo "✅ Lint Status: ${{ needs.lint.result }}"
+          echo "✅ Test Status: ${{ needs.test.result }}"
+          echo "✅ Build Status: ${{ needs.build.result }}"
+          echo "✅ Security Status: ${{ needs.security.result }}"
+          echo "✅ Dependencies Status: ${{ needs.dependencies.result }}"
+          echo "✅ Env Check Status: ${{ needs.env-check.result }}"
+          echo "================================="
+          
+          if [ "${{ needs.lint.result }}" == "failure" ] || \
+             [ "${{ needs.test.result }}" == "failure" ] || \
+             [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "❌ CI Pipeline FAILED"
+            exit 1
+          fi
+          echo "✅ CI Pipeline PASSED"
+
+  # Notification Job
+  notify:
+    name: 📧 Notifications
+    runs-on: ubuntu-latest
+    needs: ci-status
+    if: always()
+    
+    steps:
+      - name: 📬 Notify Slack (Optional)
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'Server CI Pipeline ${{ job.status }}'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+      - name: 📧 Comment on PR (Failure)
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Server CI Pipeline Failed\n\nPlease check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.'
+            });
