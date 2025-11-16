@@ -15,7 +15,7 @@ const Sidebar = () => {
     { icon: Home, label: "Dashboard", path: "/" },
     { icon: BarChart3, label: "Analytics", path: "/analytics" },
     { icon: Users, label: "Lead Management", path: "/leads" },
-    { icon: MapPin, label: "Itineraries", path: "/itineraries" },
+    { icon: MapPin, label: "Packages", path: "/itineraries" },
     { icon: DollarSign, label: "Billing", path: "/billing" },
     { icon: User, label: "User Management", path: "/users" }
   ];

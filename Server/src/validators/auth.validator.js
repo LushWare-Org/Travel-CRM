@@ -189,6 +189,37 @@ export const createStaffSchema = Joi.object({
       'array.base': 'Permissions must be an array',
       'any.only': 'Invalid permission specified',
     }),
+}).unknown(true);
+
+// Promote user to superAdmin validation
+export const promoteSuperAdminSchema = Joi.object({
+  userId: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'User ID is required',
+    }),
+  email: Joi.string()
+    .email()
+    .lowercase()
+    .messages({
+      'string.email': 'Please provide a valid email address',
+    }),
+});
+
+// Demote superAdmin validation
+export const demoteSuperAdminSchema = Joi.object({
+  userId: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'User ID is required',
+    }),
+  newRole: Joi.string()
+    .valid('admin', 'salesRep', 'vendor', 'customer')
+    .required()
+    .messages({
+      'string.empty': 'New role is required',
+      'any.only': 'Invalid role specified',
+    }),
 });
 
 // Update user status validation

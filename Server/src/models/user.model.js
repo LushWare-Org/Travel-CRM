@@ -51,8 +51,20 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['customer', 'salesRep', 'vendor', 'admin'],
+      enum: ['customer', 'salesRep', 'vendor', 'admin', 'superAdmin'],
       default: 'customer',
+    },
+    isSuperAdmin: {
+      type: Boolean,
+      default: false,
+      // Only superAdmins can have this flag set to true
+      validate: {
+        validator(value) {
+          // If isSuperAdmin is true, role must be 'superAdmin'
+          return !value || this.role === 'superAdmin';
+        },
+        message: 'Only users with superAdmin role can have isSuperAdmin flag set to true',
+      },
     },
     permissions: {
       type: [String],
@@ -159,6 +171,11 @@ const userSchema = new mongoose.Schema(
       enum: ['pending_verification', 'verified', 'suspended', 'rejected'],
       default: 'pending_verification',
     },
+    canBeDeleted: {
+      type: Boolean,
+      default: true,
+      // SuperAdmin cannot be deleted
+    },
   },
   {
     timestamps: true,
@@ -181,6 +198,30 @@ userSchema.pre('save', async function hashPassword(next) {
 
   const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS, 10) || 12);
   this.password = await bcrypt.hash(this.password, salt);
+});
+
+// Ensure consistency between role and isSuperAdmin fields
+userSchema.pre('save', function ensureRoleConsistency(next) {
+  // If role is changed away from superAdmin, reset isSuperAdmin flag
+  if (this.isModified('role') && this.role !== 'superAdmin' && this.isSuperAdmin) {
+    this.isSuperAdmin = false;
+    // Also clear permissions if not an admin
+    if (this.role !== 'admin') {
+      this.permissions = [];
+    }
+  }
+  
+  // If trying to set isSuperAdmin true, ensure role is superAdmin
+  if (this.isModified('isSuperAdmin') && this.isSuperAdmin && this.role !== 'superAdmin') {
+    this.role = 'superAdmin';
+  }
+  
+  // If demoting from superAdmin to admin, ensure canBeDeleted is true
+  if (this.isModified('role') && this.role !== 'superAdmin' && !this.isModified('canBeDeleted')) {
+    this.canBeDeleted = true;
+  }
+  
+  next();
 });
 
 // Compare password

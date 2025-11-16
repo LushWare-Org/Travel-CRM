@@ -1,7 +1,7 @@
 import React from 'react';
-import { X, Shield } from 'lucide-react';
+import { X, Shield, Crown } from 'lucide-react';
 
-const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
+const AdminDetailsModal = ({ admin, isOpen, onClose, isSuperAdmin = false }) => {
   if (!isOpen || !admin) return null;
 
   return (
@@ -9,10 +9,27 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
       <div className="bg-white rounded-lg max-w-2xl w-full shadow-xl">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Shield className="w-6 h-6 text-purple-600" />
+            {isSuperAdmin ? (
+              <div className="relative">
+                <Crown className="w-6 h-6 text-amber-600" />
+                <Shield className="w-4 h-4 text-amber-600 absolute -bottom-1 -right-1" />
+              </div>
+            ) : (
+              <Shield className="w-6 h-6 text-purple-600" />
+            )}
             <div>
-              <h2 className="text-xl font-bold text-gray-900">{admin.name}</h2>
-              <p className="text-sm text-gray-600">Administrator Details</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-gray-900">{admin.name}</h2>
+                {isSuperAdmin && (
+                  <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full flex items-center gap-1">
+                    <Crown className="w-3 h-3" />
+                    Super Admin
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-600">
+                {isSuperAdmin ? 'Super Administrator Details' : 'Administrator Details'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -42,6 +59,24 @@ const AdminDetailsModal = ({ admin, isOpen, onClose }) => {
                 {admin.twoFactorEnabled ? '✓ Enabled' : 'Disabled'}
               </span>
             </div>
+            {isSuperAdmin && (
+              <>
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 font-medium uppercase">Permissions</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="px-3 py-1 text-xs font-semibold bg-amber-100 text-amber-800 rounded-full">
+                      All Permissions (Super Admin)
+                    </span>
+                  </div>
+                </div>
+                <div className="col-span-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-xs text-amber-900 font-medium">
+                    <Crown className="w-3 h-3 inline mr-1" />
+                    Super Admin accounts have full system access and cannot be deleted.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
