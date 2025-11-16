@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 import { fetchPackageById } from '../utils/packageApi';
 import { submitCustomizationRequest } from '../utils/customizationApi';
 import { formatCurrency } from '../utils/currency';
+import { useAuth } from '../context/AuthContext';
 
 const splitTextToList = (value) => {
   if (!value) return [];
@@ -32,6 +33,7 @@ const buildDayState = (day, index) => ({
 
 export default function CustomizePackage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [pkg, setPkg] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,18 @@ export default function CustomizePackage() {
 
   const [message, setMessage] = useState('');
   const [dayOverrides, setDayOverrides] = useState([]);
+
+  // Prefill contact details for logged-in users
+  useEffect(() => {
+    if (user) {
+      setContact((prev) => ({
+        ...prev,
+        name: prev.name || user.name || '',
+        email: prev.email || user.email || '',
+        phone: prev.phone || user.phone || '',
+      }));
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!id) return;

@@ -4,6 +4,7 @@ import { Clock, Star, MapPin, Check, X, Calendar, Users, Download, ChevronLeft, 
 import { fetchPackageById } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
 import { generateManagementPDF } from '../utils/managementPdfBridge';
+import { useAuth } from '../context/AuthContext';
 import { submitBookingRequest } from '../utils/bookingApi';
 
 const FALLBACK_IMG = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
@@ -25,6 +26,7 @@ export default function PackageDetails() {
   });
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!id) return;
@@ -61,6 +63,18 @@ export default function PackageDetails() {
       isMounted = false;
     };
   }, [id]);
+
+  // Prefill booking form with logged-in user details
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || user.name || '',
+        email: prev.email || user.email || '',
+        phone: prev.phone || user.phone || '',
+      }));
+    }
+  }, [user]);
 
   const heroImages = pkg?.images || [];
 
