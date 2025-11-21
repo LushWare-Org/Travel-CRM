@@ -279,23 +279,23 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               />
             </div>
             {!isSalesRep && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
-                <select
-                  value={formData.assignedTo || ''}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    const rep = salesReps.find(r => r.id === id);
-                    setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Sales Rep</option>
-                  {salesReps.map((rep) => (
-                    <option key={rep.id} value={rep.id}>{rep.name}</option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
+              <select
+                value={formData.assignedTo || ''}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const rep = salesReps.find(r => r.id === id);
+                  setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Sales Rep</option>
+                {salesReps.map((rep) => (
+                  <option key={rep.id} value={rep.id}>{rep.name}</option>
+                ))}
+              </select>
+            </div>
             )}
             {isSalesRep && (
               <div>

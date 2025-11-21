@@ -800,6 +800,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const addItem = () => {
+    // Only allow adding items in detailed mode
+    if (!isDetailedMode) {
+      toast.error('Items can only be added in detailed mode');
+      return;
+    }
+    
     // Add a new item to the form
     setFormData(prev => {
       const newItem = {
@@ -813,20 +819,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       };
       
       // In detailed mode, keep package items at the beginning, then add new item
-      if (isDetailedMode) {
-        const packageItems = prev.items.filter(item => item.category === 'package');
-        const otherItems = prev.items.filter(item => item.category !== 'package');
-        return {
-          ...prev,
-          items: [...packageItems, ...otherItems, newItem],
-        };
-      } else {
-        // In summary mode, add item normally
-        return {
-          ...prev,
-          items: [...prev.items, newItem],
-        };
-      }
+      const packageItems = prev.items.filter(item => item.category === 'package');
+      const otherItems = prev.items.filter(item => item.category !== 'package');
+      return {
+        ...prev,
+        items: [...packageItems, ...otherItems, newItem],
+      };
     });
   };
 
@@ -1159,15 +1157,17 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <h3 className="text-lg font-semibold text-gray-800">
                   Items {isDetailedMode ? '(Detailed Mode - Individual Pricing)' : '(Summary Mode - Package Price Only)'}
                 </h3>
-                {/* Show Add Item button in both modes for manual entry */}
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Item
-                </button>
+                {/* Show Add Item button only in detailed mode for manual entry */}
+                {isDetailedMode && (
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Item
+                  </button>
+                )}
               </div>
 
               {!isDetailedMode ? (
@@ -1226,7 +1226,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     </div>
                   </div>
 
-                  {/* All Activities - Editable for manual entry, Read-Only for extracted items */}
+                  {/* All Activities - Always Read-Only in non-detail mode */}
                   {formData.items.filter(item => item.category !== 'package').length > 0 && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -1238,58 +1238,15 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             // Skip package items
                             if (item.category === 'package') return null;
                             
-                            // Check if item is manually added
-                            // Extracted items have isExtracted: true, manually added items have isManual: true
-                            // For backward compatibility: if no flags exist, check category
-                            // Items with itinerary categories (accommodation, transportation, food, activity) are likely extracted
-                            const isManuallyAdded = item.isManual === true || 
-                              (item.isExtracted !== true && 
-                               item.category !== 'accommodation' && 
-                               item.category !== 'transportation' && 
-                               item.category !== 'transport' &&
-                               item.category !== 'food' && 
-                               item.category !== 'activity' && 
-                               item.category !== 'place');
-                            
+                            // In non-detail mode, ALL activities are read-only (static)
                             return (
                               <div
                                 key={originalIndex}
                                 className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded"
                               >
-                                {isManuallyAdded ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      value={item.description || ''}
-                                      onChange={(e) => {
-                                        setFormData(prev => {
-                                          const newItems = [...prev.items];
-                                          if (originalIndex < newItems.length) {
-                                            newItems[originalIndex] = {
-                                              ...newItems[originalIndex],
-                                              description: e.target.value,
-                                            };
-                                          }
-                                          return { ...prev, items: newItems };
-                                        });
-                                      }}
-                                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                      placeholder="Enter activity description"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => removeItem(originalIndex)}
-                                      className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                                      title="Remove item"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <div className="flex-1 text-sm text-gray-700">
-                                    {item.description}
-                                  </div>
-                                )}
+                                <div className="flex-1 text-sm text-gray-700">
+                                  {item.description || 'No description'}
+                                </div>
                               </div>
                             );
                           })

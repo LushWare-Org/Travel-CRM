@@ -31,6 +31,7 @@ import adminRoutes from './routes/admin.routes.js';
 import salesRepRoutes from './routes/salesRep.routes.js';
 import vendorRoutes from './routes/vendor.routes.js';
 import packageRoutes from './routes/package.routes.js';
+import packageAIRoutes from './routes/packageAI.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import invoiceRoutes from './routes/invoice.routes.js';
@@ -99,6 +100,9 @@ app.use(`/api/${API_VERSION}/users`, userRoutes);
 app.use(`/api/${API_VERSION}/admin`, adminRoutes);
 app.use(`/api/${API_VERSION}/sales-reps`, salesRepRoutes);
 app.use(`/api/${API_VERSION}/vendors`, vendorRoutes);
+// Register AI routes BEFORE package routes to avoid route conflicts
+// Static routes like /ai-status must come before parameterized routes like /:id
+app.use(`/api/${API_VERSION}/packages`, packageAIRoutes);
 app.use(`/api/${API_VERSION}/packages`, packageRoutes);
 app.use(`/api/${API_VERSION}/bookings`, bookingRoutes);
 app.use(`/api/${API_VERSION}/leads`, leadRoutes);

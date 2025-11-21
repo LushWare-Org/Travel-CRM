@@ -674,27 +674,27 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
               {isSalesRep ? (
-                <input
+              <input
                   type="text"
                   value={formData.salesRep || ''}
                   disabled
                   className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed"
                 />
               ) : (
-                <select
-                  value={formData.assignedTo || ''}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    const rep = salesReps.find(r => r.id === id);
-                    setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Sales Rep</option>
-                  {salesReps.map((rep) => (
-                    <option key={rep.id} value={rep.id}>{rep.name}</option>
-                  ))}
-                </select>
+              <select
+                value={formData.assignedTo || ''}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const rep = salesReps.find(r => r.id === id);
+                  setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Sales Rep</option>
+                {salesReps.map((rep) => (
+                  <option key={rep.id} value={rep.id}>{rep.name}</option>
+                ))}
+              </select>
               )}
             </div>
           </div>

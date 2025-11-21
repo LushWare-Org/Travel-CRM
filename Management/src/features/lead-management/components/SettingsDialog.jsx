@@ -41,17 +41,17 @@ const SettingsDialog = ({ isOpen, onClose, settings, settingsForm, onSettingsFor
 
           {settingsForm.assignmentMode === 'auto' && (
             <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Auto Strategy</label>
-                <select
-                  value={settingsForm.autoStrategy}
-                  onChange={(e) => onSettingsFormChange({ ...settingsForm, autoStrategy: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="round_robin">Round Robin</option>
-                  <option value="load_based">Load Based</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Auto Strategy</label>
+              <select
+                value={settingsForm.autoStrategy}
+                onChange={(e) => onSettingsFormChange({ ...settingsForm, autoStrategy: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="round_robin">Round Robin</option>
+                <option value="load_based">Load Based</option>
+              </select>
+            </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
