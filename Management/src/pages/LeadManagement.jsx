@@ -427,6 +427,21 @@ const LeadManagement = () => {
             setRemarksLead(null);
           }}
           lead={remarksLead}
+          onSuccess={() => {
+            fetchLeads();
+            // Refresh the remarksLead data if it's still selected
+            if (remarksLead?._id || remarksLead?.id) {
+              leadAPI.getLead(remarksLead._id || remarksLead.id)
+                .then((response) => {
+                  if (response.success && response.data) {
+                    setRemarksLead(response.data);
+                  }
+                })
+                .catch((error) => {
+                  console.error('Error refreshing lead:', error);
+                });
+            }
+          }}
         />
 
         {/* Filter Dialog */}

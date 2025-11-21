@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, Phone, Save, Loader2, Edit, Calendar } from 'lucide-react';
+import { X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import { leadAPI, packageAPI, manualItineraryAPI, customizedPackageAPI } from '../../../services/api';
@@ -25,6 +25,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const [showManualItinerary, setShowManualItinerary] = useState(false);
   const [itineraryDays, setItineraryDays] = useState([]);
   const [loadingItinerary, setLoadingItinerary] = useState(false);
+  const [remarks, setRemarks] = useState([]);
+  const [editingRemarkIndex, setEditingRemarkIndex] = useState(null);
+  const [editRemarkText, setEditRemarkText] = useState('');
+  const [newRemarkText, setNewRemarkText] = useState('');
+  const [showAddRemark, setShowAddRemark] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -153,6 +158,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         status: lead.status || 'new',
       });
 
+      // Initialize remarks
+      setRemarks(lead.remarks || []);
+
       // Load manual itinerary if exists
       loadManualItinerary();
     }
@@ -204,6 +212,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         package: formData.package || null,
         packageName: formData.packageName || null,
         status: formData.status || 'new',
+        remarks: remarks.length > 0 ? remarks : undefined,
       };
       await leadAPI.updateLead(lead._id || lead.id, updateData);
 
@@ -828,6 +837,201 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
               <option value="lost">Lost</option>
               <option value="not-interested">Not Interested</option>
             </select>
+          </div>
+
+          {/* Remarks Section */}
+          <div className="border-t pt-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                Remarks ({remarks.length})
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddRemark(!showAddRemark);
+                  if (!showAddRemark) {
+                    setNewRemarkText('');
+                  }
+                }}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                {showAddRemark ? 'Cancel' : 'Add Remark'}
+              </button>
+            </div>
+
+            {/* Add New Remark */}
+            {showAddRemark && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <textarea
+                  value={newRemarkText}
+                  onChange={(e) => setNewRemarkText(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-3"
+                  rows={3}
+                  placeholder="Enter new remark..."
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddRemark(false);
+                      setNewRemarkText('');
+                    }}
+                    className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newRemarkText.trim()) {
+                        toast.error('Remark text cannot be empty');
+                        return;
+                      }
+                      const newRemark = {
+                        text: newRemarkText.trim(),
+                        date: new Date(),
+                        addedAt: new Date(),
+                      };
+                      setRemarks([...remarks, newRemark]);
+                      setNewRemarkText('');
+                      setShowAddRemark(false);
+                      toast.success('Remark added');
+                    }}
+                    className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Remarks List */}
+            <div className="space-y-3">
+              {remarks.length > 0 ? (
+                remarks.map((remark, index) => (
+                  <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                    {editingRemarkIndex === index ? (
+                      // Edit mode
+                      <div className="space-y-3">
+                        <textarea
+                          value={editRemarkText}
+                          onChange={(e) => setEditRemarkText(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          rows={3}
+                          placeholder="Enter remark text..."
+                        />
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">
+                            {remark.date ? new Date(remark.date).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'No date'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingRemarkIndex(null);
+                                setEditRemarkText('');
+                              }}
+                              className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!editRemarkText.trim()) {
+                                  toast.error('Remark text cannot be empty');
+                                  return;
+                                }
+                                const updatedRemarks = [...remarks];
+                                updatedRemarks[index] = {
+                                  ...updatedRemarks[index],
+                                  text: editRemarkText.trim(),
+                                  date: updatedRemarks[index].date || new Date(),
+                                  addedAt: updatedRemarks[index].addedAt || updatedRemarks[index].date || new Date(),
+                                  addedBy: updatedRemarks[index].addedBy || updatedRemarks[index].addedBy?._id || updatedRemarks[index].addedBy?.id,
+                                  ...(updatedRemarks[index]._id && { _id: updatedRemarks[index]._id }),
+                                };
+                                setRemarks(updatedRemarks);
+                                setEditingRemarkIndex(null);
+                                setEditRemarkText('');
+                                toast.success('Remark updated');
+                              }}
+                              className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                            >
+                              <Save className="w-4 h-4" />
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // View mode
+                      <>
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <p className="text-sm text-gray-900 flex-1">{remark.text}</p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedRemarks = remarks.filter((_, i) => i !== index);
+                                setRemarks(updatedRemarks);
+                                toast.success('Remark deleted');
+                              }}
+                              className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group"
+                              title="Delete remark"
+                            >
+                              <XCircle className="w-4 h-4 text-gray-500 group-hover:text-red-600 transition-colors" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingRemarkIndex(index);
+                                setEditRemarkText(remark.text || '');
+                              }}
+                              className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors group"
+                              title="Edit remark"
+                            >
+                              <Edit className="w-4 h-4 text-gray-500 group-hover:text-blue-600 transition-colors" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
+                          <span className="text-xs text-gray-500">
+                            {remark.date ? new Date(remark.date).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'No date'}
+                          </span>
+                          <span className="text-xs font-medium text-gray-600">
+                            Remark #{index + 1}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm">No remarks yet</p>
+                  <p className="text-xs mt-1">Click "Add Remark" to add one</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Manual Itinerary Section */}
