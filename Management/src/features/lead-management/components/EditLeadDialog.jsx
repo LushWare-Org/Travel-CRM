@@ -3,6 +3,7 @@ import { X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, XCi
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import { leadAPI, packageAPI, manualItineraryAPI, customizedPackageAPI } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import { PackageFormModal, NewEditPackageForm } from '../../../features/itinerary/components';
 import { useImageUpload } from '../../../features/itinerary/hooks';
 import { uploadPackageImages } from '../../../services/cloudinaryService';
@@ -12,6 +13,8 @@ import DestinationSelector from '../../itinerary/components/DestinationSelector'
 import { createDefaultDay } from '../../itinerary/types/index.js';
 
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
+  const { user } = useAuth();
+  const isSalesRep = user?.role === 'salesRep';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
@@ -195,15 +198,18 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     
     try {
       setIsSubmitting(true);
+      // If sales rep, prevent changing assignedTo - keep original assignment
+      const assignedTo = isSalesRep 
+        ? (lead.assignedTo?._id || lead.assignedTo || formData.assignedTo) 
+        : (formData.assignedTo || undefined);
+      
       const updateData = {
         name: formData.name?.trim() || undefined,
-        email: formData.email?.trim() || undefined,
         phone: formData.phone?.trim() || undefined,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
         city: formData.city || undefined,
-        whatsapp: formData.whatsapp || undefined,
         salesRep: formData.salesRep || undefined,
-        assignedTo: formData.assignedTo || undefined,
+        assignedTo: assignedTo,
         destination: formData.destination || undefined,
         platform: formData.platform || undefined,
         travelDate: formData.travelDate || undefined,
@@ -666,42 +672,30 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">E-mail ID</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp</label>
-              <input
-                type="tel"
-                value={formData.whatsapp}
-                onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
-              <select
-                value={formData.assignedTo || ''}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  const rep = salesReps.find(r => r.id === id);
-                  setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Sales Rep</option>
-                {salesReps.map((rep) => (
-                  <option key={rep.id} value={rep.id}>{rep.name}</option>
-                ))}
-              </select>
+              {isSalesRep ? (
+                <input
+                  type="text"
+                  value={formData.salesRep || ''}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed"
+                />
+              ) : (
+                <select
+                  value={formData.assignedTo || ''}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    const rep = salesReps.find(r => r.id === id);
+                    setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Sales Rep</option>
+                  {salesReps.map((rep) => (
+                    <option key={rep.id} value={rep.id}>{rep.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -782,7 +776,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <option value="Social Media">Social Media</option>
                 <option value="Phone Call">Phone Call</option>
                 <option value="Referral">Referral</option>
-                <option value="Email">Email</option>
                 <option value="Walk-in">Walk-in</option>
               </select>
             </div>
@@ -1084,28 +1077,13 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     setItineraryDays(renumberedDays);
                   }}
                   destination={formData.destination}
+                  hideTitleAndDescription={true}
                 />
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 pt-4">
-            <a
-              href={`mailto:${formData.email}`}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium flex items-center justify-center gap-2"
-            >
-              <Mail className="w-4 h-4" />
-              Email
-            </a>
-            <a
-              href={`https://wa.me/${formData.whatsapp?.replace(/[^0-9]/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
-            >
-              <Phone className="w-4 h-4" />
-              WhatsApp
-            </a>
+          <div className="flex gap-3 pt-4">
             <button
               onClick={handleSave}
               disabled={isSubmitting}

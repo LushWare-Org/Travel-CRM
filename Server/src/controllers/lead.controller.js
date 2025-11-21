@@ -28,6 +28,15 @@ const parseTravelerCount = (value, defaultValue = undefined) => {
 export const createLead = asyncHandler(async (req, res, next) => {
   // Add user who created the lead
   req.body.createdBy = req.user._id;
+  
+  // If user is a sales rep, automatically assign lead to themselves
+  if (req.user.role === 'salesRep') {
+    req.body.assignedTo = req.user._id;
+    req.body.assignmentMode = 'manual';
+    req.body.assignedBy = req.user._id;
+    req.body.salesRep = req.user.name;
+  }
+  
   const travelerCount = parseTravelerCount(req.body.numberOfTravelers, undefined);
   if (travelerCount !== undefined) {
     req.body.numberOfTravelers = travelerCount;
@@ -233,6 +242,31 @@ export const updateLead = asyncHandler(async (req, res, next) => {
 
   if (!lead) {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
+  }
+
+  // If user is a sales rep, prevent them from changing assignedTo
+  if (req.user.role === 'salesRep' && req.body.assignedTo !== undefined) {
+    // Only allow if they're trying to keep the same assignment or assign to themselves
+    const currentAssignment = lead.assignedTo?.toString() || lead.assignedTo;
+    const newAssignment = req.body.assignedTo?.toString() || req.body.assignedTo;
+    const userId = req.user._id.toString();
+    
+    // If trying to change assignment and it's not to themselves, prevent it
+    if (newAssignment && newAssignment !== currentAssignment && newAssignment !== userId) {
+      throw new AppError('Sales representatives cannot change lead assignment', 403);
+    }
+    
+    // If trying to assign to themselves, allow it
+    if (newAssignment === userId) {
+      req.body.assignedTo = req.user._id;
+      const rep = await User.findById(req.user._id).select('name');
+      if (rep) {
+        req.body.salesRep = rep.name;
+      }
+    } else {
+      // Keep the original assignment
+      delete req.body.assignedTo;
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(req.body, 'numberOfTravelers')) {

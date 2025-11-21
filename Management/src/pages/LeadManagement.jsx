@@ -38,7 +38,11 @@ const LeadManagement = () => {
   // Assignment settings state (admin)
   const [settings, setSettings] = useState(null);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-  const [settingsForm, setSettingsForm] = useState({ assignmentMode: 'manual', autoStrategy: 'round_robin' });
+  const [settingsForm, setSettingsForm] = useState({ 
+    assignmentMode: 'manual', 
+    autoStrategy: 'round_robin',
+    requireActiveLogin48h: false 
+  });
   const [salesReps, setSalesReps] = useState([]);
 
   const [leads, setLeads] = useState([]);
@@ -66,6 +70,7 @@ const LeadManagement = () => {
           setSettingsForm({
             assignmentMode: res.data.assignmentMode,
             autoStrategy: res.data.autoStrategy,
+            requireActiveLogin48h: res.data.requireActiveLogin48h || false,
           });
         }
       } catch (e) {

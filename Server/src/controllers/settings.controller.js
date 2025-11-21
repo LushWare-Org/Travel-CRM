@@ -17,6 +17,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
     'roundRobinIndex',
     'maxOpenLeadsPerRep',
     'skipInactive',
+    'requireActiveLogin48h',
   ];
 
   updatable.forEach((key) => {

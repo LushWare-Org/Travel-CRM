@@ -1,6 +1,10 @@
-import { X } from 'lucide-react';
+import { useState } from 'react';
+import { X, Users } from 'lucide-react';
+import ActiveSalesRepsDialog from './ActiveSalesRepsDialog';
 
 const SettingsDialog = ({ isOpen, onClose, settings, settingsForm, onSettingsFormChange, onSave }) => {
+  const [showActiveRepsDialog, setShowActiveRepsDialog] = useState(false);
+  
   if (!isOpen || !settings) return null;
 
   return (
@@ -36,17 +40,58 @@ const SettingsDialog = ({ isOpen, onClose, settings, settingsForm, onSettingsFor
           </div>
 
           {settingsForm.assignmentMode === 'auto' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Auto Strategy</label>
-              <select
-                value={settingsForm.autoStrategy}
-                onChange={(e) => onSettingsFormChange({ ...settingsForm, autoStrategy: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="round_robin">Round Robin</option>
-                <option value="load_based">Load Based</option>
-              </select>
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Auto Strategy</label>
+                <select
+                  value={settingsForm.autoStrategy}
+                  onChange={(e) => onSettingsFormChange({ ...settingsForm, autoStrategy: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="round_robin">Round Robin</option>
+                  <option value="load_based">Load Based</option>
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Require Active Login (48 hours)
+                    </label>
+                    <p className="text-xs text-gray-500">
+                      Only assign leads to sales reps who logged in within the last 48 hours
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onSettingsFormChange({ 
+                      ...settingsForm, 
+                      requireActiveLogin48h: !settingsForm.requireActiveLogin48h 
+                    })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      settingsForm.requireActiveLogin48h ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        settingsForm.requireActiveLogin48h ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* View Active Sales Reps Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowActiveRepsDialog(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                >
+                  <Users className="w-4 h-4" />
+                  View Active Sales Reps
+                </button>
+              </div>
+            </>
           )}
 
           <div className="flex gap-3 pt-2">
@@ -65,6 +110,13 @@ const SettingsDialog = ({ isOpen, onClose, settings, settingsForm, onSettingsFor
           </div>
         </div>
       </div>
+
+      {/* Active Sales Reps Dialog */}
+      <ActiveSalesRepsDialog
+        isOpen={showActiveRepsDialog}
+        onClose={() => setShowActiveRepsDialog(false)}
+        requireActiveLogin48h={settingsForm.requireActiveLogin48h}
+      />
     </div>
   );
 };

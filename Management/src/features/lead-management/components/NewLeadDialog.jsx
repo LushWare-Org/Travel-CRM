@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { X, Plus, Loader2, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadAPI, packageAPI, manualItineraryAPI } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import LocationAutocomplete from './LocationAutocomplete';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import DestinationSelector from '../../itinerary/components/DestinationSelector';
 import { createDefaultDay } from '../../itinerary/types/index.js';
 
 const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
+  const { user } = useAuth();
+  const isSalesRep = user?.role === 'salesRep';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
@@ -36,8 +39,16 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       fetchPackages();
+      // Auto-assign to current user if they are a sales rep
+      if (isSalesRep && user?._id) {
+        setFormData(prev => ({
+          ...prev,
+          assignedTo: user._id,
+          salesRep: user.name || ''
+        }));
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isSalesRep, user]);
 
   const fetchPackages = async () => {
     try {
@@ -98,14 +109,18 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
+      // If sales rep, always assign to themselves
+      const assignedTo = isSalesRep && user?._id ? user._id : (formData.assignedTo || undefined);
+      const salesRepName = isSalesRep && user?.name ? user.name : (formData.salesRep || undefined);
+      
       const leadData = {
         name: formData.name?.trim() || undefined,
         email: formData.email?.trim() || undefined,
         phone: formData.phone?.trim() || undefined,
         city: formData.city || undefined,
         whatsapp: formData.whatsapp || undefined,
-        salesRep: formData.salesRep || undefined,
-        assignedTo: formData.assignedTo || undefined,
+        salesRep: salesRepName,
+        assignedTo: assignedTo,
         destination: formData.destination || undefined,
         platform: formData.platform || "Manual Entry",
         source: "manual",
@@ -263,23 +278,36 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 placeholder="+1-555-0000"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
-              <select
-                value={formData.assignedTo || ''}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  const rep = salesReps.find(r => r.id === id);
-                  setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Sales Rep</option>
-                {salesReps.map((rep) => (
-                  <option key={rep.id} value={rep.id}>{rep.name}</option>
-                ))}
-              </select>
-            </div>
+            {!isSalesRep && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
+                <select
+                  value={formData.assignedTo || ''}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    const rep = salesReps.find(r => r.id === id);
+                    setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Sales Rep</option>
+                  {salesReps.map((rep) => (
+                    <option key={rep.id} value={rep.id}>{rep.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {isSalesRep && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
+                <input
+                  type="text"
+                  value={user?.name || ''}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed"
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -463,6 +491,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     setItineraryDays(renumberedDays);
                   }}
                   destination={formData.destination}
+                  hideTitleAndDescription={true}
                 />
               </div>
             )}

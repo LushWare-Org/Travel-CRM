@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Calculator, Eye, ToggleLeft, ToggleRight, Download, Send } from 'lucide-react';
+import { X, Plus, Trash2, Save, Calculator, Eye, ToggleLeft, ToggleRight, Download, Send, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
@@ -445,6 +445,30 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
+  const handleSendWhatsApp = (quotationId) => {
+    if (!lead?.whatsapp) {
+      toast.error('WhatsApp number not available for this lead');
+      return;
+    }
+    
+    const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
+    if (!whatsappNumber) {
+      toast.error('Invalid WhatsApp number');
+      return;
+    }
+    
+    const quotationNumber = currentQuotation?.quotationNumber || `#${quotationId?.slice(-6)}` || 'Quotation';
+    const message = encodeURIComponent(
+      `Hello ${lead.name || 'there'},\n\n` +
+      `Your quotation ${quotationNumber} is ready. ` +
+      `Please contact us for the detailed quotation document.\n\n` +
+      `Thank you for choosing Trip Sky Way!`
+    );
+    
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const handleSendEmail = async () => {
     const targetId =
       (selectedQuotationId && selectedQuotationId !== 'new')
@@ -609,6 +633,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           unitPrice: 0, // User can enter price
           totalPrice: 0,
           notes: day.accommodation.address || '',
+          isExtracted: true, // Mark as extracted from itinerary
         });
       }
 
@@ -621,6 +646,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           unitPrice: 0,
           totalPrice: 0,
           notes: '',
+          isExtracted: true, // Mark as extracted from itinerary
         });
       }
 
@@ -637,6 +663,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           unitPrice: 0,
           totalPrice: 0,
           notes: '',
+          isExtracted: true, // Mark as extracted from itinerary
         });
       }
 
@@ -650,6 +677,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             unitPrice: 0,
             totalPrice: 0,
             notes: '',
+            isExtracted: true, // Mark as extracted from itinerary
           });
         });
       }
@@ -664,6 +692,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             unitPrice: 0,
             totalPrice: 0,
             notes: place.description || '',
+            isExtracted: true, // Mark as extracted from itinerary
           });
         });
       }
@@ -780,6 +809,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         unitPrice: 0,
         totalPrice: 0,
         notes: '',
+        isManual: true, // Mark as manually added
       };
       
       // In detailed mode, keep package items at the beginning, then add new item
@@ -1016,15 +1046,25 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   We will send the quotation PDF to this address using the configured mail server.
                 </p>
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <button
                   type="button"
                   onClick={handleSendEmail}
                   disabled={sendingEmail || !sendEmailAddress.trim()}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded hover:from-green-700 hover:to-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded hover:from-green-700 hover:to-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
                   {sendingEmail ? 'Sending…' : 'Send Email'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendWhatsApp(currentQuotationId || currentQuotation?._id)}
+                  disabled={!currentQuotationId || currentQuotationId === 'new' || !lead?.whatsapp}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Send via WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  WhatsApp
                 </button>
               </div>
             </div>
@@ -1198,14 +1238,16 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             // Skip package items
                             if (item.category === 'package') return null;
                             
-                            // Check if item is manually added (no specific category from itinerary extraction)
-                            // Manually added items typically have category 'other' or empty category
-                            // Extracted items have categories like 'accommodation', 'transport', 'meal', 'activity', 'place'
-                            const isManuallyAdded = !item.category || 
-                              item.category === 'other' || 
-                              (item.category !== 'accommodation' && 
-                               item.category !== 'transport' && 
-                               item.category !== 'meal' && 
+                            // Check if item is manually added
+                            // Extracted items have isExtracted: true, manually added items have isManual: true
+                            // For backward compatibility: if no flags exist, check category
+                            // Items with itinerary categories (accommodation, transportation, food, activity) are likely extracted
+                            const isManuallyAdded = item.isManual === true || 
+                              (item.isExtracted !== true && 
+                               item.category !== 'accommodation' && 
+                               item.category !== 'transportation' && 
+                               item.category !== 'transport' &&
+                               item.category !== 'food' && 
                                item.category !== 'activity' && 
                                item.category !== 'place');
                             

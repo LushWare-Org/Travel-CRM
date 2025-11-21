@@ -24,12 +24,41 @@ const normalizePhone = (phone) => {
 // @access  Private (Admin, SalesRep)
 export const createOrUpdateManualItinerary = asyncHandler(async (req, res, next) => {
   const { leadId } = req.params;
-  const { days } = req.body;
+  let { days } = req.body;
 
   // Check if lead exists
   const lead = await Lead.findById(leadId);
   if (!lead) {
     return next(new AppError('Lead not found', 404));
+  }
+
+  // Clean up days data: convert empty strings to undefined for enum fields
+  if (days && Array.isArray(days)) {
+    days = days.map(day => {
+      const cleanedDay = { ...day };
+      
+      // Convert empty strings to undefined for transport
+      if (cleanedDay.transport === '' || cleanedDay.transport === null) {
+        delete cleanedDay.transport;
+      }
+      
+      // Convert empty strings to undefined for accommodation.type
+      if (cleanedDay.accommodation) {
+        if (cleanedDay.accommodation.type === '' || cleanedDay.accommodation.type === null) {
+          delete cleanedDay.accommodation.type;
+        }
+        // If accommodation object is empty after cleaning, remove it
+        const accommodationKeys = Object.keys(cleanedDay.accommodation).filter(key => {
+          const value = cleanedDay.accommodation[key];
+          return value !== undefined && value !== null && value !== '';
+        });
+        if (accommodationKeys.length === 0) {
+          delete cleanedDay.accommodation;
+        }
+      }
+      
+      return cleanedDay;
+    });
   }
 
   // Check if manual itinerary already exists for this lead

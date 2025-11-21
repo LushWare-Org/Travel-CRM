@@ -1665,73 +1665,48 @@ function buildPDFDocument(pkg, images) {
       { innerPadding: 14 },
     );
 
-    // Investment / quick facts card (rescaled and repositioned)
-    const investmentHeight = 60;
+    // Investment / quick facts card (restructured - only Max Group Size and Trip Style)
+    const investmentHeight = 45;
     ensureSpace(investmentHeight);
     doc.setDrawColor(...palette.cardBorder);
     doc.roundedRect(margin, yPos, contentWidth, investmentHeight, 9, 9, 'S');
 
     const leftColumnX = margin + 14;
-    const leftColumnWidth = contentWidth * 0.44;
+    const leftColumnWidth = (contentWidth - 42) / 2; // Half width minus padding
     const rightColumnX = margin + leftColumnWidth + 28;
-    const rightColumnWidth = contentWidth - (rightColumnX - margin) - 14;
+    const rightColumnWidth = (contentWidth - 42) / 2;
 
+    const baseY = yPos + 15;
+
+    // Max Group Size - Left Column
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(11.5);
     doc.setTextColor(...palette.accent);
-    doc.text('Investment Overview', leftColumnX, yPos + 18);
-
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(30);
-    doc.setTextColor(...palette.primaryText);
-    const priceText = formatINR(pkg.price);
-    const sanitizedPrice = priceText.replace(/[^\d.,]/g, '');
-    doc.text(`INR ${sanitizedPrice}`, leftColumnX, yPos + 36);
+    doc.text('MAX GROUP SIZE', leftColumnX, baseY);
 
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(...palette.secondaryText);
-    doc.text(
-      pkg.priceNotes ||
-        'Pricing subject to availability and seasonal adjustments',
-      leftColumnX,
-      yPos + 45,
-      {
-        align: 'justify',
-        maxWidth: leftColumnWidth - 4,
-      },
-    );
+    doc.setFontSize(12.5);
+    doc.setTextColor(...palette.primaryText);
+    const groupSizeValue = pkg.maxGroupSize ? `${pkg.maxGroupSize} Travelers` : 'Tailored to your preference';
+    const groupSizeLines = doc.splitTextToSize(groupSizeValue, leftColumnWidth - 4);
+    doc.text(groupSizeLines, leftColumnX, baseY + 9);
 
-    const detailSections = [
-      {
-        label: 'Group Size',
-        value: pkg.maxGroupSize ? `${pkg.maxGroupSize} Travelers` : 'Tailored to your preference',
-      },
-      {
-        label: 'Trip Style',
-        value:
-          (pkg.category && `${pkg.category} Journey`) ||
-          pkg.tagline ||
-          pkg.theme ||
-          'Curated Escape',
-      },
-    ];
+    // Trip Style - Right Column
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(11.5);
+    doc.setTextColor(...palette.accent);
+    doc.text('TRIP STYLE', rightColumnX, baseY);
 
-    let detailY = yPos + 20;
-    detailSections.forEach((section) => {
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(11.5);
-      doc.setTextColor(...palette.accent);
-      doc.text(section.label.toUpperCase(), rightColumnX, detailY);
-
-      doc.setFont(undefined, 'normal');
-      doc.setFontSize(12.5);
-      doc.setTextColor(...palette.primaryText);
-      const lines = doc.splitTextToSize(section.value, rightColumnWidth);
-      doc.text(lines, rightColumnX, detailY + 9);
-
-      detailY += lines.length * 5 + 18;
-    });
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(12.5);
+    doc.setTextColor(...palette.primaryText);
+    const tripStyleValue =
+      (pkg.category && `${pkg.category} Journey`) ||
+      pkg.tagline ||
+      pkg.theme ||
+      'Curated Escape';
+    const tripStyleLines = doc.splitTextToSize(tripStyleValue, rightColumnWidth - 4);
+    doc.text(tripStyleLines, rightColumnX, baseY + 9);
 
     yPos += investmentHeight;
     addSectionGap();
@@ -1800,6 +1775,42 @@ function buildPDFDocument(pkg, images) {
         drawDayCard(day, index);
       });
     }
+
+    // Package Price Display (after day-by-day itinerary)
+    addSectionGap();
+    const priceCardHeight = 50;
+    ensureSpace(priceCardHeight);
+    doc.setDrawColor(...palette.cardBorder);
+    doc.roundedRect(margin, yPos, contentWidth, priceCardHeight, 9, 9, 'S');
+
+    const priceLeftX = margin + 14;
+    const priceRightX = margin + contentWidth * 0.5 + 14;
+
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...palette.accent);
+    doc.text('Package Price', priceLeftX, yPos + 18);
+
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(28);
+    doc.setTextColor(...palette.primaryText);
+    const priceText = formatINR(pkg.price);
+    const sanitizedPrice = priceText.replace(/[^\d.,]/g, '');
+    doc.text(`INR ${sanitizedPrice}`, priceLeftX, yPos + 36);
+
+    if (pkg.priceNotes) {
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...palette.secondaryText);
+      const priceNotesLines = doc.splitTextToSize(
+        pkg.priceNotes,
+        contentWidth * 0.45 - 4,
+      );
+      doc.text(priceNotesLines, priceRightX, yPos + 20);
+    }
+
+    yPos += priceCardHeight;
+    addSectionGap();
 
     renderTerms();
 

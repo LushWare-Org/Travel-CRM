@@ -4,10 +4,19 @@ import Lead from '../models/lead.model.js';
 
 async function getEligibleSalesReps(config) {
   const baseQuery = { role: 'salesRep', isActive: true };
+  
+  // Filter by enabled sales reps if specified
   if (config.enabledSalesReps && config.enabledSalesReps.length > 0) {
     baseQuery._id = { $in: config.enabledSalesReps };
   }
-  return User.find(baseQuery).select('name email');
+  
+  // Filter by 48-hour login activity if setting is enabled
+  if (config.requireActiveLogin48h === true) {
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    baseQuery.lastLogin = { $gte: fortyEightHoursAgo };
+  }
+  
+  return User.find(baseQuery).select('name email lastLogin');
 }
 
 async function pickRoundRobin(reps, settingsDoc) {

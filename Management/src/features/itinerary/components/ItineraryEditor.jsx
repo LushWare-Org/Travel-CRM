@@ -19,6 +19,7 @@ const ItineraryEditor = ({
   destination = '', // Add destination prop
   useLocationAutocomplete = false, // New prop to determine location input type
   LocationAutocompleteComponent = null, // Optional custom location autocomplete component
+  hideTitleAndDescription = false, // Hide title and description fields (for lead management)
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
 
@@ -87,33 +88,37 @@ const ItineraryEditor = ({
 
           {/* Day Content */}
           <div className="p-6 bg-gray-50 space-y-4">
-            {/* Title */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Day Title *
-              </label>
-              <input
-                type="text"
-                value={day.title || ''}
-                onChange={(e) => onDayChange(day.dayNumber, { title: e.target.value })}
-                placeholder="e.g., Arrival in Dubai"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {/* Title - Hidden when hideTitleAndDescription is true */}
+            {!hideTitleAndDescription && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Day Title
+                </label>
+                <input
+                  type="text"
+                  value={day.title || ''}
+                  onChange={(e) => onDayChange(day.dayNumber, { title: e.target.value })}
+                  placeholder="e.g., Arrival in Dubai (optional)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Description *
-              </label>
-              <textarea
-                rows="3"
-                value={day.description || ''}
-                onChange={(e) => onDayChange(day.dayNumber, { description: e.target.value })}
-                placeholder="Detailed description of the day's activities..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {/* Description - Hidden when hideTitleAndDescription is true */}
+            {!hideTitleAndDescription && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  rows="3"
+                  value={day.description || ''}
+                  onChange={(e) => onDayChange(day.dayNumber, { description: e.target.value })}
+                  placeholder="Detailed description of the day's activities... (optional)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
 
             {/* Locations Covered */}
             <div>
@@ -280,74 +285,76 @@ const ItineraryEditor = ({
               />
             </div>
 
-            {/* Day Images */}
-            <div className="border-t pt-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Day Images
-              </label>
-              
-              {/* Upload Button */}
-              <div className="mb-3">
-                <input
-                  type="file"
-                  multiple
-                  accept="image/jpeg,image/png,image/jpg"
-                  onChange={(e) => handleDayImageUpload(day.dayNumber, e.target.files)}
-                  disabled={uploadingDayImages[day.dayNumber]}
-                  className="hidden"
-                  id={`day-${day.dayNumber}-image-upload`}
-                />
-                <label
-                  htmlFor={`day-${day.dayNumber}-image-upload`}
-                  className={`inline-flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors ${
-                    uploadingDayImages[day.dayNumber] ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  <Upload className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {uploadingDayImages[day.dayNumber] ? 'Uploading...' : 'Upload Day Images'}
-                  </span>
+            {/* Day Images - Hidden when hideTitleAndDescription is true */}
+            {!hideTitleAndDescription && (
+              <div className="border-t pt-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Day Images
                 </label>
-              </div>
+                
+                {/* Upload Button */}
+                <div className="mb-3">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/jpg"
+                    onChange={(e) => handleDayImageUpload(day.dayNumber, e.target.files)}
+                    disabled={uploadingDayImages[day.dayNumber]}
+                    className="hidden"
+                    id={`day-${day.dayNumber}-image-upload`}
+                  />
+                  <label
+                    htmlFor={`day-${day.dayNumber}-image-upload`}
+                    className={`inline-flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors ${
+                      uploadingDayImages[day.dayNumber] ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <Upload className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-600">
+                      {uploadingDayImages[day.dayNumber] ? 'Uploading...' : 'Upload Day Images'}
+                    </span>
+                  </label>
+                </div>
 
-              {/* Image Grid */}
-              {day.images && day.images.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {day.images.map((img, imgIdx) => {
-                    const imageUrl = typeof img === 'string' ? img : img.url;
-                    return (
-                      <div key={imgIdx} className="relative group">
-                        <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-colors">
-                          <img
-                            src={imageUrl}
-                            alt={`Day ${day.dayNumber} Image ${imgIdx + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
-                            }}
-                          />
+                {/* Image Grid */}
+                {day.images && day.images.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {day.images.map((img, imgIdx) => {
+                      const imageUrl = typeof img === 'string' ? img : img.url;
+                      return (
+                        <div key={imgIdx} className="relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-colors">
+                            <img
+                              src={imageUrl}
+                              alt={`Day ${day.dayNumber} Image ${imgIdx + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
+                              }}
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleRemoveDayImage(day.dayNumber, imgIdx)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-lg opacity-0 group-hover:opacity-100"
+                            type="button"
+                            title="Remove image"
+                          >
+                            <X size={14} />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleRemoveDayImage(day.dayNumber, imgIdx)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors shadow-lg opacity-0 group-hover:opacity-100"
-                          type="button"
-                          title="Remove image"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
 
-              {uploadingDayImages[day.dayNumber] && (
-                <div className="flex items-center gap-2 text-sm text-blue-600 mt-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  <span>Uploading images...</span>
-                </div>
-              )}
-            </div>
+                {uploadingDayImages[day.dayNumber] && (
+                  <div className="flex items-center gap-2 text-sm text-blue-600 mt-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span>Uploading images...</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ))}
