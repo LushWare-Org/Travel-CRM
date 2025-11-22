@@ -149,3 +149,4 @@ node -e "require('dotenv').config(); console.log(process.env.GEMINI_API_KEY ? 'K
 - Or upgrade to PowerShell 7
 
 
+
