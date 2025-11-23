@@ -60,10 +60,17 @@ class ApiService {
 
       if (!response.ok) {
         // Extract detailed error information
-        let errorMessage = data.message || data.error?.message || `HTTP error! status: ${response.status}`;
+        let errorMessage = data.message || data.error?.message || data.error || `HTTP error! status: ${response.status}`;
         
         // Log full error response for debugging
         console.log('Full error response:', data);
+        
+        // Special handling for 401 (authentication errors)
+        if (response.status === 401) {
+          // Clear invalid token
+          localStorage.removeItem('token');
+          errorMessage = data.message || 'Your session has expired. Please login again.';
+        }
         
         // Include validation errors if available
         if (data.error?.errors && Array.isArray(data.error.errors)) {
@@ -82,15 +89,26 @@ class ApiService {
         
         const error = new Error(errorMessage);
         error.status = response.status;
+        error.statusCode = response.status;
         error.data = data;
         throw error;
       }
 
       return data;
     } catch (error) {
+      // Handle network errors (connection refused, etc.)
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError' || error.message.includes('ERR_CONNECTION_REFUSED') || error.message.includes('NetworkError')) {
+        const networkError = new Error('Cannot connect to server. Please make sure the server is running on port 5000.');
+        networkError.status = 0;
+        networkError.statusCode = 0;
+        networkError.isNetworkError = true;
+        throw networkError;
+      }
+      
       console.error('API Error:', error);
       throw error;
     }
+
   }
 
   // GET request

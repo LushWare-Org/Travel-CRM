@@ -148,7 +148,11 @@ const NewEditPackageForm = ({
       {/* Basic Info Section */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-        <BasicPackageInfo formData={localFormData} onChange={handleBasicInfoChange} />
+        <BasicPackageInfo 
+          formData={localFormData} 
+          onChange={handleBasicInfoChange}
+          packageId={localFormData._id || localFormData.id || null}
+        />
       </div>
 
       {/* Package Details Section */}

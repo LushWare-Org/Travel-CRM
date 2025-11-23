@@ -205,6 +205,8 @@ export function generateQuotationPDF(quotation, lead) {
       const descriptionWidth = 380; // Description column width
       const priceWidth = 75; // Price column width
       
+      const isDetailedMode = quotation.mode === 'detailed';
+      
       // Table Header Background (black)
       doc
         .rect(tableLeft, tableTop, tableWidth, 25)
@@ -216,13 +218,35 @@ export function generateQuotationPDF(quotation, lead) {
         .fillColor(COLORS.white)
         .fontSize(10)
         .font('Helvetica-Bold')
-        .text('Description', descriptionLeft, tableTop + 8)
-        .text('Price', priceLeft - 15, tableTop + 8);
+        .text('Description', descriptionLeft, tableTop + 8);
+      
+      if (isDetailedMode) {
+        // In detailed mode, show price column
+        doc.text('Price', priceLeft - 15, tableTop + 8);
+      } else {
+        // In summary mode, show "Included" or no price column for non-package items
+        doc.text('Price', priceLeft - 15, tableTop + 8);
+      }
 
       // Table Rows - White background with black borders
       let rowY = tableTop + 25;
-      quotation.items?.forEach((item, index) => {
+      
+      // Filter items based on mode
+      const itemsToDisplay = isDetailedMode 
+        ? quotation.items?.filter(item => item.category !== 'package') || []
+        : quotation.items || [];
+      
+      // In summary mode, add package item at the end if it exists
+      if (!isDetailedMode) {
+        const packageItem = quotation.items?.find(item => item.category === 'package');
+        if (packageItem) {
+          itemsToDisplay.push(packageItem);
+        }
+      }
+      
+      itemsToDisplay.forEach((item, index) => {
         const rowHeight = 30;
+        const isPackageItem = item.category === 'package';
 
         // Row Background - White
         doc
@@ -242,8 +266,24 @@ export function generateQuotationPDF(quotation, lead) {
           .fillColor(rgbToHex(PALETTE.primaryText))
           .fontSize(9)
           .font('Helvetica')
-          .text(item.description || '', descriptionLeft, rowY + 8, { width: descriptionWidth })
-          .text(`${formatCurrency(item.totalPrice || 0)}`, priceLeft - 45, rowY + 8, { width: priceWidth, align: 'right' });
+          .text(item.description || '', descriptionLeft, rowY + 8, { width: descriptionWidth });
+        
+        // In detailed mode, show all prices
+        // In summary mode, show price only for package item, show "Included" for others
+        if (isDetailedMode) {
+          doc.text(`${formatCurrency(item.totalPrice || 0)}`, priceLeft - 45, rowY + 8, { width: priceWidth, align: 'right' });
+        } else {
+          if (isPackageItem) {
+            // Show price for package item
+            doc.text(`${formatCurrency(item.totalPrice || 0)}`, priceLeft - 45, rowY + 8, { width: priceWidth, align: 'right' });
+          } else {
+            // Show "Included" for itinerary items in summary mode
+            doc
+              .fillColor(rgbToHex(PALETTE.secondaryText))
+              .fontSize(8)
+              .text('Included', priceLeft - 45, rowY + 8, { width: priceWidth, align: 'right' });
+          }
+        }
 
         rowY += rowHeight;
       });
@@ -316,6 +356,8 @@ export function generateQuotationPDF(quotation, lead) {
 
       // ===== NOTES & TERMS =====
       let notesY = totalsY + 160;
+      let contentBottom = totalsY + 140; // Default to totals bottom
+      
       if (quotation.notes || quotation.paymentTerms) {
         doc
           .fillColor(rgbToHex(PALETTE.accent))
@@ -324,7 +366,11 @@ export function generateQuotationPDF(quotation, lead) {
           .text('Additional Information', 50, notesY);
 
         notesY += 20;
+        
         if (quotation.paymentTerms) {
+          // Estimate height for payment terms (roughly 15px per line)
+          const paymentTermsLines = Math.ceil(quotation.paymentTerms.length / 80); // Approximate chars per line
+          const paymentTermsHeight = paymentTermsLines * 15;
           doc
             .fillColor(rgbToHex(PALETTE.secondaryText))
             .fontSize(9)
@@ -332,20 +378,43 @@ export function generateQuotationPDF(quotation, lead) {
             .text('Payment Terms:', 50, notesY)
             .font('Helvetica')
             .text(quotation.paymentTerms, 50, notesY + 15, { width: 495 });
-          notesY += 40;
+          notesY += 15 + paymentTermsHeight + 10;
         }
 
         if (quotation.notes) {
+          // Estimate height for notes
+          const notesLines = Math.ceil(quotation.notes.length / 80);
+          const notesHeight = notesLines * 12;
           doc
             .fillColor(rgbToHex(PALETTE.secondaryText))
             .fontSize(9)
             .font('Helvetica')
             .text(quotation.notes, 50, notesY, { width: 495 });
+          notesY += notesHeight;
         }
+        
+        contentBottom = notesY;
       }
 
       // ===== FOOTER =====
-      const footerY = 750;
+      // Calculate footer position dynamically to avoid overlap
+      // Ensure minimum 60px gap between content and footer
+      const pageHeight = 842; // A4 height in points (297mm)
+      const minFooterY = contentBottom + 60; // Minimum spacing from content
+      const maxFooterY = pageHeight - 60; // Leave 60px from bottom of page
+      
+      // If content is too long and footer would be too close to bottom, add new page
+      let footerY;
+      if (minFooterY > maxFooterY) {
+        // Content extends too far down, add new page for footer
+        doc.addPage();
+        footerY = 50; // Start footer at top of new page
+      } else {
+        // Normal case: position footer with proper spacing
+        footerY = Math.max(minFooterY, 700); // At least 700px from top, or content + 60px
+        footerY = Math.min(footerY, maxFooterY); // But not too close to bottom
+      }
+      
       doc
         .moveTo(50, footerY)
         .lineTo(545, footerY)
@@ -623,6 +692,8 @@ export function generateInvoicePDF(invoice, lead) {
 
       // ===== PAYMENT TERMS & NOTES =====
       let notesY = totalsY + 210;
+      let contentBottom = totalsY + 180; // Default to totals section bottom
+      
       if (invoice.paymentTerms || invoice.paymentInstructions || invoice.notes) {
         doc
           .fillColor(rgbToHex(PALETTE.accent))
@@ -631,7 +702,11 @@ export function generateInvoicePDF(invoice, lead) {
           .text('Payment Information', 50, notesY);
 
         notesY += 20;
+        
         if (invoice.paymentTerms) {
+          // Estimate height for payment terms
+          const paymentTermsLines = Math.ceil((invoice.paymentTerms.length / 80) || 1);
+          const paymentTermsHeight = paymentTermsLines * 12;
           doc
             .fillColor(rgbToHex(PALETTE.secondaryText))
             .fontSize(9)
@@ -639,10 +714,13 @@ export function generateInvoicePDF(invoice, lead) {
             .text('Payment Terms:', 50, notesY)
             .font('Helvetica')
             .text(invoice.paymentTerms, 50, notesY + 15, { width: 495 });
-          notesY += 35;
+          notesY += 15 + paymentTermsHeight + 10;
         }
 
         if (invoice.paymentInstructions) {
+          // Estimate height for payment instructions
+          const instructionsLines = Math.ceil((invoice.paymentInstructions.length / 80) || 1);
+          const instructionsHeight = instructionsLines * 12;
           doc
             .fillColor(rgbToHex(PALETTE.secondaryText))
             .fontSize(9)
@@ -650,20 +728,43 @@ export function generateInvoicePDF(invoice, lead) {
             .text('Payment Instructions:', 50, notesY)
             .font('Helvetica')
             .text(invoice.paymentInstructions, 50, notesY + 15, { width: 495 });
-          notesY += 35;
+          notesY += 15 + instructionsHeight + 10;
         }
 
         if (invoice.notes) {
+          // Estimate height for notes
+          const notesLines = Math.ceil((invoice.notes.length / 80) || 1);
+          const notesHeight = notesLines * 12;
           doc
             .fillColor(rgbToHex(PALETTE.secondaryText))
             .fontSize(9)
             .font('Helvetica')
             .text(invoice.notes, 50, notesY, { width: 495 });
+          notesY += notesHeight;
         }
+        
+        contentBottom = notesY;
       }
 
       // ===== FOOTER =====
-      const footerY = 750;
+      // Calculate footer position dynamically to avoid overlap
+      // Ensure minimum 60px gap between content and footer
+      const pageHeight = 842; // A4 height in points (297mm)
+      const minFooterY = contentBottom + 60; // Minimum spacing from content
+      const maxFooterY = pageHeight - 60; // Leave 60px from bottom of page
+      
+      // If content is too long and footer would be too close to bottom, add new page
+      let footerY;
+      if (minFooterY > maxFooterY) {
+        // Content extends too far down, add new page for footer
+        doc.addPage();
+        footerY = 50; // Start footer at top of new page
+      } else {
+        // Normal case: position footer with proper spacing
+        footerY = Math.max(minFooterY, 700); // At least 700px from top, or content + 60px
+        footerY = Math.min(footerY, maxFooterY); // But not too close to bottom
+      }
+      
       doc
         .moveTo(50, footerY)
         .lineTo(545, footerY)
@@ -920,7 +1021,12 @@ export function generateReceiptPDF(receipt, invoice, lead) {
 
       // ===== NOTES =====
       let notesY = invoice ? yPos + 300 : yPos + 210;
+      let contentBottom = invoice ? yPos + 280 : yPos + 190; // Default content bottom
+      
       if (receipt.notes) {
+        // Estimate height for notes
+        const notesLines = Math.ceil((receipt.notes.length / 80) || 1);
+        const notesHeight = notesLines * 12;
         doc
           .fillColor(rgbToHex(PALETTE.accent)) // Orange accent
           .fontSize(11)
@@ -930,10 +1036,28 @@ export function generateReceiptPDF(receipt, invoice, lead) {
           .fillColor(rgbToHex(PALETTE.secondaryText))
           .fontSize(9)
           .text(receipt.notes, 50, notesY + 20, { width: 495 });
+        contentBottom = notesY + 20 + notesHeight;
       }
 
       // ===== FOOTER =====
-      const footerY = 750;
+      // Calculate footer position dynamically to avoid overlap
+      // Ensure minimum 60px gap between content and footer
+      const pageHeight = 842; // A4 height in points (297mm)
+      const minFooterY = contentBottom + 60; // Minimum spacing from content
+      const maxFooterY = pageHeight - 60; // Leave 60px from bottom of page
+      
+      // If content is too long and footer would be too close to bottom, add new page
+      let footerY;
+      if (minFooterY > maxFooterY) {
+        // Content extends too far down, add new page for footer
+        doc.addPage();
+        footerY = 50; // Start footer at top of new page
+      } else {
+        // Normal case: position footer with proper spacing
+        footerY = Math.max(minFooterY, 700); // At least 700px from top, or content + 60px
+        footerY = Math.min(footerY, maxFooterY); // But not too close to bottom
+      }
+      
       doc
         .moveTo(50, footerY)
         .lineTo(545, footerY)

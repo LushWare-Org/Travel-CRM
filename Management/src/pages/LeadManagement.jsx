@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import toast from 'react-hot-toast';
-import { useLocation } from "wouter";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Plus, Loader2 } from "lucide-react";
 import { leadAPI, adminAPI } from "../services/api";
 import { 
@@ -18,10 +18,12 @@ import {
 } from "../features/lead-management/components";
 
 const LeadManagement = () => {
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedLead, setSelectedLead] = useState(null);
+  const [highlightedLeadId, setHighlightedLeadId] = useState(null);
   const [showNewLeadDialog, setShowNewLeadDialog] = useState(false);
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [showRemarksDialog, setShowRemarksDialog] = useState(false);
@@ -38,7 +40,11 @@ const LeadManagement = () => {
   // Assignment settings state (admin)
   const [settings, setSettings] = useState(null);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-  const [settingsForm, setSettingsForm] = useState({ assignmentMode: 'manual', autoStrategy: 'round_robin' });
+  const [settingsForm, setSettingsForm] = useState({ 
+    assignmentMode: 'manual', 
+    autoStrategy: 'round_robin',
+    requireActiveLogin48h: false 
+  });
   const [salesReps, setSalesReps] = useState([]);
 
   const [leads, setLeads] = useState([]);
@@ -48,6 +54,34 @@ const LeadManagement = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const leadsPerPage = 10;
+
+  // Read leadId from URL params on mount and filter/search for that lead
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const leadId = params.get('leadId');
+    if (leadId) {
+      setHighlightedLeadId(leadId);
+      // Search for the lead by ID to make it visible - use full ID or first 8 chars
+      const leadIdStr = leadId.toString();
+      // Try full ID first, then fallback to first 8 chars
+      setSearchTerm(leadIdStr.length > 8 ? leadIdStr.substring(0, 8) : leadIdStr);
+      // Clear the URL param after reading it
+      navigate('/leads', { replace: true });
+      
+      // Ensure leads are fetched if not already loaded
+      if (leads.length === 0) {
+        fetchLeads();
+      }
+      
+      // Scroll to the highlighted lead after a delay (to allow rendering and data fetch)
+      setTimeout(() => {
+        const element = document.getElementById(`lead-${leadId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 1000);
+    }
+  }, [location.search, navigate]);
 
   // Fetch leads on component mount and when filters change
   useEffect(() => {
@@ -66,6 +100,7 @@ const LeadManagement = () => {
           setSettingsForm({
             assignmentMode: res.data.assignmentMode,
             autoStrategy: res.data.autoStrategy,
+            requireActiveLogin48h: res.data.requireActiveLogin48h || false,
           });
         }
       } catch (e) {
@@ -194,6 +229,7 @@ const LeadManagement = () => {
 
   const filteredLeads = leads.filter((lead) => {
     const searchLower = searchTerm.toLowerCase();
+    const leadId = (lead._id || lead.id)?.toString() || '';
     const matchesSearch =
       (lead.name || '').toLowerCase().includes(searchLower) ||
       (lead.email || '').toLowerCase().includes(searchLower) ||
@@ -201,13 +237,19 @@ const LeadManagement = () => {
       (lead.city || '').toLowerCase().includes(searchLower) ||
       (lead.destination || '').toLowerCase().includes(searchLower) ||
       (lead.salesRep || '').toLowerCase().includes(searchLower) ||
-      (lead.adviser || '').toLowerCase().includes(searchLower);
+      (lead.adviser || '').toLowerCase().includes(searchLower) ||
+      leadId.toLowerCase().includes(searchLower) || // Include lead ID in search
+      leadId.substring(0, 8).toLowerCase().includes(searchLower); // Match partial ID
     const matchesStatus = filterStatus === "all" || lead.status === filterStatus;
     const matchesTravelDate =
       (!filterTravelDateStart || (lead.travelDate || '') >= filterTravelDateStart) &&
       (!filterTravelDateEnd || (lead.travelDate || '') <= filterTravelDateEnd);
     const matchesPlatform = filterPlatforms.length === 0 || filterPlatforms.includes(lead.platform);
-    return matchesSearch && matchesStatus && matchesTravelDate && matchesPlatform;
+    
+    // If there's a highlighted lead ID, always include it in results
+    const isHighlightedLead = highlightedLeadId && leadId === highlightedLeadId.toString();
+    
+    return (matchesSearch && matchesStatus && matchesTravelDate && matchesPlatform) || isHighlightedLead;
   });
 
   // Pagination calculations
@@ -324,6 +366,7 @@ const LeadManagement = () => {
             error={null}
             statusColors={statusColors}
             statusLabels={statusLabels}
+            highlightedLeadId={highlightedLeadId}
           onLeadClick={(lead) => {
             setSelectedLead(lead);
             setLeadEditForm({
@@ -427,6 +470,21 @@ const LeadManagement = () => {
             setRemarksLead(null);
           }}
           lead={remarksLead}
+          onSuccess={() => {
+            fetchLeads();
+            // Refresh the remarksLead data if it's still selected
+            if (remarksLead?._id || remarksLead?.id) {
+              leadAPI.getLead(remarksLead._id || remarksLead.id)
+                .then((response) => {
+                  if (response.success && response.data) {
+                    setRemarksLead(response.data);
+                  }
+                })
+                .catch((error) => {
+                  console.error('Error refreshing lead:', error);
+                });
+            }
+          }}
         />
 
         {/* Filter Dialog */}

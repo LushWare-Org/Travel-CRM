@@ -19,6 +19,7 @@ const ItineraryEditor = ({
   destination = '', // Add destination prop
   useLocationAutocomplete = false, // New prop to determine location input type
   LocationAutocompleteComponent = null, // Optional custom location autocomplete component
+  hideTitleAndDescription = false, // Hide title and description fields (for lead management)
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
 
@@ -87,33 +88,37 @@ const ItineraryEditor = ({
 
           {/* Day Content */}
           <div className="p-6 bg-gray-50 space-y-4">
-            {/* Title */}
+            {/* Title - Hidden when hideTitleAndDescription is true */}
+            {!hideTitleAndDescription && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Day Title *
+                  Day Title
               </label>
               <input
                 type="text"
                 value={day.title || ''}
                 onChange={(e) => onDayChange(day.dayNumber, { title: e.target.value })}
-                placeholder="e.g., Arrival in Dubai"
+                  placeholder="e.g., Arrival in Dubai (optional)"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            )}
 
-            {/* Description */}
+            {/* Description - Hidden when hideTitleAndDescription is true */}
+            {!hideTitleAndDescription && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Description *
+                  Description
               </label>
               <textarea
                 rows="3"
                 value={day.description || ''}
                 onChange={(e) => onDayChange(day.dayNumber, { description: e.target.value })}
-                placeholder="Detailed description of the day's activities..."
+                  placeholder="Detailed description of the day's activities... (optional)"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            )}
 
             {/* Locations Covered */}
             <div>
@@ -280,7 +285,8 @@ const ItineraryEditor = ({
               />
             </div>
 
-            {/* Day Images */}
+            {/* Day Images - Hidden when hideTitleAndDescription is true */}
+            {!hideTitleAndDescription && (
             <div className="border-t pt-4">
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Day Images
@@ -348,6 +354,7 @@ const ItineraryEditor = ({
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       ))}

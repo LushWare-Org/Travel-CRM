@@ -121,7 +121,7 @@ export const getAllUsers = asyncHandler(async (req, res, next) => {
   const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
   const users = await User.find(query)
-    .select('-password')
+    .select('name email phone role isActive createdAt lastLogin permissions createdBy')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(parseInt(limit, 10))

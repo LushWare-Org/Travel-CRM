@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save, DollarSign, Eye, Send } from 'lucide-react';
+import { X, Save, DollarSign, Eye, Send, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
@@ -149,6 +149,31 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     } finally {
       setLoadingExisting(false);
     }
+  };
+
+  const handleSendWhatsApp = (receiptId) => {
+    if (!lead?.whatsapp) {
+      toast.error('WhatsApp number not available for this lead');
+      return;
+    }
+    
+    const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
+    if (!whatsappNumber) {
+      toast.error('Invalid WhatsApp number');
+      return;
+    }
+    
+    const receiptNumber = currentReceipt?.receiptNumber || `#${receiptId?.slice(-6)}` || 'Receipt';
+    const amount = currentReceipt?.amount || formData.amount || 0;
+    const message = encodeURIComponent(
+      `Hello ${lead.name || 'there'},\n\n` +
+      `Your payment receipt ${receiptNumber} for ${amount.toFixed(2)} is ready. ` +
+      `Please contact us for the detailed receipt document.\n\n` +
+      `Thank you for choosing Trip Sky Way!`
+    );
+    
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const handleSendReceiptEmail = async () => {
@@ -410,15 +435,25 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   The receipt PDF will be emailed to this address after saving.
                 </p>
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <button
                   type="button"
                   onClick={handleSendReceiptEmail}
                   disabled={sendingEmail || !sendEmailAddress.trim()}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded hover:from-orange-700 hover:to-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded hover:from-orange-700 hover:to-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
                   {sendingEmail ? 'Sending…' : 'Send Email'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendWhatsApp(currentReceiptId || currentReceipt?._id)}
+                  disabled={!currentReceiptId || !lead?.whatsapp}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Send via WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  WhatsApp
                 </button>
               </div>
             </div>

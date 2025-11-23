@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Calculator, Eye, ToggleLeft, ToggleRight, Download, Send } from 'lucide-react';
+import { X, Plus, Trash2, Save, Calculator, Eye, ToggleLeft, ToggleRight, Download, Send, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
@@ -87,6 +87,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       return;
     }
 
+    // Reset state
     setExistingQuotations([]);
     setCurrentQuotation(null);
     setCurrentQuotationId(null);
@@ -98,12 +99,18 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     setSelectedQuotationId(null);
     setHasInitializedNew(false);
 
+    // Fetch data - only once when dialog opens
     fetchPackages();
     detectPackageType();
     fetchExistingQuotations(true);
-  }, [isOpen, lead]);
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      // Cancel any pending operations if component unmounts
+    };
+  }, [isOpen, lead?._id || lead?.id]); // Only depend on lead ID, not entire lead object
 
-  // Load manual itinerary with simplified day descriptions (for non-detailed mode)
+  // Load manual itinerary with all activities extracted (for non-detailed mode)
   const loadManualItinerarySimple = async () => {
     if (!lead) return;
     
@@ -111,35 +118,36 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
       if (manualResponse.success || manualResponse.status === 'success') {
         const manualItinerary = manualResponse.data || manualResponse;
-        if (manualItinerary?.days && Array.isArray(manualItinerary.days)) {
-          // Create simplified items for each day
-          const simplifiedItems = manualItinerary.days.map((day, index) => ({
-            description: `Day ${day.dayNumber || index + 1}`,
-            category: 'other',
-            quantity: 1,
-            unitPrice: 0,
-            totalPrice: 0,
-            notes: '',
-          }));
-          
-          // Keep package item if exists, then add simplified day items
-          // Also remove any blank/empty items
-          setFormData(prev => {
-            const existingPackageItem = prev.items.find(item => item.category === 'package');
-            // Filter out blank items (empty descriptions) before adding simplified items
-            const cleanExistingItems = prev.items.filter(item => 
-              item.category === 'package' || 
-              (item.description && item.description.trim() !== '')
-            );
-            const newItems = existingPackageItem 
-              ? [existingPackageItem, ...simplifiedItems] 
-              : [...cleanExistingItems.filter(item => item.category !== 'package'), ...simplifiedItems];
-            return { ...prev, items: newItems };
-          });
+        if (manualItinerary?.days && Array.isArray(manualItinerary.days) && manualItinerary.days.length > 0) {
+          // Extract all activities, events, and details (same as detail mode but read-only)
+          // Use try-catch to handle any extraction errors
+          // Don't show toast in non-detail mode
+          try {
+            extractItemsFromItinerary(manualItinerary.days, false);
+          } catch (extractError) {
+            console.error('Error extracting items from manual itinerary:', extractError);
+            // Fallback: create simple day items if extraction fails
+            const simplifiedItems = manualItinerary.days.map((day, index) => ({
+              description: `Day ${day.dayNumber || index + 1}: ${day.description || day.title || 'Itinerary day'}`,
+              category: 'other',
+              quantity: 1,
+              unitPrice: 0,
+              totalPrice: 0,
+              notes: '',
+            }));
+            setFormData(prev => {
+              const existingPackageItem = prev.items.find(item => item.category === 'package');
+              const newItems = existingPackageItem 
+                ? [existingPackageItem, ...simplifiedItems] 
+                : [...simplifiedItems];
+              return { ...prev, items: newItems };
+            });
+          }
         }
       }
     } catch (error) {
       console.error('Error loading manual itinerary:', error);
+      toast.error('Failed to load manual itinerary');
     }
   };
 
@@ -174,7 +182,9 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     setCurrentQuotation(selectedQuote);
     setCurrentQuotationId(selectedQuote._id || selectedQuote.id);
     setIsEditing(true);
-    setIsDetailedMode((selectedQuote.mode || 'summary') === 'detailed');
+    // Ensure mode is explicitly set - default to summary if not detailed
+    const quoteMode = (selectedQuote.mode || 'summary') === 'detailed';
+    setIsDetailedMode(quoteMode);
 
     setFormData({
       lead: lead._id || lead.id,
@@ -240,8 +250,23 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     detectPackageType();
 
+    // In summary mode (default), load all itinerary items/activities but they'll be read-only
+    // Only load if not already loading and mode is still summary
     if (lead.manualItinerary?._id || lead.manualItinerary) {
-      loadManualItinerarySimple();
+      // Small delay to ensure state is set
+      setTimeout(() => {
+        if (!isDetailedMode && !loadingItinerary) {
+          loadManualItinerarySimple();
+        }
+      }, 100);
+    } else if (lead.package?._id || lead.package || lead.customizedPackage?._id || lead.customizedPackage) {
+      // For packages/customized packages, load all activities in summary mode
+      // Use longer timeout to ensure package detection is complete
+      setTimeout(() => {
+        if (!isDetailedMode && !loadingItinerary) {
+          loadDetailedItems(); // Load all activities even in summary mode
+        }
+      }, 600);
     }
   };
 
@@ -261,6 +286,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           if (response.data?.price || response.price) {
             const pkg = response.data || response;
             addPackageItem(pkg.name, pkg.price, 'customized');
+          }
+          // In summary mode, load all activities immediately
+          if (!isDetailedMode) {
+            setTimeout(() => {
+              loadDetailedItems();
+            }, 300);
           }
         }
       } catch (error) {
@@ -282,6 +313,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             // Auto-populate package price
             if (pkg.price) {
               addPackageItem(pkg.name, pkg.price, 'package');
+            }
+            // In summary mode, load all activities immediately
+            if (!isDetailedMode) {
+              setTimeout(() => {
+                loadDetailedItems();
+              }, 300);
             }
           }
         } catch (error) {
@@ -408,6 +445,30 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
+  const handleSendWhatsApp = (quotationId) => {
+    if (!lead?.whatsapp) {
+      toast.error('WhatsApp number not available for this lead');
+      return;
+    }
+    
+    const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
+    if (!whatsappNumber) {
+      toast.error('Invalid WhatsApp number');
+      return;
+    }
+    
+    const quotationNumber = currentQuotation?.quotationNumber || `#${quotationId?.slice(-6)}` || 'Quotation';
+    const message = encodeURIComponent(
+      `Hello ${lead.name || 'there'},\n\n` +
+      `Your quotation ${quotationNumber} is ready. ` +
+      `Please contact us for the detailed quotation document.\n\n` +
+      `Thank you for choosing Trip Sky Way!`
+    );
+    
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const handleSendEmail = async () => {
     const targetId =
       (selectedQuotationId && selectedQuotationId !== 'new')
@@ -481,32 +542,68 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       // Get itinerary based on package type
       if (detectedPackageType === 'customized' && lead.customizedPackage) {
         const packageId = lead.customizedPackage._id || lead.customizedPackage;
-        // Fetch itinerary using package ID (not itinerary ID)
-        const itineraryResponse = await packageAPI.getItineraryByPackage(packageId);
-        if (itineraryResponse.success || itineraryResponse.status === 'success') {
-          itineraryData = itineraryResponse.data || itineraryResponse;
+        // Fetch itinerary for customized package
+        try {
+          const itineraryResponse = await customizedPackageAPI.getItineraryByPackage(packageId);
+          if (itineraryResponse.success || itineraryResponse.status === 'success') {
+            itineraryData = itineraryResponse.data || itineraryResponse;
+          } else if (itineraryResponse.data) {
+            // Sometimes data is directly in response
+            itineraryData = itineraryResponse.data;
+          }
+        } catch (error) {
+          console.error('Error fetching customized package itinerary:', error);
+          // Try alternative: get the customized package and check if it has itinerary
+          try {
+            const customPkgResponse = await customizedPackageAPI.getById(packageId);
+            if (customPkgResponse.success || customPkgResponse.status === 'success') {
+              const customPkg = customPkgResponse.data || customPkgResponse;
+              if (customPkg.itinerary?.days) {
+                itineraryData = { days: customPkg.itinerary.days };
+              } else if (customPkg.days) {
+                itineraryData = { days: customPkg.days };
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching customized package:', err);
+          }
         }
       } else if (detectedPackageType === 'package' && lead.package) {
         const packageId = lead.package._id || lead.package;
-        // Fetch itinerary using package ID (not itinerary ID)
-        const itineraryResponse = await packageAPI.getItineraryByPackage(packageId);
-        if (itineraryResponse.success || itineraryResponse.status === 'success') {
-          itineraryData = itineraryResponse.data || itineraryResponse;
+        // Fetch itinerary using package ID
+        try {
+          const itineraryResponse = await packageAPI.getItineraryByPackage(packageId);
+          if (itineraryResponse.success || itineraryResponse.status === 'success') {
+            itineraryData = itineraryResponse.data || itineraryResponse;
+          } else if (itineraryResponse.data) {
+            itineraryData = itineraryResponse.data;
+          }
+        } catch (error) {
+          console.error('Error fetching package itinerary:', error);
         }
       } else if (detectedPackageType === 'manual' && lead.manualItinerary) {
-        const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
-        if (manualResponse.success || manualResponse.status === 'success') {
-          const manualItinerary = manualResponse.data || manualResponse;
-          if (manualItinerary?.days) {
-            itineraryData = { days: manualItinerary.days };
+        try {
+          const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
+          if (manualResponse.success || manualResponse.status === 'success') {
+            const manualItinerary = manualResponse.data || manualResponse;
+            if (manualItinerary?.days) {
+              itineraryData = { days: manualItinerary.days };
+            }
+          } else if (manualResponse.days) {
+            itineraryData = { days: manualResponse.days };
           }
+        } catch (error) {
+          console.error('Error fetching manual itinerary:', error);
         }
       }
 
-      if (itineraryData && itineraryData.days && Array.isArray(itineraryData.days)) {
+      if (itineraryData && itineraryData.days && Array.isArray(itineraryData.days) && itineraryData.days.length > 0) {
         extractItemsFromItinerary(itineraryData.days);
       } else {
-        toast('No itinerary data found for detailed quotation', { icon: 'ℹ️' });
+        console.warn('No valid itinerary data found', { itineraryData, detectedPackageType });
+        if (isDetailedMode) {
+          toast('No itinerary data found', { icon: 'ℹ️' });
+        }
       }
     } catch (error) {
       console.error('Error loading itinerary:', error);
@@ -517,10 +614,16 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   // Extract items from itinerary days
-  const extractItemsFromItinerary = (days) => {
+  const extractItemsFromItinerary = (days, showToast = true) => {
+    if (!days || !Array.isArray(days) || days.length === 0) {
+      console.warn('extractItemsFromItinerary: Invalid days data', days);
+      return;
+    }
+    
     const extractedItems = [];
     
     days.forEach((day, dayIndex) => {
+      if (!day) return; // Skip null/undefined days
       // Accommodation
       if (day.accommodation?.name) {
         extractedItems.push({
@@ -530,6 +633,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           unitPrice: 0, // User can enter price
           totalPrice: 0,
           notes: day.accommodation.address || '',
+          isExtracted: true, // Mark as extracted from itinerary
         });
       }
 
@@ -542,6 +646,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           unitPrice: 0,
           totalPrice: 0,
           notes: '',
+          isExtracted: true, // Mark as extracted from itinerary
         });
       }
 
@@ -558,6 +663,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           unitPrice: 0,
           totalPrice: 0,
           notes: '',
+          isExtracted: true, // Mark as extracted from itinerary
         });
       }
 
@@ -571,6 +677,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             unitPrice: 0,
             totalPrice: 0,
             notes: '',
+            isExtracted: true, // Mark as extracted from itinerary
           });
         });
       }
@@ -585,6 +692,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             unitPrice: 0,
             totalPrice: 0,
             notes: place.description || '',
+            isExtracted: true, // Mark as extracted from itinerary
           });
         });
       }
@@ -610,10 +718,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       return { ...prev, items: existingPackageItem ? [existingPackageItem] : cleanExistingItems };
     });
 
-    if (extractedItems.length > 0) {
-      toast.success(`Extracted ${extractedItems.length} items from itinerary`);
-    } else {
-      toast('No items found in itinerary', { icon: 'ℹ️' });
+    if (showToast) {
+      if (extractedItems.length > 0) {
+        toast.success(`Extracted ${extractedItems.length} items from itinerary`);
+      } else {
+        toast('No items found in itinerary', { icon: 'ℹ️' });
+      }
     }
   };
 
@@ -625,26 +735,46 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
 
     const newMode = !isDetailedMode;
+    
+    // Immediately update the state to prevent UI inconsistencies
     setIsDetailedMode(newMode);
-    setFormData((prev) => ({
-      ...prev,
-      mode: newMode ? 'detailed' : 'summary',
-    }));
     
     if (newMode) {
+      // Enable detailed mode
+      setFormData((prev) => ({
+        ...prev,
+        mode: 'detailed',
+      }));
       // Load detailed items when enabling detailed mode
-      await loadDetailedItems();
+      // For manual itinerary, use loadDetailedItems to extract all activities
+      if (detectedPackageType === 'manual') {
+        await loadDetailedItems(); // This will extract all activities from manual itinerary
+      } else {
+        await loadDetailedItems();
+      }
     } else {
-      // When disabling detailed mode for manual itineraries, restore simplified day items
+      // Disable detailed mode - switch to summary mode
+      setFormData((prev) => ({
+        ...prev,
+        mode: 'summary',
+      }));
+      
+      // When disabling detailed mode, load all itinerary items but without prices (read-only)
       if (detectedPackageType === 'manual') {
         await loadManualItinerarySimple();
+      } else if (detectedPackageType === 'package' || detectedPackageType === 'customized') {
+        // For packages/customized packages in summary mode, load all itinerary items
+        // ALL items will be displayed as read-only (no price inputs at all)
+        await loadDetailedItems(); // This loads all items from itinerary including all activities
       } else {
-        // For packages/customized packages, keep only package item (remove all other items including blank ones)
-        const packageItem = formData.items.find(item => item.category === 'package');
-        setFormData(prev => ({
-          ...prev,
-          items: packageItem ? [packageItem] : prev.items.filter(item => item.description && item.description.trim() !== '').slice(0, 1),
-        }));
+        // No package detected, just keep package item if exists
+        setFormData(prev => {
+          const packageItem = prev.items.find(item => item.category === 'package');
+          return {
+            ...prev,
+            items: packageItem ? [packageItem] : prev.items.filter(item => item.description && item.description.trim() !== '').slice(0, 1),
+          };
+        });
       }
     }
   };
@@ -670,46 +800,60 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const addItem = () => {
-    setFormData({
-      ...formData,
-      items: [
-        ...formData.items,
-        {
-          description: '',
-          category: 'other',
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
-          notes: '',
-        },
-      ],
+    // Only allow adding items in detailed mode
+    if (!isDetailedMode) {
+      toast.error('Items can only be added in detailed mode');
+      return;
+    }
+    
+    // Add a new item to the form
+    setFormData(prev => {
+      const newItem = {
+        description: '',
+        category: 'other',
+        quantity: 1,
+        unitPrice: 0,
+        totalPrice: 0,
+        notes: '',
+        isManual: true, // Mark as manually added
+      };
+      
+      // In detailed mode, keep package items at the beginning, then add new item
+      const packageItems = prev.items.filter(item => item.category === 'package');
+      const otherItems = prev.items.filter(item => item.category !== 'package');
+      return {
+        ...prev,
+        items: [...packageItems, ...otherItems, newItem],
+      };
     });
   };
 
   const removeItem = (index) => {
-    const itemsWithDescription = formData.items.filter(item => 
-      item.description && item.description.trim() !== ''
+    // Count visible items (excluding package items in detailed mode)
+    const visibleItems = formData.items.filter(item => 
+      (!isDetailedMode || item.category !== 'package') && 
+      item.description !== undefined
     );
     
-    // Allow removal if there's more than one item with a description
-    if (itemsWithDescription.length > 1) {
+    // Allow removal if there's more than one visible item
+    if (visibleItems.length > 1) {
       const newItems = formData.items.filter((_, i) => i !== index);
-      // Filter out any remaining blank items after removal
-      const cleanedItems = newItems.filter(item => 
-        (item.description && item.description.trim() !== '') ||
-        item.category === 'package'
-      );
-      setFormData({ ...formData, items: cleanedItems.length > 0 ? cleanedItems : [] });
+      // In detailed mode, keep package items; in summary mode, keep all non-empty items
+      const cleanedItems = isDetailedMode
+        ? newItems.filter(item => item.category === 'package' || item.description !== undefined)
+        : newItems.filter(item => item.description !== undefined || item.category === 'package');
+      setFormData(prev => ({ ...prev, items: cleanedItems.length > 0 ? cleanedItems : [] }));
     } else {
-      toast.error('At least one item with description is required');
+      toast.error('At least one item is required');
     }
   };
 
   const calculateTotals = () => {
     // When in detailed mode, exclude package items from calculation
+    // When in summary mode, only use package item for calculation
     const itemsToCalculate = isDetailedMode 
       ? formData.items.filter(item => item.category !== 'package')
-      : formData.items;
+      : formData.items.filter(item => item.category === 'package');
     
     // Calculate subtotal from all items (excluding package items in detailed mode)
     // Use totalPrice if available, otherwise calculate from quantity * unitPrice
@@ -850,8 +994,8 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     Existing Quotations
                   </label>
                   <select
-                    value={selectedQuotationId}
-                    onChange={(e) => setSelectedQuotationId(e.target.value)}
+                    value={selectedQuotationId || 'new'}
+                    onChange={(e) => setSelectedQuotationId(e.target.value === 'new' ? 'new' : e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
                     disabled={loadingExisting}
                   >
@@ -900,15 +1044,25 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   We will send the quotation PDF to this address using the configured mail server.
                 </p>
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <button
                   type="button"
                   onClick={handleSendEmail}
                   disabled={sendingEmail || !sendEmailAddress.trim()}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded hover:from-green-700 hover:to-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded hover:from-green-700 hover:to-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
                   {sendingEmail ? 'Sending…' : 'Send Email'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendWhatsApp(currentQuotationId || currentQuotation?._id)}
+                  disabled={!currentQuotationId || currentQuotationId === 'new' || !lead?.whatsapp}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Send via WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  WhatsApp
                 </button>
               </div>
             </div>
@@ -1000,97 +1154,187 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             {/* Items Table */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Items</h3>
-                <button
-                  onClick={addItem}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Item
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Price</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.items
-                      .map((item, originalIndex) => ({
-                        item,
-                        originalIndex,
-                        shouldShow: (!isDetailedMode || item.category !== 'package') && 
-                                   (item.description && item.description.trim() !== '' || item.category === 'package')
-                      }))
-                      .filter(({ shouldShow }) => shouldShow)
-                      .map(({ item, originalIndex }) => {
-                        // Calculate price from unitPrice * quantity or use totalPrice
-                        const displayPrice = item.totalPrice !== undefined && item.totalPrice !== null 
-                          ? item.totalPrice 
-                          : (item.quantity || 1) * (item.unitPrice || 0);
-                        
-                        return (
-                          <tr key={originalIndex} className="border-b">
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                value={item.description}
-                                onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                placeholder="Item description"
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                value={displayPrice || ''}
-                                onChange={(e) => {
-                                  const price = parseFloat(e.target.value) || 0;
-                                  const newItems = [...formData.items];
-                                  newItems[originalIndex] = {
-                                    ...newItems[originalIndex],
-                                    totalPrice: price,
-                                    unitPrice: price,
-                                    quantity: 1,
-                                  };
-                                  setFormData({ ...formData, items: newItems });
-                                }}
-                                min="0"
-                                step="0.01"
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <button
-                                onClick={() => removeItem(originalIndex)}
-                                className="text-red-600 hover:text-red-800"
-                                disabled={formData.items.filter(i => 
-                                  (i.description && i.description.trim() !== '') && 
-                                  (!isDetailedMode || i.category !== 'package')
-                                ).length <= 1}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-                {formData.items.filter(item => 
-                  (!isDetailedMode || item.category !== 'package') && 
-                  (item.description && item.description.trim() !== '' || item.category === 'package')
-                ).length === 0 && (
-                  <div className="text-center py-8 text-gray-500 text-sm border-t">
-                    No items added yet. Package price will appear here when detected, or click "Add Item" to add manually.
-                  </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Items {isDetailedMode ? '(Detailed Mode - Individual Pricing)' : '(Summary Mode - Package Price Only)'}
+                </h3>
+                {/* Show Add Item button only in detailed mode for manual entry */}
+                {isDetailedMode && (
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Item
+                  </button>
                 )}
               </div>
+
+              {!isDetailedMode ? (
+                /* Summary Mode: Package price input + All activities as read-only text */
+                <div className="space-y-4">
+                  {/* Package Price Input (Editable) */}
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Package Total Price
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">INR</span>
+                      <input
+                        type="number"
+                        value={(() => {
+                          const packageItem = formData.items.find(item => item.category === 'package');
+                          return packageItem ? (packageItem.totalPrice || packageItem.unitPrice || 0) : 0;
+                        })()}
+                        onChange={(e) => {
+                          const price = parseFloat(e.target.value) || 0;
+                          setFormData(prev => {
+                            const packageItemIndex = prev.items.findIndex(item => item.category === 'package');
+                            if (packageItemIndex >= 0) {
+                              const newItems = [...prev.items];
+                              newItems[packageItemIndex] = {
+                                ...newItems[packageItemIndex],
+                                totalPrice: price,
+                                unitPrice: price,
+                                quantity: 1,
+                              };
+                              return { ...prev, items: newItems };
+                            } else {
+                              // If no package item exists, create one
+                              return {
+                                ...prev,
+                                items: [
+                                  {
+                                    description: 'Package Total',
+                                    category: 'package',
+                                    quantity: 1,
+                                    unitPrice: price,
+                                    totalPrice: price,
+                                    notes: '',
+                                  },
+                                  ...prev.items.filter(item => item.category !== 'package'),
+                                ],
+                              };
+                            }
+                          });
+                        }}
+                        min="0"
+                        step="0.01"
+                        className="flex-1 px-3 py-2 border border-green-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Enter package total price"
+                      />
+                    </div>
+                  </div>
+
+                  {/* All Activities - Always Read-Only in non-detail mode */}
+                  {formData.items.filter(item => item.category !== 'package').length > 0 && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3">
+                        Included Activities
+                      </label>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {formData.items
+                          .map((item, originalIndex) => {
+                            // Skip package items
+                            if (item.category === 'package') return null;
+                            
+                            // In non-detail mode, ALL activities are read-only (static)
+                            return (
+                              <div
+                                key={originalIndex}
+                                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded"
+                              >
+                                <div className="flex-1 text-sm text-gray-700">
+                                  {item.description || 'No description'}
+                                </div>
+                              </div>
+                            );
+                          })
+                          .filter(item => item !== null)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Detailed Mode: All items with editable price inputs */
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Price</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formData.items
+                        .map((item, originalIndex) => ({
+                          item,
+                          originalIndex,
+                          shouldShow: item.category !== 'package' && item.description !== undefined
+                        }))
+                        .filter(({ shouldShow }) => shouldShow)
+                        .map(({ item, originalIndex }) => {
+                          // Calculate price from unitPrice * quantity or use totalPrice
+                          const displayPrice = item.totalPrice !== undefined && item.totalPrice !== null 
+                            ? item.totalPrice 
+                            : (item.quantity || 1) * (item.unitPrice || 0);
+                          
+                          return (
+                            <tr key={originalIndex} className="border-b">
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={item.description || ''}
+                                  onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                  placeholder="Item description"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  value={displayPrice || ''}
+                                  onChange={(e) => {
+                                    const price = parseFloat(e.target.value) || 0;
+                                    const newItems = [...formData.items];
+                                    newItems[originalIndex] = {
+                                      ...newItems[originalIndex],
+                                      totalPrice: price,
+                                      unitPrice: price,
+                                      quantity: 1,
+                                    };
+                                    setFormData({ ...formData, items: newItems });
+                                  }}
+                                  min="0"
+                                  step="0.01"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <button
+                                  onClick={() => removeItem(originalIndex)}
+                                  className="text-red-600 hover:text-red-800"
+                                  disabled={formData.items.filter(i => 
+                                    i.category !== 'package' && 
+                                    (i.description !== undefined && i.description !== '')
+                                  ).length <= 1}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                  {formData.items.filter(item => item.category !== 'package' && item.description).length === 0 && (
+                    <div className="text-center py-8 text-gray-500 text-sm border-t">
+                      No items added yet. Click "Add Item" to add manually.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Calculations */}
