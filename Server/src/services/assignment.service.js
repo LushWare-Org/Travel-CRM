@@ -10,10 +10,10 @@ async function getEligibleSalesReps(config) {
     baseQuery._id = { $in: config.enabledSalesReps };
   }
   
-  // Filter by 48-hour login activity if setting is enabled
+  // Filter by 1-hour login activity if setting is enabled
   if (config.requireActiveLogin48h === true) {
-    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-    baseQuery.lastLogin = { $gte: fortyEightHoursAgo };
+    const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
+    baseQuery.lastLogin = { $gte: oneHourAgo };
   }
   
   return User.find(baseQuery).select('name email lastLogin');

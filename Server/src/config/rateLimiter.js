@@ -1,7 +1,10 @@
 import rateLimit from 'express-rate-limit';
 
+// Rate limiting is DISABLED by default
+// To enable rate limiting, set RATE_LIMIT_ENABLED=true in your .env file
+// By default, all limiters will be no-op (no rate limiting applied)
 const isRateLimitingDisabled =
-  process.env.RATE_LIMIT_ENABLED === 'false' || process.env.NODE_ENV === 'development';
+  process.env.RATE_LIMIT_ENABLED !== 'true';
 
 const noopMiddleware = (req, res, next) => next();
 

@@ -57,10 +57,10 @@ const SettingsDialog = ({ isOpen, onClose, settings, settingsForm, onSettingsFor
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Require Active Login (48 hours)
+                      Require Active Login (1 hour)
                     </label>
                     <p className="text-xs text-gray-500">
-                      Only assign leads to sales reps who logged in within the last 48 hours
+                      Only assign leads to sales reps who logged in within the last 1 hour
                     </p>
                   </div>
                   <button

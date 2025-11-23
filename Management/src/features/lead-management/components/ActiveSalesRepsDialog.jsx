@@ -22,18 +22,18 @@ const ActiveSalesRepsDialog = ({ isOpen, onClose, requireActiveLogin48h }) => {
         const reps = res.data.users;
         setSalesReps(reps);
         
-        // Filter by 48-hour login if setting is enabled
+        // Filter by 1-hour login if setting is enabled
         if (requireActiveLogin48h) {
-          const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+          const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
           const active = reps.filter(rep => {
             if (!rep.lastLogin) return false;
             const lastLogin = new Date(rep.lastLogin);
-            return lastLogin >= fortyEightHoursAgo;
+            return lastLogin >= oneHourAgo;
           });
           const inactive = reps.filter(rep => {
             if (!rep.lastLogin) return true;
             const lastLogin = new Date(rep.lastLogin);
-            return lastLogin < fortyEightHoursAgo;
+            return lastLogin < oneHourAgo;
           });
           setActiveReps(active);
           setInactiveReps(inactive);
@@ -86,7 +86,7 @@ const ActiveSalesRepsDialog = ({ isOpen, onClose, requireActiveLogin48h }) => {
             <h2 className="text-xl font-bold text-gray-900">Active Sales Representatives</h2>
             <p className="text-sm text-gray-600 mt-1">
               {requireActiveLogin48h 
-                ? 'Sales reps who logged in within the last 48 hours' 
+                ? 'Sales reps who logged in within the last 1 hour' 
                 : 'All active sales representatives'}
             </p>
           </div>
@@ -111,7 +111,7 @@ const ActiveSalesRepsDialog = ({ isOpen, onClose, requireActiveLogin48h }) => {
                   <div className="flex items-center gap-2 mb-3">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Active {requireActiveLogin48h ? '(Logged in within 48h)' : ''}
+                      Active {requireActiveLogin48h ? '(Logged in within 1h)' : ''}
                     </h3>
                     <span className="ml-auto bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
                       {activeReps.length}
@@ -142,13 +142,13 @@ const ActiveSalesRepsDialog = ({ isOpen, onClose, requireActiveLogin48h }) => {
                 </div>
               )}
 
-              {/* Inactive Sales Reps (only shown if 48h filter is enabled) */}
+              {/* Inactive Sales Reps (only shown if 1h filter is enabled) */}
               {requireActiveLogin48h && inactiveReps.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <XCircle className="w-5 h-5 text-gray-400" />
                     <h3 className="text-lg font-semibold text-gray-700">
-                      Inactive (Not logged in within 48h)
+                      Inactive (Not logged in within 1h)
                     </h3>
                     <span className="ml-auto bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-0.5 rounded-full">
                       {inactiveReps.length}
