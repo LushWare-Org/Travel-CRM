@@ -38,10 +38,15 @@ export const createReview = asyncHandler(async (req, res) => {
   const allReviews = await Review.find({ package: packageId, isApproved: true });
   const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
   const avgRating = (totalRating / allReviews.length).toFixed(1);
-
-  pkg.rating = parseFloat(avgRating);
-  pkg.numReviews = allReviews.length;
-  await pkg.save();
+  await Package.findByIdAndUpdate(
+    packageId,
+    {
+      rating: parseFloat(avgRating),
+      numReviews: allReviews.length,
+    },
+    { runValidators: false }
+  );
+  
   await review.populate('author', 'name');
 
   res.status(201).json({
@@ -166,10 +171,14 @@ export const updateReview = asyncHandler(async (req, res) => {
   const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
   const avgRating = (totalRating / allReviews.length).toFixed(1);
 
-  const pkg = await Package.findById(packageId);
-  pkg.rating = parseFloat(avgRating);
-  pkg.numReviews = allReviews.length;
-  await pkg.save();
+  await Package.findByIdAndUpdate(
+    packageId,
+    {
+      rating: parseFloat(avgRating),
+      numReviews: allReviews.length,
+    },
+    { runValidators: false }
+  );
 
   res.status(200).json({
     success: true,
@@ -200,10 +209,14 @@ export const deleteReview = asyncHandler(async (req, res) => {
   const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
   const avgRating = allReviews.length > 0 ? (totalRating / allReviews.length).toFixed(1) : 0;
 
-  const pkg = await Package.findById(packageId);
-  pkg.rating = parseFloat(avgRating);
-  pkg.numReviews = allReviews.length;
-  await pkg.save();
+  await Package.findByIdAndUpdate(
+    packageId,
+    {
+      rating: parseFloat(avgRating),
+      numReviews: allReviews.length,
+    },
+    { runValidators: false }
+  );
 
   res.status(200).json({
     success: true,
