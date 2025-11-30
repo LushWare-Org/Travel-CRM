@@ -23,6 +23,7 @@ import morgan from 'morgan';
 import corsOptions from './config/cors.js';
 import { limiter } from './config/rateLimiter.js';
 import logger from './config/logger.js';
+import { dropReviewsIndexes } from './utils/indexManager.js';
 
 // Import routes
 import authRoutes from './routes/auth.routes.js';
@@ -33,6 +34,7 @@ import vendorRoutes from './routes/vendor.routes.js';
 import packageRoutes from './routes/package.routes.js';
 import packageAIRoutes from './routes/packageAI.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
+import reviewRoutes from './routes/review.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import invoiceRoutes from './routes/invoice.routes.js';
 import itineraryRoutes from './routes/itinerary.routes.js';
@@ -106,6 +108,7 @@ app.use(`/api/${API_VERSION}/vendors`, vendorRoutes);
 app.use(`/api/${API_VERSION}/packages`, packageAIRoutes);
 app.use(`/api/${API_VERSION}/packages`, packageRoutes);
 app.use(`/api/${API_VERSION}/bookings`, bookingRoutes);
+app.use(`/api/${API_VERSION}/reviews`, reviewRoutes);
 app.use(`/api/${API_VERSION}/leads`, leadRoutes);
 // Legacy route for backwards compatibility (if needed)
 app.use(`/api/${API_VERSION}/invoices`, invoiceRoutes);
@@ -135,6 +138,7 @@ const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI);
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
+    await dropReviewsIndexes();
   } catch (error) {
     logger.error(`Error: ${error.message}`);
     process.exit(1);

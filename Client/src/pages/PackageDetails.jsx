@@ -4,7 +4,7 @@ import {
   Clock, Star, MapPin, Check, X, Calendar, Download, ChevronLeft, ChevronRight,
   Award, Sparkles, ArrowRight, ChevronDown, Phone, Mail,
 } from 'lucide-react';
-import { fetchPackageById } from '../utils/packageApi';
+import { fetchPackageById, submitReview, fetchPackageReviews } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
 import { generateManagementPDF } from '../utils/managementPdfBridge';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +37,8 @@ export default function PackageDetails() {
   const [reviewData, setReviewData] = useState({
     name: '', email: '', rating: 0, comment: '',
   });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [showReviewSuccess, setShowReviewSuccess] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -44,21 +46,11 @@ export default function PackageDetails() {
     let isMounted = true;
     setLoading(true);
     setError(null);
+    
     fetchPackageById(id)
       .then((packageData) => {
         if (!isMounted) return;
         setPkg(packageData);
-        const raw = packageData?.raw ?? {};
-        const fetchedReviews = Array.isArray(raw.reviews)
-          ? raw.reviews.map((review) => ({
-              id: review._id || review.id,
-              user_name: review.author?.name || review.user?.name || 'Traveler',
-              rating: review.rating || 0,
-              comment: review.comment || '',
-              created_at: review.createdAt || review.created_at || new Date().toISOString(),
-            }))
-          : [];
-        setReviews(fetchedReviews);
       })
       .catch((err) => {
         if (!isMounted) return;
@@ -68,6 +60,27 @@ export default function PackageDetails() {
         if (!isMounted) return;
         setLoading(false);
       });
+
+    fetchPackageReviews(id, 50, 1)
+      .then((reviewsData) => {
+        if (!isMounted) return;
+        const fetchedReviews = Array.isArray(reviewsData.reviews)
+          ? reviewsData.reviews.map((review) => ({
+              id: review.id,
+              user_name: review.user_name || 'Traveler',
+              rating: review.rating || 0,
+              comment: review.comment || '',
+              created_at: review.created_at || new Date().toISOString(),
+            }))
+          : [];
+        setReviews(fetchedReviews);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error('Error fetching reviews:', err);
+        setReviews([]);
+      });
+
     return () => {
       isMounted = false;
     };
@@ -625,43 +638,62 @@ export default function PackageDetails() {
                 )}
                 {activeSection === 'reviews' && (
                   <div className="space-y-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-3xl font-bold text-gray-900">Customer Reviews</h2>
+                    <div className="flex items-center justify-between mb-8">
+                      <div>
+                        <h2 className="text-4xl font-bold text-gray-900 mb-2">Customer Reviews</h2>
+                        <p className="text-gray-600">Real experiences from real travelers</p>
+                      </div>
                       <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-                            <Star className="w-6 h-6 text-yellow-400 fill-current" />
+                        <div className="text-right p-4 rounded-lg">
+                          <div className="flex items-center gap-2 text-3xl font-bold text-gray-900">
+                            <Star className="w-7 h-7 text-yellow-400 fill-current" />
                             {pkg.rating}
                           </div>
-                          <p className="text-sm text-gray-500">{pkg.reviews_count} reviews</p>
+                          <p className="text-sm text-gray-600 mt-1">{pkg.reviews_count} reviews</p>
                         </div>
                         <button
                           onClick={() => setShowReviewModal(true)}
-                          className="bg-black text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:from-yellow-400 hover:to-orange-600 transform hover:scale-[1.02] transition-all whitespace-nowrap"
+                          className="bg-black text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all whitespace-nowrap"
                         >
                           Write a Review
                         </button>
                       </div>
                     </div>
+
                     {reviews.length === 0 && (
-                      <p className="text-gray-600">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
-                    )}
-                    {reviews.map((r) => (
-                      <div key={r.id} className="border-b border-gray-200 pb-6 last:border-0">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <p className="font-bold text-gray-900 text-lg">{r.user_name}</p>
-                            <p className="text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                          </div>
-                          <div className="flex gap-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-5 h-5 ${i < r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
-                            ))}
-                          </div>
-                        </div>
-                        <p className="text-gray-700 leading-relaxed">{r.comment}</p>
+                      <div className="text-center py-12 bg-gray-50 rounded-lg">
+                        <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-600 text-lg">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
                       </div>
-                    ))}
+                    )}
+                    
+                    {reviews.length > 0 && (
+                      <div className="space-y-4">
+                        {reviews.map((r) => (
+                          <div key={r.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow duration-300 bg-white">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-yellow-500 flex items-center justify-center text-white font-bold">
+                                    {r.user_name.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-gray-900 text-lg">{r.user_name}</p>
+                                    <p className="text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star key={i} className={`w-5 h-5 ${i < r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-gray-700 leading-relaxed">{r.comment}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -941,11 +973,38 @@ export default function PackageDetails() {
               </button>
             </div>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                console.log('Review submitted:', reviewData);
-                setReviewData({ name: '', email: '', rating: 0, comment: '' });
-                setShowReviewModal(false);
+                if (!reviewData.name || !reviewData.rating || !reviewData.comment) {
+                  alert('Please fill in all fields');
+                  return;
+                }
+
+                setIsSubmittingReview(true);
+                try {
+                  const newReview = await submitReview(id, reviewData);
+                  if (newReview) {
+                    setReviews([
+                      {
+                        id: newReview.id,
+                        user_name: newReview.user_name,
+                        rating: newReview.rating,
+                        comment: newReview.comment,
+                        created_at: newReview.created_at,
+                      },
+                      ...reviews,
+                    ]);
+                  }
+                  setReviewData({ name: '', email: '', rating: 0, comment: '' });
+                  setShowReviewModal(false);
+                  setShowReviewSuccess(true);
+                  setTimeout(() => setShowReviewSuccess(false), 4000);
+                } catch (error) {
+                  console.error('Error submitting review:', error);
+                  alert('Failed to submit review. Please try again.');
+                } finally {
+                  setIsSubmittingReview(false);
+                }
               }}
               className="space-y-4"
             >
@@ -1005,9 +1064,10 @@ export default function PackageDetails() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-black text-white rounded-lg font-semibold hover:shadow-lg hover:from-orange-600 hover:to-yellow-400 transform hover:scale-[1.02] transition-all"
+                  disabled={isSubmittingReview}
+                  className="flex-1 px-4 py-2 bg-black text-white rounded-lg font-semibold hover:shadow-lg hover:from-orange-600 hover:to-yellow-400 transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Submit Review
+                  {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
                 </button>
               </div>
             </form>
@@ -1040,6 +1100,23 @@ export default function PackageDetails() {
               >
                 OK
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Success */}
+      {showReviewSuccess && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl p-5 flex items-center gap-4 max-w-sm">
+            <div className="flex-shrink-0">
+              <div className="flex items-center justify-center h-12 w-12 rounded-full bg-white/20 backdrop-blur-sm">
+                <Check className="h-6 w-6 text-white" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-base">Review Submitted!</p>
+              <p className="text-sm text-white/90 mt-0.5">Thank you for sharing your experience.</p>
             </div>
           </div>
         </div>
