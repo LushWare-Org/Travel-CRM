@@ -102,7 +102,7 @@ export default function AboutUs() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/60 z-10"></div>
           <video
             className="absolute inset-0 w-full h-full object-cover"
-            src="/v1.mp4"
+            src="/v5.mp4"
             autoPlay
             muted
             loop
@@ -111,9 +111,9 @@ export default function AboutUs() {
           />
         <div className="relative z-20 h-full flex flex-col items-center justify-center text-white px-4">
           <div className="text-center max-w-4xl">
-            <h1 className="text-6xl md:text-7xl font-bold mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
               Crafting Dream
-              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 to-white">
+              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400">
                 Journeys Since 2010
               </span>
             </h1>
@@ -133,7 +133,7 @@ export default function AboutUs() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition-all duration-300 ${
                   activeTab === tab.id
-                    ? 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white shadow-md'
+                    ? 'bg-gradient-to-r from-orange-600 to-yellow-500 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >

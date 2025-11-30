@@ -5,6 +5,7 @@ import {
   getAllUsers,
   getUser,
   getCurrentUserProfile,
+  updateCurrentUserProfile,
   createUser,
   updateUser,
   updateUserPassword,
@@ -32,6 +33,7 @@ router.use(protect);
 
 // Get current user profile
 router.get('/profile/me', getCurrentUserProfile);
+router.put('/profile', validateRequest(updateUserSchema), updateCurrentUserProfile);
 
 // Admin only routes
 router.use(authorize('admin'));

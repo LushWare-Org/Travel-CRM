@@ -132,15 +132,15 @@ export default function ContactUs() {
           preload="auto"
           aria-hidden="true"
         >
-          <source src="/v3.mp4" type="video/mp4" />
+          <source src="/v5.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/70 z-10" aria-hidden="true"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
           <div className="text-center">
-            <h1 className="text-4xl md:text-7xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
               Let's Plan Your
-              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 to-white">
+              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400">
                 Dream Journey
               </span>
             </h1>

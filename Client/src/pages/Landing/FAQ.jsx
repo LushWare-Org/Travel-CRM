@@ -111,7 +111,7 @@ export default function FAQSection() {
   };
 
   return (
-    <section className="py-20 bg-white relative overflow-hidden font-opensans">
+    <section className="py-4 bg-white relative overflow-hidden font-opensans pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Header */}
           <div className="text-center mb-16">
@@ -119,7 +119,7 @@ export default function FAQSection() {
             Got Questions? We've Got Answers
           </h2>
           <p className="text-lg text-gray-600">
-            Everything you need to know about booking, travel planning, and our services
+            Helpful answers to make your holiday planning easy and confident
           </p>
         </div>
 

@@ -59,6 +59,7 @@ const app = express();
 
 // Trust proxy
 app.set('trust proxy', 1);
+app.set('request timeout', 45000);
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -146,7 +147,7 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
 
-  app.listen(PORT, async () => {
+  const server = app.listen(PORT, async () => {
     logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/api/${API_VERSION}`);
@@ -154,6 +155,7 @@ const startServer = async () => {
     // Verify email service after server starts
     await emailService.verifyConnection();
   });
+  server.setTimeout(45000);
 };
 
 startServer();

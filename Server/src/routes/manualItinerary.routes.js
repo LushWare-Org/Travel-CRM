@@ -4,6 +4,7 @@ import {
   getManualItineraryByLead,
   deleteManualItinerary,
   createWebsiteManualItinerary,
+  getUserManualItineraries,
 } from '../controllers/manualItinerary.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -14,6 +15,7 @@ router.post('/website', createWebsiteManualItinerary);
 
 // All routes below require authentication
 router.use(protect);
+router.get('/my-requests', getUserManualItineraries);
 
 // Create or update manual itinerary for a lead
 router.post('/lead/:leadId', authorize('admin', 'salesRep'), createOrUpdateManualItinerary);

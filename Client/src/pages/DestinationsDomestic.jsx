@@ -1,10 +1,25 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Star, Clock, IndianRupee, Filter, X, SlidersHorizontal, Grid, List, Heart, ArrowRight, Globe, Compass, Sun, ChevronRight } from 'lucide-react';
+import {
+  Search,
+  MapPin,
+  Star,
+  Clock,
+  Filter,
+  X,
+  SlidersHorizontal,
+  Heart,
+  Globe,
+  Compass,
+  ChevronRight,
+  IndianRupee,
+  Grid,
+  List,
+  ArrowRight,
+  Sun,
+} from 'lucide-react';
 import { fetchPackages } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
-
-const FALLBACK_IMAGE = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
 const filterOptions = {
   priceRanges: [
@@ -18,6 +33,7 @@ const filterOptions = {
 
 export default function DestinationsDomestic() {
   const navigate = useNavigate();
+  const [destinations, setDestinations] = useState([]);
   const [filteredDestinations, setFilteredDestinations] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,57 +44,57 @@ export default function DestinationsDomestic() {
   const [sortBy, setSortBy] = useState('popularity');
   const [showFilters, setShowFilters] = useState(true);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
-  const [destinations, setDestinations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
 
+  useEffect(() => setIsVisible(true), []);
+  
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
     setError(null);
-
     fetchPackages({ limit: 100 })
       .then(({ destinations: dest }) => {
         if (!isMounted) return;
-        setDestinations(dest.filter((d) => d.type === 'domestic'));
+        const domestic = dest.filter(d => d.type === 'domestic');
+        setDestinations(domestic);
       })
-      .catch((err) => {
+      .catch(err => {
         if (!isMounted) return;
         setError(err.message || 'Failed to load destinations');
-        setDestinations([]);
       })
       .finally(() => {
         if (!isMounted) return;
         setLoading(false);
       });
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, []);
 
-  const allDestinationNames = useMemo(() => {
-    return destinations.map((d) => d.name).filter(Boolean).sort();
-  }, [destinations]);
-
   const preparedDestinations = useMemo(() => (
-    destinations.map((dest) => ({
+    destinations.map(dest => ({
       ...dest,
       price: dest.price || 0,
       rating: dest.rating || 0,
       reviews: dest.reviews || 0,
-      duration: dest.durationLabel || '',
+      duration: dest.durationLabel || 'Flexible',
       packagesCount: dest.packagesCount || 0,
       activities: dest.activities || [],
+      country: 'India',
     }))
   ), [destinations]);
+
+  const allDestinationNames = useMemo(() => {
+    return preparedDestinations.map((d) => d.name).filter(Boolean).sort();
+  }, [preparedDestinations]);
 
   useEffect(() => {
     let filtered = [...preparedDestinations];
     if (searchQuery) {
-      filtered = filtered.filter(dest =>
-        dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dest.description.toLowerCase().includes(searchQuery.toLowerCase())
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(d =>
+        d.name?.toLowerCase().includes(q) ||
+        d.description?.toLowerCase().includes(q)
       );
     }
     if (selectedDestinations.length > 0) {
@@ -98,118 +114,143 @@ export default function DestinationsDomestic() {
       filtered = filtered.filter(dest => dest.rating >= minRating);
     }
     switch (sortBy) {
-      case 'popularity':
-        filtered.sort((a, b) => b.packagesCount - a.packagesCount);
-        break;
-      case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'name':
-        filtered.sort((a, b) => a.name.localeCompare(b.name));
-        break;
+      case 'popularity': filtered.sort((a, b) => b.packagesCount - a.packagesCount); break;
+      case 'price-low': filtered.sort((a, b) => a.price - b.price); break;
+      case 'price-high': filtered.sort((a, b) => b.price - a.price); break;
+      case 'rating': filtered.sort((a, b) => b.rating - a.rating); break;
+      case 'name': filtered.sort((a, b) => a.name.localeCompare(b.name)); break;
     }
     setFilteredDestinations(filtered);
     let count = 0;
     if (selectedDestinations.length > 0) count += selectedDestinations.length;
     if (selectedActivities.length > 0) count += selectedActivities.length;
-    if (selectedPriceRange) count++;
-    if (minRating > 0) count++;
+    if (selectedPriceRange) count += 1;
+    if (minRating > 0) count += 1;
     setActiveFiltersCount(count);
-  }, [searchQuery, selectedDestinations, selectedActivities, selectedPriceRange, minRating, sortBy, preparedDestinations]);
+  }, [preparedDestinations, searchQuery, selectedDestinations, selectedActivities, selectedPriceRange, minRating, sortBy]);
 
+  const toggleActivity = a => setSelectedActivities(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a]);
+  const toggleDestination = d => setSelectedDestinations(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d]);
   const clearAllFilters = () => {
-    setSearchQuery('');
-    setSelectedDestinations([]);
-    setSelectedActivities([]);
-    setSelectedPriceRange(null);
+    setSearchQuery(''); 
+    setSelectedDestinations([]); 
+    setSelectedActivities([]); 
+    setSelectedPriceRange(null); 
     setMinRating(0);
   };
 
-  const toggleActivity = (act) => {
-    setSelectedActivities(prev =>
-      prev.includes(act) ? prev.filter(a => a !== act) : [...prev, act]
-    );
-  };
-
-  const toggleDestination = (destName) => {
-    setSelectedDestinations(prev =>
-      prev.includes(destName) ? prev.filter(d => d !== destName) : [...prev, destName]
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load domestic destinations</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
-          >
-            Try again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" /></div>;
+  if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load domestic destinations</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700">Try again</button></div></div>;
 
   return (
-    <div className="min-h-screen font-sans bg-white">
-       {/* Hero */}
-      <div className="relative h-[40vh] overflow-hidden bg-black/90">
-        <div className="absolute inset-0 ">
+    <div className="min-h-screen bg-white">
+      {/* Hero Section */}
+      <div className="relative w-full py-24 overflow-hidden">
+        <div className="absolute inset-0">
           <video
-            src="/v1.mp4"
+            src="/v5.mp4"
             className="w-full h-full object-cover"
             autoPlay
             loop
-          >
-          </video>
+            muted
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
         </div>
-        <div className="absolute inset-0 bg-black/50 "></div>
-        <div className="relative z-10 h-full flex flex-col items-center justify-center text-white px-4">
-          <h1 className="text-5xl md:text-6xl font-bold mb-4 text-center">
-            Discover Your Next <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-orange-300">Adventure</span>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1
+            className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${
+              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+            style={{ lineHeight: '1.15' }}
+          >
+            Explore India Like{' '}
+            <span className="relative inline-block">
+              <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">
+                Never Before
+              </span>
+              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
+                <path
+                  d="M2 10C50 2 100 2 150 6C200 10 250 10 298 4"
+                  stroke="url(#gradient)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#f97316" />
+                    <stop offset="100%" stopColor="#eab308" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </span>
           </h1>
-          <p className="text-xl text-white/90 max-w-2xl text-center mb-8">
-            Explore {destinations.length} incredible local destinations
+          <p
+            className={`text-lg md:text-xl text-white/80 max-w-3xl mx-auto mb-8 transition-all duration-700 delay-200 ${
+              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
+            Discover {destinations.length} incredible domestic destinations crafted for comfort, class & unforgettable moments
           </p>
+          {/* Social Proof */}
+          <div
+            className={`mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-8 transition-all duration-700 delay-500 ${
+              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-xs font-bold shadow-lg"
+                  >
+                    {String.fromCharCode(64 + i)}
+                  </div>
+                ))}
+              </div>
+              <div className="text-left">
+                <p className="text-white font-semibold text-sm">Join 11,000+</p>
+                <p className="text-white/60 text-xs">Happy Travelers</p>
+              </div>
+            </div>
+            <div className="hidden md:block w-px h-10 bg-white/20" />
+            <div className="flex items-center gap-2">
+              <div className="flex">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                ))}
+              </div>
+              <span className="text-white font-semibold">4.9/5</span>
+              <span className="text-white/60 text-sm">(12K+ reviews)</span>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 sticky top-55 z-40">
+
+      <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Sticky Toolbar */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 sticky top-16 z-40">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                onClick={() => setShowFilters((prev) => !prev)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+                  showFilters
+                    ? 'bg-gray-100 hover:bg-gray-200 text-black shadow-md hover:shadow-lg'
+                    : 'bg-gray-100 hover:bg-gray-200 text-black border border-gray-200 hover:border-orange-300'
+                }`}
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 <span className="font-semibold">Filters</span>
                 {activeFiltersCount > 0 && (
-                  <span className="bg-orange-600 text-white text-xs px-2 py-0.5 rounded-full">
+                  <span className={`bg-black text-white text-xs px-2 py-0.5 rounded-full font-medium`}>
                     {activeFiltersCount}
                   </span>
                 )}
               </button>
               {activeFiltersCount > 0 && (
-                <button onClick={clearAllFilters} className="text-sm text-gray-600 hover:text-orange-600 font-medium flex items-center space-x-1">
+                <button onClick={clearAllFilters} className="text-sm text-gray-600 hover:text-orange-600 font-medium flex items-center space-x-1 transition-colors duration-200">
                   <X className="w-4 h-4" />
                   <span>Clear all</span>
                 </button>
@@ -219,7 +260,7 @@ export default function DestinationsDomestic() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
               >
                 <option value="popularity">Most Popular</option>
                 <option value="price-low">Price: Low to High</option>
@@ -228,28 +269,44 @@ export default function DestinationsDomestic() {
                 <option value="name">Name (A-Z)</option>
               </select>
               <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
-                <button onClick={() => setViewMode('grid')} className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm' : ''}`}>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all duration-200 ${
+                    viewMode === 'grid'
+                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
+                      : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
+                  }`}
+                >
                   <Grid className="w-5 h-5" />
                 </button>
-                <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow-sm' : ''}`}>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-all duration-200 ${
+                    viewMode === 'list'
+                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
+                      : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
+                  }`}
+                >
                   <List className="w-5 h-5" />
                 </button>
               </div>
-              <div className="text-gray-600 font-medium">
-                {filteredDestinations.length} destinations
-              </div>
+              <div className="text-gray-600 font-medium">{filteredDestinations.length} destinations</div>
             </div>
           </div>
         </div>
-        <div className="flex gap-6">
+
+        <div className="flex gap-8">
+          {/* Filters */}
           {showFilters && (
-            <div className="w-80 flex-shrink-0">
-              <div className="bg-white rounded-2xl shadow-sm p-6 sticky top-38 h-[calc(180vh-10rem)] overflow-y-auto">
-                <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
+            <div className="w-80 flex-shrink-0 sticky top-32">
+              <div className="bg-white rounded-2xl shadow-sm p-6 overflow-y-auto border border-gray-100">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Filter className="w-5 h-5 text-orange-600" />
-                  <span>Filter Destinations</span>
+                  <span className="text-gray-900">Filter Destinations</span>
                 </h3>
-                <div className="mb-4">
+                
+                {/* Search */}
+                <div className="mb-6">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -257,50 +314,51 @@ export default function DestinationsDomestic() {
                       placeholder="Search destinations..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 focus:border-orange-500 focus:outline-none text-gray-900 placeholder-gray-400 transition-all"
+                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-gray-900 placeholder-gray-400 transition-all duration-200"
                     />
                   </div>
                 </div>
+
+                {/* Destinations */}
                 <div className="mb-6">
-                  <h4 className="font-semibold mb-3 flex items-center space-x-2">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-gray-600" />
-                    <span>Destinations</span>
+                    <span className="text-gray-900">Destinations</span>
                   </h4>
-                  <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {allDestinationNames.map(destName => (
-                      <label
-                        key={destName}
-                        className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                      >
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {allDestinationNames.map((destName) => (
+                      <label key={destName} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200">
                         <input
                           type="checkbox"
                           checked={selectedDestinations.includes(destName)}
                           onChange={() => toggleDestination(destName)}
-                          className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                          className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 focus:ring-2"
                         />
                         <span className="text-gray-700">{destName}</span>
                       </label>
                     ))}
                   </div>
                 </div>
+
+                {/* Price Range */}
                 <div className="mb-6">
-                  <h4 className="font-semibold mb-3 flex items-center space-x-2">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
                     <IndianRupee className="w-4 h-4 text-gray-600" />
-                    <span>Price Range</span>
+                    <span className="text-gray-900">Price Range</span>
                   </h4>
                   <div className="space-y-2">
-                    {filterOptions.priceRanges.map(range => (
+                    {filterOptions.priceRanges.map((range) => (
                       <button
                         key={range.label}
-                        onClick={() => setSelectedPriceRange(selectedPriceRange?.label === range.label ? null : range)}
-                        className={`w-full text-left px-4 py-2 rounded-lg transition-all flex items-center justify-between cursor-pointer ${
+                        onClick={() => setSelectedPriceRange((prev) => (prev?.label === range.label ? null : range))}
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center justify-between cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${
                           selectedPriceRange?.label === range.label
-                            ? 'bg-green-50 border-2 border-green-500 text-green-900'
-                            : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-2 border-transparent'
+                            ? 'bg-gradient-to-r from-green-50 via-emerald-50 to-green-100 text-green-800 border-green-300 shadow-sm'
+                            : 'bg-white hover:bg-gray-50 text-gray-700'
                         }`}
                       >
-                        <span>{range.label}</span>
-                        <span className="text-sm">
+                        <span className="font-medium">{range.label}</span>
+                        <span className="text-sm font-medium">
                           {range.max === Infinity
                             ? `${formatCurrency(range.min)}+`
                             : `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`}
@@ -309,45 +367,48 @@ export default function DestinationsDomestic() {
                     ))}
                   </div>
                 </div>
+
+                {/* Activities */}
                 <div className="mb-6">
-                  <h4 className="font-semibold mb-3 flex items-center space-x-2">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
                     <Compass className="w-4 h-4 text-gray-600" />
-                    <span>Activities</span>
+                    <span className="text-gray-900">Activities</span>
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {filterOptions.activities.map(act => (
+                    {filterOptions.activities.map((activity) => (
                       <button
-                        key={act}
-                        onClick={() => toggleActivity(act)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
-                          selectedActivities.includes(act)
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        key={activity}
+                        onClick={() => toggleActivity(activity)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${
+                          selectedActivities.includes(activity)
+                            ? 'bg-gradient-to-r from-orange-600 to-yellow-500 text-white shadow-md hover:shadow-lg'
+                            : 'bg-white hover:bg-orange-50 text-gray-700'
                         }`}
                       >
-                        {act}
+                        {activity}
                       </button>
                     ))}
                   </div>
                 </div>
+
                 <div className="mb-6">
-                  <h4 className="font-semibold mb-3 flex items-center space-x-2">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
                     <Star className="w-4 h-4 text-gray-600" />
-                    <span>Minimum Rating</span>
+                    <span className="text-gray-900">Minimum Rating</span>
                   </h4>
                   <div className="space-y-2">
-                    {filterOptions.ratings.map(r => (
+                    {filterOptions.ratings.map((ratingValue) => (
                       <button
-                        key={r}
-                        onClick={() => setMinRating(minRating === r ? 0 : r)}
-                        className={`w-full text-left px-4 py-2 rounded-lg transition-all flex items-center space-x-2 cursor-pointer ${
-                          minRating === r
-                            ? 'bg-yellow-50 border-2 border-yellow-500'
-                            : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                        key={ratingValue}
+                        onClick={() => setMinRating((prev) => (prev === ratingValue ? 0 : ratingValue))}
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-3 cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${
+                          minRating === ratingValue
+                            ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-100 text-amber-800 border-amber-300 shadow-sm'
+                            : 'bg-white hover:bg-gray-50 text-gray-700'
                         }`}
                       >
-                        <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                        <span>{r}+ & above</span>
+                        <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                        <span className="font-medium">{ratingValue}+ & above</span>
                       </button>
                     ))}
                   </div>
@@ -355,135 +416,145 @@ export default function DestinationsDomestic() {
               </div>
             </div>
           )}
+
+          {/* Cards & List View */}
           <div className="flex-1">
             {filteredDestinations.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-4">
-                  <Search className="w-10 h-10 text-gray-400" />
-                </div>
+              <div className="text-center py-24 bg-gray-50 rounded-2xl">
+                <Filter className="w-16 h-16 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">No destinations found</h3>
-                <p className="text-gray-600 mb-4">Try adjusting your filters</p>
-                <button onClick={clearAllFilters} className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
-                  Clear all filters
-                </button>
+                <p className="text-gray-600">Try adjusting your filters</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredDestinations.map(dest => (
-                  <div
+                  <Link
                     key={dest.id}
-                    onClick={() => navigate(`/packages?destination=${dest.slug}`)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?destination=${dest.slug}`); }}
-                    role="button"
-                    tabIndex={0}
-                    className="group bg-white rounded-2xl overflow-hidden border border-gray-200 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer"
+                    to={`/packages?destination=${dest.slug}`}
+                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
                   >
-                    <div className="relative h-64 overflow-hidden">
-                      <img src={dest.image_url || FALLBACK_IMAGE} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
-                      <div className="absolute bottom-4 left-4 right-4">
-                        <div className="flex items-center space-x-2 text-white">
-                          <MapPin className="w-5 h-5" />
-                          <span className="font-semibold text-lg">{dest.name}, India</span>
+                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+                    <div className="relative overflow-hidden aspect-[5/3]">
+                      <img
+                        src={dest.image_url}
+                        alt={dest.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4 text-yellow-400" />
+                            <span className="text-sm">{dest.duration}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                            <span className="text-sm">{dest.rating} ({dest.reviews} reviews)</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="p-5">
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">{dest.description}</p>
-                      <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="text-center p-2 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-center space-x-1 mb-1">
-                            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                    <div className="p-6 space-y-5">
+                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+                        {dest.name}, India
+                      </h3>
+                      <p className="text-gray-600 text-sm line-clamp-2">{dest.description}</p>
+                      <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-gray-200">
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-yellow-600 mb-1">
+                            <Star className="w-4 h-4 fill-current" />
                             <span className="font-bold text-gray-900">{dest.rating}</span>
                           </div>
                           <p className="text-xs text-gray-500">{dest.reviews} reviews</p>
                         </div>
-                        <div className="text-center p-2 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-center space-x-1 mb-1">
-                            <Clock className="w-4 h-4 text-gray-600" />
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-gray-700 mb-1">
+                            <Clock className="w-4 h-4" />
                             <span className="font-bold text-gray-900">{dest.duration}</span>
                           </div>
                           <p className="text-xs text-gray-500">Duration</p>
                         </div>
-                        <div className="text-center p-2 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-center mb-1">
-                            <span className="font-bold text-gray-900">{dest.packagesCount}</span>
-                          </div>
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-gray-900">{dest.packagesCount}</div>
                           <p className="text-xs text-gray-500">Packages</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                      <div className="flex items-center justify-between pt-4">
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Starting from</p>
-                          <p className="text-2xl font-bold text-gray-900">{formatCurrency(dest.price)}</p>
+                          <p className="text-sm text-gray-500">Starting from</p>
+                          <p className="text-2xl font-bold text-orange-600">{formatCurrency(dest.price)}</p>
                         </div>
-                        <Link
-                          to={`/packages?destination=${dest.slug}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="px-6 py-2.5 bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
-                        >
-                          <span>Explore</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </Link>
+                        <button className="px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-xl">
+                          View Details
+                        </button>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredDestinations.map(dest => (
+              <div className="space-y-6">
+                {filteredDestinations.map((dest) => (
                   <div
                     key={dest.id}
                     onClick={() => navigate(`/packages?destination=${dest.slug}`)}
                     onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?destination=${dest.slug}`); }}
                     role="button"
                     tabIndex={0}
-                    className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-300 cursor-pointer"
+                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-100 hover:shadow-2xl hover:border-yellow-500 transition-all duration-300 cursor-pointer"
                   >
-                    <div className="flex flex-col md:flex-row">
-                      <div className="relative md:w-80 h-64 md:h-auto flex-shrink-0 overflow-hidden">
-                        <img src={dest.image_url || FALLBACK_IMAGE} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent"></div>
+                    <div className="flex flex-col lg:flex-row">
+                      <div className="relative lg:w-96 h-64 lg:h-auto overflow-hidden flex-shrink-0">
+                        <img
+                          src={dest.image_url}
+                          alt={dest.name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
                       </div>
-                      <div className="flex-1 p-6">
-                        <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 p-6 lg:p-8">
+                        <div className="flex items-start justify-between mb-4">
                           <div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">
                               {dest.name}, India
                             </h3>
-                            <div className="flex items-center space-x-4 text-sm text-gray-600">
-                              <div className="flex items-center space-x-1">
-                                <MapPin className="w-4 h-4" />
-                                <span>India</span>
-                              </div>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {dest.activities.slice(0, 4).map((activity) => (
+                                <span key={activity} className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
+                                  {activity}
+                                </span>
+                              ))}
+                              {dest.activities.length > 4 && (
+                                <span className="text-xs text-gray-500">+{dest.activities.length - 4} more</span>
+                              )}
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-1 bg-yellow-50 px-3 py-1.5 rounded-lg">
-                            <Star className="w-5 h-5 fill-yellow-500 text-yellow-500" />
-                            <span className="font-bold text-gray-900">{dest.rating}</span>
-                            <span className="text-gray-500 text-sm">({dest.reviews})</span>
                           </div>
                         </div>
-                        <p className="text-gray-600 mb-4 leading-relaxed">{dest.description}</p>
+                        <p className="text-gray-600 mb-5 leading-relaxed">{dest.description}</p>
+                        <div className="flex flex-wrap gap-6 text-sm text-gray-600 mb-6">
+                          <div className="flex items-center space-x-2">
+                            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                            <span className="font-semibold">{dest.rating}</span>
+                            <span className="text-gray-400">({dest.reviews} reviews)</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4" />
+                            <span>{dest.duration || 'Flexible'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Sun className="w-4 h-4" />
+                            <span>{dest.packagesCount} curated packages</span>
+                          </div>
+                        </div>
                         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                          <div className="flex items-center space-x-6">
-                            <div>
-                              <p className="text-xs text-gray-500 mb-1">Starting from</p>
-                              <p className="text-3xl font-bold text-gray-900">{formatCurrency(dest.price)}</p>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              <div className="flex items-center space-x-1 mb-1">
-                                <Clock className="w-4 h-4" />
-                                <span className="font-semibold">{dest.duration}</span>
-                              </div>
-                              <div>{dest.packagesCount} packages available</div>
-                            </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">Starting Price</p>
+                            <p className="text-3xl font-bold text-orange-600">{formatCurrency(dest.price)}</p>
                           </div>
                           <Link
                             to={`/packages?destination=${dest.slug}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="px-8 py-3 bg-gradient-to-r from-orange-600 to-yellow-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
+                            className="px-8 py-3 bg-black hover:bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
                           >
                             <span>View Packages</span>
                             <ArrowRight className="w-5 h-5" />
@@ -498,6 +569,16 @@ export default function DestinationsDomestic() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes twinkle {
+          0%, 100% { opacity: 0; transform: scale(0.5); }
+          50% { opacity: 1; transform: scale(1); }
+        }
+        .animate-twinkle {
+          animation: twinkle 4s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

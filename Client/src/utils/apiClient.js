@@ -10,6 +10,23 @@ const apiClient = axios.create({
   withCredentials: false,
 });
 
+apiClient.interceptors.request.use(
+  (config) => {
+    try {
+      const authData = localStorage.getItem('tsw_auth');
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        if (parsed?.token) {
+          config.headers.Authorization = `Bearer ${parsed.token}`;
+        }
+      }
+    } catch (err) {
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

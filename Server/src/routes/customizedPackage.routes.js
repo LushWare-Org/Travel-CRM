@@ -4,6 +4,7 @@ import {
   createWebsiteCustomizedPackage,
   getCustomizedPackageById,
   updateCustomizedPackage,
+  getUserCustomizedPackages,
 } from '../controllers/customizedPackage.controller.js';
 
 const router = express.Router();
@@ -13,6 +14,7 @@ router.post('/website', createWebsiteCustomizedPackage);
 
 // All other routes require authentication
 router.use(protect);
+router.get('/my-requests', getUserCustomizedPackages);
 
 router
   .route('/:id')
