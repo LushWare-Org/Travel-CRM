@@ -404,15 +404,15 @@ export default function Home() {
           })}
         </div> */}
 
-        <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110" aria-label="Previous">
+        <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110" aria-label="Next">
+        <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Next">
           <ChevronRight className="w-6 h-6" />
         </button>
 
         {/* Hero Content */}
-      <div className="relative z-30 h-full flex flex-col items-center justify-start pt-24 px-4">          
+      <div className="relative z-30 h-full flex flex-col items-center justify-start pt-12 md:pt-24 px-4">          
         <div className="max-w-7xl text-center mx-auto">
             <div className="max-w-4xl">
               <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight font-poppins">
@@ -428,7 +428,7 @@ export default function Home() {
                   );
                 })()}
               </h1>
-              <p className="text-xl text-gray-200 mb-12">{heroSlides[currentSlide % 4].subtitle}</p>
+              <p className="text-xl text-gray-200 mb-6 md:mb-12">{heroSlides[currentSlide % 4].subtitle}</p>
 
               {/* Search bar */}
               <div className="relative">

@@ -125,13 +125,13 @@ export default function AboutUs() {
         </div>
 
       <div className="max-w-7xl mx-auto px-4 pt-10">
-        <div className="flex justify-center mb-16">
-          <div className="inline-flex bg-white rounded-2xl shadow-lg p-2 gap-2">
+        <div className="flex justify-center mb-16 px-4 sm:px-0">
+          <div className="inline-flex bg-white rounded-2xl shadow-lg p-2 gap-2 flex-col sm:flex-row w-full sm:w-auto">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition-all duration-300 ${
+                className={`flex items-center justify-center gap-2 px-4 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${
                   activeTab === tab.id
                     ? 'bg-gradient-to-r from-orange-600 to-yellow-500 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-50'
@@ -145,24 +145,24 @@ export default function AboutUs() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white rounded-3xl shadow-lg p-12 mb-20">
+        <div className="bg-white rounded-3xl shadow-lg p-6 sm:p-10 md:p-12 mb-20 mx-4 sm:mx-0">
           {activeTab === 'story' && (
             <div>
               <h2 className="text-4xl font-bold mb-6 bg-clip-text text-transparent bg-black">
                 Our Journey Began with a Dream
               </h2>
               <div className="space-y-6 text-md text-gray-700 leading-relaxed">
-                <p>
+                <p className="text-justify">
                   TripSkyway is a premier travel agency specializing in providing exceptional travel experiences to its clients. With a wealth of knowledge and expertise in the travel industry, TripSkyway is committed to delivering unparalleled service and value to every customer.
                 </p>
-                <p>
-                  Whether you’re looking for a romantic getaway, an adventure-packed vacation, or a relaxing beach retreat, TripSkyway has you covered. With a wide range of travel packages and customizable itineraries, you’re sure to find the perfect vacation to suit your individual preferences and budget.                
+                <p className="text-justify">
+                  Whether you're looking for a romantic getaway, an adventure-packed vacation, or a relaxing beach retreat, TripSkyway has you covered. With a wide range of travel packages and customizable itineraries, you're sure to find the perfect vacation to suit your individual preferences and budget.                
                   </p>
-                <p>
-                  At TripSkyway, customer satisfaction is of the utmost importance. When you contact the agency, you can expect personalized attention and exceptional service from a team of experienced travel professionals. The agency’s commitment to customer service extends throughout your entire travel experience, ensuring that your trip is everything you hoped it would be and more.
+                <p className="text-justify">
+                  At TripSkyway, customer satisfaction is of the utmost importance. When you contact the agency, you can expect personalized attention and exceptional service from a team of experienced travel professionals. The agency's commitment to customer service extends throughout your entire travel experience, ensuring that your trip is everything you hoped it would be and more.
                 </p>
-                <p>
-                  So whether you’re planning a weekend getaway or a month-long excursion, let TripSkyway help you make the most of your travel experience. With their expertise and dedication to excellence, you can rest assured that your vacation will be remembered.
+                <p className="text-justify">
+                  So whether you're planning a weekend getaway or a month-long excursion, let TripSkyway help you make the most of your travel experience. With their expertise and dedication to excellence, you can rest assured that your vacation will be remembered.
                 </p>
               </div>
             </div>
@@ -172,13 +172,13 @@ export default function AboutUs() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-red-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
                   <h3 className="text-3xl  font-bold mb-4 text-gray-900">Our Mission</h3>
-                  <p className="text-md text-gray-700 leading-relaxed">
+                  <p className="text-md text-gray-700 leading-relaxed text-justify">
                     To inspire and enable meaningful travel experiences by combining local expertise with global reach. We're committed to making every journey seamless, memorable, and transformative, while maintaining the highest standards of service and sustainability.
                   </p>
                 </div>
                 <div className="bg-blue-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
                   <h3 className="text-3xl font-bold mb-4 text-gray-900">Our Vision</h3>
-                  <p className="text-md text-gray-700 leading-relaxed">
+                  <p className="text-md text-gray-700 leading-relaxed text-justify">
                     To become the world's most trusted travel companion, known for creating extraordinary experiences that connect people with places and cultures. We envision a future where responsible tourism enriches both travelers and destinations alike.
                   </p>
                 </div>

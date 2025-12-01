@@ -7,8 +7,21 @@ export default function RecentlyBookedSlider({ items = [] }) {
   const [slideIdx, setSlideIdx] = useState(0);
   const [enableTransition, setEnableTransition] = useState(true);
   const animatingRef = useRef(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   
-  const cardsPerView = Math.min(5, Math.max(items.length, 1));
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  const getCardsPerView = () => {
+    if (windowWidth < 640) return 1;
+    if (windowWidth < 1024) return 2; 
+    return 5; 
+  };
+  
+  const cardsPerView = Math.min(getCardsPerView(), Math.max(items.length, 1));
   const total = Math.max(items.length, 1);
   const combined = items.length > 0 ? [...items, ...items] : items;
   
@@ -52,7 +65,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
       setSlideIdx((i) => i + 1);
     }, 3000); 
     return () => clearInterval(id);
-  }, [total, cardsPerView]);
+  }, [total, cardsPerView, windowWidth]);
 
   // Infinite loop reset
   const onTransitionEnd = () => {
@@ -100,11 +113,11 @@ export default function RecentlyBookedSlider({ items = [] }) {
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-yellow-200/20 rounded-full blur-3xl"></div>
 
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-3 font-poppins">
+        <div className="text-center mb-8 md:mb-12">
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-2 md:mb-3 font-poppins">
             Recently Booked Itineraries
           </h2>
-          <p className="text-lg text-white max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-white max-w-2xl mx-auto">
             Real travelers, real bookings - happening right now
           </p>
         </div>
@@ -114,8 +127,8 @@ export default function RecentlyBookedSlider({ items = [] }) {
           <div className="overflow-hidden w-full">
             <div
               onTransitionEnd={onTransitionEnd}
-              className={`flex ${enableTransition ? 'transition-transform duration-700 ease-in-out' : ''}`}
-              style={{ transform: `translateX(-${slideIdx * widthPct}%)` }}
+              className={`flex gap-2 md:gap-3 ${enableTransition ? 'transition-transform duration-700 ease-in-out' : ''}`}
+              style={{ transform: `translateX(-${slideIdx * (100 / cardsPerView)}%)` }}
             >
               {combined.map((item, idx) => {
                 const travelerName = item.traveler?.name || 'Traveler';
@@ -125,13 +138,13 @@ export default function RecentlyBookedSlider({ items = [] }) {
                 return (
                   <div
                     key={`${item.id}-${idx}`}
-                    className="flex-shrink-0 px-3"
-                    style={{ width: `${widthPct}%` }} 
+                    className="flex-shrink-0 px-1.5 md:px-3"
+                    style={{ width: `${100 / cardsPerView}%` }} 
                   >
                     <div className="group relative bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 h-full border border-gray-100">
                       <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
 
-                     <div className="relative h-64 overflow-hidden">
+                     <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden">
                         <img
                           src={item.image}
                           alt={item.packageName}
@@ -191,7 +204,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
           </div>
 
           {showControls && (
-            <div className="absolute -top-16 right-0 z-20 flex items-center gap-3">
+            <div className="absolute -top-16 right-0 z-20 hidden md:flex items-center gap-3">
               <button
                 onClick={goPrev}
                 className="w-12 h-12 rounded-full flex items-center justify-center hover:scale-110 transition-all duration-300 bg-white border-2 border-white hover:border-orange-500 group"

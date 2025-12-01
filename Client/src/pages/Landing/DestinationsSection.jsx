@@ -207,7 +207,7 @@ function InternationalGrid({ destinations, loading }) {
             className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
-          <div className="absolute inset-0 flex flex-col justify-end p-6">
+          <div className="absolute inset-0 flex flex-col justify-end p-3 md:p-6">
             <h3 className="text-3xl font-bold text-white">{dest.name}</h3>
             <div className="text-white/90 text-sm mt-2">
               <span>Starting from</span>
@@ -279,11 +279,11 @@ function LocalSlider({ destinations, loading }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative px-0 md:px-16">
       {canGoLeft && (
         <button
           onClick={goToPrevious}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all"
+          className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg items-center justify-center hover:bg-white transition-all"
         >
           <ChevronLeft className="w-6 h-6 text-gray-800" />
         </button>
@@ -292,13 +292,13 @@ function LocalSlider({ destinations, loading }) {
       {canGoRight && (
         <button
           onClick={goToNext}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-all"
+          className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg items-center justify-center hover:bg-white transition-all"
         >
           <ChevronRight className="w-6 h-6 text-gray-800" />
         </button>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 px-2 py-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 px-0 md:px-2 py-2">
         {currentDestinations.map((dest) => (
           <div key={dest.id} className="w-full">
             <button

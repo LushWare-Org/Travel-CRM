@@ -63,17 +63,17 @@ export default function WhyChooseUs() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
             </div>
-            <div className="absolute -bottom-8 -left-8 bg-white rounded-2xl shadow-2xl p-6 max-w-xs">
-              <div className="flex items-center space-x-4 mb-3">
-                <div className="w-16 h-16 bg-gradient-to-r from-green-400 via-green-200 to-green-400 rounded-xl flex items-center justify-center">
-                  <Star className="w-8 h-8 text-white fill-current" />
+            <div className="absolute -bottom-4 md:-bottom-8 -left-2 md:-left-8 bg-white rounded-2xl shadow-2xl p-4 md:p-6 max-w-xs">
+              <div className="flex items-center space-x-3 md:space-x-4 mb-2 md:mb-3">
+                <div className="w-12 md:w-16 h-12 md:h-16 bg-gradient-to-r from-green-400 via-green-200 to-green-400 rounded-xl flex items-center justify-center">
+                  <Star className="w-6 md:w-8 h-6 md:h-8 text-white fill-current" />
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-gray-900 font-poppins">11,000+</div>
-                  <div className="text-sm text-gray-600">Happy Customers</div>
+                  <div className="text-2xl md:text-3xl font-bold text-gray-900 font-poppins">11,000+</div>
+                  <div className="text-xs md:text-sm text-gray-600">Happy Customers</div>
                 </div>
               </div>
-              <p className="text-gray-700 text-sm font-medium">Plan your holiday with Trip Sky Way</p>
+              <p className="text-gray-700 text-xs md:text-sm font-medium">Plan your holiday with Trip Sky Way</p>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Phone, Mail, MapPin, Plane, LogOut } from 'lucide-react';
+import { ChevronDown, Phone, Mail, MapPin, Plane, LogOut, Menu, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../utils/packageApi';
 import { useAuth } from '../context/AuthContext';
@@ -18,12 +18,39 @@ export default function Header({ currentPage, onNavigate }) {
   const { user, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    let inactivityTimer;
+    const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
+    const resetInactivityTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        logout();
+        onNavigate('home');
+      }, INACTIVITY_TIMEOUT);
+    };
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetInactivityTimer);
+    });
+    resetInactivityTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetInactivityTimer);
+      });
+    };
+  }, [user, logout, onNavigate]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -233,7 +260,69 @@ export default function Header({ currentPage, onNavigate }) {
               </div>
             )}
           </div>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-orange-500 transition-all"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-gray-800 py-4">
+            {navItems.map(item => {
+              const isActive = isItemActive(item);
+              return (
+                <div key={item.page}>
+                  <button
+                    onClick={() => {
+                      onNavigate(item.page, null, item.dropdown);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 flex items-center justify-between transition-all text-sm font-medium
+                      ${isActive 
+                        ? 'text-orange-400 bg-orange-900/20' 
+                        : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
+                      }
+                    `}
+                  >
+                    <span>{item.name}</span>
+                    {item.dropdown && <ChevronDown size={16} />}
+                  </button>
+                </div>
+              );
+            })}
+            <div className="border-t border-gray-800 mt-3 pt-3 px-4">
+              <a
+                href="/planner"
+                onClick={() => {
+                  onNavigate('planner');
+                  setMobileMenuOpen(false);
+                }}
+                className="block w-full text-center py-2 rounded-lg bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-semibold text-sm hover:shadow-lg transition-all"
+              >
+                Plan Your Trip
+              </a>
+            </div>
+            {user && (
+              <div className="border-t border-gray-800 mt-3 pt-3 px-4">
+                <button
+                  onClick={() => {
+                    logout();
+                    setMobileMenuOpen(false);
+                    onNavigate('home');
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-orange-400 hover:bg-white/5 rounded-lg transition-all flex items-center gap-3"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <style>{`
         @keyframes fadeIn {

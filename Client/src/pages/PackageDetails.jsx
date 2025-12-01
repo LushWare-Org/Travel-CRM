@@ -383,11 +383,168 @@ export default function PackageDetails() {
         .seamless-transition-in {
           animation: seamlessEnter 1.5s ease-out forwards;
         }
+
+        /* Mobile-specific styles */
+        @media (max-width: 1024px) {
+          .hero-height-mobile {
+            height: 70vh !important;
+          }
+          .hero-title-mobile {
+            font-size: 2.5rem !important;
+            line-height: 1.2 !important;
+          }
+          .hero-subtitle-mobile {
+            font-size: 1.125rem !important;
+          }
+          .hero-info-cards-mobile {
+            flex-direction: column !important;
+            gap: 0.75rem !important;
+          }
+          .hero-info-card-mobile {
+            width: 100% !important;
+            justify-content: center !important;
+            text-align: center !important;
+          }
+          .section-tabs-mobile {
+            flex-direction: column !important;
+          }
+          .section-tab-mobile {
+            border-bottom: 1px solid #e5e7eb !important;
+            border-radius: 0 !important;
+            justify-content: flex-start !important;
+          }
+          .section-tab-mobile:last-child {
+            border-bottom: none !important;
+          }
+          .section-tab-active-mobile {
+            background: linear-gradient(135deg, #000 0%, #1f2937 100%) !important;
+            color: white !important;
+            border-left: 4px solid #f59e0b !important;
+          }
+          .itinerary-day-mobile {
+            flex-direction: column !important;
+            gap: 1rem !important;
+          }
+          .itinerary-day-number-mobile {
+            align-self: flex-start !important;
+            margin-bottom: 0.5rem !important;
+          }
+          .itinerary-connector-mobile {
+            display: none !important;
+          }
+          .inclusions-grid-mobile {
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem !important;
+          }
+          .reviews-header-mobile {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 1rem !important;
+          }
+          .reviews-rating-section-mobile {
+            align-self: stretch !important;
+            text-align: left !important;
+          }
+          .sidebar-sticky-mobile {
+            position: relative !important;
+            top: auto !important;
+          }
+          .pricing-card-mobile {
+            padding: 1.5rem !important;
+          }
+          .pricing-title-mobile {
+            font-size: 1.125rem !important;
+          }
+          .pricing-amount-mobile {
+            font-size: 2.5rem !important;
+          }
+          .booking-buttons-mobile {
+            flex-direction: column !important;
+            gap: 0.75rem !important;
+          }
+          .assistance-card-mobile {
+            padding: 1.5rem !important;
+          }
+          .assistance-contact-mobile {
+            padding: 1rem !important;
+            gap: 1rem !important;
+          }
+          .modal-max-height-mobile {
+            max-height: 95vh !important;
+          }
+          .modal-padding-mobile {
+            padding: 1.5rem !important;
+          }
+          .form-grid-mobile {
+            grid-template-columns: 1fr !important;
+            gap: 1rem !important;
+          }
+          .form-input-mobile {
+            padding: 0.875rem 1rem !important;
+          }
+          .review-modal-mobile {
+            max-width: 95vw !important;
+            margin: 1rem !important;
+          }
+          .success-modal-mobile {
+            max-width: 90vw !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .hero-height-sm {
+            height: 60vh !important;
+          }
+          .hero-title-sm {
+            font-size: 2rem !important;
+          }
+          .hero-padding-sm {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-bottom: 2rem !important;
+          }
+          .main-content-padding-sm {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 1rem !important;
+          }
+          .section-padding-sm {
+            padding: 1.5rem !important;
+          }
+          .tabs-padding-sm {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+          }
+          .itinerary-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .inclusions-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .review-card-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .pricing-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .assistance-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .modal-header-padding-sm {
+            padding: 1.5rem 1.25rem !important;
+          }
+          .modal-form-padding-sm {
+            padding: 1.5rem 1.25rem !important;
+          }
+          .button-padding-sm {
+            padding: 0.875rem 1rem !important;
+          }
+        }
       `}</style>
 
-      {/* Hero Section - SEAMLESS END-TO-END TRANSITION */}
+      {/* Hero Section - Mobile Responsive */}
       <div
-        className="relative h-[83vh] overflow-hidden"
+        className="relative h-[70vh] lg:h-[83vh] overflow-hidden"
         onMouseEnter={() => setIsImageHovered(true)}
         onMouseLeave={() => setIsImageHovered(false)}
       >
@@ -396,16 +553,16 @@ export default function PackageDetails() {
             const isCurrent = idx === currentImageIndex;
             const isNext = idx === (currentImageIndex + 1) % images.length;
             const isPrevious = idx === (currentImageIndex - 1 + images.length) % images.length;
-            
+           
             return (
               <div
                 key={idx}
                 className={`
                   absolute inset-0 transition-all duration-1000 ease-out
-                  ${isCurrent 
-                    ? 'opacity-100 z-10 ken-burns-active slide-horizontal seamless-transition-in' 
-                    : isNext || isPrevious 
-                      ? 'opacity-0 z-5 seamless-transition-out' 
+                  ${isCurrent
+                    ? 'opacity-100 z-10 ken-burns-active slide-horizontal seamless-transition-in'
+                    : isNext || isPrevious
+                      ? 'opacity-0 z-5 seamless-transition-out'
                       : 'opacity-0 scale-100 z-0'
                   }
                 `}
@@ -422,7 +579,7 @@ export default function PackageDetails() {
             );
           })}
         </div>
-
+        
         {/* Hero Content */}
         <div className={`relative z-30 h-full flex items-end pb-12 transition-all duration-1000 ${
           isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
@@ -469,77 +626,83 @@ export default function PackageDetails() {
               </span>
             </div>
             </div>
-            </div>
+        </div>
+
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 animate-bounce">
           <div className="flex flex-col items-center gap-2 text-white/60">
             <span className="text-xs uppercase tracking-wider font-semibold">Scroll</span>
             <ChevronDown className="w-6 h-6" />
           </div>
         </div>
+
         {images.length > 1 && (
           <>
             <button
               onClick={prevImage}
-              className="absolute left-6 top-1/2 -translate-y-1/2 z-40 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white"
+              className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 z-40 w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
               aria-label="Previous image"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ChevronLeft className="w-5 h-5 lg:w-6 lg:h-6" />
             </button>
             <button
               onClick={nextImage}
-              className="absolute right-6 top-1/2 -translate-y-1/2 z-40 w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white"
+              className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 z-40 w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
               aria-label="Next image"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6" />
             </button>
           </>
         )}
       </div>
 
       {/* Main Content */}
-      <div className="max-w-8xl mx-auto px-8 -mt-6 relative py-20 z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-20">
-          <div className="lg:col-span-2 space-y-8">
+      <div className="max-w-8xl mx-auto px-4 lg:px-8 -mt-6 lg:-mt-6 relative py-12 lg:py-20 z-10 main-content-padding-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 pb-12 lg:pb-20">
+            <div className="lg:col-span-2 space-y-6 lg:space-y-8">
             <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-              <div className="flex border-b border-gray-200 overflow-x-auto">
-                {sections.map((section) => {
+              
+              {/* Section Tabs */}
+              <div className="flex flex-col lg:flex-row border-b border-gray-200 section-tabs-mobile">
+                {sections.map((section, index) => {
                   const Icon = section.icon;
                   return (
                     <button
                       key={section.id}
                       onClick={() => setActiveSection(section.id)}
-                      className={`flex-1 flex items-center justify-center gap-3 px-6 py-5 font-black transition-all duration-300 whitespace-nowrap ${
+                      className={`w-full lg:flex-1 flex items-center justify-start lg:justify-center gap-3 px-4 lg:px-6 py-4 lg:py-5 font-black transition-all duration-300 section-tab-mobile ${
                         activeSection === section.id
-                          ? 'bg-black text-white'
+                          ? 'section-tab-active-mobile bg-gradient-to-r from-black to-gray-800 text-white'
                           : 'text-gray-600 hover:bg-gray-50'
                       }`}
                     >
-                      <Icon className="w-5 h-5" />
-                      {section.label}
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span className="hidden sm:inline">{section.label}</span>
+                      <span className="sm:hidden">{section.label.split(' ')[0]}</span>
                     </button>
                   );
                 })}
               </div>
-              <div className="p-10">
+
+              <div className="p-6 lg:p-10 section-padding-sm">
                 {activeSection === 'overview' && (
-                  <div className="space-y-10">
+                  <div className="space-y-6 lg:space-y-10">
                     <div>
-                      <p className="text-lg text-gray-700 leading-relaxed">{pkg.description}</p>
+                      <p className="text-base lg:text-lg text-gray-700 leading-relaxed">{pkg.description}</p>
                     </div>
                     {pkg.highlights && pkg.highlights.length > 0 && (
                       <div>
-                        <h3 className="text-3xl font-black text-gray-900 mb-6">Premium Highlights</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-4 lg:mb-6">Premium Highlights</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
                           {pkg.highlights.map((h, i) => (
                             <div
                               key={i}
-                              className="group relative bg-gray-50 rounded-2xl p-5 hover:shadow-lg transition-all duration-300 border hover:border-amber-300"
+                              className="group relative bg-gray-50 rounded-2xl p-4 lg:p-5 hover:shadow-lg transition-all duration-300 border hover:border-amber-300"
                             >
-                              <div className="flex items-start gap-4">
+                              <div className="flex items-start gap-3 lg:gap-4">
                                 <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  <Check className="w-6 h-6 text-white" />
+                                  <Check className="w-4 h-4 lg:w-6 lg:h-6 text-white" />
                                 </div>
-                                <p className="text-black font-semibold leading-relaxed flex-1">{h}</p>
+                                <p className="text-black font-semibold leading-relaxed flex-1 text-sm lg:text-base">{h}</p>
                               </div>
                             </div>
                           ))}
@@ -549,24 +712,24 @@ export default function PackageDetails() {
                   </div>
                 )}
                 {activeSection === 'itinerary' && (
-                  <div className="space-y-6">
-                    <h2 className="text-3xl font-black text-gray-900 mb-8 bg-black bg-clip-text text-transparent">
+                  <div className="space-y-4 lg:space-y-6">
+                    <h2 className="text-2xl lg:text-3xl font-black text-gray-900 mb-6 lg:mb-8 bg-black bg-clip-text text-transparent">
                       Journey Timeline
                     </h2>
                     {pkg.itinerary?.map((day, i) => (
                       <div key={i} className="group relative">
-                        <div className="flex gap-6">
-                          <div className="relative flex-shrink-0">
-                            <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg group-hover:scale-110 transition-transform">
+                        <div className="itinerary-day-mobile flex flex-col lg:flex-row gap-4 lg:gap-6">
+                          <div className="relative flex-shrink-0 itinerary-day-number-mobile">
+                            <div className="w-14 lg:w-16 h-14 lg:h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl lg:text-3xl shadow-lg group-hover:scale-110 transition-transform">
                               {i + 1}
                             </div>
-                            {i < (pkg.itinerary?.length || 0) && (
-                              <div className="absolute top-20 left-1/2 -translate-x-1/2 w-1 h-12 bg-gradient-to-b from-orange-300 to-transparent" />
+                            {i < (pkg.itinerary?.length || 0)  && (
+                              <div className="itinerary-connector-mobile lg:absolute lg:top-20 lg:left-1/2 lg:-translate-x-1/2 w-1 h-12 lg:h-12 bg-gradient-to-b from-orange-300 to-transparent" />
                             )}
                           </div>
-                          <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-8 border border-gray-200 hover:border-amber-300 hover:shadow-xl transition-all">
-                            <h3 className="text-2xl font-black text-gray-900 mb-3">{day.title}</h3>
-                            <p className="text-gray-700 leading-relaxed text-lg">{day.description}</p>
+                          <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-amber-300 hover:shadow-xl transition-all itinerary-padding-sm">
+                            <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2 lg:mb-3">{day.title}</h3>
+                            <p className="text-gray-700 leading-relaxed text-base lg:text-lg">{day.description}</p>
                           </div>
                         </div>
                       </div>
@@ -574,11 +737,11 @@ export default function PackageDetails() {
                   </div>
                 )}
                 {activeSection === 'inclusions' && (
-                  <div className="space-y-8">
-                    <div className="grid md:grid-cols-2 gap-8">
-                      <div className="rounded-2xl p-6 border border-gray-200">
-                        <div className="flex items-center gap-3 mb-6">
-                          <h3 className="text-3xl font-bold text-gray-900">Inclusions</h3>
+                  <div className="space-y-6 lg:space-y-8">
+                    <div className="inclusions-grid-mobile lg:grid-cols-2 grid gap-6 lg:gap-8">
+                      <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
+                        <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                          <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Inclusions</h3>
                         </div>
                         <ul className="space-y-3">
                           {pkg.inclusions?.map((inc, i) => (
@@ -586,14 +749,14 @@ export default function PackageDetails() {
                               <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
                                 <Check className="w-4 h-4 text-green-600" />
                               </div>
-                              <span>{inc}</span>
+                              <span className="text-sm lg:text-base">{inc}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
-                      <div className="rounded-2xl p-6 border border-gray-200">
-                        <div className="flex items-center gap-3 mb-6">
-                          <h3 className="text-3xl font-bold text-gray-900">Exclusions</h3>
+                      <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
+                        <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                          <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Exclusions</h3>
                         </div>
                         <ul className="space-y-3">
                           {pkg.exclusions?.map((exc, i) => (
@@ -601,35 +764,34 @@ export default function PackageDetails() {
                               <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-red-600 flex items-center justify-center mt-0.5">
                                 <X className="w-4 h-4 text-red-600" />
                               </div>
-                              <span>{exc}</span>
+                              <span className="text-sm lg:text-base">{exc}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     </div>
-                    {/* Booking Policies */}
-                    <div className="rounded-3xl p-8 border-2 border-amber-200">
-                      <h3 className="text-3xl font-black text-gray-900 mb-6">Booking Terms</h3>
-                      <div className="space-y-5">
-                        <div className="flex items-start gap-4">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
-                          <div>
-                            <h4 className="font-black text-gray-900 mb-2 text-lg">Cancellation Policy</h4>
-                            <p className="text-gray-700 leading-relaxed">Free cancellation up to 48 hours before departure. Cancellations made within 48 hours will incur a 50% charge. No-shows will be charged 100% of the booking amount.</p>
+                    <div className="rounded-3xl p-6 lg:p-8 border-2 border-amber-200">
+                      <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-4 lg:mb-6">Booking Terms</h3>
+                      <div className="space-y-4 lg:space-y-5">
+                        <div className="flex items-start gap-3 lg:gap-4">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Cancellation Policy</h4>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">Free cancellation up to 48 hours before departure. Cancellations made within 48 hours will incur a 50% charge. No-shows will be charged 100% of the booking amount.</p>
                           </div>
                         </div>
-                        <div className="flex items-start gap-4">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
-                          <div>
-                            <h4 className="font-black text-gray-900 mb-2 text-lg">Payment Terms</h4>
-                            <p className="text-gray-700 leading-relaxed">A 30% deposit is required at the time of booking. The remaining balance must be paid 14 days before departure. We accept all major credit cards, bank transfers, and PayPal.</p>
+                        <div className="flex items-start gap-3 lg:gap-4">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Payment Terms</h4>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">A 30% deposit is required at the time of booking. The remaining balance must be paid 14 days before departure. We accept all major credit cards, bank transfers, and PayPal.</p>
                           </div>
                         </div>
-                        <div className="flex items-start gap-4">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
-                          <div>
-                            <h4 className="font-black text-gray-900 mb-2 text-lg">Group Bookings</h4>
-                            <p className="text-gray-700 leading-relaxed">Special rates available for groups of 10 or more travelers. Contact our team for customized group packages and discounts.</p>
+                        <div className="flex items-start gap-3 lg:gap-4">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Group Bookings</h4>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">Special rates available for groups of 10 or more travelers. Contact our team for customized group packages and discounts.</p>
                           </div>
                         </div>
                       </div>
@@ -637,23 +799,23 @@ export default function PackageDetails() {
                   </div>
                 )}
                 {activeSection === 'reviews' && (
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between mb-8">
+                  <div className="space-y-4 lg:space-y-6">
+                    <div className="reviews-header-mobile flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 lg:mb-8">
                       <div>
-                        <h2 className="text-4xl font-bold text-gray-900 mb-2">Customer Reviews</h2>
-                        <p className="text-gray-600">Real experiences from real travelers</p>
+                        <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Customer Reviews</h2>
+                        <p className="text-gray-600 text-sm lg:text-base">Real experiences from real travelers</p>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right p-4 rounded-lg">
-                          <div className="flex items-center gap-2 text-3xl font-bold text-gray-900">
-                            <Star className="w-7 h-7 text-yellow-400 fill-current" />
+                      <div className="flex items-center gap-4 w-full lg:w-auto">
+                        <div className="reviews-rating-section-mobile text-left lg:text-right p-3 lg:p-4 rounded-lg">
+                          <div className="flex items-center gap-2 text-2xl lg:text-3xl font-bold text-gray-900">
+                            <Star className="w-6 h-6 lg:w-7 lg:h-7 text-yellow-400 fill-current" />
                             {pkg.rating}
                           </div>
                           <p className="text-sm text-gray-600 mt-1">{pkg.reviews_count} reviews</p>
                         </div>
                         <button
                           onClick={() => setShowReviewModal(true)}
-                          className="bg-black text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all whitespace-nowrap"
+                          className="bg-black text-white px-4 lg:px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all whitespace-nowrap flex-1 lg:flex-none button-padding-sm"
                         >
                           Write a Review
                         </button>
@@ -661,35 +823,33 @@ export default function PackageDetails() {
                     </div>
 
                     {reviews.length === 0 && (
-                      <div className="text-center py-12 bg-gray-50 rounded-lg">
-                        <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-600 text-lg">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
+                      <div className="text-center py-10 lg:py-12 bg-gray-50 rounded-lg">
+                        <Star className="w-10 h-10 lg:w-12 lg:h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-600 text-base lg:text-lg">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
                       </div>
                     )}
-                    
+                   
                     {reviews.length > 0 && (
                       <div className="space-y-4">
                         {reviews.map((r) => (
-                          <div key={r.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow duration-300 bg-white">
-                            <div className="flex justify-between items-start mb-3">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-yellow-500 flex items-center justify-center text-white font-bold">
-                                    {r.user_name.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-gray-900 text-lg">{r.user_name}</p>
-                                    <p className="text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                                  </div>
+                          <div key={r.id} className="border border-gray-200 rounded-lg p-5 lg:p-6 hover:shadow-md transition-shadow duration-300 bg-white review-card-padding-sm">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-3 lg:mb-3 gap-4 sm:gap-0">
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-yellow-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                                  {r.user_name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-gray-900 text-base lg:text-lg">{r.user_name}</p>
+                                  <p className="text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                                 </div>
                               </div>
                               <div className="flex gap-1">
                                 {[...Array(5)].map((_, i) => (
-                                  <Star key={i} className={`w-5 h-5 ${i < r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                                  <Star key={i} className={`w-4 h-4 lg:w-5 lg:h-5 ${i < r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
                                 ))}
                               </div>
                             </div>
-                            <p className="text-gray-700 leading-relaxed">{r.comment}</p>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">{r.comment}</p>
                           </div>
                         ))}
                       </div>
@@ -699,92 +859,95 @@ export default function PackageDetails() {
               </div>
             </div>
           </div>
+
           {/* Sidebar */}
-         <div className="lg:col-span-1">
-            <div className="sticky top-24 space-y-6">
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <div className="mb-6">
-                  <p className="text-sm text-gray-600 mb-1">Starting from</p>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-5xl font-bold text-gray-900">{formatCurrency(pkg.price_from)}</p>
-                    <span className="text-gray-500 font-medium">/person</span>
+          <div className="lg:col-span-1">
+            <div className="sticky lg:sticky top-6 lg:top-24 space-y-4 lg:space-y-6 sidebar-sticky-mobile">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 lg:p-6 pricing-card-mobile pricing-padding-sm">
+                <div className="mb-4 lg:mb-6">
+                  <p className="text-xs lg:text-sm text-gray-600 mb-1 pricing-title-mobile">Starting from</p>
+                  <div className="flex items-baseline gap-2 pricing-amount-mobile">
+                    <p className="text-4xl lg:text-5xl font-bold text-gray-900">{formatCurrency(pkg.price_from)}</p>
+                    <span className="text-gray-500 font-medium text-sm lg:text-base">/person</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setSubmissionType('booking');
-                    setShowBookingModal(true);
-                  }}
-                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl hover:from-yellow-600 hover:to-orange-600 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
-                >
-                  <Calendar className="w-5 h-5" />
-                  Book Now
-                </button>
-                <button
-                  onClick={() => {
-                    setSubmissionType('lead');
-                    setShouldDownloadAfterSubmit(true);
-                    setShowBookingModal(true);
-                  }}
-                  className="w-full mt-3 border-2 border-gray-300 text-gray-700 py-4 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center justify-center gap-2"
-                >
-                  <Download className="w-5 h-5" />
-                  Download Itinerary
-                </button>
-                <button
-                  onClick={() => navigate(`/package/${pkg.id}/customize`)}
-                  className="w-full mt-3 border-2 border-yellow-500 text-yellow-700 py-4 rounded-xl font-semibold hover:bg-yellow-50 hover:border-yellow-600 transition-all flex items-center justify-center gap-2"
-                >
-                  Customize Package
-                </button>
+                <div className="booking-buttons-mobile space-y-3 lg:space-y-4">
+                  <button
+                    onClick={() => {
+                      setSubmissionType('booking');
+                      setShowBookingModal(true);
+                    }}
+                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg hover:shadow-xl hover:from-yellow-600 hover:to-orange-600 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2 button-padding-sm"
+                  >
+                    <Calendar className="w-4 h-4 lg:w-5 lg:h-5" />
+                    Book Now
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSubmissionType('lead');
+                      setShouldDownloadAfterSubmit(true);
+                      setShowBookingModal(true);
+                    }}
+                    className="w-full border-2 border-gray-300 text-gray-700 py-3.5 lg:py-4 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center justify-center gap-2 button-padding-sm"
+                  >
+                    <Download className="w-4 h-4 lg:w-5 lg:h-5" />
+                    Download Itinerary
+                  </button>
+                  <button
+                    onClick={() => navigate(`/package/${pkg.id}/customize`)}
+                    className="w-full border-2 border-yellow-500 text-yellow-700 py-3.5 lg:py-4 rounded-xl font-semibold hover:bg-yellow-50 hover:border-yellow-600 transition-all flex items-center justify-center gap-2 button-padding-sm"
+                  >
+                    Customize Package
+                  </button>
+                </div>
               </div>
-               <div className="bg-gradient-to-br from-black to-gray-800 rounded-3xl shadow-2xl p-8 text-white">
-                <h4 className="text-2xl font-black mb-6">Need Assistance?</h4>
-                <div className="space-y-4">
+              <div className="bg-gradient-to-br from-black to-gray-800 rounded-3xl shadow-2xl p-6 lg:p-8 text-white assistance-card-mobile assistance-padding-sm">
+                <h4 className="text-xl lg:text-2xl font-black mb-4 lg:mb-6">Need Assistance?</h4>
+                <div className="space-y-3 lg:space-y-4">
                   <a
                     href="tel:+1234567890"
-                    className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all"
+                    className="flex items-center gap-3 lg:gap-4 p-4 assistance-contact-mobile bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all block"
                   >
-                    <div className="w-14 h-14 bg-amber-500 rounded-xl flex items-center justify-center">
-                      <Phone className="w-7 h-7" />
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Phone className="w-6 h-6 lg:w-7 lg:h-7" />
                     </div>
                     <div>
                       <p className="text-xs text-amber-200 uppercase tracking-wide">Call Us</p>
-                      <p className="font-black text-lg">+91 (987) 6543-210</p>
+                      <p className="font-black text-base lg:text-lg">+91 (987) 6543-210</p>
                     </div>
                   </a>
                   <a
                     href="mailto:info@tripskyway.com"
-                    className="flex items-center gap-4 p-4 bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all"
+                    className="flex items-center gap-3 lg:gap-4 p-4 assistance-contact-mobile bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all block"
                   >
-                    <div className="w-14 h-14 bg-orange-500 rounded-xl flex items-center justify-center">
-                      <Mail className="w-7 h-7" />
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Mail className="w-6 h-6 lg:w-7 lg:h-7" />
                     </div>
                     <div>
                       <p className="text-xs text-amber-200 uppercase tracking-wide">Email Us</p>
-                      <p className="font-black text-lg">info@tripskyway.com</p>
+                      <p className="font-black text-base lg:text-lg">info@tripskyway.com</p>
                     </div>
                   </a>
                 </div>
               </div>
-              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Booking Modal */}
       {showBookingModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-amber-500 to-orange-500 p-8 text-white">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-max-height-mobile">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto modal-max-height-mobile">
+            <div className="sticky top-0 bg-gradient-to-r from-amber-500 to-orange-500 p-6 lg:p-8 text-white modal-header-padding-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-3xl font-black mb-2">
+                  <h3 className="text-2xl lg:text-3xl font-black mb-2">
                     {submissionType === 'lead' ? 'Get Your Itinerary' : 'Book Your Adventure'}
                   </h3>
-                  <p className="text-amber-100">
-                    {submissionType === 'lead' 
-                      ? 'Fill in your details to download the complete itinerary PDF' 
+                  <p className="text-amber-100 text-sm lg:text-base">
+                    {submissionType === 'lead'
+                      ? 'Fill in your details to download the complete itinerary PDF'
                       : 'Fill in your details and we\'ll get back to you within 24 hours'}
                   </p>
                 </div>
@@ -795,12 +958,12 @@ export default function PackageDetails() {
                   }}
                   className="p-2 hover:bg-white/20 rounded-xl transition-colors"
                 >
-                  <X className="w-8 h-8" />
+                  <X className="w-6 h-6 lg:w-8 lg:h-8" />
                 </button>
               </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="p-6 lg:p-8 space-y-4 lg:space-y-6 modal-form-padding-sm">
+              <div className="form-grid-mobile lg:grid-cols-2 grid gap-4 lg:gap-6">
                 <div>
                   <label className="block text-sm font-black text-gray-900 mb-2">Full Name *</label>
                   <input
@@ -813,9 +976,9 @@ export default function PackageDetails() {
                         setFormErrors({...formErrors, name: ''});
                       }
                     }}
-                    className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all ${
-                      formErrors.name 
-                        ? 'border-red-500 focus:border-red-500' 
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.name
+                        ? 'border-red-500 focus:border-red-500'
                         : 'border-gray-300 focus:border-amber-500'
                     }`}
                     placeholder="John Doe"
@@ -841,9 +1004,9 @@ export default function PackageDetails() {
                         setFormErrors({...formErrors, email: ''});
                       }
                     }}
-                    className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all ${
-                      formErrors.email 
-                        ? 'border-red-500 focus:border-red-500' 
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.email
+                        ? 'border-red-500 focus:border-red-500'
                         : 'border-gray-300 focus:border-amber-500'
                     }`}
                     placeholder="john@example.com"
@@ -858,7 +1021,8 @@ export default function PackageDetails() {
                   )}
                 </div>
               </div>
-              <div className="grid md:grid-cols-2 gap-6">
+
+              <div className="form-grid-mobile lg:grid-cols-2 grid gap-4 lg:gap-6">
                 <div>
                   <label className="block text-sm font-black text-gray-900 mb-2">Phone Number *</label>
                   <input
@@ -867,14 +1031,13 @@ export default function PackageDetails() {
                     value={formData.phone}
                     onChange={(e) => {
                       setFormData({...formData, phone: e.target.value});
-                      // Clear error when user starts typing
                       if (formErrors.phone) {
                         setFormErrors({...formErrors, phone: ''});
                       }
                     }}
-                    className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all ${
-                      formErrors.phone 
-                        ? 'border-red-500 focus:border-red-500' 
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.phone
+                        ? 'border-red-500 focus:border-red-500'
                         : 'border-gray-300 focus:border-amber-500'
                     }`}
                     placeholder="+1 234 567 890 or 5345436"
@@ -900,9 +1063,9 @@ export default function PackageDetails() {
                         setFormErrors({...formErrors, date: ''});
                       }
                     }}
-                    className={`w-full px-5 py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all ${
-                      formErrors.date 
-                        ? 'border-red-500 focus:border-red-500' 
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.date
+                        ? 'border-red-500 focus:border-red-500'
                         : 'border-gray-300 focus:border-amber-500'
                     }`}
                   />
@@ -916,6 +1079,7 @@ export default function PackageDetails() {
                   )}
                 </div>
               </div>
+
               <div>
                 <label className="block text-sm font-black text-gray-900 mb-2">Number of Travelers</label>
                 <input
@@ -923,35 +1087,37 @@ export default function PackageDetails() {
                   min="1"
                   value={formData.travelers}
                   onChange={(e) => setFormData({...formData, travelers: +e.target.value})}
-                  className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 transition-all"
+                  className="w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 transition-all form-input-mobile"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-black text-gray-900 mb-2">Special Requests</label>
                 <textarea
                   rows={4}
                   value={formData.message}
                   onChange={(e) => setFormData({...formData, message: e.target.value})}
-                  className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 transition-all resize-none"
+                  className="w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 transition-all resize-none form-input-mobile"
                   placeholder="Any dietary requirements, accessibility needs, or special occasions?"
                 />
               </div>
+
               <div className="pt-4">
                 <button
                   type="submit"
                   disabled={isSubmittingBooking}
-                  className={`w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-5 rounded-2xl font-black text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 ${
+                  className={`w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm ${
                     isSubmittingBooking ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
                 >
-                  {isSubmittingBooking 
-                    ? submissionType === 'lead' 
-                      ? 'Processing...' 
+                  {isSubmittingBooking
+                    ? submissionType === 'lead'
+                      ? 'Processing...'
                       : 'Submitting...'
                     : submissionType === 'lead'
                     ? 'Get Itinerary'
                     : 'Submit Booking Request'}
-                  <ArrowRight className="w-6 h-6" />
+                  <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
               </div>
             </form>
@@ -959,12 +1125,12 @@ export default function PackageDetails() {
         </div>
       )}
 
-      {/* Review Modal */}
-       {showReviewModal && (
+      {/* Review Modal - Mobile Responsive */}
+      {showReviewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full review-modal-mobile p-6 lg:p-8">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-900">Write a Review</h3>
+              <h3 className="text-xl lg:text-2xl font-bold text-gray-900">Write a Review</h3>
               <button
                 onClick={() => setShowReviewModal(false)}
                 className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -979,7 +1145,6 @@ export default function PackageDetails() {
                   alert('Please fill in all fields');
                   return;
                 }
-
                 setIsSubmittingReview(true);
                 try {
                   const newReview = await submitReview(id, reviewData);
@@ -1015,7 +1180,7 @@ export default function PackageDetails() {
                   required
                   value={reviewData.name}
                   onChange={(e) => setReviewData({ ...reviewData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none form-input-mobile"
                   placeholder="Enter your name"
                 />
               </div>
@@ -1024,16 +1189,16 @@ export default function PackageDetails() {
                   <label className="block text-sm font-semibold text-gray-900">Rating</label>
                   <span className="text-sm text-gray-600">{reviewData.rating} out of 5</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 justify-center sm:justify-start">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
                       onClick={() => setReviewData({ ...reviewData, rating: star })}
-                      className="transition-colors"
+                      className="transition-colors p-1"
                     >
                       <Star
-                        className={`w-8 h-8 ${
+                        className={`w-7 h-7 lg:w-8 lg:h-8 ${
                           star <= reviewData.rating
                             ? 'text-yellow-400 fill-current'
                             : 'text-gray-300'
@@ -1049,23 +1214,23 @@ export default function PackageDetails() {
                   required
                   value={reviewData.comment}
                   onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none resize-none form-input-mobile"
                   rows={4}
                   placeholder="Share your experience..."
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowReviewModal(false)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors button-padding-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingReview}
-                  className="flex-1 px-4 py-2 bg-black text-white rounded-lg font-semibold hover:shadow-lg hover:from-orange-600 hover:to-yellow-400 transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-3 bg-black text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed button-padding-sm"
                 >
                   {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
                 </button>
@@ -1075,10 +1240,10 @@ export default function PackageDetails() {
         </div>
       )}
 
-      {/* Success Modal */}
+      {/* Success Modal - Mobile Responsive */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full success-modal-mobile p-6 lg:p-8">
             <div className="text-center">
               <div className="mb-6 flex justify-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
@@ -1087,8 +1252,8 @@ export default function PackageDetails() {
                   </svg>
                 </div>
               </div>
-              <h2 className="text-3xl font-black text-gray-900 mb-3">Submitted Successfully!</h2>
-              <p className="text-gray-600 mb-8 leading-relaxed">
+              <h2 className="text-2xl lg:text-3xl font-black text-gray-900 mb-3">Submitted Successfully!</h2>
+              <p className="text-gray-600 mb-8 leading-relaxed text-sm lg:text-base">
                 Thank you for your booking request. We'll review your details and contact you within 24 hours to confirm your adventure!
               </p>
               <button
@@ -1096,7 +1261,7 @@ export default function PackageDetails() {
                   setShowSuccessModal(false);
                   setShowBookingModal(false);
                 }}
-                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-300"
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-300 button-padding-sm"
               >
                 OK
               </button>
@@ -1107,16 +1272,16 @@ export default function PackageDetails() {
 
       {/* Review Success */}
       {showReviewSuccess && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl p-5 flex items-center gap-4 max-w-sm">
+        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 lg:gap-4">
             <div className="flex-shrink-0">
-              <div className="flex items-center justify-center h-12 w-12 rounded-full bg-white/20 backdrop-blur-sm">
-                <Check className="h-6 w-6 text-white" />
+              <div className="flex items-center justify-center h-10 w-10 lg:h-12 lg:w-12 rounded-full bg-white/20 backdrop-blur-sm">
+                <Check className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
               </div>
             </div>
-            <div className="flex-1">
-              <p className="font-semibold text-base">Review Submitted!</p>
-              <p className="text-sm text-white/90 mt-0.5">Thank you for sharing your experience.</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm lg:text-base">Review Submitted!</p>
+              <p className="text-sm text-white/90 mt-0.5 line-clamp-2">Thank you for sharing your experience.</p>
             </div>
           </div>
         </div>

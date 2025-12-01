@@ -42,13 +42,21 @@ export default function DestinationsDomestic() {
   const [selectedPriceRange, setSelectedPriceRange] = useState(null);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState('popularity');
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => setIsVisible(true), []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setShowFilters(window.innerWidth >= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   useEffect(() => {
     let isMounted = true;
@@ -230,12 +238,12 @@ export default function DestinationsDomestic() {
 
       <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Sticky Toolbar */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 sticky top-16 z-40">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center space-x-4">
+        <div className="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-4 md:mb-6 sticky top-16 z-40">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
+            <div className="flex items-center space-x-2 md:space-x-4 w-full md:w-auto">
               <button
                 onClick={() => setShowFilters((prev) => !prev)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+                className={`flex items-center space-x-2 px-3 md:px-4 py-2 rounded-lg transition-all duration-300 text-sm md:text-base ${
                   showFilters
                     ? 'bg-gray-100 hover:bg-gray-200 text-black shadow-md hover:shadow-lg'
                     : 'bg-gray-100 hover:bg-gray-200 text-black border border-gray-200 hover:border-orange-300'
@@ -250,17 +258,17 @@ export default function DestinationsDomestic() {
                 )}
               </button>
               {activeFiltersCount > 0 && (
-                <button onClick={clearAllFilters} className="text-sm text-gray-600 hover:text-orange-600 font-medium flex items-center space-x-1 transition-colors duration-200">
+                <button onClick={clearAllFilters} className="text-xs md:text-sm text-gray-600 hover:text-orange-600 font-medium flex items-center space-x-1 transition-colors duration-200 whitespace-nowrap">
                   <X className="w-4 h-4" />
-                  <span>Clear all</span>
+                  <span>Clear</span>
                 </button>
               )}
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
+                className="w-full md:w-auto px-3 md:px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 text-sm md:text-base"
               >
                 <option value="popularity">Most Popular</option>
                 <option value="price-low">Price: Low to High</option>
@@ -268,7 +276,7 @@ export default function DestinationsDomestic() {
                 <option value="rating">Highest Rated</option>
                 <option value="name">Name (A-Z)</option>
               </select>
-              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1 w-full md:w-auto">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-lg transition-all duration-200 ${
@@ -290,23 +298,23 @@ export default function DestinationsDomestic() {
                   <List className="w-5 h-5" />
                 </button>
               </div>
-              <div className="text-gray-600 font-medium">{filteredDestinations.length} destinations</div>
+              <div className="text-gray-600 font-medium text-sm md:text-base whitespace-nowrap">{filteredDestinations.length} destinations</div>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-8">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-8">
           {/* Filters */}
           {showFilters && (
-            <div className="w-80 flex-shrink-0 sticky top-32">
-              <div className="bg-white rounded-2xl shadow-sm p-6 overflow-y-auto border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                  <Filter className="w-5 h-5 text-orange-600" />
+            <div className="w-full md:w-80 md:flex-shrink-0">
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 md:sticky md:top-32">
+                <h3 className="text-lg md:text-xl font-bold mb-4 md:mb-6 flex items-center gap-2">
+                  <Filter className="w-4 md:w-5 h-4 md:h-5 text-orange-600" />
                   <span className="text-gray-900">Filter Destinations</span>
                 </h3>
                 
                 {/* Search */}
-                <div className="mb-6">
+                <div className="mb-4 md:mb-6">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -314,14 +322,14 @@ export default function DestinationsDomestic() {
                       placeholder="Search destinations..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-gray-900 placeholder-gray-400 transition-all duration-200"
+                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-gray-900 placeholder-gray-400 transition-all duration-200 text-sm md:text-base"
                     />
                   </div>
                 </div>
 
                 {/* Destinations */}
-                <div className="mb-6">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <div className="mb-4 md:mb-6">
+                  <h4 className="font-semibold mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base">
                     <MapPin className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-900">Destinations</span>
                   </h4>
@@ -341,8 +349,8 @@ export default function DestinationsDomestic() {
                 </div>
 
                 {/* Price Range */}
-                <div className="mb-6">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <div className="mb-4 md:mb-6">
+                  <h4 className="font-semibold mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base">
                     <IndianRupee className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-900">Price Range</span>
                   </h4>
@@ -426,7 +434,7 @@ export default function DestinationsDomestic() {
                 <p className="text-gray-600">Try adjusting your filters</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 md:gap-6">
                 {filteredDestinations.map(dest => (
                   <Link
                     key={dest.id}

@@ -40,10 +40,18 @@ export default function PackagesPage() {
   const [selectedDuration, setSelectedDuration] = useState(null);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState('popularity');
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   useEffect(() => setIsVisible(true), []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setShowFilters(window.innerWidth >= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -280,8 +288,8 @@ export default function PackagesPage() {
 
       <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Sticky Toolbar */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 sticky top-16 z-40">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-4 md:mb-6 sticky top-16 z-40">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setShowFilters((prev) => !prev)}
@@ -306,11 +314,11 @@ export default function PackagesPage() {
                 </button>
               )}
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
+                className="w-full md:w-auto px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
               >
                 <option value="popularity">Most Popular</option>
                 <option value="price-low">Price: Low to High</option>
@@ -318,7 +326,7 @@ export default function PackagesPage() {
                 <option value="rating">Highest Rated</option>
                 <option value="duration">Shortest Trip</option>
               </select>
-              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1 w-full md:w-auto">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-lg transition-all duration-200 ${
@@ -344,11 +352,11 @@ export default function PackagesPage() {
           </div>
         </div>
 
-        <div className="flex gap-8">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-8">
           {/* Filters */}
           {showFilters && (
-            <div className="w-80 flex-shrink-0">
-              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+            <div className="w-full md:w-80 md:flex-shrink-0">
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 md:sticky md:top-32">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Filter className="w-5 h-5 text-orange-600" />
                   <span className="text-gray-900">Filter Packages</span>
@@ -464,7 +472,7 @@ export default function PackagesPage() {
                 <p className="text-gray-600">Try adjusting your filters</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
                 {filteredPackages.map(pkg => (
                   <Link
                     key={pkg.id}
