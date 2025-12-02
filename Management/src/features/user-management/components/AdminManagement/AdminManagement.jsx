@@ -533,22 +533,6 @@ const AdminManagement = () => {
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <p className="text-red-800 font-medium">{error}</p>
-        </div>
-      )}
-
-      {/* Success Message */}
-      {successMessage && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <p className="text-green-800 font-medium">{successMessage}</p>
-        </div>
-      )}
-
       {!loading && (
         <>
           {/* Header */}
@@ -622,6 +606,7 @@ const AdminManagement = () => {
         isOpen={showNewAdminDialog}
         onClose={() => {
           setShowNewAdminDialog(false);
+          setError(null);
           resetForm();
         }}
         onSubmit={handleAddAdmin}
@@ -630,6 +615,8 @@ const AdminManagement = () => {
         submitLabel="Create & Send Invitation"
         submitColor="purple"
         isSubmitting={isSubmitting}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
           {/* Step Indicator */}
@@ -715,6 +702,7 @@ const AdminManagement = () => {
         isOpen={showEditAdminDialog}
         onClose={() => {
           setShowEditAdminDialog(false);
+          setError(null);
           resetForm();
         }}
         onSubmit={handleEditAdmin}
@@ -723,6 +711,8 @@ const AdminManagement = () => {
         submitLabel="Update Admin"
         submitColor="purple"
         isSubmitting={isSubmitting}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
