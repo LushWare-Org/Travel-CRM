@@ -87,6 +87,11 @@ const VendorManagement = () => {
     loadVendors();
   }, []);
 
+  // Reload vendors when search term or filters change
+  useEffect(() => {
+    loadVendors();
+  }, [searchTerm, filterStatus, filterType, currentPage]);
+
   // Load vendors from API
   const loadVendors = useCallback(async () => {
     try {
@@ -116,6 +121,11 @@ const VendorManagement = () => {
       setLoading(false);
     }
   }, [currentPage, searchTerm, filterStatus, filterType]);
+
+  // Reload vendors list (used after operations like delete, resend, etc.)
+  const reloadVendors = () => {
+    setCurrentPage(1);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -220,7 +230,10 @@ const VendorManagement = () => {
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
         setValidationErrors({});
-        loadVendors();
+        // Clear search term and reset pagination to show all vendors after creation
+        // Note: Setting these states will trigger useEffect to reload vendors
+        setCurrentPage(1);
+        setSearchTerm('');
       }
     } catch (err) {
       console.error('Error creating vendor:', err);
@@ -297,7 +310,10 @@ const VendorManagement = () => {
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
         setValidationErrors({});
-        loadVendors();
+        // Clear search term and reset pagination to show all vendors after edit
+        // Note: Setting these will trigger useEffect to reload vendors
+        setCurrentPage(1);
+        setSearchTerm('');
       }
     } catch (err) {
       console.error('Error updating vendor:', err);
@@ -330,7 +346,7 @@ const VendorManagement = () => {
       if (response.status === 'success') {
         setSuccessMessage(`✅ Invitation resent to ${vendorToResendInvite.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
+        reloadVendors();
         setShowResendInviteConfirm(false);
         setVendorToResendInvite(null);
       }
@@ -358,7 +374,7 @@ const VendorManagement = () => {
       if (response.status === 'success') {
         setSuccessMessage(`✅ Password reset link sent to ${vendorToResetPassword.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
+        reloadVendors();
         setShowPasswordResetConfirm(false);
         setVendorToResetPassword(null);
       }
@@ -389,7 +405,7 @@ const VendorManagement = () => {
         setSelectedVendor(null);
         setSuccessMessage(`✅ Vendor deleted successfully`);
         setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
+        reloadVendors();
       }
     } catch (err) {
       console.error('Error deleting vendor:', err);
@@ -580,6 +596,9 @@ const VendorManagement = () => {
           setShowNewVendorDialog(false);
           setError(null);
           resetForm();
+          // Ensure search term is cleared when closing add vendor dialog
+          setSearchTerm('');
+          setCurrentPage(1);
         }}
         onSubmit={handleAddVendor}
         title="Add New Vendor"
@@ -880,6 +899,9 @@ const VendorManagement = () => {
           setShowEditVendorDialog(false);
           setError(null);
           resetForm();
+          // Ensure search term is cleared when closing edit vendor dialog
+          setSearchTerm('');
+          setCurrentPage(1);
         }}
         onSubmit={handleEditVendor}
         title="Edit Vendor"

@@ -29,14 +29,12 @@ export const STATUS_COLORS = {
 };
 
 export const VENDOR_TYPE_COLORS = {
-  Hotel: 'bg-indigo-100 text-indigo-800',
-  'Travel Agent': 'bg-teal-100 text-teal-800',
-  Resort: 'bg-cyan-100 text-cyan-800',
-  Restaurant: 'bg-amber-100 text-amber-800',
-  'Car Rental': 'bg-rose-100 text-rose-800',
-  'Tour Operator': 'bg-lime-100 text-lime-800',
-  Airline: 'bg-sky-100 text-sky-800',
-  Other: 'bg-gray-100 text-gray-800'
+  hotel: 'bg-indigo-100 text-indigo-800',
+  transport: 'bg-teal-100 text-teal-800',
+  activity: 'bg-cyan-100 text-cyan-800',
+  restaurant: 'bg-amber-100 text-amber-800',
+  guide: 'bg-rose-100 text-rose-800',
+  other: 'bg-gray-100 text-gray-800'
 };
 
 export const VENDOR_VERIFICATION_COLORS = {
