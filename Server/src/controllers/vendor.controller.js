@@ -235,7 +235,7 @@ export const createVendor = asyncHandler(async (req, res, next) => {
       isActive: true,
       rating: 0,
       totalBookings: 0,
-      vendorStatus: 'pending_verification',
+      vendorStatus: 'verified', // Vendors are automatically verified (no business verification flow)
     });
 
     // Send invitation email
@@ -267,12 +267,17 @@ export const createVendor = asyncHandler(async (req, res, next) => {
           businessName: newVendor.businessName,
           serviceType: newVendor.serviceType,
           businessRegistrationNumber: newVendor.businessRegistrationNumber,
+          address: newVendor.address,
+          contactPerson: newVendor.contactPerson,
+          bankDetails: newVendor.bankDetails,
+          taxIdentificationNumber: newVendor.taxIdentificationNumber,
           role: newVendor.role,
           isActive: newVendor.isActive,
           isEmailVerified: newVendor.isEmailVerified,
           isTempPassword: newVendor.isTempPassword,
           mustChangePassword: newVendor.mustChangePassword,
           vendorStatus: newVendor.vendorStatus,
+          rating: newVendor.rating,
           createdAt: newVendor.createdAt,
         },
       },

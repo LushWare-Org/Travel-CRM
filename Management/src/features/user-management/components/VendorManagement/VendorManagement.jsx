@@ -9,7 +9,7 @@ import {
   FormGroup 
 } from '../Common';
 import { VENDOR_VERIFICATION_COLORS, VENDOR_TYPE_COLORS } from '../../utils/constants';
-import { filterUsers, paginateArray } from '../../utils/helpers';
+import { filterUsers, paginateArray, formatDate } from '../../utils/helpers';
 import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 import vendorService from '../../../../services/vendor.service';
 import VendorTable from './VendorTable';
@@ -38,14 +38,11 @@ const VendorManagement = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showResendInviteConfirm, setShowResendInviteConfirm] = useState(false);
   const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
-  const [showStatusUpdateConfirm, setShowStatusUpdateConfirm] = useState(false);
-  const [showRatingUpdateConfirm, setShowRatingUpdateConfirm] = useState(false);
+  const [showVendorDetailsModal, setShowVendorDetailsModal] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [vendorToDelete, setVendorToDelete] = useState(null);
   const [vendorToResendInvite, setVendorToResendInvite] = useState(null);
   const [vendorToResetPassword, setVendorToResetPassword] = useState(null);
-  const [vendorStatusUpdate, setVendorStatusUpdate] = useState(null);
-  const [vendorRatingUpdate, setVendorRatingUpdate] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -310,41 +307,10 @@ const VendorManagement = () => {
     }
   };
 
-  // Handle verification/rejection
-  const handleVerifyVendor = async (vendor) => {
-    try {
-      setActionLoading(true);
-      const response = await vendorService.updateVendorStatus(vendor._id, 'verified');
-      
-      if (response.status === 'success') {
-        setSuccessMessage(`✅ Vendor verified successfully`);
-        setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
-      }
-    } catch (err) {
-      console.error('Error verifying vendor:', err);
-      setError(err.userMessage || err.message || 'Failed to verify vendor');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRejectVendor = async (vendor) => {
-    try {
-      setActionLoading(true);
-      const response = await vendorService.updateVendorStatus(vendor._id, 'rejected', 'Rejected by admin');
-      
-      if (response.status === 'success') {
-        setSuccessMessage(`✅ Vendor rejected`);
-        setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
-      }
-    } catch (err) {
-      console.error('Error rejecting vendor:', err);
-      setError(err.userMessage || err.message || 'Failed to reject vendor');
-    } finally {
-      setActionLoading(false);
-    }
+  // Handle view vendor details
+  const handleViewDetails = (vendor) => {
+    setSelectedVendor(vendor);
+    setShowVendorDetailsModal(true);
   };
 
   // Handle resend invitation
@@ -518,7 +484,7 @@ const VendorManagement = () => {
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-blue-900">Account & Security Policy</p>
+          <p className="text-sm font-semibold text-blue-900">Vendor Management Policy</p>
           <p className="text-sm text-blue-800 mt-1">
             Vendors receive invitation emails with temporary passwords. They must set a permanent password on first login. 
             Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
@@ -527,11 +493,10 @@ const VendorManagement = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatsCard label="Total Vendors" value={vendors.length} icon={Building2} color="indigo" />
-        <StatsCard label="Verified" value={vendors.filter(v => v.vendorStatus === 'verified').length} icon={CheckCircle} color="green" />
-        <StatsCard label="Pending" value={vendors.filter(v => v.vendorStatus === 'pending_verification').length} icon={AlertCircle} color="yellow" />
-        <StatsCard label="Rejected" value={vendors.filter(v => v.vendorStatus === 'rejected').length} icon={AlertCircle} color="red" />
+        <StatsCard label="Active" value={vendors.filter(v => v.isActive).length} icon={CheckCircle} color="green" />
+        <StatsCard label="Inactive" value={vendors.filter(v => !v.isActive).length} icon={AlertCircle} color="yellow" />
         <StatsCard label="Avg. Rating" value={vendors.filter(v => v.rating > 0).length > 0 
           ? (vendors.filter(v => v.rating > 0).reduce((sum, v) => sum + v.rating, 0) / vendors.filter(v => v.rating > 0).length).toFixed(1)
           : '0'} icon={Building2} color="purple" />
@@ -540,7 +505,7 @@ const VendorManagement = () => {
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex gap-4">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Verification Status</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Active Status</label>
           <select
             value={filterStatus}
             onChange={(e) => {
@@ -550,10 +515,8 @@ const VendorManagement = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="all">All Vendors</option>
-            <option value="verified">Verified</option>
-            <option value="pending_verification">Pending Review</option>
-            <option value="rejected">Rejected</option>
-            <option value="suspended">Suspended</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
         <div className="flex-1">
@@ -596,10 +559,8 @@ const VendorManagement = () => {
             vendors={vendors}
             onEdit={openEditDialog}
             onDelete={handleDeleteVendor}
-            onVerify={handleVerifyVendor}
-            onReject={handleRejectVendor}
+            onViewDetails={handleViewDetails}
             onResendInvite={handleResendInvitation}
-            onForcePasswordReset={handleForcePasswordReset}
           />
           
           <Pagination
@@ -1234,6 +1195,212 @@ const VendorManagement = () => {
         cancelLabel="Cancel"
         isLoading={actionLoading}
       />
+
+      {/* Vendor Details Modal */}
+      {showVendorDetailsModal && selectedVendor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-teal-600 px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white">{selectedVendor.businessName || selectedVendor.name}</h3>
+              <button
+                onClick={() => setShowVendorDetailsModal(false)}
+                className="text-white hover:bg-white hover:bg-opacity-20 p-1 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Contact Information */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                  Contact Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Name</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Phone</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Status</p>
+                    <p className={`text-sm font-medium ${selectedVendor.isActive ? 'text-green-600' : 'text-red-600'}`}>
+                      {selectedVendor.isActive ? 'Active' : 'Inactive'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Business Information */}
+              <div className="border-t pt-6">
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                  Business Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Business Name</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.businessName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Service Type</p>
+                    <p className="text-sm font-medium text-gray-900">{VENDOR_TYPE_LABELS[selectedVendor.serviceType] || selectedVendor.serviceType}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Registration Number</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.businessRegistrationNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Tax ID</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.taxIdentificationNumber}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Information */}
+              {selectedVendor.address && (
+                <div className="border-t pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                    Address
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    {selectedVendor.address.street && <p className="text-gray-900">{selectedVendor.address.street}</p>}
+                    <p className="text-gray-900">
+                      {selectedVendor.address.city && `${selectedVendor.address.city}, `}
+                      {selectedVendor.address.state && `${selectedVendor.address.state} `}
+                      {selectedVendor.address.zipCode}
+                    </p>
+                    {selectedVendor.address.country && <p className="text-gray-900">{selectedVendor.address.country}</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Contact Person */}
+              {selectedVendor.contactPerson && (
+                <div className="border-t pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                    Primary Contact
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Phone</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Designation</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.designation}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bank Details */}
+              {selectedVendor.bankDetails && (
+                <div className="border-t pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                    Bank Details
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Account Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.accountName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Account Number</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.accountNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Bank Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.bankName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Branch Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.branchName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">IFSC Code</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.ifscCode}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">SWIFT Code</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.swiftCode}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Performance Metrics */}
+              <div className="border-t pt-6">
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                  Performance
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Rating</p>
+                    <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
+                      <span className="text-yellow-500">★</span>
+                      {selectedVendor.rating ? selectedVendor.rating.toFixed(1) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Bookings</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.totalBookings || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Registered</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(selectedVendor.createdAt)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Last Updated</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(selectedVendor.updatedAt)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="sticky bottom-0 border-t bg-gray-50 px-6 py-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowVendorDetailsModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-medium text-gray-900"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowVendorDetailsModal(false);
+                  openEditDialog(selectedVendor);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              >
+                Edit Vendor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
