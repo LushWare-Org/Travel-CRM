@@ -168,6 +168,7 @@ export const createVendor = asyncHandler(async (req, res, next) => {
     name, 
     email, 
     phone, 
+    phoneCountry,
     businessName, 
     serviceType, 
     businessRegistrationNumber,
@@ -185,10 +186,11 @@ export const createVendor = asyncHandler(async (req, res, next) => {
       return next(new AppError('Email already in use', 400));
     }
 
-    // Validate phone format
-    const phoneDigitsOnly = phone.replace(/\D/g, '');
-    if (phoneDigitsOnly.length < 7 || phoneDigitsOnly.length > 15) {
-      return next(new AppError('Phone number must be between 7-15 digits', 400));
+    // Validate phone format - accept E.164 format (e.g., +94768952480)
+    // E.164 format: +<country_code><number>, 1-3 digits for country code, 4-14 digits for number
+    const e164Pattern = /^\+[1-9]\d{1,14}$/;
+    if (!e164Pattern.test(phone)) {
+      return next(new AppError('Phone must be in E.164 format (e.g., +94768952480)', 400));
     }
 
     // Check if business registration number already exists
@@ -211,11 +213,12 @@ export const createVendor = asyncHandler(async (req, res, next) => {
     // Generate temporary password
     const tempPassword = generateTemporaryPassword();
 
-    // Create new vendor
+    // Create new vendor with E.164 phone and country code
     const newVendor = await User.create({
       name: name.trim(),
       email: email.toLowerCase(),
-      phone: phoneDigitsOnly,
+      phone: phone, // Store E.164 format (e.g., +94768952480)
+      phoneCountry: phoneCountry || 'US', // Store country code (e.g., 'LK')
       password: tempPassword,
       role: 'vendor',
       businessName: businessName?.trim(),
@@ -260,6 +263,7 @@ export const createVendor = asyncHandler(async (req, res, next) => {
           name: newVendor.name,
           email: newVendor.email,
           phone: newVendor.phone,
+          phoneCountry: newVendor.phoneCountry,
           businessName: newVendor.businessName,
           serviceType: newVendor.serviceType,
           businessRegistrationNumber: newVendor.businessRegistrationNumber,
@@ -299,7 +303,8 @@ export const updateVendor = asyncHandler(async (req, res, next) => {
   const { 
     name, 
     email, 
-    phone, 
+    phone,
+    phoneCountry,
     businessName, 
     serviceType, 
     address,
@@ -350,11 +355,13 @@ export const updateVendor = asyncHandler(async (req, res, next) => {
     if (businessName) vendor.businessName = businessName.trim();
 
     if (phone) {
-      const phoneDigitsOnly = phone.replace(/\D/g, '');
-      if (phoneDigitsOnly.length < 7 || phoneDigitsOnly.length > 15) {
-        return next(new AppError('Phone number must be between 7-15 digits', 400));
+      // Validate phone format - accept E.164 format (e.g., +94768952480)
+      const e164Pattern = /^\+[1-9]\d{1,14}$/;
+      if (!e164Pattern.test(phone)) {
+        return next(new AppError('Phone must be in E.164 format (e.g., +94768952480)', 400));
       }
-      vendor.phone = phoneDigitsOnly;
+      vendor.phone = phone; // Store E.164 format
+      vendor.phoneCountry = phoneCountry || vendor.phoneCountry || 'US'; // Update country code
     }
 
     if (serviceType) {
@@ -386,11 +393,14 @@ export const updateVendor = asyncHandler(async (req, res, next) => {
           name: vendor.name,
           email: vendor.email,
           phone: vendor.phone,
+          phoneCountry: vendor.phoneCountry,
           businessName: vendor.businessName,
           serviceType: vendor.serviceType,
           businessRegistrationNumber: vendor.businessRegistrationNumber,
           address: vendor.address,
           contactPerson: vendor.contactPerson,
+          bankDetails: vendor.bankDetails,
+          taxIdentificationNumber: vendor.taxIdentificationNumber,
           isActive: vendor.isActive,
           vendorStatus: vendor.vendorStatus,
           rating: vendor.rating,

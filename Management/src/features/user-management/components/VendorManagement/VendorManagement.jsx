@@ -247,32 +247,42 @@ const VendorManagement = () => {
   const handleEditVendor = async () => {
     if (!selectedVendor) return;
 
-    // Validate main vendor phone if provided
-    if (formData.phone && !validatePhone(formData.phone, formData.phoneCountry)) {
-      setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
-      setError('Please fix the validation errors below');
-      return;
-    }
-
-    // Format main vendor phone if provided
-    let phoneData = null;
-    if (formData.phone) {
-      phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
-      if (!phoneData) {
-        setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
-        setError('Please fix the validation errors below');
-        return;
-      }
-    }
-
     try {
       setActionLoading(true);
+      setValidationErrors({});
+
+      // Validate main vendor phone ONLY if it was changed from original
+      let phoneData = null;
+      const originalPhoneNumber = selectedVendor.phone ? selectedVendor.phone.replace(/^\+\d+/, '').trim() : '';
+      
+      // Check if phone was actually modified
+      const phoneWasChanged = formData.phone !== originalPhoneNumber || formData.phoneCountry !== (selectedVendor.phoneCountry || 'US');
+      
+      if (phoneWasChanged && formData.phone) {
+        // Only validate if the field was actually changed and has a value
+        if (!validatePhone(formData.phone, formData.phoneCountry)) {
+          setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+          setError('Please fix the validation errors below');
+          setActionLoading(false);
+          return;
+        }
+
+        // Format phone to E.164
+        phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
+        if (!phoneData) {
+          setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+          setError('Please fix the validation errors below');
+          setActionLoading(false);
+          return;
+        }
+      }
+
       // Send all updated fields with E.164 formatted phone numbers
       const updateData = {
         name: formData.name,
         email: formData.email,
-        phone: phoneData ? phoneData.e164 : formData.phone,
-        phoneCountry: phoneData ? phoneData.countryCode : formData.phoneCountry,
+        phone: phoneData ? phoneData.e164 : selectedVendor.phone,
+        phoneCountry: phoneData ? phoneData.countryCode : (selectedVendor.phoneCountry || 'US'),
         businessName: formData.businessName,
         serviceType: formData.serviceType,
         businessRegistrationNumber: formData.businessRegistrationNumber,
@@ -289,6 +299,7 @@ const VendorManagement = () => {
         setSuccessMessage('✅ Vendor updated successfully');
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
+        setValidationErrors({});
         loadVendors();
       }
     } catch (err) {
@@ -432,23 +443,18 @@ const VendorManagement = () => {
       const parsed = parseE164(vendor.phone);
       if (parsed) {
         phoneCountry = parsed.countryCode || 'US';
-        // Extract phone number without country code
-        phoneNumber = vendor.phone.replace(/^\+\d+/, '').trim();
+        // Get the calling code for this country
+        const country = COUNTRIES.find(c => c.code === phoneCountry);
+        const callingCode = country?.callingCode?.replace('+', '') || '';
+        
+        // Extract only the local phone number by removing the calling code prefix
+        if (callingCode && vendor.phone.startsWith('+' + callingCode)) {
+          phoneNumber = vendor.phone.substring(callingCode.length + 1);
+        } else {
+          phoneNumber = vendor.phone.replace(/^\+\d+/, '').trim();
+        }
       } else {
         phoneNumber = vendor.phone;
-      }
-    }
-
-    // Parse contact person phone if it's in E.164 format
-    let contactPhoneCountry = 'US';
-    let contactPhoneNumber = '';
-    if (vendor.contactPerson?.phone) {
-      const parsed = parseE164(vendor.contactPerson.phone);
-      if (parsed) {
-        contactPhoneCountry = parsed.countryCode || 'US';
-        contactPhoneNumber = vendor.contactPerson.phone.replace(/^\+\d+/, '').trim();
-      } else {
-        contactPhoneNumber = vendor.contactPerson.phone;
       }
     }
 
@@ -470,8 +476,8 @@ const VendorManagement = () => {
       },
       contactPerson: vendor.contactPerson || {
         name: '',
-        phone: contactPhoneNumber,
-        phoneCountry: contactPhoneCountry,
+        phone: '',
+        phoneCountry: 'US',
         email: '',
         designation: ''
       },
