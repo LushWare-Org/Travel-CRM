@@ -253,7 +253,7 @@ export default function Home() {
         }
         
         return {
-          id: booking._id,
+          id: pkg._id,
           packageName: pkg.name,
           image: pkg.images && pkg.images[0] && pkg.images[0].url ? pkg.images[0].url : '',
           duration: `${pkg.duration}D/${pkg.duration - 1}N`,
