@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock, Loader } from 'lucide-react';
+import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock, Loader, Lock } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { 
   UserTableHeader, 
@@ -7,15 +7,22 @@ import {
   UserFormDialog, 
   ConfirmationDialog,
   StatsCard,
-  FormGroup 
+  FormGroup,
+  PermissionDeniedView
 } from '../Common';
 import { STATUS_COLORS, ROLE_COLORS, ADMIN_PERMISSIONS_LIST } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import { formatPhoneToE164, COUNTRIES } from '../../utils/phoneUtils';
 import AdminTable from './AdminTable';
 import adminService from '../../../../services/admin.service';
+import { usePermission } from '../../../../contexts/PermissionContext';
+import { getPermissionDeniedMessage } from '../../utils/permissionUtils';
 
 const AdminManagement = () => {
+  // Permission context
+  const permission = usePermission();
+  const canManageAdmins = permission.hasPermission('manage_admins');
+
   // State management
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -226,6 +233,13 @@ const AdminManagement = () => {
   };
 
   const handleAddAdmin = async () => {
+    // ✅ PERMISSION CHECK: Verify user has permission to manage admins
+    if (!canManageAdmins) {
+      setError(getPermissionDeniedMessage('create', 'admin accounts'));
+      toast.error(getPermissionDeniedMessage('create', 'admin accounts'));
+      return;
+    }
+
     if (!formData.name || !formData.email || !formData.phone) {
       // ✅ Form validation error → show in DIALOG (form-related)
       setError('Please fill in all required fields');
@@ -499,6 +513,14 @@ const AdminManagement = () => {
   };
 
   const handleDeleteAdmin = (admin) => {
+    // ✅ PERMISSION CHECK: Verify user has permission to manage admins
+    if (!canManageAdmins) {
+      toast.error(getPermissionDeniedMessage('delete', 'admin accounts'), {
+        duration: 4000,
+        position: 'top-right'
+      });
+      return;
+    }
     setAdminToDelete(admin);
     setShowDeleteConfirm(true);
   };
@@ -536,6 +558,15 @@ const AdminManagement = () => {
   };
 
   const openEditDialog = (admin) => {
+    // ✅ PERMISSION CHECK: Verify user has permission to manage admins
+    if (!canManageAdmins) {
+      toast.error(getPermissionDeniedMessage('update', 'admin accounts'), {
+        duration: 4000,
+        position: 'top-right'
+      });
+      return;
+    }
+    
     setSelectedAdmin(admin);
     setFormData({
       name: admin.name,
@@ -590,23 +621,31 @@ const AdminManagement = () => {
 
       {!loading && (
         <>
-          {/* Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
-              <p className="text-gray-600 mt-1">Manage system administrators and their permissions</p>
-            </div>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowNewAdminDialog(true);
-              }}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors font-medium flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Admin
-            </button>
-          </div>
+          {!canManageAdmins ? (
+            <PermissionDeniedView
+              section="Admin Management"
+              requiredPermission="manage_admins"
+              message="You don't have permission to manage administrator accounts. Contact your system administrator to request access."
+            />
+          ) : (
+            <>
+              {/* Header */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
+                  <p className="text-gray-600 mt-1">Manage system administrators and their permissions</p>
+                </div>
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setShowNewAdminDialog(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors font-medium flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Admin
+                </button>
+              </div>
 
           {/* Info Banner - Password & Security Policy */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
@@ -653,6 +692,8 @@ const AdminManagement = () => {
             itemsPerPage={ITEMS_PER_PAGE}
             totalItems={filteredAdmins.length}
           />
+            </>
+          )}
         </>
       )}
 
