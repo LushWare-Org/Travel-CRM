@@ -10,6 +10,7 @@ import {
 } from '../Common';
 import { VENDOR_VERIFICATION_COLORS, VENDOR_TYPE_COLORS } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
+import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 import vendorService from '../../../../services/vendor.service';
 import VendorTable from './VendorTable';
 
@@ -53,6 +54,7 @@ const VendorManagement = () => {
     name: '',
     email: '',
     phone: '',
+    phoneCountry: 'US',
     businessName: '',
     serviceType: '',
     businessRegistrationNumber: '',
@@ -67,6 +69,7 @@ const VendorManagement = () => {
     contactPerson: {
       name: '',
       phone: '',
+      phoneCountry: 'US',
       email: '',
       designation: ''
     },
@@ -122,6 +125,7 @@ const VendorManagement = () => {
       name: '',
       email: '',
       phone: '',
+      phoneCountry: 'US',
       businessName: '',
       serviceType: '',
       businessRegistrationNumber: '',
@@ -136,6 +140,7 @@ const VendorManagement = () => {
       contactPerson: {
         name: '',
         phone: '',
+        phoneCountry: 'US',
         email: '',
         designation: ''
       },
@@ -153,6 +158,39 @@ const VendorManagement = () => {
   };
 
   const handleAddVendor = async () => {
+    // Validate phone number first
+    if (!validatePhone(formData.phone, formData.phoneCountry)) {
+      setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Format phone to E.164
+    const phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
+    if (!phoneData) {
+      setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Validate contact person phone if provided
+    if (formData.contactPerson.phone && !validatePhone(formData.contactPerson.phone, formData.contactPerson.phoneCountry)) {
+      setValidationErrors({ contactPersonPhone: `Please provide a valid phone number for ${formData.contactPerson.phoneCountry}` });
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Format contact person phone if provided
+    let contactPersonPhoneData = null;
+    if (formData.contactPerson.phone) {
+      contactPersonPhoneData = formatPhoneToE164(formData.contactPerson.phone, formData.contactPerson.phoneCountry);
+      if (!contactPersonPhoneData) {
+        setValidationErrors({ contactPersonPhone: `Please provide a valid phone number for ${formData.contactPerson.phoneCountry}` });
+        setError('Please fix the validation errors below');
+        return;
+      }
+    }
+
     // Validate form data
     const validation = vendorService.validateVendorData(formData);
     if (!validation.isValid) {
@@ -166,7 +204,18 @@ const VendorManagement = () => {
 
     try {
       setActionLoading(true);
-      const response = await vendorService.createVendor(formData);
+      // Create submission data with E.164 formatted phone numbers
+      const submitData = {
+        ...formData,
+        phone: phoneData.e164,
+        phoneCountry: phoneData.countryCode,
+        contactPerson: {
+          ...formData.contactPerson,
+          phone: contactPersonPhoneData ? contactPersonPhoneData.e164 : '',
+          phoneCountry: contactPersonPhoneData ? contactPersonPhoneData.countryCode : formData.contactPerson.phoneCountry
+        }
+      };
+      const response = await vendorService.createVendor(submitData);
       
       if (response.status === 'success') {
         setShowNewVendorDialog(false);
@@ -198,16 +247,37 @@ const VendorManagement = () => {
   const handleEditVendor = async () => {
     if (!selectedVendor) return;
 
+    // Validate main vendor phone if provided
+    if (formData.phone && !validatePhone(formData.phone, formData.phoneCountry)) {
+      setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Format main vendor phone if provided
+    let phoneData = null;
+    if (formData.phone) {
+      phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
+      if (!phoneData) {
+        setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+        setError('Please fix the validation errors below');
+        return;
+      }
+    }
+
     try {
       setActionLoading(true);
-      // Only send changed fields for update
+      // Send all updated fields with E.164 formatted phone numbers
       const updateData = {
+        name: formData.name,
+        email: formData.email,
+        phone: phoneData ? phoneData.e164 : formData.phone,
+        phoneCountry: phoneData ? phoneData.countryCode : formData.phoneCountry,
         businessName: formData.businessName,
         serviceType: formData.serviceType,
         businessRegistrationNumber: formData.businessRegistrationNumber,
         taxIdentificationNumber: formData.taxIdentificationNumber,
         address: formData.address,
-        contactPerson: formData.contactPerson,
         bankDetails: formData.bankDetails
       };
 
@@ -354,10 +424,39 @@ const VendorManagement = () => {
 
   const openEditDialog = (vendor) => {
     setSelectedVendor(vendor);
+    
+    // Parse phone number if it's in E.164 format
+    let phoneCountry = 'US';
+    let phoneNumber = '';
+    if (vendor.phone) {
+      const parsed = parseE164(vendor.phone);
+      if (parsed) {
+        phoneCountry = parsed.countryCode || 'US';
+        // Extract phone number without country code
+        phoneNumber = vendor.phone.replace(/^\+\d+/, '').trim();
+      } else {
+        phoneNumber = vendor.phone;
+      }
+    }
+
+    // Parse contact person phone if it's in E.164 format
+    let contactPhoneCountry = 'US';
+    let contactPhoneNumber = '';
+    if (vendor.contactPerson?.phone) {
+      const parsed = parseE164(vendor.contactPerson.phone);
+      if (parsed) {
+        contactPhoneCountry = parsed.countryCode || 'US';
+        contactPhoneNumber = vendor.contactPerson.phone.replace(/^\+\d+/, '').trim();
+      } else {
+        contactPhoneNumber = vendor.contactPerson.phone;
+      }
+    }
+
     setFormData({
       name: vendor.name || '',
       email: vendor.email || '',
-      phone: vendor.phone || '',
+      phone: phoneNumber,
+      phoneCountry: phoneCountry,
       businessName: vendor.businessName || '',
       serviceType: vendor.serviceType || '',
       businessRegistrationNumber: vendor.businessRegistrationNumber || '',
@@ -371,7 +470,8 @@ const VendorManagement = () => {
       },
       contactPerson: vendor.contactPerson || {
         name: '',
-        phone: '',
+        phone: contactPhoneNumber,
+        phoneCountry: contactPhoneCountry,
         email: '',
         designation: ''
       },
@@ -585,34 +685,48 @@ const VendorManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Phone" required error={validationErrors.phone}>
+          <FormGroup label="Phone" required error={validationErrors.phone}>
+            <div className="flex gap-2">
+              <select
+                value={formData.phoneCountry}
+                onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                className="w-40 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                title="Select country code"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.code} value={country.code} title={country.name}>
+                    {country.flag} {country.code} {country.callingCode}
+                  </option>
+                ))}
+              </select>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                   validationErrors.phone 
                     ? 'border-red-300 bg-red-50 focus:ring-red-500' 
                     : 'border-gray-300 focus:ring-indigo-500'
                 }`}
-                placeholder="+1-555-0000"
+                placeholder={getPhonePlaceholder(formData.phoneCountry)}
               />
-            </FormGroup>
-            <FormGroup label="Business Name" required error={validationErrors.businessName}>
-              <input
-                type="text"
-                value={formData.businessName}
-                onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                  validationErrors.businessName 
-                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
-                    : 'border-gray-300 focus:ring-indigo-500'
-                }`}
-                placeholder="Business/Company Name"
-              />
-            </FormGroup>
-          </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
+          </FormGroup>
+
+          <FormGroup label="Business Name" required error={validationErrors.businessName}>
+            <input
+              type="text"
+              value={formData.businessName}
+              onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                validationErrors.businessName 
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
+              placeholder="Business/Company Name"
+            />
+          </FormGroup>
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Service Type" required error={validationErrors.serviceType}>
@@ -810,12 +924,95 @@ const VendorManagement = () => {
         successMessage={successMessage}
       >
         <div className="space-y-4">
+          {/* Validation Error Summary */}
+          {Object.keys(validationErrors).length > 0 && (
+            <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+              <p className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                Please fix the following errors:
+              </p>
+              <ul className="space-y-2">
+                {Object.entries(validationErrors).map(([field, error]) => (
+                  <li key={field} className="text-sm text-red-800 flex items-start gap-2">
+                    <span className="text-red-600 font-bold mt-0.5">•</span>
+                    <span>
+                      <strong>{field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}:</strong> {error}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Name" required>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.name 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Contact Person Name"
+              />
+            </FormGroup>
+            <FormGroup label="Email" required>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.email 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="contact@vendor.com"
+              />
+            </FormGroup>
+          </div>
+
+          <FormGroup label="Phone" required error={validationErrors.phone}>
+            <div className="flex gap-2">
+              <select
+                value={formData.phoneCountry}
+                onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                className="w-40 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                title="Select country code"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.code} value={country.code} title={country.name}>
+                    {country.flag} {country.code} {country.callingCode}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.phone 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder={getPhonePlaceholder(formData.phoneCountry)}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
+          </FormGroup>
+
           <FormGroup label="Business Name" required>
             <input
               type="text"
               value={formData.businessName}
               onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                validationErrors.businessName 
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
+              placeholder="Business/Company Name"
             />
           </FormGroup>
 
@@ -824,8 +1021,13 @@ const VendorManagement = () => {
               <select
                 value={formData.serviceType}
                 onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.serviceType 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
               >
+                <option value="">Select Type</option>
                 {VENDOR_TYPES.map(type => (
                   <option key={type} value={type}>{VENDOR_TYPE_LABELS[type]}</option>
                 ))}
@@ -836,57 +1038,147 @@ const VendorManagement = () => {
                 type="text"
                 value={formData.businessRegistrationNumber}
                 onChange={(e) => setFormData({ ...formData, businessRegistrationNumber: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.businessRegistrationNumber 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Business Reg. Number"
               />
             </FormGroup>
           </div>
 
-          <FormGroup label="Tax ID" required>
+          <FormGroup label="Tax Identification Number" required>
             <input
               type="text"
               value={formData.taxIdentificationNumber}
               onChange={(e) => setFormData({ ...formData, taxIdentificationNumber: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                validationErrors.taxIdentificationNumber 
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
+              placeholder="Tax ID"
             />
           </FormGroup>
 
-          {/* Contact Person */}
+          {/* Address Section */}
           <div className="border-t pt-4">
-            <p className="font-semibold text-gray-700 mb-3">Contact Person</p>
-            <FormGroup label="Contact Name">
+            <p className="font-semibold text-gray-700 mb-3">Address Information</p>
+            <FormGroup label="Street Address">
               <input
                 type="text"
-                value={formData.contactPerson.name}
-                onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, name: e.target.value } })}
+                value={formData.address.street}
+                onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Street address"
               />
             </FormGroup>
             <div className="grid grid-cols-2 gap-4">
-              <FormGroup label="Contact Phone">
+              <FormGroup label="City">
                 <input
-                  type="tel"
-                  value={formData.contactPerson.phone}
-                  onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, phone: e.target.value } })}
+                  type="text"
+                  value={formData.address.city}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="City"
                 />
               </FormGroup>
-              <FormGroup label="Contact Email">
+              <FormGroup label="State">
                 <input
-                  type="email"
-                  value={formData.contactPerson.email}
-                  onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, email: e.target.value } })}
+                  type="text"
+                  value={formData.address.state}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="State"
                 />
               </FormGroup>
             </div>
-            <FormGroup label="Designation">
-              <input
-                type="text"
-                value={formData.contactPerson.designation}
-                onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, designation: e.target.value } })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </FormGroup>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="ZIP Code">
+                <input
+                  type="text"
+                  value={formData.address.zipCode}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, zipCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="ZIP Code"
+                />
+              </FormGroup>
+              <FormGroup label="Country">
+                <input
+                  type="text"
+                  value={formData.address.country}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, country: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Country"
+                />
+              </FormGroup>
+            </div>
+          </div>
+
+          {/* Bank Details Section */}
+          <div className="border-t pt-4">
+            <p className="font-semibold text-gray-700 mb-3">Bank Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="Account Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.accountName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, accountName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Account Holder Name"
+                />
+              </FormGroup>
+              <FormGroup label="Account Number">
+                <input
+                  type="text"
+                  value={formData.bankDetails.accountNumber}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, accountNumber: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Account Number"
+                />
+              </FormGroup>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="Bank Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.bankName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, bankName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Bank Name"
+                />
+              </FormGroup>
+              <FormGroup label="Branch Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.branchName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, branchName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Branch Name"
+                />
+              </FormGroup>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="IFSC Code">
+                <input
+                  type="text"
+                  value={formData.bankDetails.ifscCode}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, ifscCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="IFSC Code"
+                />
+              </FormGroup>
+              <FormGroup label="SWIFT Code (International)">
+                <input
+                  type="text"
+                  value={formData.bankDetails.swiftCode}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, swiftCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="SWIFT Code"
+                />
+              </FormGroup>
+            </div>
           </div>
         </div>
       </UserFormDialog>
