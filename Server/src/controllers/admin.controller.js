@@ -509,8 +509,6 @@ export const updateAdminPermissions = asyncHandler(async (req, res, next) => {
     'manage_admins',
     'view_reports',
     'manage_billing',
-    'system_settings',
-    'audit_log',
   ];
 
   // Validate all permissions
@@ -578,8 +576,6 @@ export const getAvailablePermissions = asyncHandler(async (req, res, next) => {
     { id: 'manage_admins', label: 'Manage Admins', category: 'System', description: 'Create and manage administrator accounts' },
     { id: 'view_reports', label: 'View Reports', category: 'Analytics', description: 'Access business reports and analytics' },
     { id: 'manage_billing', label: 'Manage Billing', category: 'Finance', description: 'Handle billing and payment operations' },
-    { id: 'system_settings', label: 'System Settings', category: 'System', description: 'Configure system-wide settings' },
-    { id: 'audit_log', label: 'View Audit Logs', category: 'System', description: 'View system audit logs and activity' },
   ];
 
   res.status(200).json({
@@ -634,8 +630,6 @@ export const promoteSuperAdmin = asyncHandler(async (req, res, next) => {
     'manage_admins',
     'view_reports',
     'manage_billing',
-    'system_settings',
-    'audit_log',
   ];
 
   await userToPromote.save();

@@ -155,8 +155,6 @@ export const getAdminCapabilities = (permissionContext) => {
       canManageAdmins: false,
       canViewReports: false,
       canManageBilling: false,
-      canManageSettings: false,
-      canViewAuditLogs: false,
     };
   }
 
@@ -177,10 +175,6 @@ export const getAdminCapabilities = (permissionContext) => {
     canManageBilling: permissionContext.hasPermission(
       PERMISSION_LIST.MANAGE_BILLING
     ),
-    canManageSettings: permissionContext.hasPermission(
-      PERMISSION_LIST.SYSTEM_SETTINGS
-    ),
-    canViewAuditLogs: permissionContext.hasPermission(PERMISSION_LIST.AUDIT_LOG),
   };
 };
 

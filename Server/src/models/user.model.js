@@ -78,8 +78,6 @@ const userSchema = new mongoose.Schema(
             'manage_admins',
             'view_reports',
             'manage_billing',
-            'system_settings',
-            'audit_log',
           ];
           return permissionsArray.every((perm) => validPermissions.includes(perm));
         },

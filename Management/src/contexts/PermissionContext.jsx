@@ -14,8 +14,6 @@ export const PERMISSION_LIST = {
   MANAGE_ADMINS: 'manage_admins',
   VIEW_REPORTS: 'view_reports',
   MANAGE_BILLING: 'manage_billing',
-  SYSTEM_SETTINGS: 'system_settings',
-  AUDIT_LOG: 'audit_log',
 };
 
 /**
@@ -57,18 +55,6 @@ export const PERMISSION_METADATA = {
     label: 'Manage Billing',
     category: 'Finance',
     description: 'Handle billing and payment operations',
-  },
-  [PERMISSION_LIST.SYSTEM_SETTINGS]: {
-    id: 'system_settings',
-    label: 'System Settings',
-    category: 'System',
-    description: 'Configure system-wide settings',
-  },
-  [PERMISSION_LIST.AUDIT_LOG]: {
-    id: 'audit_log',
-    label: 'View Audit Logs',
-    category: 'System',
-    description: 'View system audit logs and activity',
   },
 };
 

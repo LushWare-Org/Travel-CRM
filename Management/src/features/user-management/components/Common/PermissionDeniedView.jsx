@@ -17,8 +17,6 @@ const PermissionDeniedView = ({
     manage_admins: 'manage admin accounts and permissions',
     view_reports: 'view system reports',
     manage_billing: 'manage billing operations',
-    system_settings: 'configure system settings',
-    audit_log: 'view audit logs',
   };
 
   const actionMessage = defaultMessages[requiredPermission] || `access ${section}`;
