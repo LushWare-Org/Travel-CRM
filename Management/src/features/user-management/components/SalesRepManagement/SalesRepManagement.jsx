@@ -236,17 +236,17 @@ const SalesRepManagement = () => {
       const response = await salesRepService.createSalesRep(payload);
 
       if (response.data) {
-        toast.success(`✅ Sales rep created! Invitation sent to ${formData.email}`);
+        toast.success(`Sales rep created! Invitation sent to ${formData.email}`);
         setShowNewRepDialog(false);
         resetForm();
         
-        // Reset search and pagination state
-        setSearchTerm('');
-        setCurrentPage(1);
-        
-        // Force reload with explicit parameters to ensure we get all reps
+        // Reload data first with current state
         await loadSalesReps(1, '');
         await loadStats();
+        
+        // Then reset pagination/search state
+        setSearchTerm('');
+        setCurrentPage(1);
       }
     } catch (err) {
       const errorMsg = err.userMessage || err.message || 'Failed to create sales representative';
@@ -298,7 +298,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.updateSalesRep(selectedRep.id, payload);
 
       if (response.data) {
-        toast.success('✅ Sales representative updated successfully');
+        toast.success('Sales representative updated successfully');
         setShowEditRepDialog(false);
         resetForm();
         await loadSalesReps();
@@ -335,7 +335,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.deleteSalesRep(repToDelete.id);
 
       if (response.status === 'success') {
-        toast.success(`✅ Sales representative deleted successfully`);
+        toast.success(`Sales representative deleted successfully`);
         setShowDeleteConfirm(false);
         setRepToDelete(null);
         await loadSalesReps();
@@ -372,7 +372,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.resetSalesRepPassword(repToResendInvite.id);
 
       if (response.data) {
-        toast.success(`✅ Invitation resent to ${repToResendInvite.email}`);
+        toast.success(`Invitation resent to ${repToResendInvite.email}`);
         setShowResendInviteConfirm(false);
         setRepToResendInvite(null);
       }
@@ -407,7 +407,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.resetSalesRepPassword(repToResetPassword.id);
 
       if (response.data) {
-        toast.success(`✅ Password reset email sent to ${repToResetPassword.email}`);
+        toast.success(`Password reset email sent to ${repToResetPassword.email}`);
         setShowPasswordResetConfirm(false);
         setRepToResetPassword(null);
       }
