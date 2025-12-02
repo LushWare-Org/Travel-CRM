@@ -85,6 +85,11 @@ export const PermissionProvider = ({ children }) => {
    */
   const fetchAvailablePermissions = useCallback(async () => {
     try {
+      // Only fetch for admin and superAdmin users
+      if (user?.role !== 'admin' && user?.role !== 'superAdmin') {
+        return;
+      }
+
       const response = await axios.get(`${API_URL}/admin/permissions/available`);
       if (response.data?.data?.permissions) {
         setAvailablePermissions(response.data.data.permissions);
@@ -92,7 +97,7 @@ export const PermissionProvider = ({ children }) => {
     } catch (error) {
       console.error('Failed to fetch available permissions:', error);
     }
-  }, [API_URL]);
+  }, [API_URL, user?.role]);
 
   /**
    * Load user's permissions on mount or when user changes
