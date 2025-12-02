@@ -61,6 +61,14 @@ const hasPermission = (role, resource, action, userPermissions = []) => {
       'admin:delete': 'manage_admins',
       'reports:view': 'view_reports',
       'billing:manage': 'manage_billing',
+      'leads:manage': 'manage_leads',
+      'leads:create': 'manage_leads',
+      'leads:update': 'manage_leads',
+      'leads:delete': 'manage_leads',
+      'packages:manage': 'manage_packages',
+      'packages:create': 'manage_packages',
+      'packages:update': 'manage_packages',
+      'packages:delete': 'manage_packages',
     };
 
     const requiredPermission = permissionMap[`${resource}:${action}`];

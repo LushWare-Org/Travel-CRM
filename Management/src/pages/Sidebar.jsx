@@ -16,8 +16,8 @@ const Sidebar = () => {
   const navigationItems = [
     { icon: Home, label: "Dashboard", path: "/", requiredPermission: null },
     { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
-    { icon: Users, label: "Lead Management", path: "/leads", requiredPermission: "manage_users" },
-    { icon: MapPin, label: "Packages", path: "/itineraries", requiredPermission: null },
+    { icon: Users, label: "Lead Management", path: "/leads", requiredPermission: "manage_leads" },
+    { icon: MapPin, label: "Packages", path: "/itineraries", requiredPermission: "manage_packages" },
     { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
     { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] }
   ];

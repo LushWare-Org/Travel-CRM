@@ -181,6 +181,8 @@ export const createStaffSchema = Joi.object({
         'manage_admins',
         'view_reports',
         'manage_billing',
+        'manage_leads',
+        'manage_packages',
       ),
     )
     .messages({
@@ -241,6 +243,8 @@ export const updatePermissionsSchema = Joi.object({
         'manage_admins',
         'view_reports',
         'manage_billing',
+        'manage_leads',
+        'manage_packages',
       ),
     )
     .required()

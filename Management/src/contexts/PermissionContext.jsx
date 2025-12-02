@@ -14,6 +14,8 @@ export const PERMISSION_LIST = {
   MANAGE_ADMINS: 'manage_admins',
   VIEW_REPORTS: 'view_reports',
   MANAGE_BILLING: 'manage_billing',
+  MANAGE_LEADS: 'manage_leads',
+  MANAGE_PACKAGES: 'manage_packages',
 };
 
 /**
@@ -55,6 +57,18 @@ export const PERMISSION_METADATA = {
     label: 'Manage Billing',
     category: 'Finance',
     description: 'Handle billing and payment operations',
+  },
+  [PERMISSION_LIST.MANAGE_LEADS]: {
+    id: 'manage_leads',
+    label: 'Manage Leads',
+    category: 'Sales',
+    description: 'Manage sales leads and lead assignments',
+  },
+  [PERMISSION_LIST.MANAGE_PACKAGES]: {
+    id: 'manage_packages',
+    label: 'Manage Packages',
+    category: 'Travel',
+    description: 'Manage travel packages and itineraries',
   },
 };
 

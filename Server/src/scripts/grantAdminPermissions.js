@@ -31,6 +31,8 @@ const grantAdminPermissions = async () => {
       'manage_admins',
       'view_reports',
       'manage_billing',
+      'manage_leads',
+      'manage_packages',
     ];
 
     // Update admin permissions

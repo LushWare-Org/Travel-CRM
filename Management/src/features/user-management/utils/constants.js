@@ -59,5 +59,7 @@ export const ADMIN_PERMISSIONS_LIST = [
   { id: 'manage_vendors', label: 'Manage Vendors', category: 'Partners' },
   { id: 'manage_admins', label: 'Manage Admins', category: 'System' },
   { id: 'view_reports', label: 'View Reports', category: 'Analytics' },
-  { id: 'manage_billing', label: 'Manage Billing', category: 'Finance' }
+  { id: 'manage_billing', label: 'Manage Billing', category: 'Finance' },
+  { id: 'manage_leads', label: 'Manage Leads', category: 'Sales' },
+  { id: 'manage_packages', label: 'Manage Packages', category: 'Travel' }
 ];

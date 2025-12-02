@@ -32,7 +32,9 @@ export const ADMIN_PERMISSIONS = {
   MANAGE_VENDORS: 'manage_vendors',
   VIEW_REPORTS: 'view_reports',
   MANAGE_BILLING: 'manage_billing',
-  MANAGE_ADMINS: 'manage_admins'
+  MANAGE_ADMINS: 'manage_admins',
+  MANAGE_LEADS: 'manage_leads',
+  MANAGE_PACKAGES: 'manage_packages'
 };
 
 export const VENDOR_VERIFICATION_STATUS = {
