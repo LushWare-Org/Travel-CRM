@@ -226,7 +226,7 @@ const VendorManagement = () => {
       
       if (response.status === 'success') {
         setShowNewVendorDialog(false);
-        setSuccessMessage(`✅ Invitation sent to ${formData.email}`);
+        setSuccessMessage(`✅ Vendor created successfully`);
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
         setValidationErrors({});
@@ -603,7 +603,7 @@ const VendorManagement = () => {
         onSubmit={handleAddVendor}
         title="Add New Vendor"
         subtitle="Register a new partner (hotel, travel agent, service provider, etc.)"
-        submitLabel="Register & Send Invitation"
+        submitLabel="Create Vendor"
         submitColor="indigo"
         isLoading={actionLoading}
         error={error}
@@ -635,10 +635,9 @@ const VendorManagement = () => {
             <p className="text-xs font-semibold text-indigo-900">WHAT HAPPENS NEXT:</p>
             <ol className="text-xs text-indigo-800 mt-2 space-y-1 ml-4">
               <li>1. ✅ Vendor account is created in the system</li>
-              <li>2. 🔐 Temporary password is generated automatically</li>
-              <li>3. 📧 Invitation email is sent to their address</li>
-              <li>4. 🔑 They must set permanent password on first login</li>
-              <li>5. ✓ Admin must verify business details before activation</li>
+              <li>2. 📝 Vendor details are saved and stored</li>
+              <li>3. ✓ Admin must verify business details before activation</li>
+              <li>4. 🔑 Account ready for vendor to use</li>
             </ol>
           </div>
 
@@ -880,13 +879,12 @@ const VendorManagement = () => {
           </div>
 
           <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-            <p className="text-xs font-semibold text-green-900 mb-2">🔐 Account Security</p>
+            <p className="text-xs font-semibold text-green-900 mb-2">✓ Account Information</p>
             <ul className="text-xs text-green-800 space-y-1">
-              <li>• Temporary password: Auto-generated (12 chars, secure)</li>
-              <li>• Sent via email: Vendor receives invitation link</li>
-              <li>• First login: Must create permanent password</li>
-              <li>• Verification: Admin reviews business details</li>
-              <li>• Password expires: After 90 days</li>
+              <li>• Vendor details securely stored in system</li>
+              <li>• Business information verified by admin</li>
+              <li>• Account ready for activation</li>
+              <li>• All contact information recorded</li>
             </ul>
           </div>
         </div>
