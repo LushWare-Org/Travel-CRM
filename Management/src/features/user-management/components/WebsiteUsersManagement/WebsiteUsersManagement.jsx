@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash, Users, UserCheck, UserX, AlertCircle, Globe } from 'lucide-react';
+import { Edit, Trash, Users, UserCheck, UserX, AlertCircle, Globe } from 'lucide-react';
 import { 
   UserTableHeader, 
   Pagination, 
@@ -20,7 +20,6 @@ const WebsiteUsersManagement = () => {
     error,
     pagination,
     filters,
-    createUser,
     updateUser,
     deleteUser,
     toggleUserStatus,
@@ -31,7 +30,6 @@ const WebsiteUsersManagement = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [showNewUserDialog, setShowNewUserDialog] = useState(false);
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -73,51 +71,6 @@ const WebsiteUsersManagement = () => {
       status: 'active'
     });
     setFormError('');
-  };
-
-  const handleAddUser = async () => {
-    setFormError('');
-    
-    // Validation
-    if (!formData.name || !formData.email || !formData.phone || !formData.password) {
-      setFormError('All fields are required');
-      return;
-    }
-
-    // Validate phone number format
-    if (!validatePhone(formData.phone, formData.phoneCountry)) {
-      setFormError(`Please provide a valid phone number for ${formData.phoneCountry}`);
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Format phone to E.164 for API
-      const phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
-      
-      if (!phoneData) {
-        setFormError('Failed to format phone number. Please check the input.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      const dataToSend = {
-        ...formData,
-        phone: phoneData.e164,
-        phoneCountry: phoneData.countryCode
-      };
-
-      await createUser(dataToSend);
-      setShowNewUserDialog(false);
-      resetForm();
-      // Clear search and filters after successful user creation
-      setSearchTerm('');
-      setFilterStatus('all');
-    } catch (err) {
-      setFormError(err.message || 'Failed to create user');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleEditUser = async () => {
@@ -243,17 +196,6 @@ const WebsiteUsersManagement = () => {
           <h2 className="text-2xl font-bold text-gray-900">Website Users</h2>
           <p className="text-gray-600 mt-1">Manage platform users and their bookings</p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowNewUserDialog(true);
-          }}
-          disabled={loading}
-          className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
-        >
-          <Plus className="w-4 h-4" />
-          Add User
-        </button>
       </div>
 
       {/* Stats Grid */}
@@ -327,96 +269,6 @@ const WebsiteUsersManagement = () => {
           />
         </>
       )}
-
-      {/* Add User Dialog */}
-      <UserFormDialog
-        isOpen={showNewUserDialog}
-        onClose={() => {
-          setShowNewUserDialog(false);
-          setFormError('');
-          resetForm();
-        }}
-        onSubmit={handleAddUser}
-        title="Add New Website User"
-        subtitle="Register a new platform user"
-        submitLabel="Create User"
-        submitColor="cyan"
-        isSubmitting={isSubmitting}
-        error={formError}
-      >
-        <div className="space-y-4">
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Full Name" required>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-                placeholder="John Doe"
-              />
-            </FormGroup>
-            <FormGroup label="Email" required>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-                placeholder="john@example.com"
-              />
-            </FormGroup>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Phone" required>
-              <div className="flex gap-2">
-                <select
-                  value={formData.phoneCountry}
-                  onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
-                  disabled={isSubmitting}
-                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-                >
-                  {COUNTRIES.map(country => (
-                    <option key={country.code} value={country.code}>
-                      {country.flag} {country.code}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  disabled={isSubmitting}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-                  placeholder={getPhonePlaceholder(formData.phoneCountry)}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
-            </FormGroup>
-            <FormGroup label="Password" required>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-                placeholder="Minimum 6 characters"
-              />
-            </FormGroup>
-          </div>
-
-          <div className="bg-cyan-50 border border-cyan-200 p-4 rounded-lg">
-            <p className="text-xs font-semibold text-cyan-900 mb-2">Quick Info</p>
-            <ul className="text-xs text-cyan-800 space-y-1">
-              <li>• User can access the platform immediately after creation</li>
-              <li>• Activation email will be sent to provided email</li>
-              <li>• All bookings and spending tracked automatically</li>
-            </ul>
-          </div>
-        </div>
-      </UserFormDialog>
 
       {/* Edit User Dialog */}
       <UserFormDialog
