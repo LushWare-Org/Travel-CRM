@@ -44,7 +44,7 @@ const UserFormDialog = ({
         </div>
 
         <div className="p-6">
-          {/* Error Message */}
+          {/* Error Message - Form Validation Errors Only */}
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 mb-4">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -52,7 +52,7 @@ const UserFormDialog = ({
             </div>
           )}
 
-          {/* Success Message */}
+          {/* Success Message - Form Success Only */}
           {successMessage && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3 mb-4">
               <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock, Loader } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 import { 
   UserTableHeader, 
   Pagination, 
@@ -18,17 +19,19 @@ const AdminManagement = () => {
   // State management
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); // ✅ Dialog form validation errors only
+  const [successMessage, setSuccessMessage] = useState(''); // ✅ Dialog form success messages only
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showNewAdminDialog, setShowNewAdminDialog] = useState(false);
   const [showEditAdminDialog, setShowEditAdminDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showInviteResendConfirm, setShowInviteResendConfirm] = useState(false);
+  const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [adminToDelete, setAdminToDelete] = useState(null);
   const [adminToResendInvite, setAdminToResendInvite] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [adminToResetPassword, setAdminToResetPassword] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -224,6 +227,7 @@ const AdminManagement = () => {
 
   const handleAddAdmin = async () => {
     if (!formData.name || !formData.email || !formData.phone) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError('Please fill in all required fields');
       return;
     }
@@ -231,6 +235,7 @@ const AdminManagement = () => {
     // Format phone to E.164 format
     const phoneFormatted = formatPhoneToE164(formData.phone, formData.countryCode);
     if (!phoneFormatted) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError(`Invalid phone number for ${formData.countryCode}. Please check the format.`);
       return;
     }
@@ -292,7 +297,7 @@ const AdminManagement = () => {
           mustChangePassword: mustChangePassword
         };
 
-        // Log email details AFTER creating the object (so email is defined)
+        // Log email details to console (for developer reference)
         console.log(`📧 Email sent to ${newAdmin.email}`);
         console.log(`Temporary Password: ${tempPassword}`);
 
@@ -300,12 +305,15 @@ const AdminManagement = () => {
         setAdmins(prev => [...prev, newAdmin]);
         setShowNewAdminDialog(false);
         setSearchTerm(''); // Clear search bar after creation
-        setSuccessMessage(`✅ Admin created! Invitation sent to ${newAdmin.email}`);
+        
+        // ✅ Show success in DIALOG (form-related: creation success)
+        setSuccessMessage(`Admin created! Invitation sent to ${newAdmin.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
       }
     } catch (err) {
       console.error('Error creating admin:', err);
+      // ✅ Show error in DIALOG (form-related: creation failed)
       setError(err.message || 'Failed to create admin');
     } finally {
       setIsSubmitting(false);
@@ -314,6 +322,7 @@ const AdminManagement = () => {
 
   const handleEditAdmin = async () => {
     if (!selectedAdmin || !formData.name || !formData.email || !formData.phone) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError('Please fill in all required fields');
       return;
     }
@@ -321,6 +330,7 @@ const AdminManagement = () => {
     // Format phone to E.164 format
     const phoneFormatted = formatPhoneToE164(formData.phone, formData.countryCode);
     if (!phoneFormatted) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError(`Invalid phone number for ${formData.countryCode}. Please check the format.`);
       return;
     }
@@ -364,10 +374,11 @@ const AdminManagement = () => {
         setSelectedAdmin(null);
         setShowEditAdminDialog(false);
         
+        // ✅ Show success in DIALOG (form-related: edit success)
         if (isEditingSelf) {
-          setSuccessMessage(`✅ Profile updated successfully (permissions cannot be self-modified)`);
+          setSuccessMessage(`Profile updated successfully (permissions cannot be self-modified)`);
         } else {
-          setSuccessMessage(`✅ Admin updated successfully`);
+          setSuccessMessage(`Admin updated successfully`);
         }
         
         setTimeout(() => setSuccessMessage(''), 5000);
@@ -375,6 +386,7 @@ const AdminManagement = () => {
       }
     } catch (err) {
       console.error('Error updating admin:', err);
+      // ✅ Show error in DIALOG (form-related: edit failed)
       setError(err.message || 'Failed to update admin');
     } finally {
       setIsSubmitting(false);
@@ -390,7 +402,6 @@ const AdminManagement = () => {
   const confirmResendInvitation = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
 
       const tempPassword = generateTemporaryPassword();
       
@@ -402,17 +413,26 @@ const AdminManagement = () => {
           : a
       ));
       
-      setSuccessMessage(`✅ Invitation resent to ${adminToResendInvite.email}`);
-      setTimeout(() => setSuccessMessage(''), 5000);
       setShowInviteResendConfirm(false);
       setAdminToResendInvite(null);
 
-      // Log email details
+      // Log email details to console (for developer reference)
       console.log(`📧 Invitation resent to ${adminToResendInvite.email}`);
       console.log(`Temporary Password: ${tempPassword}`);
+
+      // ✅ Show success as TOAST notification (table action result)
+      toast.success(`Invitation resent to ${adminToResendInvite.email}`, {
+        duration: 4000,
+        position: 'top-right'
+      });
     } catch (err) {
       console.error('Error resending invitation:', err);
-      setError(err.message || 'Failed to resend invitation');
+      
+      // ✅ Show error as TOAST notification (action failure)
+      toast.error(err.message || 'Failed to resend invitation', {
+        duration: 4000,
+        position: 'top-right'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -420,17 +440,21 @@ const AdminManagement = () => {
 
   // 🔑 Force password reset
   const handleForcePasswordReset = async (admin) => {
+    setAdminToResetPassword(admin);
+    setShowPasswordResetConfirm(true);
+  };
+
+  const confirmPasswordReset = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
 
       // ✅ Call the backend API to force password reset and send email
-      const response = await adminService.resetUserPassword(admin.id);
+      const response = await adminService.resetUserPassword(adminToResetPassword.id);
 
       if (response.status === 'success') {
         // Update admin status to reflect password reset
         setAdmins(admins.map(a => 
-          a.id === admin.id 
+          a.id === adminToResetPassword.id 
             ? { 
                 ...a, 
                 status: 'password_reset_required',
@@ -440,13 +464,19 @@ const AdminManagement = () => {
             : a
         ));
         
-        setSuccessMessage(`✅ Password reset email sent to ${admin.email}`);
-        setTimeout(() => setSuccessMessage(''), 5000);
+        setShowPasswordResetConfirm(false);
+        setAdminToResetPassword(null);
 
-        console.log(`📧 Password reset email sent to ${admin.email}`);
+        console.log(`📧 Password reset email sent to ${adminToResetPassword.email}`);
         console.log(`Response:`, response);
+
+        // ✅ Show success as TOAST notification (table action result)
+        toast.success(`Password reset email sent to ${adminToResetPassword.email}`, {
+          duration: 4000,
+          position: 'top-right'
+        });
       } else {
-        setError(response.message || 'Failed to send password reset email');
+        throw new Error(response.message || 'Failed to send password reset email');
       }
     } catch (err) {
       console.error('Error sending password reset:', err);
@@ -455,10 +485,14 @@ const AdminManagement = () => {
       let errorMessage = err.message || 'Failed to send password reset email';
       
       if (err.message.includes('Cannot reset other admin passwords')) {
-        errorMessage = '🔒 Security Policy: Admins can only reset their own password or non-admin user passwords. You cannot reset another admin\'s password.';
+        errorMessage = '🔒 Security Policy: Admins can only reset their own password or non-admin user passwords.';
       }
       
-      setError(errorMessage);
+      // ✅ Show error as TOAST notification (action failure)
+      toast.error(errorMessage, {
+        duration: 4000,
+        position: 'top-right'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -472,7 +506,6 @@ const AdminManagement = () => {
   const confirmDelete = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
 
       // Delete admin via API
       const response = await adminService.deleteUser(adminToDelete.id);
@@ -482,12 +515,21 @@ const AdminManagement = () => {
         setShowDeleteConfirm(false);
         setAdminToDelete(null);
         setSelectedAdmin(null);
-        setSuccessMessage(`✅ Admin deleted successfully`);
-        setTimeout(() => setSuccessMessage(''), 5000);
+        
+        // ✅ Show success as TOAST notification (table action result)
+        toast.success(`Admin "${adminToDelete.name}" deleted successfully`, {
+          duration: 4000,
+          position: 'top-right'
+        });
       }
     } catch (err) {
       console.error('Error deleting admin:', err);
-      setError(err.message || 'Failed to delete admin');
+      
+      // ✅ Show error as TOAST notification (action failure)
+      toast.error(err.message || 'Failed to delete admin', {
+        duration: 4000,
+        position: 'top-right'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -525,6 +567,19 @@ const AdminManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notifications Container */}
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#000',
+          },
+        }}
+      />
+
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">
@@ -826,6 +881,21 @@ const AdminManagement = () => {
         description={`Resend invitation email to ${adminToResendInvite?.email}? They will receive a new temporary password.`}
         confirmLabel="Resend"
         cancelLabel="Cancel"
+      />
+
+      {/* Password Reset Confirmation */}
+      <ConfirmationDialog
+        isOpen={showPasswordResetConfirm}
+        onClose={() => {
+          setShowPasswordResetConfirm(false);
+          setAdminToResetPassword(null);
+        }}
+        onConfirm={confirmPasswordReset}
+        title="Force Password Reset"
+        description={`Send password reset email to ${adminToResetPassword?.email}? They will receive a temporary password and must set a new one on next login.`}
+        confirmLabel="Send Reset Email"
+        cancelLabel="Cancel"
+        isLoading={isSubmitting}
       />
     </div>
   );
