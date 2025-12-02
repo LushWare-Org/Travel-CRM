@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import { leadAPI, packageAPI, manualItineraryAPI, customizedPackageAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { usePermission } from '../../../contexts/PermissionContext';
 import { PackageFormModal, NewEditPackageForm } from '../../../features/itinerary/components';
 import { useImageUpload } from '../../../features/itinerary/hooks';
 import { uploadPackageImages } from '../../../services/cloudinaryService';
@@ -14,7 +15,13 @@ import { createDefaultDay } from '../../itinerary/types/index.js';
 
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const { user } = useAuth();
+  const { hasPermission } = usePermission();
+  
+  // Determine if user can edit leads
+  // Sales Reps can view/edit their own assigned leads
+  // Admins/SuperAdmins with manage_leads permission can edit any lead
   const isSalesRep = user?.role === 'salesRep';
+  const canManageLeads = user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_leads'));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
@@ -198,8 +205,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     
     try {
       setIsSubmitting(true);
-      // If sales rep, prevent changing assignedTo - keep original assignment
-      const assignedTo = isSalesRep 
+      // Only Sales Reps cannot change the assigned sales rep
+      // Admins/SuperAdmins with manage_leads permission can change it freely
+      const assignedTo = isSalesRep && !canManageLeads
         ? (lead.assignedTo?._id || lead.assignedTo || formData.assignedTo) 
         : (formData.assignedTo || undefined);
       
@@ -673,7 +681,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
-              {isSalesRep ? (
+              {isSalesRep && !canManageLeads ? (
               <input
                   type="text"
                   value={formData.salesRep || ''}

@@ -224,7 +224,13 @@ export const getLead = asyncHandler(async (req, res, next) => {
   }
 
   // Check permissions - sales rep can only access leads assigned to them
-  if (req.user.role === 'salesRep' && lead.assignedTo?.toString() !== req.user._id.toString()) {
+  // Admins/SuperAdmins with manage_leads permission can access any lead
+  const canManageLeads = 
+    req.user.role === 'superAdmin' || 
+    req.user.role === 'admin' ||
+    (req.user.permissions && req.user.permissions.includes('manage_leads'));
+
+  if (!canManageLeads && req.user.role === 'salesRep' && lead.assignedTo?.toString() !== req.user._id.toString()) {
     throw new AppError('Not authorized to access this lead', 403);
   }
 
@@ -332,8 +338,17 @@ export const updateLead = asyncHandler(async (req, res, next) => {
     }
   }
 
-  // Check permissions - allow update if admin or assigned to lead
-  if (req.user.role !== 'admin' && lead.assignedTo?.toString() !== req.user._id.toString()) {
+  // Check permissions - allow update if:
+  // 1. SuperAdmin (has all permissions)
+  // 2. Admin with manage_leads permission
+  // 3. Regular admin role
+  // 4. Sales rep assigned to the lead
+  const canManageLeads = 
+    req.user.role === 'superAdmin' || 
+    req.user.role === 'admin' ||
+    (req.user.permissions && req.user.permissions.includes('manage_leads'));
+
+  if (!canManageLeads && lead.assignedTo?.toString() !== req.user._id.toString()) {
     throw new AppError('Not authorized to update this lead', 403);
   }
 
