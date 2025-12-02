@@ -36,8 +36,7 @@ const AdminManagement = () => {
     email: '',
     phone: '',
     countryCode: 'US',
-    permissions: [],
-    twoFactorEnabled: false
+    permissions: []
   });
 
   const ITEMS_PER_PAGE = 10;
@@ -80,7 +79,6 @@ const AdminManagement = () => {
           createdAt: admin.createdAt,
           lastActive: admin.lastLogin,
           permissions: admin.permissions || [],
-          twoFactorEnabled: admin.twoFactorEnabled || false,
           passwordExpireDate: admin.passwordExpireDate,
           invitationSentAt: admin.createdAt,
           firstLoginAt: admin.lastLogin,
@@ -211,8 +209,7 @@ const AdminManagement = () => {
     total: admins.length,
     active: admins.filter(a => a.status === 'active').length,
     invited: admins.filter(a => a.status === 'invited').length,
-    inactive: admins.filter(a => a.status === 'inactive').length,
-    twoFactorEnabled: admins.filter(a => a.twoFactorEnabled).length
+    inactive: admins.filter(a => a.status === 'inactive').length
   }), [admins]);
 
   const resetForm = () => {
@@ -221,8 +218,7 @@ const AdminManagement = () => {
       email: '',
       phone: '',
       countryCode: 'US',
-      permissions: [],
-      twoFactorEnabled: false
+      permissions: []
     });
   };
 
@@ -288,7 +284,6 @@ const AdminManagement = () => {
           createdAt: userData.createdAt || new Date().toISOString(),
           lastActive: userData.lastLogin || null,
           permissions: userData.permissions || formData.permissions || [], // ✅ Use backend data first
-          twoFactorEnabled: formData.twoFactorEnabled || false,
           passwordExpireDate: userData.passwordExpireDate || null,
           invitationSentAt: new Date().toISOString(),
           firstLoginAt: userData.lastLogin || null,
@@ -362,8 +357,7 @@ const AdminManagement = () => {
                 name: formData.name,
                 email: formData.email,
                 phone: phoneFormatted.e164,
-                permissions: isEditingSelf ? a.permissions : (formData.permissions || []), // Keep old permissions if editing self
-                twoFactorEnabled: formData.twoFactorEnabled
+                permissions: isEditingSelf ? a.permissions : (formData.permissions || [])
               }
             : a
         ));
@@ -588,11 +582,10 @@ const AdminManagement = () => {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <StatsCard label="Total Admins" value={stats.total} icon={Shield} color="purple" />
             <StatsCard label="Active" value={stats.active} icon={Shield} color="green" />
             <StatsCard label="Invited" value={stats.invited} icon={Mail} color="blue" />
-            <StatsCard label="2FA Enabled" value={stats.twoFactorEnabled} icon={Shield} color="amber" />
             <StatsCard label="Inactive" value={stats.inactive} icon={Shield} color="red" />
           </div>
 
@@ -714,19 +707,6 @@ const AdminManagement = () => {
               ))}
             </div>
           </div>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer p-3 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
-            <input
-              type="checkbox"
-              checked={formData.twoFactorEnabled}
-              onChange={(e) => setFormData({ ...formData, twoFactorEnabled: e.target.checked })}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <div>
-              <span className="text-gray-900 font-medium">Require Two-Factor Authentication</span>
-              <p className="text-xs text-gray-600">Admin must set up 2FA on first login</p>
-            </div>
-          </label>
         </div>
       </UserFormDialog>
 
@@ -826,16 +806,6 @@ const AdminManagement = () => {
               ))}
             </div>
           </div>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer p-3 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
-            <input
-              type="checkbox"
-              checked={formData.twoFactorEnabled}
-              onChange={(e) => setFormData({ ...formData, twoFactorEnabled: e.target.checked })}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-gray-900 font-medium">Require Two-Factor Authentication</span>
-          </label>
         </div>
       </UserFormDialog>
 
