@@ -389,28 +389,6 @@ const VendorManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error Message - Positioned above modals */}
-      {error && (
-        <div className="fixed top-4 left-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 z-[60] shadow-lg max-w-md">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <p className="text-red-800 font-medium text-sm">{error}</p>
-          <button 
-            onClick={() => setError(null)}
-            className="ml-auto text-red-600 hover:text-red-800 flex-shrink-0"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Success Message - Positioned above modals */}
-      {successMessage && (
-        <div className="fixed top-4 left-4 right-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 z-[60] shadow-lg max-w-md">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-          <p className="text-green-800 font-medium text-sm">{successMessage}</p>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -533,6 +511,7 @@ const VendorManagement = () => {
         isOpen={showNewVendorDialog}
         onClose={() => {
           setShowNewVendorDialog(false);
+          setError(null);
           resetForm();
         }}
         onSubmit={handleAddVendor}
@@ -541,6 +520,8 @@ const VendorManagement = () => {
         submitLabel="Register & Send Invitation"
         submitColor="indigo"
         isLoading={actionLoading}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
           {/* Validation Error Summary */}
@@ -816,6 +797,7 @@ const VendorManagement = () => {
         isOpen={showEditVendorDialog}
         onClose={() => {
           setShowEditVendorDialog(false);
+          setError(null);
           resetForm();
         }}
         onSubmit={handleEditVendor}
@@ -824,6 +806,8 @@ const VendorManagement = () => {
         submitLabel="Update Vendor"
         submitColor="indigo"
         isLoading={actionLoading}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
           <FormGroup label="Business Name" required>

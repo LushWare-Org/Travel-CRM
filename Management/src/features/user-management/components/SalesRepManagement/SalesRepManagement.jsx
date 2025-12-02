@@ -423,14 +423,6 @@ const SalesRepManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error Alert */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <p className="text-red-800 font-medium">{error}</p>
-        </div>
-      )}
-
       {/* Loading State */}
       {isLoading && (
         <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center gap-3">
@@ -528,6 +520,7 @@ const SalesRepManagement = () => {
         isOpen={showNewRepDialog}
         onClose={() => {
           setShowNewRepDialog(false);
+          setError('');
           resetForm();
         }}
         onSubmit={handleAddRep}
@@ -536,6 +529,7 @@ const SalesRepManagement = () => {
         submitLabel={isSubmitting ? 'Creating...' : 'Create & Send Invitation'}
         submitColor="blue"
         isSubmitting={isSubmitting}
+        error={error}
       >
         <div className="space-y-4">
           {/* What Happens Next */}
@@ -630,6 +624,7 @@ const SalesRepManagement = () => {
         isOpen={showEditRepDialog}
         onClose={() => {
           setShowEditRepDialog(false);
+          setError('');
           resetForm();
         }}
         onSubmit={handleEditRep}
@@ -638,6 +633,7 @@ const SalesRepManagement = () => {
         submitLabel={isSubmitting ? 'Updating...' : 'Update Sales Rep'}
         submitColor="blue"
         isSubmitting={isSubmitting}
+        error={error}
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

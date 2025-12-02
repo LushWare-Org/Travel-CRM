@@ -333,6 +333,7 @@ const WebsiteUsersManagement = () => {
         isOpen={showNewUserDialog}
         onClose={() => {
           setShowNewUserDialog(false);
+          setFormError('');
           resetForm();
         }}
         onSubmit={handleAddUser}
@@ -341,13 +342,9 @@ const WebsiteUsersManagement = () => {
         submitLabel="Create User"
         submitColor="cyan"
         isSubmitting={isSubmitting}
+        error={formError}
       >
         <div className="space-y-4">
-          {formError && (
-            <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
-              <p className="text-sm text-red-700">{formError}</p>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Full Name" required>
@@ -426,6 +423,7 @@ const WebsiteUsersManagement = () => {
         isOpen={showEditUserDialog}
         onClose={() => {
           setShowEditUserDialog(false);
+          setFormError('');
           resetForm();
         }}
         onSubmit={handleEditUser}
@@ -434,13 +432,9 @@ const WebsiteUsersManagement = () => {
         submitLabel="Update User"
         submitColor="cyan"
         isSubmitting={isSubmitting}
+        error={formError}
       >
         <div className="space-y-4">
-          {formError && (
-            <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
-              <p className="text-sm text-red-700">{formError}</p>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Full Name" required>
