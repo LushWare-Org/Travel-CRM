@@ -180,9 +180,14 @@ export const updateUserStatus = asyncHandler(async (req, res, next) => {
     throw new AppError('You cannot deactivate your own account', 400);
   }
 
-  // Prevent deactivating other admins
-  if (user.role === 'admin') {
+  // Prevent deactivating other admins (unless current user is super admin)
+  if (user.role === 'admin' && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot deactivate admin accounts', 403);
+  }
+
+  // Prevent deactivating super admins
+  if (user.role === 'superAdmin') {
+    throw new AppError('Cannot deactivate super admin accounts', 403);
   }
 
   user.isActive = isActive;
@@ -214,9 +219,14 @@ export const resetUserPassword = asyncHandler(async (req, res, next) => {
     throw new AppError('User not found', 404);
   }
 
-  // Prevent resetting other admin passwords
-  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString()) {
+  // Prevent resetting other admin passwords (unless current user is super admin)
+  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString() && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot reset other admin passwords', 403);
+  }
+
+  // Prevent resetting super admin passwords (only super admin themselves can reset)
+  if (user.role === 'superAdmin' && user._id.toString() !== req.user.id.toString()) {
+    throw new AppError('Only the super admin can reset their own password', 403);
   }
 
   // Generate new temporary password
@@ -263,13 +273,13 @@ export const updateUser = asyncHandler(async (req, res, next) => {
     throw new AppError('User not found', 404);
   }
 
-  // Prevent updating admin details (except self)
-  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString()) {
+  // Prevent updating admin details (except self or if current user is super admin)
+  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString() && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot update other admin accounts', 403);
   }
 
   // Prevent updating superAdmin details (only superAdmin themselves can update)
-  if ((user.role === 'superAdmin' || user.isSuperAdmin) && user._id.toString() !== req.user.id.toString()) {
+  if (user.role === 'superAdmin' && user._id.toString() !== req.user.id.toString()) {
     throw new AppError('Only the super admin can update their own details', 403);
   }
 
@@ -314,13 +324,13 @@ export const deleteUser = asyncHandler(async (req, res, next) => {
     throw new AppError('You cannot delete your own account', 400);
   }
 
-  // Prevent deleting other admins
-  if (user.role === 'admin') {
+  // Prevent deleting other admins (unless current user is super admin)
+  if (user.role === 'admin' && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot delete admin accounts', 403);
   }
 
   // Prevent deleting superAdmins
-  if (user.role === 'superAdmin' || user.isSuperAdmin) {
+  if (user.role === 'superAdmin') {
     throw new AppError('Super admin accounts cannot be deleted. Only super admins can demote themselves.', 403);
   }
 
@@ -399,7 +409,12 @@ export const updateAdminPermissions = asyncHandler(async (req, res, next) => {
 
   // Prevent modifying own permissions
   if (user._id.toString() === req.user.id.toString()) {
-    throw new AppError('You cannot modify your own permissions', 400);
+    throw new AppError('You cannot modify your own permissions', 403);
+  }
+
+  // Only super admins can modify admin permissions
+  if (req.user.role !== 'superAdmin') {
+    throw new AppError('Only super admins can modify admin permissions', 403);
   }
 
   const validPermissions = [

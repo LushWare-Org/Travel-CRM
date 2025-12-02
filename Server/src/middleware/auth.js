@@ -56,8 +56,7 @@ export const protect = asyncHandler(async (req, res, next) => {
 export function authorize(...roles) {
   return function authorizeRoles(req, res, next) {
     // SuperAdmin has access to all routes that require admin or higher
-    // If user is superAdmin, they have all permissions
-    if (req.user.role === 'superAdmin' || req.user.isSuperAdmin) {
+    if (req.user.role === 'superAdmin') {
       return next();
     }
 

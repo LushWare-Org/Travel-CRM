@@ -72,7 +72,16 @@ const Sidebar = () => {
           <div className="bg-slate-700 rounded-lg p-3 mb-3">
             <p className="text-xs text-gray-400">Logged in as</p>
             <p className="text-sm font-semibold truncate">{user.name}</p>
-            <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-xs text-gray-500 capitalize">
+                {user.role === 'superAdmin' ? 'Super Admin' : user.role}
+              </p>
+              {user.role === 'superAdmin' && (
+                <span className="text-xs bg-yellow-500 text-gray-900 px-2 py-0.5 rounded-full font-semibold">
+                  ⭐ Super
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
