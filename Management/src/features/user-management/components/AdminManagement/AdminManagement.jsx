@@ -12,7 +12,7 @@ import {
 } from '../Common';
 import { STATUS_COLORS, ROLE_COLORS, ADMIN_PERMISSIONS_LIST } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
-import { formatPhoneToE164, COUNTRIES } from '../../utils/phoneUtils';
+import { formatPhoneToE164, COUNTRIES, parseE164 } from '../../utils/phoneUtils';
 import AdminTable from './AdminTable';
 import adminService from '../../../../services/admin.service';
 import { usePermission } from '../../../../contexts/PermissionContext';
@@ -568,11 +568,34 @@ const AdminManagement = () => {
     }
     
     setSelectedAdmin(admin);
+    
+    // Parse phone number if it's in E.164 format
+    let phoneCountry = 'US';
+    let phoneNumber = '';
+    if (admin.phone) {
+      const parsed = parseE164(admin.phone);
+      if (parsed) {
+        phoneCountry = parsed.countryCode || 'US';
+        // Get the calling code for this country
+        const country = COUNTRIES.find(c => c.code === phoneCountry);
+        const callingCode = country?.callingCode?.replace('+', '') || '';
+        
+        // Extract only the local phone number by removing the calling code prefix
+        if (callingCode && admin.phone.startsWith('+' + callingCode)) {
+          phoneNumber = admin.phone.substring(callingCode.length + 1);
+        } else {
+          phoneNumber = admin.phone.replace(/^\+\d+/, '').trim();
+        }
+      } else {
+        phoneNumber = admin.phone;
+      }
+    }
+    
     setFormData({
       name: admin.name,
       email: admin.email,
-      phone: admin.phone || '',
-      countryCode: 'US', // Default country code when editing
+      phone: phoneNumber,
+      countryCode: phoneCountry,
       permissions: admin.permissions || [],
       twoFactorEnabled: admin.twoFactorEnabled || false
     });
