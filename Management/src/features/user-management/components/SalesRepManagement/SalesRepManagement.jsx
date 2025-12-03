@@ -13,7 +13,7 @@ import { STATUS_COLORS } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import SalesRepTable from './SalesRepTable';
 import salesRepService from '../../../../services/salesRep.service';
-import { validatePhone, formatPhoneToE164, getPhonePlaceholder, COUNTRIES } from '../../utils/phoneUtils';
+import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 
 const SalesRepManagement = () => {
   const isInitialMount = useRef(true);
@@ -173,11 +173,34 @@ const SalesRepManagement = () => {
 
   const openEditDialog = (rep) => {
     setSelectedRep(rep);
+    
+    // Parse phone number if it's in E.164 format
+    let phoneCountry = rep.phoneCountry || 'US';
+    let phoneNumber = rep.phone || '';
+    
+    if (rep.phone) {
+      const parsed = parseE164(rep.phone);
+      if (parsed) {
+        // Use parsed country code, fallback to stored phoneCountry or 'US'
+        phoneCountry = parsed.countryCode || rep.phoneCountry || 'US';
+        // Get the calling code for this country
+        const country = COUNTRIES.find(c => c.code === phoneCountry);
+        const callingCode = country?.callingCode?.replace('+', '') || '';
+        
+        // Extract only the local phone number by removing the calling code prefix
+        if (callingCode && rep.phone.startsWith('+' + callingCode)) {
+          phoneNumber = rep.phone.substring(callingCode.length + 1);
+        } else {
+          phoneNumber = rep.phone.replace(/^\+\d+/, '').trim();
+        }
+      }
+    }
+    
     setFormData({
       name: rep.name,
       email: rep.email,
-      phone: rep.phone,
-      phoneCountry: rep.phoneCountry || 'US',
+      phone: phoneNumber,
+      phoneCountry: phoneCountry,
       commissionRate: rep.commissionRate,
       targetLeads: 50
     });
