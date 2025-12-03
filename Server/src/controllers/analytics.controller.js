@@ -931,7 +931,7 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
 
     // 4. Users with Bookings (Conversion)
     const usersWithBookings = await Booking.countDocuments();
-    const conversionRate = totalUsers > 0 ? ((usersWithBookings / totalUsers) * 100).toFixed(2) : 0;
+    const conversionRate = totalUsers > 0 ? parseFloat(((usersWithBookings / totalUsers) * 100).toFixed(2)) : 0;
 
     // 5. Average Users Per Time Period
     const avgNewUsersPerPeriod = trendData.length > 0
@@ -1013,6 +1013,159 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error fetching user analytics',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Get SalesRep Personal Performance Analytics
+ * Returns personal performance metrics for the logged-in sales representative
+ * @route GET /api/v1/analytics/salesreps/me/performance
+ * @access Private/SalesRep
+ * @query timeRange - 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
+ */
+export const getSalesRepPersonalPerformance = asyncHandler(async (req, res) => {
+  // Verify user is a sales rep
+  if (req.user.role !== 'salesRep') {
+    return res.status(403).json({
+      success: false,
+      message: 'This endpoint is only accessible to sales representatives',
+    });
+  }
+
+  const timeRange = clampTimeRange(req.query.timeRange);
+  const buckets = buildTimeBuckets(timeRange);
+  const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
+  const groupId = buildGroupId(timeRange);
+  const salesRepId = req.user._id;
+
+  try {
+    // Get trend data for assigned leads
+    const trendAggregation = await Lead.aggregate([
+      {
+        $match: {
+          assignedTo: salesRepId,
+          createdAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: groupId,
+          total: { $sum: 1 },
+          converted: {
+            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          },
+          contacted: {
+            $sum: { $cond: [{ $eq: ['$status', 'contacted'] }, 1, 0] },
+          },
+          interested: {
+            $sum: { $cond: [{ $eq: ['$status', 'interested'] }, 1, 0] },
+          },
+          new: {
+            $sum: { $cond: [{ $eq: ['$status', 'new'] }, 1, 0] },
+          },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    ]);
+
+    // Map trend data to time buckets
+    const trendMap = new Map();
+    trendAggregation.forEach((item) => {
+      const key = buildTrendKey(timeRange, item._id);
+      trendMap.set(key, item);
+    });
+
+    const trendData = buckets.map((bucket) => {
+      const key = buildBucketKey(timeRange, bucket);
+      const item = trendMap.get(key);
+      const assigned = item?.total || 0;
+      const converted = item?.converted || 0;
+      const conversionRate = assigned > 0 ? Math.round((converted / assigned) * 100) : 0;
+
+      return {
+        label: bucket.label,
+        assigned,
+        converted,
+        conversionRate,
+        contacted: item?.contacted || 0,
+        interested: item?.interested || 0,
+      };
+    });
+
+    // Get overall statistics
+    const allLeadsAggregation = await Lead.aggregate([
+      { $match: { assignedTo: salesRepId } },
+      {
+        $facet: {
+          stats: [
+            {
+              $group: {
+                _id: null,
+                totalAssignedLeads: { $sum: 1 },
+                totalConvertedLeads: {
+                  $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+                },
+              },
+            },
+          ],
+          statusDistribution: [
+            {
+              $group: {
+                _id: '$status',
+                count: { $sum: 1 },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const detailed = allLeadsAggregation?.[0] || {};
+    const statsData = detailed.stats?.[0] || { totalAssignedLeads: 0, totalConvertedLeads: 0 };
+    const statusData = detailed.statusDistribution || [];
+
+    const totalAssignedLeads = statsData.totalAssignedLeads || 0;
+    const totalConvertedLeads = statsData.totalConvertedLeads || 0;
+    const conversionRate = totalAssignedLeads > 0 
+      ? parseFloat(((totalConvertedLeads / totalAssignedLeads) * 100).toFixed(2))
+      : 0;
+
+    // Calculate estimated earnings based on commission rate
+    const commissionRate = req.user.commissionRate || 5;
+    const estimatedEarnings = Math.round(totalConvertedLeads * (commissionRate * 1000));
+
+    // Map status distribution
+    const statusDistribution = statusData.map((item) => ({
+      status: item._id || 'unknown',
+      name: STATUS_LABELS[item._id] || item._id,
+      count: item.count || 0,
+    }));
+
+    const stats = {
+      totalAssignedLeads,
+      totalConvertedLeads,
+      conversionRate,
+      estimatedEarnings,
+      commissionRate,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        timeRange,
+        generatedAt: new Date().toISOString(),
+        stats,
+        trend: trendData,
+        statusDistribution,
+      },
+    });
+  } catch (error) {
+    console.error('SalesRep performance analytics error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching sales rep performance analytics',
       error: error.message,
     });
   }
