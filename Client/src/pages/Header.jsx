@@ -106,7 +106,7 @@ export default function Header({ currentPage, onNavigate }) {
 
   const getColumnClass = len => len <= 7 ? 'grid-cols-2' : len <= 15 ? 'grid-cols-3' : 'grid-cols-4';
   const getDropdownWidth = len => len <= 7 ? 'w-80' : len <= 15 ? 'w-[500px]' : 'w-[600px]';
-  const LONG_NAME_THRESHOLD = 16;
+  const LONG_NAME_THRESHOLD = 18;
   const isItemActive = (item) => {
     if (item.page === 'home') return pathname === '/';
     if (pathname.startsWith(`/${item.page}`)) return true;
