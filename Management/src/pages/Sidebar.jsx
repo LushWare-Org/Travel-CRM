@@ -2,23 +2,50 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut, BarChart3 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { usePermission } from "../contexts/PermissionContext";
 import toast from "react-hot-toast";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuth();
+  const permission = usePermission();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const navigationItems = [
-    { icon: Home, label: "Dashboard", path: "/" },
-    { icon: BarChart3, label: "Analytics", path: "/analytics" },
-    { icon: Users, label: "Lead Management", path: "/leads" },
-    { icon: MapPin, label: "Packages", path: "/itineraries" },
-    { icon: DollarSign, label: "Billing", path: "/billing" },
-    { icon: User, label: "User Management", path: "/users" }
+    { icon: Home, label: "Dashboard", path: "/", requiredPermission: null },
+    { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
+    { icon: Users, label: "Lead Management", path: "/leads", requiredPermission: null, allowedRoles: ["salesRep"], requiresAnyPermission: ["manage_leads"] },
+    { icon: MapPin, label: "Packages", path: "/itineraries", requiredPermission: "manage_packages" },
+    { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
+    { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] }
   ];
+
+  // Filter navigation items based on permissions and roles
+  const accessibleItems = navigationItems.filter((item) => {
+    // Check if user's role is in allowed roles
+    if (item.allowedRoles && item.allowedRoles.includes(user?.role)) {
+      return true;
+    }
+
+    // If no permission required, always show
+    if (!item.requiredPermission && !item.requiresAnyPermission) {
+      return true;
+    }
+
+    // If specific permission required, check for it
+    if (item.requiredPermission) {
+      return permission.hasPermission(item.requiredPermission);
+    }
+
+    // If requires any of multiple permissions, check for at least one
+    if (item.requiresAnyPermission) {
+      return item.requiresAnyPermission.some((perm) => permission.hasPermission(perm));
+    }
+
+    return false;
+  });
 
   const isActive = (path) => location.pathname === path;
 
@@ -52,7 +79,7 @@ const Sidebar = () => {
       </div>
 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navigationItems.map((item) => (
+        {accessibleItems.map((item) => (
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
@@ -72,7 +99,16 @@ const Sidebar = () => {
           <div className="bg-slate-700 rounded-lg p-3 mb-3">
             <p className="text-xs text-gray-400">Logged in as</p>
             <p className="text-sm font-semibold truncate">{user.name}</p>
-            <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-xs text-gray-500 capitalize">
+                {user.role === 'superAdmin' ? 'Super Admin' : user.role}
+              </p>
+              {user.role === 'superAdmin' && (
+                <span className="text-xs bg-yellow-500 text-gray-900 px-2 py-0.5 rounded-full font-semibold">
+                  ⭐ Super
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}

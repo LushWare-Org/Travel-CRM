@@ -161,28 +161,37 @@ class ItineraryAnalyticsService {
         },
       ]);
 
-      // Enrich with inquiry and purchase data
+      // Enrich with inquiry and purchase data from leads
       const enriched = await Promise.all(
         destinations.map(async (dest) => {
+          // Find packages for this destination
+          const packagesForDestination = await Package.find({ 
+            destination: dest._id 
+          }).select('_id');
+          
+          const packageIds = packagesForDestination.map(p => p._id);
+
+          // Count leads that reference these packages
           const leads = await Lead.countDocuments({
-            'package.destination': dest._id,
+            package: { $in: packageIds }
           });
 
           const purchases = await Lead.countDocuments({
-            'package.destination': dest._id,
+            package: { $in: packageIds },
             status: 'converted',
           });
 
           return {
-            destination: dest._id,
+            destination: dest._id || 'Unknown',
             inquiries: leads || 0,
             purchases: purchases || 0,
             avgPrice: Math.round(dest.avgPrice || 0),
+            totalPackages: dest.totalPackages || 0,
           };
         })
       );
 
-      return enriched;
+      return enriched.filter(item => item.destination !== 'Unknown');
     } catch (error) {
       logger.error('Error in getDestinationPerformance:', error);
       throw error;

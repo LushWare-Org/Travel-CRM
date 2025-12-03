@@ -1,34 +1,44 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock, Loader } from 'lucide-react';
+import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock, Loader, Lock } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 import { 
   UserTableHeader, 
   Pagination, 
   UserFormDialog, 
   ConfirmationDialog,
   StatsCard,
-  FormGroup 
+  FormGroup,
+  PermissionDeniedView
 } from '../Common';
 import { STATUS_COLORS, ROLE_COLORS, ADMIN_PERMISSIONS_LIST } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
-import { formatPhoneToE164, COUNTRIES } from '../../utils/phoneUtils';
+import { formatPhoneToE164, COUNTRIES, parseE164 } from '../../utils/phoneUtils';
 import AdminTable from './AdminTable';
 import adminService from '../../../../services/admin.service';
+import { usePermission } from '../../../../contexts/PermissionContext';
+import { getPermissionDeniedMessage } from '../../utils/permissionUtils';
 
 const AdminManagement = () => {
+  // Permission context
+  const permission = usePermission();
+  const canManageAdmins = permission.hasPermission('manage_admins');
+
   // State management
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); // ✅ Dialog form validation errors only
+  const [successMessage, setSuccessMessage] = useState(''); // ✅ Dialog form success messages only
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showNewAdminDialog, setShowNewAdminDialog] = useState(false);
   const [showEditAdminDialog, setShowEditAdminDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showInviteResendConfirm, setShowInviteResendConfirm] = useState(false);
+  const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [adminToDelete, setAdminToDelete] = useState(null);
   const [adminToResendInvite, setAdminToResendInvite] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [adminToResetPassword, setAdminToResetPassword] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -36,8 +46,7 @@ const AdminManagement = () => {
     email: '',
     phone: '',
     countryCode: 'US',
-    permissions: [],
-    twoFactorEnabled: false
+    permissions: []
   });
 
   const ITEMS_PER_PAGE = 10;
@@ -80,7 +89,6 @@ const AdminManagement = () => {
           createdAt: admin.createdAt,
           lastActive: admin.lastLogin,
           permissions: admin.permissions || [],
-          twoFactorEnabled: admin.twoFactorEnabled || false,
           passwordExpireDate: admin.passwordExpireDate,
           invitationSentAt: admin.createdAt,
           firstLoginAt: admin.lastLogin,
@@ -211,8 +219,7 @@ const AdminManagement = () => {
     total: admins.length,
     active: admins.filter(a => a.status === 'active').length,
     invited: admins.filter(a => a.status === 'invited').length,
-    inactive: admins.filter(a => a.status === 'inactive').length,
-    twoFactorEnabled: admins.filter(a => a.twoFactorEnabled).length
+    inactive: admins.filter(a => a.status === 'inactive').length
   }), [admins]);
 
   const resetForm = () => {
@@ -221,13 +228,20 @@ const AdminManagement = () => {
       email: '',
       phone: '',
       countryCode: 'US',
-      permissions: [],
-      twoFactorEnabled: false
+      permissions: []
     });
   };
 
   const handleAddAdmin = async () => {
+    // ✅ PERMISSION CHECK: Verify user has permission to manage admins
+    if (!canManageAdmins) {
+      setError(getPermissionDeniedMessage('create', 'admin accounts'));
+      toast.error(getPermissionDeniedMessage('create', 'admin accounts'));
+      return;
+    }
+
     if (!formData.name || !formData.email || !formData.phone) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError('Please fill in all required fields');
       return;
     }
@@ -235,6 +249,7 @@ const AdminManagement = () => {
     // Format phone to E.164 format
     const phoneFormatted = formatPhoneToE164(formData.phone, formData.countryCode);
     if (!phoneFormatted) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError(`Invalid phone number for ${formData.countryCode}. Please check the format.`);
       return;
     }
@@ -288,7 +303,6 @@ const AdminManagement = () => {
           createdAt: userData.createdAt || new Date().toISOString(),
           lastActive: userData.lastLogin || null,
           permissions: userData.permissions || formData.permissions || [], // ✅ Use backend data first
-          twoFactorEnabled: formData.twoFactorEnabled || false,
           passwordExpireDate: userData.passwordExpireDate || null,
           invitationSentAt: new Date().toISOString(),
           firstLoginAt: userData.lastLogin || null,
@@ -297,7 +311,7 @@ const AdminManagement = () => {
           mustChangePassword: mustChangePassword
         };
 
-        // Log email details AFTER creating the object (so email is defined)
+        // Log email details to console (for developer reference)
         console.log(`📧 Email sent to ${newAdmin.email}`);
         console.log(`Temporary Password: ${tempPassword}`);
 
@@ -305,12 +319,15 @@ const AdminManagement = () => {
         setAdmins(prev => [...prev, newAdmin]);
         setShowNewAdminDialog(false);
         setSearchTerm(''); // Clear search bar after creation
-        setSuccessMessage(`✅ Admin created! Invitation sent to ${newAdmin.email}`);
+        
+        // ✅ Show success in DIALOG (form-related: creation success)
+        setSuccessMessage(`Admin created! Invitation sent to ${newAdmin.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
       }
     } catch (err) {
       console.error('Error creating admin:', err);
+      // ✅ Show error in DIALOG (form-related: creation failed)
       setError(err.message || 'Failed to create admin');
     } finally {
       setIsSubmitting(false);
@@ -319,6 +336,7 @@ const AdminManagement = () => {
 
   const handleEditAdmin = async () => {
     if (!selectedAdmin || !formData.name || !formData.email || !formData.phone) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError('Please fill in all required fields');
       return;
     }
@@ -326,6 +344,7 @@ const AdminManagement = () => {
     // Format phone to E.164 format
     const phoneFormatted = formatPhoneToE164(formData.phone, formData.countryCode);
     if (!phoneFormatted) {
+      // ✅ Form validation error → show in DIALOG (form-related)
       setError(`Invalid phone number for ${formData.countryCode}. Please check the format.`);
       return;
     }
@@ -362,18 +381,18 @@ const AdminManagement = () => {
                 name: formData.name,
                 email: formData.email,
                 phone: phoneFormatted.e164,
-                permissions: isEditingSelf ? a.permissions : (formData.permissions || []), // Keep old permissions if editing self
-                twoFactorEnabled: formData.twoFactorEnabled
+                permissions: isEditingSelf ? a.permissions : (formData.permissions || [])
               }
             : a
         ));
         setSelectedAdmin(null);
         setShowEditAdminDialog(false);
         
+        // ✅ Show success in DIALOG (form-related: edit success)
         if (isEditingSelf) {
-          setSuccessMessage(`✅ Profile updated successfully (permissions cannot be self-modified)`);
+          setSuccessMessage(`Profile updated successfully (permissions cannot be self-modified)`);
         } else {
-          setSuccessMessage(`✅ Admin updated successfully`);
+          setSuccessMessage(`Admin updated successfully`);
         }
         
         setTimeout(() => setSuccessMessage(''), 5000);
@@ -381,6 +400,7 @@ const AdminManagement = () => {
       }
     } catch (err) {
       console.error('Error updating admin:', err);
+      // ✅ Show error in DIALOG (form-related: edit failed)
       setError(err.message || 'Failed to update admin');
     } finally {
       setIsSubmitting(false);
@@ -396,7 +416,6 @@ const AdminManagement = () => {
   const confirmResendInvitation = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
 
       const tempPassword = generateTemporaryPassword();
       
@@ -408,17 +427,26 @@ const AdminManagement = () => {
           : a
       ));
       
-      setSuccessMessage(`✅ Invitation resent to ${adminToResendInvite.email}`);
-      setTimeout(() => setSuccessMessage(''), 5000);
       setShowInviteResendConfirm(false);
       setAdminToResendInvite(null);
 
-      // Log email details
+      // Log email details to console (for developer reference)
       console.log(`📧 Invitation resent to ${adminToResendInvite.email}`);
       console.log(`Temporary Password: ${tempPassword}`);
+
+      // ✅ Show success as TOAST notification (table action result)
+      toast.success(`Invitation resent to ${adminToResendInvite.email}`, {
+        duration: 4000,
+        position: 'top-right'
+      });
     } catch (err) {
       console.error('Error resending invitation:', err);
-      setError(err.message || 'Failed to resend invitation');
+      
+      // ✅ Show error as TOAST notification (action failure)
+      toast.error(err.message || 'Failed to resend invitation', {
+        duration: 4000,
+        position: 'top-right'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -426,17 +454,21 @@ const AdminManagement = () => {
 
   // 🔑 Force password reset
   const handleForcePasswordReset = async (admin) => {
+    setAdminToResetPassword(admin);
+    setShowPasswordResetConfirm(true);
+  };
+
+  const confirmPasswordReset = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
 
       // ✅ Call the backend API to force password reset and send email
-      const response = await adminService.resetUserPassword(admin.id);
+      const response = await adminService.resetUserPassword(adminToResetPassword.id);
 
       if (response.status === 'success') {
         // Update admin status to reflect password reset
         setAdmins(admins.map(a => 
-          a.id === admin.id 
+          a.id === adminToResetPassword.id 
             ? { 
                 ...a, 
                 status: 'password_reset_required',
@@ -446,13 +478,19 @@ const AdminManagement = () => {
             : a
         ));
         
-        setSuccessMessage(`✅ Password reset email sent to ${admin.email}`);
-        setTimeout(() => setSuccessMessage(''), 5000);
+        setShowPasswordResetConfirm(false);
+        setAdminToResetPassword(null);
 
-        console.log(`📧 Password reset email sent to ${admin.email}`);
+        console.log(`📧 Password reset email sent to ${adminToResetPassword.email}`);
         console.log(`Response:`, response);
+
+        // ✅ Show success as TOAST notification (table action result)
+        toast.success(`Password reset email sent to ${adminToResetPassword.email}`, {
+          duration: 4000,
+          position: 'top-right'
+        });
       } else {
-        setError(response.message || 'Failed to send password reset email');
+        throw new Error(response.message || 'Failed to send password reset email');
       }
     } catch (err) {
       console.error('Error sending password reset:', err);
@@ -461,16 +499,28 @@ const AdminManagement = () => {
       let errorMessage = err.message || 'Failed to send password reset email';
       
       if (err.message.includes('Cannot reset other admin passwords')) {
-        errorMessage = '🔒 Security Policy: Admins can only reset their own password or non-admin user passwords. You cannot reset another admin\'s password.';
+        errorMessage = '🔒 Security Policy: Admins can only reset their own password or non-admin user passwords.';
       }
       
-      setError(errorMessage);
+      // ✅ Show error as TOAST notification (action failure)
+      toast.error(errorMessage, {
+        duration: 4000,
+        position: 'top-right'
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDeleteAdmin = (admin) => {
+    // ✅ PERMISSION CHECK: Verify user has permission to manage admins
+    if (!canManageAdmins) {
+      toast.error(getPermissionDeniedMessage('delete', 'admin accounts'), {
+        duration: 4000,
+        position: 'top-right'
+      });
+      return;
+    }
     setAdminToDelete(admin);
     setShowDeleteConfirm(true);
   };
@@ -478,7 +528,6 @@ const AdminManagement = () => {
   const confirmDelete = async () => {
     try {
       setIsSubmitting(true);
-      setError(null);
 
       // Delete admin via API
       const response = await adminService.deleteUser(adminToDelete.id);
@@ -488,24 +537,65 @@ const AdminManagement = () => {
         setShowDeleteConfirm(false);
         setAdminToDelete(null);
         setSelectedAdmin(null);
-        setSuccessMessage(`✅ Admin deleted successfully`);
-        setTimeout(() => setSuccessMessage(''), 5000);
+        
+        // ✅ Show success as TOAST notification (table action result)
+        toast.success(`Admin "${adminToDelete.name}" deleted successfully`, {
+          duration: 4000,
+          position: 'top-right'
+        });
       }
     } catch (err) {
       console.error('Error deleting admin:', err);
-      setError(err.message || 'Failed to delete admin');
+      
+      // ✅ Show error as TOAST notification (action failure)
+      toast.error(err.message || 'Failed to delete admin', {
+        duration: 4000,
+        position: 'top-right'
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const openEditDialog = (admin) => {
+    // ✅ PERMISSION CHECK: Verify user has permission to manage admins
+    if (!canManageAdmins) {
+      toast.error(getPermissionDeniedMessage('update', 'admin accounts'), {
+        duration: 4000,
+        position: 'top-right'
+      });
+      return;
+    }
+    
     setSelectedAdmin(admin);
+    
+    // Parse phone number if it's in E.164 format
+    let phoneCountry = 'US';
+    let phoneNumber = '';
+    if (admin.phone) {
+      const parsed = parseE164(admin.phone);
+      if (parsed) {
+        phoneCountry = parsed.countryCode || 'US';
+        // Get the calling code for this country
+        const country = COUNTRIES.find(c => c.code === phoneCountry);
+        const callingCode = country?.callingCode?.replace('+', '') || '';
+        
+        // Extract only the local phone number by removing the calling code prefix
+        if (callingCode && admin.phone.startsWith('+' + callingCode)) {
+          phoneNumber = admin.phone.substring(callingCode.length + 1);
+        } else {
+          phoneNumber = admin.phone.replace(/^\+\d+/, '').trim();
+        }
+      } else {
+        phoneNumber = admin.phone;
+      }
+    }
+    
     setFormData({
       name: admin.name,
       email: admin.email,
-      phone: admin.phone || '',
-      countryCode: 'US', // Default country code when editing
+      phone: phoneNumber,
+      countryCode: phoneCountry,
       permissions: admin.permissions || [],
       twoFactorEnabled: admin.twoFactorEnabled || false
     });
@@ -531,6 +621,19 @@ const AdminManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notifications Container */}
+      <Toaster
+        position="top-right"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#000',
+          },
+        }}
+      />
+
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">
@@ -539,41 +642,33 @@ const AdminManagement = () => {
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <p className="text-red-800 font-medium">{error}</p>
-        </div>
-      )}
-
-      {/* Success Message */}
-      {successMessage && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <p className="text-green-800 font-medium">{successMessage}</p>
-        </div>
-      )}
-
       {!loading && (
         <>
-          {/* Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
-              <p className="text-gray-600 mt-1">Manage system administrators and their permissions</p>
-            </div>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowNewAdminDialog(true);
-              }}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors font-medium flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Admin
-            </button>
-          </div>
+          {!canManageAdmins ? (
+            <PermissionDeniedView
+              section="Admin Management"
+              requiredPermission="manage_admins"
+              message="You don't have permission to manage administrator accounts. Contact your system administrator to request access."
+            />
+          ) : (
+            <>
+              {/* Header */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
+                  <p className="text-gray-600 mt-1">Manage system administrators and their permissions</p>
+                </div>
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setShowNewAdminDialog(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors font-medium flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Admin
+                </button>
+              </div>
 
           {/* Info Banner - Password & Security Policy */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
@@ -588,11 +683,10 @@ const AdminManagement = () => {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <StatsCard label="Total Admins" value={stats.total} icon={Shield} color="purple" />
             <StatsCard label="Active" value={stats.active} icon={Shield} color="green" />
             <StatsCard label="Invited" value={stats.invited} icon={Mail} color="blue" />
-            <StatsCard label="2FA Enabled" value={stats.twoFactorEnabled} icon={Shield} color="amber" />
             <StatsCard label="Inactive" value={stats.inactive} icon={Shield} color="red" />
           </div>
 
@@ -621,6 +715,8 @@ const AdminManagement = () => {
             itemsPerPage={ITEMS_PER_PAGE}
             totalItems={filteredAdmins.length}
           />
+            </>
+          )}
         </>
       )}
 
@@ -629,6 +725,7 @@ const AdminManagement = () => {
         isOpen={showNewAdminDialog}
         onClose={() => {
           setShowNewAdminDialog(false);
+          setError(null);
           resetForm();
         }}
         onSubmit={handleAddAdmin}
@@ -637,6 +734,8 @@ const AdminManagement = () => {
         submitLabel="Create & Send Invitation"
         submitColor="purple"
         isSubmitting={isSubmitting}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
           {/* Step Indicator */}
@@ -714,19 +813,6 @@ const AdminManagement = () => {
               ))}
             </div>
           </div>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer p-3 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
-            <input
-              type="checkbox"
-              checked={formData.twoFactorEnabled}
-              onChange={(e) => setFormData({ ...formData, twoFactorEnabled: e.target.checked })}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <div>
-              <span className="text-gray-900 font-medium">Require Two-Factor Authentication</span>
-              <p className="text-xs text-gray-600">Admin must set up 2FA on first login</p>
-            </div>
-          </label>
         </div>
       </UserFormDialog>
 
@@ -735,6 +821,7 @@ const AdminManagement = () => {
         isOpen={showEditAdminDialog}
         onClose={() => {
           setShowEditAdminDialog(false);
+          setError(null);
           resetForm();
         }}
         onSubmit={handleEditAdmin}
@@ -743,6 +830,8 @@ const AdminManagement = () => {
         submitLabel="Update Admin"
         submitColor="purple"
         isSubmitting={isSubmitting}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -826,16 +915,6 @@ const AdminManagement = () => {
               ))}
             </div>
           </div>
-
-          <label className="flex items-center gap-2 text-sm cursor-pointer p-3 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
-            <input
-              type="checkbox"
-              checked={formData.twoFactorEnabled}
-              onChange={(e) => setFormData({ ...formData, twoFactorEnabled: e.target.checked })}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-gray-900 font-medium">Require Two-Factor Authentication</span>
-          </label>
         </div>
       </UserFormDialog>
 
@@ -866,6 +945,21 @@ const AdminManagement = () => {
         description={`Resend invitation email to ${adminToResendInvite?.email}? They will receive a new temporary password.`}
         confirmLabel="Resend"
         cancelLabel="Cancel"
+      />
+
+      {/* Password Reset Confirmation */}
+      <ConfirmationDialog
+        isOpen={showPasswordResetConfirm}
+        onClose={() => {
+          setShowPasswordResetConfirm(false);
+          setAdminToResetPassword(null);
+        }}
+        onConfirm={confirmPasswordReset}
+        title="Force Password Reset"
+        description={`Send password reset email to ${adminToResetPassword?.email}? They will receive a temporary password and must set a new one on next login.`}
+        confirmLabel="Send Reset Email"
+        cancelLabel="Cancel"
+        isLoading={isSubmitting}
       />
     </div>
   );

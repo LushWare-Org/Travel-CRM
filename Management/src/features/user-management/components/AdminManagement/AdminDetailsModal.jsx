@@ -53,12 +53,7 @@ const AdminDetailsModal = ({ admin, isOpen, onClose, isSuperAdmin = false }) => 
                 {admin.status.charAt(0).toUpperCase() + admin.status.slice(1)}
               </span>
             </div>
-            <div>
-              <p className="text-xs text-gray-500 font-medium uppercase">2FA Status</p>
-              <span className="inline-block mt-1 px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
-                {admin.twoFactorEnabled ? '✓ Enabled' : 'Disabled'}
-              </span>
-            </div>
+
             {isSuperAdmin && (
               <>
                 <div className="col-span-2">

@@ -21,9 +21,9 @@ export const registerSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   phone: Joi.string()
-    .pattern(/^[0-9]{7,15}$/)
+    .pattern(/^\+?[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid phone number (digits only)',
+      'string.pattern.base': 'Please provide a valid phone number (with or without country code)',
     }),
   password: Joi.string()
     .min(6)
@@ -128,9 +128,9 @@ export const updateProfileSchema = Joi.object({
       'string.max': 'Name cannot exceed 50 characters',
     }),
   phone: Joi.string()
-    .pattern(/^[0-9]{7,15}$/)
+    .pattern(/^\+?[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid phone number (digits only)',
+      'string.pattern.base': 'Please provide a valid phone number (with or without country code)',
     }),
   email: Joi.string()
     .email()
@@ -161,9 +161,9 @@ export const createStaffSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   phone: Joi.string()
-    .pattern(/^[0-9]{7,15}$/)
+    .pattern(/^\+?[0-9]{7,15}$/)
     .messages({
-      'string.pattern.base': 'Please provide a valid phone number (digits only)',
+      'string.pattern.base': 'Please provide a valid phone number (with or without country code)',
     }),
   role: Joi.string()
     .valid('salesRep', 'vendor', 'admin')
@@ -181,8 +181,8 @@ export const createStaffSchema = Joi.object({
         'manage_admins',
         'view_reports',
         'manage_billing',
-        'system_settings',
-        'audit_log',
+        'manage_leads',
+        'manage_packages',
       ),
     )
     .messages({
@@ -243,8 +243,8 @@ export const updatePermissionsSchema = Joi.object({
         'manage_admins',
         'view_reports',
         'manage_billing',
-        'system_settings',
-        'audit_log',
+        'manage_leads',
+        'manage_packages',
       ),
     )
     .required()

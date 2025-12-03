@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import toast from 'react-hot-toast';
 import { useNavigate, useLocation } from "react-router-dom";
 import { Plus, Loader2 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 import { leadAPI, adminAPI } from "../services/api";
 import { 
   NewLeadDialog, 
@@ -20,6 +21,7 @@ import {
 const LeadManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedLead, setSelectedLead] = useState(null);
@@ -90,9 +92,14 @@ const LeadManagement = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus, searchTerm]);
 
-  // Fetch assignment settings (admin)
+  // Fetch assignment settings (admin-only)
   useEffect(() => {
     (async () => {
+      // Only fetch for admin and superAdmin users
+      if (user?.role !== 'admin' && user?.role !== 'superAdmin') {
+        return;
+      }
+
       try {
         const res = await adminAPI.getSettings();
         if (res.success) {
@@ -104,24 +111,29 @@ const LeadManagement = () => {
           });
         }
       } catch (e) {
-        // Non-admins will get 403; ignore silently in UI
+        console.error('Failed to fetch settings:', e);
       }
     })();
-  }, []);
+  }, [user?.role]);
 
-  // Fetch sales reps and admins (admin-only; ignore errors if not admin)
+  // Fetch sales reps and admins (admin-only)
   useEffect(() => {
     (async () => {
+      // Only fetch for admin and superAdmin users
+      if (user?.role !== 'admin' && user?.role !== 'superAdmin') {
+        return;
+      }
+
       try {
         const res = await adminAPI.getSalesRepsAndAdmins();
         if (res.status === 'success' && res.data?.users) {
           setSalesReps(res.data.users.map(u => ({ id: u._id || u.id, name: u.name })));
         }
       } catch (e) {
-        // ignore silently if unauthorized
+        console.error('Failed to fetch sales reps and admins:', e);
       }
     })();
-  }, []);
+  }, [user?.role]);
 
   const fetchLeads = async () => {
     try {

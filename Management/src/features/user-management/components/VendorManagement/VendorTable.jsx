@@ -1,6 +1,6 @@
 import React from 'react';
-import { Edit, Trash, CheckCircle, XCircle, Mail, Key } from 'lucide-react';
-import { VENDOR_VERIFICATION_COLORS, VENDOR_TYPE_COLORS } from '../../utils/constants';
+import { Edit, Trash, Eye, Mail } from 'lucide-react';
+import { VENDOR_TYPE_COLORS } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 
 const VENDOR_TYPE_LABELS = {
@@ -12,7 +12,7 @@ const VENDOR_TYPE_LABELS = {
   other: 'Other'
 };
 
-const VendorTable = ({ vendors, onEdit, onDelete, onVerify, onReject, onResendInvite, onForcePasswordReset }) => {
+const VendorTable = ({ vendors, onEdit, onDelete, onViewDetails, onResendInvite }) => {
   return (
     <div className="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
       <table className="min-w-full divide-y divide-gray-200">
@@ -23,7 +23,6 @@ const VendorTable = ({ vendors, onEdit, onDelete, onVerify, onReject, onResendIn
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Email</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Phone</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Rating</th>
-            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Status</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Registered</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
           </tr>
@@ -46,33 +45,17 @@ const VendorTable = ({ vendors, onEdit, onDelete, onVerify, onReject, onResendIn
                     <span className="font-semibold text-gray-900">{vendor.rating && vendor.rating > 0 ? vendor.rating.toFixed(1) : 'N/A'}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm border-r border-gray-200">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${VENDOR_VERIFICATION_COLORS[vendor.vendorStatus] || 'bg-gray-100 text-gray-800'}`}>
-                    {vendor.vendorStatus ? vendor.vendorStatus.replace(/_/g, ' ').charAt(0).toUpperCase() + vendor.vendorStatus.slice(1).replace(/_/g, ' ') : '—'}
-                  </span>
-                </td>
                 <td className="px-4 py-3 text-sm text-gray-600 border-r border-gray-200">{vendor.createdAt ? formatDate(vendor.createdAt) : '—'}</td>
                 <td className="px-4 py-3 text-sm">
                   <div className="flex gap-2 flex-wrap">
-                    {/* Verification Actions - Only show for pending vendors */}
-                    {vendor.vendorStatus === 'pending_verification' && (
-                      <>
-                        <button
-                          onClick={() => onVerify(vendor)}
-                          className="p-2 hover:bg-green-100 rounded-lg transition-colors text-green-600 flex-shrink-0"
-                          title="Verify Vendor"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onReject(vendor)}
-                          className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600 flex-shrink-0"
-                          title="Reject Vendor"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
+                    {/* View Details Button */}
+                    <button
+                      onClick={() => onViewDetails(vendor)}
+                      className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600 flex-shrink-0"
+                      title="View Vendor Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
 
                     {/* Resend Invitation - Show if pending first login */}
                     {vendor.accountStatus === 'pending_first_login' && (
@@ -82,17 +65,6 @@ const VendorTable = ({ vendors, onEdit, onDelete, onVerify, onReject, onResendIn
                         title="Resend Invitation Email"
                       >
                         <Mail className="w-4 h-4" />
-                      </button>
-                    )}
-
-                    {/* Force Password Reset - Show if account is active */}
-                    {(vendor.vendorStatus === 'verified' || vendor.accountStatus === 'verified') && (
-                      <button
-                        onClick={() => onForcePasswordReset?.(vendor)}
-                        className="p-2 hover:bg-purple-100 rounded-lg transition-colors text-purple-600 flex-shrink-0"
-                        title="Force Password Reset"
-                      >
-                        <Key className="w-4 h-4" />
                       </button>
                     )}
 
@@ -119,7 +91,7 @@ const VendorTable = ({ vendors, onEdit, onDelete, onVerify, onReject, onResendIn
             ))
           ) : (
             <tr>
-              <td colSpan="8" className="px-4 py-12 text-center text-gray-500">
+              <td colSpan="7" className="px-4 py-12 text-center text-gray-500">
                 <p className="text-lg">No vendors found</p>
               </td>
             </tr>

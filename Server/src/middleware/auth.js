@@ -56,8 +56,7 @@ export const protect = asyncHandler(async (req, res, next) => {
 export function authorize(...roles) {
   return function authorizeRoles(req, res, next) {
     // SuperAdmin has access to all routes that require admin or higher
-    // If user is superAdmin, they have all permissions
-    if (req.user.role === 'superAdmin' || req.user.isSuperAdmin) {
+    if (req.user.role === 'superAdmin') {
       return next();
     }
 
@@ -65,6 +64,28 @@ export function authorize(...roles) {
     if (!roles.includes(req.user.role)) {
       throw new AppError(
         `User role '${req.user.role}' is not authorized to access this route`,
+        403,
+      );
+    }
+    next();
+  };
+}
+
+export function checkPermission(...permissions) {
+  return function checkPermissions(req, res, next) {
+    // SuperAdmin has all permissions
+    if (req.user.role === 'superAdmin') {
+      return next();
+    }
+
+    // Check if user has at least one of the required permissions
+    const hasPermission = permissions.some(permission => 
+      req.user.permissions && req.user.permissions.includes(permission)
+    );
+
+    if (!hasPermission) {
+      throw new AppError(
+        `You do not have permission to access this resource. Required: ${permissions.join(', ')}`,
         403,
       );
     }

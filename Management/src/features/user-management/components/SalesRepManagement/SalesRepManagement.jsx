@@ -13,7 +13,7 @@ import { STATUS_COLORS } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import SalesRepTable from './SalesRepTable';
 import salesRepService from '../../../../services/salesRep.service';
-import { validatePhone, formatPhoneToE164, getPhonePlaceholder, COUNTRIES } from '../../utils/phoneUtils';
+import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 
 const SalesRepManagement = () => {
   const isInitialMount = useRef(true);
@@ -173,11 +173,34 @@ const SalesRepManagement = () => {
 
   const openEditDialog = (rep) => {
     setSelectedRep(rep);
+    
+    // Parse phone number if it's in E.164 format
+    let phoneCountry = rep.phoneCountry || 'US';
+    let phoneNumber = rep.phone || '';
+    
+    if (rep.phone) {
+      const parsed = parseE164(rep.phone);
+      if (parsed) {
+        // Use parsed country code, fallback to stored phoneCountry or 'US'
+        phoneCountry = parsed.countryCode || rep.phoneCountry || 'US';
+        // Get the calling code for this country
+        const country = COUNTRIES.find(c => c.code === phoneCountry);
+        const callingCode = country?.callingCode?.replace('+', '') || '';
+        
+        // Extract only the local phone number by removing the calling code prefix
+        if (callingCode && rep.phone.startsWith('+' + callingCode)) {
+          phoneNumber = rep.phone.substring(callingCode.length + 1);
+        } else {
+          phoneNumber = rep.phone.replace(/^\+\d+/, '').trim();
+        }
+      }
+    }
+    
     setFormData({
       name: rep.name,
       email: rep.email,
-      phone: rep.phone,
-      phoneCountry: rep.phoneCountry || 'US',
+      phone: phoneNumber,
+      phoneCountry: phoneCountry,
       commissionRate: rep.commissionRate,
       targetLeads: 50
     });
@@ -236,17 +259,17 @@ const SalesRepManagement = () => {
       const response = await salesRepService.createSalesRep(payload);
 
       if (response.data) {
-        toast.success(`✅ Sales rep created! Invitation sent to ${formData.email}`);
+        toast.success(`Sales rep created! Invitation sent to ${formData.email}`);
         setShowNewRepDialog(false);
         resetForm();
         
-        // Reset search and pagination state
-        setSearchTerm('');
-        setCurrentPage(1);
-        
-        // Force reload with explicit parameters to ensure we get all reps
+        // Reload data first with current state
         await loadSalesReps(1, '');
         await loadStats();
+        
+        // Then reset pagination/search state
+        setSearchTerm('');
+        setCurrentPage(1);
       }
     } catch (err) {
       const errorMsg = err.userMessage || err.message || 'Failed to create sales representative';
@@ -298,7 +321,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.updateSalesRep(selectedRep.id, payload);
 
       if (response.data) {
-        toast.success('✅ Sales representative updated successfully');
+        toast.success('Sales representative updated successfully');
         setShowEditRepDialog(false);
         resetForm();
         await loadSalesReps();
@@ -335,7 +358,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.deleteSalesRep(repToDelete.id);
 
       if (response.status === 'success') {
-        toast.success(`✅ Sales representative deleted successfully`);
+        toast.success(`Sales representative deleted successfully`);
         setShowDeleteConfirm(false);
         setRepToDelete(null);
         await loadSalesReps();
@@ -372,7 +395,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.resetSalesRepPassword(repToResendInvite.id);
 
       if (response.data) {
-        toast.success(`✅ Invitation resent to ${repToResendInvite.email}`);
+        toast.success(`Invitation resent to ${repToResendInvite.email}`);
         setShowResendInviteConfirm(false);
         setRepToResendInvite(null);
       }
@@ -407,7 +430,7 @@ const SalesRepManagement = () => {
       const response = await salesRepService.resetSalesRepPassword(repToResetPassword.id);
 
       if (response.data) {
-        toast.success(`✅ Password reset email sent to ${repToResetPassword.email}`);
+        toast.success(`Password reset email sent to ${repToResetPassword.email}`);
         setShowPasswordResetConfirm(false);
         setRepToResetPassword(null);
       }
@@ -423,14 +446,6 @@ const SalesRepManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error Alert */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600" />
-          <p className="text-red-800 font-medium">{error}</p>
-        </div>
-      )}
-
       {/* Loading State */}
       {isLoading && (
         <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center gap-3">
@@ -528,6 +543,7 @@ const SalesRepManagement = () => {
         isOpen={showNewRepDialog}
         onClose={() => {
           setShowNewRepDialog(false);
+          setError('');
           resetForm();
         }}
         onSubmit={handleAddRep}
@@ -536,6 +552,7 @@ const SalesRepManagement = () => {
         submitLabel={isSubmitting ? 'Creating...' : 'Create & Send Invitation'}
         submitColor="blue"
         isSubmitting={isSubmitting}
+        error={error}
       >
         <div className="space-y-4">
           {/* What Happens Next */}
@@ -630,6 +647,7 @@ const SalesRepManagement = () => {
         isOpen={showEditRepDialog}
         onClose={() => {
           setShowEditRepDialog(false);
+          setError('');
           resetForm();
         }}
         onSubmit={handleEditRep}
@@ -638,6 +656,7 @@ const SalesRepManagement = () => {
         submitLabel={isSubmitting ? 'Updating...' : 'Update Sales Rep'}
         submitColor="blue"
         isSubmitting={isSubmitting}
+        error={error}
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

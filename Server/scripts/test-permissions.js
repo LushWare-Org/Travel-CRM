@@ -37,7 +37,7 @@ const testPermissions = async () => {
 
     // Test 2: Update admin permissions
     console.log('📝 Test 2: Updating admin permissions...');
-    admin.permissions = ['manage_users', 'manage_vendors', 'view_reports', 'audit_log'];
+    admin.permissions = ['manage_users', 'manage_vendors', 'view_reports'];
     await admin.save();
     console.log('✅ Permissions updated successfully');
     console.log(`   New Permissions: ${admin.permissions.join(', ')}\n`);

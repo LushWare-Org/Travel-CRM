@@ -9,7 +9,8 @@ import {
   FormGroup 
 } from '../Common';
 import { VENDOR_VERIFICATION_COLORS, VENDOR_TYPE_COLORS } from '../../utils/constants';
-import { filterUsers, paginateArray } from '../../utils/helpers';
+import { filterUsers, paginateArray, formatDate } from '../../utils/helpers';
+import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 import vendorService from '../../../../services/vendor.service';
 import VendorTable from './VendorTable';
 
@@ -37,14 +38,11 @@ const VendorManagement = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showResendInviteConfirm, setShowResendInviteConfirm] = useState(false);
   const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
-  const [showStatusUpdateConfirm, setShowStatusUpdateConfirm] = useState(false);
-  const [showRatingUpdateConfirm, setShowRatingUpdateConfirm] = useState(false);
+  const [showVendorDetailsModal, setShowVendorDetailsModal] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [vendorToDelete, setVendorToDelete] = useState(null);
   const [vendorToResendInvite, setVendorToResendInvite] = useState(null);
   const [vendorToResetPassword, setVendorToResetPassword] = useState(null);
-  const [vendorStatusUpdate, setVendorStatusUpdate] = useState(null);
-  const [vendorRatingUpdate, setVendorRatingUpdate] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -53,6 +51,7 @@ const VendorManagement = () => {
     name: '',
     email: '',
     phone: '',
+    phoneCountry: 'US',
     businessName: '',
     serviceType: '',
     businessRegistrationNumber: '',
@@ -67,6 +66,7 @@ const VendorManagement = () => {
     contactPerson: {
       name: '',
       phone: '',
+      phoneCountry: 'US',
       email: '',
       designation: ''
     },
@@ -86,6 +86,11 @@ const VendorManagement = () => {
   useEffect(() => {
     loadVendors();
   }, []);
+
+  // Reload vendors when search term or filters change
+  useEffect(() => {
+    loadVendors();
+  }, [searchTerm, filterStatus, filterType, currentPage]);
 
   // Load vendors from API
   const loadVendors = useCallback(async () => {
@@ -117,11 +122,17 @@ const VendorManagement = () => {
     }
   }, [currentPage, searchTerm, filterStatus, filterType]);
 
+  // Reload vendors list (used after operations like delete, resend, etc.)
+  const reloadVendors = () => {
+    setCurrentPage(1);
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
       email: '',
       phone: '',
+      phoneCountry: 'US',
       businessName: '',
       serviceType: '',
       businessRegistrationNumber: '',
@@ -136,6 +147,7 @@ const VendorManagement = () => {
       contactPerson: {
         name: '',
         phone: '',
+        phoneCountry: 'US',
         email: '',
         designation: ''
       },
@@ -153,6 +165,39 @@ const VendorManagement = () => {
   };
 
   const handleAddVendor = async () => {
+    // Validate phone number first
+    if (!validatePhone(formData.phone, formData.phoneCountry)) {
+      setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Format phone to E.164
+    const phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
+    if (!phoneData) {
+      setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Validate contact person phone if provided
+    if (formData.contactPerson.phone && !validatePhone(formData.contactPerson.phone, formData.contactPerson.phoneCountry)) {
+      setValidationErrors({ contactPersonPhone: `Please provide a valid phone number for ${formData.contactPerson.phoneCountry}` });
+      setError('Please fix the validation errors below');
+      return;
+    }
+
+    // Format contact person phone if provided
+    let contactPersonPhoneData = null;
+    if (formData.contactPerson.phone) {
+      contactPersonPhoneData = formatPhoneToE164(formData.contactPerson.phone, formData.contactPerson.phoneCountry);
+      if (!contactPersonPhoneData) {
+        setValidationErrors({ contactPersonPhone: `Please provide a valid phone number for ${formData.contactPerson.phoneCountry}` });
+        setError('Please fix the validation errors below');
+        return;
+      }
+    }
+
     // Validate form data
     const validation = vendorService.validateVendorData(formData);
     if (!validation.isValid) {
@@ -166,15 +211,29 @@ const VendorManagement = () => {
 
     try {
       setActionLoading(true);
-      const response = await vendorService.createVendor(formData);
+      // Create submission data with E.164 formatted phone numbers
+      const submitData = {
+        ...formData,
+        phone: phoneData.e164,
+        phoneCountry: phoneData.countryCode,
+        contactPerson: {
+          ...formData.contactPerson,
+          phone: contactPersonPhoneData ? contactPersonPhoneData.e164 : '',
+          phoneCountry: contactPersonPhoneData ? contactPersonPhoneData.countryCode : formData.contactPerson.phoneCountry
+        }
+      };
+      const response = await vendorService.createVendor(submitData);
       
       if (response.status === 'success') {
         setShowNewVendorDialog(false);
-        setSuccessMessage(`✅ Invitation sent to ${formData.email}`);
+        setSuccessMessage(`✅ Vendor created successfully`);
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
         setValidationErrors({});
-        loadVendors();
+        // Clear search term and reset pagination to show all vendors after creation
+        // Note: Setting these states will trigger useEffect to reload vendors
+        setCurrentPage(1);
+        setSearchTerm('');
       }
     } catch (err) {
       console.error('Error creating vendor:', err);
@@ -200,14 +259,45 @@ const VendorManagement = () => {
 
     try {
       setActionLoading(true);
-      // Only send changed fields for update
+      setValidationErrors({});
+
+      // Validate main vendor phone ONLY if it was changed from original
+      let phoneData = null;
+      const originalPhoneNumber = selectedVendor.phone ? selectedVendor.phone.replace(/^\+\d+/, '').trim() : '';
+      
+      // Check if phone was actually modified
+      const phoneWasChanged = formData.phone !== originalPhoneNumber || formData.phoneCountry !== (selectedVendor.phoneCountry || 'US');
+      
+      if (phoneWasChanged && formData.phone) {
+        // Only validate if the field was actually changed and has a value
+        if (!validatePhone(formData.phone, formData.phoneCountry)) {
+          setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+          setError('Please fix the validation errors below');
+          setActionLoading(false);
+          return;
+        }
+
+        // Format phone to E.164
+        phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
+        if (!phoneData) {
+          setValidationErrors({ phone: `Please provide a valid phone number for ${formData.phoneCountry}` });
+          setError('Please fix the validation errors below');
+          setActionLoading(false);
+          return;
+        }
+      }
+
+      // Send all updated fields with E.164 formatted phone numbers
       const updateData = {
+        name: formData.name,
+        email: formData.email,
+        phone: phoneData ? phoneData.e164 : selectedVendor.phone,
+        phoneCountry: phoneData ? phoneData.countryCode : (selectedVendor.phoneCountry || 'US'),
         businessName: formData.businessName,
         serviceType: formData.serviceType,
         businessRegistrationNumber: formData.businessRegistrationNumber,
         taxIdentificationNumber: formData.taxIdentificationNumber,
         address: formData.address,
-        contactPerson: formData.contactPerson,
         bankDetails: formData.bankDetails
       };
 
@@ -219,7 +309,11 @@ const VendorManagement = () => {
         setSuccessMessage('✅ Vendor updated successfully');
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
-        loadVendors();
+        setValidationErrors({});
+        // Clear search term and reset pagination to show all vendors after edit
+        // Note: Setting these will trigger useEffect to reload vendors
+        setCurrentPage(1);
+        setSearchTerm('');
       }
     } catch (err) {
       console.error('Error updating vendor:', err);
@@ -229,41 +323,10 @@ const VendorManagement = () => {
     }
   };
 
-  // Handle verification/rejection
-  const handleVerifyVendor = async (vendor) => {
-    try {
-      setActionLoading(true);
-      const response = await vendorService.updateVendorStatus(vendor._id, 'verified');
-      
-      if (response.status === 'success') {
-        setSuccessMessage(`✅ Vendor verified successfully`);
-        setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
-      }
-    } catch (err) {
-      console.error('Error verifying vendor:', err);
-      setError(err.userMessage || err.message || 'Failed to verify vendor');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRejectVendor = async (vendor) => {
-    try {
-      setActionLoading(true);
-      const response = await vendorService.updateVendorStatus(vendor._id, 'rejected', 'Rejected by admin');
-      
-      if (response.status === 'success') {
-        setSuccessMessage(`✅ Vendor rejected`);
-        setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
-      }
-    } catch (err) {
-      console.error('Error rejecting vendor:', err);
-      setError(err.userMessage || err.message || 'Failed to reject vendor');
-    } finally {
-      setActionLoading(false);
-    }
+  // Handle view vendor details
+  const handleViewDetails = (vendor) => {
+    setSelectedVendor(vendor);
+    setShowVendorDetailsModal(true);
   };
 
   // Handle resend invitation
@@ -283,7 +346,7 @@ const VendorManagement = () => {
       if (response.status === 'success') {
         setSuccessMessage(`✅ Invitation resent to ${vendorToResendInvite.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
+        reloadVendors();
         setShowResendInviteConfirm(false);
         setVendorToResendInvite(null);
       }
@@ -311,7 +374,7 @@ const VendorManagement = () => {
       if (response.status === 'success') {
         setSuccessMessage(`✅ Password reset link sent to ${vendorToResetPassword.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
+        reloadVendors();
         setShowPasswordResetConfirm(false);
         setVendorToResetPassword(null);
       }
@@ -342,7 +405,7 @@ const VendorManagement = () => {
         setSelectedVendor(null);
         setSuccessMessage(`✅ Vendor deleted successfully`);
         setTimeout(() => setSuccessMessage(''), 5000);
-        loadVendors();
+        reloadVendors();
       }
     } catch (err) {
       console.error('Error deleting vendor:', err);
@@ -354,10 +417,34 @@ const VendorManagement = () => {
 
   const openEditDialog = (vendor) => {
     setSelectedVendor(vendor);
+    
+    // Parse phone number if it's in E.164 format
+    let phoneCountry = 'US';
+    let phoneNumber = '';
+    if (vendor.phone) {
+      const parsed = parseE164(vendor.phone);
+      if (parsed) {
+        phoneCountry = parsed.countryCode || 'US';
+        // Get the calling code for this country
+        const country = COUNTRIES.find(c => c.code === phoneCountry);
+        const callingCode = country?.callingCode?.replace('+', '') || '';
+        
+        // Extract only the local phone number by removing the calling code prefix
+        if (callingCode && vendor.phone.startsWith('+' + callingCode)) {
+          phoneNumber = vendor.phone.substring(callingCode.length + 1);
+        } else {
+          phoneNumber = vendor.phone.replace(/^\+\d+/, '').trim();
+        }
+      } else {
+        phoneNumber = vendor.phone;
+      }
+    }
+
     setFormData({
       name: vendor.name || '',
       email: vendor.email || '',
-      phone: vendor.phone || '',
+      phone: phoneNumber,
+      phoneCountry: phoneCountry,
       businessName: vendor.businessName || '',
       serviceType: vendor.serviceType || '',
       businessRegistrationNumber: vendor.businessRegistrationNumber || '',
@@ -372,6 +459,7 @@ const VendorManagement = () => {
       contactPerson: vendor.contactPerson || {
         name: '',
         phone: '',
+        phoneCountry: 'US',
         email: '',
         designation: ''
       },
@@ -389,28 +477,6 @@ const VendorManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error Message - Positioned above modals */}
-      {error && (
-        <div className="fixed top-4 left-4 right-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 z-[60] shadow-lg max-w-md">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <p className="text-red-800 font-medium text-sm">{error}</p>
-          <button 
-            onClick={() => setError(null)}
-            className="ml-auto text-red-600 hover:text-red-800 flex-shrink-0"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Success Message - Positioned above modals */}
-      {successMessage && (
-        <div className="fixed top-4 left-4 right-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 z-[60] shadow-lg max-w-md">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-          <p className="text-green-800 font-medium text-sm">{successMessage}</p>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -434,7 +500,7 @@ const VendorManagement = () => {
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-blue-900">Account & Security Policy</p>
+          <p className="text-sm font-semibold text-blue-900">Vendor Management Policy</p>
           <p className="text-sm text-blue-800 mt-1">
             Vendors receive invitation emails with temporary passwords. They must set a permanent password on first login. 
             Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
@@ -443,11 +509,10 @@ const VendorManagement = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatsCard label="Total Vendors" value={vendors.length} icon={Building2} color="indigo" />
-        <StatsCard label="Verified" value={vendors.filter(v => v.vendorStatus === 'verified').length} icon={CheckCircle} color="green" />
-        <StatsCard label="Pending" value={vendors.filter(v => v.vendorStatus === 'pending_verification').length} icon={AlertCircle} color="yellow" />
-        <StatsCard label="Rejected" value={vendors.filter(v => v.vendorStatus === 'rejected').length} icon={AlertCircle} color="red" />
+        <StatsCard label="Active" value={vendors.filter(v => v.isActive).length} icon={CheckCircle} color="green" />
+        <StatsCard label="Inactive" value={vendors.filter(v => !v.isActive).length} icon={AlertCircle} color="yellow" />
         <StatsCard label="Avg. Rating" value={vendors.filter(v => v.rating > 0).length > 0 
           ? (vendors.filter(v => v.rating > 0).reduce((sum, v) => sum + v.rating, 0) / vendors.filter(v => v.rating > 0).length).toFixed(1)
           : '0'} icon={Building2} color="purple" />
@@ -456,7 +521,7 @@ const VendorManagement = () => {
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex gap-4">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Verification Status</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Active Status</label>
           <select
             value={filterStatus}
             onChange={(e) => {
@@ -466,10 +531,8 @@ const VendorManagement = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="all">All Vendors</option>
-            <option value="verified">Verified</option>
-            <option value="pending_verification">Pending Review</option>
-            <option value="rejected">Rejected</option>
-            <option value="suspended">Suspended</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
         <div className="flex-1">
@@ -512,10 +575,8 @@ const VendorManagement = () => {
             vendors={vendors}
             onEdit={openEditDialog}
             onDelete={handleDeleteVendor}
-            onVerify={handleVerifyVendor}
-            onReject={handleRejectVendor}
+            onViewDetails={handleViewDetails}
             onResendInvite={handleResendInvitation}
-            onForcePasswordReset={handleForcePasswordReset}
           />
           
           <Pagination
@@ -533,14 +594,20 @@ const VendorManagement = () => {
         isOpen={showNewVendorDialog}
         onClose={() => {
           setShowNewVendorDialog(false);
+          setError(null);
           resetForm();
+          // Ensure search term is cleared when closing add vendor dialog
+          setSearchTerm('');
+          setCurrentPage(1);
         }}
         onSubmit={handleAddVendor}
         title="Add New Vendor"
         subtitle="Register a new partner (hotel, travel agent, service provider, etc.)"
-        submitLabel="Register & Send Invitation"
+        submitLabel="Create Vendor"
         submitColor="indigo"
         isLoading={actionLoading}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
           {/* Validation Error Summary */}
@@ -568,10 +635,9 @@ const VendorManagement = () => {
             <p className="text-xs font-semibold text-indigo-900">WHAT HAPPENS NEXT:</p>
             <ol className="text-xs text-indigo-800 mt-2 space-y-1 ml-4">
               <li>1. ✅ Vendor account is created in the system</li>
-              <li>2. 🔐 Temporary password is generated automatically</li>
-              <li>3. 📧 Invitation email is sent to their address</li>
-              <li>4. 🔑 They must set permanent password on first login</li>
-              <li>5. ✓ Admin must verify business details before activation</li>
+              <li>2. 📝 Vendor details are saved and stored</li>
+              <li>3. ✓ Admin must verify business details before activation</li>
+              <li>4. 🔑 Account ready for vendor to use</li>
             </ol>
           </div>
 
@@ -604,34 +670,48 @@ const VendorManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <FormGroup label="Phone" required error={validationErrors.phone}>
+          <FormGroup label="Phone" required error={validationErrors.phone}>
+            <div className="flex gap-2">
+              <select
+                value={formData.phoneCountry}
+                onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                className="w-40 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                title="Select country code"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.code} value={country.code} title={country.name}>
+                    {country.flag} {country.code} {country.callingCode}
+                  </option>
+                ))}
+              </select>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                   validationErrors.phone 
                     ? 'border-red-300 bg-red-50 focus:ring-red-500' 
                     : 'border-gray-300 focus:ring-indigo-500'
                 }`}
-                placeholder="+1-555-0000"
+                placeholder={getPhonePlaceholder(formData.phoneCountry)}
               />
-            </FormGroup>
-            <FormGroup label="Business Name" required error={validationErrors.businessName}>
-              <input
-                type="text"
-                value={formData.businessName}
-                onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                  validationErrors.businessName 
-                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
-                    : 'border-gray-300 focus:ring-indigo-500'
-                }`}
-                placeholder="Business/Company Name"
-              />
-            </FormGroup>
-          </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
+          </FormGroup>
+
+          <FormGroup label="Business Name" required error={validationErrors.businessName}>
+            <input
+              type="text"
+              value={formData.businessName}
+              onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                validationErrors.businessName 
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
+              placeholder="Business/Company Name"
+            />
+          </FormGroup>
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Service Type" required error={validationErrors.serviceType}>
@@ -799,13 +879,12 @@ const VendorManagement = () => {
           </div>
 
           <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-            <p className="text-xs font-semibold text-green-900 mb-2">🔐 Account Security</p>
+            <p className="text-xs font-semibold text-green-900 mb-2">✓ Account Information</p>
             <ul className="text-xs text-green-800 space-y-1">
-              <li>• Temporary password: Auto-generated (12 chars, secure)</li>
-              <li>• Sent via email: Vendor receives invitation link</li>
-              <li>• First login: Must create permanent password</li>
-              <li>• Verification: Admin reviews business details</li>
-              <li>• Password expires: After 90 days</li>
+              <li>• Vendor details securely stored in system</li>
+              <li>• Business information verified by admin</li>
+              <li>• Account ready for activation</li>
+              <li>• All contact information recorded</li>
             </ul>
           </div>
         </div>
@@ -816,7 +895,11 @@ const VendorManagement = () => {
         isOpen={showEditVendorDialog}
         onClose={() => {
           setShowEditVendorDialog(false);
+          setError(null);
           resetForm();
+          // Ensure search term is cleared when closing edit vendor dialog
+          setSearchTerm('');
+          setCurrentPage(1);
         }}
         onSubmit={handleEditVendor}
         title="Edit Vendor"
@@ -824,14 +907,99 @@ const VendorManagement = () => {
         submitLabel="Update Vendor"
         submitColor="indigo"
         isLoading={actionLoading}
+        error={error}
+        successMessage={successMessage}
       >
         <div className="space-y-4">
+          {/* Validation Error Summary */}
+          {Object.keys(validationErrors).length > 0 && (
+            <div className="p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+              <p className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                Please fix the following errors:
+              </p>
+              <ul className="space-y-2">
+                {Object.entries(validationErrors).map(([field, error]) => (
+                  <li key={field} className="text-sm text-red-800 flex items-start gap-2">
+                    <span className="text-red-600 font-bold mt-0.5">•</span>
+                    <span>
+                      <strong>{field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}:</strong> {error}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Name" required>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.name 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Contact Person Name"
+              />
+            </FormGroup>
+            <FormGroup label="Email" required>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.email 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="contact@vendor.com"
+              />
+            </FormGroup>
+          </div>
+
+          <FormGroup label="Phone" required error={validationErrors.phone}>
+            <div className="flex gap-2">
+              <select
+                value={formData.phoneCountry}
+                onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                className="w-40 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                title="Select country code"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.code} value={country.code} title={country.name}>
+                    {country.flag} {country.code} {country.callingCode}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.phone 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder={getPhonePlaceholder(formData.phoneCountry)}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
+          </FormGroup>
+
           <FormGroup label="Business Name" required>
             <input
               type="text"
               value={formData.businessName}
               onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                validationErrors.businessName 
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
+              placeholder="Business/Company Name"
             />
           </FormGroup>
 
@@ -840,8 +1008,13 @@ const VendorManagement = () => {
               <select
                 value={formData.serviceType}
                 onChange={(e) => setFormData({ ...formData, serviceType: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.serviceType 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
               >
+                <option value="">Select Type</option>
                 {VENDOR_TYPES.map(type => (
                   <option key={type} value={type}>{VENDOR_TYPE_LABELS[type]}</option>
                 ))}
@@ -852,57 +1025,147 @@ const VendorManagement = () => {
                 type="text"
                 value={formData.businessRegistrationNumber}
                 onChange={(e) => setFormData({ ...formData, businessRegistrationNumber: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  validationErrors.businessRegistrationNumber 
+                    ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Business Reg. Number"
               />
             </FormGroup>
           </div>
 
-          <FormGroup label="Tax ID" required>
+          <FormGroup label="Tax Identification Number" required>
             <input
               type="text"
               value={formData.taxIdentificationNumber}
               onChange={(e) => setFormData({ ...formData, taxIdentificationNumber: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                validationErrors.taxIdentificationNumber 
+                  ? 'border-red-300 bg-red-50 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-indigo-500'
+              }`}
+              placeholder="Tax ID"
             />
           </FormGroup>
 
-          {/* Contact Person */}
+          {/* Address Section */}
           <div className="border-t pt-4">
-            <p className="font-semibold text-gray-700 mb-3">Contact Person</p>
-            <FormGroup label="Contact Name">
+            <p className="font-semibold text-gray-700 mb-3">Address Information</p>
+            <FormGroup label="Street Address">
               <input
                 type="text"
-                value={formData.contactPerson.name}
-                onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, name: e.target.value } })}
+                value={formData.address.street}
+                onChange={(e) => setFormData({ ...formData, address: { ...formData.address, street: e.target.value } })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Street address"
               />
             </FormGroup>
             <div className="grid grid-cols-2 gap-4">
-              <FormGroup label="Contact Phone">
+              <FormGroup label="City">
                 <input
-                  type="tel"
-                  value={formData.contactPerson.phone}
-                  onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, phone: e.target.value } })}
+                  type="text"
+                  value={formData.address.city}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="City"
                 />
               </FormGroup>
-              <FormGroup label="Contact Email">
+              <FormGroup label="State">
                 <input
-                  type="email"
-                  value={formData.contactPerson.email}
-                  onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, email: e.target.value } })}
+                  type="text"
+                  value={formData.address.state}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="State"
                 />
               </FormGroup>
             </div>
-            <FormGroup label="Designation">
-              <input
-                type="text"
-                value={formData.contactPerson.designation}
-                onChange={(e) => setFormData({ ...formData, contactPerson: { ...formData.contactPerson, designation: e.target.value } })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </FormGroup>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="ZIP Code">
+                <input
+                  type="text"
+                  value={formData.address.zipCode}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, zipCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="ZIP Code"
+                />
+              </FormGroup>
+              <FormGroup label="Country">
+                <input
+                  type="text"
+                  value={formData.address.country}
+                  onChange={(e) => setFormData({ ...formData, address: { ...formData.address, country: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Country"
+                />
+              </FormGroup>
+            </div>
+          </div>
+
+          {/* Bank Details Section */}
+          <div className="border-t pt-4">
+            <p className="font-semibold text-gray-700 mb-3">Bank Details</p>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="Account Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.accountName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, accountName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Account Holder Name"
+                />
+              </FormGroup>
+              <FormGroup label="Account Number">
+                <input
+                  type="text"
+                  value={formData.bankDetails.accountNumber}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, accountNumber: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Account Number"
+                />
+              </FormGroup>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="Bank Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.bankName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, bankName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Bank Name"
+                />
+              </FormGroup>
+              <FormGroup label="Branch Name">
+                <input
+                  type="text"
+                  value={formData.bankDetails.branchName}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, branchName: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Branch Name"
+                />
+              </FormGroup>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormGroup label="IFSC Code">
+                <input
+                  type="text"
+                  value={formData.bankDetails.ifscCode}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, ifscCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="IFSC Code"
+                />
+              </FormGroup>
+              <FormGroup label="SWIFT Code (International)">
+                <input
+                  type="text"
+                  value={formData.bankDetails.swiftCode}
+                  onChange={(e) => setFormData({ ...formData, bankDetails: { ...formData.bankDetails, swiftCode: e.target.value } })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="SWIFT Code"
+                />
+              </FormGroup>
+            </div>
           </div>
         </div>
       </UserFormDialog>
@@ -952,6 +1215,212 @@ const VendorManagement = () => {
         cancelLabel="Cancel"
         isLoading={actionLoading}
       />
+
+      {/* Vendor Details Modal */}
+      {showVendorDetailsModal && selectedVendor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-teal-600 px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white">{selectedVendor.businessName || selectedVendor.name}</h3>
+              <button
+                onClick={() => setShowVendorDetailsModal(false)}
+                className="text-white hover:bg-white hover:bg-opacity-20 p-1 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Contact Information */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                  Contact Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Name</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Phone</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Status</p>
+                    <p className={`text-sm font-medium ${selectedVendor.isActive ? 'text-green-600' : 'text-red-600'}`}>
+                      {selectedVendor.isActive ? 'Active' : 'Inactive'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Business Information */}
+              <div className="border-t pt-6">
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                  Business Information
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Business Name</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.businessName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Service Type</p>
+                    <p className="text-sm font-medium text-gray-900">{VENDOR_TYPE_LABELS[selectedVendor.serviceType] || selectedVendor.serviceType}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Registration Number</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.businessRegistrationNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Tax ID</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.taxIdentificationNumber}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Information */}
+              {selectedVendor.address && (
+                <div className="border-t pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                    Address
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    {selectedVendor.address.street && <p className="text-gray-900">{selectedVendor.address.street}</p>}
+                    <p className="text-gray-900">
+                      {selectedVendor.address.city && `${selectedVendor.address.city}, `}
+                      {selectedVendor.address.state && `${selectedVendor.address.state} `}
+                      {selectedVendor.address.zipCode}
+                    </p>
+                    {selectedVendor.address.country && <p className="text-gray-900">{selectedVendor.address.country}</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Contact Person */}
+              {selectedVendor.contactPerson && (
+                <div className="border-t pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                    Primary Contact
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Phone</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Designation</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.designation}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bank Details */}
+              {selectedVendor.bankDetails && (
+                <div className="border-t pt-6">
+                  <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                    Bank Details
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Account Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.accountName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Account Number</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.accountNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Bank Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.bankName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Branch Name</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.branchName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">IFSC Code</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.ifscCode}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">SWIFT Code</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.swiftCode}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Performance Metrics */}
+              <div className="border-t pt-6">
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
+                  Performance
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Rating</p>
+                    <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
+                      <span className="text-yellow-500">★</span>
+                      {selectedVendor.rating ? selectedVendor.rating.toFixed(1) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Bookings</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedVendor.totalBookings || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Registered</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(selectedVendor.createdAt)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Last Updated</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(selectedVendor.updatedAt)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="sticky bottom-0 border-t bg-gray-50 px-6 py-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowVendorDetailsModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-medium text-gray-900"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowVendorDetailsModal(false);
+                  openEditDialog(selectedVendor);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              >
+                Edit Vendor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
