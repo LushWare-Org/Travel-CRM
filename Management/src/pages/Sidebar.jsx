@@ -17,13 +17,30 @@ const Sidebar = () => {
     { icon: Home, label: "Dashboard", path: "/", requiredPermission: null },
     { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
     { icon: Users, label: "Lead Management", path: "/leads", requiredPermission: null, allowedRoles: ["salesRep"], requiresAnyPermission: ["manage_leads"] },
-    { icon: MapPin, label: "Packages", path: "/itineraries", requiredPermission: "manage_packages" },
+    { 
+      icon: MapPin, 
+      label: "Packages", 
+      path: "/itineraries", 
+      requiredPermission: null, 
+      // SuperAdmins and salesReps have access, regular admins need manage_packages permission
+      customCheck: (userRole, hasPermission) => {
+        if (userRole === 'superAdmin') return true; // SuperAdmins always have access
+        if (userRole === 'salesRep') return true; // SalesReps always have access
+        if (userRole === 'admin') return hasPermission('manage_packages'); // Regular admins need permission
+        return false;
+      }
+    },
     { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
     { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] }
   ];
 
   // Filter navigation items based on permissions and roles
   const accessibleItems = navigationItems.filter((item) => {
+    // Check custom access control first (for complex role/permission combinations)
+    if (item.customCheck) {
+      return item.customCheck(user?.role, (perm) => permission.hasPermission(perm));
+    }
+
     // Check if user's role is in allowed roles
     if (item.allowedRoles && item.allowedRoles.includes(user?.role)) {
       return true;

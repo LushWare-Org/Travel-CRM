@@ -791,6 +791,11 @@ export const getBillingAnalyticsOverview = asyncHandler(async (req, res) => {
  * Get Package Analytics Overview
  * Returns comprehensive analytics for packages including trends, performance metrics
  */
+/**
+ * Get Package Analytics Overview
+ * Returns comprehensive analytics for published packages including trends, performance metrics
+ * Shows inquiries (leads with published packages) and conversions (lead conversions)
+ */
 export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
   const { timeRange = 'monthly' } = req.query;
 
@@ -809,9 +814,6 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
     // Get activity preferences
     const activityPreferences = await ItineraryAnalyticsService.getActivityPreferences(5);
 
-    // Get hotel preferences
-    const hotelPreferences = await ItineraryAnalyticsService.getHotelPreferences(4);
-
     return res.status(200).json({
       success: true,
       data: {
@@ -822,7 +824,6 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
         mostInquired,
         destinationPerformance,
         activityPreferences,
-        hotelPreferences,
       },
     });
   } catch (error) {

@@ -82,6 +82,11 @@ const packageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    status: {
+      type: String,
+      enum: ['draft', 'published', 'archived'],
+      default: 'draft',
+    },
     availableFrom: {
       type: Date,
       default: Date.now,
@@ -168,6 +173,7 @@ packageSchema.index({ category: 1 });
 packageSchema.index({ destination: 1 });
 packageSchema.index({ isActive: 1 });
 packageSchema.index({ isFeatured: 1 });
+packageSchema.index({ status: 1 });
 packageSchema.index({ createdBy: 1 });
 packageSchema.index({ price: 1 });
 packageSchema.index({ duration: 1 });
@@ -189,5 +195,6 @@ packageSchema.index({
 packageSchema.index({ isActive: 1, category: 1 });
 packageSchema.index({ isActive: 1, isFeatured: 1 });
 packageSchema.index({ isActive: 1, price: 1 });
+packageSchema.index({ isActive: 1, status: 1 });
 
 export default mongoose.model('Package', packageSchema);
