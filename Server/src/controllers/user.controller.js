@@ -278,6 +278,57 @@ export const createUser = asyncHandler(async (req, res, next) => {
   }
 });
 
+export const updateCurrentUserProfile = asyncHandler(async (req, res, next) => {
+  const { name, email, phone } = req.body;
+  const userId = req.user._id;
+
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      logger.warn(`User not found for profile update: ${userId}`);
+      return next(new AppError('User not found', 404));
+    }
+    if (name) {
+      user.name = name.trim();
+    }
+
+    if (email) {
+      user.email = email.trim().toLowerCase();
+    }
+
+    if (phone) {
+      if (!phone.match(/^[0-9]{5,15}$/)) {
+        return next(new AppError('Invalid phone number format. Must be 5-15 digits', 400));
+      }
+      user.phone = phone;
+    }
+
+    await user.save();
+
+    logger.info(`User profile updated: ${user.email}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+      },
+    });
+  } catch (error) {
+    logger.error(`Error updating user profile: ${error.message}`);
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return next(new AppError(`A user with this ${field} already exists`, 400));
+    }
+
+    return next(new AppError('Error updating profile', 500));
+  }
+});
+
 /**
  * @desc    Update user details with field-level authorization
  * @route   PUT /api/v1/users/:id

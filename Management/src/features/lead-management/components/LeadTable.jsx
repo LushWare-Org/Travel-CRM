@@ -18,7 +18,8 @@ const LeadTable = ({
   totalPages,
   onPageChange,
   leadsPerPage,
-  totalLeads
+  totalLeads,
+  highlightedLeadId
 }) => {
   const paginationStart = (currentPage - 1) * leadsPerPage + 1;
   const paginationEnd = Math.min(currentPage * leadsPerPage, totalLeads);
@@ -155,11 +156,16 @@ const LeadTable = ({
           <tbody className="divide-y divide-gray-200">
             {leads.map((lead) => {
               const colors = (statusColors && statusColors[lead.status]) || {};
+              const leadId = (lead._id || lead.id)?.toString();
+              const isHighlighted = highlightedLeadId && leadId === highlightedLeadId.toString();
               
               return (
                 <tr
                   key={lead._id || lead.id}
-                  className={`transition-all duration-200 cursor-pointer group ${colors?.border || ''}`}
+                  id={isHighlighted ? `lead-${leadId}` : undefined}
+                  className={`transition-all duration-200 cursor-pointer group ${colors?.border || ''} ${
+                    isHighlighted ? 'bg-yellow-100 border-2 border-yellow-400 shadow-lg' : ''
+                  }`}
                   onClick={() => onLeadClick(lead)}
                 >
                   <td className={`px-4 py-3 text-sm font-bold border-r border-gray-200 sticky left-0 bg-white group-hover:bg-gray-50 z-5 shadow-[2px_0_4px_rgba(0,0,0,0.1)] ${colors?.id || ''}`}>

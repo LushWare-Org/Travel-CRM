@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, Plane, ArrowRight, Shield, Globe, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import logo from '/logo.png';
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -66,13 +67,8 @@ export default function AuthPage() {
           
           <div className="relative z-10">
             {/* Logo */}
-            <div className="flex items-center space-x-3 mb-12">
-              <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 via-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-xl transform hover:rotate-6 transition-transform duration-300">
-                <Plane className="w-8 h-8 text-white transform -rotate-45" />
-              </div>
-              <div>
-                <span className="text-2xl font-bold text-white block">TripSkyWay</span>
-              </div>
+            <div className="flex items-center space-x-3 mb-16">
+              <img src={logo} alt="Trip Sky Way Logo" className="w-54 h-54 object-contain drop-shadow-lg" />
             </div>
             <div className="mb-16">
               <h1 className="text-3xl font-bold text-white mb-6 leading-tight">

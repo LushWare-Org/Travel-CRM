@@ -5,7 +5,12 @@ export const submitManualItineraryRequest = async (payload = {}) => {
   return response.data?.data || null;
 };
 
-export default {
-  submitManualItineraryRequest,
+export const fetchUserManualItineraries = async () => {
+  const response = await apiClient.get('/manual-itineraries/my-requests');
+  return response.data?.data || [];
 };
 
+export default {
+  submitManualItineraryRequest,
+  fetchUserManualItineraries,
+};

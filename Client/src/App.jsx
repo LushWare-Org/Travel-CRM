@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Header from './pages/Header';
 import Footer from './pages/Footer';
-import Home from './pages/Home';
+import Home from './pages/Landing/Home';
 import DestinationsInternational from './pages/DestinationsInternational';
 import DestinationsDomestic from './pages/DestinationsDomestic';
 import PackageDetails from './pages/PackageDetails';
@@ -11,6 +11,7 @@ import Packages from './pages/Packages';
 import AboutUs from './pages/About';
 import Contact from './pages/Contact';
 import Login from './pages/Login';
+import MyAccount from './pages/MyAccount';
 import PlanYourTrip from './pages/PlanYourTrip';
 import { AuthProvider } from './context/AuthContext';
 
@@ -56,6 +57,7 @@ function AppContent() {
           <Route path="/planner" element={<PlanYourTrip />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/my-account" element={<MyAccount />} />
           <Route path="/package/:id" element={<PackageDetails />} />
           <Route path="/package/:id/customize" element={<CustomizePackage />} />
           <Route path="/login" element={<Login />} />

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Search, Download, Eye, Send, MoreVertical, Receipt, FileText, FileCheck } from "lucide-react";
+import { ArrowLeft, Search, Download, Eye, Send, MoreVertical, Receipt, FileText, FileCheck, ExternalLink } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { invoiceAPI, receiptAPI, quotationAPI } from "../services/api.js";
 
 const BillingInvoicing = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("quotations"); // 'quotations', 'invoices', or 'receipts'
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -181,6 +183,15 @@ const BillingInvoicing = () => {
     }
   };
 
+  // Navigate to lead management with lead ID
+  const handleNavigateToLead = (leadId) => {
+    if (!leadId) {
+      toast.error('Lead ID not found');
+      return;
+    }
+    navigate(`/leads?leadId=${leadId}`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -280,10 +291,32 @@ const BillingInvoicing = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredQuotations.map((quotation) => (
-                      <tr key={quotation._id || quotation.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    {filteredQuotations.map((quotation) => {
+                      const leadId = quotation.lead?._id || quotation.lead?.id || quotation.lead;
+                      return (
+                      <tr 
+                        key={quotation._id || quotation.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (leadId) {
+                            handleNavigateToLead(leadId);
+                          }
+                        }}
+                      >
                         <td className="py-3 px-4">
-                          <span className="font-semibold text-gray-900">{quotation.quotationNumber || 'N/A'}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (leadId) {
+                                handleNavigateToLead(leadId);
+                              }
+                            }}
+                            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline flex items-center gap-1"
+                            disabled={!leadId}
+                          >
+                            {quotation.quotationNumber || 'N/A'}
+                            {leadId && <ExternalLink className="w-3 h-3" />}
+                          </button>
                         </td>
                         <td className="py-3 px-4">
                           <div>
@@ -295,8 +328,17 @@ const BillingInvoicing = () => {
                             </p>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-gray-700">
-                          {quotation.lead?._id || quotation.lead?.id || quotation.lead || 'N/A'}
+                        <td className="py-3 px-4 text-gray-700" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleNavigateToLead(quotation.lead?._id || quotation.lead?.id || quotation.lead)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                            disabled={!quotation.lead?._id && !quotation.lead?.id && !quotation.lead}
+                          >
+                            {quotation.lead?._id || quotation.lead?.id || quotation.lead || 'N/A'}
+                            {(quotation.lead?._id || quotation.lead?.id || quotation.lead) && (
+                              <ExternalLink className="w-3 h-3" />
+                            )}
+                          </button>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <span className="font-bold text-gray-900">{formatCurrency(quotation.totalAmount)}</span>
@@ -315,7 +357,7 @@ const BillingInvoicing = () => {
                             {quotation.status?.charAt(0).toUpperCase() + quotation.status?.slice(1) || 'Draft'}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-2 justify-center">
                             <button
                               onClick={() => setSelectedQuotation(quotation)}
@@ -341,7 +383,8 @@ const BillingInvoicing = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -395,7 +438,16 @@ const BillingInvoicing = () => {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-gray-700">
-                          {invoice.lead?._id || invoice.lead?.id || invoice.lead || 'N/A'}
+                          <button
+                            onClick={() => handleNavigateToLead(invoice.lead?._id || invoice.lead?.id || invoice.lead)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                            disabled={!invoice.lead?._id && !invoice.lead?.id && !invoice.lead}
+                          >
+                            {invoice.lead?._id || invoice.lead?.id || invoice.lead || 'N/A'}
+                            {(invoice.lead?._id || invoice.lead?.id || invoice.lead) && (
+                              <ExternalLink className="w-3 h-3" />
+                            )}
+                          </button>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <span className="font-bold text-gray-900">{formatCurrency(invoice.totalAmount)}</span>
@@ -498,7 +550,16 @@ const BillingInvoicing = () => {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-gray-700">
-                          {receipt.lead?._id || receipt.lead?.id || receipt.lead || 'N/A'}
+                          <button
+                            onClick={() => handleNavigateToLead(receipt.lead?._id || receipt.lead?.id || receipt.lead)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                            disabled={!receipt.lead?._id && !receipt.lead?.id && !receipt.lead}
+                          >
+                            {receipt.lead?._id || receipt.lead?.id || receipt.lead || 'N/A'}
+                            {(receipt.lead?._id || receipt.lead?.id || receipt.lead) && (
+                              <ExternalLink className="w-3 h-3" />
+                            )}
+                          </button>
                         </td>
                         <td className="py-3 px-4">
                           <span className="text-gray-700">

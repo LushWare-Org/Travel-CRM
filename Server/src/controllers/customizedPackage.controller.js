@@ -543,3 +543,26 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
   }
 });
 
+export const getUserCustomizedPackages = asyncHandler(async (req, res, next) => {
+  const userEmail = req.user?.email;
+  if (!userEmail) {
+    return next(new AppError('User email not found', 400));
+  }
+
+  // Find leads with user's email
+  const leads = await Lead.find({ email: userEmail.toLowerCase() });
+  const leadIds = leads.map(l => l._id);
+
+  // Find customized packages
+  const customizedPackages = await CustomizedPackage.find({ 
+    customizedForLead: { $in: leadIds } 
+  })
+    .populate('itinerary')
+    .populate('originalPackage', 'name destination')
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    data: customizedPackages,
+  });
+});

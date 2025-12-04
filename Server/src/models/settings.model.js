@@ -16,6 +16,7 @@ const settingsSchema = new mongoose.Schema(
     roundRobinIndex: { type: Number, default: 0 },
     maxOpenLeadsPerRep: { type: Number, default: 100 },
     skipInactive: { type: Boolean, default: true },
+    requireActiveLogin48h: { type: Boolean, default: false }, // Only assign to sales reps who logged in within 1 hour
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true },

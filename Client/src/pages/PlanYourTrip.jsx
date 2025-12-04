@@ -411,16 +411,16 @@ export default function PlanYourTrip() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50 font-opensans">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="w-full mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-5xl">
         <form onSubmit={(e) => { e.preventDefault(); next(); }}>
-          <div className="bg-white rounded-3xl shadow-md p-6 mb-6">
-            <div className="max-w-5xl mx-auto px-8">
-              <div className="flex items-start justify-between">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-4 sm:p-5 md:p-6 mb-4 sm:mb-5 md:mb-6">
+            <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-8">
+              <div className="flex items-start justify-between gap-1 sm:gap-2">
                 {[1, 2, 3, 4].map((s, idx) => (
                   <div key={s} className="flex items-start" style={{ flex: s < 4 ? '1 1 0%' : '0 0 auto' }}>
                     <div className="flex flex-col items-center">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${
+                        className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all ${
                           s <= step
                             ? 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white'
                             : 'bg-gray-200 text-gray-500'
@@ -428,13 +428,13 @@ export default function PlanYourTrip() {
                       >
                         {s}
                       </div>
-                      <div className="mt-2 text-xs text-center text-gray-600 font-medium whitespace-nowrap">
+                      <div className="mt-1 sm:mt-2 text-xs text-center text-gray-600 font-medium whitespace-nowrap">
                         {['Destination', 'Dates & Travelers', 'Plan Itinerary', 'Contact Info'][idx]}
                       </div>
                     </div>
                     {s < 4 && (
                       <div
-                        className={`flex-1 h-1 mx-4 mt-5 transition-all ${
+                        className={`flex-1 h-0.5 sm:h-1 mx-1 sm:mx-2 md:mx-4 mt-4 sm:mt-5 transition-all ${
                           s < step ? 'bg-gradient-to-r from-orange-600 to-yellow-600' : 'bg-gray-200'
                         }`}
                       />
@@ -446,18 +446,18 @@ export default function PlanYourTrip() {
           </div>
           {/* ==== STEP 1 : Destination ==== */}
           {step === 1 && (
-            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl flex items-center justify-center">
-                  <MapPin className="w-7 h-7 text-white" />
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-gray-100">
+              <div className="flex items-center space-x-3 mb-4 sm:mb-6">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl flex items-center justify-center">
+                  <MapPin className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 font-poppins">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-poppins">
                   Where do you want to go?
                 </h2>
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
                   Select or type your destination
                 </label>
                 <DestinationSelector
@@ -468,14 +468,14 @@ export default function PlanYourTrip() {
               </div>
 
               {selectedDest && (
-                <div className="mt-4 p-4 bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center">
-                      <Check className="w-6 h-6 text-white" />
+                <div className="mt-4 p-3 sm:p-4 bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-xl">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center">
+                      <Check className="w-4 sm:w-6 h-4 sm:h-6 text-white" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900 text-lg">{selectedDest.label || selectedDest}</p>
-                      <p className="text-sm text-gray-600">Destination selected</p>
+                      <p className="font-bold text-gray-900 text-sm sm:text-lg">{selectedDest.label || selectedDest}</p>
+                      <p className="text-xs sm:text-sm text-gray-600">Destination selected</p>
                     </div>
                   </div>
                 </div>
@@ -485,38 +485,38 @@ export default function PlanYourTrip() {
 
           {/* ==== STEP 2 : Dates & Travelers ==== */}
           {step === 2 && (
-            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-7 h-7 text-white" />
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-gray-100">
+              <div className="flex items-center space-x-3 mb-4 sm:mb-6">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                  <Calendar className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 font-poppins">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-poppins">
                   When & How Many?
                 </h2>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
                 <div className="relative">
-                  <label className="block text-sm font-semibold mb-2">Start Date</label>
+                  <label className="block text-xs sm:text-sm font-semibold mb-2">Start Date</label>
                   <input
                     readOnly
                     type="text"
                     value={startDate || ""}
                     onClick={() => setShowCal(true)}
                     placeholder="Select start date"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white cursor-pointer"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white cursor-pointer"
                     required
                   />
                 </div>
                 <div className="relative">
-                  <label className="block text-sm font-semibold mb-2">End Date</label>
+                  <label className="block text-xs sm:text-sm font-semibold mb-2">End Date</label>
                   <input
                     readOnly
                     type="text"
                     value={endDate || ""}
                     onClick={() => setShowCal(true)}
                     placeholder="Select end date"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white cursor-pointer"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white cursor-pointer"
                     required
                   />
                 </div>
@@ -533,34 +533,34 @@ export default function PlanYourTrip() {
               </div>
 
               {duration > 0 && (
-                <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl flex items-center space-x-2">
-                  <Clock className="w-5 h-5 text-orange-600" />
-                  <p className="text-orange-800 font-semibold">
+                <div className="mt-4 p-3 sm:p-4 bg-orange-50 border border-orange-200 rounded-xl flex items-center space-x-2">
+                  <Clock className="w-4 sm:w-5 h-4 sm:h-5 text-orange-600" />
+                  <p className="text-xs sm:text-sm text-orange-800 font-semibold">
                     {duration} Days / {duration - 1} Nights
                   </p>
                 </div>
               )}
 
-              <div className="mt-6">
-                <label className="block text-sm font-semibold mb-3">Travelers</label>
-                <div className="flex items-center space-x-6 bg-gray-50 rounded-xl p-5">
+              <div className="mt-4 sm:mt-6">
+                <label className="block text-xs sm:text-sm font-semibold mb-2 sm:mb-3">Travelers</label>
+                <div className="flex items-center space-x-3 sm:space-x-6 bg-gray-50 rounded-xl p-3 sm:p-5">
                   <button
                     type="button"
                     onClick={() => setTravelers(Math.max(1, travelers - 1))}
-                    className="w-12 h-12 rounded-full bg-white shadow-md hover:shadow-lg flex items-center justify-center"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-md hover:shadow-lg flex items-center justify-center"
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    <ChevronLeft className="w-4 sm:w-5 h-4 sm:h-5" />
                   </button>
                   <div className="flex-1 text-center">
-                    <div className="text-3xl font-bold text-gray-900 font-poppins">{travelers}</div>
-                    <div className="text-sm text-gray-600">Person(s)</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 font-poppins">{travelers}</div>
+                    <div className="text-xs sm:text-sm text-gray-600">Person(s)</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setTravelers(travelers + 1)}
-                    className="w-12 h-12 rounded-full bg-white shadow-md hover:shadow-lg flex items-center justify-center"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-md hover:shadow-lg flex items-center justify-center"
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="w-4 sm:w-5 h-4 sm:h-5" />
                   </button>
                 </div>
               </div>
@@ -569,17 +569,17 @@ export default function PlanYourTrip() {
 
           {/* ==== STEP 3 : Day-by-Day Itinerary ==== */}
           {step === 3 && (
-            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 space-y-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                    <Zap className="w-7 h-7 text-white" />
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-gray-100 space-y-4 sm:space-y-6">
+              <div className="flex items-start sm:items-center justify-between mb-4 sm:mb-6 gap-2">
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                    <Zap className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 font-poppins">
+                    <h2 className="text-lg sm:text-2xl font-bold text-gray-900 font-poppins">
                       Plan Your Itinerary
                     </h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
                       {duration} Days / {duration - 1} Nights in {selectedDest?.label || selectedDest || 'destination'}
                     </p>
                   </div>
@@ -587,61 +587,61 @@ export default function PlanYourTrip() {
               </div>
 
               {duration === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
-                  <p className="text-gray-600 mb-2">Please select travel dates first</p>
+                <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                  <p className="text-xs sm:text-sm text-gray-600 mb-2">Please select travel dates first</p>
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    className="text-orange-600 hover:text-orange-700 font-semibold"
+                    className="text-sm sm:text-base text-orange-600 hover:text-orange-700 font-semibold"
                   >
                     Go to Dates & Travelers →
                   </button>
                 </div>
               ) : itineraryDays.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
-                  <p className="text-gray-600 mb-4">Start planning your itinerary</p>
+                <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+                  <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">Start planning your itinerary</p>
                   <button
                     type="button"
                     onClick={handleAddDay}
-                    className="px-6 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all font-semibold shadow-md flex items-center gap-2 mx-auto"
+                    className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white text-xs sm:text-sm rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all font-semibold shadow-md flex items-center gap-2 mx-auto"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
                     Add Day 1
                   </button>
                 </div>
               ) : (
-                <div className="space-y-6" data-itinerary-form>
+                <div className="space-y-4 sm:space-y-6" data-itinerary-form>
                   {/* Navigation and Progress - Only show if more than one day */}
                   {itineraryDays.length > 1 && (
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
+                    <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
                       <button
                         type="button"
                         onClick={() => setCurrentDayIndex(prev => Math.max(0, prev - 1))}
                         disabled={currentDayIndex === 0}
-                        className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                       >
-                        <ChevronLeft className="w-4 h-4" />
-                        Previous
+                        <ChevronLeft className="w-3 sm:w-4 h-3 sm:h-4" />
+                        <span className="hidden sm:inline">Previous</span>
                       </button>
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-xs sm:text-sm font-medium text-gray-700">
                         Day {itineraryDays[currentDayIndex].dayNumber} of {itineraryDays.length} ({duration} total)
                       </p>
                       <button
                         type="button"
                         onClick={() => setCurrentDayIndex(prev => Math.min(itineraryDays.length - 1, prev + 1))}
                         disabled={currentDayIndex === itineraryDays.length - 1}
-                        className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                       >
-                        Next
-                        <ChevronRight className="w-4 h-4" />
+                        <span className="hidden sm:inline">Next</span>
+                        <ChevronRight className="w-3 sm:w-4 h-3 sm:h-4" />
                       </button>
                     </div>
                   )}
 
                   {/* Progress Indicator - Show when only one day */}
                   {itineraryDays.length === 1 && (
-                    <div className="mb-4 p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
-                      <p className="text-sm font-medium text-gray-700 text-center">
+                    <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
+                      <p className="text-xs sm:text-sm font-medium text-gray-700 text-center">
                         Day 1 of {duration} {duration > 1 && '(Click "Add Day 2" below to add more days)'}
                       </p>
                     </div>

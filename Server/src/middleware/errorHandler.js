@@ -7,6 +7,7 @@ export default (err, req, res, next) => {
   const status = err.status || 'error';
 
   res.status(statusCode).json({
+    success: false,
     status,
     message: err.message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),

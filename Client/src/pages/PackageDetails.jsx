@@ -1,54 +1,56 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Clock, Star, MapPin, Check, X, Calendar, Users, Download, ChevronLeft, ChevronRight, XCircle, Shield, Award, Heart, Share2, FileText, Map, CheckCircle } from 'lucide-react';
-import { fetchPackageById } from '../utils/packageApi';
+import {
+  Clock, Star, MapPin, Check, X, Calendar, Download, ChevronLeft, ChevronRight,
+  Award, Sparkles, ArrowRight, ChevronDown, Phone, Mail,
+} from 'lucide-react';
+import { fetchPackageById, submitReview, fetchPackageReviews } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
 import { generateManagementPDF } from '../utils/managementPdfBridge';
 import { useAuth } from '../context/AuthContext';
 import { submitBookingRequest } from '../utils/bookingApi';
-
-const FALLBACK_IMG = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
 export default function PackageDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [pkg, setPkg] = useState(null);
   const [reviews, setReviews] = useState([]);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showBookingForm, setShowBookingForm] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
+  const [activeSection, setActiveSection] = useState('overview');
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isImageHovered, setIsImageHovered] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(false);
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', travelers: 2, date: '', message: '',
+    name: '', email: '', phone: '', travelers: 1, date: '', message: '',
   });
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submissionType, setSubmissionType] = useState('booking');
+  const [formErrors, setFormErrors] = useState({});
+  const [shouldDownloadAfterSubmit, setShouldDownloadAfterSubmit] = useState(false);
+  const [reviewData, setReviewData] = useState({
+    name: '', email: '', rating: 0, comment: '',
+  });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [showReviewSuccess, setShowReviewSuccess] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
     if (!id) return;
-
     let isMounted = true;
     setLoading(true);
     setError(null);
-
+    
     fetchPackageById(id)
       .then((packageData) => {
         if (!isMounted) return;
         setPkg(packageData);
-        const fetchedReviews = Array.isArray(packageData?.raw?.reviews)
-          ? packageData.raw.reviews.map((review) => ({
-              id: review._id || review.id,
-              user_name: review.author?.name || review.user?.name || 'Traveler',
-              rating: review.rating || 0,
-              comment: review.comment || '',
-              created_at: review.createdAt || review.created_at || new Date().toISOString(),
-            }))
-          : [];
-        setReviews(fetchedReviews);
       })
       .catch((err) => {
         if (!isMounted) return;
@@ -59,12 +61,31 @@ export default function PackageDetails() {
         setLoading(false);
       });
 
+    fetchPackageReviews(id, 50, 1)
+      .then((reviewsData) => {
+        if (!isMounted) return;
+        const fetchedReviews = Array.isArray(reviewsData.reviews)
+          ? reviewsData.reviews.map((review) => ({
+              id: review.id,
+              user_name: review.user_name || 'Traveler',
+              rating: review.rating || 0,
+              comment: review.comment || '',
+              created_at: review.created_at || new Date().toISOString(),
+            }))
+          : [];
+        setReviews(fetchedReviews);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error('Error fetching reviews:', err);
+        setReviews([]);
+      });
+
     return () => {
       isMounted = false;
     };
   }, [id]);
 
-  // Prefill booking form with logged-in user details
   useEffect(() => {
     if (user) {
       setFormData((prev) => ({
@@ -77,28 +98,75 @@ export default function PackageDetails() {
   }, [user]);
 
   const heroImages = pkg?.images || [];
+  const validatePhone = (phone) => {
+    if (!phone || phone.trim() === '') return false;
+    const digits = phone.replace(/\D/g, '');
+    return digits.length >= 5 && digits.length <= 15;
+  };
 
   useEffect(() => {
-    if (!heroImages || heroImages.length <= 1) return;
-    if (lightboxOpen) return;
-    if (isHovered) return;
+    if (!heroImages || heroImages.length <= 1 || isImageHovered) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => {
+        const nextIndex = (prev + 1) % heroImages.length;
+        return nextIndex;
+      });
+    }, 2800);
 
-    const idt = setInterval(() => {
-      setLightboxIndex(prev => (prev + 1) % heroImages.length);
-    }, 4000);
+    return () => clearInterval(interval);
+  }, [heroImages.length, isImageHovered]);
 
-    return () => clearInterval(idt);
-  }, [heroImages.length, lightboxOpen, isHovered]);
+  useEffect(() => {
+    setTimeout(() => setIsVisible(true), 100);
+  }, []);
 
-  const pkgDestination = pkg?.destination || null;
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (scrollTop / docHeight) * 100;
+      setScrollProgress(progress);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!pkg) return;
 
+    // Validate form fields
+    const errors = {};
+    
+    if (!formData.name?.trim()) {
+      errors.name = 'Name is required';
+    }
+    
+    if (!formData.email?.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    if (!formData.phone?.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (!validatePhone(formData.phone)) {
+      errors.phone = 'Phone number is not valid (e.g., +1 234 567 8900 or 534543678)';
+    }
+    
+    if (!formData.date) {
+      errors.date = 'Travel date is required';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+
     setIsSubmittingBooking(true);
     try {
-      await submitBookingRequest({
+      const submissionData = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
@@ -106,34 +174,50 @@ export default function PackageDetails() {
         travelDate: formData.date,
         message: formData.message,
         packageId: pkg.id || pkg._id || pkg?.raw?._id,
-      });
+        type: submissionType,
+      };
+      if (submissionType === 'booking') {
+        await submitBookingRequest(submissionData);
+        setPkg((prevPkg) => {
+          if (!prevPkg) return prevPkg;
+          const updatedBookings = (prevPkg.bookings || 0) + 1;
+          return {
+            ...prevPkg,
+            bookings: updatedBookings,
+            raw: prevPkg.raw
+              ? { ...prevPkg.raw, bookings: (prevPkg.raw.bookings || 0) + 1 }
+              : prevPkg.raw,
+          };
+        });
+      } else if (submissionType === 'lead') {
+        await submitBookingRequest(submissionData);
+      }
 
-    alert('Booking request submitted successfully! We\'ll contact you within 24 hours.');
-    setShowBookingForm(false);
-    setFormData({ name: '', email: '', phone: '', travelers: 2, date: '', message: '' });
-      setPkg((prevPkg) => {
-        if (!prevPkg) return prevPkg;
-        const updatedBookings = (prevPkg.bookings || 0) + 1;
-        return {
-          ...prevPkg,
-          bookings: updatedBookings,
-          raw: prevPkg.raw
-            ? { ...prevPkg.raw, bookings: (prevPkg.raw.bookings || 0) + 1 }
-            : prevPkg.raw,
-        };
-      });
+      setShowSuccessModal(true);
+      setFormData({ name: '', email: '', phone: '', travelers: 1, date: '', message: '' });
+      
+      // If this was a lead submission for download, trigger PDF download
+      if (submissionType === 'lead' && shouldDownloadAfterSubmit) {
+        setTimeout(() => {
+          downloadPDF();
+          setShouldDownloadAfterSubmit(false);
+        }, 1000);
+      }
+      
+      setSubmissionType('booking');
     } catch (err) {
-      alert(err.message || 'Unable to submit your booking request right now. Please try again.');
+      if (err && typeof err === 'object' && 'message' in err) {
+        alert(err.message);
+      } else {
+        alert('Unable to submit your booking request right now. Please try again.');
+      }
     } finally {
       setIsSubmittingBooking(false);
     }
   };
 
   const downloadPDF = async () => {
-    if (!pkg) {
-      return;
-    }
-
+    if (!pkg) return;
     setIsDownloading(true);
     try {
       await generateManagementPDF(pkg.raw || pkg);
@@ -145,31 +229,41 @@ export default function PackageDetails() {
     }
   };
 
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: FileText },
-    { id: 'itinerary', label: 'Itinerary', icon: Map },
-    { id: 'inclusions', label: 'Inclusions', icon: CheckCircle },
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % heroImages.length);
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => (prev - 1 + heroImages.length) % heroImages.length);
+  };
+
+  const sections = [
+    { id: 'overview', label: 'Overview', icon: Sparkles },
+    { id: 'itinerary', label: 'Itinerary', icon: Calendar },
+    { id: 'inclusions', label: 'What\'s Included', icon: Award },
     { id: 'reviews', label: 'Reviews', icon: Star },
   ];
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-amber-500" />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-        <div className="max-w-md text-center bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load package</h2>
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="max-w-md text-center bg-white rounded-3xl shadow-xl p-8">
+          <h2 className="text-3xl font-black text-gray-900 mb-4">Unable to load package</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             type="button"
             onClick={() => navigate('/packages')}
-            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
+            className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-black hover:shadow-xl transform hover:scale-105 transition-all"
           >
             Browse packages
           </button>
@@ -180,14 +274,14 @@ export default function PackageDetails() {
 
   if (!pkg) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Package not found</h2>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <div className="text-center bg-white rounded-3xl shadow-xl p-8">
+          <h2 className="text-3xl font-black text-gray-900 mb-2">Package not found</h2>
           <p className="text-gray-600 mb-6">The package you're looking for may have been removed.</p>
           <button
             type="button"
             onClick={() => navigate('/packages')}
-            className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors"
+            className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-black hover:shadow-xl transform hover:scale-105 transition-all"
           >
             Explore packages
           </button>
@@ -196,76 +290,328 @@ export default function PackageDetails() {
     );
   }
 
+  const images = heroImages.length > 0 ? heroImages : [];
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Hero Section */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+      <style>{`
+        @keyframes kenBurns {
+          0% { transform: scale(1); }
+          100% { transform: scale(1.15); }
+        }
+        @keyframes horizontalScroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0) translateX(0);
+            opacity: 0;
+          }
+          10% { opacity: 0.3; }
+          50% {
+            transform: translateY(-100vh) translateX(50px);
+            opacity: 0.5;
+          }
+          90% { opacity: 0.3; }
+          100% {
+            transform: translateY(-100vh) translateX(100px);
+            opacity: 0;
+          }
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes seamlessTransition {
+          0% {
+            opacity: 1;
+            transform: scale(1.05) translateX(0);
+          }
+          20% {
+            opacity: 1;
+            transform: scale(1.08) translateX(0);
+          }
+          25% {
+            opacity: 0;
+            transform: scale(1.1) translateX(10%);
+          }
+          30% {
+            opacity: 0;
+            transform: scale(1.05) translateX(-10%);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1) translateX(0);
+          }
+        }
+        @keyframes seamlessEnter {
+          0% {
+            opacity: 0;
+            transform: scale(0.95) translateX(-10%);
+          }
+          20% {
+            opacity: 1;
+            transform: scale(1.02) translateX(0);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1.05) translateX(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.8s ease-out forwards;
+        }
+        .animate-float {
+          animation: float linear infinite;
+        }
+        .ken-burns-active {
+          animation: kenBurns 15s ease-out infinite;
+        }
+        .slide-horizontal {
+          animation: horizontalScroll 1s ease-in-out;
+        }
+        .seamless-transition-out {
+          animation: seamlessTransition 3.5s ease-out forwards;
+        }
+        .seamless-transition-in {
+          animation: seamlessEnter 1.5s ease-out forwards;
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 1024px) {
+          .hero-height-mobile {
+            height: 70vh !important;
+          }
+          .hero-title-mobile {
+            font-size: 2.5rem !important;
+            line-height: 1.2 !important;
+          }
+          .hero-subtitle-mobile {
+            font-size: 1.125rem !important;
+          }
+          .hero-info-cards-mobile {
+            flex-direction: column !important;
+            gap: 0.75rem !important;
+          }
+          .hero-info-card-mobile {
+            width: 100% !important;
+            justify-content: center !important;
+            text-align: center !important;
+          }
+          .section-tabs-mobile {
+            flex-direction: column !important;
+          }
+          .section-tab-mobile {
+            border-bottom: 1px solid #e5e7eb !important;
+            border-radius: 0 !important;
+            justify-content: flex-start !important;
+          }
+          .section-tab-mobile:last-child {
+            border-bottom: none !important;
+          }
+          .section-tab-active-mobile {
+            background: linear-gradient(135deg, #000 0%, #1f2937 100%) !important;
+            color: white !important;
+            border-left: 4px solid #f59e0b !important;
+          }
+          .itinerary-day-mobile {
+            flex-direction: column !important;
+            gap: 1rem !important;
+          }
+          .itinerary-day-number-mobile {
+            align-self: flex-start !important;
+            margin-bottom: 0.5rem !important;
+          }
+          .itinerary-connector-mobile {
+            display: none !important;
+          }
+          .inclusions-grid-mobile {
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem !important;
+          }
+          .reviews-header-mobile {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 1rem !important;
+          }
+          .reviews-rating-section-mobile {
+            align-self: stretch !important;
+            text-align: left !important;
+          }
+          .sidebar-sticky-mobile {
+            position: relative !important;
+            top: auto !important;
+          }
+          .pricing-card-mobile {
+            padding: 1.5rem !important;
+          }
+          .pricing-title-mobile {
+            font-size: 1.125rem !important;
+          }
+          .pricing-amount-mobile {
+            font-size: 2.5rem !important;
+          }
+          .booking-buttons-mobile {
+            flex-direction: column !important;
+            gap: 0.75rem !important;
+          }
+          .assistance-card-mobile {
+            padding: 1.5rem !important;
+          }
+          .assistance-contact-mobile {
+            padding: 1rem !important;
+            gap: 1rem !important;
+          }
+          .modal-max-height-mobile {
+            max-height: 95vh !important;
+          }
+          .modal-padding-mobile {
+            padding: 1.5rem !important;
+          }
+          .form-grid-mobile {
+            grid-template-columns: 1fr !important;
+            gap: 1rem !important;
+          }
+          .form-input-mobile {
+            padding: 0.875rem 1rem !important;
+          }
+          .review-modal-mobile {
+            max-width: 95vw !important;
+            margin: 1rem !important;
+          }
+          .success-modal-mobile {
+            max-width: 90vw !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .hero-height-sm {
+            height: 60vh !important;
+          }
+          .hero-title-sm {
+            font-size: 2rem !important;
+          }
+          .hero-padding-sm {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-bottom: 2rem !important;
+          }
+          .main-content-padding-sm {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 1rem !important;
+          }
+          .section-padding-sm {
+            padding: 1.5rem !important;
+          }
+          .tabs-padding-sm {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+          }
+          .itinerary-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .inclusions-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .review-card-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .pricing-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .assistance-padding-sm {
+            padding: 1.25rem !important;
+          }
+          .modal-header-padding-sm {
+            padding: 1.5rem 1.25rem !important;
+          }
+          .modal-form-padding-sm {
+            padding: 1.5rem 1.25rem !important;
+          }
+          .button-padding-sm {
+            padding: 0.875rem 1rem !important;
+          }
+        }
+      `}</style>
+
+      {/* Hero Section - Mobile Responsive */}
       <div
-        className="relative h-[70vh] overflow-hidden"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        className="relative h-[70vh] lg:h-[83vh] overflow-hidden"
+        onMouseEnter={() => setIsImageHovered(true)}
+        onMouseLeave={() => setIsImageHovered(false)}
       >
         <div className="absolute inset-0">
-          {heroImages.map((img, idx) => (
-            <div
-              key={idx}
-              className={`absolute inset-0 transition-opacity duration-1000 ${
-                idx === lightboxIndex ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              <img
-                src={img || FALLBACK_IMG}
-                alt={`${pkg.title} - ${idx + 1}`}
-                className="w-full h-full object-cover"
-                onError={(e) => { e.currentTarget.src = FALLBACK_IMG; }}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent"></div>
-
-        {heroImages.length > 1 && (
-          <>
-            <button
-              onClick={() => setLightboxIndex((prev) => (prev - 1 + heroImages.length) % heroImages.length)}
-              className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-sm text-white p-3 rounded-full hover:bg-white/30 transition-all z-10"
-              aria-label="Previous image"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() => setLightboxIndex((prev) => (prev + 1) % heroImages.length)}
-              className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur-sm text-white p-3 rounded-full hover:bg-white/30 transition-all z-10"
-              aria-label="Next image"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-            <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-              {heroImages.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setLightboxIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    idx === lightboxIndex ? 'bg-white w-8' : 'bg-white/50'
-                  }`}
-                  aria-label={`Go to image ${idx + 1}`}
+          {images.map((img, idx) => {
+            const isCurrent = idx === currentImageIndex;
+            const isNext = idx === (currentImageIndex + 1) % images.length;
+            const isPrevious = idx === (currentImageIndex - 1 + images.length) % images.length;
+           
+            return (
+              <div
+                key={idx}
+                className={`
+                  absolute inset-0 transition-all duration-1000 ease-out
+                  ${isCurrent
+                    ? 'opacity-100 z-10 ken-burns-active slide-horizontal seamless-transition-in'
+                    : isNext || isPrevious
+                      ? 'opacity-0 z-5 seamless-transition-out'
+                      : 'opacity-0 scale-100 z-0'
+                  }
+                `}
+              >
+                <img
+                  src={img}
+                  alt={`${pkg.title} - ${idx + 1}`}
+                  className="w-full h-full object-cover"
                 />
-              ))}
-            </div>
-          </>
-        )}
-
-        <div className="absolute inset-0 flex items-end">
-          <div className="w-full max-w-7xl mx-auto px-6 md:px-8 pb-12">
-            <div className="flex items-center gap-2 text-white/90 text-sm mb-3">
-              <MapPin className="w-4 h-4" />
-              <span className="font-medium">{pkgDestination?.name}, {pkgDestination?.country}</span>
-            </div>
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-              {pkg.title}
+                {/* Gradient Overlays */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/40" />
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Hero Content */}
+        <div className={`relative z-30 h-full flex items-end pb-12 transition-all duration-1000 ${
+          isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+        }`}>
+          <div className="max-w-7xl mx-auto px-6 lg:px-12 w-full">
+            {pkg.destination && (
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/20 px-4 py-2 rounded-full mb-6 transform hover:scale-105 transition-transform">
+                <MapPin className="w-4 h-4 text-amber-400" />
+                <span className="text-white/90 font-medium text-sm">
+                  {pkg.destination.name}{pkg.destination.country && `, ${pkg.destination.country}`}
+                </span>
+              </div>
+            )}
+            {/* Main Title */}
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white mb-8 leading-none tracking-tight max-w-5xl">
+              <span className="inline-block animate-fadeInUp">
+                {pkg.title && pkg.title.split(' ').map((word, i) => (
+                  <span
+                    key={i}
+                    className="inline-block mr-4 mb-2"
+                    style={{
+                      animationDelay: `${i * 0.1}s`,
+                      textShadow: '0 4px 30px rgba(0,0,0,0.7)'
+                    }}
+                  >
+                    {word}
+                  </span>
+                ))}
+              </span>
             </h1>
-            <div className="flex flex-wrap items-center gap-6 text-white">
+            {/* Info Cards */}
+           <div className="flex flex-wrap items-center gap-6 text-white">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                 <Clock className="w-5 h-5" />
                 <span className="font-medium">{pkg.duration_days} Days</span>
@@ -275,57 +621,89 @@ export default function PackageDetails() {
                 <span className="font-medium">{pkg.rating}</span>
                 <span className="text-white/80">({pkg.reviews_count} reviews)</span>
               </div>
-              <span className="px-4 py-2 bg-yellow-500/90 backdrop-blur-sm text-white rounded-full font-semibold capitalize">
+              <span className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-black rounded-full font-semibold capitalize">
                 {pkg.category}
               </span>
             </div>
+            </div>
+        </div>
+
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 animate-bounce">
+          <div className="flex flex-col items-center gap-2 text-white/60">
+            <span className="text-xs uppercase tracking-wider font-semibold">Scroll</span>
+            <ChevronDown className="w-6 h-6" />
           </div>
         </div>
+
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={prevImage}
+              className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 z-40 w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-5 h-5 lg:w-6 lg:h-6" />
+            </button>
+            <button
+              onClick={nextImage}
+              className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 z-40 w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Main Content */}
-      <div className="max-w-8xl mx-auto px-6 md:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-8">
-                  <h3 className="text-xl font-bold text-gray-800 mb-4">Overview</h3>
-                  <div className="flex flex-wrap gap-3 p-2 bg-gray-100 rounded-2xl mb-6">
-                    {tabs.map((tab) => {
-                      const Icon = tab.icon;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => setActiveTab(tab.id)}
-                          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 ${
-                            activeTab === tab.id
-                              ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg scale-105'
-                              : 'text-gray-600 hover:bg-white hover:text-gray-900'
-                          }`}
-                        >
-                          <Icon className="w-4 h-4" />
-                          {tab.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                {/* Overview */}
-                {activeTab === 'overview' && (
-                  <div className="space-y-8">
+      <div className="max-w-8xl mx-auto px-4 lg:px-8 -mt-6 lg:-mt-6 relative py-12 lg:py-20 z-10 main-content-padding-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 pb-12 lg:pb-20">
+            <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+              
+              {/* Section Tabs */}
+              <div className="flex flex-col lg:flex-row border-b border-gray-200 section-tabs-mobile">
+                {sections.map((section, index) => {
+                  const Icon = section.icon;
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => setActiveSection(section.id)}
+                      className={`w-full lg:flex-1 flex items-center justify-start lg:justify-center gap-3 px-4 lg:px-6 py-4 lg:py-5 font-black transition-all duration-300 section-tab-mobile ${
+                        activeSection === section.id
+                          ? 'section-tab-active-mobile bg-gradient-to-r from-black to-gray-800 text-white'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span className="hidden sm:inline">{section.label}</span>
+                      <span className="sm:hidden">{section.label.split(' ')[0]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="p-6 lg:p-10 section-padding-sm">
+                {activeSection === 'overview' && (
+                  <div className="space-y-6 lg:space-y-10">
                     <div>
-                      <h2 className="text-3xl font-bold text-gray-900 mb-4">About This Package</h2>
-                      <p className="text-gray-600 leading-relaxed text-lg">{pkg.description}</p>
+                      <p className="text-base lg:text-lg text-gray-700 leading-relaxed">{pkg.description}</p>
                     </div>
-                    {pkg.highlights && (
+                    {pkg.highlights && pkg.highlights.length > 0 && (
                       <div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-6">Key Highlights</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-4 lg:mb-6">Premium Highlights</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
                           {pkg.highlights.map((h, i) => (
-                            <div key={i} className="flex items-start gap-3 p-4 rounded-xl border border-yellow-100">
-                              <div className="flex-shrink-0 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center mt-0.5">
-                                <Check className="w-4 h-4 text-white" />
+                            <div
+                              key={i}
+                              className="group relative bg-gray-50 rounded-2xl p-4 lg:p-5 hover:shadow-lg transition-all duration-300 border hover:border-amber-300"
+                            >
+                              <div className="flex items-start gap-3 lg:gap-4">
+                                <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <Check className="w-4 h-4 lg:w-6 lg:h-6 text-white" />
+                                </div>
+                                <p className="text-black font-semibold leading-relaxed flex-1 text-sm lg:text-base">{h}</p>
                               </div>
-                              <span className="text-gray-700 font-medium">{h}</span>
                             </div>
                           ))}
                         </div>
@@ -333,223 +711,221 @@ export default function PackageDetails() {
                     )}
                   </div>
                 )}
-
-                {/* Itinerary */}
-                {activeTab === 'itinerary' && (
-                  <div className="space-y-6">
-                    <h2 className="text-3xl font-bold text-gray-900 mb-6">Day by Day Itinerary</h2>
+                {activeSection === 'itinerary' && (
+                  <div className="space-y-4 lg:space-y-6">
+                    <h2 className="text-2xl lg:text-3xl font-black text-gray-900 mb-6 lg:mb-8 bg-black bg-clip-text text-transparent">
+                      Journey Timeline
+                    </h2>
                     {pkg.itinerary?.map((day, i) => (
-                      <div key={i} className="group relative rounded-2xl p-6 border border-blue-100 hover:shadow-lg transition-all">
-                        <div className="flex flex-col md:flex-row gap-6">
-                          <div className="flex-shrink-0">
-                            <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                      <div key={i} className="group relative">
+                        <div className="itinerary-day-mobile flex flex-col lg:flex-row gap-4 lg:gap-6">
+                          <div className="relative flex-shrink-0 itinerary-day-number-mobile">
+                            <div className="w-14 lg:w-16 h-14 lg:h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl lg:text-3xl shadow-lg group-hover:scale-110 transition-transform">
                               {i + 1}
                             </div>
+                            {i < (pkg.itinerary?.length || 0)  && (
+                              <div className="itinerary-connector-mobile lg:absolute lg:top-20 lg:left-1/2 lg:-translate-x-1/2 w-1 h-12 lg:h-12 bg-gradient-to-b from-orange-300 to-transparent" />
+                            )}
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <h3 className="text-xl font-bold text-gray-900">{day.title}</h3>
-                            </div>
-                            <p className="text-gray-600 leading-relaxed">{day.description}</p>
+                          <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-amber-300 hover:shadow-xl transition-all itinerary-padding-sm">
+                            <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2 lg:mb-3">{day.title}</h3>
+                            <p className="text-gray-700 leading-relaxed text-base lg:text-lg">{day.description}</p>
                           </div>
-                          {heroImages[i] && (
-                            <div className="md:w-56 h-40 rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-shadow">
-                              <img
-                                src={heroImages[i]}
-                                alt={day.title}
-                                onError={(e) => { e.currentTarget.src = FALLBACK_IMG; }}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                              />
-                            </div>
-                          )}
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-
-                {/* Inclusions */}
-                {activeTab === 'inclusions' && (
-                  <div className="space-y-8">
-                    <div className="grid md:grid-cols-2 gap-8">
-                      <div className="rounded-2xl p-6 border border-gray-200">
-                        <div className="flex items-center gap-3 mb-6">
-                          <h3 className="text-2xl font-bold text-gray-900">Inclusions</h3>
+                {activeSection === 'inclusions' && (
+                  <div className="space-y-6 lg:space-y-8">
+                    <div className="inclusions-grid-mobile lg:grid-cols-2 grid gap-6 lg:gap-8">
+                      <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
+                        <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                          <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Inclusions</h3>
                         </div>
                         <ul className="space-y-3">
                           {pkg.inclusions?.map((inc, i) => (
                             <li key={i} className="flex items-start gap-3 text-gray-700">
-                              <Check className="w-5 h-5 mt-1 flex-shrink-0 text-green-600" />
-                              <span>{inc}</span>
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
+                                <Check className="w-4 h-4 text-green-600" />
+                              </div>
+                              <span className="text-sm lg:text-base">{inc}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
-
-                      <div className="rounded-2xl p-6 border border-gray-200">
-                        <div className="flex items-center gap-3 mb-6">
-                          <h3 className="text-2xl font-bold text-gray-900">Exclusions</h3>
+                      <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
+                        <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                          <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Exclusions</h3>
                         </div>
                         <ul className="space-y-3">
                           {pkg.exclusions?.map((exc, i) => (
                             <li key={i} className="flex items-start gap-3 text-gray-700">
-                              <X className="w-5 h-5 mt-1 flex-shrink-0 text-red-600" />
-                              <span>{exc}</span>
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-red-600 flex items-center justify-center mt-0.5">
+                                <X className="w-4 h-4 text-red-600" />
+                              </div>
+                              <span className="text-sm lg:text-base">{exc}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     </div>
-
-                    {/* Booking Policies Section */}
-                    <div className="mt-12">
-                      <h3 className="text-2xl font-bold text-gray-900 mb-6">Booking Policies</h3>
-                      <div className="space-y-4 text-gray-700">
-                        <div className="border-l-4 border-yellow-500 pl-4 py-2">
-                          <h4 className="font-semibold text-gray-900 mb-1">Cancellation Policy</h4>
-                          <p>Free cancellation up to 48 hours before departure. Cancellations made within 48 hours will incur a 50% charge. No-shows will be charged 100% of the booking amount.</p>
+                    <div className="rounded-3xl p-6 lg:p-8 border-2 border-amber-200">
+                      <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-4 lg:mb-6">Booking Terms</h3>
+                      <div className="space-y-4 lg:space-y-5">
+                        <div className="flex items-start gap-3 lg:gap-4">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Cancellation Policy</h4>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">Free cancellation up to 48 hours before departure. Cancellations made within 48 hours will incur a 50% charge. No-shows will be charged 100% of the booking amount.</p>
+                          </div>
                         </div>
-                        <div className="border-l-4 border-yellow-500 pl-4 py-2">
-                          <h4 className="font-semibold text-gray-900 mb-1">Payment Terms</h4>
-                          <p>A 30% deposit is required at the time of booking. The remaining balance must be paid 14 days before departure. We accept all major credit cards, bank transfers, and PayPal.</p>
+                        <div className="flex items-start gap-3 lg:gap-4">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Payment Terms</h4>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">A 30% deposit is required at the time of booking. The remaining balance must be paid 14 days before departure. We accept all major credit cards, bank transfers, and PayPal.</p>
+                          </div>
                         </div>
-                        <div className="border-l-4 border-yellow-500 pl-4 py-2">
-                          <h4 className="font-semibold text-gray-900 mb-1">Group Bookings</h4>
-                          <p>Special rates available for groups of 10 or more travelers. Contact our team for customized group packages and discounts.</p>
-                        </div>
-                        <div className="border-l-4 border-yellow-500 pl-4 py-2">
-                          <h4 className="font-semibold text-gray-900 mb-1">Changes & Modifications</h4>
-                          <p>Changes to travel dates are subject to availability and may incur additional charges. Modifications must be requested at least 7 days before departure.</p>
+                        <div className="flex items-start gap-3 lg:gap-4">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Group Bookings</h4>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">Special rates available for groups of 10 or more travelers. Contact our team for customized group packages and discounts.</p>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
-
-                {/* Reviews */}
-                {activeTab === 'reviews' && (
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-3xl font-bold text-gray-900">Customer Reviews</h2>
-                      <div className="text-right">
-                        <div className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-                          <Star className="w-6 h-6 text-yellow-400 fill-current" />
-                          {pkg.rating}
+                {activeSection === 'reviews' && (
+                  <div className="space-y-4 lg:space-y-6">
+                    <div className="reviews-header-mobile flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 lg:mb-8">
+                      <div>
+                        <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Customer Reviews</h2>
+                        <p className="text-gray-600 text-sm lg:text-base">Real experiences from real travelers</p>
+                      </div>
+                      <div className="flex items-center gap-4 w-full lg:w-auto">
+                        <div className="reviews-rating-section-mobile text-left lg:text-right p-3 lg:p-4 rounded-lg">
+                          <div className="flex items-center gap-2 text-2xl lg:text-3xl font-bold text-gray-900">
+                            <Star className="w-6 h-6 lg:w-7 lg:h-7 text-yellow-400 fill-current" />
+                            {pkg.rating}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{pkg.reviews_count} reviews</p>
                         </div>
-                        <p className="text-sm text-gray-500">{pkg.reviews_count} reviews</p>
+                        <button
+                          onClick={() => setShowReviewModal(true)}
+                          className="bg-black text-white px-4 lg:px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all whitespace-nowrap flex-1 lg:flex-none button-padding-sm"
+                        >
+                          Write a Review
+                        </button>
                       </div>
                     </div>
+
                     {reviews.length === 0 && (
-                      <p className="text-gray-600">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
-                    )}
-                    {reviews.map((r) => (
-                      <div key={r.id} className="border-b border-gray-200 pb-6 last:border-0">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <p className="font-bold text-gray-900 text-lg">{r.user_name}</p>
-                            <p className="text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                          </div>
-                          <div className="flex gap-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`w-5 h-5 ${i < r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
-                            ))}
-                          </div>
-                        </div>
-                        <p className="text-gray-700 leading-relaxed">{r.comment}</p>
+                      <div className="text-center py-10 lg:py-12 bg-gray-50 rounded-lg">
+                        <Star className="w-10 h-10 lg:w-12 lg:h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-600 text-base lg:text-lg">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
                       </div>
-                    ))}
+                    )}
+                   
+                    {reviews.length > 0 && (
+                      <div className="space-y-4">
+                        {reviews.map((r) => (
+                          <div key={r.id} className="border border-gray-200 rounded-lg p-5 lg:p-6 hover:shadow-md transition-shadow duration-300 bg-white review-card-padding-sm">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-3 lg:mb-3 gap-4 sm:gap-0">
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-yellow-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                                  {r.user_name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-gray-900 text-base lg:text-lg">{r.user_name}</p>
+                                  <p className="text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star key={i} className={`w-4 h-4 lg:w-5 lg:h-5 ${i < r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">{r.comment}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Right Sidebar */}
+          {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24 space-y-6">
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <div className="mb-6">
-                  <p className="text-sm text-gray-600 mb-1">Starting from</p>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-5xl font-bold text-gray-900">{formatCurrency(pkg.price_from)}</p>
-                    <span className="text-gray-500 font-medium">/person</span>
+            <div className="sticky lg:sticky top-6 lg:top-24 space-y-4 lg:space-y-6 sidebar-sticky-mobile">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 lg:p-6 pricing-card-mobile pricing-padding-sm">
+                <div className="mb-4 lg:mb-6">
+                  <p className="text-xs lg:text-sm text-gray-600 mb-1 pricing-title-mobile">Starting from</p>
+                  <div className="flex items-baseline gap-2 pricing-amount-mobile">
+                    <p className="text-4xl lg:text-5xl font-bold text-gray-900">{formatCurrency(pkg.price_from)}</p>
+                    <span className="text-gray-500 font-medium text-sm lg:text-base">/person</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowBookingForm(!showBookingForm)}
-                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-xl hover:from-yellow-600 hover:to-orange-600 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
-                >
-                  <Calendar className="w-5 h-5" />
-                  Book Now
-                </button>
-                <button
-                  onClick={downloadPDF}
-                  disabled={isDownloading}
-                  aria-busy={isDownloading}
-                  className={`w-full mt-3 border-2 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-                    isDownloading
-                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
-                  }`}
-                >
-                  <Download className={`w-5 h-5 ${isDownloading ? 'animate-pulse' : ''}`} />
-                  {isDownloading ? 'Preparing PDF...' : 'Download Itinerary'}
-                </button>
-                <button
-                  onClick={() => navigate(`/package/${pkg.id}/customize`)}
-                  className="w-full mt-3 border-2 border-yellow-500 text-yellow-700 py-4 rounded-xl font-semibold hover:bg-yellow-50 hover:border-yellow-600 transition-all flex items-center justify-center gap-2"
-                >
-                  Customize Package
-                </button>
-              </div>
-
-              {showBookingForm && (
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 animate-fade-in">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-6">Quick Inquiry</h3>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <input type="text" required placeholder="Full Name" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                    <input type="email" required placeholder="Email Address" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                    <input type="tel" required placeholder="Phone Number" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                    <div className="grid grid-cols-2 gap-4">
-                      <input type="number" min="1" placeholder="Travelers" className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all" value={formData.travelers} onChange={e => setFormData({...formData, travelers: +e.target.value})} />
-                      <input type="date" required className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                    </div>
-                    <textarea placeholder="Special requests or questions..." rows={4} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all resize-none" value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} />
-                    <button
-                      type="submit"
-                      disabled={isSubmittingBooking}
-                      className={`w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg transition-all ${
-                        isSubmittingBooking
-                          ? 'opacity-70 cursor-not-allowed'
-                          : 'hover:shadow-xl hover:from-yellow-600 hover:to-orange-600'
-                      }`}
-                    >
-                      {isSubmittingBooking ? 'Submitting...' : 'Send Inquiry'}
-                    </button>
-                  </form>
+                <div className="booking-buttons-mobile space-y-3 lg:space-y-4">
+                  <button
+                    onClick={() => {
+                      setSubmissionType('booking');
+                      setShowBookingModal(true);
+                    }}
+                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg hover:shadow-xl hover:from-yellow-600 hover:to-orange-600 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2 button-padding-sm"
+                  >
+                    <Calendar className="w-4 h-4 lg:w-5 lg:h-5" />
+                    Book Now
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSubmissionType('lead');
+                      setShouldDownloadAfterSubmit(true);
+                      setShowBookingModal(true);
+                    }}
+                    className="w-full border-2 border-gray-300 text-gray-700 py-3.5 lg:py-4 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center justify-center gap-2 button-padding-sm"
+                  >
+                    <Download className="w-4 h-4 lg:w-5 lg:h-5" />
+                    Download Itinerary
+                  </button>
+                  <button
+                    onClick={() => navigate(`/package/${pkg.id}/customize`)}
+                    className="w-full border-2 border-yellow-500 text-yellow-700 py-3.5 lg:py-4 rounded-xl font-semibold hover:bg-yellow-50 hover:border-yellow-600 transition-all flex items-center justify-center gap-2 button-padding-sm"
+                  >
+                    Customize Package
+                  </button>
                 </div>
-              )}
-
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-                <h4 className="font-bold text-gray-900 text-lg mb-4">Need Help?</h4>
-                <p className="text-gray-600 text-sm mb-4">Our travel experts are here to help you plan your perfect trip.</p>
-                <div className="space-y-3">
-                  <a href="tel:+1234567890" className="flex items-center gap-3 text-gray-700 hover:text-blue-600 transition-colors">
-                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+              </div>
+              <div className="bg-gradient-to-br from-black to-gray-800 rounded-3xl shadow-2xl p-6 lg:p-8 text-white assistance-card-mobile assistance-padding-sm">
+                <h4 className="text-xl lg:text-2xl font-black mb-4 lg:mb-6">Need Assistance?</h4>
+                <div className="space-y-3 lg:space-y-4">
+                  <a
+                    href="tel:+1234567890"
+                    className="flex items-center gap-3 lg:gap-4 p-4 assistance-contact-mobile bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all block"
+                  >
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Phone className="w-6 h-6 lg:w-7 lg:h-7" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Call us</p>
-                      <p className="font-semibold">+1 (234) 567-890</p>
+                      <p className="text-xs text-amber-200 uppercase tracking-wide">Call Us</p>
+                      <p className="font-black text-base lg:text-lg">+91 (987) 6543-210</p>
                     </div>
                   </a>
-                  <a href="mailto:info@travel.com" className="flex items-center gap-3 text-gray-700 hover:text-blue-600 transition-colors">
-                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  <a
+                    href="mailto:info@tripskyway.com"
+                    className="flex items-center gap-3 lg:gap-4 p-4 assistance-contact-mobile bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all block"
+                  >
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Mail className="w-6 h-6 lg:w-7 lg:h-7" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Email us</p>
-                      <p className="font-semibold">info@travel.com</p>
+                      <p className="text-xs text-amber-200 uppercase tracking-wide">Email Us</p>
+                      <p className="font-black text-base lg:text-lg">info@tripskyway.com</p>
                     </div>
                   </a>
                 </div>
@@ -558,6 +934,358 @@ export default function PackageDetails() {
           </div>
         </div>
       </div>
+
+      {/* Booking Modal */}
+      {showBookingModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-max-height-mobile">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto modal-max-height-mobile">
+            <div className="sticky top-0 bg-gradient-to-r from-amber-500 to-orange-500 p-6 lg:p-8 text-white modal-header-padding-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl lg:text-3xl font-black mb-2">
+                    {submissionType === 'lead' ? 'Get Your Itinerary' : 'Book Your Adventure'}
+                  </h3>
+                  <p className="text-amber-100 text-sm lg:text-base">
+                    {submissionType === 'lead'
+                      ? 'Fill in your details to download the complete itinerary PDF'
+                      : 'Fill in your details and we\'ll get back to you within 24 hours'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowBookingModal(false);
+                    setShouldDownloadAfterSubmit(false);
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6 lg:w-8 lg:h-8" />
+                </button>
+              </div>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 lg:p-8 space-y-4 lg:space-y-6 modal-form-padding-sm">
+              <div className="form-grid-mobile lg:grid-cols-2 grid gap-4 lg:gap-6">
+                <div>
+                  <label className="block text-sm font-black text-gray-900 mb-2">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => {
+                      setFormData({...formData, name: e.target.value});
+                      if (formErrors.name) {
+                        setFormErrors({...formErrors, name: ''});
+                      }
+                    }}
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.name
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:border-amber-500'
+                    }`}
+                    placeholder="John Doe"
+                  />
+                  {formErrors.name && (
+                    <p className="text-red-600 text-sm font-semibold mt-2 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18.101 12.93a1 1 0 00-1.414-1.414L10 17.586l-3.293-3.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l8-8z" clipRule="evenodd" />
+                      </svg>
+                      {formErrors.name}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-black text-gray-900 mb-2">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => {
+                      setFormData({...formData, email: e.target.value});
+                      if (formErrors.email) {
+                        setFormErrors({...formErrors, email: ''});
+                      }
+                    }}
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.email
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:border-amber-500'
+                    }`}
+                    placeholder="john@example.com"
+                  />
+                  {formErrors.email && (
+                    <p className="text-red-600 text-sm font-semibold mt-2 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18.101 12.93a1 1 0 00-1.414-1.414L10 17.586l-3.293-3.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l8-8z" clipRule="evenodd" />
+                      </svg>
+                      {formErrors.email}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-grid-mobile lg:grid-cols-2 grid gap-4 lg:gap-6">
+                <div>
+                  <label className="block text-sm font-black text-gray-900 mb-2">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={formData.phone}
+                    onChange={(e) => {
+                      setFormData({...formData, phone: e.target.value});
+                      if (formErrors.phone) {
+                        setFormErrors({...formErrors, phone: ''});
+                      }
+                    }}
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.phone
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:border-amber-500'
+                    }`}
+                    placeholder="+1 234 567 890 or 5345436"
+                  />
+                  {formErrors.phone && (
+                    <p className="text-red-600 text-sm font-semibold mt-2 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18.101 12.93a1 1 0 00-1.414-1.414L10 17.586l-3.293-3.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l8-8z" clipRule="evenodd" />
+                      </svg>
+                      {formErrors.phone}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-black text-gray-900 mb-2">Travel Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => {
+                      setFormData({...formData, date: e.target.value});
+                      if (formErrors.date) {
+                        setFormErrors({...formErrors, date: ''});
+                      }
+                    }}
+                    className={`w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 rounded-xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      formErrors.date
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:border-amber-500'
+                    }`}
+                  />
+                  {formErrors.date && (
+                    <p className="text-red-600 text-sm font-semibold mt-2 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18.101 12.93a1 1 0 00-1.414-1.414L10 17.586l-3.293-3.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l8-8z" clipRule="evenodd" />
+                      </svg>
+                      {formErrors.date}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-black text-gray-900 mb-2">Number of Travelers</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.travelers}
+                  onChange={(e) => setFormData({...formData, travelers: +e.target.value})}
+                  className="w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 transition-all form-input-mobile"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-black text-gray-900 mb-2">Special Requests</label>
+                <textarea
+                  rows={4}
+                  value={formData.message}
+                  onChange={(e) => setFormData({...formData, message: e.target.value})}
+                  className="w-full px-4 lg:px-5 py-3.5 lg:py-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 transition-all resize-none form-input-mobile"
+                  placeholder="Any dietary requirements, accessibility needs, or special occasions?"
+                />
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={isSubmittingBooking}
+                  className={`w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm ${
+                    isSubmittingBooking ? 'opacity-70 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isSubmittingBooking
+                    ? submissionType === 'lead'
+                      ? 'Processing...'
+                      : 'Submitting...'
+                    : submissionType === 'lead'
+                    ? 'Get Itinerary'
+                    : 'Submit Booking Request'}
+                  <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal - Mobile Responsive */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full review-modal-mobile p-6 lg:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl lg:text-2xl font-bold text-gray-900">Write a Review</h3>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!reviewData.name || !reviewData.rating || !reviewData.comment) {
+                  alert('Please fill in all fields');
+                  return;
+                }
+                setIsSubmittingReview(true);
+                try {
+                  const newReview = await submitReview(id, reviewData);
+                  if (newReview) {
+                    setReviews([
+                      {
+                        id: newReview.id,
+                        user_name: newReview.user_name,
+                        rating: newReview.rating,
+                        comment: newReview.comment,
+                        created_at: newReview.created_at,
+                      },
+                      ...reviews,
+                    ]);
+                  }
+                  setReviewData({ name: '', email: '', rating: 0, comment: '' });
+                  setShowReviewModal(false);
+                  setShowReviewSuccess(true);
+                  setTimeout(() => setShowReviewSuccess(false), 4000);
+                } catch (error) {
+                  console.error('Error submitting review:', error);
+                  alert('Failed to submit review. Please try again.');
+                } finally {
+                  setIsSubmittingReview(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Your Name</label>
+                <input
+                  type="text"
+                  required
+                  value={reviewData.name}
+                  onChange={(e) => setReviewData({ ...reviewData, name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none form-input-mobile"
+                  placeholder="Enter your name"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-gray-900">Rating</label>
+                  <span className="text-sm text-gray-600">{reviewData.rating} out of 5</span>
+                </div>
+                <div className="flex gap-2 justify-center sm:justify-start">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewData({ ...reviewData, rating: star })}
+                      className="transition-colors p-1"
+                    >
+                      <Star
+                        className={`w-7 h-7 lg:w-8 lg:h-8 ${
+                          star <= reviewData.rating
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Your Review</label>
+                <textarea
+                  required
+                  value={reviewData.comment}
+                  onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none resize-none form-input-mobile"
+                  rows={4}
+                  placeholder="Share your experience..."
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewModal(false)}
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors button-padding-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReview}
+                  className="flex-1 px-4 py-3 bg-black text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed button-padding-sm"
+                >
+                  {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal - Mobile Responsive */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full success-modal-mobile p-6 lg:p-8">
+            <div className="text-center">
+              <div className="mb-6 flex justify-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+              <h2 className="text-2xl lg:text-3xl font-black text-gray-900 mb-3">Submitted Successfully!</h2>
+              <p className="text-gray-600 mb-8 leading-relaxed text-sm lg:text-base">
+                Thank you for your booking request. We'll review your details and contact you within 24 hours to confirm your adventure!
+              </p>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setShowBookingModal(false);
+                }}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-2xl font-bold text-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-300 button-padding-sm"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Success */}
+      {showReviewSuccess && (
+        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 lg:gap-4">
+            <div className="flex-shrink-0">
+              <div className="flex items-center justify-center h-10 w-10 lg:h-12 lg:w-12 rounded-full bg-white/20 backdrop-blur-sm">
+                <Check className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm lg:text-base">Review Submitted!</p>
+              <p className="text-sm text-white/90 mt-0.5 line-clamp-2">Thank you for sharing your experience.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

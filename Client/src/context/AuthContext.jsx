@@ -47,6 +47,7 @@ export function AuthProvider({ children }) {
       throw new Error('Invalid login response from server');
     }
     persist(respUser, respToken);
+    setTimeout(() => window.location.reload(), 100);
     return respUser;
   }, [persist]);
 
@@ -57,11 +58,13 @@ export function AuthProvider({ children }) {
       throw new Error('Invalid registration response from server');
     }
     persist(respUser, respToken);
+    setTimeout(() => window.location.reload(), 100);
     return respUser;
   }, [persist]);
 
   const logout = useCallback(() => {
     persist(null, null);
+    setTimeout(() => window.location.reload(), 100);
   }, [persist]);
 
   const value = {

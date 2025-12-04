@@ -7,41 +7,29 @@ export default function Footer({ onNavigate }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center mb-4">
+              <img src="/logo.png" alt="Trip Sky Way Logo" className="h-12 w-auto" />
               <div className="ml-3">
-                <h3 className="text-xl font-bold text-white font-poppins">Trip Sky Way</h3>
-                <p className="text-xs text-gray-400">Your Journey, Our Passion</p>
               </div>
             </div>
             <p className="text-sm mb-4">
               Creating unforgettable travel experiences worldwide. Your trusted partner for international and domestic holidays since 2010.
             </p>
             <div className="flex gap-3">
-              <a href="#" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
+              <a href="https://www.facebook.com/tripskyway" target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
                 <Facebook size={18} />
               </a>
-              <a href="#" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
+              <a href="https://www.instagram.com/tripskyway" target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
                 <Instagram size={18} />
-              </a>
-              <a href="#" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
-                <Twitter size={18} />
-              </a>
-              <a href="#" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
-                <Youtube size={18} />
               </a>
             </div>
           </div>
 
-          <div>
+          <div className="lg:ml-16">
             <h4 className="text-white font-semibold mb-4 font-poppins">Quick Links</h4>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-3 text-sm">
               <li>
                 <button onClick={() => onNavigate('home')} className="hover:text-yellow-400 transition">
                   Home
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('destinations')} className="hover:text-yellow-400 transition">
-                  Destinations
                 </button>
               </li>
               <li>
@@ -68,36 +56,16 @@ export default function Footer({ onNavigate }) {
           </div>
 
           <div>
-            <h4 className="text-white font-semibold mb-4 font-poppins">Popular Destinations</h4>
+            <h4 className="text-white font-semibold mb-4 font-poppins">Destination Types</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <button onClick={() => onNavigate('destinations', 'asia')} className="hover:text-yellow-400 transition">
-                  Maldives
+                <button onClick={() => onNavigate('destinations-international')} className="hover:text-yellow-400 transition">
+                  International Destinations
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('destinations', 'asia')} className="hover:text-yellow-400 transition">
-                  Thailand
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('destinations', 'europe')} className="hover:text-yellow-400 transition">
-                  Switzerland
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('destinations', 'europe')} className="hover:text-yellow-400 transition">
-                  Paris
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('destinations', 'asia')} className="hover:text-yellow-400 transition">
-                  Bali
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('destinations', 'middle-east')} className="hover:text-yellow-400 transition">
-                  Dubai
+                <button onClick={() => onNavigate('destinations-domestic')} className="hover:text-yellow-400 transition">
+                  Domestic Destinations
                 </button>
               </li>
             </ul>

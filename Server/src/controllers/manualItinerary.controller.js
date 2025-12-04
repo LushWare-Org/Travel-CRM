@@ -24,12 +24,41 @@ const normalizePhone = (phone) => {
 // @access  Private (Admin, SalesRep)
 export const createOrUpdateManualItinerary = asyncHandler(async (req, res, next) => {
   const { leadId } = req.params;
-  const { days } = req.body;
+  let { days } = req.body;
 
   // Check if lead exists
   const lead = await Lead.findById(leadId);
   if (!lead) {
     return next(new AppError('Lead not found', 404));
+  }
+
+  // Clean up days data: convert empty strings to undefined for enum fields
+  if (days && Array.isArray(days)) {
+    days = days.map(day => {
+      const cleanedDay = { ...day };
+      
+      // Convert empty strings to undefined for transport
+      if (cleanedDay.transport === '' || cleanedDay.transport === null) {
+        delete cleanedDay.transport;
+      }
+      
+      // Convert empty strings to undefined for accommodation.type
+      if (cleanedDay.accommodation) {
+        if (cleanedDay.accommodation.type === '' || cleanedDay.accommodation.type === null) {
+          delete cleanedDay.accommodation.type;
+        }
+        // If accommodation object is empty after cleaning, remove it
+        const accommodationKeys = Object.keys(cleanedDay.accommodation).filter(key => {
+          const value = cleanedDay.accommodation[key];
+          return value !== undefined && value !== null && value !== '';
+        });
+        if (accommodationKeys.length === 0) {
+          delete cleanedDay.accommodation;
+        }
+      }
+      
+      return cleanedDay;
+    });
   }
 
   // Check if manual itinerary already exists for this lead
@@ -299,36 +328,6 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
 
     await session.commitTransaction();
 
-    // Send assignment email notification if a sales rep was assigned
-    if (newLead.assignedTo && assignmentResult?.assigned) {
-      try {
-        const salesRep = assignmentResult.salesRep || await User.findById(newLead.assignedTo).select('name email').lean();
-        if (salesRep && salesRep.email) {
-          logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${newLead._id} (from manual itinerary)`);
-          
-          emailService
-            .sendLeadAssignmentEmail({
-              salesRep,
-              lead: newLead.toObject(),
-              assignedBy: null,
-              assignmentMode: 'auto',
-            })
-            .then(() => {
-              logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email}`);
-            })
-            .catch((err) => {
-              logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
-              logger.error(`Email error details:`, err);
-            });
-        } else {
-          logger.warn(`⚠️  Cannot send assignment email: sales rep ${newLead.assignedTo} has no email address`);
-        }
-      } catch (error) {
-        logger.error(`Error preparing lead assignment email: ${error.message}`);
-        logger.error(`Error stack:`, error.stack);
-      }
-    }
-
     logger.info(`Website manual itinerary created for lead ${newLead._id} by ${sanitizedEmail}`);
 
     res.status(201).json({
@@ -340,6 +339,31 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
         salesRepId: assignedSalesRepId || null,
       },
     });
+
+    // Send assignment email notification if a sales rep was assigned
+    if (newLead.assignedTo && assignmentResult?.assigned) {
+      setImmediate(async () => {
+        try {
+          const salesRep = assignmentResult.salesRep || await User.findById(newLead.assignedTo).select('name email').lean();
+          if (salesRep && salesRep.email) {
+            logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${newLead._id} (from manual itinerary)`);
+            
+            await emailService.sendLeadAssignmentEmail({
+              salesRep,
+              lead: newLead.toObject(),
+              assignedBy: null,
+              assignmentMode: 'auto',
+            });
+            logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email}`);
+          } else {
+            logger.warn(`⚠️  Cannot send assignment email: sales rep ${newLead.assignedTo} has no email address`);
+          }
+        } catch (error) {
+          logger.error(`Error sending lead assignment email: ${error.message}`);
+          logger.error(`Error stack:`, error.stack);
+        }
+      });
+    }
   } catch (error) {
     await session.abortTransaction();
     logger.error(`Error creating website manual itinerary: ${error.message}`);
@@ -349,3 +373,22 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
   }
 });
 
+
+export const getUserManualItineraries = asyncHandler(async (req, res, next) => {
+  const userEmail = req.user?.email;
+  if (!userEmail) {
+    return next(new AppError('User email not found', 400));
+  }
+  // Find leads with user's email
+  const leads = await Lead.find({ email: userEmail.toLowerCase() });
+  const leadIds = leads.map(l => l._id);
+  // Find manual itineraries linked to those leads
+  const manualItineraries = await ManualItinerary.find({ lead: { $in: leadIds } })
+    .populate('lead')
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    data: manualItineraries,
+  });
+});
