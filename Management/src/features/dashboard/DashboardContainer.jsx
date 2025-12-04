@@ -121,13 +121,13 @@ const DashboardContainer = () => {
   }
 
   return (
-    <div className="h-full overflow-auto bg-gray-50">
+    <div className="h-full overflow-auto bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6 shadow-sm sticky top-0 z-10">
+      <div className="bg-white border-b border-gray-200 px-8 py-4 shadow-sm sticky top-0 z-10">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600 mt-1">Welcome back! Here's your platform overview.</p>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-sm text-gray-500 mt-1">Welcome back! Here's your platform overview.</p>
           </div>
           <div>
             <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
@@ -136,7 +136,7 @@ const DashboardContainer = () => {
       </div>
 
       {/* Content */}
-      <div className="p-8">
+      <div className="p-6">
         {/* Error Banner */}
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
