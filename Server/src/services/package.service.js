@@ -449,34 +449,62 @@ class PackageService {
    */
   async getPackageStats() {
     try {
-      const stats = await Package.aggregate([
-        {
-          $group: {
-            _id: null,
-            totalPackages: { $sum: 1 },
-            publishedPackages: {
-              $sum: { $cond: ['$isActive', 1, 0] },
+      // Get counts by status
+      const [stats, statusCounts] = await Promise.all([
+        Package.aggregate([
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              totalBookings: { $sum: '$bookings' },
+              avgRating: { $avg: '$rating' },
+              totalRevenue: { $sum: '$price' },
+              avgPrice: { $avg: '$price' },
+              minPrice: { $min: '$price' },
+              maxPrice: { $max: '$price' },
             },
-            totalBookings: { $sum: '$bookings' },
-            averageRating: { $avg: '$rating' },
-            totalRevenue: { $sum: '$price' },
-            avgPrice: { $avg: '$price' },
-            minPrice: { $min: '$price' },
-            maxPrice: { $max: '$price' },
           },
-        },
+        ]),
+        Package.aggregate([
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 },
+            },
+          },
+        ]),
       ]);
 
-      return stats[0] || {
-        totalPackages: 0,
-        publishedPackages: 0,
+      // Convert status counts array to object
+      const statusMap = {
+        published: 0,
+        draft: 0,
+        archived: 0,
+      };
+      
+      statusCounts.forEach(item => {
+        if (item._id && statusMap.hasOwnProperty(item._id)) {
+          statusMap[item._id] = item.count;
+        }
+      });
+
+      const baseStats = stats[0] || {
+        total: 0,
         totalBookings: 0,
-        averageRating: 0,
+        avgRating: 0,
         totalRevenue: 0,
         avgPrice: 0,
         minPrice: 0,
         maxPrice: 0,
       };
+
+      const result = {
+        ...baseStats,
+        ...statusMap,
+      };
+
+      logger.info('Package stats calculated:', result);
+      return result;
     } catch (error) {
       logger.error(`Error fetching package stats: ${error.message}`);
       throw error;

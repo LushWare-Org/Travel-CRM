@@ -22,6 +22,7 @@ import {
   NewEditPackageForm,
   PackagePDFPreviewDialog,
 } from '../components';
+import Pagination from '../../user-management/components/Common/Pagination';
 
 // Services
 import { createPackagePdfBlob } from '../services/pdfService';
@@ -31,7 +32,6 @@ import ApiService from '../services/apiService';
 // Utils
 import {
   filterPackages,
-  calculatePackageStats,
   parseDurationToDays,
   validateItinerary,
 } from '../utils/helpers';
@@ -58,6 +58,21 @@ const ItineraryGenerationContainer = () => {
     packageData: null,
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
+  const [itemsPerPage] = useState(12); // 12 items per page for better grid layout (3 columns x 4 rows)
+  
+  // Stats state - fetch from API instead of calculating from local packages
+  const [stats, setStats] = useState({
+    total: 0,
+    published: 0,
+    draft: 0,
+    archived: 0,
+    totalBookings: 0,
+    avgRating: 0,
+  });
 
   // Check if user is a salesRep (read-only access)
   const isSalesRep = user?.role === 'salesRep';
@@ -78,30 +93,60 @@ const ItineraryGenerationContainer = () => {
     removeImage,
   } = useImageUpload();
 
-  // Filter packages
+  // Filter packages by search term only (status filtering is done server-side)
   let filteredPackages = filterPackages(packages, searchTerm);
-  
-  // Apply status filter if one is selected
-  if (statusFilter) {
-    filteredPackages = filteredPackages.filter(pkg => pkg.status === statusFilter);
-  }
-  
-  const stats = calculatePackageStats(packages);
+
+  /**
+   * Load package stats from API
+   */
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const response = await ApiService.getPackageStats();
+        if (response.success && response.data) {
+          setStats(response.data);
+          console.log('[Stats] Loaded from API:', response.data);
+        }
+      } catch (error) {
+        console.error('Error loading package stats:', error);
+      }
+    };
+
+    loadStats();
+  }, [packages]); // Reload stats when packages change (after create/update/delete)
 
   /**
    * Load packages from API on component mount
    */
   useEffect(() => {
-    const loadPackages = async () => {
+    const loadPackages = async (page = 1) => {
       try {
+        // Build query params with pagination and status filter
+        const params = { 
+          page, 
+          limit: itemsPerPage 
+        };
+        
+        // Add status filter if selected
+        if (statusFilter) {
+          params.status = statusFilter;
+        }
+        
         // For salesReps, use the protected endpoint which will automatically filter published packages
         // For other roles, use the standard endpoint
         const response = isSalesRep 
-          ? await ApiService.getPackagesProtected()
-          : await ApiService.getPackages();
+          ? await ApiService.getPackagesProtected(params)
+          : await ApiService.getPackages(params);
         
         if (response.success && Array.isArray(response.data)) {
           setPackages(response.data);
+          
+          // Store pagination metadata
+          if (response.pagination) {
+            setPagination(response.pagination);
+            console.log('[Pagination] Loaded page', response.pagination.page, 'of', response.pagination.pages);
+            console.log('[Pagination] Total packages:', response.pagination.total);
+          }
         }
       } catch (error) {
         console.error('Error loading packages:', error);
@@ -109,8 +154,8 @@ const ItineraryGenerationContainer = () => {
       }
     };
 
-    loadPackages();
-  }, [isSalesRep]);
+    loadPackages(currentPage);
+  }, [isSalesRep, currentPage, itemsPerPage, statusFilter]); // Added statusFilter to dependencies
 
   // Handlers
   const handleNewPackageDialogOpen = () => {
@@ -291,6 +336,7 @@ const ItineraryGenerationContainer = () => {
         setShowNewPackageDialog(false);
         setNewFormData(createDefaultPackage());
         setImages([]);
+        setCurrentPage(1); // Reset to first page to see the new package
         Swal.fire('Success', VALIDATION_MESSAGES.PACKAGE_CREATED, 'success');
       } else {
         Swal.fire('Error', response.message || 'Failed to create package', 'error');
@@ -565,6 +611,7 @@ const ItineraryGenerationContainer = () => {
 
           if (response.success) {
             setPackages((prev) => [response.data, ...prev]);
+            setCurrentPage(1); // Reset to first page to see the duplicated package
             Swal.fire('Success', `${pkg.name} has been duplicated successfully.`, 'success');
           } else {
             Swal.fire('Error', response.message || 'Failed to duplicate package', 'error');
@@ -657,6 +704,24 @@ const ItineraryGenerationContainer = () => {
     // No longer needed with new structure
   };
 
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top when changing pages
+  };
+
+  // Handle status filter change - reset to page 1 when filter changes
+  const handleStatusFilterChange = (status) => {
+    setStatusFilter(status);
+    setCurrentPage(1); // Reset to first page when changing filter
+  };
+
+  // Handle search change - reset to page 1 when searching
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -666,7 +731,7 @@ const ItineraryGenerationContainer = () => {
       <div className="bg-white border-b border-gray-200 px-8 py-4">
         <PackageStats 
           stats={stats} 
-          onFilterChange={setStatusFilter}
+          onFilterChange={handleStatusFilterChange}
           activeFilter={statusFilter}
         />
       </div>
@@ -674,7 +739,7 @@ const ItineraryGenerationContainer = () => {
       {/* Content */}
       <div className="p-8">
         {/* Search */}
-        <SearchBar value={searchTerm} onChange={setSearchTerm} />
+        <SearchBar value={searchTerm} onChange={handleSearchChange} />
 
         {/* Packages Grid */}
         <PackagesGrid
@@ -685,6 +750,17 @@ const ItineraryGenerationContainer = () => {
           onDelete={handleDeletePackage}
           onDuplicate={handleDuplicatePackage}
         />
+
+        {/* Pagination */}
+        {pagination && pagination.pages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={pagination.pages}
+            onPageChange={handlePageChange}
+            itemsPerPage={itemsPerPage}
+            totalItems={pagination.total}
+          />
+        )}
 
         {/* Package Details Modal */}
         <PackageDetailsModal
