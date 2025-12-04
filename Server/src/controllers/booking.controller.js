@@ -14,13 +14,13 @@ import logger from '../config/logger.js';
 const normalizePhone = (phone) => {
   if (!phone) return undefined;
   const digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) {
+  if (digits.length >= 10 && digits.length <= 15) {
     return digits;
   }
   return undefined;
 };
 
-export const createWebsiteBooking = asyncHandler(async (req, res) => {
+export const createWebsiteBooking = asyncHandler(async (req, res) => {  
   const {
     name,
     email,
@@ -89,7 +89,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
   const leadPayload = {
       name: sanitizedName,
       email: sanitizedEmail,
-      phone: normalizedPhone,
+      phone: normalizedPhone || '',
       source: 'booking',
       platform: 'Website Form',
       package: pkg._id,
@@ -209,6 +209,43 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
   }
 });
 
-export default {
-  createWebsiteBooking,
-};
+export const getUserBookings = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  if (!userId) {
+    throw new AppError('User ID is required', 401);
+  }
+
+  const bookings = await Booking.find({ user: userId })
+    .populate('package')
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    data: bookings || [],
+  });
+});
+
+export const getRecentBookings = asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+
+  const bookings = await Booking.find({
+    bookingStatus: { $in: ['confirmed', 'completed', 'pending'] },
+  })
+    .populate({
+      path: 'package',
+      select: 'name description price duration coverImage images slug destination maxGroupSize category inclusions exclusions highlights terms isActive isFeatured rating numReviews views bookings createdBy availableFrom createdAt updatedAt itinerary',
+    })
+    .populate({
+      path: 'user',
+      select: 'name country email',
+    })
+    .sort({ confirmedAt: -1, createdAt: -1 })
+    .limit(limit)
+    .lean();
+
+  res.status(200).json({
+    success: true,
+    data: bookings || [],
+  });
+});

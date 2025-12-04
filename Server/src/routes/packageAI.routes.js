@@ -17,19 +17,18 @@ router.get(
   packageAIController.checkAIStatus
 );
 
-// All other routes require authentication
-router.use(protect);
-
 // Generate AI content from title only (no package ID needed) - must be before /:id routes
 // Note: Using protect only (no role restriction) to allow all authenticated users
 router.post(
   '/generate-from-title',
+  protect,
   packageAIController.generateFromTitle
 );
 
 // Generate AI content for a package
 router.post(
   '/:id/generate-ai-content',
+  protect,
   authorize('admin', 'salesRep'),
   packageAIController.generateAIContent
 );
@@ -37,6 +36,7 @@ router.post(
 // Preview AI content without saving
 router.get(
   '/:id/preview-ai-content',
+  protect,
   authorize('admin', 'salesRep'),
   packageAIController.previewAIContent
 );
@@ -44,6 +44,7 @@ router.get(
 // Generate and download AI PDF
 router.get(
   '/:id/ai-pdf',
+  protect,
   authorize('admin', 'salesRep'),
   packageAIController.generateAIPDF
 );

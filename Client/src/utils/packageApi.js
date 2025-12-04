@@ -41,3 +41,41 @@ export const fetchPackageById = async (id) => {
   return normalizePackage(response.data?.data || {});
 };
 
+export const submitReview = async (packageId, reviewData) => {
+  if (!packageId) {
+    throw new Error('Package id is required');
+  }
+
+  const response = await apiClient.post(`/reviews/package/${packageId}`, {
+    name: reviewData.name,
+    email: reviewData.email || '',
+    rating: reviewData.rating,
+    comment: reviewData.comment,
+  });
+
+  return response.data?.data || null;
+};
+
+export const fetchPackageReviews = async (packageId, limit = 10, page = 1) => {
+  if (!packageId) {
+    throw new Error('Package id is required');
+  }
+
+  const response = await apiClient.get(`/reviews/package/${packageId}`, {
+    params: { limit, page },
+  });
+
+  return {
+    reviews: response.data?.data || [],
+    pagination: response.data?.pagination || null,
+  };
+};
+
+export const fetchReviewStats = async (packageId) => {
+  if (!packageId) {
+    throw new Error('Package id is required');
+  }
+
+  const response = await apiClient.get(`/reviews/package/${packageId}/stats`);
+  return response.data?.data || null;
+};
