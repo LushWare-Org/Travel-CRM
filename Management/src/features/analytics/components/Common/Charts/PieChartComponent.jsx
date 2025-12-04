@@ -37,15 +37,16 @@ const PieChartComponent = ({
 }) => {
   const defaultLegend = ({ payload = [] }) => {
     if (!payload || payload.length === 0) return null;
+    const isHorizontal = legendProps?.layout === "horizontal";
     return (
-      <ul className="flex flex-col gap-2 text-sm text-gray-700">
+      <ul className={`${isHorizontal ? "flex flex-wrap justify-center gap-x-6 gap-y-2" : "flex flex-col gap-2"} text-xs text-gray-700`}>
         {payload.map((entry, index) => (
-          <li key={`${entry.value}-${index}`} className="flex items-center gap-2">
+          <li key={`${entry.value}-${index}`} className="flex items-center gap-1.5 whitespace-nowrap">
             <span
-              className="w-3.5 h-3.5 rounded-full border border-gray-200"
+              className="w-2.5 h-2.5 rounded-full border border-gray-200 flex-shrink-0"
               style={{ backgroundColor: entry.color || entry.payload?.fill }}
             />
-            <span>
+            <span className="truncate">
               {entry.payload?.[nameKey] ?? entry.value}:{" "}
               <span className="font-semibold text-gray-900">
                 {entry.payload?.[dataKey] ?? entry.value}
@@ -64,15 +65,15 @@ const PieChartComponent = ({
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <PieChart margin={{ left: 0, right: 0, top: 16, bottom: 16 }}>
+      <PieChart margin={legendProps?.layout === "horizontal" ? { left: 0, right: 0, top: 8, bottom: 60 } : { left: 0, right: 0, top: 16, bottom: 16 }}>
         <Pie
           data={data}
           labelLine={false}
           dataKey={dataKey}
           cx="50%"
-          cy="50%"
-          innerRadius={Math.min(height * 0.2, 70)}
-          outerRadius={Math.min(height * 0.4, 130)}
+          cy="40%"
+          innerRadius={Math.min(height * 0.15, 60)}
+          outerRadius={Math.min(height * 0.35, 110)}
           {...pieProps}
           label={
             pieProps.label !== undefined
