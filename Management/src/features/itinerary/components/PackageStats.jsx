@@ -2,9 +2,17 @@
  * Header Statistics Component
  * Displays package statistics in a grid format
  * Cards are clickable to filter packages by status
+ * 
+ * For SalesReps: Only shows Published count (they can only see published packages)
+ * For Admins: Shows Total, Published, Draft, and Archived packages
  */
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 const PackageStats = ({ stats, onFilterChange, activeFilter }) => {
+  const { user } = useAuth();
+  const isSalesRep = user?.role === 'salesRep';
+
   const statItems = [
     {
       label: 'Total Packages',
@@ -12,6 +20,7 @@ const PackageStats = ({ stats, onFilterChange, activeFilter }) => {
       bgColor: 'bg-gray-50',
       hoverColor: 'hover:bg-gray-100',
       filterValue: null,
+      showFor: ['admin', 'superAdmin', 'staff'], // Only show for admins/staff
     },
     {
       label: 'Published',
@@ -19,6 +28,7 @@ const PackageStats = ({ stats, onFilterChange, activeFilter }) => {
       bgColor: 'bg-green-50',
       hoverColor: 'hover:bg-green-100',
       filterValue: 'published',
+      showFor: ['admin', 'superAdmin', 'staff', 'salesRep'], // Show for everyone
     },
     {
       label: 'Draft',
@@ -26,12 +36,20 @@ const PackageStats = ({ stats, onFilterChange, activeFilter }) => {
       bgColor: 'bg-yellow-50',
       hoverColor: 'hover:bg-yellow-100',
       filterValue: 'draft',
+      showFor: ['admin', 'superAdmin', 'staff'], // Only show for admins/staff
     },
   ];
 
+  // Filter stat items based on user role
+  const visibleStats = statItems.filter(item => item.showFor.includes(user?.role));
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {statItems.map((item, idx) => (
+    <div className={`grid gap-4 ${
+      isSalesRep 
+        ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4' 
+        : 'grid-cols-2 md:grid-cols-4'
+    }`}>
+      {visibleStats.map((item, idx) => (
         <div
           key={idx}
           onClick={() => onFilterChange(item.filterValue)}
