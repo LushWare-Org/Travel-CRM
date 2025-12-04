@@ -23,8 +23,9 @@ const Sidebar = () => {
       path: "/itineraries", 
       requiredPermission: null, 
       // SuperAdmins and salesReps have access, regular admins need manage_packages permission
-      customCheck: (userRole, hasPermission) => {
-        if (userRole === 'superAdmin') return true; // SuperAdmins always have access
+      customCheck: (userRole, userIsSuperAdmin, hasPermission) => {
+        // FIXED: Check both role and isSuperAdmin flag
+        if (userRole === 'superAdmin' && userIsSuperAdmin === true) return true; // SuperAdmins always have access
         if (userRole === 'salesRep') return true; // SalesReps always have access
         if (userRole === 'admin') return hasPermission('manage_packages'); // Regular admins need permission
         return false;
@@ -38,7 +39,7 @@ const Sidebar = () => {
   const accessibleItems = navigationItems.filter((item) => {
     // Check custom access control first (for complex role/permission combinations)
     if (item.customCheck) {
-      return item.customCheck(user?.role, (perm) => permission.hasPermission(perm));
+      return item.customCheck(user?.role, user?.isSuperAdmin, (perm) => permission.hasPermission(perm));
     }
 
     // Check if user's role is in allowed roles

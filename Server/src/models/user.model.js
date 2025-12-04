@@ -194,24 +194,28 @@ userSchema.pre('save', async function hashPassword(next) {
 });
 
 // Ensure consistency between role and isSuperAdmin fields
+// FIXED: Only auto-adjust on EXPLICIT field modifications to prevent accidental downgrades
 userSchema.pre('save', function ensureRoleConsistency(next) {
-  // If role is changed away from superAdmin, reset isSuperAdmin flag and clear permissions
+  // ONLY if role is explicitly being changed FROM superAdmin, reset isSuperAdmin
+  // This prevents accidental role changes from affecting the superAdmin flag
   if (this.isModified('role') && this.role !== 'superAdmin' && this.isSuperAdmin) {
     this.isSuperAdmin = false;
-    // Clear permissions if demoting from superAdmin or if not an admin
+    // Clear permissions only for non-admin roles
     if (this.role !== 'admin') {
       this.permissions = [];
     }
   }
   
-  // If trying to set isSuperAdmin true, ensure role is superAdmin
-  if (this.isModified('isSuperAdmin') && this.isSuperAdmin && this.role !== 'superAdmin') {
-    this.role = 'superAdmin';
+  // If role is changed to superAdmin but isSuperAdmin is not explicitly set, set it
+  if (this.isModified('role') && this.role === 'superAdmin' && !this.isSuperAdmin) {
+    this.isSuperAdmin = true;
   }
   
-  // If demoting from superAdmin to admin, ensure canBeDeleted is true
-  if (this.isModified('role') && this.role !== 'superAdmin' && !this.isModified('canBeDeleted')) {
-    this.canBeDeleted = true;
+  // If demoting from superAdmin to non-superAdmin, ensure canBeDeleted is true
+  if (this.isModified('role') && this.role !== 'superAdmin') {
+    if (!this.isModified('canBeDeleted')) {
+      this.canBeDeleted = true;
+    }
   }
   
   next();

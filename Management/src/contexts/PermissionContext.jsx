@@ -125,8 +125,8 @@ export const PermissionProvider = ({ children }) => {
    */
   const hasPermission = useCallback(
     (permissionId) => {
-      // SuperAdmins have all permissions
-      if (user?.role === 'superAdmin') {
+      // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+      if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
         return true;
       }
 
@@ -147,8 +147,8 @@ export const PermissionProvider = ({ children }) => {
         return false;
       }
 
-      // SuperAdmins have all permissions
-      if (user?.role === 'superAdmin') {
+      // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+      if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
         return true;
       }
 
@@ -168,8 +168,8 @@ export const PermissionProvider = ({ children }) => {
         return false;
       }
 
-      // SuperAdmins have all permissions
-      if (user?.role === 'superAdmin') {
+      // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+      if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
         return true;
       }
 
@@ -183,8 +183,8 @@ export const PermissionProvider = ({ children }) => {
    * @returns {string[]} Array of role names user can manage
    */
   const getAccessibleRoles = useCallback(() => {
-    // SuperAdmins can manage all roles
-    if (user?.role === 'superAdmin') {
+    // FIXED: Check both role AND isSuperAdmin flag for proper role verification
+    if (user?.role === 'superAdmin' && user?.isSuperAdmin === true) {
       return ['customer', 'salesRep', 'vendor', 'admin'];
     }
 
