@@ -388,7 +388,7 @@ export const updateUser = asyncHandler(async (req, res, next) => {
     if (req.user.role === 'admin' || req.user.role === 'superAdmin') {
       if (role) {
         // Prevent downgrading superAdmin through regular update - must use demote endpoint
-        if (user.role === 'superAdmin' || user.isSuperAdmin) {
+        if (user.role === 'superAdmin') {
           return next(new AppError('Cannot modify superAdmin role through this endpoint. Use /admin/super/demote instead.', 403));
         }
 
@@ -696,7 +696,7 @@ export const assignUserRole = asyncHandler(async (req, res, next) => {
   }
 
   // Prevent downgrading superAdmin through this endpoint
-  if (user.role === 'superAdmin' || user.isSuperAdmin) {
+  if (user.role === 'superAdmin') {
     return next(new AppError('Cannot modify superAdmin role through this endpoint. Use /admin/super/demote instead.', 403));
   }
 

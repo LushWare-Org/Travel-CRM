@@ -13,7 +13,7 @@ import logger from '../config/logger.js';
 class ItineraryAnalyticsService {
   /**
    * Get overall itinerary analytics overview
-   * Includes total itineraries, inquiries, purchases, and hotel bookings
+   * Includes total published packages, inquiries, and conversions
    * @param {Object} filters - Filter options (timeRange, destination, category, etc.)
    * @returns {Promise<Object>} Analytics overview data
    */
@@ -21,58 +21,38 @@ class ItineraryAnalyticsService {
     try {
       const { timeRange = 'monthly', destination, category } = filters;
 
-      // Build query
-      const query = {};
+      // Build query - only published packages
+      const query = { status: 'published' };
       if (destination) query.destination = destination;
       if (category) query.category = category;
 
-      // Get total packages count (not itineraries)
+      // Get total published packages count
       const totalPackages = await Package.countDocuments(query);
 
-      // Get leads associated with packages for inquiries and purchases
-      const leads = await Lead.find()
-        .select('status currentItinerary package')
-        .populate('currentItinerary');
+      // Get published package IDs for filtering leads
+      const publishedPackageIds = (await Package.find({ status: 'published' }).select('_id')).map(p => p._id);
 
-      // Count inquiries (all leads with package reference)
-      const totalInquiries = leads.filter((lead) => lead.package).length;
+      // Count inquiries (leads with published packages only)
+      const totalInquiries = await Lead.countDocuments({
+        package: { $in: publishedPackageIds }
+      });
 
-      // Count purchases (converted leads with package)
-      const totalPurchases = leads.filter(
-        (lead) => lead.package && lead.status === 'converted'
-      ).length;
-
-      // Count hotel bookings from itineraries
-      const hotelBookings = await Itinerary.aggregate([
-        {
-          $unwind: '$days',
-        },
-        {
-          $match: {
-            'days.accommodation.name': { $exists: true, $ne: null },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            count: { $sum: 1 },
-          },
-        },
-      ]);
-
-      const totalHotels = hotelBookings[0]?.count || 0;
+      // Count conversions (converted leads with published packages)
+      const totalConversions = await Lead.countDocuments({
+        package: { $in: publishedPackageIds },
+        status: 'converted'
+      });
 
       // Calculate conversion rate
       const conversionRate = totalInquiries > 0
-        ? ((totalPurchases / totalInquiries) * 100).toFixed(2)
+        ? ((totalConversions / totalInquiries) * 100).toFixed(2)
         : 0;
 
       return {
         stats: {
           totalItineraries: totalPackages,
           totalInquiries,
-          totalPurchases,
-          totalHotels,
+          totalConversions,
           conversionRate: parseFloat(conversionRate),
         },
         trend: await this.getTrendData(timeRange),
@@ -84,22 +64,22 @@ class ItineraryAnalyticsService {
   }
 
   /**
-   * Get most inquired itineraries
+   * Get most inquired published packages
    * @param {number} limit - Number of results to return
-   * @returns {Promise<Array>} Top inquired itineraries
+   * @returns {Promise<Array>} Top inquired packages
    */
   static async getMostInquired(limit = 5) {
     try {
-      // Get all leads grouped by package/itinerary
+      // Get all leads with published packages grouped by package
       const leadAggregation = await Lead.aggregate([
         {
-          $match: { currentItinerary: { $exists: true, $ne: null } },
+          $match: { package: { $exists: true, $ne: null } },
         },
         {
           $group: {
-            _id: '$currentItinerary',
+            _id: '$package',
             inquiries: { $sum: 1 },
-            purchases: {
+            conversions: {
               $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
             },
           },
@@ -112,21 +92,22 @@ class ItineraryAnalyticsService {
         },
       ]);
 
-      // Populate itinerary and package details
+      // Populate package details
       const results = await Promise.all(
         leadAggregation.map(async (item) => {
-          const itinerary = await Itinerary.findById(item._id)
-            .populate('package', 'name destination price rating');
+          const pkg = await Package.findById(item._id)
+            .select('name destination price rating status');
 
-          if (!itinerary || !itinerary.package) {
+          // Only include published packages
+          if (!pkg || pkg.status !== 'published') {
             return null;
           }
 
           return {
-            name: itinerary.package.name,
+            name: pkg.name,
             inquiries: item.inquiries,
-            purchases: item.purchases,
-            rating: itinerary.package.rating || 4.5,
+            conversions: item.conversions,
+            rating: pkg.rating || 4.5,
           };
         })
       );
@@ -139,13 +120,16 @@ class ItineraryAnalyticsService {
   }
 
   /**
-   * Get destination performance
+   * Get destination performance from published packages
    * @param {number} limit - Number of results to return
    * @returns {Promise<Array>} Top destinations
    */
   static async getDestinationPerformance(limit = 5) {
     try {
       const destinations = await Package.aggregate([
+        {
+          $match: { status: 'published' },
+        },
         {
           $group: {
             _id: '$destination',
@@ -161,28 +145,38 @@ class ItineraryAnalyticsService {
         },
       ]);
 
-      // Enrich with inquiry and purchase data
+      // Enrich with inquiry and conversion data from leads
       const enriched = await Promise.all(
         destinations.map(async (dest) => {
+          // Find published packages for this destination
+          const packagesForDestination = await Package.find({ 
+            destination: dest._id,
+            status: 'published',
+          }).select('_id');
+          
+          const packageIds = packagesForDestination.map(p => p._id);
+
+          // Count leads that reference these packages
           const leads = await Lead.countDocuments({
-            'package.destination': dest._id,
+            package: { $in: packageIds }
           });
 
-          const purchases = await Lead.countDocuments({
-            'package.destination': dest._id,
+          const conversions = await Lead.countDocuments({
+            package: { $in: packageIds },
             status: 'converted',
           });
 
           return {
-            destination: dest._id,
+            destination: dest._id || 'Unknown',
             inquiries: leads || 0,
-            purchases: purchases || 0,
+            conversions: conversions || 0,
             avgPrice: Math.round(dest.avgPrice || 0),
+            totalPackages: dest.totalPackages || 0,
           };
         })
       );
 
-      return enriched;
+      return enriched.filter(item => item.destination !== 'Unknown');
     } catch (error) {
       logger.error('Error in getDestinationPerformance:', error);
       throw error;
@@ -194,10 +188,21 @@ class ItineraryAnalyticsService {
    * @param {number} limit - Number of results to return
    * @returns {Promise<Array>} Top activities
    */
+  /**
+   * Get activity preferences from published packages
+   * @param {number} limit - Number of results to return
+   * @returns {Promise<Array>} Top activities
+   */
   static async getActivityPreferences(limit = 5) {
     try {
-      // Aggregate activities from itineraries
+      // Get published package IDs
+      const publishedPackageIds = (await Package.find({ status: 'published' }).select('_id')).map(p => p._id);
+
+      // Aggregate activities from published itineraries only
       const activities = await Itinerary.aggregate([
+        {
+          $match: { package: { $in: publishedPackageIds } },
+        },
         {
           $unwind: '$days',
         },
@@ -218,11 +223,16 @@ class ItineraryAnalyticsService {
         },
       ]);
 
-      // Map activities with inquiry and purchase counts
-      const result = activities.map((activity, idx) => ({
-        name: activity._id || `Activity ${idx + 1}`,
+      // Get conversion ratio from published packages
+      const totalPublishedInquiries = await Lead.countDocuments({ package: { $in: publishedPackageIds } });
+      const totalPublishedConversions = await Lead.countDocuments({ package: { $in: publishedPackageIds }, status: 'converted' });
+      const conversionRatio = totalPublishedInquiries > 0 ? totalPublishedConversions / totalPublishedInquiries : 0;
+
+      // Map activities with inquiry and actual conversion counts
+      const result = activities.map((activity) => ({
+        name: activity._id || 'Activity',
         inquiries: activity.count,
-        purchases: Math.round(activity.count * 0.6), // Estimate 60% conversion
+        conversions: Math.round(activity.count * conversionRatio),
       }));
 
       return result;
@@ -302,11 +312,15 @@ class ItineraryAnalyticsService {
         startDate.setDate(now.getDate() - 1); // Daily
       }
 
-      // Get leads created in the time range
+      // Get published package IDs
+      const publishedPackageIds = (await Package.find({ status: 'published' }).select('_id')).map(p => p._id);
+
+      // Get leads created in the time range for published packages only
       const trendData = await Lead.aggregate([
         {
           $match: {
             createdAt: { $gte: startDate, $lte: now },
+            package: { $in: publishedPackageIds },
           },
         },
         {
@@ -316,7 +330,7 @@ class ItineraryAnalyticsService {
               year: { $year: '$createdAt' },
             },
             inquiries: { $sum: 1 },
-            purchases: {
+            conversions: {
               $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
             },
           },
@@ -330,8 +344,7 @@ class ItineraryAnalyticsService {
       return trendData.map((item) => ({
         month: months[item._id.month - 1] || 'Unknown',
         inquiries: item.inquiries,
-        purchases: item.purchases,
-        hotels: Math.round(item.purchases * 0.95), // Most purchases include hotels
+        conversions: item.conversions,
       }));
     } catch (error) {
       logger.error('Error in getTrendData:', error);

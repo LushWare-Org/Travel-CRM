@@ -38,6 +38,7 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
         avatar: user.avatar,
         isEmailVerified: user.isEmailVerified,
         mustChangePassword: user.mustChangePassword,
+        permissions: user.permissions || [], // Include permissions array for granular permission checks
       },
     },
   });

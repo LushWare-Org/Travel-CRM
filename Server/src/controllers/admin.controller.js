@@ -8,6 +8,40 @@ import logger from '../config/logger.js';
 // Generate temporary password
 const generateTempPassword = () => crypto.randomBytes(8).toString('hex'); // 16 character hex string
 
+/**
+ * Check if admin has permission to manage a specific role
+ * @param {Object} requestingAdmin - The admin making the request
+ * @param {String} targetRole - The role being managed (admin, vendor, salesRep)
+ * @throws {AppError} If admin lacks permission
+ */
+const checkAdminPermissionForRole = (requestingAdmin, targetRole) => {
+  // SuperAdmin has all permissions
+  if (requestingAdmin.role === 'superAdmin') {
+    return;
+  }
+
+  // If admin has granular permissions, check them
+  if (requestingAdmin.role === 'admin' && requestingAdmin.permissions && requestingAdmin.permissions.length > 0) {
+    const permissionMap = {
+      admin: 'manage_admins',
+      vendor: 'manage_vendors',
+      salesRep: 'manage_sales_reps',
+      customer: 'manage_users',
+    };
+
+    const requiredPermission = permissionMap[targetRole];
+    if (requiredPermission && !requestingAdmin.permissions.includes(requiredPermission)) {
+      logger.warn(
+        `Unauthorized action attempt: ${requestingAdmin.email} lacks '${requiredPermission}' permission to manage ${targetRole}`,
+      );
+      throw new AppError(
+        `You do not have permission to manage ${targetRole} accounts. Required permission: ${requiredPermission}`,
+        403,
+      );
+    }
+  }
+};
+
 // @desc    Create sales rep or vendor (admin only)
 // @route   POST /api/v1/admin/users
 // @access  Private/Admin
@@ -20,6 +54,9 @@ export const createStaff = asyncHandler(async (req, res, next) => {
   if (!['salesRep', 'vendor', 'admin'].includes(role)) {
     throw new AppError('Invalid role. Only salesRep, vendor, and admin can be created through this endpoint', 400);
   }
+
+  // PERMISSION CHECK: Enforce granular permissions for admins
+  checkAdminPermissionForRole(req.user, role);
 
   // Check if user already exists
   const existingUser = await User.findOne({ email });
@@ -100,8 +137,41 @@ export const getAllUsers = asyncHandler(async (req, res, next) => {
 
   const query = {};
 
-  // Filter by role
-  if (role) {
+  // PERMISSION-BASED FILTERING: If admin has granular permissions, filter by accessible roles
+  if (req.user.role === 'admin' && req.user.permissions && req.user.permissions.length > 0) {
+    const accessibleRoles = [];
+    if (req.user.permissions.includes('manage_users')) accessibleRoles.push('customer');
+    if (req.user.permissions.includes('manage_sales_reps')) accessibleRoles.push('salesRep');
+    if (req.user.permissions.includes('manage_vendors')) accessibleRoles.push('vendor');
+    if (req.user.permissions.includes('manage_admins')) accessibleRoles.push('admin');
+
+    // If admin has no permissions, return empty list
+    if (accessibleRoles.length === 0) {
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          users: [],
+          pagination: {
+            total: 0,
+            page: parseInt(page, 10),
+            pages: 0,
+            limit: parseInt(limit, 10),
+          },
+        },
+      });
+    }
+
+    // Only allow filtering by accessible roles
+    if (role && !accessibleRoles.includes(role)) {
+      return res.status(403).json({
+        status: 'error',
+        message: `You do not have permission to view ${role} users`,
+      });
+    }
+
+    query.role = role || { $in: accessibleRoles };
+  } else if (role) {
+    // SuperAdmin can filter by any role
     query.role = role;
   }
 
@@ -121,7 +191,7 @@ export const getAllUsers = asyncHandler(async (req, res, next) => {
   const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
   const users = await User.find(query)
-    .select('name email phone role isActive createdAt lastLogin permissions createdBy')
+    .select('name email phone phoneCountry role isActive createdAt lastLogin permissions createdBy')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(parseInt(limit, 10))
@@ -155,6 +225,9 @@ export const getUserById = asyncHandler(async (req, res, next) => {
     throw new AppError('User not found', 404);
   }
 
+  // PERMISSION CHECK: Verify access to user's role
+  checkAdminPermissionForRole(req.user, user.role);
+
   res.status(200).json({
     status: 'success',
     data: {
@@ -175,14 +248,22 @@ export const updateUserStatus = asyncHandler(async (req, res, next) => {
     throw new AppError('User not found', 404);
   }
 
+  // PERMISSION CHECK: Verify access to user's role
+  checkAdminPermissionForRole(req.user, user.role);
+
   // Prevent deactivating own account
   if (user._id.toString() === req.user.id.toString()) {
     throw new AppError('You cannot deactivate your own account', 400);
   }
 
-  // Prevent deactivating other admins
-  if (user.role === 'admin') {
+  // Prevent deactivating other admins (unless current user is super admin)
+  if (user.role === 'admin' && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot deactivate admin accounts', 403);
+  }
+
+  // Prevent deactivating super admins
+  if (user.role === 'superAdmin') {
+    throw new AppError('Cannot deactivate super admin accounts', 403);
   }
 
   user.isActive = isActive;
@@ -214,9 +295,17 @@ export const resetUserPassword = asyncHandler(async (req, res, next) => {
     throw new AppError('User not found', 404);
   }
 
-  // Prevent resetting other admin passwords
-  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString()) {
+  // PERMISSION CHECK: Verify access to user's role
+  checkAdminPermissionForRole(req.user, user.role);
+
+  // Prevent resetting other admin passwords (unless current user is super admin)
+  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString() && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot reset other admin passwords', 403);
+  }
+
+  // Prevent resetting super admin passwords (only super admin themselves can reset)
+  if (user.role === 'superAdmin' && user._id.toString() !== req.user.id.toString()) {
+    throw new AppError('Only the super admin can reset their own password', 403);
   }
 
   // Generate new temporary password
@@ -263,13 +352,16 @@ export const updateUser = asyncHandler(async (req, res, next) => {
     throw new AppError('User not found', 404);
   }
 
-  // Prevent updating admin details (except self)
-  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString()) {
+  // PERMISSION CHECK: Verify access to user's role
+  checkAdminPermissionForRole(req.user, user.role);
+
+  // Prevent updating admin details (except self or if current user is super admin)
+  if (user.role === 'admin' && user._id.toString() !== req.user.id.toString() && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot update other admin accounts', 403);
   }
 
   // Prevent updating superAdmin details (only superAdmin themselves can update)
-  if ((user.role === 'superAdmin' || user.isSuperAdmin) && user._id.toString() !== req.user.id.toString()) {
+  if (user.role === 'superAdmin' && user._id.toString() !== req.user.id.toString()) {
     throw new AppError('Only the super admin can update their own details', 403);
   }
 
@@ -309,18 +401,21 @@ export const deleteUser = asyncHandler(async (req, res, next) => {
     throw new AppError('User not found', 404);
   }
 
+  // PERMISSION CHECK: Verify access to user's role
+  checkAdminPermissionForRole(req.user, user.role);
+
   // Prevent deleting own account
   if (user._id.toString() === req.user.id.toString()) {
     throw new AppError('You cannot delete your own account', 400);
   }
 
-  // Prevent deleting other admins
-  if (user.role === 'admin') {
+  // Prevent deleting other admins (unless current user is super admin)
+  if (user.role === 'admin' && req.user.role !== 'superAdmin') {
     throw new AppError('Cannot delete admin accounts', 403);
   }
 
   // Prevent deleting superAdmins
-  if (user.role === 'superAdmin' || user.isSuperAdmin) {
+  if (user.role === 'superAdmin') {
     throw new AppError('Super admin accounts cannot be deleted. Only super admins can demote themselves.', 403);
   }
 
@@ -399,7 +494,12 @@ export const updateAdminPermissions = asyncHandler(async (req, res, next) => {
 
   // Prevent modifying own permissions
   if (user._id.toString() === req.user.id.toString()) {
-    throw new AppError('You cannot modify your own permissions', 400);
+    throw new AppError('You cannot modify your own permissions', 403);
+  }
+
+  // Only super admins can modify admin permissions
+  if (req.user.role !== 'superAdmin') {
+    throw new AppError('Only super admins can modify admin permissions', 403);
   }
 
   const validPermissions = [
@@ -409,8 +509,8 @@ export const updateAdminPermissions = asyncHandler(async (req, res, next) => {
     'manage_admins',
     'view_reports',
     'manage_billing',
-    'system_settings',
-    'audit_log',
+    'manage_leads',
+    'manage_packages',
   ];
 
   // Validate all permissions
@@ -478,8 +578,8 @@ export const getAvailablePermissions = asyncHandler(async (req, res, next) => {
     { id: 'manage_admins', label: 'Manage Admins', category: 'System', description: 'Create and manage administrator accounts' },
     { id: 'view_reports', label: 'View Reports', category: 'Analytics', description: 'Access business reports and analytics' },
     { id: 'manage_billing', label: 'Manage Billing', category: 'Finance', description: 'Handle billing and payment operations' },
-    { id: 'system_settings', label: 'System Settings', category: 'System', description: 'Configure system-wide settings' },
-    { id: 'audit_log', label: 'View Audit Logs', category: 'System', description: 'View system audit logs and activity' },
+    { id: 'manage_leads', label: 'Manage Leads', category: 'Sales', description: 'Manage sales leads and lead assignments' },
+    { id: 'manage_packages', label: 'Manage Packages', category: 'Travel', description: 'Manage travel packages and itineraries' },
   ];
 
   res.status(200).json({
@@ -534,8 +634,8 @@ export const promoteSuperAdmin = asyncHandler(async (req, res, next) => {
     'manage_admins',
     'view_reports',
     'manage_billing',
-    'system_settings',
-    'audit_log',
+    'manage_leads',
+    'manage_packages',
   ];
 
   await userToPromote.save();

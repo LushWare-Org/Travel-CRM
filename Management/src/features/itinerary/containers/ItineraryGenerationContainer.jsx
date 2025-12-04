@@ -9,6 +9,7 @@ import Swal from 'sweetalert2';
 
 // Hooks
 import { usePackageState, useItineraryForm, useImageUpload } from '../hooks';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Components
 import {
@@ -42,7 +43,9 @@ import { SAMPLE_PACKAGES } from './sampleData';
 
 const ItineraryGenerationContainer = () => {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState(null); // null = all, 'draft', 'published', 'archived'
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [showNewPackageDialog, setShowNewPackageDialog] = useState(false);
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
@@ -55,6 +58,9 @@ const ItineraryGenerationContainer = () => {
     packageData: null,
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Check if user is a salesRep (read-only access)
+  const isSalesRep = user?.role === 'salesRep';
 
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(
@@ -73,7 +79,13 @@ const ItineraryGenerationContainer = () => {
   } = useImageUpload();
 
   // Filter packages
-  const filteredPackages = filterPackages(packages, searchTerm);
+  let filteredPackages = filterPackages(packages, searchTerm);
+  
+  // Apply status filter if one is selected
+  if (statusFilter) {
+    filteredPackages = filteredPackages.filter(pkg => pkg.status === statusFilter);
+  }
+  
   const stats = calculatePackageStats(packages);
 
   /**
@@ -82,7 +94,12 @@ const ItineraryGenerationContainer = () => {
   useEffect(() => {
     const loadPackages = async () => {
       try {
-        const response = await ApiService.getPackages();
+        // For salesReps, use the protected endpoint which will automatically filter published packages
+        // For other roles, use the standard endpoint
+        const response = isSalesRep 
+          ? await ApiService.getPackagesProtected()
+          : await ApiService.getPackages();
+        
         if (response.success && Array.isArray(response.data)) {
           setPackages(response.data);
         }
@@ -93,10 +110,16 @@ const ItineraryGenerationContainer = () => {
     };
 
     loadPackages();
-  }, []);
+  }, [isSalesRep]);
 
   // Handlers
   const handleNewPackageDialogOpen = () => {
+    // Prevent salesReps from creating new packages
+    if (isSalesRep) {
+      Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
+      return;
+    }
+    
     setNewFormData(createDefaultPackage());
     setImages([]);
     setShowNewPackageDialog(true);
@@ -107,6 +130,12 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleEditPackage = (pkg) => {
+    // Prevent salesReps from editing packages
+    if (isSalesRep) {
+      Swal.fire('Access Denied', 'Sales Representatives do not have permission to edit packages.', 'info');
+      return;
+    }
+
     console.log('[DEBUG] Edit package clicked. Package object:', pkg);
     console.log('[DEBUG] Package _id:', pkg._id, 'Package id:', pkg.id);
     console.log('[DEBUG] Package images:', pkg.images);
@@ -146,6 +175,10 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveNewPackage = async (formData) => {
     try {
+      // Debug: Log incoming status
+      console.log('[Container] handleSaveNewPackage called');
+      console.log('[Container] formData.status:', formData.status);
+      
       // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -233,6 +266,7 @@ const ItineraryGenerationContainer = () => {
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
         days: cleanDays, // Use cleaned days
         images: validImages, // Use only valid images (no temp blobs)
+        status: formData.status || 'draft', // Explicitly preserve status
       };
 
       // Remove _id field for new packages (should not be included in POST request)
@@ -242,6 +276,7 @@ const ItineraryGenerationContainer = () => {
       delete sanitizedData.__v;
 
       console.log('[DEBUG] ==> SAVING PACKAGE <==');
+      console.log('[DEBUG] Status:', sanitizedData.status);
       console.log('[DEBUG] Valid images to save:', validImages);
       console.log('[DEBUG] Images count:', validImages?.length);
       console.log('[DEBUG] First image:', validImages?.[0]);
@@ -251,8 +286,8 @@ const ItineraryGenerationContainer = () => {
       const response = await ApiService.createPackage(sanitizedData);
 
       if (response.success) {
-        // Update local state with the newly created package from API
-        setPackages((prev) => [...prev, response.data]);
+        // Add newly created package to the top of the list
+        setPackages((prev) => [response.data, ...prev]);
         setShowNewPackageDialog(false);
         setNewFormData(createDefaultPackage());
         setImages([]);
@@ -288,6 +323,10 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveEditPackage = async (formData) => {
     try {
+      // Debug: Log incoming status
+      console.log('[Container] handleSaveEditPackage called');
+      console.log('[Container] formData.status:', formData.status);
+      
       // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -388,6 +427,7 @@ const ItineraryGenerationContainer = () => {
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1,
         days: cleanDays, // Use cleaned days
         images: validImages, // Use only valid images (no temp blobs)
+        status: formData.status || 'draft', // Explicitly preserve status
       };
 
       // Remove internal fields that should not be updated
@@ -399,6 +439,7 @@ const ItineraryGenerationContainer = () => {
       delete sanitizedData.slug; // Let backend regenerate if needed
 
       console.log('[DEBUG] ==> UPDATING PACKAGE <==');
+      console.log('[DEBUG] Status:', sanitizedData.status);
       console.log('[DEBUG] Valid images to save:', validImages);
       console.log('[DEBUG] Images count:', validImages?.length);
       console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
@@ -490,6 +531,12 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleDuplicatePackage = (pkg) => {
+    // Prevent salesReps from duplicating packages
+    if (isSalesRep) {
+      Swal.fire('Access Denied', 'Sales Representatives do not have permission to duplicate packages.', 'info');
+      return;
+    }
+
     Swal.fire({
       title: `Duplicate ${pkg.name}?`,
       text: 'This will create a copy of the package.',
@@ -517,7 +564,7 @@ const ItineraryGenerationContainer = () => {
           const response = await ApiService.createPackage(duplicateData);
 
           if (response.success) {
-            setPackages((prev) => [...prev, response.data]);
+            setPackages((prev) => [response.data, ...prev]);
             Swal.fire('Success', `${pkg.name} has been duplicated successfully.`, 'success');
           } else {
             Swal.fire('Error', response.message || 'Failed to duplicate package', 'error');
@@ -617,7 +664,11 @@ const ItineraryGenerationContainer = () => {
 
       {/* Stats */}
       <div className="bg-white border-b border-gray-200 px-8 py-4">
-        <PackageStats stats={stats} />
+        <PackageStats 
+          stats={stats} 
+          onFilterChange={setStatusFilter}
+          activeFilter={statusFilter}
+        />
       </div>
 
       {/* Content */}

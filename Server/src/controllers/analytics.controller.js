@@ -1,5 +1,8 @@
 import Lead from '../models/lead.model.js';
 import Invoice from '../models/invoice.model.js';
+import Booking from '../models/booking.model.js';
+import Itinerary from '../models/itinerary.model.js';
+import Package from '../models/package.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { COUNTRY_NAMES, normalizeString } from '../utils/countryUtils.js';
 import ItineraryAnalyticsService from '../services/itineraryAnalytics.service.js';
@@ -791,6 +794,11 @@ export const getBillingAnalyticsOverview = asyncHandler(async (req, res) => {
  * Get Package Analytics Overview
  * Returns comprehensive analytics for packages including trends, performance metrics
  */
+/**
+ * Get Package Analytics Overview
+ * Returns comprehensive analytics for published packages including trends, performance metrics
+ * Shows inquiries (leads with published packages) and conversions (lead conversions)
+ */
 export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
   const { timeRange = 'monthly' } = req.query;
 
@@ -809,9 +817,6 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
     // Get activity preferences
     const activityPreferences = await ItineraryAnalyticsService.getActivityPreferences(5);
 
-    // Get hotel preferences
-    const hotelPreferences = await ItineraryAnalyticsService.getHotelPreferences(4);
-
     return res.status(200).json({
       success: true,
       data: {
@@ -822,7 +827,6 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
         mostInquired,
         destinationPerformance,
         activityPreferences,
-        hotelPreferences,
       },
     });
   } catch (error) {
@@ -931,7 +935,7 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
 
     // 4. Users with Bookings (Conversion)
     const usersWithBookings = await Booking.countDocuments();
-    const conversionRate = totalUsers > 0 ? ((usersWithBookings / totalUsers) * 100).toFixed(2) : 0;
+    const conversionRate = totalUsers > 0 ? parseFloat(((usersWithBookings / totalUsers) * 100).toFixed(2)) : 0;
 
     // 5. Average Users Per Time Period
     const avgNewUsersPerPeriod = trendData.length > 0
@@ -1016,6 +1020,462 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
       error: error.message,
     });
   }
+});
+
+/**
+ * Get SalesRep Personal Performance Analytics
+ * Returns personal performance metrics for the logged-in sales representative
+ * @route GET /api/v1/analytics/salesreps/me/performance
+ * @access Private/SalesRep
+ * @query timeRange - 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
+ */
+export const getSalesRepPersonalPerformance = asyncHandler(async (req, res) => {
+  // Verify user is a sales rep
+  if (req.user.role !== 'salesRep') {
+    return res.status(403).json({
+      success: false,
+      message: 'This endpoint is only accessible to sales representatives',
+    });
+  }
+
+  const timeRange = clampTimeRange(req.query.timeRange);
+  const buckets = buildTimeBuckets(timeRange);
+  const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
+  const groupId = buildGroupId(timeRange);
+  const salesRepId = req.user._id;
+
+  try {
+    // Get trend data for assigned leads
+    const trendAggregation = await Lead.aggregate([
+      {
+        $match: {
+          assignedTo: salesRepId,
+          createdAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: groupId,
+          total: { $sum: 1 },
+          converted: {
+            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          },
+          contacted: {
+            $sum: { $cond: [{ $eq: ['$status', 'contacted'] }, 1, 0] },
+          },
+          interested: {
+            $sum: { $cond: [{ $eq: ['$status', 'interested'] }, 1, 0] },
+          },
+          new: {
+            $sum: { $cond: [{ $eq: ['$status', 'new'] }, 1, 0] },
+          },
+        },
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    ]);
+
+    // Map trend data to time buckets
+    const trendMap = new Map();
+    trendAggregation.forEach((item) => {
+      const key = buildTrendKey(timeRange, item._id);
+      trendMap.set(key, item);
+    });
+
+    const trendData = buckets.map((bucket) => {
+      const key = buildBucketKey(timeRange, bucket);
+      const item = trendMap.get(key);
+      const assigned = item?.total || 0;
+      const converted = item?.converted || 0;
+      const conversionRate = assigned > 0 ? Math.round((converted / assigned) * 100) : 0;
+
+      return {
+        label: bucket.label,
+        assigned,
+        converted,
+        conversionRate,
+        contacted: item?.contacted || 0,
+        interested: item?.interested || 0,
+      };
+    });
+
+    // Get overall statistics
+    const allLeadsAggregation = await Lead.aggregate([
+      { $match: { assignedTo: salesRepId } },
+      {
+        $facet: {
+          stats: [
+            {
+              $group: {
+                _id: null,
+                totalAssignedLeads: { $sum: 1 },
+                totalConvertedLeads: {
+                  $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+                },
+              },
+            },
+          ],
+          statusDistribution: [
+            {
+              $group: {
+                _id: '$status',
+                count: { $sum: 1 },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const detailed = allLeadsAggregation?.[0] || {};
+    const statsData = detailed.stats?.[0] || { totalAssignedLeads: 0, totalConvertedLeads: 0 };
+    const statusData = detailed.statusDistribution || [];
+
+    const totalAssignedLeads = statsData.totalAssignedLeads || 0;
+    const totalConvertedLeads = statsData.totalConvertedLeads || 0;
+    const conversionRate = totalAssignedLeads > 0 
+      ? parseFloat(((totalConvertedLeads / totalAssignedLeads) * 100).toFixed(2))
+      : 0;
+
+    // Calculate estimated earnings based on commission rate
+    const commissionRate = req.user.commissionRate || 5;
+    const estimatedEarnings = Math.round(totalConvertedLeads * (commissionRate * 1000));
+
+    // Map status distribution
+    const statusDistribution = statusData.map((item) => ({
+      status: item._id || 'unknown',
+      name: STATUS_LABELS[item._id] || item._id,
+      count: item.count || 0,
+    }));
+
+    const stats = {
+      totalAssignedLeads,
+      totalConvertedLeads,
+      conversionRate,
+      estimatedEarnings,
+      commissionRate,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        timeRange,
+        generatedAt: new Date().toISOString(),
+        stats,
+        trend: trendData,
+        statusDistribution,
+      },
+    });
+  } catch (error) {
+    console.error('SalesRep performance analytics error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching sales rep performance analytics',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Get Website Analytics Overview
+ * Returns comprehensive website analytics including lead trends, destination analysis, activity preferences
+ * Shows actual lead inquiries (searches), bookings (conversions), and customer preferences
+ * @route GET /api/v1/analytics/website/overview
+ * @access Private/Admin
+ * @query timeRange - 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
+ */
+export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
+  const timeRange = clampTimeRange(req.query.timeRange);
+  const buckets = buildTimeBuckets(timeRange);
+  const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
+
+  const groupId = buildGroupId(timeRange);
+
+  // Get lead trends (inquiries) and booking data
+  const leadTrendAggregation = await Lead.aggregate([
+    { $match: { createdAt: { $gte: startDate } } },
+    {
+      $group: {
+        _id: groupId,
+        searches: { $sum: 1 }, // Total leads created = searches/inquiries
+        conversions: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'converted'] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+  ]);
+
+  // Get booking data (actual conversions)
+  const bookingTrendAggregation = await Booking.aggregate([
+    { $match: { createdAt: { $gte: startDate } } },
+    {
+      $group: {
+        _id: groupId,
+        bookings: { $sum: 1 },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+  ]);
+
+  // Create trend maps
+  const leadTrendMap = new Map();
+  leadTrendAggregation.forEach((item) => {
+    const key = buildTrendKey(timeRange, item._id);
+    leadTrendMap.set(key, item);
+  });
+
+  const bookingTrendMap = new Map();
+  bookingTrendAggregation.forEach((item) => {
+    const key = buildTrendKey(timeRange, item._id);
+    bookingTrendMap.set(key, item);
+  });
+
+  const trendData = buckets.map((bucket) => {
+    const key = buildBucketKey(timeRange, bucket);
+    const leadItem = leadTrendMap.get(key);
+    const bookingItem = bookingTrendMap.get(key);
+
+    return {
+      label: bucket.label,
+      searches: leadItem?.searches ?? 0,
+      conversions: bookingItem?.bookings ?? 0,
+    };
+  });
+
+  // Get destination analysis with package lookup
+  const destinationAggregation = await Lead.aggregate([
+    {
+      $lookup: {
+        from: 'packages',
+        localField: 'package',
+        foreignField: '_id',
+        as: 'packageData',
+      },
+    },
+    {
+      $lookup: {
+        from: 'customizedpackages',
+        localField: 'customizedPackage',
+        foreignField: '_id',
+        as: 'customizedData',
+      },
+    },
+    {
+      $addFields: {
+        effectiveDestination: {
+          $ifNull: [
+            '$destination',
+            {
+              $ifNull: [
+                { $arrayElemAt: ['$customizedData.destination', 0] },
+                { $arrayElemAt: ['$packageData.destination', 0] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $match: { effectiveDestination: { $exists: true, $ne: null } } },
+    {
+      $group: {
+        _id: '$effectiveDestination',
+        searches: { $sum: 1 },
+        conversions: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'converted'] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { searches: -1 } },
+    { $limit: 10 },
+  ]);
+
+  const topDestinations = destinationAggregation.map((item) => ({
+    destination: item._id || 'Unknown',
+    searches: item.searches,
+    conversions: item.conversions,
+    conversionRate: item.searches > 0 ? parseFloat(((item.conversions / item.searches) * 100).toFixed(1)) : 0,
+  }));
+
+  // Get activity preferences from itineraries
+  const activityAggregation = await Itinerary.aggregate([
+    { $unwind: '$days' },
+    { $unwind: '$days.activities' },
+    { $match: { 'days.activities': { $exists: true, $ne: '' } } },
+    {
+      $group: {
+        _id: '$days.activities',
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+    { $limit: 10 },
+  ]);
+
+  const activityPreferences = activityAggregation.map((item) => ({
+    name: item._id,
+    value: item.count,
+  }));
+
+  // Get accommodation types from itineraries
+  const accommodationAggregation = await Itinerary.aggregate([
+    { $unwind: '$days' },
+    { $match: { 'days.accommodation.type': { $exists: true, $ne: null } } },
+    {
+      $group: {
+        _id: '$days.accommodation.type',
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+  ]);
+
+  const accommodationTypes = accommodationAggregation.map((item) => ({
+    name: item._id ? item._id.charAt(0).toUpperCase() + item._id.slice(1) : 'Other',
+    value: item.count,
+  }));
+
+  // Get duration preferences
+  const durationAggregation = await Lead.aggregate([
+    { $match: { package: { $exists: true, $ne: null } } },
+    {
+      $lookup: {
+        from: 'packages',
+        localField: 'package',
+        foreignField: '_id',
+        as: 'packageData',
+      },
+    },
+    { $unwind: '$packageData' },
+    {
+      $group: {
+        _id: '$packageData.duration',
+        searches: { $sum: 1 },
+        bookings: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'converted'] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const durationData = durationAggregation
+    .map((item) => {
+      let durationLabel = 'Unknown';
+      if (item._id) {
+        durationLabel = item._id <= 5 ? '3-5 Days' : item._id <= 7 ? '5-7 Days' : item._id <= 10 ? '7-10 Days' : item._id <= 14 ? '10-14 Days' : '14+ Days';
+      }
+      return {
+        duration: durationLabel,
+        searches: item.searches,
+        bookings: item.bookings,
+      };
+    })
+    .filter((item, index, arr) => arr.findIndex((x) => x.duration === item.duration) === index); // Remove duplicates by duration label
+
+  // Get price range distribution
+  const priceAggregation = await Lead.aggregate([
+    {
+      $lookup: {
+        from: 'packages',
+        localField: 'package',
+        foreignField: '_id',
+        as: 'packageData',
+      },
+    },
+    {
+      $lookup: {
+        from: 'customizedpackages',
+        localField: 'customizedPackage',
+        foreignField: '_id',
+        as: 'customizedData',
+      },
+    },
+    {
+      $addFields: {
+        effectivePrice: {
+          $cond: [
+            { $and: [{ $arrayElemAt: ['$customizedData.price', 0] }, { $gt: [{ $arrayElemAt: ['$customizedData.price', 0] }, 0] }] },
+            { $arrayElemAt: ['$customizedData.price', 0] },
+            {
+              $cond: [
+                { $and: [{ $arrayElemAt: ['$packageData.price', 0] }, { $gt: [{ $arrayElemAt: ['$packageData.price', 0] }, 0] }] },
+                { $arrayElemAt: ['$packageData.price', 0] },
+                { $cond: [{ $and: ['$quoteAmount', { $gt: ['$quoteAmount', 0] }] }, '$quoteAmount', null] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $match: { effectivePrice: { $exists: true, $ne: null } } },
+    {
+      $project: {
+        priceBucket: {
+          $switch: {
+            branches: [
+              { case: { $lt: ['$effectivePrice', 50000] }, then: 'Below ₹50K' },
+              { case: { $lt: ['$effectivePrice', 200000] }, then: '₹50K-₹2L' },
+              { case: { $lt: ['$effectivePrice', 500000] }, then: '₹2L-₹5L' },
+              { case: { $lt: ['$effectivePrice', 1000000] }, then: '₹5L-₹10L' },
+              { case: { $lt: ['$effectivePrice', 2500000] }, then: '₹10L-₹25L' },
+            ],
+            default: '₹25L+',
+          },
+        },
+      },
+    },
+    {
+      $group: {
+        _id: '$priceBucket',
+        searches: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const priceRanges = priceAggregation.map((item) => ({
+    range: item._id,
+    searches: item.searches,
+  }));
+
+  // Calculate overall stats
+  const totalLeads = await Lead.countDocuments();
+  const totalBookings = await Booking.countDocuments();
+  const uniqueDestinations = await Lead.distinct('destination');
+  const uniqueActivities = activityAggregation.length;
+  const convertedLeads = await Lead.countDocuments({ status: 'converted' });
+
+  const stats = {
+    totalSearches: totalLeads,
+    totalBookings: totalBookings,
+    uniqueDestinations: uniqueDestinations.filter((d) => d !== null && d !== undefined).length,
+    uniqueActivities: uniqueActivities,
+    conversionRate:
+      totalLeads > 0
+        ? parseFloat(((convertedLeads / totalLeads) * 100).toFixed(2))
+        : 0,
+  };
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      timeRange,
+      generatedAt: new Date().toISOString(),
+      stats,
+      trend: trendData,
+      topDestinations,
+      activityPreferences,
+      accommodationTypes,
+      durationPreferences: durationData,
+      priceRanges,
+    },
+  });
 });
 
 

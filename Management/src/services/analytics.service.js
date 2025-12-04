@@ -84,6 +84,48 @@ class AnalyticsService {
       throw error;
     }
   }
+
+  /**
+   * Get SalesRep Personal Performance
+   */
+  static async getSalesRepPerformance(timeRange = 'monthly') {
+    try {
+      const response = await ApiService.fetch(
+        `/analytics/salesreps/me/performance?timeRange=${timeRange}`,
+        { method: 'GET' }
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch salesrep performance');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching salesrep performance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get Website Analytics Overview
+   */
+  static async getWebsiteAnalyticsOverview(timeRange = 'monthly') {
+    try {
+      const response = await ApiService.fetch(
+        `/analytics/website/overview?timeRange=${timeRange}`,
+        { method: 'GET' }
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch website analytics');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching website analytics:', error);
+      throw error;
+    }
+  }
 }
 
 export default AnalyticsService;

@@ -29,14 +29,12 @@ export const STATUS_COLORS = {
 };
 
 export const VENDOR_TYPE_COLORS = {
-  Hotel: 'bg-indigo-100 text-indigo-800',
-  'Travel Agent': 'bg-teal-100 text-teal-800',
-  Resort: 'bg-cyan-100 text-cyan-800',
-  Restaurant: 'bg-amber-100 text-amber-800',
-  'Car Rental': 'bg-rose-100 text-rose-800',
-  'Tour Operator': 'bg-lime-100 text-lime-800',
-  Airline: 'bg-sky-100 text-sky-800',
-  Other: 'bg-gray-100 text-gray-800'
+  hotel: 'bg-indigo-100 text-indigo-800',
+  transport: 'bg-teal-100 text-teal-800',
+  activity: 'bg-cyan-100 text-cyan-800',
+  restaurant: 'bg-amber-100 text-amber-800',
+  guide: 'bg-rose-100 text-rose-800',
+  other: 'bg-gray-100 text-gray-800'
 };
 
 export const VENDOR_VERIFICATION_COLORS = {
@@ -60,6 +58,6 @@ export const ADMIN_PERMISSIONS_LIST = [
   { id: 'manage_admins', label: 'Manage Admins', category: 'System' },
   { id: 'view_reports', label: 'View Reports', category: 'Analytics' },
   { id: 'manage_billing', label: 'Manage Billing', category: 'Finance' },
-  { id: 'system_settings', label: 'System Settings', category: 'System' },
-  { id: 'audit_log', label: 'View Audit Logs', category: 'System' }
+  { id: 'manage_leads', label: 'Manage Leads', category: 'Sales' },
+  { id: 'manage_packages', label: 'Manage Packages', category: 'Travel' }
 ];

@@ -78,8 +78,8 @@ const userSchema = new mongoose.Schema(
             'manage_admins',
             'view_reports',
             'manage_billing',
-            'system_settings',
-            'audit_log',
+            'manage_leads',
+            'manage_packages',
           ];
           return permissionsArray.every((perm) => validPermissions.includes(perm));
         },
@@ -179,33 +179,26 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  },
-);
-
-// Normalize role: convert 'superAdmin' to 'admin' (legacy support)
-userSchema.pre('save', function normalizeRole(next) {
-  if (this.role === 'superAdmin') {
-    this.role = 'admin';
   }
-  next();
-});
+);
 
 // Hash password before saving
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
 
   const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS, 10) || 12);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Ensure consistency between role and isSuperAdmin fields
 userSchema.pre('save', function ensureRoleConsistency(next) {
-  // If role is changed away from superAdmin, reset isSuperAdmin flag
+  // If role is changed away from superAdmin, reset isSuperAdmin flag and clear permissions
   if (this.isModified('role') && this.role !== 'superAdmin' && this.isSuperAdmin) {
     this.isSuperAdmin = false;
-    // Also clear permissions if not an admin
+    // Clear permissions if demoting from superAdmin or if not an admin
     if (this.role !== 'admin') {
       this.permissions = [];
     }

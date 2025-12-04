@@ -161,6 +161,7 @@ class PackageService {
         difficulty,
         isActive = true,
         isFeatured,
+        status,
         sortBy = 'createdAt',
         sortOrder = 'desc',
         page = 1,
@@ -219,6 +220,11 @@ class PackageService {
       // Featured filter
       if (isFeatured !== undefined) {
         query.isFeatured = isFeatured;
+      }
+
+      // Status filter
+      if (status) {
+        query.status = status;
       }
 
       // Build sort object
@@ -335,6 +341,7 @@ class PackageService {
         'terms',
         'isActive',
         'isFeatured',
+        'status',
         'availableFrom',
         'availableTo',
         'images',

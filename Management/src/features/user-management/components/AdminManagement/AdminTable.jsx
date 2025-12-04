@@ -57,7 +57,6 @@ const AdminTable = ({ admins, onEdit, onDelete, onSelectAdmin, onResendInvite, o
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Email</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Account Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">2FA</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Permissions</th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Last Active</th>
               <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700">Actions</th>
@@ -88,11 +87,6 @@ const AdminTable = ({ admins, onEdit, onDelete, onSelectAdmin, onResendInvite, o
                 </td>
                 <td className="px-6 py-4">
                   {getAccountStatusLabel(admin.accountStatus)}
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`text-xs font-medium ${admin.twoFactorEnabled ? 'text-green-700' : 'text-gray-500'}`}>
-                    {admin.twoFactorEnabled ? '✓ Enabled' : 'Disabled'}
-                  </span>
                 </td>
                 <td className="px-6 py-4">
                   <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2 py-1 rounded-full">

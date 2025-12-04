@@ -88,8 +88,6 @@ async function promoteSuperAdmin() {
       'manage_admins',
       'view_reports',
       'manage_billing',
-      'system_settings',
-      'audit_log',
     ];
 
     await adminUser.save();

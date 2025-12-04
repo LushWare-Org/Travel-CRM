@@ -121,6 +121,11 @@ export const createPackageValidator = [
     .optional()
     .isBoolean()
     .withMessage('Featured must be a boolean value'),
+
+  body('status')
+    .optional()
+    .isIn(['draft', 'published', 'archived'])
+    .withMessage('Status must be draft, published, or archived'),
 ];
 
 export const updatePackageValidator = [
@@ -191,6 +196,11 @@ export const updatePackageValidator = [
     .optional()
     .isBoolean()
     .withMessage('Featured must be a boolean value'),
+
+  body('status')
+    .optional()
+    .isIn(['draft', 'published', 'archived'])
+    .withMessage('Status must be draft, published, or archived'),
 ];
 
 export const packageIdValidator = [
@@ -268,6 +278,11 @@ export const getPackagesValidator = [
     .optional()
     .isBoolean()
     .withMessage('Featured must be a boolean value'),
+
+  query('status')
+    .optional()
+    .isIn(['draft', 'published', 'archived'])
+    .withMessage('Status must be draft, published, or archived'),
 
   query('sortBy')
     .optional()
