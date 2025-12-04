@@ -33,6 +33,10 @@ const PackageCard = ({
   }
 
   const formattedPrice = formatPriceINR(pkg.price);
+  // Default to 'draft' if status is not set
+  const status = pkg.status || 'draft';
+  // Capitalize first letter for display
+  const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
@@ -57,10 +61,10 @@ const PackageCard = ({
         )}
         <span
           className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold ${
-            STATUS_COLORS[pkg.status] || 'bg-gray-100 text-gray-800'
+            STATUS_COLORS[status] || 'bg-gray-100 text-gray-800'
           }`}
         >
-          {pkg.status}
+          {statusLabel}
         </span>
       </div>
 
@@ -152,7 +156,7 @@ const PackageCard = ({
             Duplicate
           </button>
           <button
-            onClick={() => onDelete(pkg.id)}
+            onClick={() => onDelete(pkg._id || pkg.id)}
             className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
             title="Delete package"
           >

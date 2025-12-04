@@ -146,6 +146,10 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveNewPackage = async (formData) => {
     try {
+      // Debug: Log incoming status
+      console.log('[Container] handleSaveNewPackage called');
+      console.log('[Container] formData.status:', formData.status);
+      
       // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -233,6 +237,7 @@ const ItineraryGenerationContainer = () => {
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
         days: cleanDays, // Use cleaned days
         images: validImages, // Use only valid images (no temp blobs)
+        status: formData.status || 'draft', // Explicitly preserve status
       };
 
       // Remove _id field for new packages (should not be included in POST request)
@@ -242,6 +247,7 @@ const ItineraryGenerationContainer = () => {
       delete sanitizedData.__v;
 
       console.log('[DEBUG] ==> SAVING PACKAGE <==');
+      console.log('[DEBUG] Status:', sanitizedData.status);
       console.log('[DEBUG] Valid images to save:', validImages);
       console.log('[DEBUG] Images count:', validImages?.length);
       console.log('[DEBUG] First image:', validImages?.[0]);
@@ -288,6 +294,10 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveEditPackage = async (formData) => {
     try {
+      // Debug: Log incoming status
+      console.log('[Container] handleSaveEditPackage called');
+      console.log('[Container] formData.status:', formData.status);
+      
       // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -388,6 +398,7 @@ const ItineraryGenerationContainer = () => {
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1,
         days: cleanDays, // Use cleaned days
         images: validImages, // Use only valid images (no temp blobs)
+        status: formData.status || 'draft', // Explicitly preserve status
       };
 
       // Remove internal fields that should not be updated
@@ -399,6 +410,7 @@ const ItineraryGenerationContainer = () => {
       delete sanitizedData.slug; // Let backend regenerate if needed
 
       console.log('[DEBUG] ==> UPDATING PACKAGE <==');
+      console.log('[DEBUG] Status:', sanitizedData.status);
       console.log('[DEBUG] Valid images to save:', validImages);
       console.log('[DEBUG] Images count:', validImages?.length);
       console.log('[DEBUG] Sanitized data images:', sanitizedData.images);

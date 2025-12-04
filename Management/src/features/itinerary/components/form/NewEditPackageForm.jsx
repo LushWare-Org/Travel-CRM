@@ -138,6 +138,9 @@ const NewEditPackageForm = ({
       }
     }
     
+    console.log('[Form] handleSave called with status:', status);
+    console.log('[Form] dataToSave status:', dataToSave.status);
+    
     setFormData(dataToSave);
     // Pass the updated data directly to onSave instead of relying on state update
     onSave?.(dataToSave);
