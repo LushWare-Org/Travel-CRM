@@ -9,6 +9,7 @@ import Swal from 'sweetalert2';
 
 // Hooks
 import { usePackageState, useItineraryForm, useImageUpload } from '../hooks';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Components
 import {
@@ -42,6 +43,7 @@ import { SAMPLE_PACKAGES } from './sampleData';
 
 const ItineraryGenerationContainer = () => {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState(null); // null = all, 'draft', 'published', 'archived'
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -56,6 +58,9 @@ const ItineraryGenerationContainer = () => {
     packageData: null,
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Check if user is a salesRep (read-only access)
+  const isSalesRep = user?.role === 'salesRep';
 
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(
@@ -89,7 +94,12 @@ const ItineraryGenerationContainer = () => {
   useEffect(() => {
     const loadPackages = async () => {
       try {
-        const response = await ApiService.getPackages();
+        // For salesReps, use the protected endpoint which will automatically filter published packages
+        // For other roles, use the standard endpoint
+        const response = isSalesRep 
+          ? await ApiService.getPackagesProtected()
+          : await ApiService.getPackages();
+        
         if (response.success && Array.isArray(response.data)) {
           setPackages(response.data);
         }
@@ -100,10 +110,16 @@ const ItineraryGenerationContainer = () => {
     };
 
     loadPackages();
-  }, []);
+  }, [isSalesRep]);
 
   // Handlers
   const handleNewPackageDialogOpen = () => {
+    // Prevent salesReps from creating new packages
+    if (isSalesRep) {
+      Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
+      return;
+    }
+    
     setNewFormData(createDefaultPackage());
     setImages([]);
     setShowNewPackageDialog(true);
@@ -114,6 +130,12 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleEditPackage = (pkg) => {
+    // Prevent salesReps from editing packages
+    if (isSalesRep) {
+      Swal.fire('Access Denied', 'Sales Representatives do not have permission to edit packages.', 'info');
+      return;
+    }
+
     console.log('[DEBUG] Edit package clicked. Package object:', pkg);
     console.log('[DEBUG] Package _id:', pkg._id, 'Package id:', pkg.id);
     console.log('[DEBUG] Package images:', pkg.images);
@@ -509,6 +531,12 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleDuplicatePackage = (pkg) => {
+    // Prevent salesReps from duplicating packages
+    if (isSalesRep) {
+      Swal.fire('Access Denied', 'Sales Representatives do not have permission to duplicate packages.', 'info');
+      return;
+    }
+
     Swal.fire({
       title: `Duplicate ${pkg.name}?`,
       text: 'This will create a copy of the package.',

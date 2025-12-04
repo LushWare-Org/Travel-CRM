@@ -77,6 +77,12 @@ class ApiService {
     return makeRequest(`/packages${queryString ? `?${queryString}` : ''}`);
   }
 
+  static async getPackagesProtected(params = {}) {
+    // Protected endpoint that automatically filters published packages for salesReps
+    const queryString = new URLSearchParams(params).toString();
+    return makeRequest(`/packages/protected/all${queryString ? `?${queryString}` : ''}`);
+  }
+
   static async getPackage(id) {
     return makeRequest(`/packages/${id}`);
   }

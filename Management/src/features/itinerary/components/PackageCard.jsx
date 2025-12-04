@@ -16,6 +16,8 @@ import {
   Copy,
   Image as ImageIcon,
 } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
+import { usePermission } from '../../../contexts/PermissionContext';
 import { STATUS_COLORS, CATEGORY_COLORS } from '../utils/constants';
 import { formatPriceINR } from '../utils/helpers';
 
@@ -27,6 +29,9 @@ const PackageCard = ({
   onDelete,
   onDuplicate,
 }) => {
+  const { user } = useAuth();
+  const { hasPermission } = usePermission();
+  
   // Guard: Return null if pkg is invalid
   if (!pkg || typeof pkg !== 'object') {
     return null;
@@ -37,6 +42,12 @@ const PackageCard = ({
   const status = pkg.status || 'draft';
   // Capitalize first letter for display
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+
+  // Check if user is a salesRep (read-only access)
+  const isSalesRep = user?.role === 'salesRep';
+  
+  // Check if user can edit packages (superAdmin or admin with manage_packages)
+  const canEditPackages = user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_packages'));
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
@@ -128,14 +139,18 @@ const PackageCard = ({
             <Eye className="w-4 h-4" />
             View
           </button>
-          <button
-            onClick={() => onEdit(pkg)}
-            className="flex-1 px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
-            title="Edit package"
-          >
-            <Edit className="w-4 h-4" />
-            Edit
-          </button>
+          
+          {/* Edit button - only visible to admins/staff with manage_packages permission or superAdmin */}
+          {canEditPackages && (
+            <button
+              onClick={() => onEdit(pkg)}
+              className="flex-1 px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
+              title="Edit package"
+            >
+              <Edit className="w-4 h-4" />
+              Edit
+            </button>
+          )}
         </div>
         
         <div className="flex gap-2 pt-2">
@@ -147,22 +162,30 @@ const PackageCard = ({
             <Download className="w-4 h-4" />
             PDF
           </button>
-          <button
-            onClick={() => onDuplicate(pkg)}
-            className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
-            title="Duplicate package"
-          >
-            <Copy className="w-4 h-4" />
-            Duplicate
-          </button>
-          <button
-            onClick={() => onDelete(pkg._id || pkg.id)}
-            className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
-            title="Delete package"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete
-          </button>
+          
+          {/* Duplicate button - only visible to admins/staff with manage_packages permission or superAdmin */}
+          {canEditPackages && (
+            <button
+              onClick={() => onDuplicate(pkg)}
+              className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
+              title="Duplicate package"
+            >
+              <Copy className="w-4 h-4" />
+              Duplicate
+            </button>
+          )}
+          
+          {/* Delete button - visible to superAdmin or admin with manage_packages permission */}
+          {(user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_packages'))) && (
+            <button
+              onClick={() => onDelete(pkg._id || pkg.id)}
+              className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
+              title="Delete package"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+          )}
         </div>
         <br />
       </div>
