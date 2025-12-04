@@ -6,6 +6,7 @@
 import { Star } from 'lucide-react';
 import ItineraryDisplay from './ItineraryDisplay';
 import { formatPriceINR } from '../utils/helpers';
+import { STATUS_COLORS } from '../utils/constants';
 
 const PackageDetailsModal = ({ pkg, onClose }) => {
   if (!pkg) return null;
@@ -32,6 +33,19 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Status Badge */}
+          <div className="flex justify-end">
+            {pkg.status && (
+              <span
+                className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                  STATUS_COLORS[pkg.status] || 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                {pkg.status.charAt(0).toUpperCase() + pkg.status.slice(1)}
+              </span>
+            )}
+          </div>
+
           {/* Basic Info Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div>

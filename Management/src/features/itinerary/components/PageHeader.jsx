@@ -11,9 +11,9 @@ const PageHeader = ({ onNewPackage }) => {
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Itinerary Generation</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Package Management</h1>
             <p className="text-gray-600 mt-1">
-              Create and manage travel packages and itineraries
+              Create, edit, and manage travel packages with detailed itineraries
             </p>
           </div>
         </div>

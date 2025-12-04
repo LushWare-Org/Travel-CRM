@@ -43,6 +43,7 @@ import { SAMPLE_PACKAGES } from './sampleData';
 const ItineraryGenerationContainer = () => {
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState(null); // null = all, 'draft', 'published', 'archived'
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [showNewPackageDialog, setShowNewPackageDialog] = useState(false);
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
@@ -73,7 +74,13 @@ const ItineraryGenerationContainer = () => {
   } = useImageUpload();
 
   // Filter packages
-  const filteredPackages = filterPackages(packages, searchTerm);
+  let filteredPackages = filterPackages(packages, searchTerm);
+  
+  // Apply status filter if one is selected
+  if (statusFilter) {
+    filteredPackages = filteredPackages.filter(pkg => pkg.status === statusFilter);
+  }
+  
   const stats = calculatePackageStats(packages);
 
   /**
@@ -257,8 +264,8 @@ const ItineraryGenerationContainer = () => {
       const response = await ApiService.createPackage(sanitizedData);
 
       if (response.success) {
-        // Update local state with the newly created package from API
-        setPackages((prev) => [...prev, response.data]);
+        // Add newly created package to the top of the list
+        setPackages((prev) => [response.data, ...prev]);
         setShowNewPackageDialog(false);
         setNewFormData(createDefaultPackage());
         setImages([]);
@@ -529,7 +536,7 @@ const ItineraryGenerationContainer = () => {
           const response = await ApiService.createPackage(duplicateData);
 
           if (response.success) {
-            setPackages((prev) => [...prev, response.data]);
+            setPackages((prev) => [response.data, ...prev]);
             Swal.fire('Success', `${pkg.name} has been duplicated successfully.`, 'success');
           } else {
             Swal.fire('Error', response.message || 'Failed to duplicate package', 'error');
@@ -629,7 +636,11 @@ const ItineraryGenerationContainer = () => {
 
       {/* Stats */}
       <div className="bg-white border-b border-gray-200 px-8 py-4">
-        <PackageStats stats={stats} />
+        <PackageStats 
+          stats={stats} 
+          onFilterChange={setStatusFilter}
+          activeFilter={statusFilter}
+        />
       </div>
 
       {/* Content */}
