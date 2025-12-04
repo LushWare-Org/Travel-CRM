@@ -1,5 +1,8 @@
 import Lead from '../models/lead.model.js';
 import Invoice from '../models/invoice.model.js';
+import Booking from '../models/booking.model.js';
+import Itinerary from '../models/itinerary.model.js';
+import Package from '../models/package.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { COUNTRY_NAMES, normalizeString } from '../utils/countryUtils.js';
 import ItineraryAnalyticsService from '../services/itineraryAnalytics.service.js';
@@ -1170,6 +1173,309 @@ export const getSalesRepPersonalPerformance = asyncHandler(async (req, res) => {
       error: error.message,
     });
   }
+});
+
+/**
+ * Get Website Analytics Overview
+ * Returns comprehensive website analytics including lead trends, destination analysis, activity preferences
+ * Shows actual lead inquiries (searches), bookings (conversions), and customer preferences
+ * @route GET /api/v1/analytics/website/overview
+ * @access Private/Admin
+ * @query timeRange - 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
+ */
+export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
+  const timeRange = clampTimeRange(req.query.timeRange);
+  const buckets = buildTimeBuckets(timeRange);
+  const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
+
+  const groupId = buildGroupId(timeRange);
+
+  // Get lead trends (inquiries) and booking data
+  const leadTrendAggregation = await Lead.aggregate([
+    { $match: { createdAt: { $gte: startDate } } },
+    {
+      $group: {
+        _id: groupId,
+        searches: { $sum: 1 }, // Total leads created = searches/inquiries
+        conversions: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'converted'] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+  ]);
+
+  // Get booking data (actual conversions)
+  const bookingTrendAggregation = await Booking.aggregate([
+    { $match: { createdAt: { $gte: startDate } } },
+    {
+      $group: {
+        _id: groupId,
+        bookings: { $sum: 1 },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+  ]);
+
+  // Create trend maps
+  const leadTrendMap = new Map();
+  leadTrendAggregation.forEach((item) => {
+    const key = buildTrendKey(timeRange, item._id);
+    leadTrendMap.set(key, item);
+  });
+
+  const bookingTrendMap = new Map();
+  bookingTrendAggregation.forEach((item) => {
+    const key = buildTrendKey(timeRange, item._id);
+    bookingTrendMap.set(key, item);
+  });
+
+  const trendData = buckets.map((bucket) => {
+    const key = buildBucketKey(timeRange, bucket);
+    const leadItem = leadTrendMap.get(key);
+    const bookingItem = bookingTrendMap.get(key);
+
+    return {
+      label: bucket.label,
+      searches: leadItem?.searches ?? 0,
+      conversions: bookingItem?.bookings ?? 0,
+    };
+  });
+
+  // Get destination analysis with package lookup
+  const destinationAggregation = await Lead.aggregate([
+    {
+      $lookup: {
+        from: 'packages',
+        localField: 'package',
+        foreignField: '_id',
+        as: 'packageData',
+      },
+    },
+    {
+      $lookup: {
+        from: 'customizedpackages',
+        localField: 'customizedPackage',
+        foreignField: '_id',
+        as: 'customizedData',
+      },
+    },
+    {
+      $addFields: {
+        effectiveDestination: {
+          $ifNull: [
+            '$destination',
+            {
+              $ifNull: [
+                { $arrayElemAt: ['$customizedData.destination', 0] },
+                { $arrayElemAt: ['$packageData.destination', 0] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $match: { effectiveDestination: { $exists: true, $ne: null } } },
+    {
+      $group: {
+        _id: '$effectiveDestination',
+        searches: { $sum: 1 },
+        conversions: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'converted'] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { searches: -1 } },
+    { $limit: 10 },
+  ]);
+
+  const topDestinations = destinationAggregation.map((item) => ({
+    destination: item._id || 'Unknown',
+    searches: item.searches,
+    conversions: item.conversions,
+    conversionRate: item.searches > 0 ? parseFloat(((item.conversions / item.searches) * 100).toFixed(1)) : 0,
+  }));
+
+  // Get activity preferences from itineraries
+  const activityAggregation = await Itinerary.aggregate([
+    { $unwind: '$days' },
+    { $unwind: '$days.activities' },
+    { $match: { 'days.activities': { $exists: true, $ne: '' } } },
+    {
+      $group: {
+        _id: '$days.activities',
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+    { $limit: 10 },
+  ]);
+
+  const activityPreferences = activityAggregation.map((item) => ({
+    name: item._id,
+    value: item.count,
+  }));
+
+  // Get accommodation types from itineraries
+  const accommodationAggregation = await Itinerary.aggregate([
+    { $unwind: '$days' },
+    { $match: { 'days.accommodation.type': { $exists: true, $ne: null } } },
+    {
+      $group: {
+        _id: '$days.accommodation.type',
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+  ]);
+
+  const accommodationTypes = accommodationAggregation.map((item) => ({
+    name: item._id ? item._id.charAt(0).toUpperCase() + item._id.slice(1) : 'Other',
+    value: item.count,
+  }));
+
+  // Get duration preferences
+  const durationAggregation = await Lead.aggregate([
+    { $match: { package: { $exists: true, $ne: null } } },
+    {
+      $lookup: {
+        from: 'packages',
+        localField: 'package',
+        foreignField: '_id',
+        as: 'packageData',
+      },
+    },
+    { $unwind: '$packageData' },
+    {
+      $group: {
+        _id: '$packageData.duration',
+        searches: { $sum: 1 },
+        bookings: {
+          $sum: {
+            $cond: [{ $eq: ['$status', 'converted'] }, 1, 0],
+          },
+        },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const durationData = durationAggregation
+    .map((item) => {
+      let durationLabel = 'Unknown';
+      if (item._id) {
+        durationLabel = item._id <= 5 ? '3-5 Days' : item._id <= 7 ? '5-7 Days' : item._id <= 10 ? '7-10 Days' : item._id <= 14 ? '10-14 Days' : '14+ Days';
+      }
+      return {
+        duration: durationLabel,
+        searches: item.searches,
+        bookings: item.bookings,
+      };
+    })
+    .filter((item, index, arr) => arr.findIndex((x) => x.duration === item.duration) === index); // Remove duplicates by duration label
+
+  // Get price range distribution
+  const priceAggregation = await Lead.aggregate([
+    {
+      $lookup: {
+        from: 'packages',
+        localField: 'package',
+        foreignField: '_id',
+        as: 'packageData',
+      },
+    },
+    {
+      $lookup: {
+        from: 'customizedpackages',
+        localField: 'customizedPackage',
+        foreignField: '_id',
+        as: 'customizedData',
+      },
+    },
+    {
+      $addFields: {
+        effectivePrice: {
+          $cond: [
+            { $and: [{ $arrayElemAt: ['$customizedData.price', 0] }, { $gt: [{ $arrayElemAt: ['$customizedData.price', 0] }, 0] }] },
+            { $arrayElemAt: ['$customizedData.price', 0] },
+            {
+              $cond: [
+                { $and: [{ $arrayElemAt: ['$packageData.price', 0] }, { $gt: [{ $arrayElemAt: ['$packageData.price', 0] }, 0] }] },
+                { $arrayElemAt: ['$packageData.price', 0] },
+                { $cond: [{ $and: ['$quoteAmount', { $gt: ['$quoteAmount', 0] }] }, '$quoteAmount', null] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $match: { effectivePrice: { $exists: true, $ne: null } } },
+    {
+      $project: {
+        priceBucket: {
+          $switch: {
+            branches: [
+              { case: { $lt: ['$effectivePrice', 50000] }, then: 'Below ₹50K' },
+              { case: { $lt: ['$effectivePrice', 200000] }, then: '₹50K-₹2L' },
+              { case: { $lt: ['$effectivePrice', 500000] }, then: '₹2L-₹5L' },
+              { case: { $lt: ['$effectivePrice', 1000000] }, then: '₹5L-₹10L' },
+              { case: { $lt: ['$effectivePrice', 2500000] }, then: '₹10L-₹25L' },
+            ],
+            default: '₹25L+',
+          },
+        },
+      },
+    },
+    {
+      $group: {
+        _id: '$priceBucket',
+        searches: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const priceRanges = priceAggregation.map((item) => ({
+    range: item._id,
+    searches: item.searches,
+  }));
+
+  // Calculate overall stats
+  const totalLeads = await Lead.countDocuments();
+  const totalBookings = await Booking.countDocuments();
+  const uniqueDestinations = await Lead.distinct('destination');
+  const uniqueActivities = activityAggregation.length;
+  const convertedLeads = await Lead.countDocuments({ status: 'converted' });
+
+  const stats = {
+    totalSearches: totalLeads,
+    totalBookings: totalBookings,
+    uniqueDestinations: uniqueDestinations.filter((d) => d !== null && d !== undefined).length,
+    uniqueActivities: uniqueActivities,
+    conversionRate:
+      totalLeads > 0
+        ? parseFloat(((convertedLeads / totalLeads) * 100).toFixed(2))
+        : 0,
+  };
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      timeRange,
+      generatedAt: new Date().toISOString(),
+      stats,
+      trend: trendData,
+      topDestinations,
+      activityPreferences,
+      accommodationTypes,
+      durationPreferences: durationData,
+      priceRanges,
+    },
+  });
 });
 
 

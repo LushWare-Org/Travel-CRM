@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, authorize, checkPermission } from '../middleware/auth.js';
-import { getLeadAnalyticsOverview, getBillingAnalyticsOverview, getPackageAnalyticsOverview, getUserAnalyticsOverview, getSalesRepPersonalPerformance } from '../controllers/analytics.controller.js';
+import { getLeadAnalyticsOverview, getBillingAnalyticsOverview, getPackageAnalyticsOverview, getUserAnalyticsOverview, getSalesRepPersonalPerformance, getWebsiteAnalyticsOverview } from '../controllers/analytics.controller.js';
 
 const router = express.Router();
 
@@ -13,6 +13,9 @@ router.get('/packages/overview', protect, authorize('admin', 'salesRep'), getPac
 
 // User analytics overview
 router.get('/users/overview', protect, authorize('admin'), checkPermission('view_reports'), getUserAnalyticsOverview);
+
+// Website analytics overview
+router.get('/website/overview', protect, authorize('admin', 'salesRep'), getWebsiteAnalyticsOverview);
 
 // SalesRep personal performance analytics
 router.get('/salesreps/me/performance', protect, authorize('salesRep'), getSalesRepPersonalPerformance);
