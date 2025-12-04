@@ -66,8 +66,10 @@ export const getPackages = asyncHandler(async (req, res, next) => {
   const query = req.query;
   
   // If user is a salesRep and no explicit status is provided, filter to published only
-  if (req.user && req.user.role === 'salesRep' && !query.status) {
-    query.status = 'published';
+  if (!req.user || (req.user && req.user.role === 'salesRep')) {
+    if (!query.status) {
+      query.status = 'published';
+    }
   }
 
   const result = await packageService.getPackages(query);

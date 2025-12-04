@@ -7,7 +7,7 @@ export const fetchPackages = async (params = {}) => {
   const response = await apiClient.get('/packages', {
     params: {
       limit: DEFAULT_LIMIT,
-      isActive: true,
+      status: 'published',
       ...params,
     },
   });
