@@ -127,7 +127,7 @@ export default function RecommendedPackagesSection() {
   const getVisiblePackages = () => {
     if (categoryPackages.length === 0) return [];
     const packages = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       packages.push(categoryPackages[(currentSlide + i) % categoryPackages.length]);
     }
     return packages;
@@ -139,10 +139,9 @@ export default function RecommendedPackagesSection() {
 
   return (
     <section className="py-20 bg-white">
-      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-          {/* Left Side */}
-           <div className="lg:col-span-4 space-y-8 lg:ml-9">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 items-start">
+           {/* <div className="lg:col-span-4 space-y-8 lg:ml-9">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-12 font-poppins leading-tight">
               Excellence in 
               <span className="block mt-2 bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
@@ -150,14 +149,12 @@ export default function RecommendedPackagesSection() {
               </span>
             </h2>
             
-            {/* Stats Container with rolling effect */}
             <div className="space-y-8">
               {[0, 1, 2].map((offset) => {
                 const displayIndex = currentStatIndex + offset;
                 return (
                   <div key={offset} className="h-[70px] flex items-center group">
                     <div className="flex items-start gap-6 w-full p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 hover:shadow-lg transition-all duration-300 hover:border-orange-300">
-                      {/* Rolling Numbers */}
                       <div className="flex items-center gap-0">
                         <div className="relative h-12 overflow-hidden inline-block">
                           <div 
@@ -177,7 +174,6 @@ export default function RecommendedPackagesSection() {
                         </div>
                       </div>
                       
-                      {/* Rolling Labels */}
                       <div className="relative h-12 overflow-hidden flex-1">
                         <div 
                           className="transition-transform duration-1000 ease-in-out"
@@ -197,17 +193,17 @@ export default function RecommendedPackagesSection() {
                 );
               })}
             </div>
-          </div>
+          </div> */}
 
           {/* Right Side */}
           <div className="lg:col-span-8 relative">
             <div className="mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <h3 className="text-4xl font-bold text-gray-900 font-poppins">
+              <div className="mb-12 text-center">
+                <h2 className="text-4xl font-bold text-gray-900 font-poppins mb-4">
                   Discover Your Perfect Holiday
-                </h3>
-              </div>
+                </h2>
               <p className="text-lg text-gray-600 md-2">From relaxing escapes to thrilling adventures - find your ideal trip here.</p>
+            </div>
             </div>
             
             {loading ? (
@@ -222,7 +218,7 @@ export default function RecommendedPackagesSection() {
               <div className="relative">
 
             {/* Carousel Container */}
-            <div className="overflow-hidden">
+            <div>
               <div className="flex gap-4 transition-transform duration-1000 ease-in-out relative">
                 <button
                   onClick={prevSlide}
@@ -244,10 +240,10 @@ export default function RecommendedPackagesSection() {
                   return (
                     <div
                       key={`${pkg.id}-${currentSlide}-${index}`}
-                      className="flex-shrink-0 w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] cursor-pointer"
+                      className="flex-shrink-0 w-full sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)] cursor-pointer"
                       onClick={() => handlePackageClick(pkg.categoryName)}
                     >
-                      <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-105 border-2 border-gray-100 group">
+                      <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-105 border-2 border-orange-100 group">
                         <div className="relative h-56 overflow-hidden">
                           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
                           <img

@@ -542,7 +542,7 @@ export default function PackageDetails() {
         }
       `}</style>
 
-      {/* Hero Section - Mobile Responsive */}
+      {/* Hero Section */}
       <div
         className="relative h-[70vh] lg:h-[83vh] overflow-hidden"
         onMouseEnter={() => setIsImageHovered(true)}
@@ -572,7 +572,6 @@ export default function PackageDetails() {
                   alt={`${pkg.title} - ${idx + 1}`}
                   className="w-full h-full object-cover"
                 />
-                {/* Gradient Overlays */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/40" />
               </div>
@@ -618,8 +617,8 @@ export default function PackageDetails() {
               </div>
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                 <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                <span className="font-medium">{pkg.rating}</span>
-                <span className="text-white/80">({pkg.reviews_count} reviews)</span>
+                <span className="font-medium">4.9</span>
+                <span className="text-white/80">(250k+ Reviews)</span>
               </div>
               <span className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-black rounded-full font-semibold capitalize">
                 {pkg.category}
@@ -686,6 +685,51 @@ export default function PackageDetails() {
               <div className="p-6 lg:p-10 section-padding-sm">
                 {activeSection === 'overview' && (
                   <div className="space-y-6 lg:space-y-10">
+                    <div className="bg-white rounded-2xl p-6 lg:p-8 border border-orange-200">
+                      <div className="flex items-center gap-3 mb-10">
+                        <Award className="w-6 h-6 lg:w-8 lg:h-8 text-orange-600" />
+                        <h3 className="text-2xl lg:text-3xl font-black text-black">Why Choose Trip Sky Way?</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+                        <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
+                            <Check className="w-4 h-4 text-green-600" />
+                              </div>                          
+                              <div>
+                            <p className="font-bold text-black text-sm lg:text-base">Expert Local Guides</p>
+                            <p className="text-black text-xs lg:text-sm mt-1">Authentic experiences with guides who know every corner</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
+                            <Check className="w-4 h-4 text-green-600" />
+                              </div>                          
+                              <div>
+                            <p className="font-bold text-black text-sm lg:text-base">Personalized Itineraries</p>
+                            <p className="text-black text-xs lg:text-sm mt-1">Customized journeys tailored to your preferences</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
+                            <Check className="w-4 h-4 text-green-600" />
+                              </div>                          
+                              <div>
+                            <p className="font-bold text-black text-sm lg:text-base">Rated 4.9 on Google</p>
+                            <p className="text-black text-xs lg:text-sm mt-1">Trusted by 250k+ happy travelers</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
+                            <Check className="w-4 h-4 text-green-600" />
+                              </div>                          
+                              <div>
+                            <p className="font-bold text-black text-sm lg:text-base">24/7 Customer Support</p>
+                            <p className="text-gray-600 text-xs lg:text-sm mt-1">Round-the-clock assistance on your journey</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
                       <p className="text-base lg:text-lg text-gray-700 leading-relaxed">{pkg.description}</p>
                     </div>
@@ -800,60 +844,15 @@ export default function PackageDetails() {
                 )}
                 {activeSection === 'reviews' && (
                   <div className="space-y-4 lg:space-y-6">
-                    <div className="reviews-header-mobile flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 lg:mb-8">
-                      <div>
-                        <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Customer Reviews</h2>
-                        <p className="text-gray-600 text-sm lg:text-base">Real experiences from real travelers</p>
-                      </div>
-                      <div className="flex items-center gap-4 w-full lg:w-auto">
-                        <div className="reviews-rating-section-mobile text-left lg:text-right p-3 lg:p-4 rounded-lg">
-                          <div className="flex items-center gap-2 text-2xl lg:text-3xl font-bold text-gray-900">
-                            <Star className="w-6 h-6 lg:w-7 lg:h-7 text-yellow-400 fill-current" />
-                            {pkg.rating}
-                          </div>
-                          <p className="text-sm text-gray-600 mt-1">{pkg.reviews_count} reviews</p>
-                        </div>
-                        <button
-                          onClick={() => setShowReviewModal(true)}
-                          className="bg-black text-white px-4 lg:px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all whitespace-nowrap flex-1 lg:flex-none button-padding-sm"
-                        >
-                          Write a Review
-                        </button>
-                      </div>
+                    <div className="mb-6 lg:mb-8">
+                      <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Google Reviews</h2>
+                      <p className="text-gray-600 text-sm lg:text-base">Verified reviews from real travelers on Google</p>
                     </div>
-
-                    {reviews.length === 0 && (
-                      <div className="text-center py-10 lg:py-12 bg-gray-50 rounded-lg">
-                        <Star className="w-10 h-10 lg:w-12 lg:h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-600 text-base lg:text-lg">No reviews have been shared yet. Be the first to travel with us and leave a review!</p>
-                      </div>
-                    )}
-                   
-                    {reviews.length > 0 && (
-                      <div className="space-y-4">
-                        {reviews.map((r) => (
-                          <div key={r.id} className="border border-gray-200 rounded-lg p-5 lg:p-6 hover:shadow-md transition-shadow duration-300 bg-white review-card-padding-sm">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-3 lg:mb-3 gap-4 sm:gap-0">
-                              <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-yellow-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                                  {r.user_name.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                  <p className="font-bold text-gray-900 text-base lg:text-lg">{r.user_name}</p>
-                                  <p className="text-sm text-gray-500">{new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                                </div>
-                              </div>
-                              <div className="flex gap-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star key={i} className={`w-4 h-4 lg:w-5 lg:h-5 ${i < r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
-                                ))}
-                              </div>
-                            </div>
-                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base">{r.comment}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    
+                    {/* Elfsight */}
+                    <div className="bg-white rounded-2xl p-6 lg:p-8 border border-gray-100">
+                      <div className="elfsight-app-29a1900e-0181-4873-aac0-7b426c7a478b" data-elfsight-app-lazy></div>
+                    </div>
                   </div>
                 )}
               </div>

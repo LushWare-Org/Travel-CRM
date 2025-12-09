@@ -23,9 +23,12 @@ import { formatCurrency } from '../utils/currency';
 
 const filterOptions = {
   priceRanges: [
-    { label: 'Budget', min: 0, max: 500 },
-    { label: 'Mid-Range', min: 500, max: 1200 },
-    { label: 'Luxury', min: 1200, max: 2500 }
+    { label: 'Below ₹ 50 k', min: 0, max: 50000 },
+    { label: '₹ 50k - ₹ 75k', min: 50000, max: 75000 },
+    { label: '₹ 75k - ₹ 1 L', min: 75000, max: 100000 },
+    { label: '₹ 1 L - ₹ 1.5L', min: 100000, max: 150000 },
+    { label: '₹ 1.5L - ₹ 2 L', min: 150000, max: 200000 },
+    { label: 'Above ₹ 2L', min: 200000, max: Infinity }
   ],
   activities: ['Beach', 'Mountains', 'Culture', 'Adventure', 'Luxury', 'Food', 'Shopping', 'Nature', 'Romance'],
   ratings: [4.9, 4.8, 4.7, 4.5, 4.0],
@@ -38,7 +41,6 @@ export default function DestinationsDomestic() {
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDestinations, setSelectedDestinations] = useState([]);
-  const [selectedActivities, setSelectedActivities] = useState([]);
   const [selectedPriceRange, setSelectedPriceRange] = useState(null);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState('popularity');
@@ -84,7 +86,6 @@ export default function DestinationsDomestic() {
       ...dest,
       price: dest.price || 0,
       rating: dest.rating || 0,
-      reviews: dest.reviews || 0,
       duration: dest.durationLabel || 'Flexible',
       packagesCount: dest.packagesCount || 0,
       activities: dest.activities || [],
@@ -108,11 +109,6 @@ export default function DestinationsDomestic() {
     if (selectedDestinations.length > 0) {
       filtered = filtered.filter(dest => selectedDestinations.includes(dest.name));
     }
-    if (selectedActivities.length > 0) {
-      filtered = filtered.filter(dest =>
-        selectedActivities.some(act => dest.activities.includes(act))
-      );
-    }
     if (selectedPriceRange) {
       filtered = filtered.filter(dest =>
         dest.price >= selectedPriceRange.min && dest.price <= selectedPriceRange.max
@@ -131,18 +127,15 @@ export default function DestinationsDomestic() {
     setFilteredDestinations(filtered);
     let count = 0;
     if (selectedDestinations.length > 0) count += selectedDestinations.length;
-    if (selectedActivities.length > 0) count += selectedActivities.length;
     if (selectedPriceRange) count += 1;
     if (minRating > 0) count += 1;
     setActiveFiltersCount(count);
-  }, [preparedDestinations, searchQuery, selectedDestinations, selectedActivities, selectedPriceRange, minRating, sortBy]);
+  }, [preparedDestinations, searchQuery, selectedDestinations, selectedPriceRange, minRating, sortBy]);
 
-  const toggleActivity = a => setSelectedActivities(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a]);
   const toggleDestination = d => setSelectedDestinations(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d]);
   const clearAllFilters = () => {
     setSearchQuery(''); 
     setSelectedDestinations([]); 
-    setSelectedActivities([]); 
     setSelectedPriceRange(null); 
     setMinRating(0);
   };
@@ -230,13 +223,13 @@ export default function DestinationsDomestic() {
                 ))}
               </div>
               <span className="text-white font-semibold">4.9/5</span>
-              <span className="text-white/60 text-sm">(12K+ reviews)</span>
+              <span className="text-white/60 text-sm">(250K+ reviews)</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Sticky Toolbar */}
         <div className="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-4 md:mb-6 sticky top-16 z-40">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
@@ -250,7 +243,7 @@ export default function DestinationsDomestic() {
                 }`}
               >
                 <SlidersHorizontal className="w-4 h-4" />
-                <span className="font-semibold">Filters</span>
+                <span className="font-semibold">{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
                 {activeFiltersCount > 0 && (
                   <span className={`bg-black text-white text-xs px-2 py-0.5 rounded-full font-medium`}>
                     {activeFiltersCount}
@@ -306,11 +299,10 @@ export default function DestinationsDomestic() {
         <div className="flex flex-col md:flex-row gap-4 md:gap-8">
           {/* Filters */}
           {showFilters && (
-            <div className="w-full md:w-80 md:flex-shrink-0">
+            <div className="w-full md:w-72 md:flex-shrink-0">
               <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 md:sticky md:top-32">
                 <h3 className="text-lg md:text-xl font-bold mb-4 md:mb-6 flex items-center gap-2">
                   <Filter className="w-4 md:w-5 h-4 md:h-5 text-orange-600" />
-                  <span className="text-gray-900">Filter Destinations</span>
                 </h3>
                 
                 {/* Search */}
@@ -352,49 +344,22 @@ export default function DestinationsDomestic() {
                 <div className="mb-4 md:mb-6">
                   <h4 className="font-semibold mb-2 md:mb-3 flex items-center gap-2 text-sm md:text-base">
                     <IndianRupee className="w-4 h-4 text-gray-600" />
-                    <span className="text-gray-900">Price Range</span>
+                    <span className="text-gray-900">Budget</span>
                   </h4>
                   <div className="space-y-2">
                     {filterOptions.priceRanges.map((range) => (
-                      <button
+                      <label
                         key={range.label}
-                        onClick={() => setSelectedPriceRange((prev) => (prev?.label === range.label ? null : range))}
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center justify-between cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${
-                          selectedPriceRange?.label === range.label
-                            ? 'bg-gradient-to-r from-green-50 via-emerald-50 to-green-100 text-green-800 border-green-300 shadow-sm'
-                            : 'bg-white hover:bg-gray-50 text-gray-700'
-                        }`}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200"
                       >
-                        <span className="font-medium">{range.label}</span>
-                        <span className="text-sm font-medium">
-                          {range.max === Infinity
-                            ? `${formatCurrency(range.min)}+`
-                            : `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Activities */}
-                <div className="mb-6">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Compass className="w-4 h-4 text-gray-600" />
-                    <span className="text-gray-900">Activities</span>
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {filterOptions.activities.map((activity) => (
-                      <button
-                        key={activity}
-                        onClick={() => toggleActivity(activity)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${
-                          selectedActivities.includes(activity)
-                            ? 'bg-gradient-to-r from-orange-600 to-yellow-500 text-white shadow-md hover:shadow-lg'
-                            : 'bg-white hover:bg-orange-50 text-gray-700'
-                        }`}
-                      >
-                        {activity}
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={selectedPriceRange?.label === range.label}
+                          onChange={() => setSelectedPriceRange((prev) => (prev?.label === range.label ? null : range))}
+                          className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 focus:ring-2"
+                        />
+                        <span className="text-gray-700 font-medium">{range.label}</span>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -402,22 +367,32 @@ export default function DestinationsDomestic() {
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
                     <Star className="w-4 h-4 text-gray-600" />
-                    <span className="text-gray-900">Minimum Rating</span>
+                    <span className="text-gray-900">Hotel Rating</span>
                   </h4>
                   <div className="space-y-2">
-                    {filterOptions.ratings.map((ratingValue) => (
-                      <button
-                        key={ratingValue}
-                        onClick={() => setMinRating((prev) => (prev === ratingValue ? 0 : ratingValue))}
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-3 cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${
-                          minRating === ratingValue
-                            ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-100 text-amber-800 border-amber-300 shadow-sm'
-                            : 'bg-white hover:bg-gray-50 text-gray-700'
-                        }`}
+                    {[5, 4, 3, 2, 1].map((starCount) => (
+                      <label
+                        key={starCount}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200"
                       >
-                        <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                        <span className="font-medium">{ratingValue}+ & above</span>
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={minRating === starCount}
+                          onChange={() => setMinRating((prev) => (prev === starCount ? 0 : starCount))}
+                          className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 focus:ring-2"
+                        />
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-0.5">
+                            {[...Array(5)].map((_, i) => (
+                              <Star 
+                                key={i} 
+                                className={`w-4 h-4 ${i < starCount ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-gray-700 font-medium text-sm">{starCount} Star{starCount !== 1 ? 's' : ''}</span>
+                        </div>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -439,7 +414,7 @@ export default function DestinationsDomestic() {
                   <Link
                     key={dest.id}
                     to={`/packages?destination=${dest.slug}`}
-                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 transform"
                   >
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
                     <div className="relative overflow-hidden aspect-[5/3]">
@@ -455,10 +430,6 @@ export default function DestinationsDomestic() {
                             <Clock className="w-4 h-4 text-yellow-400" />
                             <span className="text-sm">{dest.duration}</span>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="text-sm">{dest.rating} ({dest.reviews} reviews)</span>
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -467,16 +438,9 @@ export default function DestinationsDomestic() {
                         {dest.name}, India
                       </h3>
                       <p className="text-gray-600 text-sm line-clamp-2">{dest.description}</p>
-                      <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-gray-200">
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-yellow-600 mb-1">
-                            <Star className="w-4 h-4 fill-current" />
-                            <span className="font-bold text-gray-900">{dest.rating}</span>
-                          </div>
-                          <p className="text-xs text-gray-500">{dest.reviews} reviews</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-gray-700 mb-1">
+                      <div className="flex items-center justify-between py-4 border-t border-b border-gray-200">
+                        <div className="text-left">
+                          <div className="flex items-center gap-1 text-gray-700 mb-1">
                             <Clock className="w-4 h-4" />
                             <span className="font-bold text-gray-900">{dest.duration}</span>
                           </div>
@@ -512,7 +476,7 @@ export default function DestinationsDomestic() {
                     className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-100 hover:shadow-2xl hover:border-yellow-500 transition-all duration-300 cursor-pointer"
                   >
                     <div className="flex flex-col lg:flex-row">
-                      <div className="relative lg:w-96 h-64 lg:h-auto overflow-hidden flex-shrink-0">
+                      <div className="relative lg:w-80 h-64 lg:h-80 overflow-hidden flex-shrink-0">
                         <img
                           src={dest.image_url}
                           alt={dest.name}
@@ -520,8 +484,8 @@ export default function DestinationsDomestic() {
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
                       </div>
-                      <div className="flex-1 p-6 lg:p-8">
-                        <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1 p-4 lg:p-5">
+                        <div className="flex items-start justify-between mb-3">
                           <div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">
                               {dest.name}, India
@@ -540,11 +504,6 @@ export default function DestinationsDomestic() {
                         </div>
                         <p className="text-gray-600 mb-5 leading-relaxed">{dest.description}</p>
                         <div className="flex flex-wrap gap-6 text-sm text-gray-600 mb-6">
-                          <div className="flex items-center space-x-2">
-                            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                            <span className="font-semibold">{dest.rating}</span>
-                            <span className="text-gray-400">({dest.reviews} reviews)</span>
-                          </div>
                           <div className="flex items-center space-x-2">
                             <Clock className="w-4 h-4" />
                             <span>{dest.duration || 'Flexible'}</span>

@@ -7,167 +7,194 @@ import {
   ChevronRight,
   ArrowRight,
   Star,
-  Users,
-  Globe,
-  MapPin,
-  Heart,
-  Sparkles,
-  TrendingUp,
-  Award,
-  CheckCircle2,
 } from "lucide-react"
 import { fetchPackages } from "../../utils/packageApi"
 
-function InternationalBanner() {
-  const [stats] = useState({
-    destinations: "87+",
-    travelers: "50K+",
-    reviews: "12K+",
-  })
-
-  const [isVisible, setIsVisible] = useState(false)
+function ReviewsVideoSlider() {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const itemsPerPage = 4
+  const [videos, setVideos] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setIsVisible(true)
+    const videoData = [
+      { name: "Bali Tour", location: "Bali", file: "/reviews/bali.mp4" },
+      { name: "Thailand Tour", location: "Thailand", file: "/reviews/thailand2.mp4" },
+      { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives2.mp4" },
+      { name: "Machachafushi Tour", location: "Machachafushi", file: "/reviews/machachafushi.mp4" },
+      { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives7.mp4" },
+      { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives3.mp4" },
+      { name: "Dubai Tour", location: "Dubai", file: "/reviews/dubai.mp4" },
+      { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives1.mp4" },
+      { name: "Thailand Tour", location: "Thailand", file: "/reviews/thailand.mp4" },
+      { name: "Mauritius Tour", location: "Mauritius", file: "/reviews/mauritius.mp4" },
+      { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives4.mp4" },
+      { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives6.mp4" },
+      { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives5.mp4" },
+    ]
+    setVideos(videoData)
+    setLoading(false)
   }, [])
 
-  return (
-    <div className="relative w-full py-24 overflow-hidden">
-      {/* Video Background */}
-      <div className="absolute inset-0">
-        <video className="w-full h-full object-cover" src="/v4.mp4" autoPlay muted loop playsInline />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
+  const showCircular = videos.length > itemsPerPage
+
+  const getCurrentVideos = () => {
+    if (!showCircular) {
+      return videos.slice(0, itemsPerPage)
+    }
+    const items = []
+    for (let i = 0; i < itemsPerPage; i++) {
+      items.push(videos[(currentIndex + i) % videos.length])
+    }
+    return items
+  }
+
+  const currentVideos = getCurrentVideos()
+
+  const goToPrevious = () => {
+    if (showCircular) {
+      setCurrentIndex((prev) => (prev - 1 + videos.length) % videos.length)
+    } else {
+      if (currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1)
+      }
+    }
+  }
+
+  const goToNext = () => {
+    if (showCircular) {
+      setCurrentIndex((prev) => (prev + 1) % videos.length)
+    } else {
+      if (currentIndex < videos.length - itemsPerPage) {
+        setCurrentIndex(currentIndex + 1)
+      }
+    }
+  }
+
+  const canGoLeft = showCircular || currentIndex > 0
+  const canGoRight = showCircular || currentIndex < videos.length - itemsPerPage
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-orange-500" />
       </div>
+    )
+  }
+
+  return (
+    <section className="relative py-16 bg-[#051C35] overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(50)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 bg-white/60 rounded-full animate-twinkle"
+            className="absolute rounded-full bg-white"
             style={{
+              width: `${Math.random() * 3}px`,
+              height: `${Math.random() * 3}px`,
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
+              animation: `twinkle ${2 + Math.random() * 3}s ease-in-out infinite`,
               animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 4}s`,
+              opacity: Math.random() * 0.7 + 0.3,
             }}
           />
         ))}
       </div>
-
-      {/* Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative">
-          <div className="text-center px-4">
-
-            <h3
-              className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-              style={{ lineHeight: "1.15" }}
-            >
-              Experience Our{" "}
-              <span className="relative inline-block">
-                <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">
-                  Iconic Destinations
-                </span>
-                <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
-                  <path
-                    d="M2 10C50 2 100 2 150 6C200 10 250 10 298 4"
-                    stroke="url(#gradient)"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
-                  <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#f97316" />
-                      <stop offset="100%" stopColor="#eab308" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </span>
-              <br />
-              <span className="text-white/95">Across the Globe</span>
-            </h3>
-
-            <p
-              className={`text-lg md:text-xl text-white/80 max-w-3xl mx-auto mb-8 transition-all duration-700 delay-200 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              Step Beyond Borders and Discover Cultures, Adventures, and Experiences That Transform Every Trip into a
-              Story You'll Cherish Forever
-            </p>
-
-            {/* Social Proof Strip */}
-            <div
-              className={`mt-12 flex flex-wrap items-center justify-center gap-6 md:gap-8 transition-all duration-700 delay-500 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
-            >
-              {/* Avatar */}
-              <div className="flex items-center gap-3">
-                <div className="flex -space-x-3">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div
-                      key={i}
-                      className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-xs font-bold shadow-lg"
-                    >
-                      {String.fromCharCode(64 + i)}
-                    </div>
-                  ))}
-                </div>
-                <div className="text-left">
-                  <p className="text-white font-semibold text-sm">Join 11,000+</p>
-                  <p className="text-white/60 text-xs">Happy Travelers</p>
-                </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Journeys told by our happy travelers</h2>
+          <p className="text-lg text-white mb-6">True stories that show why India loves traveling with us</p>
+          <div className="flex justify-center">
+            <div className="flex bg-white items-center gap-3 rounded-full px-6 py-3 shadow-lg">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              <span className="text-black text-sm font-bold">4.9</span>
+              <div className="flex gap-0.5">
+                {[1].map((i) => (
+                  <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                ))}
               </div>
-              <div className="hidden md:block w-px h-10 bg-white/20" />
-
-              {/* Rating  */}
-              <div className="flex items-center gap-2">
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                  ))}
-                </div>
-                <span className="text-white font-semibold">{stats.rating}/5</span>
-                <span className="text-white/60 text-sm">({stats.reviews} reviews)</span>
-              </div>
+              <span className="text-black text-sm font-medium">(250k+ reviews)</span>
             </div>
           </div>
         </div>
+
+        <div className="relative">
+          {canGoLeft && (
+            <button
+              onClick={goToPrevious}
+              className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg items-center justify-center hover:bg-white transition-all border border-gray-200"
+            >
+              <ChevronLeft className="w-6 h-6 text-gray-800" />
+            </button>
+          )}
+
+          {canGoRight && (
+            <button
+              onClick={goToNext}
+              className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg items-center justify-center hover:bg-white transition-all border border-gray-200"
+            >
+              <ChevronRight className="w-6 h-6 text-gray-800" />
+            </button>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-0 md:px-16">
+            {currentVideos.map((video, index) => (
+              <div key={`${currentIndex}-${index}`} className="flex flex-col">
+                <div className="group relative overflow-hidden rounded-2xl aspect-[9/16] bg-gray-200 border-2 hover:shadow-2xl transition-all duration-300">
+                  <video
+                    src={video.file}
+                    className="w-full h-full object-cover"
+                    controls
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    controlsList="nodownload"
+                    style={{ pointerEvents: 'auto' }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                </div>
+                <div className="mt-6 text-center">
+                  <h3 className="font-semibold text-white text-lg">{video.name}</h3>
+                  {/* <p className="text-lg text-white mt-1">{video.location}</p> */}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="flex md:hidden justify-center gap-2 mt-8">
+          <button
+            onClick={goToPrevious}
+            className="p-2 bg-gray-200 rounded-full hover:bg-orange-500 transition-colors"
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-800" />
+          </button>
+          <button
+            onClick={goToNext}
+            className="p-2 bg-gray-200 rounded-full hover:bg-orange-500 transition-colors"
+          >
+            <ChevronRight className="w-6 h-6 text-gray-800" />
+          </button>
+        </div>
       </div>
       <style>{`
-        @keyframes float-slow {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-15px) rotate(2deg); }
-        }
-        @keyframes float-medium {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-10px) rotate(-2deg); }
-        }
-        @keyframes float-fast {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
         @keyframes twinkle {
           0%, 100% { opacity: 0; transform: scale(0.5); }
           50% { opacity: 1; transform: scale(1); }
-        }
-        .animate-float-slow {
-          animation: float-slow 4s ease-in-out infinite;
-        }
-        .animate-float-medium {
-          animation: float-medium 3s ease-in-out infinite;
-        }
-        .animate-float-fast {
-          animation: float-fast 2.5s ease-in-out infinite;
         }
         .animate-twinkle {
           animation: twinkle 4s ease-in-out infinite;
         }
       `}</style>
-    </div>
+    </section>
   )
 }
 
@@ -208,7 +235,7 @@ function InternationalGrid({ destinations, loading }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
           <div className="absolute inset-0 flex flex-col justify-end p-3 md:p-6">
-            <h3 className="text-3xl font-bold text-white">{dest.name}</h3>
+            <h3 className="text-xl font-bold text-white">{dest.name}</h3>
             <div className="text-white/90 text-sm mt-2">
               <span>Starting from</span>
               <p className="text-lg font-bold">₹{Math.round(dest.price)?.toLocaleString()}</p>
@@ -313,7 +340,7 @@ function LocalSlider({ destinations, loading }) {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
               <div className="absolute top-4 left-4 right-4">
-                <h3 className="text-2xl font-bold text-white drop-shadow-lg text-left">{dest.name}</h3>
+                <h3 className="text-xl font-bold text-white drop-shadow-lg text-left">{dest.name}</h3>
               </div>
               <div className="absolute bottom-4 left-4 right-4">
                 <div className="text-white/90 text-left">
@@ -364,7 +391,7 @@ export default function DestinationsSection() {
     <div className="bg-gradient-to-b from-gray-50 to-white">
       {/* International Section */}
       <section className="py-28 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
-        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="mb-12 text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Explore the World Without Limits</h2>
             <p className="text-lg text-gray-600">
@@ -385,7 +412,7 @@ export default function DestinationsSection() {
         </div>
       </section>
 
-      <InternationalBanner />
+      <ReviewsVideoSlider />
 
       {/* Local Destinations  */}
       <section className="py-24 bg-white">

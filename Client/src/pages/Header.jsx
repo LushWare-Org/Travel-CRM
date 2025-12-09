@@ -10,6 +10,7 @@ export default function Header({ currentPage, onNavigate }) {
   const [scrollY, setScrollY] = useState(0);
   const isScrolled = scrollY > 50;
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
   const [internationalMenu, setInternationalMenu] = useState([]);
   const [domesticMenu, setDomesticMenu] = useState([]);
   const location = useLocation();
@@ -19,6 +20,7 @@ export default function Header({ currentPage, onNavigate }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sideMenuOpen, setSideMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -104,6 +106,19 @@ export default function Header({ currentPage, onNavigate }) {
     !user && { name: 'Login', page: 'login' },
   ].filter(Boolean);
 
+  const leftNavItems = [
+    { name: 'International Destinations', page: 'destinations-international', dropdown: internationalMenu },
+    { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: domesticMenu },
+  ];
+
+  const sideMenuItems = [
+    { name: 'Home', page: 'home' },
+    { name: 'About Us', page: 'about' },
+    { name: 'Contact', page: 'contact' },
+    user && { name: 'My Account', page: 'my-account' },
+    !user && { name: 'Login', page: 'login' },
+  ].filter(Boolean);
+
   const getColumnClass = len => len <= 7 ? 'grid-cols-2' : len <= 15 ? 'grid-cols-3' : 'grid-cols-4';
   const getDropdownWidth = len => len <= 7 ? 'w-80' : len <= 15 ? 'w-[500px]' : 'w-[600px]';
   const LONG_NAME_THRESHOLD = 18;
@@ -124,13 +139,12 @@ export default function Header({ currentPage, onNavigate }) {
     <header className="relative z-50 overflow-visible transition-all duration-300 bg-black shadow-lg font-opensans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
-        <a href="/" className="flex items-center cursor-pointer">
-            <img src="/logo.png" alt="TripSkyWay Logo" className="h-9 w-auto" />
+        <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
+            <img src="/logo.png" alt="TripSkyWay Logo" className="h-10 w-auto" />
           </a>
-
-          {/* Navigation */}
-          <nav className="hidden lg:flex items-center space-x-1 flex-1 justify-center min-w-0">
-            {navItems.map(item => {
+          <div className="flex-1" />
+          <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
+            {leftNavItems.map(item => {
               const isActive = isItemActive(item);
 
               return (
@@ -243,13 +257,11 @@ export default function Header({ currentPage, onNavigate }) {
                 </div>
               );
             })}
-          </nav>
 
           {/* Right Side */}
-          <div className="hidden lg:flex items-center gap-3 ml-auto flex-shrink-0">
             <a
               href="/planner"
-              className="group relative overflow-hidden bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2"
+              className="group relative overflow-hidden bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2 ml-4 flex-shrink-0"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="relative flex items-center justify-center gap-1.5">
@@ -257,7 +269,9 @@ export default function Header({ currentPage, onNavigate }) {
                 <span className="text-xs">Plan Your Trip</span>
               </div>
             </a>
+          </nav>
 
+          <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
             {user && (
               <div className="relative" ref={userMenuRef}>
                 <button
@@ -295,6 +309,14 @@ export default function Header({ currentPage, onNavigate }) {
                 )}
               </div>
             )}
+            {/* Side Menu Button */}
+            <button
+              onClick={() => setSideMenuOpen(!sideMenuOpen)}
+              className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-orange-500 transition-all flex-shrink-0"
+              aria-label="Toggle side menu"
+            >
+              {sideMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -306,31 +328,73 @@ export default function Header({ currentPage, onNavigate }) {
         </div>
 
         {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-800 py-4">
+        <div className={`fixed lg:hidden top-0 right-0 h-screen w-3/4 bg-gray-950 border-l border-gray-800 shadow-2xl z-[100] transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="flex items-center justify-between p-4 border-b border-gray-800">
+            <h2 className="text-lg font-bold text-white">Menu</h2>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-all"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          {/* Menu Items */}
+          <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 70px)' }}>
             {navItems.map(item => {
               const isActive = isItemActive(item);
+              const isMobileDropdownOpen = mobileDropdownOpen === item.page;
               return (
                 <div key={item.page}>
-                  <button
-                    onClick={() => {
-                      onNavigate(item.page, null, item.dropdown);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-3 flex items-center justify-between transition-all text-sm font-medium
-                      ${isActive 
-                        ? 'text-orange-400 bg-orange-900/20' 
-                        : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
-                      }
-                    `}
-                  >
-                    <span>{item.name}</span>
-                    {item.dropdown && <ChevronDown size={16} />}
-                  </button>
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => {
+                        if (!item.dropdown) {
+                          onNavigate(item.page, null, null);
+                          setMobileMenuOpen(false);
+                        }
+                      }}
+                      className={`flex-1 text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
+                        ${isActive 
+                          ? 'text-orange-400 bg-orange-900/20' 
+                          : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
+                        }
+                      `}
+                    >
+                      {item.name}
+                    </button>
+                    {item.dropdown && (
+                      <button
+                        onClick={() => setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page)}
+                        className="px-3 py-3 text-gray-300 hover:text-orange-400 transition-all"
+                      >
+                        <ChevronDown size={16} className={`transition-transform ${isMobileDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Mobile Dropdown List */}
+                  {item.dropdown && isMobileDropdownOpen && (
+                    <div className="bg-gray-900/50 rounded-lg mt-1 mb-2 grid grid-cols-2 gap-2 p-3">
+                      {item.dropdown.map(dest => (
+                        <button
+                          key={dest.id}
+                          onClick={() => {
+                            onNavigate(item.page, dest.slug);
+                            setMobileMenuOpen(false);
+                            setMobileDropdownOpen(null);
+                          }}
+                          className="text-left px-3 py-2 text-xs rounded-lg bg-gray-800/50 text-gray-300 hover:text-orange-400 hover:bg-orange-900/20 transition-all"
+                        >
+                          {dest.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
-            <div className="border-t border-gray-800 mt-3 pt-3 px-4">
+            <div className="border-t border-gray-800 mt-4 pt-4">
               <a
                 href="/planner"
                 onClick={() => {
@@ -343,7 +407,7 @@ export default function Header({ currentPage, onNavigate }) {
               </a>
             </div>
             {user && (
-              <div className="border-t border-gray-800 mt-3 pt-3 px-4">
+              <div className="border-t border-gray-800 mt-4 pt-4">
                 <button
                   onClick={() => {
                     logout();
@@ -357,8 +421,59 @@ export default function Header({ currentPage, onNavigate }) {
                 </button>
               </div>
             )}
-          </div>
+          </nav>
+        </div>
+
+        {mobileMenuOpen && (
+          <div
+            className="fixed inset-0 lg:hidden bg-black/40 z-[99]"
+            onClick={() => setMobileMenuOpen(false)}
+          />
         )}
+
+        {/* Side Menu */}
+        <div className={`fixed top-0 right-0 h-screen w-80 bg-gray-950 border-l border-gray-800 shadow-2xl z-[100] transform transition-transform duration-300 ${sideMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="flex items-center justify-between p-4 border-b border-gray-800">
+            <h2 className="text-lg font-bold text-white">Menu</h2>
+            <button
+              onClick={() => setSideMenuOpen(false)}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-all"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+
+          {/* Menu Items */}
+          <nav className="p-4 space-y-2">
+            {sideMenuItems.map(item => {
+              const isActive = isItemActive(item);
+              return (
+                <button
+                  key={item.page}
+                  onClick={() => {
+                    onNavigate(item.page, null, item.dropdown);
+                    setSideMenuOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
+                    ${isActive 
+                      ? 'text-orange-400 bg-orange-900/20' 
+                      : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
+                    }
+                  `}
+                >
+                  {item.name}
+                </button>
+              );
+            })}
+          </nav>
+
+          {sideMenuOpen && (
+            <div
+              className="fixed inset-0 bg-black/40 z-[-1]"
+              onClick={() => setSideMenuOpen(false)}
+            />
+          )}
+        </div>
       </div>
       <style>{`
         @keyframes fadeIn {
