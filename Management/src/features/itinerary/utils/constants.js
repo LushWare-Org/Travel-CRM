@@ -23,15 +23,10 @@ export const STATUS_COLORS = {
 
 export const CATEGORY_OPTIONS = [
   { value: 'honeymoon', label: 'Honeymoon' },
+  { value: 'couple', label: 'Couple' },
   { value: 'family', label: 'Family' },
-  { value: 'adventure', label: 'Adventure' },
-  { value: 'budget', label: 'Budget' },
-  { value: 'luxury', label: 'Luxury' },
-  { value: 'religious', label: 'Religious' },
-  { value: 'wildlife', label: 'Wildlife' },
-  { value: 'beach', label: 'Beach' },
-  { value: 'heritage', label: 'Heritage' },
-  { value: 'other', label: 'Other' },
+  { value: 'group', label: 'Group' },
+  { value: 'wild safari', label: 'Wild Safari' },
 ];
 
 export const REGION_OPTIONS = [

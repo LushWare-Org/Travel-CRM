@@ -85,6 +85,25 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
         </div>
       </div>
 
+      {/* Package Type */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Package Type <span className="text-red-500">*</span>
+        </label>
+        <select
+          name="packageType"
+          value={formData.packageType || ''}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select Package Type</option>
+          <option value="Standard">Standard</option>
+          <option value="Deluxe">Deluxe</option>
+          <option value="Luxury">Luxury</option>
+          <option value="Premium">Premium</option>
+        </select>
+      </div>
+
       <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
         <p className="text-sm text-blue-800">
           <strong>Note:</strong> Specific destinations, activities, accommodation, and transport details 
