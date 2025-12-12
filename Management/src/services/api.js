@@ -479,6 +479,52 @@ export const receiptAPI = {
   },
 };
 
+export const voucherAPI = {
+  getAll: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/billing/vouchers', params);
+  },
+  create: async (payload) => {
+    const api = new ApiService();
+    return api.post('/billing/vouchers', payload);
+  },
+  getByLead: async (leadId) => {
+    const api = new ApiService();
+    return api.get('/billing/vouchers/lead/' + leadId);
+  },
+  getById: async (voucherId) => {
+    const api = new ApiService();
+    return api.get(`/billing/vouchers/${voucherId}`);
+  },
+  update: async (voucherId, payload) => {
+    const api = new ApiService();
+    return api.put(`/billing/vouchers/${voucherId}`, payload);
+  },
+  downloadPDF: async (voucherId) => {
+    const api = new ApiService();
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/billing/vouchers/${voucherId}/pdf`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to download PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `voucher-${voucherId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+  sendEmail: async (voucherId, email) => {
+    const api = new ApiService();
+    return api.post(`/billing/vouchers/${voucherId}/send`, { email });
+  },
+};
+
 // Package API Methods
 export const packageAPI = {
   // Get all packages
@@ -525,6 +571,18 @@ export const customizedPackageAPI = {
   update: async (id, payload) => {
     const api = new ApiService();
     return api.put(`/customized-packages/${id}`, payload);
+  },
+};
+
+// Itinerary API Methods
+export const itineraryAPI = {
+  getById: async (id) => {
+    const api = new ApiService();
+    return api.get(`/itineraries/${id}`);
+  },
+  getByPackage: async (packageId) => {
+    const api = new ApiService();
+    return api.get(`/itineraries/package/${packageId}`);
   },
 };
 

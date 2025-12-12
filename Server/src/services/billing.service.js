@@ -93,8 +93,6 @@ class BillingService {
       discountType: quotation.discountType,
       discountValue: quotation.discountValue,
       discountAmount: quotation.discountAmount,
-      serviceChargeRate: quotation.serviceChargeRate,
-      serviceChargeAmount: quotation.serviceChargeAmount,
       totalAmount: quotation.totalAmount,
       notes: quotation.notes,
       terms: quotation.terms,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, XCircle } from 'lucide-react';
+import { X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, XCircle, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import { leadAPI, packageAPI, manualItineraryAPI, customizedPackageAPI } from '../../../services/api';
@@ -8,6 +8,8 @@ import { usePermission } from '../../../contexts/PermissionContext';
 import { PackageFormModal, NewEditPackageForm } from '../../../features/itinerary/components';
 import { useImageUpload } from '../../../features/itinerary/hooks';
 import { uploadPackageImages } from '../../../services/cloudinaryService';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import LocationAutocomplete from './LocationAutocomplete';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import DestinationSelector from '../../itinerary/components/DestinationSelector';
@@ -44,16 +46,15 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     name: "",
     email: "",
     phone: "",
+    whatsapp: "",
     numberOfTravelers: 1,
     city: "",
-    whatsapp: "",
     salesRep: "",
     assignedTo: "",
     destination: "",
     platform: "",
     travelDate: "",
     endDate: "",
-    time: "",
     package: "",
     packageName: "",
     status: "new",
@@ -78,7 +79,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
-        packagesList = packagesList.filter((pkg) => pkg.isActive !== false);
+        // Filter to only show active and published packages
+        packagesList = packagesList.filter((pkg) => 
+          pkg.isActive !== false && pkg.status === 'published'
+        );
 
         if (customPackageId) {
           try {
@@ -153,16 +157,15 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         name: lead.name || '',
         email: lead.email || '',
         phone: lead.phone || '',
+        whatsapp: lead.whatsapp || '',
         numberOfTravelers: lead.numberOfTravelers || 1,
         city: lead.city || '',
-        whatsapp: lead.whatsapp || '',
         salesRep: lead.salesRep || lead.adviser || '',
         assignedTo: lead.assignedTo?._id || lead.assignedTo || '',
         destination: lead.destination || '',
         platform: lead.platform || '',
         travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
         endDate: lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
-        time: lead.time || '',
         package: defaultPackageId,
         packageName: defaultPackageName,
         status: lead.status || 'new',
@@ -213,7 +216,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       
       const updateData = {
         name: formData.name?.trim() || undefined,
-        phone: formData.phone?.trim() || undefined,
+        phone: formData.phone || undefined,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
         city: formData.city || undefined,
         salesRep: formData.salesRep || undefined,
@@ -222,7 +225,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         platform: formData.platform || undefined,
         travelDate: formData.travelDate || undefined,
         endDate: formData.endDate || undefined,
-        time: formData.time || undefined,
+        whatsapp: formData.whatsapp || undefined,
         package: formData.package || null,
         packageName: formData.packageName || null,
         status: formData.status || 'new',
@@ -618,235 +621,289 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 flex justify-between items-center rounded-t-xl shadow-lg z-10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Edit Lead - {formData.name}</h2>
-            <p className="text-gray-600 mt-1">Update lead information</p>
+            <h2 className="text-2xl font-bold">Edit Lead - {formData.name || 'Lead'}</h2>
+            <p className="text-sm text-blue-100 mt-1">Update lead information and details</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-red-50 rounded-lg transition-all duration-200 group">
-            <X className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors duration-200" />
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg transition-all duration-200 group">
+            <X className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-200" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        <div className="p-6 space-y-6">
+          {/* Personal Information Section */}
+          <div className="space-y-4">
+            <div className="border-b border-gray-200 pb-2">
+              <h3 className="text-lg font-semibold text-gray-900">Personal Information</h3>
+              <p className="text-xs text-gray-500 mt-1">Basic contact details of the lead</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Number of Travelers</label>
-              <input
-                type="number"
-                min="1"
-                value={formData.numberOfTravelers}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData({
-                    ...formData,
-                    numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Departure</label>
-              <LocationAutocomplete
-                value={formData.city}
-                onChange={(value) => setFormData({...formData, city: value})}
-                placeholder="e.g., Colombo, Sri Lanka"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sales Rep</label>
-              {isSalesRep && !canManageLeads ? (
-              <input
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
                   type="text"
-                  value={formData.salesRep || ''}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-gray-600 cursor-not-allowed"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  placeholder="Enter full name"
                 />
-              ) : (
-              <select
-                value={formData.assignedTo || ''}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  const rep = salesReps.find(r => r.id === id);
-                  setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Sales Rep</option>
-                {salesReps.map((rep) => (
-                  <option key={rep.id} value={rep.id}>{rep.name}</option>
-                ))}
-              </select>
-              )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  placeholder="email@example.com"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Contact Number <span className="text-red-500">*</span>
+                </label>
+                <PhoneInput
+                  international
+                  defaultCountry="LK"
+                  value={formData.phone}
+                  onChange={(value) => setFormData({ ...formData, phone: value || "" })}
+                  className="phone-input-wrapper"
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    WhatsApp Number
+                  </label>
+                  {formData.phone && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
+                      className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                      title="Copy contact number to WhatsApp"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Copy from Contact
+                    </button>
+                  )}
+                </div>
+                <PhoneInput
+                  international
+                  defaultCountry="LK"
+                  value={formData.whatsapp}
+                  onChange={(value) => setFormData({ ...formData, whatsapp: value || "" })}
+                  className="phone-input-wrapper"
+                  placeholder="Enter WhatsApp number"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Package</label>
-              <div className="space-y-2">
-                <select
-                  value={formData.package || ''}
+          {/* Travel Details Section */}
+          <div className="space-y-4">
+            <div className="border-b border-gray-200 pb-2">
+              <h3 className="text-lg font-semibold text-gray-900">Travel Details</h3>
+              <p className="text-xs text-gray-500 mt-1">Information about the travel requirements</p>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Departure City
+                </label>
+                <LocationAutocomplete
+                  value={formData.city}
+                  onChange={(value) => setFormData({...formData, city: value})}
+                  placeholder="e.g., Colombo, Sri Lanka"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Destination
+                </label>
+                <DestinationSelector
+                  value={formData.destination}
+                  onChange={(event) =>
+                    setFormData({ ...formData, destination: event.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Travel Date (Start)
+                </label>
+                <input
+                  type="date"
+                  value={formData.travelDate}
+                  onChange={(e) => setFormData({...formData, travelDate: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  min={formData.travelDate || undefined}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Number of Travelers
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.numberOfTravelers}
                   onChange={(e) => {
-                    const packageId = e.target.value;
-                    const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-                    setFormData({ 
-                      ...formData, 
-                      package: packageId,
-                      packageName: selectedPackage?.name || '',
-                      destination: selectedPackage?.destination || formData.destination
+                    const value = e.target.value;
+                    setFormData({
+                      ...formData,
+                      numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
                     });
                   }}
-                  disabled={loadingPackages}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  placeholder="e.g., 2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Platform/Source
+                </label>
+                <select
+                  value={formData.platform}
+                  onChange={(e) => setFormData({...formData, platform: e.target.value})}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
                 >
-                  <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
-                  {packages.map((pkg) => {
-                    const optionId = pkg._id || pkg.id;
-                    const baseName =
-                      pkg.baseName ||
-                      `${pkg.name || 'Unnamed Package'}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
-                    const sequence = pkg.customizationSequence || pkg.sequence || 0;
-                    let label = baseName || 'Unnamed Package';
-                    if (pkg.customizedForLead || pkg.isCustomizedPackage) {
-                      label = sequence > 1 ? `${label} (Customized-${sequence})` : `${label} (Customized)`;
-                    }
-                    return (
-                      <option key={optionId} value={optionId}>
-                        {label}
-                      </option>
-                    );
-                  })}
+                  <option value="">Select Platform</option>
+                  <option value="Website Form">Website Form</option>
+                  <option value="Social Media">Social Media</option>
+                  <option value="Phone Call">Phone Call</option>
+                  <option value="Referral">Referral</option>
+                  <option value="Walk-in">Walk-in</option>
                 </select>
-                {formData.package && (
-                  <button
-                    onClick={handleEditPackage}
-                    className="w-full px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 relative"
-                    title="Customize Package & Itinerary (Creates New Package)"
+              </div>
+            </div>
+          </div>
+
+          {/* Package & Assignment Section */}
+          <div className="space-y-4">
+            <div className="border-b border-gray-200 pb-2">
+              <h3 className="text-lg font-semibold text-gray-900">Package & Assignment</h3>
+              <p className="text-xs text-gray-500 mt-1">Select package and assign sales representative</p>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Package
+                </label>
+                <div className="space-y-2">
+                  <select
+                    value={formData.package || ''}
+                    onChange={(e) => {
+                      const packageId = e.target.value;
+                      const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
+                      setFormData({ 
+                        ...formData, 
+                        package: packageId,
+                        packageName: selectedPackage?.name || '',
+                        destination: selectedPackage?.destination || formData.destination
+                      });
+                    }}
+                    disabled={loadingPackages}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
-                    <Edit className="w-4 h-4" />
-                    <span>Customize Package</span>
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-white" title="Will create a new package"></span>
-                  </button>
+                    <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
+                    {packages.map((pkg) => {
+                      const optionId = pkg._id || pkg.id;
+                      const baseName =
+                        pkg.baseName ||
+                        `${pkg.name || 'Unnamed Package'}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+                      const sequence = pkg.customizationSequence || pkg.sequence || 0;
+                      let label = baseName || 'Unnamed Package';
+                      if (pkg.customizedForLead || pkg.isCustomizedPackage) {
+                        label = sequence > 1 ? `${label} (Customized-${sequence})` : `${label} (Customized)`;
+                      }
+                      return (
+                        <option key={optionId} value={optionId}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {formData.package && (
+                    <button
+                      onClick={handleEditPackage}
+                      className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all font-medium flex items-center justify-center gap-2 shadow-sm"
+                      type="button"
+                    >
+                      <Edit className="w-4 h-4" />
+                      Customize Package
+                    </button>
+                  )}
+                </div>
+                {packages.length === 0 && !loadingPackages && (
+                  <p className="text-xs text-gray-500 mt-1">No packages available</p>
                 )}
               </div>
-              {packages.length === 0 && !loadingPackages && (
-                <p className="text-xs text-gray-500 mt-1">No packages available</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Destination</label>
-              <DestinationSelector
-                value={formData.destination}
-                onChange={(event) =>
-                  setFormData({ ...formData, destination: event.target.value })
-                }
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-              <select
-                value={formData.platform}
-                onChange={(e) => setFormData({...formData, platform: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select Platform</option>
-                <option value="Website Form">Website Form</option>
-                <option value="Social Media">Social Media</option>
-                <option value="Phone Call">Phone Call</option>
-                <option value="Referral">Referral</option>
-                <option value="Walk-in">Walk-in</option>
-              </select>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Sales Representative
+                </label>
+                {isSalesRep && !canManageLeads ? (
+                  <input
+                    type="text"
+                    value={formData.salesRep || ''}
+                    disabled
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                  />
+                ) : (
+                  <select
+                    value={formData.assignedTo || ''}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const rep = salesReps.find(r => r.id === id);
+                      setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
+                    }}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                  >
+                    <option value="">Select Sales Rep</option>
+                    {salesReps.map((rep) => (
+                      <option key={rep.id} value={rep.id}>{rep.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Travel Date (Start)</label>
-              <input
-                type="date"
-                value={formData.travelDate}
-                onChange={(e) => setFormData({...formData, travelDate: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-              <input
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                min={formData.travelDate || undefined}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
-              <input
-                type="text"
-                value={formData.time}
-                onChange={(e) => setFormData({...formData, time: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., 10:30 AM or 14:00"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({...formData, status: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="interested">Interested</option>
-              <option value="quoted">Quoted</option>
-              <option value="converted">Converted</option>
-              <option value="lost">Lost</option>
-              <option value="not-interested">Not Interested</option>
-            </select>
-          </div>
 
           {/* Remarks Section */}
-          <div className="border-t pt-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
-                Remarks ({remarks.length})
-              </h3>
+          <div className="space-y-4 border-t border-gray-200 pt-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Remarks ({remarks.length})
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">Add notes and comments about this lead</p>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -855,7 +912,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     setNewRemarkText('');
                   }
                 }}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all font-medium flex items-center gap-2 shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 {showAddRemark ? 'Cancel' : 'Add Remark'}
@@ -864,22 +921,23 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
             {/* Add New Remark */}
             {showAddRemark && (
-              <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="mb-4 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 shadow-sm">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">New Remark</label>
                 <textarea
                   value={newRemarkText}
                   onChange={(e) => setNewRemarkText(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-3"
-                  rows={3}
-                  placeholder="Enter new remark..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none mb-4 transition-all"
+                  rows={4}
+                  placeholder="Enter your remark here..."
                 />
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setShowAddRemark(false);
                       setNewRemarkText('');
                     }}
-                    className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                    className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center gap-2"
                   >
                     <XCircle className="w-4 h-4" />
                     Cancel
@@ -899,30 +957,30 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                       setRemarks([...remarks, newRemark]);
                       setNewRemarkText('');
                       setShowAddRemark(false);
-                      toast.success('Remark added');
+                      toast.success('Remark added successfully');
                     }}
-                    className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                    className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-sm"
                   >
                     <Save className="w-4 h-4" />
-                    Add
+                    Add Remark
                   </button>
                 </div>
               </div>
             )}
 
             {/* Remarks List */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {remarks.length > 0 ? (
                 remarks.map((remark, index) => (
-                  <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                  <div key={index} className="p-5 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
                     {editingRemarkIndex === index ? (
                       // Edit mode
                       <div className="space-y-3">
                         <textarea
                           value={editRemarkText}
                           onChange={(e) => setEditRemarkText(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                          rows={3}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
+                          rows={4}
                           placeholder="Enter remark text..."
                         />
                         <div className="flex items-center justify-between">
@@ -942,7 +1000,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                                 setEditingRemarkIndex(null);
                                 setEditRemarkText('');
                               }}
-                              className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                              className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center gap-2"
                             >
                               <XCircle className="w-4 h-4" />
                               Cancel
@@ -966,12 +1024,12 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                                 setRemarks(updatedRemarks);
                                 setEditingRemarkIndex(null);
                                 setEditRemarkText('');
-                                toast.success('Remark updated');
+                                toast.success('Remark updated successfully');
                               }}
-                              className="px-3 py-1.5 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                              className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-sm"
                             >
                               <Save className="w-4 h-4" />
-                              Save
+                              Save Changes
                             </button>
                           </div>
                         </div>
@@ -1026,10 +1084,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                  <p className="text-sm">No remarks yet</p>
-                  <p className="text-xs mt-1">Click "Add Remark" to add one</p>
+                <div className="text-center py-12 text-gray-500 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                  <p className="text-sm font-medium">No remarks yet</p>
+                  <p className="text-xs mt-1 text-gray-400">Click "Add Remark" to add your first note</p>
                 </div>
               )}
             </div>
@@ -1091,21 +1149,30 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             )}
           </div>
 
-          <div className="flex gap-3 pt-4">
+          {/* Action Buttons */}
+          <div className="flex gap-4 pt-6 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all font-semibold"
+              type="button"
+            >
+              Cancel
+            </button>
             <button
               onClick={handleSave}
               disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
+              type="button"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Saving Changes...
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" />
-                  Save
+                  <Save className="w-5 h-5" />
+                  Save Changes
                 </>
               )}
             </button>
@@ -1139,6 +1206,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             images={images}
             isUploadingImages={isUploadingImages}
             hideLeadManagementButtons={true}
+            onlyItineraryEditable={true}
           />
         </PackageFormModal>
       )}

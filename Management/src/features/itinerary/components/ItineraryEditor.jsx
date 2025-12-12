@@ -20,6 +20,7 @@ const ItineraryEditor = ({
   useLocationAutocomplete = false, // New prop to determine location input type
   LocationAutocompleteComponent = null, // Optional custom location autocomplete component
   hideTitleAndDescription = false, // Hide title and description fields (for lead management)
+  hideDescription = false, // Hide only description field (for customize package mode)
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
 
@@ -104,8 +105,8 @@ const ItineraryEditor = ({
             </div>
             )}
 
-            {/* Description - Hidden when hideTitleAndDescription is true */}
-            {!hideTitleAndDescription && (
+            {/* Description - Hidden when hideTitleAndDescription or hideDescription is true */}
+            {!hideTitleAndDescription && !hideDescription && (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Description

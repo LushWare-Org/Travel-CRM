@@ -1,4 +1,4 @@
-import { MessageSquare, Edit, FileText, Receipt, FileCheck } from 'lucide-react';
+import { MessageSquare, Edit, FileText, Receipt, FileCheck, Ticket } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { quotationAPI, invoiceAPI, receiptAPI } from '../../../services/api';
 
@@ -14,15 +14,24 @@ const LeadTable = ({
   onQuotationClick,
   onInvoiceClick,
   onReceiptClick,
+  onVoucherClick,
   currentPage,
   totalPages,
   onPageChange,
   leadsPerPage,
   totalLeads,
-  highlightedLeadId
+  highlightedLeadId,
+  onStatusClick
 }) => {
   const paginationStart = (currentPage - 1) * leadsPerPage + 1;
   const paginationEnd = Math.min(currentPage * leadsPerPage, totalLeads);
+
+  const handleStatusClick = (e, lead) => {
+    e.stopPropagation();
+    if (onStatusClick) {
+      onStatusClick(lead);
+    }
+  };
 
   if (loading) {
     return (
@@ -67,6 +76,13 @@ const LeadTable = ({
     e.stopPropagation();
     if (onReceiptClick) {
       onReceiptClick(lead);
+    }
+  };
+
+  const handleVoucherClick = (e, lead) => {
+    e.stopPropagation();
+    if (onVoucherClick) {
+      onVoucherClick(lead);
     }
   };
 
@@ -206,10 +222,17 @@ const LeadTable = ({
                   <td className="px-4 py-3 text-sm border-r border-gray-200">
                     {formatDateTime(lead.createdAt || lead.leadDateTime)}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap border-r border-gray-200 sticky right-[250px] bg-white group-hover:bg-gray-50 z-5 shadow-[2px_0_4px_rgba(0,0,0,0.1)]">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${colors?.badge || 'bg-gray-100 text-gray-800'}`}>
+                  <td 
+                    className="px-4 py-3 whitespace-nowrap border-r border-gray-200 sticky right-[250px] bg-white group-hover:bg-gray-50 z-5 shadow-[2px_0_4px_rgba(0,0,0,0.1)]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${colors?.badge || 'bg-gray-100 text-gray-800'}`}
+                      onClick={(e) => handleStatusClick(e, lead)}
+                      title="Click to change status"
+                    >
                       {(statusLabels && statusLabels[lead.status]) || lead.status || 'N/A'}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 sticky right-0 bg-white group-hover:bg-gray-50 z-5 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]" onClick={(e) => { e.stopPropagation(); }}>
                     <div className="flex items-center gap-1 flex-wrap">
@@ -240,6 +263,13 @@ const LeadTable = ({
                         title="Payment Receipt"
                       >
                         <FileCheck className="w-4 h-4 text-orange-600" />
+                      </button>
+                      <button 
+                        onClick={(e) => handleVoucherClick(e, lead)}
+                        className="px-2 py-2 hover:bg-indigo-100 rounded-lg transition-colors bg-gray-100"
+                        title="Travel Voucher"
+                      >
+                        <Ticket className="w-4 h-4 text-indigo-600" />
                       </button>
                     </div>
                   </td>

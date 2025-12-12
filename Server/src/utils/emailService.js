@@ -357,6 +357,45 @@ class EmailService {
     });
   }
 
+  async sendVoucherEmail({ to, voucherNumber, customerName, packageName, pdfBuffer, fileName }) {
+    const subject = voucherNumber
+      ? `Trip Sky Way Travel Voucher - ${voucherNumber}`
+      : 'Trip Sky Way Travel Voucher';
+
+    const html = `
+      <p>Dear ${customerName},</p>
+      <p>Thank you for choosing Trip Sky Way! We're excited to be part of your travel journey.</p>
+      <p>Please find your travel voucher attached. This voucher contains all the important details about your trip.</p>
+      <h3>Voucher Summary</h3>
+      <ul>
+        <li><strong>Voucher Number:</strong> ${voucherNumber}</li>
+        <li><strong>Package:</strong> ${packageName}</li>
+        <li><strong>Status:</strong> CONFIRMED</li>
+      </ul>
+      <p>Please review the attached voucher carefully. It contains your travel dates, accommodation details, meal plans, and itinerary.</p>
+      <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
+      <p>We wish you a wonderful and memorable journey!</p>
+      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    `;
+
+    const text = `Dear ${customerName},\n\nThank you for choosing Trip Sky Way! Your travel voucher is attached.\nVoucher Number: ${voucherNumber}\nPackage: ${packageName}\n\nPlease review the attached voucher for all travel details.\n\nWarm regards,\nTrip Sky Way Team`;
+
+    return this.sendEmail({
+      to,
+      subject,
+      html,
+      text,
+      attachments: pdfBuffer
+        ? [
+            {
+              filename: fileName || `voucher-${voucherNumber}.pdf`,
+              content: pdfBuffer,
+            },
+          ]
+        : [],
+    });
+  }
+
   async sendVendorStatusUpdate(vendor, status) {
     let subject = '';
     let message = '';

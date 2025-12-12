@@ -31,7 +31,6 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     taxRate: 0,
     discountType: 'none',
     discountValue: 0,
-    serviceChargeRate: 0,
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     notes: '',
     terms: '',
@@ -204,7 +203,6 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       taxRate: selectedQuote.taxRate || 0,
       discountType: selectedQuote.discountType || 'none',
       discountValue: selectedQuote.discountValue || 0,
-      serviceChargeRate: selectedQuote.serviceChargeRate || 0,
       validUntil: selectedQuote.validUntil
         ? new Date(selectedQuote.validUntil).toISOString().split('T')[0]
         : buildDefaultFormData(lead).validUntil,
@@ -800,13 +798,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const addItem = () => {
-    // Only allow adding items in detailed mode
-    if (!isDetailedMode) {
-      toast.error('Items can only be added in detailed mode');
-      return;
-    }
-    
-    // Add a new item to the form
+    // Add a new item to the form (works in both detailed and summary mode)
     setFormData(prev => {
       const newItem = {
         description: '',
@@ -819,6 +811,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       };
       
       // In detailed mode, keep package items at the beginning, then add new item
+      // In summary mode, add extra fields after package item
       const packageItems = prev.items.filter(item => item.category === 'package');
       const otherItems = prev.items.filter(item => item.category !== 'package');
       return {
@@ -850,10 +843,13 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const calculateTotals = () => {
     // When in detailed mode, exclude package items from calculation
-    // When in summary mode, only use package item for calculation
+    // When in summary mode, include package item + all extra fields (manually added items)
     const itemsToCalculate = isDetailedMode 
       ? formData.items.filter(item => item.category !== 'package')
-      : formData.items.filter(item => item.category === 'package');
+      : formData.items.filter(item => {
+          // In summary mode, include package item and all manually added extra fields
+          return item.category === 'package' || item.isManual === true;
+        });
     
     // Calculate subtotal from all items (excluding package items in detailed mode)
     // Use totalPrice if available, otherwise calculate from quantity * unitPrice
@@ -871,12 +867,11 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       discountAmount = formData.discountValue || 0;
     }
     
-    const serviceChargeAmount = (subtotal * (formData.serviceChargeRate || 0)) / 100;
-    const taxableAmount = subtotal - discountAmount + serviceChargeAmount;
+    const taxableAmount = subtotal - discountAmount;
     const taxAmount = (taxableAmount * (formData.taxRate || 0)) / 100;
     const totalAmount = taxableAmount + taxAmount;
     
-    return { subtotal, discountAmount, serviceChargeAmount, taxAmount, totalAmount };
+    return { subtotal, discountAmount, taxAmount, totalAmount };
   };
 
   const handleSubmit = async (status = 'send') => {
@@ -1157,17 +1152,15 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <h3 className="text-lg font-semibold text-gray-800">
                   Items {isDetailedMode ? '(Detailed Mode - Individual Pricing)' : '(Summary Mode - Package Price Only)'}
                 </h3>
-                {/* Show Add Item button only in detailed mode for manual entry */}
-                {isDetailedMode && (
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Item
-                  </button>
-                )}
+                {/* Show Add Item/Field button */}
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  {isDetailedMode ? 'Add Item' : 'Add Field'}
+                </button>
               </div>
 
               {!isDetailedMode ? (
@@ -1226,27 +1219,58 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     </div>
                   </div>
 
-                  {/* All Activities - Always Read-Only in non-detail mode */}
-                  {formData.items.filter(item => item.category !== 'package').length > 0 && (
+                  {/* Extra Fields Only - No included activities shown */}
+                  {formData.items.filter(item => item.category !== 'package' && item.isManual === true).length > 0 && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <label className="block text-sm font-semibold text-gray-700 mb-3">
-                        Included Activities
+                        Extra Fields
                       </label>
                       <div className="space-y-2 max-h-60 overflow-y-auto">
                         {formData.items
                           .map((item, originalIndex) => {
-                            // Skip package items
-                            if (item.category === 'package') return null;
+                            // Skip package items and non-manual items (activities from itinerary)
+                            if (item.category === 'package' || item.isManual !== true) return null;
                             
-                            // In non-detail mode, ALL activities are read-only (static)
+                            // Only show manually added extra fields
                             return (
                               <div
                                 key={originalIndex}
                                 className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded"
                               >
-                                <div className="flex-1 text-sm text-gray-700">
-                                  {item.description || 'No description'}
-                                </div>
+                                <input
+                                  type="text"
+                                  value={item.description || ''}
+                                  onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                  placeholder="Field description"
+                                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                                <input
+                                  type="number"
+                                  value={item.totalPrice || item.unitPrice || 0}
+                                  onChange={(e) => {
+                                    const price = parseFloat(e.target.value) || 0;
+                                    // Update both totalPrice and unitPrice in a single state update
+                                    const newItems = [...formData.items];
+                                    newItems[originalIndex] = {
+                                      ...newItems[originalIndex],
+                                      totalPrice: price,
+                                      unitPrice: price,
+                                      quantity: 1,
+                                    };
+                                    setFormData({ ...formData, items: newItems });
+                                  }}
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="Price"
+                                  className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                                <button
+                                  onClick={() => removeItem(originalIndex)}
+                                  className="text-red-600 hover:text-red-800"
+                                  type="button"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </div>
                             );
                           })
@@ -1383,20 +1407,6 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     />
                   </div>
                 )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Service Charge Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.serviceChargeRate}
-                    onChange={(e) => setFormData({ ...formData, serviceChargeRate: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                 <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -1411,12 +1421,6 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Discount:</span>
                     <span>-{totals.discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                {totals.serviceChargeAmount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Service Charge:</span>
-                    <span className="font-medium">{totals.serviceChargeAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {totals.taxAmount > 0 && (
