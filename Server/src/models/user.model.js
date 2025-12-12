@@ -78,6 +78,7 @@ const userSchema = new mongoose.Schema(
             'manage_admins',
             'view_reports',
             'manage_billing',
+            'view_billing',
             'manage_leads',
             'manage_packages',
           ];

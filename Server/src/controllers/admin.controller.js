@@ -74,7 +74,8 @@ export const createStaff = asyncHandler(async (req, res, next) => {
     phone,
     password: tempPassword,
     role,
-    permissions: role === 'admin' && permissions ? permissions : [], // Only apply permissions to admins
+    // Sales reps get view_billing and manage_leads by default
+    permissions: role === 'salesRep' ? ['manage_leads', 'view_billing'] : (role === 'admin' && permissions ? permissions : []),
     isTempPassword: true,
     mustChangePassword: true,
     isEmailVerified: true, // Staff accounts are pre-verified
