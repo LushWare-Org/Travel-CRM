@@ -25,31 +25,18 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
   return (
     <div className="space-y-4">
       {/* Duration */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Number of Nights <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={nightsInput}
-            onChange={(e) => onNightsChange(parseInt(e.target.value, 10) || 0)}
-            placeholder="Number of Nights"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Duration (Auto-filled)
-          </label>
-          <input
-            type="text"
-            value={formData.duration}
-            disabled
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Number of Nights <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="number"
+          min="1"
+          value={nightsInput}
+          onChange={(e) => onNightsChange(parseInt(e.target.value, 10) || 0)}
+          placeholder="Number of Nights"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
       </div>
 
       {/* Price and Max Group Size */}
@@ -58,17 +45,20 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Price <span className="text-red-500">*</span>
           </label>
-          <input
-            type="number"
-            name="price"
-            value={formData.price || ''}
-            onChange={handlePriceChange}
-            placeholder="Enter price (e.g., 2499)"
-            min="0"
-            step="0.01"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-xs text-gray-500 mt-1">Enter numeric value only (no currency symbols)</p>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-700 font-semibold">₹</span>
+            <input
+              type="number"
+              name="price"
+              value={formData.price || ''}
+              onChange={handlePriceChange}
+              placeholder="Enter price (e.g., 2499)"
+              min="0"
+              step="0.01"
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Enter numeric value only</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -85,24 +75,6 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
           />
           <p className="text-xs text-gray-500 mt-1">Maximum number of people per group</p>
         </div>
-      </div>
-
-      {/* Difficulty Level */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Difficulty Level
-        </label>
-        <select
-          name="difficulty"
-          value={formData.difficulty || 'moderate'}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="easy">Easy</option>
-          <option value="moderate">Moderate</option>
-          <option value="difficult">Difficult</option>
-        </select>
-        <p className="text-xs text-gray-500 mt-1">Select the difficulty level of this tour</p>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
