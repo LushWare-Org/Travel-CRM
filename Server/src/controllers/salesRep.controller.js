@@ -177,6 +177,7 @@ export const createSalesRep = asyncHandler(async (req, res, next) => {
       phoneCountry: req.body.phoneCountry || 'US',
       password: tempPassword,
       role: 'salesRep',
+      permissions: ['manage_leads', 'view_billing'], // Sales reps can manage leads and view billing
       createdBy: req.user.id,
       isEmailVerified: true, // Auto-verify sales reps
       isTempPassword: true,

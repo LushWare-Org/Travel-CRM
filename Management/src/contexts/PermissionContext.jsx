@@ -14,6 +14,7 @@ export const PERMISSION_LIST = {
   MANAGE_ADMINS: 'manage_admins',
   VIEW_REPORTS: 'view_reports',
   MANAGE_BILLING: 'manage_billing',
+  VIEW_BILLING: 'view_billing',
   MANAGE_LEADS: 'manage_leads',
   MANAGE_PACKAGES: 'manage_packages',
 };
@@ -57,6 +58,12 @@ export const PERMISSION_METADATA = {
     label: 'Manage Billing',
     category: 'Finance',
     description: 'Handle billing and payment operations',
+  },
+  [PERMISSION_LIST.VIEW_BILLING]: {
+    id: 'view_billing',
+    label: 'View Billing',
+    category: 'Finance',
+    description: 'View billing documents for assigned leads (read-only)',
   },
   [PERMISSION_LIST.MANAGE_LEADS]: {
     id: 'manage_leads',
