@@ -22,6 +22,11 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
     onFormChange({ ...formData, maxGroupSize: numValue });
   };
 
+  // Prevent scroll wheel from changing number input values
+  const handleNumberInputWheel = (e) => {
+    e.currentTarget.blur();
+  };
+
   return (
     <div className="space-y-4">
       {/* Duration */}
@@ -34,6 +39,7 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
           min="1"
           value={nightsInput}
           onChange={(e) => onNightsChange(parseInt(e.target.value, 10) || 0)}
+          onWheel={handleNumberInputWheel}
           placeholder="Number of Nights"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -52,6 +58,7 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
               name="price"
               value={formData.price || ''}
               onChange={handlePriceChange}
+              onWheel={handleNumberInputWheel}
               placeholder="Enter price (e.g., 2499)"
               min="0"
               step="0.01"
@@ -69,6 +76,7 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
             name="maxGroupSize"
             value={formData.maxGroupSize || 10}
             onChange={handleMaxGroupSizeChange}
+            onWheel={handleNumberInputWheel}
             placeholder="Max Group Size"
             min="1"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
