@@ -262,6 +262,20 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
+          Destination <span className="text-red-500">*</span>
+        </label>
+        <DestinationSelector
+          name="destination"
+          value={formData.destination || ''}
+          onChange={handleChange}
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Select from popular destinations or type a custom one
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Package Name <span className="text-red-500">*</span>
         </label>
         <div className="flex items-center gap-2">
@@ -350,39 +364,23 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Category <span className="text-red-500">*</span>
-          </label>
-          <select
-            name="category"
-            value={formData.category || ''}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select Category</option>
-            {CATEGORY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Destination <span className="text-red-500">*</span>
-          </label>
-          <DestinationSelector
-            name="destination"
-            value={formData.destination || ''}
-            onChange={handleChange}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Select from popular destinations or type a custom one
-          </p>
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Category <span className="text-red-500">*</span>
+        </label>
+        <select
+          name="category"
+          value={formData.category || ''}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select Category</option>
+          {CATEGORY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Highlights */}
