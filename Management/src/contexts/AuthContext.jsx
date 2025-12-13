@@ -43,6 +43,15 @@ export const AuthProvider = ({ children }) => {
           password,
         });
 
+        // Check if OTP is required (for sales representatives)
+        if (response.data.data?.requiresOTP) {
+          // Store temporary data for OTP verification
+          localStorage.setItem('otpTempToken', response.data.data.tempToken);
+          localStorage.setItem('otpMaskedEmail', response.data.data.maskedEmail);
+          toast.success('OTP sent to your email. Please verify to continue.');
+          return 'otp-required';
+        }
+
         // Check if password change is required (for first-time login with temporary password)
         if (response.data.data?.mustChangePassword) {
           // Store temporary credentials for password reset
