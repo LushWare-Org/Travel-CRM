@@ -71,8 +71,8 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
               <p className="text-sm text-gray-900 mt-1">{pkg.maxGroupSize || 10}</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Difficulty</label>
-              <p className="text-sm text-gray-900 mt-1 capitalize">{pkg.difficulty || 'N/A'}</p>
+              <label className="text-sm font-medium text-gray-700">Package Type</label>
+              <p className="text-sm text-gray-900 mt-1 capitalize">{pkg.packageType || 'N/A'}</p>
             </div>
           </div>
 
