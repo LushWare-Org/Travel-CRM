@@ -35,13 +35,32 @@ export const AuthProvider = ({ children }) => {
 
   // Login function
   const login = useCallback(
-    async (email, password) => {
+    async (email, password, userData = null) => {
       try {
         setLoading(true);
+        
+        // If userData is provided (from OTP verification), skip API call
+        if (userData && password && typeof password === 'string' && password.startsWith('eyJ')) {
+          // This is a token from OTP verification
+          setToken(password);
+          setUser(userData);
+          setIsAuthenticated(true);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${password}`;
+          return true;
+        }
+
         const response = await axios.post(`${API_URL}/auth/login`, {
           email,
           password,
         });
+
+        // Check if OTP is required
+        if (response.data.data?.requiresOtp) {
+          // Store email for OTP verification page
+          localStorage.setItem('otpEmail', email);
+          toast.info('📧 Please check your email for the OTP code');
+          return 'otp-required';
+        }
 
         // Check if password change is required (for first-time login with temporary password)
         if (response.data.data?.mustChangePassword) {

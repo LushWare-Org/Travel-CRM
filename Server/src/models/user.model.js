@@ -177,6 +177,28 @@ const userSchema = new mongoose.Schema(
       default: true,
       // SuperAdmin cannot be deleted
     },
+    // OTP (One-Time Password) Configuration for 2FA
+    isOtpEnabled: {
+      type: Boolean,
+      default: true, // OTP required for all admins by default
+    },
+    otpCode: String, // Current OTP code (hashed)
+    otpExpire: Date, // OTP expiration time
+    otpAttempts: {
+      type: Number,
+      default: 0, // Failed OTP attempts tracking
+    },
+    otpAttemptsResetAt: Date, // Reset attempts after cooldown
+    lastOtpSentAt: Date, // Timestamp of last OTP sent
+    isOtpVerified: {
+      type: Boolean,
+      default: false, // Whether OTP for current session is verified
+    },
+    otpMethod: {
+      type: String,
+      enum: ['email', 'sms', 'authenticator'],
+      default: 'email', // Default OTP delivery method
+    },
   },
   {
     timestamps: true,
@@ -269,6 +291,50 @@ userSchema.methods.getEmailVerificationToken = function getEmailVerificationToke
   this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
   return verificationToken;
+};
+
+// Generate OTP code (6 digits)
+userSchema.methods.generateOtpCode = function generateOtpCode() {
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit number
+
+  this.otpCode = crypto
+    .createHash('sha256')
+    .update(otpCode)
+    .digest('hex');
+
+  this.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
+  this.otpAttempts = 0; // Reset attempts when new OTP is generated
+  this.lastOtpSentAt = Date.now();
+
+  return otpCode;
+};
+
+// Verify OTP code
+userSchema.methods.verifyOtpCode = async function verifyOtpCode(enteredOtp) {
+  if (!this.otpCode || !this.otpExpire) {
+    return false;
+  }
+
+  // Check if OTP has expired
+  if (Date.now() > this.otpExpire) {
+    return false;
+  }
+
+  // Hash the entered OTP and compare with stored hashed OTP
+  const hashedEnteredOtp = crypto
+    .createHash('sha256')
+    .update(enteredOtp)
+    .digest('hex');
+
+  return hashedEnteredOtp === this.otpCode;
+};
+
+// Clear OTP after verification
+userSchema.methods.clearOtp = function clearOtp() {
+  this.otpCode = undefined;
+  this.otpExpire = undefined;
+  this.otpAttempts = 0;
+  this.isOtpVerified = true;
 };
 
 export default mongoose.model('User', userSchema);

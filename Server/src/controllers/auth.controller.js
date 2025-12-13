@@ -3,6 +3,7 @@ import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import emailService from '../utils/emailService.js';
+import otpService from '../utils/otpService.js';
 import logger from '../config/logger.js';
 
 // Generate token and send cookie
@@ -124,6 +125,44 @@ export const login = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // Check if user is admin or superAdmin and OTP is enabled
+  if ((user.role === 'admin' || user.role === 'superAdmin') && user.isOtpEnabled) {
+    // Generate and send OTP
+    const otpCode = user.generateOtpCode();
+    await user.save({ validateBeforeSave: false });
+
+    otpService.logOtpActivity(user._id, 'LOGIN_OTP_SENT', {
+      email: user.email,
+      role: user.role,
+    });
+
+    try {
+      await emailService.sendOtpCode(user, otpCode);
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'OTP code sent to your email. Please verify to complete login.',
+        data: {
+          requiresOtp: true,
+          email: user.email,
+          otpMethod: user.otpMethod,
+          expiresIn: '10 minutes',
+          userId: user._id,
+        },
+      });
+    } catch (err) {
+      // Clear OTP if email fails
+      user.otpCode = undefined;
+      user.otpExpire = undefined;
+      user.lastOtpSentAt = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      logger.error(`Failed to send login OTP: ${err.message}`);
+      throw new AppError('Failed to send OTP. Please try again later.', 500);
+    }
+  }
+
+  // For non-admin users, proceed with regular login
   sendTokenResponse(user, 200, res, 'Login successful');
 });
 
@@ -407,3 +446,195 @@ export const updateProfile = asyncHandler(async (req, res, next) => {
     },
   });
 });
+
+// @desc    Send OTP code to user email for login verification
+// @route   POST /api/v1/auth/send-otp
+// @access  Public (after initial login)
+export const sendOtp = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+
+  // Get user by email
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Check if OTP is enabled for this user
+  if (!user.isOtpEnabled) {
+    throw new AppError('OTP is not enabled for your account', 400);
+  }
+
+  // Check cooldown period (prevent OTP spam)
+  const { canResend, remainingSeconds } = otpService.checkResendCooldown(user.lastOtpSentAt, 30);
+  
+  if (!canResend) {
+    throw new AppError(
+      `Please wait ${remainingSeconds} seconds before requesting another OTP`,
+      429
+    );
+  }
+
+  // Generate OTP code
+  const otpCode = user.generateOtpCode();
+  await user.save({ validateBeforeSave: false });
+
+  // Log OTP sent activity
+  otpService.logOtpActivity(user._id, 'OTP_SENT', {
+    email: user.email,
+    otpMethod: user.otpMethod,
+  });
+
+  try {
+    // Send OTP via email
+    await emailService.sendOtpCode(user, otpCode);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'OTP code sent to your email. It will expire in 10 minutes.',
+      data: {
+        email: user.email,
+        otpMethod: user.otpMethod,
+        expiresIn: '10 minutes',
+      },
+    });
+  } catch (err) {
+    // Clear OTP if email fails
+    user.otpCode = undefined;
+    user.otpExpire = undefined;
+    user.lastOtpSentAt = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    logger.error(`Failed to send OTP: ${err.message}`);
+    throw new AppError('Failed to send OTP. Please try again later.', 500);
+  }
+});
+
+// @desc    Verify OTP code and return JWT token
+// @route   POST /api/v1/auth/verify-otp
+// @access  Public
+export const verifyOtp = asyncHandler(async (req, res, next) => {
+  const { email, otpCode } = req.body;
+
+  // Validate input
+  if (!email || !otpCode) {
+    throw new AppError('Email and OTP code are required', 400);
+  }
+
+  // Get user by email
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new AppError('Invalid credentials', 401);
+  }
+
+  // Check if OTP is enabled
+  if (!user.isOtpEnabled) {
+    throw new AppError('OTP is not enabled for your account', 400);
+  }
+
+  // Check if OTP code exists
+  if (!user.otpCode || !user.otpExpire) {
+    throw new AppError('No OTP code found. Please request a new code.', 400);
+  }
+
+  // Check if OTP has expired
+  if (otpService.isOtpExpired(user.otpExpire)) {
+    throw new AppError('OTP code has expired. Please request a new code.', 400);
+  }
+
+  // Check attempt limits
+  if (otpService.isOtpAttemptsExceeded(user.otpAttempts)) {
+    throw new AppError('Too many failed attempts. Please request a new OTP code.', 429);
+  }
+
+  // Verify OTP code
+  const isOtpValid = await user.verifyOtpCode(otpCode);
+
+  if (!isOtpValid) {
+    // Increment failed attempts
+    user.otpAttempts += 1;
+    await user.save({ validateBeforeSave: false });
+
+    otpService.logOtpActivity(user._id, 'OTP_VERIFY_FAILED', {
+      email: user.email,
+      attempt: user.otpAttempts,
+    });
+
+    throw new AppError('Invalid OTP code', 401);
+  }
+
+  // Clear OTP after successful verification
+  user.clearOtp();
+  await user.save({ validateBeforeSave: false });
+
+  // Log successful OTP verification
+  otpService.logOtpActivity(user._id, 'OTP_VERIFIED', {
+    email: user.email,
+  });
+
+  // Send success notification email
+  emailService
+    .sendOtpVerificationSuccess(user)
+    .catch((err) => logger.error(`Failed to send OTP verification email: ${err.message}`));
+
+  // Return token using the existing sendTokenResponse function
+  sendTokenResponse(user, 200, res, 'OTP verified successfully. Login completed.');
+});
+
+// @desc    Resend OTP code
+// @route   POST /api/v1/auth/resend-otp
+// @access  Public
+export const resendOtp = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    throw new AppError('Email is required', 400);
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Check cooldown period
+  const { canResend, remainingSeconds } = otpService.checkResendCooldown(user.lastOtpSentAt, 30);
+  
+  if (!canResend) {
+    throw new AppError(
+      `Please wait ${remainingSeconds} seconds before requesting another OTP`,
+      429
+    );
+  }
+
+  // Generate new OTP code
+  const otpCode = user.generateOtpCode();
+  await user.save({ validateBeforeSave: false });
+
+  otpService.logOtpActivity(user._id, 'OTP_RESENT', {
+    email: user.email,
+  });
+
+  try {
+    await emailService.sendOtpCode(user, otpCode);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'New OTP code sent to your email. It will expire in 10 minutes.',
+      data: {
+        email: user.email,
+        expiresIn: '10 minutes',
+      },
+    });
+  } catch (err) {
+    user.otpCode = undefined;
+    user.otpExpire = undefined;
+    user.lastOtpSentAt = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    logger.error(`Failed to resend OTP: ${err.message}`);
+    throw new AppError('Failed to send OTP. Please try again later.', 500);
+  }
+});
+

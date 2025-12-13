@@ -11,6 +11,9 @@ import {
   verifyEmail,
   resendVerification,
   updateProfile,
+  sendOtp,
+  verifyOtp,
+  resendOtp,
 } from '../controllers/auth.controller.js';
 import { protect } from '../middleware/auth.js';
 import { authLimiter } from '../config/rateLimiter.js';
@@ -29,6 +32,9 @@ const router = express.Router();
 // Public routes (with rate limiting)
 router.post('/register', authLimiter, validate(registerSchema), register);
 router.post('/login', authLimiter, validate(loginSchema), login);
+router.post('/send-otp', authLimiter, sendOtp);
+router.post('/verify-otp', authLimiter, verifyOtp);
+router.post('/resend-otp', authLimiter, resendOtp);
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), forgotPassword);
 router.put('/reset-password/:token', authLimiter, validate(resetPasswordSchema), resetPassword);
 router.post('/reset-temp-password', authLimiter, resetTempPassword);

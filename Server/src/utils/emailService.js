@@ -534,6 +534,128 @@ class EmailService {
       text,
     });
   }
+
+  // @desc Send OTP code for login verification
+  async sendOtpCode(user, otpCode) {
+    const subject = 'Your Login Verification Code - Trip Sky Way';
+    const html = `
+      <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px;">
+        <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #333; margin: 0;">Trip Sky Way</h1>
+            <p style="color: #666; margin: 5px 0; font-size: 14px;">Secure Login Verification</p>
+          </div>
+
+          <h2 style="color: #333; text-align: center; margin-bottom: 20px;">Your Verification Code</h2>
+
+          <p style="color: #666; line-height: 1.6;">Dear ${user.name},</p>
+
+          <p style="color: #666; line-height: 1.6;">
+            You recently tried to log in to your Trip Sky Way admin account. To complete your login, 
+            please use the verification code below:
+          </p>
+
+          <div style="background-color: #f0f0f0; padding: 20px; border-radius: 6px; text-align: center; margin: 30px 0; border-left: 4px solid #007bff;">
+            <p style="margin: 0; font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 2px;">Verification Code</p>
+            <p style="margin: 15px 0; font-size: 36px; font-weight: bold; color: #007bff; letter-spacing: 4px; font-family: 'Courier New', monospace;">
+              ${otpCode}
+            </p>
+            <p style="margin: 10px 0; font-size: 12px; color: #999;">This code expires in 10 minutes</p>
+          </div>
+
+          <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #856404; font-size: 14px;">
+              <strong>Security Tip:</strong> Never share this code with anyone. We will never ask for this code via email or phone.
+            </p>
+          </div>
+
+          <p style="color: #666; line-height: 1.6; margin-top: 20px;">
+            <strong>Having trouble?</strong>
+          </p>
+          <ul style="color: #666; line-height: 1.8; margin: 10px 0;">
+            <li>Make sure you entered the code within 10 minutes of receiving this email</li>
+            <li>Check your email for the most recent verification code</li>
+            <li>Try requesting a new code if this one has expired</li>
+          </ul>
+
+          <p style="color: #666; line-height: 1.6; margin-top: 20px;">
+            If you did not attempt to log in, please ignore this email. Your account is secure.
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+          <p style="color: #999; font-size: 12px; text-align: center; margin: 20px 0;">
+            Trip Sky Way Admin Portal<br>
+            © ${new Date().getFullYear()} Trip Sky Way. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const text = `Dear ${user.name},\n\nYour verification code is: ${otpCode}\n\nThis code expires in 10 minutes.\n\nIf you did not attempt to log in, please ignore this email.\n\nBest regards,\nThe Trip Sky Way Team`;
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  // @desc Send OTP verification success email
+  async sendOtpVerificationSuccess(user) {
+    const subject = 'Login Verified - Trip Sky Way';
+    const html = `
+      <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px;">
+        <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #333; margin: 0;">Trip Sky Way</h1>
+            <p style="color: #666; margin: 5px 0; font-size: 14px;">Login Successful</p>
+          </div>
+
+          <h2 style="color: #28a745; text-align: center; margin-bottom: 20px;">✓ Login Verified</h2>
+
+          <p style="color: #666; line-height: 1.6;">Dear ${user.name},</p>
+
+          <p style="color: #666; line-height: 1.6;">
+            Your login has been verified successfully. You are now accessing your Trip Sky Way admin account.
+          </p>
+
+          <div style="background-color: #d4edda; border: 1px solid #28a745; border-radius: 6px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #155724;">
+              <strong>Login Details:</strong><br>
+              Account: ${user.email}<br>
+              Time: ${new Date().toLocaleString()}<br>
+              Role: ${user.role}
+            </p>
+          </div>
+
+          <p style="color: #666; line-height: 1.6; margin-top: 20px;">
+            <strong>Notice something unusual?</strong>
+          </p>
+          <p style="color: #666; line-height: 1.6;">
+            If this login was not made by you, please secure your account immediately by changing your password and contacting our support team.
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+          <p style="color: #999; font-size: 12px; text-align: center; margin: 20px 0;">
+            Trip Sky Way Admin Portal<br>
+            © ${new Date().getFullYear()} Trip Sky Way. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const text = `Dear ${user.name},\n\nYour login has been verified successfully.\n\nAccount: ${user.email}\nTime: ${new Date().toLocaleString()}\n\nIf this was not you, please change your password immediately.\n\nBest regards,\nThe Trip Sky Way Team`;
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      html,
+      text,
+    });
+  }
 }
 
 export default new EmailService();

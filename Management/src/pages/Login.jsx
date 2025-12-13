@@ -61,7 +61,10 @@ export default function Login() {
       // Use the login function from AuthContext to ensure state is properly updated
       const result = await login(formData.email, formData.password);
       
-      if (result === 'password-reset-required') {
+      if (result === 'otp-required') {
+        // OTP is required, redirect to OTP verification page
+        navigate('/otp-verification', { state: { email: formData.email } });
+      } else if (result === 'password-reset-required') {
         // Password reset is required, AuthContext already stored credentials and showed toast
         navigate('/reset-password');
       } else if (result === true) {

@@ -9,6 +9,7 @@ import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import OTPVerification from "./pages/OTPVerification";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -50,6 +51,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/otp-verification" element={<OTPVerification />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       
       <Route
