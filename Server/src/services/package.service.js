@@ -28,11 +28,14 @@ class PackageService {
     try {
       // Extract days array if present
       const { days, ...pkgData } = packageData;
-
-      // Ensure description meets minimum length requirement
-      if (!pkgData.description || pkgData.description.trim().length < 10) {
-        throw new Error('Description must be at least 10 characters long');
+      
+      // Debug logging
+      logger.info(`Creating package. Days count: ${days?.length || 0}`);
+      if (days && days.length > 0) {
+        logger.info(`First day sample: ${JSON.stringify(days[0])}`);
       }
+
+      // Description is now optional, no minimum length requirement
 
       // Remove any null or undefined _id fields
       delete pkgData._id;
@@ -114,22 +117,59 @@ class PackageService {
       // Create itinerary if days are provided and valid
       if (days && Array.isArray(days) && days.length > 0) {
         try {
+          logger.info(`Creating itinerary for package ${newPackage._id} with ${days.length} days`);
+          
+          // Ensure all days have required fields (dayNumber is required by model)
+          const validatedDays = days
+            .filter(day => day && (day.dayNumber !== undefined || day.title || day.dayNumber))
+            .map((day, index) => {
+              const dayNumber = day.dayNumber !== undefined && day.dayNumber !== null 
+                ? parseInt(day.dayNumber, 10) 
+                : (index + 1);
+              
+              return {
+                dayNumber: dayNumber,
+                title: day.title || `Day ${dayNumber}`,
+                description: day.description || '',
+                locations: Array.isArray(day.locations) ? day.locations : (day.locations ? [day.locations] : []),
+                activities: Array.isArray(day.activities) ? day.activities : (day.activities ? [day.activities] : []),
+                accommodation: day.accommodation || {},
+                meals: day.meals || { breakfast: false, lunch: false, dinner: false },
+                transport: day.transport || '',
+                places: Array.isArray(day.places) ? day.places : (day.places ? [day.places] : []),
+                images: Array.isArray(day.images) ? day.images : [],
+                notes: day.notes || '',
+              };
+            });
+          
+          // Sort days by dayNumber to ensure proper order
+          validatedDays.sort((a, b) => a.dayNumber - b.dayNumber);
+          
+          logger.info(`Validated days sample: ${JSON.stringify(validatedDays[0])}`);
+          
           const itinerary = await Itinerary.create({
             package: newPackage._id,
             packageModel: 'Package',
-            days: days,
+            days: validatedDays,
             createdBy: userId,
             status: packageData.status || 'draft',
           });
 
+          logger.info(`Itinerary created successfully: ${itinerary._id}`);
+
           // Link itinerary to package
           newPackage.itinerary = itinerary._id;
           await newPackage.save();
+          
+          logger.info(`Package ${newPackage._id} linked to itinerary ${itinerary._id}`);
         } catch (itineraryError) {
-          logger.warn(`Itinerary creation warning for package ${newPackage._id}: ${itineraryError.message}`);
+          logger.error(`Itinerary creation error for package ${newPackage._id}: ${itineraryError.message}`);
+          logger.error(`Itinerary creation stack: ${itineraryError.stack}`);
           // Don't fail the entire operation if itinerary creation fails
           // The package was created successfully
         }
+      } else {
+        logger.warn(`No days provided for package ${newPackage._id}. Days value: ${JSON.stringify(days)}`);
       }
 
       // Populate references

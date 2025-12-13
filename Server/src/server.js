@@ -52,6 +52,7 @@ import paymentReceiptRoutes from './routes/paymentReceipt.routes.js';
 import creditNoteRoutes from './routes/creditNote.routes.js';
 import billingRoutes from './routes/billing.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
+import hotelSuggestionRoutes from './routes/hotelSuggestion.routes.js';
 
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
@@ -130,6 +131,7 @@ app.use(`/api/${API_VERSION}/billing/receipts`, paymentReceiptRoutes);
 app.use(`/api/${API_VERSION}/billing/credit-notes`, creditNoteRoutes);
 app.use(`/api/${API_VERSION}/billing/vouchers`, voucherRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
+app.use(`/api/${API_VERSION}/hotels`, hotelSuggestionRoutes);
 
 // Error handling
 app.use(notFound);

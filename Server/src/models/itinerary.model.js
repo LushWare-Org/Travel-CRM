@@ -23,13 +23,15 @@ const itinerarySchema = new mongoose.Schema(
         },
         title: {
           type: String,
-          required: true,
+          required: false,
           trim: true,
+          default: '',
         },
         description: {
           type: String,
-          required: true,
+          required: false,
           trim: true,
+          default: '',
         },
         locations: [
           {

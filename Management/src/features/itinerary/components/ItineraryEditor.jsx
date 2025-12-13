@@ -4,12 +4,13 @@
  * Aligned with backend day-based structure
  */
 
-import { Trash2, Plus, Upload, X } from 'lucide-react';
-import { useState } from 'react';
+import { Trash2, Plus, Upload, X, Search, Loader } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { uploadItineraryImages } from '../../../services/cloudinaryService';
 import Swal from 'sweetalert2';
 import ActivitySelector from './ActivitySelector';
 import LocationSelector from './LocationSelector';
+import HotelSuggestionsModal from './HotelSuggestionsModal';
 
 const ItineraryEditor = ({
   days = [],
@@ -17,12 +18,18 @@ const ItineraryEditor = ({
   onAddDay,
   onRemoveDay,
   destination = '', // Add destination prop
+  packageType = '', // Package type (Standard, Deluxe, Luxury, Premium)
+  category = '', // Package category
   useLocationAutocomplete = false, // New prop to determine location input type
   LocationAutocompleteComponent = null, // Optional custom location autocomplete component
   hideTitleAndDescription = false, // Hide title and description fields (for lead management)
   hideDescription = false, // Hide only description field (for customize package mode)
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
+  const [showHotelModal, setShowHotelModal] = useState(false);
+  const [currentDayForHotel, setCurrentDayForHotel] = useState(null);
+  const [currentDayLocations, setCurrentDayLocations] = useState([]);
+  const [autoFillingHotel, setAutoFillingHotel] = useState(false);
 
   const handleDayImageUpload = async (dayNumber, files) => {
     if (!files || files.length === 0) return;
@@ -55,6 +62,80 @@ const ItineraryEditor = ({
     const updatedImages = (day?.images || []).filter((_, idx) => idx !== imageIndex);
     onDayChange(dayNumber, { images: updatedImages });
   };
+
+  // Auto-fill best match hotel when locations are added/changed
+  const autoFillBestMatchHotel = async (dayNumber, dayLocations) => {
+    if (!dayLocations || dayLocations.length === 0) return;
+    if (!destination) return; // Need destination to search
+
+    try {
+      setAutoFillingHotel(true);
+      const { hotelAPI } = await import('../../../services/api');
+      
+      // Combine all locations into a search string
+      const locationsString = dayLocations.join(', ');
+      
+      const response = await hotelAPI.suggest(
+        destination,
+        packageType,
+        category,
+        locationsString,
+        1 // Only get the best match
+      );
+
+      if (response.success || response.status === 'success') {
+        const hotels = response.data || [];
+        if (hotels.length > 0) {
+          const bestMatch = hotels[0];
+          const day = days.find(d => d.dayNumber === dayNumber);
+          
+          // Auto-fill accommodation fields with best match
+          onDayChange(dayNumber, {
+            accommodation: {
+              name: bestMatch.name,
+              address: bestMatch.address,
+              contactNumber: bestMatch.contactNumber || '',
+              rating: bestMatch.rating !== undefined && bestMatch.rating !== null 
+                ? parseFloat(bestMatch.rating) 
+                : (day?.accommodation?.rating !== undefined ? day.accommodation.rating : ''),
+              type: day?.accommodation?.type || 'hotel', // Keep existing type or default to hotel
+            },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error auto-filling hotel:', error);
+      // Silently fail - don't show error for auto-fill
+    } finally {
+      setAutoFillingHotel(false);
+    }
+  };
+
+  // Watch for location changes and auto-fill hotel
+  useEffect(() => {
+    const timeouts = [];
+    
+    days.forEach((day) => {
+      if (day.locations && day.locations.length > 0 && destination) {
+        // Check if accommodation is already filled
+        const hasAccommodation = day.accommodation?.name && day.accommodation?.address;
+        
+        // Only auto-fill if accommodation is not already set
+        if (!hasAccommodation && !autoFillingHotel) {
+          // Small delay to avoid too many API calls
+          const timeoutId = setTimeout(() => {
+            autoFillBestMatchHotel(day.dayNumber, day.locations);
+          }, 1500); // Wait 1.5 seconds after location change
+          
+          timeouts.push(timeoutId);
+        }
+      }
+    });
+
+    return () => {
+      timeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    };
+  }, [days.map(d => `${d.dayNumber}-${d.locations?.join(',')}`).join('|'), destination, packageType, category]);
 
   if (!days || days.length === 0) {
     return (
@@ -201,9 +282,36 @@ const ItineraryEditor = ({
 
             {/* Accommodation */}
             <div className="border-t pt-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Accommodation
-              </label>
+              <div className="flex justify-between items-center mb-3">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Accommodation
+                </label>
+                <div className="flex items-center gap-2">
+                  {autoFillingHotel && days.find(d => d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-blue-600">
+                      <Loader className="w-3 h-3 animate-spin" />
+                      <span>Finding best match...</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentDayForHotel(day.dayNumber);
+                      // Get all locations from the day's locations array
+                      const dayLocations = day.locations && day.locations.length > 0 
+                        ? day.locations 
+                        : [];
+                      setCurrentDayLocations(dayLocations);
+                      setShowHotelModal(true);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                    title="Search for hotel suggestions"
+                  >
+                    <Search className="w-4 h-4" />
+                    Search Hotels
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-3">
                 <input
                   type="text"
@@ -368,6 +476,36 @@ const ItineraryEditor = ({
         <Plus size={20} />
         Add Another Day
       </button>
+
+      {/* Hotel Suggestions Modal */}
+      <HotelSuggestionsModal
+        isOpen={showHotelModal}
+        onClose={() => {
+          setShowHotelModal(false);
+          setCurrentDayForHotel(null);
+          setCurrentDayLocations([]);
+        }}
+        onSelectHotel={(hotel) => {
+          if (currentDayForHotel) {
+            const day = days.find(d => d.dayNumber === currentDayForHotel);
+            onDayChange(currentDayForHotel, {
+              accommodation: {
+                name: hotel.name,
+                address: hotel.address,
+                contactNumber: hotel.contactNumber || '',
+                rating: hotel.rating !== undefined && hotel.rating !== null 
+                  ? parseFloat(hotel.rating) 
+                  : (day?.accommodation?.rating !== undefined ? day.accommodation.rating : ''),
+                type: day?.accommodation?.type || 'hotel',
+              },
+            });
+          }
+        }}
+        destination={destination}
+        packageType={packageType}
+        category={category}
+        locations={currentDayLocations}
+      />
     </div>
   );
 };

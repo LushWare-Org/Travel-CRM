@@ -37,8 +37,28 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
         <input
           type="number"
           min="1"
-          value={nightsInput}
-          onChange={(e) => onNightsChange(parseInt(e.target.value, 10) || 0)}
+          value={nightsInput === '' || nightsInput === null || nightsInput === undefined ? '' : nightsInput}
+          onChange={(e) => {
+            const value = e.target.value;
+            // Allow empty string - don't force any value while typing
+            if (value === '') {
+              onNightsChange('');
+            } else {
+              const numValue = parseInt(value, 10);
+              // Only update if it's a valid number
+              if (!isNaN(numValue)) {
+                onNightsChange(numValue);
+              }
+            }
+          }}
+          onBlur={(e) => {
+            // On blur, if empty or invalid, set to minimum 1
+            const value = e.target.value;
+            const numValue = parseInt(value, 10);
+            if (value === '' || isNaN(numValue) || numValue < 1) {
+              onNightsChange(1);
+            }
+          }}
           onWheel={handleNumberInputWheel}
           placeholder="Number of Nights"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

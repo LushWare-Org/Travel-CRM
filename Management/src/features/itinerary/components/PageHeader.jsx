@@ -3,10 +3,10 @@
  * Displays the page title, description, and action buttons
  */
 
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
-const PageHeader = ({ onNewPackage }) => {
+const PageHeader = ({ onNewPackage, onAIPackage }) => {
   const { user } = useAuth();
   
   // Check if user is a salesRep (read-only access)
@@ -26,16 +26,26 @@ const PageHeader = ({ onNewPackage }) => {
           </div>
         </div>
         
-        {/* New Package button - only visible to admins and staff */}
+        {/* Action buttons - only visible to admins and staff */}
         {!isSalesRep && (
-          <button
-            onClick={onNewPackage}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium flex items-center gap-2"
-            aria-label="Create new package"
-          >
-            <Plus className="w-4 h-4" />
-            New Package
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onAIPackage}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors font-medium flex items-center gap-2"
+              aria-label="Generate AI package"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI Package
+            </button>
+            <button
+              onClick={onNewPackage}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium flex items-center gap-2"
+              aria-label="Create new package"
+            >
+              <Plus className="w-4 h-4" />
+              New Package
+            </button>
+          </div>
         )}
       </div>
     </div>

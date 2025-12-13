@@ -5,7 +5,6 @@ const packageSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Please provide a package name'],
       trim: true,
       maxlength: [100, 'Package name cannot be more than 100 characters'],
     },
@@ -14,21 +13,17 @@ const packageSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: [true, 'Please provide a description'],
       maxlength: [2000, 'Description cannot be more than 2000 characters'],
     },
     destination: {
       type: String,
-      required: [true, 'Please provide a destination'],
     },
     duration: {
       type: Number,
-      required: [true, 'Please provide duration in days'],
-      min: [1, 'Duration must be at least 1 day'],
+      min: [0, 'Duration must be non-negative'],
     },
     price: {
       type: Number,
-      required: [true, 'Please provide a price'],
       min: [0, 'Price cannot be negative'],
     },
     maxGroupSize: {

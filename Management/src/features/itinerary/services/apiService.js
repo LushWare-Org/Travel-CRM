@@ -87,6 +87,18 @@ class ApiService {
     return makeRequest(`/packages/${id}`);
   }
 
+  static async generateAIPackage(destination, packageType, category, nights) {
+    return makeRequest('/packages/generate-ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        destination,
+        packageType,
+        category,
+        nights: parseInt(nights, 10),
+      }),
+    });
+  }
+
   static async createPackage(packageData) {
     // Clean the data - remove _id fields and internal properties
     const cleanData = {
@@ -99,6 +111,16 @@ class ApiService {
     delete cleanData.createdAt;
     delete cleanData.createdBy;
     delete cleanData.slug;
+    
+    // Ensure days array is preserved
+    if (packageData.days) {
+      cleanData.days = packageData.days;
+    }
+    
+    console.log('[API Service] Sending package data with days:', cleanData.days?.length || 0);
+    if (cleanData.days && cleanData.days.length > 0) {
+      console.log('[API Service] First day sample:', JSON.stringify(cleanData.days[0], null, 2));
+    }
     
     return makeRequest('/packages', {
       method: 'POST',

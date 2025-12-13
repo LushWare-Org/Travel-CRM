@@ -2,41 +2,35 @@ import { body, param, query } from 'express-validator';
 
 export const createPackageValidator = [
   body('name')
-    .notEmpty()
-    .withMessage('Package name is required')
+    .optional()
     .trim()
-    .isLength({ min: 3, max: 100 })
-    .withMessage('Package name must be between 3 and 100 characters'),
+    .isLength({ min: 0, max: 100 })
+    .withMessage('Package name must not exceed 100 characters'),
 
   body('description')
-    .notEmpty()
-    .withMessage('Description is required')
+    .optional()
     .trim()
-    .isLength({ min: 10, max: 2000 })
-    .withMessage('Description must be between 10 and 2000 characters'),
+    .isLength({ min: 0, max: 2000 })
+    .withMessage('Description must not exceed 2000 characters'),
 
   body('destination')
-    .notEmpty()
-    .withMessage('Destination is required')
+    .optional()
     .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Destination must be between 2 and 100 characters'),
+    .isLength({ min: 0, max: 100 })
+    .withMessage('Destination must not exceed 100 characters'),
 
   body('duration')
-    .notEmpty()
-    .withMessage('Duration is required')
-    .isInt({ min: 1, max: 365 })
-    .withMessage('Duration must be between 1 and 365 days'),
+    .optional()
+    .isInt({ min: 0, max: 365 })
+    .withMessage('Duration must be between 0 and 365 days'),
 
   body('price')
-    .notEmpty()
-    .withMessage('Price is required')
+    .optional()
     .isFloat({ min: 0 })
     .withMessage('Price must be a non-negative number'),
 
   body('category')
-    .notEmpty()
-    .withMessage('Category is required')
+    .optional()
     .isIn([
       'honeymoon',
       'couple',
@@ -47,8 +41,7 @@ export const createPackageValidator = [
     .withMessage('Invalid category'),
 
   body('packageType')
-    .notEmpty()
-    .withMessage('Package type is required')
+    .optional()
     .isIn(['Standard', 'Deluxe', 'Luxury', 'Premium'])
     .withMessage('Invalid package type'),
 

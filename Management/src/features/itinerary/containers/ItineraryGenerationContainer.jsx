@@ -21,6 +21,7 @@ import {
   PackageFormModal,
   NewEditPackageForm,
   PackagePDFPreviewDialog,
+  AIPackageDialog,
 } from '../components';
 import Pagination from '../../user-management/components/Common/Pagination';
 
@@ -50,6 +51,7 @@ const ItineraryGenerationContainer = () => {
   const [showNewPackageDialog, setShowNewPackageDialog] = useState(false);
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
   const [editPackageData, setEditPackageData] = useState(null);
+  const [showAIPackageDialog, setShowAIPackageDialog] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false); // Track upload state
   const [pdfPreviewData, setPdfPreviewData] = useState({
     isOpen: false,
@@ -170,6 +172,31 @@ const ItineraryGenerationContainer = () => {
     setShowNewPackageDialog(true);
   };
 
+  const handleAIPackageDialogOpen = () => {
+    // Prevent salesReps from creating new packages
+    if (isSalesRep) {
+      Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
+      return;
+    }
+    
+    setShowAIPackageDialog(true);
+  };
+
+  const handleAIPackageGenerated = (generatedPackageData) => {
+    // Populate the form with AI-generated data
+    setNewFormData({
+      ...createDefaultPackage(),
+      ...generatedPackageData,
+      status: 'draft', // Ensure it's saved as draft
+      price: 0, // Leave price empty for manual entry
+      images: [], // Leave images empty for manual upload
+    });
+    
+    // Close AI dialog and open the package form for editing
+    setShowAIPackageDialog(false);
+    setShowNewPackageDialog(true);
+  };
+
   const handleViewPackage = (pkg) => {
     setSelectedPackage(pkg);
   };
@@ -236,39 +263,27 @@ const ItineraryGenerationContainer = () => {
       console.log('[DEBUG] handleSaveNewPackage - All images:', images);
       console.log('[DEBUG] handleSaveNewPackage - Valid images:', validImages);
 
-      // Validate required fields with detailed checks
+      // Validate field lengths only (no required fields)
       const validationErrors = [];
 
-      if (!formData.name || !formData.name.trim()) {
-        validationErrors.push('Package Name is required');
-      } else if (formData.name.trim().length < 3 || formData.name.trim().length > 100) {
-        validationErrors.push('Package Name must be between 3 and 100 characters');
+      if (formData.name && formData.name.trim().length > 100) {
+        validationErrors.push('Package Name must not exceed 100 characters');
       }
 
-      if (!formData.category || !formData.category.trim()) {
-        validationErrors.push('Category is required');
+      if (formData.destination && formData.destination.trim().length > 100) {
+        validationErrors.push('Destination must not exceed 100 characters');
       }
 
-      if (!formData.destination || !formData.destination.trim()) {
-        validationErrors.push('Destination is required');
-      } else if (formData.destination.trim().length < 2 || formData.destination.trim().length > 100) {
-        validationErrors.push('Destination must be between 2 and 100 characters');
-      }
-
-      if (!formData.description || !formData.description.trim()) {
-        validationErrors.push('Description is required');
-      } else if (formData.description.trim().length < 10) {
-        validationErrors.push(`Description must be at least 10 characters (currently ${formData.description.trim().length} characters)`);
-      } else if (formData.description.trim().length > 2000) {
+      if (formData.description && formData.description.trim().length > 2000) {
         validationErrors.push('Description must not exceed 2000 characters');
       }
 
-      if (!formData.price || parseFloat(formData.price) < 0) {
-        validationErrors.push('Valid Price is required');
+      if (formData.price && parseFloat(formData.price) < 0) {
+        validationErrors.push('Price must be a non-negative number');
       }
 
-      if (!formData.duration || parseInt(formData.duration, 10) < 1) {
-        validationErrors.push('Duration must be at least 1 day');
+      if (formData.duration && parseInt(formData.duration, 10) < 0) {
+        validationErrors.push('Duration must be a non-negative number');
       }
 
       if (validationErrors.length > 0) {
@@ -279,9 +294,26 @@ const ItineraryGenerationContainer = () => {
 
       // Clean up days data - remove invalid enum values and incomplete days
       const cleanDays = (formData.days || [])
-        .filter(day => day.title && day.description) // Only include days with required fields
+        .filter(day => day && (day.title || day.dayNumber)) // Include days with title or dayNumber
         .map(day => {
           const cleanDay = { ...day };
+          
+          // Ensure dayNumber exists
+          if (!cleanDay.dayNumber && cleanDay.title) {
+            // Try to extract day number from title, or use index
+            const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
+            cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
+          }
+          
+          // Ensure title exists
+          if (!cleanDay.title && cleanDay.dayNumber) {
+            cleanDay.title = `Day ${cleanDay.dayNumber}`;
+          }
+          
+          // Ensure description exists (can be empty string)
+          if (cleanDay.description === undefined || cleanDay.description === null) {
+            cleanDay.description = '';
+          }
           
           // Remove empty transport enum
           if (!cleanDay.transport || cleanDay.transport === '') {
@@ -303,9 +335,28 @@ const ItineraryGenerationContainer = () => {
           return cleanDay;
         });
 
+      // Map category to valid backend enum values
+      const categoryMap = {
+        'adventure': 'family',
+        'budget': 'family',
+        'luxury': 'family',
+        'religious': 'family',
+        'wildlife': 'wild safari',
+        'beach': 'family',
+        'heritage': 'family',
+        'other': 'family',
+        'honeymoon': 'honeymoon',
+        'couple': 'couple',
+        'family': 'family',
+        'group': 'group',
+        'wild safari': 'wild safari',
+      };
+      const validCategory = categoryMap[formData.category?.toLowerCase()] || 'family';
+
       // Ensure numeric fields are numbers and remove _id for new packages
       const sanitizedData = {
         ...formData,
+        category: validCategory, // Use mapped category
         price: parseFloat(formData.price) || 0,
         duration: parseInt(formData.duration, 10) || 1,
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
@@ -326,6 +377,8 @@ const ItineraryGenerationContainer = () => {
       console.log('[DEBUG] Images count:', validImages?.length);
       console.log('[DEBUG] First image:', validImages?.[0]);
       console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
+      console.log('[DEBUG] Days to save:', cleanDays);
+      console.log('[DEBUG] Days count:', cleanDays?.length);
 
       // Call API to save package
       const response = await ApiService.createPackage(sanitizedData);
@@ -389,39 +442,27 @@ const ItineraryGenerationContainer = () => {
       console.log('[DEBUG] formData received:', formData);
       console.log('[DEBUG] formData._id:', formData._id, 'formData.id:', formData.id);
       
-      // Validate required fields with detailed checks
+      // Validate field lengths only (no required fields)
       const validationErrors = [];
 
-      if (!formData.name || !formData.name.trim()) {
-        validationErrors.push('Package Name is required');
-      } else if (formData.name.trim().length < 3 || formData.name.trim().length > 100) {
-        validationErrors.push('Package Name must be between 3 and 100 characters');
+      if (formData.name && formData.name.trim().length > 100) {
+        validationErrors.push('Package Name must not exceed 100 characters');
       }
 
-      if (!formData.category || !formData.category.trim()) {
-        validationErrors.push('Category is required');
+      if (formData.destination && formData.destination.trim().length > 100) {
+        validationErrors.push('Destination must not exceed 100 characters');
       }
 
-      if (!formData.destination || !formData.destination.trim()) {
-        validationErrors.push('Destination is required');
-      } else if (formData.destination.trim().length < 2 || formData.destination.trim().length > 100) {
-        validationErrors.push('Destination must be between 2 and 100 characters');
-      }
-
-      if (!formData.description || !formData.description.trim()) {
-        validationErrors.push('Description is required');
-      } else if (formData.description.trim().length < 10) {
-        validationErrors.push(`Description must be at least 10 characters (currently ${formData.description.trim().length} characters)`);
-      } else if (formData.description.trim().length > 2000) {
+      if (formData.description && formData.description.trim().length > 2000) {
         validationErrors.push('Description must not exceed 2000 characters');
       }
 
-      if (!formData.price || parseFloat(formData.price) < 0) {
-        validationErrors.push('Valid Price is required');
+      if (formData.price && parseFloat(formData.price) < 0) {
+        validationErrors.push('Price must be a non-negative number');
       }
 
-      if (!formData.duration || parseInt(formData.duration, 10) < 1) {
-        validationErrors.push('Duration must be at least 1 day');
+      if (formData.duration && parseInt(formData.duration, 10) < 0) {
+        validationErrors.push('Duration must be a non-negative number');
       }
 
       if (validationErrors.length > 0) {
@@ -441,9 +482,26 @@ const ItineraryGenerationContainer = () => {
       
       // Clean up days data - remove invalid enum values and incomplete days
       const cleanDays = (formData.days || [])
-        .filter(day => day.title && day.description) // Only include days with required fields
+        .filter(day => day && (day.title || day.dayNumber)) // Include days with title or dayNumber
         .map(day => {
           const cleanDay = { ...day };
+          
+          // Ensure dayNumber exists
+          if (!cleanDay.dayNumber && cleanDay.title) {
+            // Try to extract day number from title, or use index
+            const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
+            cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
+          }
+          
+          // Ensure title exists
+          if (!cleanDay.title && cleanDay.dayNumber) {
+            cleanDay.title = `Day ${cleanDay.dayNumber}`;
+          }
+          
+          // Ensure description exists (can be empty string)
+          if (cleanDay.description === undefined || cleanDay.description === null) {
+            cleanDay.description = '';
+          }
           
           // Remove empty transport enum
           if (!cleanDay.transport || cleanDay.transport === '') {
@@ -465,9 +523,28 @@ const ItineraryGenerationContainer = () => {
           return cleanDay;
         });
       
+      // Map category to valid backend enum values
+      const categoryMap = {
+        'adventure': 'family',
+        'budget': 'family',
+        'luxury': 'family',
+        'religious': 'family',
+        'wildlife': 'wild safari',
+        'beach': 'family',
+        'heritage': 'family',
+        'other': 'family',
+        'honeymoon': 'honeymoon',
+        'couple': 'couple',
+        'family': 'family',
+        'group': 'group',
+        'wild safari': 'wild safari',
+      };
+      const validCategory = categoryMap[formData.category?.toLowerCase()] || 'family';
+
       // Sanitize data - ensure numeric fields are numbers
       const sanitizedData = {
         ...formData,
+        category: validCategory, // Use mapped category
         price: parseFloat(formData.price) || 0,
         duration: parseInt(formData.duration, 10) || 1,
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1,
@@ -725,7 +802,10 @@ const ItineraryGenerationContainer = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <PageHeader onNewPackage={handleNewPackageDialogOpen} />
+      <PageHeader 
+        onNewPackage={handleNewPackageDialogOpen}
+        onAIPackage={handleAIPackageDialogOpen}
+      />
 
       {/* Stats */}
       <div className="bg-white border-b border-gray-200 px-8 py-4">
@@ -807,6 +887,13 @@ const ItineraryGenerationContainer = () => {
             />
           )}
         </PackageFormModal>
+
+        {/* AI Package Generation Dialog */}
+        <AIPackageDialog
+          isOpen={showAIPackageDialog}
+          onClose={() => setShowAIPackageDialog(false)}
+          onPackageGenerated={handleAIPackageGenerated}
+        />
 
         <PackagePDFPreviewDialog
           isOpen={pdfPreviewData.isOpen}
