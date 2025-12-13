@@ -37,24 +37,22 @@ const packageSchema = new mongoose.Schema(
     },
     difficulty: {
       type: String,
-      enum: ['easy', 'moderate', 'difficult'],
-      default: 'moderate',
     },
     category: {
       type: String,
       enum: [
         'honeymoon',
+        'couple',
         'family',
-        'adventure',
-        'budget',
-        'luxury',
-        'religious',
-        'wildlife',
-        'beach',
-        'heritage',
-        'other',
+        'group',
+        'wild safari',
       ],
-      default: 'other',
+      default: 'family',
+    },
+    packageType: {
+      type: String,
+      enum: ['Standard', 'Deluxe', 'Luxury', 'Premium'],
+      default: 'Standard',
     },
     images: [
       {

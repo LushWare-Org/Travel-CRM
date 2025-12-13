@@ -39,22 +39,18 @@ export const createPackageValidator = [
     .withMessage('Category is required')
     .isIn([
       'honeymoon',
+      'couple',
       'family',
-      'adventure',
-      'budget',
-      'luxury',
-      'religious',
-      'wildlife',
-      'beach',
-      'heritage',
-      'other',
+      'group',
+      'wild safari',
     ])
     .withMessage('Invalid category'),
 
-  body('difficulty')
-    .optional()
-    .isIn(['easy', 'moderate', 'difficult'])
-    .withMessage('Invalid difficulty level'),
+  body('packageType')
+    .notEmpty()
+    .withMessage('Package type is required')
+    .isIn(['Standard', 'Deluxe', 'Luxury', 'Premium'])
+    .withMessage('Invalid package type'),
 
   body('maxGroupSize')
     .optional()
@@ -165,22 +161,17 @@ export const updatePackageValidator = [
     .optional()
     .isIn([
       'honeymoon',
+      'couple',
       'family',
-      'adventure',
-      'budget',
-      'luxury',
-      'religious',
-      'wildlife',
-      'beach',
-      'heritage',
-      'other',
+      'group',
+      'wild safari',
     ])
     .withMessage('Invalid category'),
 
-  body('difficulty')
+  body('packageType')
     .optional()
-    .isIn(['easy', 'moderate', 'difficult'])
-    .withMessage('Invalid difficulty level'),
+    .isIn(['Standard', 'Deluxe', 'Luxury', 'Premium'])
+    .withMessage('Invalid package type'),
 
   body('maxGroupSize')
     .optional()
@@ -220,17 +211,17 @@ export const getPackagesValidator = [
     .optional()
     .isIn([
       'honeymoon',
+      'couple',
       'family',
-      'adventure',
-      'budget',
-      'luxury',
-      'religious',
-      'wildlife',
-      'beach',
-      'heritage',
-      'other',
+      'group',
+      'wild safari',
     ])
     .withMessage('Invalid category'),
+
+  query('packageType')
+    .optional()
+    .isIn(['Standard', 'Deluxe', 'Luxury', 'Premium'])
+    .withMessage('Invalid package type'),
 
   query('minPrice')
     .optional()
@@ -263,11 +254,6 @@ export const getPackagesValidator = [
       }
       return true;
     }),
-
-  query('difficulty')
-    .optional()
-    .isIn(['easy', 'moderate', 'difficult'])
-    .withMessage('Invalid difficulty level'),
 
   query('isActive')
     .optional()

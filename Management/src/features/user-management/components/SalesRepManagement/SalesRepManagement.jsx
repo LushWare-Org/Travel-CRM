@@ -45,7 +45,7 @@ const SalesRepManagement = () => {
     name: '',
     email: '',
     phone: '',
-    phoneCountry: 'US',
+    phoneCountry: 'IN',
     commissionRate: 10,
     targetLeads: 50
   });
@@ -124,6 +124,7 @@ const SalesRepManagement = () => {
           leadsAssigned: rep.leadsAssigned || 0,
           leadsConverted: rep.leadsConverted || 0,
           createdAt: rep.createdAt,
+          lastLogin: rep.lastLogin,
           isActive: rep.isActive,
           isEmailVerified: rep.isEmailVerified,
           isTempPassword: rep.isTempPassword,
@@ -215,6 +216,7 @@ const SalesRepManagement = () => {
       name: '',
       email: '',
       phone: '',
+      phoneCountry: 'IN',
       commissionRate: 10,
       targetLeads: 50
     });
@@ -589,31 +591,33 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
-          <FormGroup label="Country Code" required>
-            <select
-              value={formData.phoneCountry}
-              onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
-              disabled={isSubmitting}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              {COUNTRIES.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.flag} {country.name} ({country.code})
-                </option>
-              ))}
-            </select>
-          </FormGroup>
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Country Code" required>
+              <select
+                value={formData.phoneCountry}
+                onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                {COUNTRIES.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.flag} {country.name} ({country.code})
+                  </option>
+                ))}
+              </select>
+            </FormGroup>
 
-          <FormGroup label="Phone" required>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              disabled={isSubmitting}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              placeholder={getPhonePlaceholder(formData.phoneCountry)}
-            />
-          </FormGroup>
+            <FormGroup label="Phone" required>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder={getPhonePlaceholder(formData.phoneCountry)}
+              />
+            </FormGroup>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Commission Rate (%)" required>
@@ -680,31 +684,33 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
-          <FormGroup label="Country Code" required>
-            <select
-              value={formData.phoneCountry}
-              onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
-              disabled={isSubmitting}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              {COUNTRIES.map((country) => (
-                <option key={country.code} value={country.code}>
-                  {country.flag} {country.name} ({country.code})
-                </option>
-              ))}
-            </select>
-          </FormGroup>
+          <div className="grid grid-cols-2 gap-4">
+            <FormGroup label="Country Code" required>
+              <select
+                value={formData.phoneCountry}
+                onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                {COUNTRIES.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.flag} {country.name} ({country.code})
+                  </option>
+                ))}
+              </select>
+            </FormGroup>
 
-          <FormGroup label="Phone" required>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              disabled={isSubmitting}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              placeholder={getPhonePlaceholder(formData.phoneCountry)}
-            />
-          </FormGroup>
+            <FormGroup label="Phone" required>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder={getPhonePlaceholder(formData.phoneCountry)}
+              />
+            </FormGroup>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <FormGroup label="Commission Rate (%)" required>

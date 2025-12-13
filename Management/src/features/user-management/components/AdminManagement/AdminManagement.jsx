@@ -45,7 +45,7 @@ const AdminManagement = () => {
     name: '',
     email: '',
     phone: '',
-    countryCode: 'US',
+    countryCode: 'IN',
     permissions: []
   });
 
@@ -227,7 +227,7 @@ const AdminManagement = () => {
       name: '',
       email: '',
       phone: '',
-      countryCode: 'US',
+      countryCode: 'IN',
       permissions: []
     });
   };
