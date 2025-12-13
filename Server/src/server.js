@@ -51,6 +51,7 @@ import quotationRoutes from './routes/quotation.routes.js';
 import paymentReceiptRoutes from './routes/paymentReceipt.routes.js';
 import creditNoteRoutes from './routes/creditNote.routes.js';
 import billingRoutes from './routes/billing.routes.js';
+import voucherRoutes from './routes/voucher.routes.js';
 
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
@@ -127,6 +128,7 @@ app.use(`/api/${API_VERSION}/analytics`, analyticsRoutes);
 app.use(`/api/${API_VERSION}/billing/quotations`, quotationRoutes);
 app.use(`/api/${API_VERSION}/billing/receipts`, paymentReceiptRoutes);
 app.use(`/api/${API_VERSION}/billing/credit-notes`, creditNoteRoutes);
+app.use(`/api/${API_VERSION}/billing/vouchers`, voucherRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 
 // Error handling

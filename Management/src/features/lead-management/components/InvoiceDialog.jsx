@@ -36,7 +36,6 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     taxRate: 0,
     discountType: 'none',
     discountValue: 0,
-    serviceChargeRate: 0,
     issueDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     notes: '',
@@ -301,7 +300,6 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             taxRate: latestInvoice.taxRate || 0,
             discountType: latestInvoice.discountType || 'none',
             discountValue: latestInvoice.discountValue || 0,
-            serviceChargeRate: latestInvoice.serviceChargeRate || 0,
             issueDate: latestInvoice.issueDate ? new Date(latestInvoice.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             dueDate: latestInvoice.dueDate ? new Date(latestInvoice.dueDate).toISOString().split('T')[0] : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             notes: latestInvoice.notes || '',
@@ -405,6 +403,9 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       if (response.success || response.status === 'success' || response.data) {
         const quote = response.data || response;
         
+        const quoteMode = quote.mode || 'summary';
+        setQuotationMode(quoteMode);
+        
         // Update form with latest quotation data
         setFormData(prev => ({
           ...prev,
@@ -417,18 +418,17 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             totalPrice: item.totalPrice || 0,
             taxRate: item.taxRate || 0,
             notes: item.notes || '',
+            // Preserve isManual flag if it exists, or mark as manual if it's an extra field in summary mode
+            isManual: item.isManual !== undefined ? item.isManual : 
+                     (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package'),
           })) : prev.items,
           taxRate: quote.taxRate !== undefined ? quote.taxRate : prev.taxRate,
           discountType: quote.discountType || prev.discountType,
           discountValue: quote.discountValue !== undefined ? quote.discountValue : prev.discountValue,
-          serviceChargeRate: quote.serviceChargeRate !== undefined ? quote.serviceChargeRate : prev.serviceChargeRate,
           notes: quote.notes !== undefined ? quote.notes : prev.notes,
           terms: quote.terms !== undefined ? quote.terms : prev.terms,
           paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms,
         }));
-
-        const quoteMode = quote.mode || 'summary';
-        setQuotationMode(quoteMode);
         
         toast.success('Quotation data refreshed successfully');
       }
@@ -471,6 +471,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           totalPrice: 0,
           taxRate: 0,
           notes: '',
+          isManual: true, // Mark as manually added for summary mode
         },
       ],
     });
@@ -487,11 +488,22 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const calculateTotals = () => {
     // When in detailed mode, exclude package items from calculation
+    // When in summary mode, include package item + all extra fields (manually added items)
     const itemsToCalculate = isDetailedMode 
       ? formData.items.filter(item => item.category !== 'package')
-      : formData.items;
+      : formData.items.filter(item => {
+          // In summary mode, include package item and all manually added extra fields
+          // Exclude read-only activities from itinerary
+          return item.category === 'package' || item.isManual === true;
+        });
     
-    const subtotal = itemsToCalculate.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+    // Calculate subtotal - use totalPrice if available, otherwise calculate from quantity * unitPrice
+    const subtotal = itemsToCalculate.reduce((sum, item) => {
+      const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null 
+        ? item.totalPrice 
+        : (item.quantity || 0) * (item.unitPrice || 0);
+      return sum + itemTotal;
+    }, 0);
     
     let discountAmount = 0;
     if (formData.discountType === 'percentage') {
@@ -500,12 +512,11 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       discountAmount = formData.discountValue || 0;
     }
     
-    const serviceChargeAmount = (subtotal * (formData.serviceChargeRate || 0)) / 100;
-    const taxableAmount = subtotal - discountAmount + serviceChargeAmount;
+    const taxableAmount = subtotal - discountAmount;
     const taxAmount = (taxableAmount * (formData.taxRate || 0)) / 100;
     const totalAmount = taxableAmount + taxAmount;
     
-    return { subtotal, discountAmount, serviceChargeAmount, taxAmount, totalAmount };
+    return { subtotal, discountAmount, taxAmount, totalAmount };
   };
 
   const handleSubmit = async (status = 'draft') => {
@@ -800,59 +811,93 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               </div>
             </div>
 
-            {/* Items Table */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Items</h3>
-                <button
-                  onClick={addItem}
-                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Item
-                </button>
-              </div>
+            {/* Items - Show summary mode for non-detailed, detailed table for detailed mode */}
+            {!isDetailedMode ? (
+              /* Summary Mode: Package price input + All activities as read-only text + Editable extra fields */
+              <div className="space-y-4">
+                {/* Package Price Input (Editable) */}
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Package Total Price
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">INR</span>
+                    <input
+                      type="number"
+                      value={(() => {
+                        const packageItem = formData.items.find(item => item.category === 'package');
+                        return packageItem ? (packageItem.totalPrice || packageItem.unitPrice || 0) : 0;
+                      })()}
+                      onChange={(e) => {
+                        const price = parseFloat(e.target.value) || 0;
+                        setFormData(prev => {
+                          const packageItemIndex = prev.items.findIndex(item => item.category === 'package');
+                          if (packageItemIndex >= 0) {
+                            const newItems = [...prev.items];
+                            newItems[packageItemIndex] = {
+                              ...newItems[packageItemIndex],
+                              totalPrice: price,
+                              unitPrice: price,
+                              quantity: 1,
+                            };
+                            return { ...prev, items: newItems };
+                          } else {
+                            return {
+                              ...prev,
+                              items: [
+                                {
+                                  description: 'Package Total',
+                                  category: 'package',
+                                  quantity: 1,
+                                  unitPrice: price,
+                                  totalPrice: price,
+                                  notes: '',
+                                },
+                                ...prev.items.filter(item => item.category !== 'package'),
+                              ],
+                            };
+                          }
+                        });
+                      }}
+                      min="0"
+                      step="0.01"
+                      className="flex-1 px-3 py-2 border border-purple-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="Enter package total price"
+                    />
+                  </div>
+                </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Price</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.items
-                      .map((item, originalIndex) => ({
-                        item,
-                        originalIndex,
-                        shouldShow: !isDetailedMode || item.category !== 'package'
-                      }))
-                      .filter(({ shouldShow }) => shouldShow)
-                      .map(({ item, originalIndex }) => {
-                        // Calculate price from unitPrice * quantity or use totalPrice
-                        const displayPrice = item.totalPrice !== undefined && item.totalPrice !== null 
-                          ? item.totalPrice 
-                          : (item.quantity || 1) * (item.unitPrice || 0);
-                        
-                        return (
-                          <tr key={originalIndex} className="border-b">
-                            <td className="px-3 py-2">
+                {/* Extra Fields Only - No included activities shown in summary mode */}
+                {formData.items.filter(item => item.category !== 'package' && item.isManual === true).length > 0 && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Extra Fields
+                    </label>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {formData.items
+                        .map((item, originalIndex) => {
+                          // Skip package items and non-manual items (activities from itinerary)
+                          if (item.category === 'package' || item.isManual !== true) return null;
+                          
+                          // Only show manually added extra fields
+                          return (
+                            <div
+                              key={originalIndex}
+                              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded"
+                            >
                               <input
                                 type="text"
-                                value={item.description}
+                                value={item.description || ''}
                                 onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                placeholder="Item description"
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder="Field description"
+                                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                               />
-                            </td>
-                            <td className="px-3 py-2">
                               <input
                                 type="number"
-                                value={displayPrice || ''}
+                                value={item.totalPrice || item.unitPrice || 0}
                                 onChange={(e) => {
                                   const price = parseFloat(e.target.value) || 0;
+                                  // Update both totalPrice and unitPrice in a single state update
                                   const newItems = [...formData.items];
                                   newItems[originalIndex] = {
                                     ...newItems[originalIndex],
@@ -864,25 +909,108 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                                 }}
                                 min="0"
                                 step="0.01"
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder="Price"
+                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
                               />
-                            </td>
-                            <td className="px-3 py-2">
                               <button
                                 onClick={() => removeItem(originalIndex)}
                                 className="text-red-600 hover:text-red-800"
-                                disabled={formData.items.filter(i => !isDetailedMode || i.category !== 'package').length === 1}
+                                type="button"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
+                            </div>
+                          );
+                        })
+                        .filter(item => item !== null)}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              /* Detailed Mode: All items with editable price inputs */
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Items</h3>
+                  <button
+                    onClick={addItem}
+                    className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Item
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Price</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formData.items
+                        .map((item, originalIndex) => ({
+                          item,
+                          originalIndex,
+                          shouldShow: item.category !== 'package'
+                        }))
+                        .filter(({ shouldShow }) => shouldShow)
+                        .map(({ item, originalIndex }) => {
+                          const displayPrice = item.totalPrice !== undefined && item.totalPrice !== null 
+                            ? item.totalPrice 
+                            : (item.quantity || 1) * (item.unitPrice || 0);
+                          
+                          return (
+                            <tr key={originalIndex} className="border-b">
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={item.description}
+                                  onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                  placeholder="Item description"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  value={displayPrice || ''}
+                                  onChange={(e) => {
+                                    const price = parseFloat(e.target.value) || 0;
+                                    const newItems = [...formData.items];
+                                    newItems[originalIndex] = {
+                                      ...newItems[originalIndex],
+                                      totalPrice: price,
+                                      unitPrice: price,
+                                      quantity: 1,
+                                    };
+                                    setFormData({ ...formData, items: newItems });
+                                  }}
+                                  min="0"
+                                  step="0.01"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <button
+                                  onClick={() => removeItem(originalIndex)}
+                                  className="text-red-600 hover:text-red-800"
+                                  disabled={formData.items.filter(i => i.category !== 'package').length === 1}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Calculations */}
             <div className="grid grid-cols-2 gap-4">
@@ -930,20 +1058,6 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     />
                   </div>
                 )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Service Charge Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.serviceChargeRate}
-                    onChange={(e) => setFormData({ ...formData, serviceChargeRate: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                 <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -958,12 +1072,6 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Discount:</span>
                     <span>-{totals.discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                {totals.serviceChargeAmount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Service Charge:</span>
-                    <span className="font-medium">{totals.serviceChargeAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {totals.taxAmount > 0 && (

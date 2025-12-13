@@ -15,7 +15,9 @@ import {
   LeadTable,
   QuotationDialog,
   InvoiceDialog,
-  ReceiptDialog
+  ReceiptDialog,
+  VoucherDialog,
+  StatusChangeDialog
 } from "../features/lead-management/components";
 
 const LeadManagement = () => {
@@ -34,7 +36,10 @@ const LeadManagement = () => {
   const [showQuotationDialog, setShowQuotationDialog] = useState(false);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [showVoucherDialog, setShowVoucherDialog] = useState(false);
   const [billingLead, setBillingLead] = useState(null);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [statusChangeLead, setStatusChangeLead] = useState(null);
   const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState([]);
@@ -223,6 +228,17 @@ const LeadManagement = () => {
     "not-interested": "Not Interested",
   };
 
+  // Status options for dialog
+  const statusOptions = [
+    { value: 'new', label: 'New' },
+    { value: 'contacted', label: 'Contacted' },
+    { value: 'interested', label: 'Interested' },
+    { value: 'quoted', label: 'Quoted' },
+    { value: 'converted', label: 'Converted' },
+    { value: 'lost', label: 'Loss' },
+    { value: 'not-interested', label: 'Not Interested' },
+  ];
+
   const platforms = ["Website Form", "Social Media", "Phone Call", "Referral", "Email", "Walk-in"];
 
   // Calculate absolute status counts from all leads (no filters applied)
@@ -238,6 +254,41 @@ const LeadManagement = () => {
       'not-interested': leads.filter((l) => l.status === 'not-interested').length,
     };
   }, [leads]);
+
+  // Handle status click - open dialog
+  const handleStatusClick = (lead) => {
+    setStatusChangeLead(lead);
+    setShowStatusDialog(true);
+  };
+
+  // Handle status change from dialog
+  const handleStatusChange = async (newStatus) => {
+    if (!statusChangeLead) return;
+    
+    const leadId = (statusChangeLead._id || statusChangeLead.id)?.toString();
+    
+    try {
+      const response = await leadAPI.updateLead(leadId, { status: newStatus });
+      if (response.success) {
+        toast.success(`Status updated to ${statusLabels[newStatus] || newStatus}`);
+        // Update the lead in the local state
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            (lead._id || lead.id)?.toString() === leadId.toString()
+              ? { ...lead, status: newStatus }
+              : lead
+          )
+        );
+        setShowStatusDialog(false);
+        setStatusChangeLead(null);
+      } else {
+        toast.error(response.message || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      toast.error(error.message || 'Failed to update status');
+    }
+  };
 
   const filteredLeads = leads.filter((lead) => {
     const searchLower = searchTerm.toLowerCase();
@@ -354,7 +405,7 @@ const LeadManagement = () => {
         </div>
 
         {/* Stats */}
-        <LeadStats totalLeads={leads.length} />
+        <LeadStats totalLeads={leads.length} leads={leads} />
       </div>
 
       {/* Content */}
@@ -379,6 +430,7 @@ const LeadManagement = () => {
             statusColors={statusColors}
             statusLabels={statusLabels}
             highlightedLeadId={highlightedLeadId}
+            onStatusClick={handleStatusClick}
           onLeadClick={(lead) => {
             setSelectedLead(lead);
             setLeadEditForm({
@@ -391,7 +443,6 @@ const LeadManagement = () => {
               destination: lead.destination,
               platform: lead.platform,
               travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
-              time: lead.time,
               status: lead.status,
             });
           }}
@@ -411,7 +462,6 @@ const LeadManagement = () => {
               destination: lead.destination,
               platform: lead.platform,
               travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
-              time: lead.time,
               status: lead.status,
             });
           }}
@@ -426,6 +476,10 @@ const LeadManagement = () => {
           onReceiptClick={(lead) => {
             setBillingLead(lead);
             setShowReceiptDialog(true);
+          }}
+          onVoucherClick={(lead) => {
+            setBillingLead(lead);
+            setShowVoucherDialog(true);
           }}
           currentPage={currentPage}
           totalPages={totalPages}
@@ -555,6 +609,30 @@ const LeadManagement = () => {
           }}
           lead={billingLead}
           onSuccess={fetchLeads}
+        />
+
+        <VoucherDialog
+          isOpen={showVoucherDialog}
+          onClose={() => {
+            setShowVoucherDialog(false);
+            setBillingLead(null);
+          }}
+          lead={billingLead}
+          onSuccess={fetchLeads}
+        />
+
+        {/* Status Change Dialog */}
+        <StatusChangeDialog
+          isOpen={showStatusDialog}
+          onClose={() => {
+            setShowStatusDialog(false);
+            setStatusChangeLead(null);
+          }}
+          currentStatus={statusChangeLead?.status}
+          statusOptions={statusOptions}
+          statusColors={statusColors}
+          statusLabels={statusLabels}
+          onStatusSelect={handleStatusChange}
         />
       </div>
     </div>

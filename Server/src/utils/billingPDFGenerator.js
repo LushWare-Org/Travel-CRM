@@ -321,13 +321,6 @@ export function generateQuotationPDF(quotation, lead) {
           .text(`-${formatCurrency(quotation.discountAmount)}`, 420, calcY, { width: 110, align: 'right' });
       }
 
-      if (quotation.serviceChargeAmount > 0) {
-        calcY += 20;
-        doc
-          .fillColor(rgbToHex(PALETTE.secondaryText))
-          .text(`Service Charge (${quotation.serviceChargeRate}%):`, 320, calcY)
-          .text(formatCurrency(quotation.serviceChargeAmount), 420, calcY, { width: 110, align: 'right' });
-      }
 
       if (quotation.taxAmount > 0) {
         calcY += 20;
@@ -640,13 +633,6 @@ export function generateInvoicePDF(invoice, lead) {
           .text(`-${formatCurrency(invoice.discountAmount)}`, 420, calcY, { width: 110, align: 'right' });
       }
 
-      if (invoice.serviceChargeAmount > 0) {
-        calcY += 20;
-        doc
-          .fillColor(rgbToHex(PALETTE.secondaryText))
-          .text(`Service Charge (${invoice.serviceChargeRate}%):`, 320, calcY)
-          .text(formatCurrency(invoice.serviceChargeAmount), 420, calcY, { width: 110, align: 'right' });
-      }
 
       if (invoice.taxAmount > 0) {
         calcY += 20;

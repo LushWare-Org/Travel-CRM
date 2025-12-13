@@ -25,6 +25,7 @@ const NewEditPackageForm = ({
   images, // Images state from parent container
   isUploadingImages, // Upload state from parent
   hideLeadManagementButtons = false, // Hide buttons when used in lead management
+  onlyItineraryEditable = false, // When true, only itinerary is editable, all other fields are read-only
 }) => {
   const [localFormData, setLocalFormData] = useState(formData);
   const [showItinerary, setShowItinerary] = useState(false);
@@ -148,37 +149,105 @@ const NewEditPackageForm = ({
 
   return (
     <div className="space-y-6">
-      {/* Basic Info Section */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-        <BasicPackageInfo 
-          formData={localFormData} 
-          onChange={handleBasicInfoChange}
-          packageId={localFormData._id || localFormData.id || null}
-        />
-      </div>
+      {/* Basic Info Section - Read-only when onlyItineraryEditable is true */}
+      {!onlyItineraryEditable ? (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+          <BasicPackageInfo 
+            formData={localFormData} 
+            onChange={handleBasicInfoChange}
+            packageId={localFormData._id || localFormData.id || null}
+          />
+        </div>
+      ) : (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-700 mb-3">Basic Information (Read-Only)</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Package Name:</span>
+              <span className="ml-2 font-medium text-gray-900">{localFormData.name || 'N/A'}</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Category:</span>
+              <span className="ml-2 font-medium text-gray-900">{localFormData.category || 'N/A'}</span>
+            </div>
+            <div className="col-span-2">
+              <span className="text-gray-500">Destination:</span>
+              <span className="ml-2 font-medium text-gray-900">{localFormData.destination || 'N/A'}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Package Details Section */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Details</h3>
-        <PackageDetails
-          formData={localFormData}
-          nightsInput={localFormData.duration || 1}
-          onFormChange={handleDetailsChange}
-          onNightsChange={handleDurationChange}
-        />
-      </div>
+      {/* Package Details Section - Read-only when onlyItineraryEditable is true */}
+      {!onlyItineraryEditable ? (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Details</h3>
+          <PackageDetails
+            formData={localFormData}
+            nightsInput={localFormData.duration || 1}
+            onFormChange={handleDetailsChange}
+            onNightsChange={handleDurationChange}
+          />
+        </div>
+      ) : (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-700 mb-3">Package Details (Read-Only)</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Duration:</span>
+              <span className="ml-2 font-medium text-gray-900">{localFormData.duration || 0} Days</span>
+            </div>
+            <div>
+              <span className="text-gray-500">Price:</span>
+              <span className="ml-2 font-medium text-gray-900">INR {localFormData.price?.toFixed(2) || '0.00'}</span>
+            </div>
+            {localFormData.highlights && localFormData.highlights.length > 0 && (
+              <div className="col-span-2">
+                <span className="text-gray-500">Highlights:</span>
+                <ul className="mt-1 list-disc list-inside text-gray-700">
+                  {localFormData.highlights.map((highlight, idx) => (
+                    <li key={idx}>{highlight}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {localFormData.inclusions && localFormData.inclusions.length > 0 && (
+              <div className="col-span-2">
+                <span className="text-gray-500">Inclusions:</span>
+                <ul className="mt-1 list-disc list-inside text-gray-700">
+                  {localFormData.inclusions.map((inclusion, idx) => (
+                    <li key={idx}>{inclusion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {localFormData.exclusions && localFormData.exclusions.length > 0 && (
+              <div className="col-span-2">
+                <span className="text-gray-500">Exclusions:</span>
+                <ul className="mt-1 list-disc list-inside text-gray-700">
+                  {localFormData.exclusions.map((exclusion, idx) => (
+                    <li key={idx}>{exclusion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* Images Section */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Images</h3>
-        <ImageUpload
-          images={images || localFormData.images || []}
-          onImageUpload={onImageUpload}
-          onImageRemove={onImageRemove}
-          isUploading={isUploadingImages}
-        />
-      </div>
+      {/* Images Section - Hidden when onlyItineraryEditable is true */}
+      {!onlyItineraryEditable && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Images</h3>
+          <ImageUpload
+            images={images || localFormData.images || []}
+            onImageUpload={onImageUpload}
+            onImageRemove={onImageRemove}
+            isUploading={isUploadingImages}
+          />
+        </div>
+      )}
 
       {/* Itinerary Section */}
       <div>
@@ -191,6 +260,7 @@ const NewEditPackageForm = ({
               onAddDay={handleAddDay}
               onRemoveDay={handleRemoveDay}
               destination={localFormData.destination}
+              hideDescription={onlyItineraryEditable}
             />
 
             {!hideLeadManagementButtons && (

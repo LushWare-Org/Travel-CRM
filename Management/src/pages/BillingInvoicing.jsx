@@ -1,23 +1,26 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Search, Download, Eye, Send, MoreVertical, Receipt, FileText, FileCheck, ExternalLink } from "lucide-react";
+import { ArrowLeft, Search, Download, Eye, Send, MoreVertical, Receipt, FileText, FileCheck, ExternalLink, Ticket } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { invoiceAPI, receiptAPI, quotationAPI } from "../services/api.js";
+import { invoiceAPI, receiptAPI, quotationAPI, voucherAPI } from "../services/api.js";
 
 const BillingInvoicing = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("quotations"); // 'quotations', 'invoices', or 'receipts'
+  const [activeTab, setActiveTab] = useState("quotations"); // 'quotations', 'invoices', 'receipts', or 'vouchers'
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedQuotation, setSelectedQuotation] = useState(null);
+  const [selectedVoucher, setSelectedVoucher] = useState(null);
   
   const [quotations, setQuotations] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [receipts, setReceipts] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
   const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [loadingReceipts, setLoadingReceipts] = useState(false);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
 
   // Fetch quotations
   const fetchQuotations = async () => {
@@ -73,10 +76,29 @@ const BillingInvoicing = () => {
     }
   };
 
+  // Fetch vouchers
+  const fetchVouchers = async () => {
+    try {
+      setLoadingVouchers(true);
+      const response = await voucherAPI.getAll({ limit: 100, page: 1 });
+      if (response.success || response.status === 'success') {
+        setVouchers(response.data || []);
+      } else {
+        toast.error('Failed to fetch vouchers');
+      }
+    } catch (error) {
+      console.error('Error fetching vouchers:', error);
+      toast.error('Failed to fetch vouchers');
+    } finally {
+      setLoadingVouchers(false);
+    }
+  };
+
   useEffect(() => {
     fetchQuotations();
     fetchInvoices();
     fetchReceipts();
+    fetchVouchers();
   }, []);
 
   // Filter quotations based on search
@@ -109,6 +131,17 @@ const BillingInvoicing = () => {
     return (
       customerName.toLowerCase().includes(searchLower) ||
       receiptNumber.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Filter vouchers based on search
+  const filteredVouchers = vouchers.filter((voucher) => {
+    const customerName = voucher.customer?.name || voucher.lead?.name || '';
+    const voucherNumber = voucher.voucherNumber || '';
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      customerName.toLowerCase().includes(searchLower) ||
+      voucherNumber.toLowerCase().includes(searchLower)
     );
   });
 
@@ -183,6 +216,26 @@ const BillingInvoicing = () => {
     }
   };
 
+  const handleDownloadVoucherPDF = async (voucherId) => {
+    try {
+      await voucherAPI.downloadPDF(voucherId);
+      toast.success('Voucher PDF downloaded');
+    } catch (error) {
+      console.error('Error downloading voucher PDF:', error);
+      toast.error('Failed to download voucher PDF');
+    }
+  };
+
+  const handleSendVoucher = async (voucherId) => {
+    try {
+      await voucherAPI.sendEmail(voucherId);
+      toast.success('Voucher sent successfully');
+    } catch (error) {
+      console.error('Error sending voucher:', error);
+      toast.error('Failed to send voucher');
+    }
+  };
+
   // Navigate to lead management with lead ID
   const handleNavigateToLead = (leadId) => {
     if (!leadId) {
@@ -199,7 +252,7 @@ const BillingInvoicing = () => {
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Billing & Invoicing</h1>
-            <p className="text-gray-600 mt-1">Manage quotations, invoices, and payment receipts</p>
+            <p className="text-gray-600 mt-1">Manage quotations, invoices, payment receipts, and vouchers</p>
           </div>
         </div>
 
@@ -244,6 +297,19 @@ const BillingInvoicing = () => {
               Receipts ({receipts.length})
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab("vouchers")}
+            className={`px-4 py-2 font-medium transition-colors relative ${
+              activeTab === "vouchers"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Ticket className="w-4 h-4" />
+              Vouchers ({vouchers.length})
+            </div>
+          </button>
         </div>
       </div>
 
@@ -255,7 +321,7 @@ const BillingInvoicing = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder={`Search ${activeTab === "quotations" ? "quotations" : activeTab === "invoices" ? "invoices" : "receipts"} by customer name or ${activeTab === "quotations" ? "quotation" : activeTab === "invoices" ? "invoice" : "receipt"} number...`}
+              placeholder={`Search ${activeTab === "quotations" ? "quotations" : activeTab === "invoices" ? "invoices" : activeTab === "receipts" ? "receipts" : "vouchers"} by customer name or ${activeTab === "quotations" ? "quotation" : activeTab === "invoices" ? "invoice" : activeTab === "receipts" ? "receipt" : "voucher"} number...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -422,10 +488,32 @@ const BillingInvoicing = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredInvoices.map((invoice) => (
-                      <tr key={invoice._id || invoice.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    {filteredInvoices.map((invoice) => {
+                      const leadId = invoice.lead?._id || invoice.lead?.id || invoice.lead;
+                      return (
+                      <tr 
+                        key={invoice._id || invoice.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (leadId) {
+                            handleNavigateToLead(leadId);
+                          }
+                        }}
+                      >
                         <td className="py-3 px-4">
-                          <span className="font-semibold text-gray-900">{invoice.invoiceNumber || 'N/A'}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (leadId) {
+                                handleNavigateToLead(leadId);
+                              }
+                            }}
+                            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline flex items-center gap-1"
+                            disabled={!leadId}
+                          >
+                            {invoice.invoiceNumber || 'N/A'}
+                            {leadId && <ExternalLink className="w-3 h-3" />}
+                          </button>
                         </td>
                         <td className="py-3 px-4">
                           <div>
@@ -437,7 +525,7 @@ const BillingInvoicing = () => {
                             </p>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-gray-700">
+                        <td className="py-3 px-4 text-gray-700" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleNavigateToLead(invoice.lead?._id || invoice.lead?.id || invoice.lead)}
                             className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
@@ -471,7 +559,7 @@ const BillingInvoicing = () => {
                             {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1) || 'Draft'}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-2 justify-center">
                             <button
                               onClick={() => setSelectedInvoice(invoice)}
@@ -497,7 +585,136 @@ const BillingInvoicing = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Vouchers List */}
+        {activeTab === "vouchers" && (
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">Voucher List</h2>
+              <p className="text-sm text-gray-600 mt-1">All vouchers ({filteredVouchers.length})</p>
+            </div>
+
+            {loadingVouchers ? (
+              <div className="p-8 text-center text-gray-500">Loading vouchers...</div>
+            ) : filteredVouchers.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">No vouchers found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Voucher Number</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Customer</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Lead ID</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Package</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Travel Start</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Travel End</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredVouchers.map((voucher) => {
+                      const leadId = voucher.lead?._id || voucher.lead?.id || voucher.lead;
+                      return (
+                      <tr 
+                        key={voucher._id || voucher.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (leadId) {
+                            handleNavigateToLead(leadId);
+                          }
+                        }}
+                      >
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (leadId) {
+                                handleNavigateToLead(leadId);
+                              }
+                            }}
+                            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline flex items-center gap-1"
+                            disabled={!leadId}
+                          >
+                            {voucher.voucherNumber || 'N/A'}
+                            {leadId && <ExternalLink className="w-3 h-3" />}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {voucher.customer?.name || voucher.lead?.name || 'N/A'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {voucher.customer?.email || voucher.lead?.email || ''}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleNavigateToLead(voucher.lead?._id || voucher.lead?.id || voucher.lead)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                            disabled={!voucher.lead?._id && !voucher.lead?.id && !voucher.lead}
+                          >
+                            {voucher.lead?._id || voucher.lead?.id || voucher.lead || 'N/A'}
+                            {(voucher.lead?._id || voucher.lead?.id || voucher.lead) && (
+                              <ExternalLink className="w-3 h-3" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700">
+                          {voucher.package?.name || voucher.customizedPackage?.name || voucher.packageDetails?.name || 'N/A'}
+                        </td>
+                        <td className="py-3 px-4 text-gray-700">{formatDate(voucher.travelStartDate)}</td>
+                        <td className="py-3 px-4 text-gray-700">{formatDate(voucher.travelEndDate)}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            voucher.status === 'active' ? 'bg-green-100 text-green-800' :
+                            voucher.status === 'used' ? 'bg-blue-100 text-blue-800' :
+                            voucher.status === 'expired' ? 'bg-red-100 text-red-800' :
+                            voucher.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {voucher.status?.charAt(0).toUpperCase() + voucher.status?.slice(1) || 'Draft'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={() => setSelectedVoucher(voucher)}
+                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDownloadVoucherPDF(voucher._id || voucher.id)}
+                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                              title="Download PDF"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleSendVoucher(voucher._id || voucher.id)}
+                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                              title="Send Email"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -534,10 +751,32 @@ const BillingInvoicing = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredReceipts.map((receipt) => (
-                      <tr key={receipt._id || receipt.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    {filteredReceipts.map((receipt) => {
+                      const leadId = receipt.lead?._id || receipt.lead?.id || receipt.lead;
+                      return (
+                      <tr 
+                        key={receipt._id || receipt.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (leadId) {
+                            handleNavigateToLead(leadId);
+                          }
+                        }}
+                      >
                         <td className="py-3 px-4">
-                          <span className="font-semibold text-gray-900">{receipt.receiptNumber || 'N/A'}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (leadId) {
+                                handleNavigateToLead(leadId);
+                              }
+                            }}
+                            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline flex items-center gap-1"
+                            disabled={!leadId}
+                          >
+                            {receipt.receiptNumber || 'N/A'}
+                            {leadId && <ExternalLink className="w-3 h-3" />}
+                          </button>
                         </td>
                         <td className="py-3 px-4">
                           <div>
@@ -549,7 +788,7 @@ const BillingInvoicing = () => {
                             </p>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-gray-700">
+                        <td className="py-3 px-4 text-gray-700" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleNavigateToLead(receipt.lead?._id || receipt.lead?.id || receipt.lead)}
                             className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
@@ -584,7 +823,7 @@ const BillingInvoicing = () => {
                             {receipt.receiptStatus?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Pending'}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-2 justify-center">
                             <button
                               onClick={() => setSelectedReceipt(receipt)}
@@ -610,7 +849,8 @@ const BillingInvoicing = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -800,6 +1040,94 @@ const BillingInvoicing = () => {
                 </button>
                 <button
                   onClick={() => handleSendInvoice(selectedInvoice._id || selectedInvoice.id)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Send Email
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voucher Detail Modal */}
+      {selectedVoucher && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Voucher {selectedVoucher.voucherNumber}</h2>
+                <p className="text-gray-600 mt-1">Voucher details</p>
+              </div>
+              <button
+                onClick={() => setSelectedVoucher(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Header Info */}
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">CUSTOMER</p>
+                  <p className="text-sm font-semibold text-gray-900 mt-1">
+                    {selectedVoucher.customer?.name || selectedVoucher.lead?.name || 'N/A'}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {selectedVoucher.customer?.email || selectedVoucher.lead?.email || ''}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 font-medium mb-1">
+                    Travel Start: {formatDate(selectedVoucher.travelStartDate) || 'N/A'}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium mb-1">
+                    Travel End: {formatDate(selectedVoucher.travelEndDate) || 'N/A'}
+                  </p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mt-2 ${
+                    selectedVoucher.status === 'active' ? 'bg-green-100 text-green-800' :
+                    selectedVoucher.status === 'used' ? 'bg-blue-100 text-blue-800' :
+                    selectedVoucher.status === 'expired' ? 'bg-red-100 text-red-800' :
+                    selectedVoucher.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {selectedVoucher.status?.toUpperCase() || 'DRAFT'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Package Info */}
+              <div className="pb-4 border-b border-gray-200">
+                <p className="text-xs text-gray-500 font-medium mb-2">PACKAGE</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {selectedVoucher.package?.name || selectedVoucher.customizedPackage?.name || selectedVoucher.packageDetails?.name || 'N/A'}
+                </p>
+                {selectedVoucher.packageDetails?.destination && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Destination: {selectedVoucher.packageDetails.destination}
+                  </p>
+                )}
+                {selectedVoucher.packageDetails?.duration && (
+                  <p className="text-xs text-gray-600">
+                    Duration: {selectedVoucher.packageDetails.duration} days
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => handleDownloadVoucherPDF(selectedVoucher._id || selectedVoucher.id)}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </button>
+                <button
+                  onClick={() => handleSendVoucher(selectedVoucher._id || selectedVoucher.id)}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2"
                 >
                   <Send className="w-4 h-4" />
