@@ -142,6 +142,22 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
     };
   }
 
+  // Clean up empty package fields before processing
+  if (req.body.package === '' || req.body.package === null) {
+    delete req.body.package;
+  }
+  if (req.body.customizedPackage === '' || req.body.customizedPackage === null) {
+    delete req.body.customizedPackage;
+  }
+
+  // Clean up empty package fields before processing
+  if (req.body.package === '' || req.body.package === null || req.body.package === undefined) {
+    delete req.body.package;
+  }
+  if (req.body.customizedPackage === '' || req.body.customizedPackage === null || req.body.customizedPackage === undefined) {
+    delete req.body.customizedPackage;
+  }
+
   // Get package data if package or customizedPackage is provided
   let packageData = null;
   let itineraryData = null;
@@ -187,13 +203,37 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
   if (itineraryData && itineraryData.days) {
     req.body.itinerarySummary = itineraryData.days.map((day) => ({
       dayNumber: day.dayNumber,
-      title: day.title,
+      title: day.title || '',
       locations: day.locations || [],
       activities: day.activities || [],
-      accommodation: {
-        name: day.accommodation?.name || '',
-        type: day.accommodation?.type || '',
-      },
+      accommodation: day.accommodation && typeof day.accommodation === 'object'
+        ? {
+            name: day.accommodation.name || '',
+            type: day.accommodation.type || '',
+          }
+        : {
+            name: '',
+            type: '',
+          },
+    }));
+  }
+
+  // Ensure itinerarySummary accommodation is properly formatted if provided from frontend
+  if (req.body.itinerarySummary && Array.isArray(req.body.itinerarySummary)) {
+    req.body.itinerarySummary = req.body.itinerarySummary.map((day) => ({
+      dayNumber: day.dayNumber || 0,
+      title: String(day.title || ''),
+      locations: Array.isArray(day.locations) ? day.locations.map(loc => String(loc)) : [],
+      activities: Array.isArray(day.activities) ? day.activities.map(act => String(act)) : [],
+      accommodation: day.accommodation && typeof day.accommodation === 'object' && !Array.isArray(day.accommodation)
+        ? {
+            name: String(day.accommodation.name || ''),
+            type: String(day.accommodation.type || ''),
+          }
+        : {
+            name: '',
+            type: '',
+          },
     }));
   }
 

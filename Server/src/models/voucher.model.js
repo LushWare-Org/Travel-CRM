@@ -43,20 +43,12 @@ const voucherSchema = new mongoose.Schema(
       {
         location: {
           type: String,
-          required: true,
         },
         checkIn: {
           type: Date,
-          required: true,
         },
         checkOut: {
           type: Date,
-          required: true,
-        },
-        accommodation: {
-          name: String,
-          type: String,
-          address: String,
         },
       },
     ],
@@ -83,24 +75,22 @@ const voucherSchema = new mongoose.Schema(
     // Itinerary summary
     itinerarySummary: [
       {
-        dayNumber: Number,
-        title: String,
-        locations: [String],
-        activities: [String],
+        dayNumber: { type: Number },
+        title: { type: String, default: '' },
+        locations: [{ type: String }],
+        activities: [{ type: String }],
         accommodation: {
-          name: String,
-          type: String,
+          name: { type: String, default: '' },
+          type: { type: String, default: '' },
         },
       },
     ],
     // Travel dates
     travelStartDate: {
       type: Date,
-      required: true,
     },
     travelEndDate: {
       type: Date,
-      required: true,
     },
     // Additional information
     notes: String,
@@ -145,6 +135,31 @@ const voucherSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   },
 );
+
+// Clean and validate itinerarySummary accommodation before saving
+voucherSchema.pre('save', function (next) {
+  if (this.itinerarySummary && Array.isArray(this.itinerarySummary)) {
+    this.itinerarySummary = this.itinerarySummary.map((day) => {
+      if (day.accommodation && typeof day.accommodation === 'object' && !Array.isArray(day.accommodation)) {
+        return {
+          ...day,
+          accommodation: {
+            name: String(day.accommodation.name || ''),
+            type: String(day.accommodation.type || ''),
+          },
+        };
+      }
+      return {
+        ...day,
+        accommodation: {
+          name: String(day.accommodation?.name || ''),
+          type: String(day.accommodation?.type || ''),
+        },
+      };
+    });
+  }
+  next();
+});
 
 // Generate voucher number before saving
 voucherSchema.pre('save', async function (next) {

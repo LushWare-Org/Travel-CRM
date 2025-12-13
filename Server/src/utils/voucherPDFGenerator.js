@@ -172,17 +172,24 @@ export function generateVoucherPDF(voucher, lead) {
 
       // ===== CUSTOMER INFO =====
       yPos = 220;
+      const customerName = voucher.customer?.name || lead?.name || '-';
       doc
         .fillColor(rgbToHex(PALETTE.primaryText))
         .fontSize(11)
         .font('Helvetica-Bold')
         .text('Customer Information', 50, yPos)
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .fillColor(rgbToHex(PALETTE.primaryText))
+        .text(`Name: ${customerName}`, 50, yPos + 20)
         .font('Helvetica')
         .fontSize(10)
         .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(`Name: ${voucher.customer?.name || lead?.name || 'N/A'}`, 50, yPos + 20)
-        .text(`Email: ${voucher.customer?.email || lead?.email || 'N/A'}`, 50, yPos + 35)
-        .text(`Phone: ${voucher.customer?.phone || lead?.phone || 'N/A'}`, 50, yPos + 50);
+        .text(`Email: ${voucher.customer?.email || lead?.email || '-'}`, 50, yPos + 40)
+        .text(`Phone: ${voucher.customer?.phone || lead?.phone || '-'}`, 50, yPos + 55);
+      if (voucher.customer?.address || lead?.address) {
+        doc.text(`Address: ${voucher.customer?.address || lead?.address || ''}`, 50, yPos + 70);
+      }
 
       // ===== PACKAGE DETAILS =====
       yPos = 320;
@@ -210,10 +217,11 @@ export function generateVoucherPDF(voucher, lead) {
         .font('Helvetica')
         .fontSize(10)
         .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(`Start Date: ${formatDate(voucher.travelStartDate)}`, 50, yPos + 20)
-        .text(`End Date: ${formatDate(voucher.travelEndDate)}`, 50, yPos + 35);
+        .text(`Start Date: ${voucher.travelStartDate ? formatDate(voucher.travelStartDate) : '-'}`, 50, yPos + 20)
+        .text(`End Date: ${voucher.travelEndDate ? formatDate(voucher.travelEndDate) : '-'}`, 50, yPos + 35);
 
       // ===== LOCATION DATES =====
+      let locationY = 520; // Initialize locationY
       if (voucher.locationDates && voucher.locationDates.length > 0) {
         yPos = 520;
         doc
@@ -222,7 +230,7 @@ export function generateVoucherPDF(voucher, lead) {
           .font('Helvetica-Bold')
           .text('Location & Accommodation Dates', 50, yPos);
 
-        let locationY = yPos + 25;
+        locationY = yPos + 25;
         voucher.locationDates.forEach((locationDate, index) => {
           if (locationY > 700) {
             doc.addPage();
@@ -232,21 +240,23 @@ export function generateVoucherPDF(voucher, lead) {
             .font('Helvetica')
             .fontSize(10)
             .fillColor(rgbToHex(PALETTE.secondaryText))
-            .text(`${index + 1}. ${locationDate.location}`, 50, locationY)
-            .text(`   Check-in: ${formatDate(locationDate.checkIn)}`, 60, locationY + 15)
-            .text(`   Check-out: ${formatDate(locationDate.checkOut)}`, 60, locationY + 30);
-          if (locationDate.accommodation?.name) {
-            doc.text(`   Accommodation: ${locationDate.accommodation.name}`, 60, locationY + 45);
-            locationY += 60;
-          } else {
-            locationY += 50;
-          }
+            .text(`${index + 1}. ${locationDate.location || '-'}`, 50, locationY)
+            .text(`   Check-in: ${locationDate.checkIn ? formatDate(locationDate.checkIn) : '-'}`, 60, locationY + 15)
+            .text(`   Check-out: ${locationDate.checkOut ? formatDate(locationDate.checkOut) : '-'}`, 60, locationY + 30);
+          locationY += 50;
         });
+      } else {
+        // If no location dates, set locationY to the position after travel dates
+        locationY = 520; // Position after travel dates section
       }
 
       // ===== MEAL PLANS =====
+      // Initialize mealY - will be set if meal plans exist
+      let mealY = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 520 + 30;
+      
       if (voucher.mealPlans && voucher.mealPlans.length > 0) {
-        yPos = locationY || 650;
+        // Calculate yPos based on whether location dates were shown
+        yPos = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 520 + 30;
         if (yPos > 700) {
           doc.addPage();
           yPos = 50;
@@ -257,7 +267,7 @@ export function generateVoucherPDF(voucher, lead) {
           .font('Helvetica-Bold')
           .text('Meal Plans (Day-wise)', 50, yPos);
 
-        let mealY = yPos + 25;
+        mealY = yPos + 25;
         voucher.mealPlans.forEach((mealPlan) => {
           if (mealY > 700) {
             doc.addPage();
@@ -278,8 +288,12 @@ export function generateVoucherPDF(voucher, lead) {
       }
 
       // ===== ITINERARY SUMMARY =====
+      // Initialize itineraryY - will be set if itinerary exists
+      let itineraryY = mealY;
+      
       if (voucher.itinerarySummary && voucher.itinerarySummary.length > 0) {
-        yPos = mealY || 650;
+        // Calculate yPos based on whether meal plans were shown
+        yPos = (voucher.mealPlans && voucher.mealPlans.length > 0) ? mealY + 30 : mealY;
         if (yPos > 700) {
           doc.addPage();
           yPos = 50;
@@ -290,7 +304,7 @@ export function generateVoucherPDF(voucher, lead) {
           .font('Helvetica-Bold')
           .text('Itinerary Summary', 50, yPos);
 
-        let itineraryY = yPos + 25;
+        itineraryY = yPos + 25;
         voucher.itinerarySummary.forEach((day) => {
           if (itineraryY > 700) {
             doc.addPage();
@@ -318,8 +332,12 @@ export function generateVoucherPDF(voucher, lead) {
       }
 
       // ===== INCLUSIONS =====
+      // Initialize inclusionY - will be set if inclusions exist
+      let inclusionY = itineraryY;
+      
       if (packageDetails.inclusions && packageDetails.inclusions.length > 0) {
-        yPos = itineraryY || 650;
+        // Calculate yPos based on whether itinerary was shown
+        yPos = (voucher.itinerarySummary && voucher.itinerarySummary.length > 0) ? itineraryY + 30 : itineraryY;
         if (yPos > 700) {
           doc.addPage();
           yPos = 50;
@@ -333,7 +351,7 @@ export function generateVoucherPDF(voucher, lead) {
           .fontSize(10)
           .fillColor(rgbToHex(PALETTE.secondaryText));
 
-        let inclusionY = yPos + 25;
+        inclusionY = yPos + 25;
         packageDetails.inclusions.forEach((inclusion) => {
           if (inclusionY > 700) {
             doc.addPage();
@@ -346,7 +364,8 @@ export function generateVoucherPDF(voucher, lead) {
 
       // ===== SPECIAL INSTRUCTIONS =====
       if (voucher.specialInstructions) {
-        yPos = inclusionY || 650;
+        // Calculate yPos based on whether inclusions were shown
+        yPos = (packageDetails.inclusions && packageDetails.inclusions.length > 0) ? inclusionY + 30 : inclusionY;
         if (yPos > 700) {
           doc.addPage();
           yPos = 50;

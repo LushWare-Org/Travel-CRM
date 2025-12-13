@@ -12,6 +12,9 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [allVouchers, setAllVouchers] = useState([]);
+  const [loadingAllVouchers, setLoadingAllVouchers] = useState(false);
+  const [selectedVoucherForDownload, setSelectedVoucherForDownload] = useState('');
   const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [packageData, setPackageData] = useState(null);
@@ -50,6 +53,14 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   useEffect(() => {
     if (isOpen && lead) {
+      // Auto-populate travel dates from lead if available
+      const travelStartDate = lead.travelDate 
+        ? new Date(lead.travelDate).toISOString().split('T')[0] 
+        : '';
+      const travelEndDate = lead.endDate 
+        ? new Date(lead.endDate).toISOString().split('T')[0] 
+        : '';
+
       setFormData(prev => ({
         ...prev,
         lead: lead._id || lead.id,
@@ -59,9 +70,12 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           phone: lead.phone || '',
           address: lead.address || '',
         },
+        travelStartDate: travelStartDate,
+        travelEndDate: travelEndDate,
       }));
       setSendEmailAddress(lead?.email || lead?.customer?.email || '');
       fetchExistingVouchers();
+      fetchAllVouchers();
       loadPackageAndItinerary();
     }
   }, [isOpen, lead]);
@@ -163,11 +177,6 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       location,
                       checkIn: '',
                       checkOut: '',
-                      accommodation: {
-                        name: '',
-                        type: '',
-                        address: '',
-                      },
                     })),
                   };
                 } else if (newLocations.length > 0) {
@@ -180,11 +189,6 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         location,
                         checkIn: '',
                         checkOut: '',
-                        accommodation: {
-                          name: '',
-                          type: '',
-                          address: '',
-                        },
                       })),
                     ],
                   };
@@ -245,6 +249,23 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
+  const fetchAllVouchers = async () => {
+    try {
+      setLoadingAllVouchers(true);
+      const response = await voucherAPI.getAll({ limit: 1000, page: 1 });
+      if (response.success || response.status === 'success') {
+        const vouchersData = response.data || [];
+        const vouchersArray = Array.isArray(vouchersData) ? vouchersData : [];
+        setAllVouchers(vouchersArray);
+      }
+    } catch (error) {
+      console.error('Error fetching all vouchers:', error);
+      toast.error('Failed to fetch vouchers');
+    } finally {
+      setLoadingAllVouchers(false);
+    }
+  };
+
   const handleLocationDateChange = (index, field, value) => {
     setFormData(prev => {
       const newLocationDates = [...prev.locationDates];
@@ -254,15 +275,6 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         newLocationDates[index] = { ...newLocationDates[index], checkIn: value };
       } else if (field === 'checkOut') {
         newLocationDates[index] = { ...newLocationDates[index], checkOut: value };
-      } else if (field.startsWith('accommodation.')) {
-        const accField = field.split('.')[1];
-        newLocationDates[index] = {
-          ...newLocationDates[index],
-          accommodation: {
-            ...newLocationDates[index].accommodation,
-            [accField]: value,
-          },
-        };
       }
       return { ...prev, locationDates: newLocationDates };
     });
@@ -277,11 +289,6 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           location: '',
           checkIn: '',
           checkOut: '',
-          accommodation: {
-            name: '',
-            type: '',
-            address: '',
-          },
         },
       ],
     }));
@@ -296,18 +303,45 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.travelStartDate || !formData.travelEndDate) {
-      toast.error('Please select travel start and end dates');
-      return;
-    }
+    // All fields are optional - no validation required
 
     try {
       setLoading(true);
+      
+      // Clean up form data before sending
+      const cleanedFormData = {
+        ...formData,
+        // Convert empty strings to null/undefined for ObjectId fields
+        package: formData.package && formData.package.trim() !== '' ? formData.package : undefined,
+        customizedPackage: formData.customizedPackage && formData.customizedPackage.trim() !== '' ? formData.customizedPackage : undefined,
+        // Ensure accommodation in itinerarySummary is properly formatted
+        itinerarySummary: formData.itinerarySummary?.map(day => ({
+          dayNumber: day.dayNumber,
+          title: day.title || '',
+          locations: day.locations || [],
+          activities: day.activities || [],
+          accommodation: day.accommodation && typeof day.accommodation === 'object' 
+            ? {
+                name: day.accommodation.name || '',
+                type: day.accommodation.type || '',
+              }
+            : {
+                name: '',
+                type: '',
+              },
+        })) || [],
+        // Convert empty date strings to null
+        travelStartDate: formData.travelStartDate && formData.travelStartDate.trim() !== '' ? formData.travelStartDate : null,
+        travelEndDate: formData.travelEndDate && formData.travelEndDate.trim() !== '' ? formData.travelEndDate : null,
+        // Clean location dates - remove empty locations
+        locationDates: formData.locationDates?.filter(ld => ld.location && ld.location.trim() !== '') || [],
+      };
+
       let response;
       if (isEditing && currentVoucherId) {
-        response = await voucherAPI.update(currentVoucherId, formData);
+        response = await voucherAPI.update(currentVoucherId, cleanedFormData);
       } else {
-        response = await voucherAPI.create(formData);
+        response = await voucherAPI.create(cleanedFormData);
       }
 
       if (response.success || response.status === 'success') {
@@ -327,13 +361,16 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
-  const handleDownloadPDF = async () => {
-    if (!currentVoucherId) {
-      toast.error('Please save the voucher first');
+  const handleDownloadPDF = async (voucherId = null) => {
+    const idToDownload = voucherId || currentVoucherId || selectedVoucherForDownload;
+    
+    if (!idToDownload) {
+      toast.error('Please select a voucher to download');
       return;
     }
+    
     try {
-      await voucherAPI.downloadPDF(currentVoucherId);
+      await voucherAPI.downloadPDF(idToDownload);
       toast.success('Voucher PDF downloaded');
     } catch (error) {
       console.error('Error downloading voucher PDF:', error);
@@ -440,11 +477,47 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           </button>
         </div>
 
+        {/* Download Voucher Section */}
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Download Voucher PDF
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                value={selectedVoucherForDownload}
+                onChange={(e) => setSelectedVoucherForDownload(e.target.value)}
+                disabled={loadingAllVouchers}
+              >
+                <option value="">Select a voucher to download...</option>
+                {allVouchers.map((voucher) => (
+                  <option key={voucher._id || voucher.id} value={voucher._id || voucher.id}>
+                    {voucher.voucherNumber || 'Voucher'} - {voucher.customer?.name || voucher.lead?.name || 'N/A'} 
+                    {voucher.travelStartDate ? ` (${new Date(voucher.travelStartDate).toLocaleDateString()})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="pt-6">
+              <button
+                type="button"
+                onClick={() => handleDownloadPDF(selectedVoucherForDownload)}
+                disabled={!selectedVoucherForDownload || loadingAllVouchers}
+                className="flex items-center justify-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                <Download className="w-5 h-5" />
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Existing Vouchers */}
         {existingVouchers.length > 0 && (
           <div className="p-4 border-b border-gray-200">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Existing Vouchers
+              Existing Vouchers (for this lead)
             </label>
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -509,26 +582,24 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Travel Start Date <span className="text-red-500">*</span>
+                Travel Start Date
               </label>
               <input
                 type="date"
                 value={formData.travelStartDate}
                 onChange={(e) => setFormData(prev => ({ ...prev, travelStartDate: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Travel End Date <span className="text-red-500">*</span>
+                Travel End Date
               </label>
               <input
                 type="date"
                 value={formData.travelEndDate}
                 onChange={(e) => setFormData(prev => ({ ...prev, travelEndDate: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
               />
             </div>
           </div>
@@ -536,7 +607,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           {/* Location Dates */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-700">Location & Accommodation Dates</h3>
+              <h3 className="text-lg font-semibold text-gray-700">Location Dates</h3>
               <button
                 type="button"
                 onClick={addLocationDate}
@@ -559,7 +630,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                       <input
@@ -585,16 +656,6 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         value={locationDate.checkOut}
                         onChange={(e) => handleLocationDateChange(index, 'checkOut', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Accommodation Name</label>
-                      <input
-                        type="text"
-                        value={locationDate.accommodation?.name || ''}
-                        onChange={(e) => handleLocationDateChange(index, 'accommodation.name', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Hotel/Resort name"
                       />
                     </div>
                   </div>
