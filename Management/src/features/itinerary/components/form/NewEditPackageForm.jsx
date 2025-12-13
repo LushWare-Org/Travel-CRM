@@ -42,8 +42,43 @@ const NewEditPackageForm = ({
     setLocalFormData(data);
   };
 
-  const handleDurationChange = (duration) => {
-    const daysCount = parseInt(duration, 10) || 0;
+  const handleDurationChange = (nights) => {
+    // Allow empty string for editing
+    if (nights === '' || nights === null || nights === undefined) {
+      setLocalFormData((prev) => ({
+        ...prev,
+        duration: '',
+      }));
+      return;
+    }
+    
+    const nightsCount = parseInt(nights, 10);
+    // Only proceed if we have a valid number >= 1
+    if (isNaN(nightsCount) || nightsCount < 1) {
+      // If invalid, set to 1 night (2 days) as minimum
+      const minNights = 1;
+      const minDays = minNights + 1; // 1 night = 2 days
+      let newDays = [...(localFormData.days || [])];
+      
+      // Ensure at least 2 days exist (1 night = 2 days)
+      if (newDays.length === 0) {
+        newDays = [createDefaultDay(1), createDefaultDay(2)];
+      } else if (newDays.length < minDays) {
+        for (let i = newDays.length + 1; i <= minDays; i++) {
+          newDays.push(createDefaultDay(i));
+        }
+      }
+      
+      setLocalFormData((prev) => ({
+        ...prev,
+        duration: minDays, // Store days in duration field
+        days: newDays,
+      }));
+      return;
+    }
+    
+    // Convert nights to days: n nights = n+1 days
+    const daysCount = nightsCount + 1;
     let newDays = [...(localFormData.days || [])];
 
     // Add new days if needed
@@ -59,7 +94,7 @@ const NewEditPackageForm = ({
 
     setLocalFormData((prev) => ({
       ...prev,
-      duration: daysCount,
+      duration: daysCount, // Store days in duration field (nights + 1)
       days: newDays,
     }));
   };
@@ -185,7 +220,16 @@ const NewEditPackageForm = ({
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Details</h3>
           <PackageDetails
             formData={localFormData}
-            nightsInput={localFormData.duration || 1}
+            nightsInput={(() => {
+              // Convert days to nights for display: nights = days - 1
+              // If duration is null/undefined/0, default to 1 night
+              if (localFormData.duration === null || localFormData.duration === undefined || localFormData.duration === '' || localFormData.duration === 0) {
+                return '';
+              }
+              // Convert days to nights: if duration is days, nights = days - 1
+              const nights = localFormData.duration - 1;
+              return nights >= 1 ? nights : '';
+            })()}
             onFormChange={handleDetailsChange}
             onNightsChange={handleDurationChange}
           />
@@ -259,7 +303,9 @@ const NewEditPackageForm = ({
               onDayChange={handleDayChange}
               onAddDay={handleAddDay}
               onRemoveDay={handleRemoveDay}
-              destination={localFormData.destination}
+              destination={localFormData.destination || ''}
+              packageType={localFormData.packageType || ''}
+              category={localFormData.category || ''}
               hideDescription={onlyItineraryEditable}
             />
 

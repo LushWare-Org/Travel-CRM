@@ -525,6 +525,20 @@ export const voucherAPI = {
   },
 };
 
+// Hotel Suggestion API Methods
+export const hotelAPI = {
+  suggest: async (destination, packageType, category, location, count = 5) => {
+    const api = new ApiService();
+    return api.post('/hotels/suggest', {
+      destination,
+      packageType,
+      category,
+      location,
+      count,
+    });
+  },
+};
+
 // Package API Methods
 export const packageAPI = {
   // Get all packages
