@@ -28,15 +28,21 @@ export const createPackage = asyncHandler(async (req, res, next) => {
   const packageData = req.body;
   const userId = req.user._id;
 
-  // Debug logging for images
+  // Debug logging for images and days
   console.log('[Package Controller] Creating package');
   console.log('[Package Controller] Images received:', packageData.images);
   console.log('[Package Controller] Images count:', packageData.images?.length || 0);
+  console.log('[Package Controller] Days received:', packageData.days);
+  console.log('[Package Controller] Days count:', packageData.days?.length || 0);
+  if (packageData.days && packageData.days.length > 0) {
+    console.log('[Package Controller] First day sample:', JSON.stringify(packageData.days[0], null, 2));
+  }
 
   const newPackage = await packageService.createPackage(packageData, userId);
 
   console.log('[Package Controller] Package created with images:', newPackage.images);
   console.log('[Package Controller] Saved images count:', newPackage.images?.length || 0);
+  console.log('[Package Controller] Package itinerary ID:', newPackage.itinerary);
 
   res.status(201).json({
     success: true,

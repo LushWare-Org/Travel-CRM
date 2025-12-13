@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
+import { generateAIPackage } from '../controllers/aiPackageGeneration.controller.js';
 import {
   createPackage,
   getPackages,
@@ -60,6 +61,9 @@ router.get('/', getPackagesValidator, getPackages);
 /**
  * Protected Routes (Admin/Staff only)
  */
+
+// Generate AI package (admin and staff only)
+router.post('/generate-ai', protect, authorize('admin', 'staff'), generateAIPackage);
 
 // Create a new package (admin and staff only)
 router.post('/', protect, authorize('admin', 'staff'), createPackageValidator, createPackage);

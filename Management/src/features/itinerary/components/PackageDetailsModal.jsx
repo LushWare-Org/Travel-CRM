@@ -15,20 +15,22 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto relative">
+        {/* Close Button - Top Right Corner */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors text-2xl text-gray-500 hover:text-gray-700 z-10"
+          aria-label="Close modal"
+        >
+          ✕
+        </button>
+        
         {/* Header */}
-        <div className="border-b border-gray-200 p-6 flex justify-between items-center">
+        <div className="border-b border-gray-200 p-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{pkg.name}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 pr-8">{pkg.name}</h2>
             <p className="text-gray-600 mt-1">{pkg.description}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-2xl"
-            aria-label="Close modal"
-          >
-            ✕
-          </button>
         </div>
 
         {/* Content */}

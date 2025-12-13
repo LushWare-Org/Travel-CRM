@@ -59,10 +59,20 @@ Format your response as a JSON array with this exact structure:
 
 Return ONLY the JSON array, nothing else.`;
 
-      const responseText = await geminiRestService.generateContent(prompt);
+      // Request more tokens for hotel suggestions (hotel data can be large)
+      const responseText = await geminiRestService.generateContent(prompt, {
+        maxTokens: 4000, // Increased for complete hotel suggestions
+        temperature: 0.7,
+      });
       
       if (!responseText || typeof responseText !== 'string') {
         throw new Error('No response from AI service');
+      }
+
+      // Log response length for debugging
+      console.log(`[Hotel Suggestions] Response length: ${responseText.length} characters`);
+      if (responseText.length > 3000) {
+        console.warn(`[Hotel Suggestions] Response is very long (${responseText.length} chars), may be truncated`);
       }
 
       // Parse the JSON response
@@ -146,14 +156,99 @@ Return ONLY the JSON array, nothing else.`;
               hotels = JSON.parse(match[0]);
             } catch (e) {
               // Try cleaning up the match
-              const cleaned = match[0]
+              let cleaned = match[0]
                 .replace(/```json/gi, '')
                 .replace(/```/g, '')
                 .trim();
-              hotels = JSON.parse(cleaned);
+              
+              // If JSON is incomplete/truncated, try to fix it
+              try {
+                hotels = JSON.parse(cleaned);
+              } catch (parseErr) {
+                // Check if JSON is incomplete
+                const openBrackets = (cleaned.match(/\[/g) || []).length;
+                const closeBrackets = (cleaned.match(/\]/g) || []).length;
+                const openBraces = (cleaned.match(/\{/g) || []).length;
+                const closeBraces = (cleaned.match(/\}/g) || []).length;
+                
+                // If incomplete, try to close it properly
+                if (openBrackets > closeBrackets || openBraces > closeBraces) {
+                  // Find the last complete object
+                  let lastCompleteIndex = cleaned.lastIndexOf('}');
+                  if (lastCompleteIndex !== -1) {
+                    // Extract up to the last complete object
+                    let partialJson = cleaned.substring(0, lastCompleteIndex + 1);
+                    
+                    // Close any open brackets
+                    if (openBrackets > closeBrackets) {
+                      partialJson += ']';
+                    }
+                    
+                    try {
+                      hotels = JSON.parse(partialJson);
+                      console.warn(`[Hotel Suggestions] Using partial JSON (${hotels.length} hotels)`);
+                    } catch (e) {
+                      // Try to extract individual hotel objects
+                      const hotelMatches = cleaned.match(/\{[^}]*"name"[^}]*\}/g);
+                      if (hotelMatches && hotelMatches.length > 0) {
+                        hotels = hotelMatches.map(match => {
+                          try {
+                            return JSON.parse(match);
+                          } catch (e) {
+                            // Extract fields manually
+                            const nameMatch = match.match(/"name"\s*:\s*"([^"]*)"/);
+                            const addressMatch = match.match(/"address"\s*:\s*"([^"]*)"/);
+                            const contactMatch = match.match(/"contactNumber"\s*:\s*"([^"]*)"/);
+                            const ratingMatch = match.match(/"rating"\s*:\s*([0-9.]+)/);
+                            
+                            return {
+                              name: nameMatch ? nameMatch[1] : 'Unknown Hotel',
+                              address: addressMatch ? addressMatch[1] : '',
+                              contactNumber: contactMatch ? contactMatch[1] : '',
+                              rating: ratingMatch ? parseFloat(ratingMatch[1]) : 0,
+                            };
+                          }
+                        }).filter(h => h && h.name);
+                        console.warn(`[Hotel Suggestions] Extracted ${hotels.length} hotels from incomplete JSON`);
+                      } else {
+                        throw e;
+                      }
+                    }
+                  } else {
+                    throw e;
+                  }
+                } else {
+                  throw e;
+                }
+              }
             }
           } else {
-            throw new Error('Could not extract JSON array from response');
+            // Try to extract hotel objects directly from text
+            const hotelPattern = /\{[^}]*"name"[^}]*\}/g;
+            const hotelMatches = responseText.match(hotelPattern);
+            if (hotelMatches && hotelMatches.length > 0) {
+              hotels = hotelMatches.map(match => {
+                try {
+                  return JSON.parse(match);
+                } catch (e) {
+                  // Extract fields manually
+                  const nameMatch = match.match(/"name"\s*:\s*"([^"]*)"/);
+                  const addressMatch = match.match(/"address"\s*:\s*"([^"]*)"/);
+                  const contactMatch = match.match(/"contactNumber"\s*:\s*"([^"]*)"/);
+                  const ratingMatch = match.match(/"rating"\s*:\s*([0-9.]+)/);
+                  
+                  return {
+                    name: nameMatch ? nameMatch[1] : 'Unknown Hotel',
+                    address: addressMatch ? addressMatch[1] : '',
+                    contactNumber: contactMatch ? contactMatch[1] : '',
+                    rating: ratingMatch ? parseFloat(ratingMatch[1]) : 0,
+                  };
+                }
+              }).filter(h => h && h.name);
+              console.warn(`[Hotel Suggestions] Extracted ${hotels.length} hotels using pattern matching`);
+            } else {
+              throw new Error('Could not extract JSON array from response');
+            }
           }
         } catch (finalError) {
           console.error('Final parse attempt failed:', finalError);
