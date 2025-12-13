@@ -61,7 +61,10 @@ export default function Login() {
       // Use the login function from AuthContext to ensure state is properly updated
       const result = await login(formData.email, formData.password);
       
-      if (result === 'password-reset-required') {
+      if (result === 'otp-required') {
+        // OTP required for sales reps - redirect to OTP verification
+        navigate('/sales-rep-login-otp');
+      } else if (result === 'password-reset-required') {
         // Password reset is required, AuthContext already stored credentials and showed toast
         navigate('/reset-password');
       } else if (result === true) {
@@ -179,6 +182,9 @@ export default function Login() {
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-center text-sm text-gray-600">
               Authorized personnel only. All access is monitored and logged.
+            </p>
+            <p className="text-center text-sm text-gray-600 mt-3">
+              Are you a Sales Rep? <a href="/sales-rep-login" className="text-blue-600 hover:text-blue-700 font-medium">Login with OTP</a>
             </p>
           </div>
         </div>
