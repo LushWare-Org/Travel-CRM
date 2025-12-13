@@ -64,10 +64,13 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
     }
 
     // Build select object for field limiting
-    let selectFields = '-__v -password'; // Exclude sensitive fields by default
+    let selectFields;
     if (req.query.fields) {
       const fields = req.query.fields.split(',').map(f => f.trim());
-      selectFields = fields.join(' ');
+      selectFields = fields.join(' ') + ' lastLogin'; // Include lastLogin with custom fields
+    } else {
+      // Use inclusion fields instead of exclusion to include lastLogin
+      selectFields = 'name email phone phoneCountry role isActive isEmailVerified commissionRate targetLeads createdAt lastLogin';
     }
 
     // Execute query with optimizations

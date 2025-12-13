@@ -17,6 +17,7 @@ const SalesRepTable = ({ reps, onEdit, onDelete, onResendInvite, onForcePassword
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Conv. Rate</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Commission</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Status</th>
+            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Last Login</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
@@ -50,6 +51,11 @@ const SalesRepTable = ({ reps, onEdit, onDelete, onResendInvite, onForcePassword
                 <td className="px-4 py-3 text-sm border-r border-gray-200">
                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[rep.status] || STATUS_COLORS.active}`}>
                     {rep.status.charAt(0).toUpperCase() + rep.status.slice(1)}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-sm border-r border-gray-200">
+                  <span className="text-gray-700">
+                    {rep.lastLogin ? formatDate(rep.lastLogin) : <span className="text-gray-400 italic">Never</span>}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm">
