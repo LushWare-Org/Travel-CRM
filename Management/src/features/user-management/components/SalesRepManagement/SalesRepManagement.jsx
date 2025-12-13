@@ -124,6 +124,7 @@ const SalesRepManagement = () => {
           leadsAssigned: rep.leadsAssigned || 0,
           leadsConverted: rep.leadsConverted || 0,
           createdAt: rep.createdAt,
+          lastLogin: rep.lastLogin,
           isActive: rep.isActive,
           isEmailVerified: rep.isEmailVerified,
           isTempPassword: rep.isTempPassword,

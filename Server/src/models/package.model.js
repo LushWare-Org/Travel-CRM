@@ -37,6 +37,7 @@ const packageSchema = new mongoose.Schema(
     },
     difficulty: {
       type: String,
+    },
     category: {
       type: String,
       enum: [

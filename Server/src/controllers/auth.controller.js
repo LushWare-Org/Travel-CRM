@@ -22,7 +22,9 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
 
   // Update last login
   user.lastLogin = Date.now();
-  user.save({ validateBeforeSave: false });
+  user.save({ validateBeforeSave: false }).catch((err) => {
+    logger.error(`Failed to update lastLogin: ${err.message}`);
+  });
 
   res.status(statusCode).cookie('token', token, options).json({
     status: 'success',
