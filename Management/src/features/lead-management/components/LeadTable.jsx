@@ -1,12 +1,19 @@
-import { MessageSquare, Edit, FileText, Receipt, FileCheck, Ticket } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { quotationAPI, invoiceAPI, receiptAPI } from '../../../services/api';
+import {
+  MessageSquare,
+  Edit,
+  FileText,
+  Receipt,
+  FileCheck,
+  Ticket,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { quotationAPI, invoiceAPI, receiptAPI } from "../../../services/api";
 
-const LeadTable = ({ 
-  leads, 
-  loading, 
-  error, 
-  statusColors, 
+const LeadTable = ({
+  leads,
+  loading,
+  error,
+  statusColors,
   statusLabels,
   onLeadClick,
   onRemarksClick,
@@ -21,7 +28,8 @@ const LeadTable = ({
   leadsPerPage,
   totalLeads,
   highlightedLeadId,
-  onStatusClick
+  onStatusClick,
+  onSectionClick,
 }) => {
   const paginationStart = (currentPage - 1) * leadsPerPage + 1;
   const paginationEnd = Math.min(currentPage * leadsPerPage, totalLeads);
@@ -35,7 +43,7 @@ const LeadTable = ({
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-12">
+      <div className="flex items-center justify-center py-12">
         <span className="text-gray-600">Loading leads...</span>
       </div>
     );
@@ -43,7 +51,7 @@ const LeadTable = ({
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="p-4 border border-red-200 rounded-lg bg-red-50">
         <p className="text-red-800">{error}</p>
       </div>
     );
@@ -51,9 +59,11 @@ const LeadTable = ({
 
   if (!leads || leads.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="py-12 text-center text-gray-500">
         <p className="text-lg">No leads found</p>
-        <p className="text-sm mt-2">Try adjusting your search or filter criteria</p>
+        <p className="mt-2 text-sm">
+          Try adjusting your search or filter criteria
+        </p>
       </div>
     );
   }
@@ -87,11 +97,19 @@ const LeadTable = ({
   };
 
   const formatDateTime = (date) => {
-    if (!date) return 'N/A';
+    if (!date) return "N/A";
     try {
       const d = new Date(date);
-      const dateStr = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-      const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dateStr = d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+      const timeStr = d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
       return (
         <div className="text-xs">
           <div className="font-medium">{dateStr}</div>
@@ -99,7 +117,7 @@ const LeadTable = ({
         </div>
       );
     } catch (error) {
-      return 'N/A';
+      return "N/A";
     }
   };
 
@@ -109,7 +127,10 @@ const LeadTable = ({
       return {
         name: lead.customizedPackage.name,
         badge: (
-          <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-semibold" title="Customized Package">
+          <span
+            className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-semibold"
+            title="Customized Package"
+          >
             ✨ Custom
           </span>
         ),
@@ -127,9 +148,12 @@ const LeadTable = ({
     // Check for manual itinerary
     if (lead.manualItinerary?._id || lead.manualItinerary) {
       return {
-        name: 'Manual Itinerary',
+        name: "Manual Itinerary",
         badge: (
-          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full font-semibold" title="Manual Itinerary">
+          <span
+            className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full font-semibold"
+            title="Manual Itinerary"
+          >
             📋 Manual
           </span>
         ),
@@ -138,138 +162,249 @@ const LeadTable = ({
 
     // No package or itinerary
     return {
-      name: 'N/A',
+      name: "N/A",
       badge: null,
     };
   };
 
   return (
     <>
-      <div className="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm relative">
+      <div className="relative overflow-x-auto bg-white border border-gray-200 rounded-lg shadow-sm">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 sticky left-0 bg-gray-50 z-10">ID</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">Name</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Contact No.</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Departure</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[180px]">E-mail ID</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Whatsapp</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Sales Rep</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[110px]">Travelers</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">Package</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">Destination</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">Platform</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Travel Date</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">End Date</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[100px]">Time</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">Remarks</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[140px]">Created Date/Time</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 sticky right-[250px] bg-gray-50 z-10 min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.1)]">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 z-10 min-w-[250px] shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">Actions</th>
+              <th className="sticky left-0 z-10 px-4 py-3 text-xs font-bold tracking-wider text-left text-gray-700 uppercase border-r border-gray-300 bg-gray-50">
+                ID
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">
+                Name
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">
+                Contact No.
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">
+                Departure
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[180px]">
+                E-mail ID
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">
+                Whatsapp
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">
+                Sales Rep
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[110px]">
+                Travelers
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">
+                Package
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[150px]">
+                Destination
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">
+                Platform
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">
+                Travel Date
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">
+                End Date
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[100px]">
+                Time
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[120px]">
+                Remarks
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[140px]">
+                Created Date/Time
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 sticky right-[250px] bg-gray-50 z-10 min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.1)]">
+                Status
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 z-10 min-w-[250px] shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {leads.map((lead) => {
               const colors = (statusColors && statusColors[lead.status]) || {};
               const leadId = (lead._id || lead.id)?.toString();
-              const isHighlighted = highlightedLeadId && leadId === highlightedLeadId.toString();
-              
+              const isHighlighted =
+                highlightedLeadId && leadId === highlightedLeadId.toString();
+
               return (
                 <tr
                   key={lead._id || lead.id}
                   id={isHighlighted ? `lead-${leadId}` : undefined}
-                  className={`transition-all duration-200 cursor-pointer group ${colors?.border || ''} ${
-                    isHighlighted ? 'bg-yellow-100 border-2 border-yellow-400 shadow-lg' : ''
+                  className={`transition-all duration-200 cursor-pointer group ${
+                    colors?.border || ""
+                  } ${
+                    isHighlighted
+                      ? "bg-yellow-100 border-2 border-yellow-400 shadow-lg"
+                      : ""
                   }`}
                   onClick={() => onLeadClick(lead)}
                 >
-                  <td className={`px-4 py-3 text-sm font-bold border-r border-gray-200 sticky left-0 bg-white group-hover:bg-gray-50 z-5 shadow-[2px_0_4px_rgba(0,0,0,0.1)] ${colors?.id || ''}`}>
+                  <td
+                    className={`px-4 py-3 text-sm font-bold border-r border-gray-200 sticky left-0 bg-white group-hover:bg-gray-50 z-5 shadow-[2px_0_4px_rgba(0,0,0,0.1)] ${
+                      colors?.id || ""
+                    }`}
+                  >
                     {(lead._id || lead.id).toString().substring(0, 8)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 border-r border-gray-200 font-semibold">{lead.name || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.phone || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.city || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.email || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.whatsapp || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.salesRep || lead.adviser || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.numberOfTravelers || 'N/A'}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-gray-900 border-r border-gray-200">
+                    {lead.name || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.phone || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.city || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.email || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.whatsapp || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.salesRep || lead.adviser || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.numberOfTravelers || "N/A"}
+                  </td>
                   <td className="px-4 py-3 text-sm border-r border-gray-200">
                     {(() => {
                       const packageInfo = getPackageDisplay(lead);
                       return (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-gray-700">{packageInfo.name}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-gray-700">
+                            {packageInfo.name}
+                          </span>
                           {packageInfo.badge}
                         </div>
                       );
                     })()}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.destination || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.platform || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{lead.time || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm border-r border-gray-200" onClick={(e) => { e.stopPropagation(); }}>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.destination || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.platform || "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.travelDate
+                      ? new Date(lead.travelDate).toISOString().split("T")[0]
+                      : "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.endDate
+                      ? new Date(lead.endDate).toISOString().split("T")[0]
+                      : "N/A"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                    {lead.time || "N/A"}
+                  </td>
+                  <td
+                    className="px-4 py-3 text-sm border-r border-gray-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
                     <button
                       onClick={() => onRemarksClick(lead)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors group"
+                      className="flex items-center gap-2 px-3 py-2 transition-colors rounded-lg hover:bg-gray-100 group"
                     >
                       <MessageSquare className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
-                      <span className="text-gray-700 font-medium">{lead.remarks?.length || 0}</span>
+                      <span className="font-medium text-gray-700">
+                        {lead.remarks?.length || 0}
+                      </span>
                     </button>
                   </td>
                   <td className="px-4 py-3 text-sm border-r border-gray-200">
                     {formatDateTime(lead.createdAt || lead.leadDateTime)}
                   </td>
-                  <td 
+                  <td
                     className="px-4 py-3 whitespace-nowrap border-r border-gray-200 sticky right-[250px] bg-white group-hover:bg-gray-50 z-5 shadow-[2px_0_4px_rgba(0,0,0,0.1)]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
-                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${colors?.badge || 'bg-gray-100 text-gray-800'}`}
+                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
+                        colors?.badge || "bg-gray-100 text-gray-800"
+                      }`}
                       onClick={(e) => handleStatusClick(e, lead)}
                       title="Click to change status"
                     >
-                      {(statusLabels && statusLabels[lead.status]) || lead.status || 'N/A'}
+                      {(statusLabels && statusLabels[lead.status]) ||
+                        lead.status ||
+                        "N/A"}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700 sticky right-0 bg-white group-hover:bg-gray-50 z-5 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]" onClick={(e) => { e.stopPropagation(); }}>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <button 
+                  <td
+                    className="px-4 py-3 text-sm text-gray-700 sticky right-0 bg-white group-hover:bg-gray-50 z-5 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <div className="flex flex-wrap items-center gap-1">
+                      <button
                         onClick={() => onEditClick(lead)}
-                        className="px-2 py-2 hover:bg-blue-100 rounded-lg transition-colors bg-gray-100"
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-blue-100"
                         title="Edit Lead"
                       >
                         <Edit className="w-4 h-4 text-blue-600" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleQuotationClick(e, lead)}
-                        className="px-2 py-2 hover:bg-green-100 rounded-lg transition-colors bg-gray-100"
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-green-100"
                         title="Quotation"
                       >
                         <FileText className="w-4 h-4 text-green-600" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleInvoiceClick(e, lead)}
-                        className="px-2 py-2 hover:bg-purple-100 rounded-lg transition-colors bg-gray-100"
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-purple-100"
                         title="Invoice"
                       >
                         <Receipt className="w-4 h-4 text-purple-600" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleReceiptClick(e, lead)}
-                        className="px-2 py-2 hover:bg-orange-100 rounded-lg transition-colors bg-gray-100"
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-orange-100"
                         title="Payment Receipt"
                       >
                         <FileCheck className="w-4 h-4 text-orange-600" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleVoucherClick(e, lead)}
-                        className="px-2 py-2 hover:bg-indigo-100 rounded-lg transition-colors bg-gray-100"
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-indigo-100"
                         title="Travel Voucher"
                       >
                         <Ticket className="w-4 h-4 text-indigo-600" />
+                      </button>
+                    </div>
+                  </td>
+                  {/*view document*/}
+                  <td
+                    className="px-4 py-3 text-sm text-gray-700 sticky right-0 bg-white group-hover:bg-gray-50 z-5 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <div className="flex flex-wrap items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSectionClick) onSectionClick(lead);
+                        }}
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-blue-200"
+                        title="View Documents"
+                      >
+                        <FileText className="w-4 h-4 text-blue-700" />
                       </button>
                     </div>
                   </td>
@@ -279,10 +414,10 @@ const LeadTable = ({
           </tbody>
         </table>
       </div>
-      
+
       {/* Pagination Controls */}
       {totalLeads > 0 && (
-        <div className="mt-4 flex items-center justify-between bg-white px-4 py-3 border border-gray-200 rounded-lg">
+        <div className="flex items-center justify-between px-4 py-3 mt-4 bg-white border border-gray-200 rounded-lg">
           <div className="text-sm text-gray-700">
             Showing {paginationStart} to {paginationEnd} of {totalLeads} leads
           </div>
@@ -290,7 +425,7 @@ const LeadTable = ({
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 text-gray-700 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
@@ -311,8 +446,8 @@ const LeadTable = ({
                   onClick={() => onPageChange(pageNum)}
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     currentPage === pageNum
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
-                      : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-50"
                   }`}
                 >
                   {pageNum}
@@ -322,7 +457,7 @@ const LeadTable = ({
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 text-gray-700 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
             </button>
@@ -334,4 +469,3 @@ const LeadTable = ({
 };
 
 export default LeadTable;
-
