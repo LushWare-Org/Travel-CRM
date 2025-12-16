@@ -43,6 +43,11 @@ export default function Footer({ onNavigate }) {
                 </button>
               </li>
               <li>
+                <button onClick={() => onNavigate('career')} className="hover:text-yellow-400 transition">
+                  Career
+                </button>
+              </li>
+              <li>
                 <button onClick={() => onNavigate('about')} className="hover:text-yellow-400 transition">
                   About Us
                 </button>

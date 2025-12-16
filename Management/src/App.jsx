@@ -7,6 +7,7 @@ import LeadManagement from "./pages/LeadManagement";
 import ItineraryGeneration from "./pages/ItineraryGeneration";
 import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
+import CareerManagement from "./pages/CareerManagement";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -66,6 +67,7 @@ function AppContent() {
                   <Route path="/itineraries" element={<ItineraryGeneration />} />
                   <Route path="/billing" element={<BillingInvoicing />} />
                   <Route path="/users" element={<UserManagement />} />
+                  <Route path="/career" element={<CareerManagement />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </div>

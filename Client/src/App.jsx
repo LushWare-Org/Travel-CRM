@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Header from './pages/Header';
 import Footer from './pages/Footer';
+import WhatsAppFloating from './components/WhatsAppFloating';
 import Home from './pages/Landing/Home';
 import DestinationsInternational from './pages/DestinationsInternational';
 import DestinationsDomestic from './pages/DestinationsDomestic';
@@ -10,6 +11,7 @@ import CustomizePackage from './pages/CustomizePackage';
 import Packages from './pages/Packages';
 import AboutUs from './pages/About';
 import Contact from './pages/Contact';
+import Career from './pages/Career';
 import Login from './pages/Login';
 import MyAccount from './pages/MyAccount';
 import PlanYourTrip from './pages/PlanYourTrip';
@@ -57,6 +59,7 @@ function AppContent() {
           <Route path="/planner" element={<PlanYourTrip />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/career" element={<Career />} />
           <Route path="/my-account" element={<MyAccount />} />
           <Route path="/package/:id" element={<PackageDetails />} />
           <Route path="/package/:id/customize" element={<CustomizePackage />} />
@@ -64,6 +67,7 @@ function AppContent() {
         </Routes>
       </div>
       <Footer onNavigate={handleNavigate} />
+      <WhatsAppFloating />
     </div>
   );
 }

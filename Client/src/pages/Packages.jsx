@@ -19,7 +19,7 @@ const filterOptions = {
     { label: 'Medium (5-7 days)', min: 5, max: 7 },
     { label: 'Long (8+ days)', min: 8, max: Infinity }
   ],
-  ratings: [4.9, 4.8, 4.7, 4.5, 4.0],
+  ratings: [5, 4, 3],
 };
 
 export default function PackagesPage() {
@@ -412,7 +412,7 @@ export default function PackagesPage() {
                     <span className="text-gray-900">Hotel Rating</span>
                   </h4>
                   <div className="space-y-2">
-                    {[5, 4, 3, 2, 1].map((starCount) => (
+                    {[5, 4, 3].map((starCount) => (
                       <label
                         key={starCount}
                         className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200"
@@ -451,7 +451,7 @@ export default function PackagesPage() {
                 <p className="text-gray-600">Try adjusting your filters</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
+              <div className={`grid gap-4 md:gap-6 lg:gap-8 ${showFilters ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 {filteredPackages.map(pkg => (
                   <Link
                     key={pkg.id}

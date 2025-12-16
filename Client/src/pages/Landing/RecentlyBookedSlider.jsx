@@ -93,7 +93,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Recently Booked Itineraries
+            Recently Booked Packages
           </h2>
           <p className="text-lg text-white">
             Discover the most recent bookings - get inspired for your next journey

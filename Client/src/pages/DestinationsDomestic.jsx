@@ -31,7 +31,7 @@ const filterOptions = {
     { label: 'Above ₹ 2L', min: 200000, max: Infinity }
   ],
   activities: ['Beach', 'Mountains', 'Culture', 'Adventure', 'Luxury', 'Food', 'Shopping', 'Nature', 'Romance'],
-  ratings: [4.9, 4.8, 4.7, 4.5, 4.0],
+  ratings: [5, 4, 3],
 };
 
 export default function DestinationsDomestic() {
@@ -370,7 +370,7 @@ export default function DestinationsDomestic() {
                     <span className="text-gray-900">Hotel Rating</span>
                   </h4>
                   <div className="space-y-2">
-                    {[5, 4, 3, 2, 1].map((starCount) => (
+                    {[5, 4, 3].map((starCount) => (
                       <label
                         key={starCount}
                         className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200"
@@ -409,7 +409,7 @@ export default function DestinationsDomestic() {
                 <p className="text-gray-600">Try adjusting your filters</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 md:gap-6">
+              <div className={`grid gap-4 md:gap-5 md:gap-6 ${showFilters ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
                 {filteredDestinations.map(dest => (
                   <Link
                     key={dest.id}
@@ -433,12 +433,12 @@ export default function DestinationsDomestic() {
                         </div>
                       </div>
                     </div>
-                    <div className="p-6 space-y-5">
-                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+                    <div className="p-4 space-y-3">
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
                         {dest.name}, India
                       </h3>
                       <p className="text-gray-600 text-sm line-clamp-2">{dest.description}</p>
-                      <div className="flex items-center justify-between py-4 border-t border-b border-gray-200">
+                      <div className="flex items-center justify-between py-2 border-t border-b border-gray-200">
                         <div className="text-left">
                           <div className="flex items-center gap-1 text-gray-700 mb-1">
                             <Clock className="w-4 h-4" />
@@ -451,12 +451,12 @@ export default function DestinationsDomestic() {
                           <p className="text-xs text-gray-500">Packages</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pt-4">
+                      <div className="flex items-center justify-between pt-2">
                         <div>
                           <p className="text-sm text-gray-500">Starting from</p>
-                          <p className="text-2xl font-bold text-orange-600">{formatCurrency(dest.price)}</p>
+                          <p className="text-xl font-bold text-orange-600">{formatCurrency(dest.price)}</p>
                         </div>
-                        <button className="px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-xl">
+                        <button className="px-4 py-2 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-xl text-sm">
                           View Details
                         </button>
                       </div>
@@ -490,16 +490,6 @@ export default function DestinationsDomestic() {
                             <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">
                               {dest.name}, India
                             </h3>
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {dest.activities.slice(0, 4).map((activity) => (
-                                <span key={activity} className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
-                                  {activity}
-                                </span>
-                              ))}
-                              {dest.activities.length > 4 && (
-                                <span className="text-xs text-gray-500">+{dest.activities.length - 4} more</span>
-                              )}
-                            </div>
                           </div>
                         </div>
                         <p className="text-gray-600 mb-5 leading-relaxed">{dest.description}</p>
@@ -521,7 +511,7 @@ export default function DestinationsDomestic() {
                           <Link
                             to={`/packages?destination=${dest.slug}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="px-8 py-3 bg-black hover:bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
+                        className="px-8 py-3 bg-black hover:bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
                           >
                             <span>View Packages</span>
                             <ArrowRight className="w-5 h-5" />

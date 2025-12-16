@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut, BarChart3 } from "lucide-react";
+import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut, BarChart3, Briefcase } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
 import toast from "react-hot-toast";
@@ -32,7 +32,14 @@ const Sidebar = () => {
       }
     },
     { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
-    { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] }
+    { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] },
+    { 
+      icon: Briefcase, 
+      label: "Career", 
+      path: "/career", 
+      requiredPermission: null,
+      customCheck: (userRole) => userRole === 'superAdmin'
+    }
   ];
 
   // Filter navigation items based on permissions and roles
