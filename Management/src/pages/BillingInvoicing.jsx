@@ -3,27 +3,6 @@ import { ArrowLeft, Search, Download, Eye, Send, MoreVertical, Receipt, FileText
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { invoiceAPI, receiptAPI, quotationAPI, voucherAPI, paymentHistoryAPI } from "../services/api.js";
-import {
-  ArrowLeft,
-  Search,
-  Download,
-  Eye,
-  Send,
-  MoreVertical,
-  Receipt,
-  FileText,
-  FileCheck,
-  ExternalLink,
-  Ticket,
-} from "lucide-react";
-import { toast } from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
-import {
-  invoiceAPI,
-  receiptAPI,
-  quotationAPI,
-  voucherAPI,
-} from "../services/api.js";
 
 
 const BillingInvoicing = () => {
@@ -61,8 +40,6 @@ const BillingInvoicing = () => {
       if (endDate) params.endDate = endDate;
       const response = await quotationAPI.getAll(params);
       if (response.success || response.status === 'success') {
-      const response = await quotationAPI.getAll({ limit: 100, page: 1 });
-      if (response.success || response.status === "success") {
         setQuotations(response.data || []);
       } else {
         toast.error("Failed to fetch quotations");
@@ -84,8 +61,6 @@ const BillingInvoicing = () => {
       if (endDate) params.endDate = endDate;
       const response = await invoiceAPI.getAll(params);
       if (response.success || response.status === 'success') {
-      const response = await invoiceAPI.getAll({ limit: 100, page: 1 });
-      if (response.success || response.status === "success") {
         setInvoices(response.data || []);
       } else {
         toast.error("Failed to fetch invoices");
@@ -107,8 +82,6 @@ const BillingInvoicing = () => {
       if (endDate) params.endDate = endDate;
       const response = await receiptAPI.getAll(params);
       if (response.success || response.status === 'success') {
-      const response = await receiptAPI.getAll({ limit: 100, page: 1 });
-      if (response.success || response.status === "success") {
         setReceipts(response.data || []);
       } else {
         toast.error("Failed to fetch receipts");
@@ -130,8 +103,6 @@ const BillingInvoicing = () => {
       if (endDate) params.endDate = endDate;
       const response = await voucherAPI.getAll(params);
       if (response.success || response.status === 'success') {
-      const response = await voucherAPI.getAll({ limit: 100, page: 1 });
-      if (response.success || response.status === "success") {
         setVouchers(response.data || []);
       } else {
         toast.error("Failed to fetch vouchers");
@@ -459,29 +430,6 @@ const BillingInvoicing = () => {
             <input
               type="text"
               placeholder={`Search ${activeTab === "quotations" ? "quotations" : activeTab === "invoices" ? "invoices" : activeTab === "receipts" ? "receipts" : activeTab === "vouchers" ? "vouchers" : "payment history"} by customer name or ${activeTab === "quotations" ? "quotation" : activeTab === "invoices" ? "invoice" : activeTab === "receipts" ? "receipt" : activeTab === "vouchers" ? "voucher" : "payment history"} number...`}
-        {/* Search */}
-        <div className="flex gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute w-5 h-5 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
-            <input
-              type="text"
-              placeholder={`Search ${
-                activeTab === "quotations"
-                  ? "quotations"
-                  : activeTab === "invoices"
-                  ? "invoices"
-                  : activeTab === "receipts"
-                  ? "receipts"
-                  : "vouchers"
-              } by customer name or ${
-                activeTab === "quotations"
-                  ? "quotation"
-                  : activeTab === "invoices"
-                  ? "invoice"
-                  : activeTab === "receipts"
-                  ? "receipt"
-                  : "voucher"
-              } number...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
