@@ -14,7 +14,7 @@ const bookingSchema = new mongoose.Schema(
     },
     travelDate: {
       type: Date,
-      required: [true, 'Please provide travel date'],
+      required: false,
     },
     numberOfTravelers: {
       type: Number,

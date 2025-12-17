@@ -36,6 +36,22 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
     .limitFields()
     .paginate();
 
+  // Apply date range filter after APIFeatures processes the query
+  if (req.query.startDate || req.query.endDate) {
+    const dateFilter = {};
+    if (req.query.startDate) {
+      dateFilter.$gte = new Date(req.query.startDate);
+    }
+    if (req.query.endDate) {
+      const endDate = new Date(req.query.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.$lte = endDate;
+    }
+    if (Object.keys(dateFilter).length > 0) {
+      features.query = features.query.and({ paymentDate: dateFilter });
+    }
+  }
+
   const receipts = await features.query;
   
   // Get total count with same filter
@@ -45,6 +61,23 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
     const leadIds = assignedLeadIds.map((lead) => lead._id);
     countQuery = countQuery.where('lead').in(leadIds);
   }
+  
+  // Apply date range filter to count query
+  if (req.query.startDate || req.query.endDate) {
+    const dateFilter = {};
+    if (req.query.startDate) {
+      dateFilter.$gte = new Date(req.query.startDate);
+    }
+    if (req.query.endDate) {
+      const endDate = new Date(req.query.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.$lte = endDate;
+    }
+    if (Object.keys(dateFilter).length > 0) {
+      countQuery = countQuery.find({ paymentDate: dateFilter });
+    }
+  }
+  
   const total = await countQuery.countDocuments();
 
   res.status(200).json({

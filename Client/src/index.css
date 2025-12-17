@@ -21,3 +21,82 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Phone Input Styles */
+.phone-input-wrapper .PhoneInput {
+  display: flex !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  border-radius: 0.75rem !important;
+  border: 2px solid rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.2s !important;
+  background: white !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.phone-input-wrapper .PhoneInput:focus-within {
+  border-color: #ea580c !important;
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.5) !important;
+  outline: none !important;
+}
+
+.phone-input-wrapper .PhoneInputInput {
+  flex: 1 !important;
+  padding: 0.75rem 1rem !important;
+  border: none !important;
+  border-left: 2px solid rgba(0, 0, 0, 0.1) !important;
+  outline: none !important;
+  font-size: 0.875rem !important;
+  line-height: 1.5rem !important;
+  background: white !important;
+  color: #000 !important;
+  border-radius: 0 0.75rem 0.75rem 0 !important;
+}
+
+.phone-input-wrapper .PhoneInputInput::placeholder {
+  color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.phone-input-wrapper .PhoneInputCountry {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0.75rem 0.875rem !important;
+  background: #fff7ed !important;
+  border-right: 2px solid rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  min-width: 100px !important;
+  border-radius: 0.75rem 0 0 0.75rem !important;
+  border: none !important;
+}
+
+.phone-input-wrapper .PhoneInputCountry:hover {
+  background: #ffedd5 !important;
+}
+
+.phone-input-wrapper .PhoneInputCountryIcon {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  margin-right: 0.5rem !important;
+  border-radius: 0.125rem !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.phone-input-wrapper .PhoneInputCountrySelect {
+  appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  cursor: pointer !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  color: #000 !important;
+  padding-right: 1.25rem !important;
+}
+
+.phone-input-wrapper .PhoneInputCountrySelectArrow {
+  position: absolute !important;
+  right: 0.5rem !important;
+  pointer-events: none !important;
+  color: rgba(0, 0, 0, 0.6) !important;
+}

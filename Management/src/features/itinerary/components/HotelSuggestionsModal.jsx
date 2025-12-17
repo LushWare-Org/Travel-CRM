@@ -16,6 +16,7 @@ const HotelSuggestionsModal = ({
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [bestMatch, setBestMatch] = useState(null);
+  const [error, setError] = useState(null);
 
   const handleSearch = async () => {
     if (!destination && (!locations || locations.length === 0)) {
@@ -25,6 +26,7 @@ const HotelSuggestionsModal = ({
 
     try {
       setLoading(true);
+      setError(null);
       // Combine all locations into a single string
       const locationsString = locations && locations.length > 0 ? locations.join(', ') : '';
       const response = await hotelAPI.suggest(destination, packageType, category, locationsString, 5);
@@ -33,6 +35,7 @@ const HotelSuggestionsModal = ({
         const hotelData = response.data || [];
         setHotels(hotelData);
         setHasSearched(true);
+        setError(null);
         
         // Set the first hotel as the best match
         if (hotelData.length > 0) {
@@ -40,14 +43,24 @@ const HotelSuggestionsModal = ({
         }
         
         if (hotelData.length === 0) {
-          toast.error('No hotels found. Try different criteria.');
+          setError('No hotels found. Try different criteria or search again.');
         }
       } else {
-        toast.error(response.message || 'Failed to fetch hotel suggestions');
+        const errorMsg = response.message || 'Failed to fetch hotel suggestions';
+        setError(errorMsg);
+        // Don't show toast for auto-search failures, only for manual searches
+        if (hasSearched) {
+          toast.error(errorMsg);
+        }
       }
     } catch (error) {
       console.error('Error fetching hotel suggestions:', error);
-      toast.error(error.message || 'Failed to fetch hotel suggestions');
+      const errorMsg = error.message || 'Failed to fetch hotel suggestions. Please check your API key configuration.';
+      setError(errorMsg);
+      // Don't show toast for auto-search failures, only for manual searches
+      if (hasSearched) {
+        toast.error(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -63,6 +76,7 @@ const HotelSuggestionsModal = ({
       setHasSearched(false);
       setHotels([]);
       setBestMatch(null);
+      setError(null);
     }
   }, [isOpen, locations?.join(',')]);
 
@@ -128,6 +142,20 @@ const HotelSuggestionsModal = ({
                     Search Hotels
                   </>
                 )}
+              </button>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !loading && hasSearched && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800 text-sm font-medium mb-2">Error loading hotels</p>
+              <p className="text-red-600 text-sm">{error}</p>
+              <button
+                onClick={handleSearch}
+                className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+              >
+                Try Again
               </button>
             </div>
           )}

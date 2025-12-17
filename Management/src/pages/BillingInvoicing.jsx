@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import { ArrowLeft, Search, Download, Eye, Send, MoreVertical, Receipt, FileText, FileCheck, ExternalLink, Ticket, History, Calendar } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
+import { invoiceAPI, receiptAPI, quotationAPI, voucherAPI, paymentHistoryAPI } from "../services/api.js";
 import {
   ArrowLeft,
   Search,
@@ -30,20 +34,33 @@ const BillingInvoicing = () => {
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [selectedPaymentHistory, setSelectedPaymentHistory] = useState(null);
+  
 
   const [quotations, setQuotations] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [vouchers, setVouchers] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
   const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [loadingReceipts, setLoadingReceipts] = useState(false);
   const [loadingVouchers, setLoadingVouchers] = useState(false);
+  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(false);
+  
+  // Date range filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Fetch quotations
   const fetchQuotations = async () => {
     try {
       setLoadingQuotations(true);
+      const params = { limit: 100, page: 1 };
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const response = await quotationAPI.getAll(params);
+      if (response.success || response.status === 'success') {
       const response = await quotationAPI.getAll({ limit: 100, page: 1 });
       if (response.success || response.status === "success") {
         setQuotations(response.data || []);
@@ -62,6 +79,11 @@ const BillingInvoicing = () => {
   const fetchInvoices = async () => {
     try {
       setLoadingInvoices(true);
+      const params = { limit: 100, page: 1 };
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const response = await invoiceAPI.getAll(params);
+      if (response.success || response.status === 'success') {
       const response = await invoiceAPI.getAll({ limit: 100, page: 1 });
       if (response.success || response.status === "success") {
         setInvoices(response.data || []);
@@ -80,6 +102,11 @@ const BillingInvoicing = () => {
   const fetchReceipts = async () => {
     try {
       setLoadingReceipts(true);
+      const params = { limit: 100, page: 1 };
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const response = await receiptAPI.getAll(params);
+      if (response.success || response.status === 'success') {
       const response = await receiptAPI.getAll({ limit: 100, page: 1 });
       if (response.success || response.status === "success") {
         setReceipts(response.data || []);
@@ -98,6 +125,11 @@ const BillingInvoicing = () => {
   const fetchVouchers = async () => {
     try {
       setLoadingVouchers(true);
+      const params = { limit: 100, page: 1 };
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const response = await voucherAPI.getAll(params);
+      if (response.success || response.status === 'success') {
       const response = await voucherAPI.getAll({ limit: 100, page: 1 });
       if (response.success || response.status === "success") {
         setVouchers(response.data || []);
@@ -112,12 +144,43 @@ const BillingInvoicing = () => {
     }
   };
 
+  // Fetch payment history
+  const fetchPaymentHistory = async () => {
+    try {
+      setLoadingPaymentHistory(true);
+      const params = { limit: 100, page: 1 };
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const response = await paymentHistoryAPI.getAll(params);
+      if (response.success || response.status === 'success') {
+        setPaymentHistory(response.data || []);
+      } else {
+        toast.error('Failed to fetch payment history');
+      }
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+      toast.error('Failed to fetch payment history');
+    } finally {
+      setLoadingPaymentHistory(false);
+    }
+  };
+
   useEffect(() => {
     fetchQuotations();
     fetchInvoices();
     fetchReceipts();
     fetchVouchers();
+    fetchPaymentHistory();
   }, []);
+
+  // Refetch when date range changes
+  useEffect(() => {
+    if (activeTab === 'quotations') fetchQuotations();
+    if (activeTab === 'invoices') fetchInvoices();
+    if (activeTab === 'receipts') fetchReceipts();
+    if (activeTab === 'vouchers') fetchVouchers();
+    if (activeTab === 'payment-history') fetchPaymentHistory();
+  }, [startDate, endDate, activeTab]);
 
   // Filter quotations based on search
   const filteredQuotations = quotations.filter((quote) => {
@@ -160,6 +223,19 @@ const BillingInvoicing = () => {
     return (
       customerName.toLowerCase().includes(searchLower) ||
       voucherNumber.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Filter payment history based on search
+  const filteredPaymentHistory = paymentHistory.filter((ph) => {
+    const customerName = ph.customer?.name || ph.lead?.name || '';
+    const paymentHistoryNumber = ph.paymentHistoryNumber || '';
+    const receiptNumber = ph.receipt?.receiptNumber || '';
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      customerName.toLowerCase().includes(searchLower) ||
+      paymentHistoryNumber.toLowerCase().includes(searchLower) ||
+      receiptNumber.toLowerCase().includes(searchLower)
     );
   });
 
@@ -261,6 +337,21 @@ const BillingInvoicing = () => {
     }
   };
 
+  const handleDownloadPaymentHistoryPDF = async (paymentHistoryId) => {
+    try {
+      await paymentHistoryAPI.downloadPDF(paymentHistoryId);
+      toast.success('Payment history PDF downloaded');
+    } catch (error) {
+      console.error('Error downloading payment history PDF:', error);
+      toast.error('Failed to download payment history PDF');
+    }
+  };
+
+  const handleClearDateFilter = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
   // Navigate to lead management with lead ID
   const handleNavigateToLead = (leadId) => {
     if (!leadId) {
@@ -343,11 +434,31 @@ const BillingInvoicing = () => {
               Vouchers ({vouchers.length})
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab("payment-history")}
+            className={`px-4 py-2 font-medium transition-colors relative ${
+              activeTab === "payment-history"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4" />
+              Payment History ({paymentHistory.length})
+            </div>
+          </button>
         </div>
       </div>
 
       {/* Content */}
       <div className="p-8">
+        {/* Search and Date Range Filter */}
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[300px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder={`Search ${activeTab === "quotations" ? "quotations" : activeTab === "invoices" ? "invoices" : activeTab === "receipts" ? "receipts" : activeTab === "vouchers" ? "vouchers" : "payment history"} by customer name or ${activeTab === "quotations" ? "quotation" : activeTab === "invoices" ? "invoice" : activeTab === "receipts" ? "receipt" : activeTab === "vouchers" ? "voucher" : "payment history"} number...`}
         {/* Search */}
         <div className="flex gap-4 mb-6">
           <div className="relative flex-1">
@@ -375,6 +486,32 @@ const BillingInvoicing = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+          <div className="flex gap-2 items-center">
+            <Calendar className="w-5 h-5 text-gray-400" />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Start Date"
+            />
+            <span className="text-gray-500">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="End Date"
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={handleClearDateFilter}
+                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
@@ -1199,6 +1336,140 @@ const BillingInvoicing = () => {
             )}
           </div>
         )}
+
+        {/* Payment History List */}
+        {activeTab === "payment-history" && (
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">Payment History</h2>
+              <p className="text-sm text-gray-600 mt-1">All payment history records ({filteredPaymentHistory.length})</p>
+            </div>
+
+            {loadingPaymentHistory ? (
+              <div className="p-8 text-center text-gray-500">Loading payment history...</div>
+            ) : filteredPaymentHistory.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">No payment history found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment History #</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Customer</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Lead ID</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Receipt #</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Invoice #</th>
+                      <th className="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment Method</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment Date</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPaymentHistory.map((ph) => {
+                      const leadId = ph.lead?._id || ph.lead?.id || ph.lead;
+                      return (
+                      <tr 
+                        key={ph._id || ph.id} 
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          if (leadId) {
+                            handleNavigateToLead(leadId);
+                          }
+                        }}
+                      >
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (leadId) {
+                                handleNavigateToLead(leadId);
+                              }
+                            }}
+                            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline flex items-center gap-1"
+                            disabled={!leadId}
+                          >
+                            {ph.paymentHistoryNumber || 'N/A'}
+                            {leadId && <ExternalLink className="w-3 h-3" />}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {ph.customer?.name || ph.lead?.name || 'N/A'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {ph.customer?.email || ph.lead?.email || ''}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleNavigateToLead(ph.lead?._id || ph.lead?.id || ph.lead)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                            disabled={!ph.lead?._id && !ph.lead?.id && !ph.lead}
+                          >
+                            {ph.lead?._id || ph.lead?.id || ph.lead || 'N/A'}
+                            {(ph.lead?._id || ph.lead?.id || ph.lead) && (
+                              <ExternalLink className="w-3 h-3" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-gray-700">
+                            {ph.receipt?.receiptNumber || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-gray-700">
+                            {ph.invoice?.invoiceNumber || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="font-bold text-gray-900">{formatCurrency(ph.amount)}</span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700">
+                          {ph.paymentMethod ? ph.paymentMethod.charAt(0).toUpperCase() + ph.paymentMethod.slice(1).replace(/-/g, ' ') : 'N/A'}
+                        </td>
+                        <td className="py-3 px-4 text-gray-700">{formatDate(ph.paymentDate)}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            ph.status === 'reconciled' ? 'bg-green-100 text-green-800' :
+                            ph.status === 'verified' ? 'bg-blue-100 text-blue-800' :
+                            ph.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {ph.status ? ph.status.charAt(0).toUpperCase() + ph.status.slice(1) : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-2 justify-center">
+                            <button
+                              onClick={() => setSelectedPaymentHistory(ph)}
+                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDownloadPaymentHistoryPDF(ph._id || ph.id)}
+                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                              title="Download PDF"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Quotation Detail Modal */}
@@ -1652,6 +1923,98 @@ const BillingInvoicing = () => {
                 >
                   <Send className="w-4 h-4" />
                   Send Email
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment History Detail Modal */}
+      {selectedPaymentHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Payment History {selectedPaymentHistory.paymentHistoryNumber}</h2>
+                <p className="text-gray-600 mt-1">Payment history details</p>
+              </div>
+              <button
+                onClick={() => setSelectedPaymentHistory(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Header Info */}
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium">PAYMENT FROM</p>
+                  <p className="text-sm font-semibold text-gray-900 mt-1">
+                    {selectedPaymentHistory.customer?.name || selectedPaymentHistory.lead?.name || 'N/A'}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    {selectedPaymentHistory.customer?.email || selectedPaymentHistory.lead?.email || ''}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 font-medium mb-1">
+                    Payment Date: {formatDate(selectedPaymentHistory.paymentDate)}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium mb-1">
+                    Payment Method: {selectedPaymentHistory.paymentMethod ? selectedPaymentHistory.paymentMethod.charAt(0).toUpperCase() + selectedPaymentHistory.paymentMethod.slice(1).replace(/-/g, ' ') : 'N/A'}
+                  </p>
+                  {selectedPaymentHistory.receipt?.receiptNumber && (
+                    <p className="text-xs text-gray-500 font-medium mb-1">
+                      Receipt: {selectedPaymentHistory.receipt.receiptNumber}
+                    </p>
+                  )}
+                  {selectedPaymentHistory.invoice?.invoiceNumber && (
+                    <p className="text-xs text-gray-500 font-medium mb-1">
+                      Invoice: {selectedPaymentHistory.invoice.invoiceNumber}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div className="flex justify-center">
+                <div className="text-center">
+                  <p className="text-sm text-gray-500 mb-2">Payment Amount</p>
+                  <p className="text-3xl font-bold text-green-600">{formatCurrency(selectedPaymentHistory.amount)}</p>
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="flex justify-center">
+                <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                  selectedPaymentHistory.status === 'reconciled' ? 'bg-green-100 text-green-800' :
+                  selectedPaymentHistory.status === 'verified' ? 'bg-blue-100 text-blue-800' :
+                  selectedPaymentHistory.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {selectedPaymentHistory.status ? selectedPaymentHistory.status.charAt(0).toUpperCase() + selectedPaymentHistory.status.slice(1) : 'Pending'}
+                </span>
+              </div>
+
+              {/* Notes */}
+              {selectedPaymentHistory.notes && (
+                <div className="pb-4 border-b border-gray-200">
+                  <p className="text-xs text-gray-500 font-medium mb-2">NOTES</p>
+                  <p className="text-sm text-gray-700">{selectedPaymentHistory.notes}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => handleDownloadPaymentHistoryPDF(selectedPaymentHistory._id || selectedPaymentHistory.id)}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
                 </button>
               </div>
             </div>
