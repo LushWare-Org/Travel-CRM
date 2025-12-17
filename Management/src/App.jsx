@@ -8,6 +8,8 @@ import ItineraryGeneration from "./pages/ItineraryGeneration";
 import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
 import Login from "./pages/Login";
+import SalesRepLogin from "./pages/SalesRepLogin";
+import SalesRepLoginOTP from "./pages/SalesRepLoginOTP";
 import ResetPassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
@@ -50,6 +52,8 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/sales-rep-login" element={<SalesRepLogin />} />
+      <Route path="/sales-rep-login-otp" element={<SalesRepLoginOTP />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       
       <Route

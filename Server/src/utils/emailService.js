@@ -534,6 +534,139 @@ class EmailService {
       text,
     });
   }
+
+  // ==========================================
+  // OTP Authentication Email Methods
+  // ==========================================
+
+  async sendOTPEmail(user, otp) {
+    const subject = 'Your Trip Sky Way Login OTP Code';
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 20px auto; padding: 0; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+            .content { padding: 30px 20px; }
+            .otp-box { 
+              background-color: #f8f9fa; 
+              padding: 25px; 
+              text-align: center; 
+              margin: 30px 0;
+              border-radius: 8px;
+              border: 2px dashed #667eea;
+            }
+            .otp-code { 
+              font-size: 42px; 
+              font-weight: bold; 
+              color: #667eea;
+              letter-spacing: 8px;
+              font-family: 'Courier New', monospace;
+              margin: 15px 0;
+            }
+            .otp-expires {
+              color: #666;
+              font-size: 14px;
+              margin-top: 10px;
+            }
+            .warning-box {
+              background-color: #fff3cd;
+              border-left: 4px solid #ffc107;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .warning-box strong { color: #856404; }
+            .warning-box p { margin: 5px 0; color: #856404; }
+            .info-list { list-style: none; padding: 0; margin: 20px 0; }
+            .info-list li { padding: 8px 0; border-bottom: 1px solid #eee; }
+            .info-list li:last-child { border-bottom: none; }
+            .footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
+            .footer p { margin: 5px 0; }
+            a.button { display: inline-block; padding: 10px 20px; background-color: #667eea; color: white; text-decoration: none; border-radius: 5px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Trip Sky Way</h1>
+              <p style="margin: 10px 0 0 0; font-size: 14px;">Security Verification</p>
+            </div>
+            
+            <div class="content">
+              <p style="font-size: 16px; color: #333;">Dear ${user.name},</p>
+              
+              <p>Your one-time password (OTP) for logging into your Trip Sky Way account is:</p>
+              
+              <div class="otp-box">
+                <p style="margin: 0 0 10px 0; color: #666; font-size: 12px;">Your OTP Code</p>
+                <div class="otp-code">${otp}</div>
+                <p class="otp-expires">⏱️ Valid for 10 minutes</p>
+              </div>
+
+              <div class="warning-box">
+                <p><strong>⚠️ Important Security Notice:</strong></p>
+                <p>• Never share this OTP with anyone</p>
+                <p>• Never reply to this email with sensitive information</p>
+                <p>• This code expires in 10 minutes</p>
+                <p>• If you didn't request this OTP, ignore this email</p>
+              </div>
+
+              <p style="color: #666; font-size: 14px; margin-top: 20px;">If you continue to have trouble logging in, please <a href="mailto:support@tripskyway.com" style="color: #667eea; text-decoration: none;">contact our support team</a>.</p>
+            </div>
+            
+            <div class="footer">
+              <p><strong>Trip Sky Way Management System</strong></p>
+              <p>© 2025 Trip Sky Way. All rights reserved.</p>
+              <p style="color: #999;">This is an automated message. Please do not reply to this email.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const text = `Dear ${user.name},\n\nYour one-time password (OTP) for logging in is:\n\n${otp}\n\nThis code is valid for 10 minutes.\n\nIMPORTANT: Never share this OTP with anyone. If you didn't request this code, please ignore this email.\n\nBest regards,\nThe Trip Sky Way Team`;
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  async sendLoginNotification(user) {
+    const subject = 'New Login Detected - Trip Sky Way';
+    const html = `
+      <p>Dear ${user.name},</p>
+      
+      <p>We detected a new login to your Trip Sky Way account.</p>
+      
+      <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p><strong>Login Details:</strong></p>
+        <ul style="margin: 10px 0;">
+          <li><strong>Timestamp:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</li>
+          <li><strong>Account:</strong> ${user.email}</li>
+        </ul>
+      </div>
+      
+      <p>If you didn't authorize this login, please change your password immediately and contact our support team.</p>
+      
+      <p>Best regards,<br/>The Trip Sky Way Team</p>
+    `;
+
+    const text = `Dear ${user.name},\n\nWe detected a new login to your Trip Sky Way account at ${new Date().toLocaleString()}.\n\nIf you didn't authorize this login, please contact support immediately.\n\nBest regards,\nThe Trip Sky Way Team`;
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      html,
+      text,
+    });
+  }
 }
 
 export default new EmailService();

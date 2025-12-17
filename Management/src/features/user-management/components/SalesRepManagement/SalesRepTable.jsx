@@ -60,8 +60,8 @@ const SalesRepTable = ({ reps, onEdit, onDelete, onResendInvite, onForcePassword
                 </td>
                 <td className="px-4 py-3 text-sm">
                   <div className="flex gap-2 flex-wrap">
-                    {/* Resend Invitation - Show if pending first login */}
-                    {rep.accountStatus === 'pending_first_login' && (
+                    {/* Resend Invitation - Show if pending email verification */}
+                    {rep.accountStatus === 'pending_email_verification' && (
                       <button
                         onClick={() => onResendInvite?.(rep)}
                         className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600 flex-shrink-0"

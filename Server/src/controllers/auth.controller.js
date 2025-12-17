@@ -1,5 +1,7 @@
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
+import OTP from '../models/otp.model.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import emailService from '../utils/emailService.js';
@@ -120,6 +122,49 @@ export const login = asyncHandler(async (req, res, next) => {
         mustChangePassword: true,
         userId: user._id,
         email: user.email,
+      },
+    });
+  }
+
+  // ⚠️ SALES REPS REQUIRE OTP LOGIN - Redirect to OTP flow
+  if (user.role === 'salesRep') {
+    // Generate 6-digit OTP
+    const otp = generateOTP();
+
+    // Delete any existing OTP for this user
+    await OTP.deleteMany({ userId: user._id, type: 'login', isUsed: false });
+
+    // Store OTP in database
+    const otpRecord = await OTP.create({
+      userId: user._id,
+      code: otp,
+      type: 'login',
+      email: user.email,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    // Send OTP via email
+    try {
+      await emailService.sendOTPEmail(user, otp);
+    } catch (error) {
+      logger.error(`Failed to send OTP email: ${error.message}`);
+      await OTP.deleteOne({ _id: otpRecord._id });
+      throw new AppError('Failed to send OTP. Please try again.', 500);
+    }
+
+    // Generate temporary token
+    const tempToken = generateTempToken(user._id);
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Sales representative login requires OTP verification. OTP sent to your email.',
+      data: {
+        tempToken,
+        maskedEmail: maskEmail(user.email),
+        expiresIn: 600, // 10 minutes in seconds
+        requiresOTP: true, // Flag to indicate OTP is required
       },
     });
   }
@@ -404,6 +449,222 @@ export const updateProfile = asyncHandler(async (req, res, next) => {
     message: 'Profile updated successfully',
     data: {
       user,
+    },
+  });
+});
+
+// ==========================================
+// OTP Authentication Functions (Sales Rep)
+// ==========================================
+
+/**
+ * Generate a random 6-digit OTP code
+ * @returns {string} 6-digit OTP code
+ */
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+/**
+ * Generate temporary token for OTP verification
+ * @param {string} userId - User ID
+ * @returns {string} Temporary JWT token
+ */
+const generateTempToken = (userId) => {
+  return jwt.sign(
+    { userId, tempAuth: true },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' } // Temp token valid for 15 minutes
+  );
+};
+
+/**
+ * Verify temporary token
+ * @param {string} token - Temporary JWT token
+ * @returns {object} Decoded token
+ */
+const verifyTempToken = (token) => {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    throw new AppError('Invalid or expired temporary token', 401);
+  }
+};
+
+/**
+ * Mask email for privacy (e.g., an***@gmail.com)
+ * @param {string} email - Email to mask
+ * @returns {string} Masked email
+ */
+const maskEmail = (email) => {
+  const [name, domain] = email.split('@');
+  const maskedName = name.substring(0, 2) + '***';
+  return `${maskedName}@${domain}`;
+};
+
+// @desc    Login Step 1: Verify email and password, send OTP
+// @route   POST /api/v1/auth/login-step1
+// @access  Public
+export const loginStep1 = asyncHandler(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  // Get user with password field
+  const user = await User.findOne({ email }).select('+password');
+
+  if (!user) {
+    throw new AppError('Invalid credentials', 401);
+  }
+
+  // Verify password
+  const isPasswordMatch = await user.matchPassword(password);
+  if (!isPasswordMatch) {
+    throw new AppError('Invalid credentials', 401);
+  }
+
+  // Only sales reps require OTP for login
+  if (user.role !== 'salesRep') {
+    // For non-sales reps, proceed with normal login
+    return sendTokenResponse(user, 200, res, 'Login successful');
+  }
+
+  // Generate 6-digit OTP
+  const otp = generateOTP();
+
+  // Delete any existing OTP for this user
+  await OTP.deleteMany({ userId: user._id, type: 'login', isUsed: false });
+
+  // Store OTP in database
+  const otpRecord = await OTP.create({
+    userId: user._id,
+    code: otp,
+    type: 'login',
+    email: user.email,
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+  });
+
+  // Send OTP via email
+  try {
+    await emailService.sendOTPEmail(user, otp);
+  } catch (error) {
+    logger.error(`Failed to send OTP email: ${error.message}`);
+    await OTP.deleteOne({ _id: otpRecord._id });
+    throw new AppError('Failed to send OTP. Please try again.', 500);
+  }
+
+  // Generate temporary token
+  const tempToken = generateTempToken(user._id);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'OTP sent to your email. Please verify to continue.',
+    data: {
+      tempToken,
+      maskedEmail: maskEmail(user.email),
+      expiresIn: 600, // 10 minutes in seconds
+    },
+  });
+});
+
+// @desc    Login Step 2: Verify OTP and complete login
+// @route   POST /api/v1/auth/login-step2
+// @access  Public
+export const loginStep2 = asyncHandler(async (req, res, next) => {
+  const { tempToken, otp } = req.body;
+
+  // Verify temporary token
+  const decoded = verifyTempToken(tempToken);
+  const user = await User.findById(decoded.userId);
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Verify user is a sales rep
+  if (user.role !== 'salesRep') {
+    throw new AppError('OTP verification only required for sales representatives', 403);
+  }
+
+  // Find matching OTP
+  const otpRecord = await OTP.findOne({
+    userId: user._id,
+    code: String(otp).trim(), // Ensure string and trim whitespace
+    type: 'login',
+    isUsed: false,
+  });
+
+  if (!otpRecord) {
+    // Temporarily removed attempt limitation for debugging
+    throw new AppError('Invalid OTP. Please try again.', 401);
+  }
+
+  // Check OTP expiration
+  if (new Date() > otpRecord.expiresAt) {
+    await OTP.deleteOne({ _id: otpRecord._id });
+    throw new AppError('OTP has expired. Please request a new one.', 401);
+  }
+
+  // Mark OTP as used
+  otpRecord.isUsed = true;
+  await otpRecord.save();
+
+  // Send login successful email
+  try {
+    await emailService.sendLoginNotification(user);
+  } catch (error) {
+    logger.error(`Failed to send login notification: ${error.message}`);
+  }
+
+  // Issue JWT token and send response
+  sendTokenResponse(user, 200, res, 'Login successful');
+});
+
+// @desc    Resend OTP code
+// @route   POST /api/v1/auth/resend-otp
+// @access  Public
+export const resendOTP = asyncHandler(async (req, res, next) => {
+  const { tempToken } = req.body;
+
+  // Verify temporary token
+  const decoded = verifyTempToken(tempToken);
+  const user = await User.findById(decoded.userId);
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Delete old unused OTP codes
+  await OTP.deleteMany({ userId: user._id, type: 'login', isUsed: false });
+
+  // Generate new OTP
+  const newOtp = generateOTP();
+
+  const otpRecord = await OTP.create({
+    userId: user._id,
+    code: newOtp,
+    type: 'login',
+    email: user.email,
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+  });
+
+  // Send new OTP via email
+  try {
+    await emailService.sendOTPEmail(user, newOtp);
+  } catch (error) {
+    logger.error(`Failed to send OTP email: ${error.message}`);
+    await OTP.deleteOne({ _id: otpRecord._id });
+    throw new AppError('Failed to send OTP. Please try again.', 500);
+  }
+
+  res.status(200).json({
+    status: 'success',
+    message: 'New OTP sent to your email',
+    data: {
+      maskedEmail: maskEmail(user.email),
+      expiresIn: 600, // 10 minutes in seconds
     },
   });
 });

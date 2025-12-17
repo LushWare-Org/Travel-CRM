@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import User from '../models/user.model.js';
+import Lead from '../models/lead.model.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import emailService from '../utils/emailService.js';
@@ -86,17 +87,44 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
       User.countDocuments(filter),
     ]);
 
+    // Enrich sales reps data with lead metrics
+    const enrichedSalesReps = await Promise.all(
+      salesReps.map(async (rep) => {
+        // Count leads assigned to this sales rep
+        const leadsAssigned = await Lead.countDocuments({ assignedTo: rep._id });
+        
+        // Count converted leads (status = 'converted')
+        const leadsConverted = await Lead.countDocuments({
+          assignedTo: rep._id,
+          status: 'converted',
+        });
+
+        // Get last login date
+        const lastLogin = rep.lastLogin ? new Date(rep.lastLogin).toISOString().split('T')[0] : null;
+
+        return {
+          ...rep,
+          id: rep._id,
+          leadsAssigned,
+          leadsConverted,
+          status: rep.isActive ? 'active' : 'inactive',
+          accountStatus: rep.isEmailVerified ? (rep.mustChangePassword ? 'pending_password_reset' : 'verified') : 'pending_email_verification',
+          lastLogin,
+        };
+      }),
+    );
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalSalesReps / limit);
 
     logger.debug(
-      `Retrieved ${salesReps.length} sales reps (page ${page}, total ${totalSalesReps})`,
+      `Retrieved ${enrichedSalesReps.length} sales reps (page ${page}, total ${totalSalesReps})`,
     );
 
     res.status(200).json({
       status: 'success',
       data: {
-        salesReps,
+        salesReps: enrichedSalesReps,
         pagination: {
           currentPage: page,
           totalPages,
@@ -476,6 +504,23 @@ export const getSalesRepStats = asyncHandler(async (req, res, next) => {
       isEmailVerified: true,
     });
 
+    // Get total leads assigned to all sales reps
+    const leadStats = await Lead.aggregate([
+      { $match: { assignedTo: { $exists: true, $ne: null } } },
+      {
+        $group: {
+          _id: null,
+          totalLeads: { $sum: 1 },
+          convertedLeads: {
+            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const totalLeads = leadStats[0]?.totalLeads || 0;
+    const convertedLeads = leadStats[0]?.convertedLeads || 0;
+
     res.status(200).json({
       status: 'success',
       data: {
@@ -483,6 +528,9 @@ export const getSalesRepStats = asyncHandler(async (req, res, next) => {
         active: activeSalesReps,
         inactive: inactiveSalesReps,
         verified: verifiedSalesReps,
+        totalLeads,
+        convertedLeads,
+        conversionRate: totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : 0,
       },
     });
   } catch (error) {
