@@ -646,6 +646,39 @@ export const voucherAPI = {
   },
 };
 
+// Payment History API Methods
+export const paymentHistoryAPI = {
+  getAll: async (params = {}) => {
+    const api = new ApiService();
+    return api.get('/billing/payment-history', params);
+  },
+  getByLead: async (leadId) => {
+    const api = new ApiService();
+    return api.get('/billing/payment-history/lead/' + leadId);
+  },
+  getById: async (paymentHistoryId) => {
+    const api = new ApiService();
+    return api.get(`/billing/payment-history/${paymentHistoryId}`);
+  },
+  downloadPDF: async (paymentHistoryId) => {
+    const url = `${API_BASE_URL}/billing/payment-history/${paymentHistoryId}/pdf`;
+    const response = await fetch(url, { headers: new ApiService().getAuthHeaders() });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const urlBlob = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = urlBlob;
+    a.download = `payment-history-${paymentHistoryId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(urlBlob);
+    document.body.removeChild(a);
+  },
+};
+
 // Hotel Suggestion API Methods
 export const hotelAPI = {
   suggest: async (destination, packageType, category, location, count = 5) => {
