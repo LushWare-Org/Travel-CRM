@@ -299,7 +299,7 @@ export default function Home() {
   return (
     <div className="min-h-screen with-fixed-header font-opensans">
       {/* HERO SECTION */}
-      <div className="relative h-[80vh] lg:h-[83vh] bg-black">
+      <div className="relative h-[80vh] lg:h-[80vh] bg-black">
         <div className="absolute bottom-0 left-0 right-0 z-20 bg-black/90 backdrop-blur-sm border-t border-white/10 overflow-hidden">
           <style>{`
             @keyframes scroll-left {
@@ -317,9 +317,9 @@ export default function Home() {
               animation-play-state: paused;
             }
           `}</style>
-          <div className="flex animate-scroll-continuous whitespace-nowrap py-5">
+          {/* <div className="flex animate-scroll-continuous whitespace-nowrap py-5"> */}
             {/* Tags */}
-            <div className="flex items-center">
+            {/* <div className="flex items-center">
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
                 <Globe className="w-5 h-5 text-orange-400 flex-shrink-0" /> Explore 100+ Destinations
               </span>
@@ -345,7 +345,6 @@ export default function Home() {
                 <Plane className="w-5 h-5 text-orange-400 flex-shrink-0" /> Hassle-Free Bookings
               </span>
             </div>
-            {/* Duplicate set */}
             <div className="flex items-center">
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
                 <Globe className="w-5 h-5 text-orange-400 flex-shrink-0" /> Explore 100+ Destinations
@@ -371,8 +370,8 @@ export default function Home() {
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
                 <Plane className="w-5 h-5 text-orange-400 flex-shrink-0" /> Hassle-Free Bookings
               </span>
-            </div>
-          </div>
+            </div> */}
+          {/* </div> */}
         </div>       
          {/* Video Slides */}
         {[0, 1, 2, 3, 4].map((i) => (
@@ -432,7 +431,7 @@ export default function Home() {
               <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{heroSlides[currentSlide % 4].subtitle}</p>             
 
               {/* Search bar */}
-              <div className="relative mt-12 md:mt-15 lg:mt-15">
+              <div className="relative mt-16 md:mt-15 lg:mt-15">
                 <div className="bg-white/99 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 overflow-visible">
                   <div className="h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 animate-gradient-x" />
                   <div className="p-4 sm:p-5 overflow-visible">
