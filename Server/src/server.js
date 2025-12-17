@@ -52,6 +52,7 @@ import paymentReceiptRoutes from './routes/paymentReceipt.routes.js';
 import creditNoteRoutes from './routes/creditNote.routes.js';
 import billingRoutes from './routes/billing.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
+import paymentHistoryRoutes from './routes/paymentHistory.routes.js';
 import hotelSuggestionRoutes from './routes/hotelSuggestion.routes.js';
 
 // Import middleware
@@ -130,6 +131,7 @@ app.use(`/api/${API_VERSION}/billing/quotations`, quotationRoutes);
 app.use(`/api/${API_VERSION}/billing/receipts`, paymentReceiptRoutes);
 app.use(`/api/${API_VERSION}/billing/credit-notes`, creditNoteRoutes);
 app.use(`/api/${API_VERSION}/billing/vouchers`, voucherRoutes);
+app.use(`/api/${API_VERSION}/billing/payment-history`, paymentHistoryRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 app.use(`/api/${API_VERSION}/hotels`, hotelSuggestionRoutes);
 

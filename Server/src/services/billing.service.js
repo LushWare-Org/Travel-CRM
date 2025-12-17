@@ -164,6 +164,26 @@ class BillingService {
 
     const receipt = await PaymentReceipt.create(receiptData);
 
+    // Create payment history entry
+    const PaymentHistory = (await import('../models/paymentHistory.model.js')).default;
+    const paymentHistoryData = {
+      receipt: receipt._id,
+      lead: invoice.lead,
+      invoice: invoice._id,
+      customer: invoice.customer,
+      amount: paymentData.amount,
+      currency: paymentData.currency || 'LKR',
+      paymentMethod: paymentData.paymentMethod,
+      paymentDate: paymentData.paymentDate || new Date(),
+      paymentType: paymentData.paymentType || 'installment',
+      transactionId: paymentData.transactionId,
+      notes: paymentData.notes,
+      internalNotes: paymentData.internalNotes,
+      status: 'pending',
+      createdBy: userId,
+    };
+    await PaymentHistory.create(paymentHistoryData);
+
     // Update invoice
     invoice.paidAmount += paymentData.amount;
     invoice.payments.push(receipt._id);

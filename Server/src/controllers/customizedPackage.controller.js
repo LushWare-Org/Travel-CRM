@@ -290,8 +290,8 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
     throw new AppError('travelers must be a positive number', 400);
   }
   const parsedTravelDate = travelDate ? new Date(travelDate) : null;
-  if (!parsedTravelDate || Number.isNaN(parsedTravelDate.getTime())) {
-    throw new AppError('A valid travelDate is required', 400);
+  if (travelDate && (!parsedTravelDate || Number.isNaN(parsedTravelDate.getTime()))) {
+    throw new AppError('If provided, travelDate must be a valid date', 400);
   }
 
   let user = await User.findOne({ email: sanitizedEmail });
