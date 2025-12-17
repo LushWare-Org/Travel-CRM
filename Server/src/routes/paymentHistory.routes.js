@@ -10,7 +10,10 @@ router.get('/', protect, paymentHistoryController.getAllPaymentHistory);
 // Get payment history by lead
 router.get('/lead/:leadId', protect, paymentHistoryController.getPaymentHistoryByLeadId);
 
-// Download PDF (must be before :id route)
+// Download list PDF (must be before :id routes)
+router.get('/pdf/list', protect, paymentHistoryController.downloadPaymentHistoryListPDF);
+
+// Download single PDF (must be before :id route)
 router.get('/:id/pdf', protect, paymentHistoryController.downloadPaymentHistoryPDF);
 
 // Get payment history by ID

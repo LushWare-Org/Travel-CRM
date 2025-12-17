@@ -132,8 +132,19 @@ class BillingService {
       throw new AppError('Cannot record payment for cancelled invoice', 400);
     }
 
-    if (invoice.paymentStatus === 'paid') {
-      throw new AppError('Invoice is already fully paid', 400);
+    // Calculate cumulative payments from all existing receipts for this invoice
+    const PaymentReceipt = (await import('../models/paymentReceipt.model.js')).default;
+    const existingReceipts = await PaymentReceipt.find({
+      invoice: invoice._id,
+      receiptStatus: { $ne: 'cancelled' }, // Exclude cancelled receipts
+    }).select('amount').lean();
+
+    const totalPaidAmount = existingReceipts.reduce((sum, receipt) => sum + (receipt.amount || 0), 0);
+    const currentOutstandingAmount = invoice.totalAmount - totalPaidAmount;
+
+    // Check if invoice is already fully paid
+    if (currentOutstandingAmount <= 0) {
+      throw new AppError('Invoice is already fully paid and settled. Cannot create more receipts.', 400);
     }
 
     // Validate payment amount
@@ -141,11 +152,15 @@ class BillingService {
       throw new AppError('Payment amount must be greater than 0', 400);
     }
 
-    if (paymentData.amount > invoice.outstandingAmount) {
-      throw new AppError(`Payment amount exceeds outstanding balance of ${invoice.outstandingAmount}`, 400);
+    if (paymentData.amount > currentOutstandingAmount) {
+      throw new AppError(`Payment amount exceeds outstanding balance of ${currentOutstandingAmount.toFixed(2)}`, 400);
     }
 
-    // Create payment receipt
+    // Calculate new outstanding amount after this payment
+    const newPaidAmount = totalPaidAmount + paymentData.amount;
+    const newOutstandingAmount = invoice.totalAmount - newPaidAmount;
+
+    // Create payment receipt with previous and outstanding balance
     const receiptData = {
       lead: invoice.lead,
       invoice: invoice._id,
@@ -159,6 +174,8 @@ class BillingService {
       paymentType: paymentData.paymentType || 'installment',
       notes: paymentData.notes,
       internalNotes: paymentData.internalNotes,
+      previousBalance: currentOutstandingAmount, // Outstanding before this payment
+      outstandingBalance: newOutstandingAmount, // Outstanding after this payment
       createdBy: userId,
     };
 
@@ -184,8 +201,9 @@ class BillingService {
     };
     await PaymentHistory.create(paymentHistoryData);
 
-    // Update invoice
-    invoice.paidAmount += paymentData.amount;
+    // Update invoice with cumulative payments
+    // The pre-save hook will automatically calculate outstandingAmount and update paymentStatus/status
+    invoice.paidAmount = newPaidAmount;
     invoice.payments.push(receipt._id);
     await invoice.save();
 

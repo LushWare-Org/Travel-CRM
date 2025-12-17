@@ -677,6 +677,31 @@ export const paymentHistoryAPI = {
     window.URL.revokeObjectURL(urlBlob);
     document.body.removeChild(a);
   },
+  downloadListPDF: async (params = {}) => {
+    const api = new ApiService();
+    const queryParams = new URLSearchParams();
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+    
+    const url = `${API_BASE_URL}/billing/payment-history/pdf/list${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const response = await fetch(url, { headers: api.getAuthHeaders() });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const urlBlob = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = urlBlob;
+    const dateStr = params.startDate || params.endDate 
+      ? `-${params.startDate || 'all'}-${params.endDate || 'all'}`
+      : '';
+    a.download = `payment-history-list${dateStr}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(urlBlob);
+    document.body.removeChild(a);
+  },
 };
 
 // Hotel Suggestion API Methods
