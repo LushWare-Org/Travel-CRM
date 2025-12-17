@@ -201,9 +201,16 @@ export const updatePaymentReceipt = asyncHandler(async (req, res, next) => {
     return next(new AppError('Cannot update cancelled payment receipt', 400));
   }
 
+  // Prevent updating critical fields that affect payment tracking
+  const restrictedFields = ['amount', 'invoice', 'lead', 'customer', 'paymentDate', 'paymentMethod', 'paymentType', 'currency', 'transactionId'];
+  const hasRestrictedFields = restrictedFields.some(field => req.body[field] !== undefined);
+  if (hasRestrictedFields) {
+    return next(new AppError('Cannot update payment amount, invoice, or other critical fields. Create a new receipt for additional payments.', 400));
+  }
+
   receipt.lastModifiedBy = req.user.id;
 
-  // Update allowed fields
+  // Update allowed fields (only non-critical fields)
   const allowedUpdates = ['notes', 'internalNotes', 'paymentDetails'];
   Object.keys(req.body).forEach((key) => {
     if (allowedUpdates.includes(key) && req.body[key] !== undefined) {

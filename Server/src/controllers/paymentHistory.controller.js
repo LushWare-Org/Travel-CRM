@@ -183,3 +183,75 @@ export const downloadPaymentHistoryPDF = asyncHandler(async (req, res, next) => 
   }
 });
 
+/**
+ * @desc    Download payment history list PDF (all filtered records)
+ * @route   GET /api/v1/billing/payment-history/pdf/list
+ * @access  Private
+ */
+export const downloadPaymentHistoryListPDF = asyncHandler(async (req, res, next) => {
+  // Build base query - filter by lead assignedTo for sales reps
+  let baseQuery = PaymentHistory.find();
+  
+  // If user is a sales rep, only show payment history for leads assigned to them
+  if (req.user.role === 'salesRep') {
+    const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
+    const leadIds = assignedLeadIds.map((lead) => lead._id);
+    baseQuery = baseQuery.where('lead').in(leadIds);
+  }
+
+  // Apply date range filter
+  if (req.query.startDate || req.query.endDate) {
+    const dateFilter = {};
+    if (req.query.startDate) {
+      dateFilter.$gte = new Date(req.query.startDate);
+    }
+    if (req.query.endDate) {
+      const endDate = new Date(req.query.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.$lte = endDate;
+    }
+    if (Object.keys(dateFilter).length > 0) {
+      baseQuery = baseQuery.where('paymentDate', dateFilter);
+    }
+  }
+
+  // Get all matching records (no pagination for PDF export)
+  const paymentHistoryList = await baseQuery
+    .populate('lead', 'name email phone')
+    .populate('invoice', 'invoiceNumber totalAmount')
+    .populate('receipt', 'receiptNumber')
+    .populate('createdBy', 'name email')
+    .sort({ paymentDate: -1 })
+    .lean();
+
+  if (!paymentHistoryList || paymentHistoryList.length === 0) {
+    return next(new AppError('No payment history records found for the selected filters', 404));
+  }
+
+  try {
+    const { generatePaymentHistoryListPDF } = await import('../utils/paymentHistoryPDFGenerator.js');
+    const dateRange = {
+      startDate: req.query.startDate || null,
+      endDate: req.query.endDate || null,
+    };
+    const pdfPath = await generatePaymentHistoryListPDF(paymentHistoryList, dateRange);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="payment-history-list-${Date.now()}.pdf"`);
+    
+    const fileStream = fs.createReadStream(pdfPath);
+    fileStream.pipe(res);
+
+    fileStream.on('end', () => {
+      // Optionally delete the file after sending
+      fs.unlink(pdfPath, () => {});
+    });
+
+    fileStream.on('error', (error) => {
+      return next(new AppError('Error reading PDF file', 500));
+    });
+  } catch (error) {
+    return next(new AppError(`Error generating PDF: ${error.message}`, 500));
+  }
+});
+

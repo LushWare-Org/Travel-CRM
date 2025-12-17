@@ -318,6 +318,19 @@ const BillingInvoicing = () => {
     }
   };
 
+  const handleDownloadPaymentHistoryListPDF = async () => {
+    try {
+      const params = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      await paymentHistoryAPI.downloadListPDF(params);
+      toast.success('Payment history list PDF downloaded');
+    } catch (error) {
+      console.error('Error downloading payment history list PDF:', error);
+      toast.error('Failed to download payment history list PDF');
+    }
+  };
+
   const handleClearDateFilter = () => {
     setStartDate('');
     setEndDate('');
@@ -1288,9 +1301,20 @@ const BillingInvoicing = () => {
         {/* Payment History List */}
         {activeTab === "payment-history" && (
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-gray-900">Payment History</h2>
-              <p className="text-sm text-gray-600 mt-1">All payment history records ({filteredPaymentHistory.length})</p>
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Payment History</h2>
+                <p className="text-sm text-gray-600 mt-1">All payment history records ({filteredPaymentHistory.length})</p>
+              </div>
+              <button
+                onClick={handleDownloadPaymentHistoryListPDF}
+                disabled={loadingPaymentHistory || filteredPaymentHistory.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                title="Download all payment history as PDF"
+              >
+                <Download className="w-4 h-4" />
+                Download List PDF
+              </button>
             </div>
 
             {loadingPaymentHistory ? (
