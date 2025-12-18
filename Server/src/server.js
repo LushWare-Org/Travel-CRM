@@ -52,6 +52,7 @@ import paymentReceiptRoutes from './routes/paymentReceipt.routes.js';
 import creditNoteRoutes from './routes/creditNote.routes.js';
 import billingRoutes from './routes/billing.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
+import paymentHistoryRoutes from './routes/paymentHistory.routes.js';
 import hotelSuggestionRoutes from './routes/hotelSuggestion.routes.js';
 
 // Import middleware
@@ -69,8 +70,8 @@ app.set('request timeout', 45000);
 app.use(helmet()); // Security headers
 app.use(cors(corsOptions)); // CORS
 app.use(compression()); // Compress responses
-app.use(express.json({ limit: '10mb' })); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Parse URL-encoded bodies
+app.use(express.json({ limit: '50mb' })); // Parse JSON bodies - increased for large chart images
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded bodies
 app.use(cookieParser()); // Parse cookies
 app.use(mongoSanitize()); // Sanitize data against NoSQL injection
 app.use(xss()); // Prevent XSS attacks
@@ -130,6 +131,7 @@ app.use(`/api/${API_VERSION}/billing/quotations`, quotationRoutes);
 app.use(`/api/${API_VERSION}/billing/receipts`, paymentReceiptRoutes);
 app.use(`/api/${API_VERSION}/billing/credit-notes`, creditNoteRoutes);
 app.use(`/api/${API_VERSION}/billing/vouchers`, voucherRoutes);
+app.use(`/api/${API_VERSION}/billing/payment-history`, paymentHistoryRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 app.use(`/api/${API_VERSION}/hotels`, hotelSuggestionRoutes);
 

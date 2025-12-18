@@ -45,6 +45,8 @@ class GeminiRestService {
       'gemini-pro',            // Legacy fallback
     ];
 
+    const errors = []; // Collect errors for better diagnostics
+
     for (const version of apiVersions) {
       for (const model of modelsToTry) {
         try {
@@ -75,7 +77,9 @@ class GeminiRestService {
 
           if (!response.ok) {
             const errorText = await response.text();
-            logger.warn(`${version}/${cleanModel} failed: ${response.status} - ${errorText.substring(0, 100)}`);
+            const errorInfo = `${version}/${cleanModel}: ${response.status} - ${errorText.substring(0, 200)}`;
+            logger.warn(`Failed: ${errorInfo}`);
+            errors.push(errorInfo);
             
             // If it's a 401/403, the key is invalid - don't try other models
             if (response.status === 401 || response.status === 403) {
@@ -90,8 +94,38 @@ class GeminiRestService {
               continue;
             }
             
-            // Other errors
-            throw new Error(`API error: ${response.status} - ${errorText.substring(0, 200)}`);
+            // If it's 429 (quota exceeded), this is a critical error - don't try other models
+            if (response.status === 429) {
+              try {
+                const errorData = JSON.parse(errorText);
+                if (errorData.error && errorData.error.message && errorData.error.message.includes('quota')) {
+                  throw new Error(
+                    `API quota exceeded. You have exceeded your current quota. ` +
+                    `Please check your plan and billing details at https://ai.google.dev/gemini-api/pricing ` +
+                    `or wait for your quota to reset.`
+                  );
+                }
+              } catch (e) {
+                // If parsing fails, still throw quota error
+                if (errorText.includes('quota') || errorText.includes('Quota')) {
+                  throw new Error(
+                    `API quota exceeded. You have exceeded your current quota. ` +
+                    `Please check your plan and billing details or wait for your quota to reset.`
+                  );
+                }
+              }
+              // If it's 429 but not quota-related, try next model
+              logger.warn(`Rate limit hit for ${version}/${cleanModel}, trying next model...`);
+              continue;
+            }
+            
+            if (response.status === 503) {
+              logger.warn(`Service unavailable for ${version}/${cleanModel}, trying next model...`);
+              continue;
+            }
+            
+            // Other errors - try next model
+            continue;
           }
 
           const data = await response.json();
@@ -133,28 +167,47 @@ class GeminiRestService {
             continue;
           }
         } catch (error) {
-          // If it's a network error or auth error, throw it
+          // If it's a network error or auth error, throw it immediately
           if (error.message.includes('Invalid API key') || error.message.includes('401') || error.message.includes('403')) {
             throw error;
           }
           
           // For 404 or other errors, try next model/version
           if (error.message.includes('404') || error.message.includes('not found')) {
+            errors.push(`${version}/${model}: ${error.message}`);
             continue;
           }
           
           // Log and continue for other errors
-          logger.warn(`Error with ${version}/${model}:`, error.message);
+          const errorInfo = `${version}/${model}: ${error.message}`;
+          logger.warn(`Error: ${errorInfo}`);
+          errors.push(errorInfo);
           continue;
         }
       }
     }
 
+    // Check if all errors are quota-related
+    const quotaErrors = errors.filter(e => e.includes('429') || e.toLowerCase().includes('quota'));
+    if (quotaErrors.length > 0 && quotaErrors.length === errors.length) {
+      throw new Error(
+        'API quota exceeded. You have exceeded your current quota for all models. ' +
+        'Please check your plan and billing details at https://ai.google.dev/gemini-api/pricing ' +
+        'or wait for your quota to reset. ' +
+        'Free tier quotas typically reset daily or monthly.'
+      );
+    }
+    
     // If we get here, all models/versions failed
+    const errorSummary = errors.length > 0 
+      ? `\n\nErrors encountered:\n${errors.slice(0, 5).map((e, i) => `${i + 1}. ${e}`).join('\n')}${errors.length > 5 ? `\n... and ${errors.length - 5} more errors` : ''}`
+      : '';
+    
     throw new Error(
       'Unable to generate content. All models and API versions returned errors. ' +
       'Please check: 1) API key is valid, 2) Generative AI API is enabled, ' +
-      '3) Get a new key from https://makersuite.google.com/app/apikey'
+      '3) Get a new key from https://makersuite.google.com/app/apikey' +
+      errorSummary
     );
   }
 

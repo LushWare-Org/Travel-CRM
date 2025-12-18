@@ -5,7 +5,7 @@ import Itinerary from '../models/itinerary.model.js';
 import Package from '../models/package.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { COUNTRY_NAMES, normalizeString } from '../utils/countryUtils.js';
-import ItineraryAnalyticsService from '../services/itineraryAnalytics.service.js';
+import PackageAnalyticsService from '../services/itineraryAnalytics.service.js';
 
 const STATUS_LABELS = {
   new: 'New',
@@ -804,18 +804,15 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
 
   try {
     // Get analytics overview from service
-    const overview = await ItineraryAnalyticsService.getAnalyticsOverview({
+    const overview = await PackageAnalyticsService.getAnalyticsOverview({
       timeRange: timeRange || 'monthly',
     });
 
-    // Get most inquired packages
-    const mostInquired = await ItineraryAnalyticsService.getMostInquired(5);
+    // Get most inquired packages with time range filter
+    const mostInquired = await PackageAnalyticsService.getMostInquired(5, timeRange);
 
-    // Get destination performance
-    const destinationPerformance = await ItineraryAnalyticsService.getDestinationPerformance(5);
-
-    // Get activity preferences
-    const activityPreferences = await ItineraryAnalyticsService.getActivityPreferences(5);
+    // Get destination performance with time range filter
+    const destinationPerformance = await PackageAnalyticsService.getDestinationPerformance(100, timeRange);
 
     return res.status(200).json({
       success: true,
@@ -826,7 +823,6 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
         trend: overview.trend,
         mostInquired,
         destinationPerformance,
-        activityPreferences,
       },
     });
   } catch (error) {
@@ -1177,7 +1173,7 @@ export const getSalesRepPersonalPerformance = asyncHandler(async (req, res) => {
 
 /**
  * Get Website Analytics Overview
- * Returns comprehensive website analytics including lead trends, destination analysis, activity preferences
+ * Returns comprehensive website analytics including lead trends, destination analysis
  * Shows actual lead inquiries (searches), bookings (conversions), and customer preferences
  * @route GET /api/v1/analytics/website/overview
  * @access Private/Admin
@@ -1298,26 +1294,6 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
     searches: item.searches,
     conversions: item.conversions,
     conversionRate: item.searches > 0 ? parseFloat(((item.conversions / item.searches) * 100).toFixed(1)) : 0,
-  }));
-
-  // Get activity preferences from itineraries
-  const activityAggregation = await Itinerary.aggregate([
-    { $unwind: '$days' },
-    { $unwind: '$days.activities' },
-    { $match: { 'days.activities': { $exists: true, $ne: '' } } },
-    {
-      $group: {
-        _id: '$days.activities',
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { count: -1 } },
-    { $limit: 10 },
-  ]);
-
-  const activityPreferences = activityAggregation.map((item) => ({
-    name: item._id,
-    value: item.count,
   }));
 
   // Get accommodation types from itineraries
@@ -1448,7 +1424,8 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
   const totalLeads = await Lead.countDocuments();
   const totalBookings = await Booking.countDocuments();
   const uniqueDestinations = await Lead.distinct('destination');
-  const uniqueActivities = activityAggregation.length;
+  const uniqueActivitiesData = await Itinerary.distinct('days.activities');
+  const uniqueActivities = uniqueActivitiesData.filter((a) => a && a !== '').length;
   const convertedLeads = await Lead.countDocuments({ status: 'converted' });
 
   const stats = {
@@ -1470,7 +1447,6 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
       stats,
       trend: trendData,
       topDestinations,
-      activityPreferences,
       accommodationTypes,
       durationPreferences: durationData,
       priceRanges,

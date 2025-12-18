@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   TimeRangeFilter,
   StatCard,
@@ -7,8 +7,10 @@ import {
   PieChartComponent,
   BarChartComponent,
 } from "../Common";
-import { DollarSign, Wallet, TrendingUp, AlertCircle } from "lucide-react";
+import { DollarSign, Wallet, TrendingUp, AlertCircle, Download } from "lucide-react";
 import { analyticsAPI } from "../../../../services/api";
+import { exportBillingAnalyticsPDF } from "../../utils/exportAnalytics";
+import toast from "react-hot-toast";
 
 /**
  * BillingAnalytics Component
@@ -18,6 +20,7 @@ import { analyticsAPI } from "../../../../services/api";
 const BillingAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -102,6 +105,35 @@ const BillingAnalytics = () => {
     fetchBillingAnalytics();
   }, [timeRange]);
 
+  // Handle PDF export
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true);
+      const toastId = toast.loading("Preparing billing analytics PDF...");
+
+      const summaryMetrics = [
+        { label: "Total Revenue", value: formatCurrency(stats.totalRevenue) },
+        { label: "Outstanding Amount", value: formatCurrency(stats.totalOutstanding) },
+        { label: "Potential Revenue", value: formatCurrency(stats.totalPotentialRevenue) },
+        { label: "Pending Invoices", value: stats.pendingInvoices },
+        { label: "Time Range", value: timeRange.toUpperCase() },
+      ];
+
+      await exportBillingAnalyticsPDF({
+        timeRange,
+        summaryMetrics,
+      });
+
+      toast.dismiss(toastId);
+      toast.success("Billing analytics PDF downloaded successfully!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export analytics PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const revenueTrend = getLastTwoValues(revenueTrendData, "revenue");
   const outstandingTrend = getLastTwoValues(outstandingTrendData, "outstanding");
   const potentialRevenueTrend = getLastTwoValues(revenueTrendData, "target");
@@ -129,13 +161,23 @@ const BillingAnalytics = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Time Range Filter */}
+      {/* Header with Time Range Filter and Export Button */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Billing & Invoicing Analytics</h2>
           <p className="text-gray-600 mt-1">Revenue and payment tracking</p>
         </div>
-        <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+        <div className="flex items-center gap-4">
+          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+          >
+            <Download size={18} />
+            {exporting ? "Exporting..." : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}

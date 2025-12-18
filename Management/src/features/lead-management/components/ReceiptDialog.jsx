@@ -46,14 +46,41 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   useEffect(() => {
     if (isOpen && lead) {
-      setFormData(prev => ({
-        ...prev,
+      // Reset form to initial state for creating new receipt
+      setFormData({
         lead: lead._id || lead.id,
-      }));
+        invoice: '',
+        amount: 0,
+        currency: 'INR',
+        paymentMethod: 'cash',
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentType: 'installment',
+        transactionId: '',
+        notes: '',
+        paymentDetails: {
+          cardType: '',
+          cardLastFour: '',
+          bankName: '',
+          accountNumber: '',
+          transactionReference: '',
+          chequeNumber: '',
+          chequeDate: '',
+          chequeBank: '',
+          paymentGateway: '',
+          gatewayTransactionId: '',
+          upiId: '',
+          upiTransactionId: '',
+        },
+      });
+      setSelectedInvoice(null);
       setSendEmailAddress(lead?.email || lead?.customer?.email || '');
+      setCurrentReceiptId(null);
+      setCurrentReceipt(null);
+      setIsEditing(false);
+      
       // Fetch invoices first, then receipts (receipts need invoices loaded)
       fetchInvoices().then(() => {
-        // Fetch existing receipts for this lead after invoices are loaded
+        // Fetch existing receipts for this lead after invoices are loaded (for display only)
         fetchExistingReceipts();
       });
     }
@@ -66,9 +93,12 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       const response = await invoiceAPI.getByLead(lead._id || lead.id);
       if (response.success || response.status === 'success') {
         const invoicesData = response.data?.invoices || response.data || [];
-        setInvoices(invoicesData.filter(inv => 
-          inv.status !== 'cancelled' && inv.paymentStatus !== 'paid'
-        ));
+        // Filter out cancelled invoices and fully paid invoices (outstandingAmount = 0)
+        setInvoices(invoicesData.filter(inv => {
+          if (inv.status === 'cancelled') return false;
+          const outstanding = inv.outstandingAmount ?? (inv.totalAmount - (inv.paidAmount || 0));
+          return outstanding > 0; // Only show invoices with remaining balance
+        }));
       }
     } catch (error) {
       console.error('Error fetching invoices:', error);
@@ -86,64 +116,11 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         const receiptsData = response.data?.receipts || response.data?.data || response.data || [];
         const receiptsArray = Array.isArray(receiptsData) ? receiptsData : [];
         setExistingReceipts(receiptsArray);
-        
-        // Load the most recent receipt into form for editing
-        if (receiptsArray.length > 0) {
-          const latestReceipt = receiptsArray[0]; // Most recent first
-          setCurrentReceipt(latestReceipt);
-          setIsEditing(true);
-          
-          // Populate form with existing receipt data
-          setFormData({
-            lead: lead._id || lead.id,
-            invoice: latestReceipt.invoice?._id || latestReceipt.invoice || '',
-            amount: latestReceipt.amount || 0,
-            currency: 'INR', // Fixed to INR
-            paymentMethod: latestReceipt.paymentMethod || 'cash',
-            paymentType: latestReceipt.paymentType || 'full',
-            paymentDate: latestReceipt.paymentDate ? new Date(latestReceipt.paymentDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            paymentDetails: latestReceipt.paymentDetails || {
-              cardType: '',
-              cardLastFour: '',
-              bankName: '',
-              accountNumber: '',
-              transactionReference: '',
-              chequeNumber: '',
-              chequeDate: '',
-              chequeBank: '',
-              paymentGateway: '',
-              gatewayTransactionId: '',
-              upiId: '',
-              upiTransactionId: '',
-            },
-            transactionId: latestReceipt.transactionId || '',
-            notes: latestReceipt.notes || '',
-          });
-          
-          setCurrentReceiptId(latestReceipt._id || latestReceipt.id);
-
-          setSendEmailAddress(
-            latestReceipt.customer?.email ||
-              latestReceipt.lead?.email ||
-              lead?.email ||
-              '',
-          );
-          
-          // Load invoice details if invoice is set
-          if (latestReceipt.invoice) {
-            const invoiceId = latestReceipt.invoice._id || latestReceipt.invoice;
-            const invoice = invoices.find(inv => (inv._id || inv.id) === invoiceId);
-            if (invoice) {
-              setSelectedInvoice(invoice);
-            } else {
-              // Try to find it from the invoices array or fetch it
-              handleInvoiceSelect(invoiceId);
-            }
-          }
-        } else {
-          setIsEditing(false);
-          setCurrentReceipt(null);
-        }
+        // Always start with a fresh form for creating new receipts
+        // Do not auto-load existing receipts for editing
+        setIsEditing(false);
+        setCurrentReceipt(null);
+        setCurrentReceiptId(null);
       }
     } catch (error) {
       console.error('Error fetching existing receipts:', error);
@@ -298,23 +275,38 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     try {
       setLoading(true);
-      let response;
       
-      // Update existing receipt if editing, otherwise create new
-      if (isEditing && currentReceipt) {
-        const receiptId = currentReceipt._id || currentReceipt.id;
-        response = await receiptAPI.update(receiptId, payload);
-        setCurrentReceiptId(receiptId);
-      } else {
-        response = await receiptAPI.create(payload);
-        if (response.success || response.status === 'success') {
-          const receiptId = response.data?._id || response.data?.id;
-          setCurrentReceiptId(receiptId);
-        }
-      }
-      
+      // Always create a new receipt (never update existing ones)
+      const response = await receiptAPI.create(payload);
       if (response.success || response.status === 'success') {
-        toast.success(`Payment receipt ${isEditing ? 'updated' : 'created'} successfully!`);
+        const receiptId = response.data?._id || response.data?.id;
+        setCurrentReceiptId(receiptId);
+        toast.success('Payment receipt created successfully!');
+        
+        // Refresh invoices to get updated outstanding amounts
+        await fetchInvoices();
+        
+        // Refresh existing receipts list
+        await fetchExistingReceipts();
+        
+        // Update selected invoice if it still exists
+        if (formData.invoice) {
+          const updatedInvoice = invoices.find(inv => (inv._id || inv.id) === formData.invoice);
+          if (updatedInvoice) {
+            setSelectedInvoice(updatedInvoice);
+            // Update outstanding balance display
+            const newOutstanding = updatedInvoice.outstandingAmount ?? (updatedInvoice.totalAmount - (updatedInvoice.paidAmount || 0));
+            if (newOutstanding <= 0) {
+              // Invoice is now fully paid, clear selection
+              setFormData(prev => ({ ...prev, invoice: '', amount: 0 }));
+              setSelectedInvoice(null);
+              toast.success('Invoice is now fully paid and settled!');
+            } else {
+              // Reset amount to 0 for next receipt
+              setFormData(prev => ({ ...prev, amount: 0 }));
+            }
+          }
+        }
         
         // Show PDF preview after successful save
         if (currentReceiptId || (response.data?._id || response.data?.id)) {
@@ -326,10 +318,10 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           onClose();
         }
       } else {
-        toast.error(response.message || `Failed to ${isEditing ? 'update' : 'create'} payment receipt`);
+        toast.error(response.message || 'Failed to create payment receipt');
       }
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEditing ? 'update' : 'create'} payment receipt`);
+      toast.error(error.message || 'Failed to create payment receipt');
     } finally {
       setLoading(false);
     }
@@ -348,7 +340,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-t-xl">
           <div>
             <h2 className="text-2xl font-bold">
-              {isEditing ? 'Edit Payment Receipt' : 'Create Payment Receipt'}
+              Create Payment Receipt
             </h2>
             <p className="text-orange-100 text-sm mt-1">
               {lead?.name && `For: ${lead.name}`}
@@ -416,12 +408,30 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     <span className="font-semibold text-gray-900">INR {selectedInvoice.totalAmount?.toFixed(2) || '0.00'}</span>
                   </div>
                   <div className="bg-white rounded-lg p-3 border border-blue-100">
-                    <span className="text-xs text-gray-500 block mb-1">Paid Amount</span>
-                    <span className="font-semibold text-green-600">INR {selectedInvoice.paidAmount?.toFixed(2) || '0.00'}</span>
+                    <span className="text-xs text-gray-500 block mb-1">
+                      Paid Amount {formData.amount > 0 && <span className="text-orange-600">(Projected)</span>}
+                    </span>
+                    <span className="font-semibold text-green-600">
+                      INR {((selectedInvoice.paidAmount || 0) + (formData.amount || 0)).toFixed(2)}
+                    </span>
+                    {formData.amount > 0 && (
+                      <span className="text-xs text-gray-400 block mt-1">
+                        Current: INR {(selectedInvoice.paidAmount || 0).toFixed(2)} + Payment: INR {formData.amount.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                   <div className="bg-white rounded-lg p-3 border-2 border-orange-300">
-                    <span className="text-xs text-gray-500 block mb-1">Outstanding Balance</span>
-                    <span className="font-bold text-lg text-orange-600">INR {outstandingBalance.toFixed(2)}</span>
+                    <span className="text-xs text-gray-500 block mb-1">
+                      Outstanding Balance {formData.amount > 0 && <span className="text-orange-600">(After Payment)</span>}
+                    </span>
+                    <span className="font-bold text-lg text-orange-600">
+                      INR {Math.max(0, (outstandingBalance - (formData.amount || 0))).toFixed(2)}
+                    </span>
+                    {formData.amount > 0 && (
+                      <span className="text-xs text-gray-400 block mt-1">
+                        Current: INR {outstandingBalance.toFixed(2)} - Payment: INR {formData.amount.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -814,7 +824,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg hover:from-orange-700 hover:to-amber-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-md"
             >
               <Save className="w-5 h-5" />
-              {isEditing ? 'Update Receipt' : 'Save Receipt'}
+              Create Receipt
             </button>
           </div>
         </div>
