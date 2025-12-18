@@ -7,8 +7,10 @@ import {
   BarChartComponent,
   PieChartComponent,
 } from "../Common";
-import { MapPin, ShoppingCart, TrendingUp } from "lucide-react";
+import { MapPin, ShoppingCart, TrendingUp, Download } from "lucide-react";
 import AnalyticsService from "../../../../services/analytics.service";
+import { exportPackageAnalyticsPDF } from "../../utils/exportAnalytics";
+import toast from "react-hot-toast";
 
 /**
  * PackageAnalytics Component
@@ -22,6 +24,7 @@ import AnalyticsService from "../../../../services/analytics.service";
 const PackageAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
 
@@ -57,6 +60,34 @@ const PackageAnalytics = () => {
     fetchAnalyticsData();
   }, [timeRange]);
 
+  // Handle PDF export
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true);
+      const toastId = toast.loading("Preparing package analytics PDF...");
+
+      const summaryMetrics = [
+        { label: "Published Packages", value: data.stats.totalItineraries },
+        { label: "Lead Inquiries", value: data.stats.totalInquiries },
+        { label: "Conversions", value: data.stats.totalConversions },
+        { label: "Time Range", value: timeRange.toUpperCase() },
+      ];
+
+      await exportPackageAnalyticsPDF({
+        timeRange,
+        summaryMetrics,
+      });
+
+      toast.dismiss(toastId);
+      toast.success("Package analytics PDF downloaded successfully!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export analytics PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Use fetched data or show empty state
   const data = analyticsData || {
     stats: {
@@ -78,7 +109,17 @@ const PackageAnalytics = () => {
           <p className="text-gray-600 mt-1">Track leads from published packages - booking/customization inquiries and conversions</p>
           {error && <p className="text-red-600 text-sm mt-1">Error: {error}</p>}
         </div>
-        <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+        <div className="flex items-center gap-4">
+          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+          >
+            <Download size={18} />
+            {exporting ? "Exporting..." : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
