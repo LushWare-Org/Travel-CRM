@@ -281,8 +281,6 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       if (response.success || response.status === 'success') {
         const receiptId = response.data?._id || response.data?.id;
         setCurrentReceiptId(receiptId);
-      
-      if (response.success || response.status === 'success') {
         toast.success('Payment receipt created successfully!');
         
         // Refresh invoices to get updated outstanding amounts
