@@ -7,7 +7,9 @@ import {
   BarChartComponent,
   PieChartComponent,
 } from "../Common";
-import { Users, UserCheck, TrendingUp, DollarSign } from "lucide-react";
+import { Users, UserCheck, TrendingUp, DollarSign, Download } from "lucide-react";
+import { exportUserAnalyticsPDF } from "../../utils/exportAnalytics";
+import toast from "react-hot-toast";
 import AnalyticsService from "../../../../services/analytics.service";
 import {
   getUserGrowthByTimeRange,
@@ -27,6 +29,7 @@ const UserAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
   const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
 
   // Fetch analytics data from backend
@@ -91,6 +94,35 @@ const UserAnalytics = () => {
   const salesStats = useMemo(() => {
     return getSalesRepStats(timeRange);
   }, [timeRange]);
+
+  // Handle PDF export
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true);
+      const toastId = toast.loading("Preparing user analytics PDF...");
+
+      const summaryMetrics = [
+        { label: "Total Users", value: analyticsData?.stats?.totalUsers || 0 },
+        { label: "Active Users", value: analyticsData?.stats?.activeUsers || 0 },
+        { label: "Users with Bookings", value: analyticsData?.stats?.usersWithBookings || 0 },
+        { label: "Conversion Rate", value: `${analyticsData?.stats?.conversionRate || 0}%` },
+        { label: "Time Range", value: timeRange.toUpperCase() },
+      ];
+
+      await exportUserAnalyticsPDF({
+        timeRange,
+        summaryMetrics,
+      });
+
+      toast.dismiss(toastId);
+      toast.success("User analytics PDF downloaded successfully!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export analytics PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Get x-axis key based on time range
   const getXAxisKey = () => {
@@ -162,7 +194,17 @@ const UserAnalytics = () => {
           <h2 className="text-2xl font-bold text-gray-900">User Management Analytics</h2>
           <p className="text-gray-600 mt-1">User growth and sales performance metrics</p>
         </div>
-        <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+        <div className="flex items-center gap-4">
+          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+          >
+            <Download size={18} />
+            {exporting ? "Exporting..." : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}

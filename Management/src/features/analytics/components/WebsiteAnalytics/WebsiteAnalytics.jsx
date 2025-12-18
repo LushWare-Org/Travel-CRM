@@ -7,7 +7,9 @@ import {
   BarChartComponent,
   PieChartComponent,
 } from "../Common";
-import { Search, MapPin, Activity, TrendingUp } from "lucide-react";
+import { Search, MapPin, Activity, TrendingUp, Download } from "lucide-react";
+import { exportWebsiteAnalyticsPDF } from "../../utils/exportAnalytics";
+import toast from "react-hot-toast";
 import AnalyticsService from "../../../../services/analytics.service";
 
 /**
@@ -19,6 +21,7 @@ import AnalyticsService from "../../../../services/analytics.service";
 const WebsiteAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
 
@@ -41,6 +44,35 @@ const WebsiteAnalytics = () => {
     fetchAnalyticsData();
   }, [timeRange]);
 
+  // Handle PDF export
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true);
+      const toastId = toast.loading("Preparing website analytics PDF...");
+
+      const summaryMetrics = [
+        { label: "Total Inquiries", value: data.stats.totalSearches || 0 },
+        { label: "Total Bookings", value: data.stats.totalBookings || 0 },
+        { label: "Top Destinations", value: data.stats.uniqueDestinations || 0 },
+        { label: "Activities Offered", value: data.stats.uniqueActivities || 0 },
+        { label: "Time Range", value: timeRange.toUpperCase() },
+      ];
+
+      await exportWebsiteAnalyticsPDF({
+        timeRange,
+        summaryMetrics,
+      });
+
+      toast.dismiss(toastId);
+      toast.success("Website analytics PDF downloaded successfully!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export analytics PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Use fetched data or show empty state
   const data = analyticsData || {
     stats: {
@@ -52,7 +84,6 @@ const WebsiteAnalytics = () => {
     },
     trend: [],
     topDestinations: [],
-    activityPreferences: [],
     accommodationTypes: [],
     durationPreferences: [],
     priceRanges: [],
@@ -121,7 +152,17 @@ const WebsiteAnalytics = () => {
           <h2 className="text-2xl font-bold text-gray-900">Website Analytics</h2>
           <p className="text-gray-600 mt-1">Customer inquiry and booking conversion patterns</p>
         </div>
-        <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+        <div className="flex items-center gap-4">
+          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+          >
+            <Download size={18} />
+            {exporting ? "Exporting..." : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -193,16 +234,15 @@ const WebsiteAnalytics = () => {
         </ChartContainer>
 
         <ChartContainer
-          title="Activity Preferences"
-          description="Most inquired activities by customers"
+          title="Price Range Distribution"
+          description="Customer inquiries by package price range"
         >
-          <PieChartComponent
-            data={data.activityPreferences || []}
-            dataKey="value"
-            nameKey="name"
-            height={360}
-            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6366f1", "#22c55e"]}
-            legendProps={{ align: "bottom", verticalAlign: "bottom", layout: "horizontal" }}
+          <BarChartComponent
+            data={data.priceRanges || []}
+            bars={[{ dataKey: "searches", fill: "#8b5cf6", name: "Inquiries" }]}
+            xAxisKey="range"
+            height={320}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
           />
         </ChartContainer>
       </div>
@@ -235,18 +275,6 @@ const WebsiteAnalytics = () => {
           />
         </ChartContainer>
       </div>
-
-      <ChartContainer
-        title="Price Range Distribution"
-        description="Customer inquiries by package price range"
-      >
-        <BarChartComponent
-          data={data.priceRanges || []}
-          bars={[{ dataKey: "searches", fill: "#8b5cf6", name: "Inquiries" }]}
-          xAxisKey="range"
-          height={300}
-        />
-      </ChartContainer>
     </div>
   );
 };
