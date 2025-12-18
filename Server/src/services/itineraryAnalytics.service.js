@@ -80,19 +80,38 @@ class PackageAnalyticsService {
    * Get most inquired published packages
    * Ranks packages by number of leads (booking/customization inquiries) received
    * Only includes packages with status='published'
+   * Filters leads based on the specified time range
    * 
    * @param {number} limit - Number of results to return (default: 5)
+   * @param {string} timeRange - Time range: 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
    * @returns {Promise<Array>} Top inquired packages with inquiry/conversion counts
    */
-  static async getMostInquired(limit = 5) {
+  static async getMostInquired(limit = 5, timeRange = 'monthly') {
     try {
+      // Calculate time range
+      const now = new Date();
+      let startDate = new Date();
+
+      if (timeRange === 'daily') {
+        startDate.setDate(now.getDate() - 1);
+      } else if (timeRange === 'weekly') {
+        startDate.setDate(now.getDate() - 7);
+      } else if (timeRange === 'monthly') {
+        startDate.setMonth(now.getMonth() - 1);
+      } else if (timeRange === 'annual') {
+        startDate.setFullYear(now.getFullYear() - 1);
+      }
+
       // Get published package IDs
       const publishedPackageIds = (await Package.find({ status: 'published' }).select('_id')).map(p => p._id);
 
-      // Get leads with published packages grouped by package
+      // Get leads with published packages grouped by package, filtered by time range
       const leadAggregation = await Lead.aggregate([
         {
-          $match: { package: { $in: publishedPackageIds } },
+          $match: { 
+            package: { $in: publishedPackageIds },
+            createdAt: { $gte: startDate, $lte: now }
+          },
         },
         {
           $group: {
@@ -333,9 +352,14 @@ class PackageAnalyticsService {
   /**
    * Get trend data showing inquiries and conversions over time
    * Only includes leads for published packages in the specified time range
+   * Groups data appropriately based on time range:
+   * - daily: groups by day
+   * - weekly: groups by week
+   * - monthly: groups by month
+   * - annual: groups by month
    * 
    * @param {string} timeRange - Time range: 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
-   * @returns {Promise<Array>} Trend data with monthly inquiries and conversions
+   * @returns {Promise<Array>} Trend data with inquiries and conversions grouped by time period
    */
   static async getTrendData(timeRange = 'monthly') {
     try {
@@ -343,15 +367,49 @@ class PackageAnalyticsService {
       let startDate = new Date();
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-      // Set start date based on time range
-      if (timeRange === 'weekly') {
+      // Set start date and grouping strategy based on time range
+      let groupConfig = {
+        month: { $month: '$createdAt' },
+        year: { $year: '$createdAt' },
+      };
+      let sortConfig = { '_id.year': 1, '_id.month': 1 };
+      let formatFn = (item) => `${months[item._id.month - 1]}`;
+
+      if (timeRange === 'daily') {
+        // Last 7 days, group by day
         startDate.setDate(now.getDate() - 7);
+        groupConfig = {
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        };
+        sortConfig = { '_id.date': 1 };
+        formatFn = (item) => item._id.date;
+      } else if (timeRange === 'weekly') {
+        // Last 4 weeks, group by week
+        startDate.setDate(now.getDate() - 28);
+        groupConfig = {
+          year: { $year: '$createdAt' },
+          week: { $week: '$createdAt' },
+        };
+        sortConfig = { '_id.year': 1, '_id.week': 1 };
+        formatFn = (item) => `W${item._id.week}`;
       } else if (timeRange === 'monthly') {
-        startDate.setMonth(now.getMonth() - 5); // Last 6 months
+        // Last 6 months, group by month
+        startDate.setMonth(now.getMonth() - 5);
+        groupConfig = {
+          month: { $month: '$createdAt' },
+          year: { $year: '$createdAt' },
+        };
+        sortConfig = { '_id.year': 1, '_id.month': 1 };
+        formatFn = (item) => `${months[item._id.month - 1]}`;
       } else if (timeRange === 'annual') {
+        // Last 12 months, group by month
         startDate.setFullYear(now.getFullYear() - 1);
-      } else {
-        startDate.setDate(now.getDate() - 1); // Daily
+        groupConfig = {
+          month: { $month: '$createdAt' },
+          year: { $year: '$createdAt' },
+        };
+        sortConfig = { '_id.year': 1, '_id.month': 1 };
+        formatFn = (item) => `${months[item._id.month - 1]} ${item._id.year}`;
       }
 
       // Get published package IDs
@@ -367,10 +425,7 @@ class PackageAnalyticsService {
         },
         {
           $group: {
-            _id: {
-              month: { $month: '$createdAt' },
-              year: { $year: '$createdAt' },
-            },
+            _id: groupConfig,
             inquiries: { $sum: 1 },
             conversions: {
               $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
@@ -378,13 +433,13 @@ class PackageAnalyticsService {
           },
         },
         {
-          $sort: { '_id.year': 1, '_id.month': 1 },
+          $sort: sortConfig,
         },
       ]);
 
-      // Format trend data
+      // Format trend data with dynamic label based on time range
       return trendData.map((item) => ({
-        month: months[item._id.month - 1] || 'Unknown',
+        month: formatFn(item),
         inquiries: item.inquiries,
         conversions: item.conversions,
       }));

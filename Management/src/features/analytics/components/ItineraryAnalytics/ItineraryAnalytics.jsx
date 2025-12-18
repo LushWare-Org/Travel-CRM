@@ -115,7 +115,7 @@ const PackageAnalytics = () => {
       {/* Package Trend Chart */}
       <ChartContainer
         title="Package Inquiry & Conversion Trend"
-        description="Monthly trends of booking/customization inquiries and conversions for published packages"
+        description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} trends of booking/customization inquiries and conversions for published packages`}
       >
         <LineChartComponent
           data={data.trend}
@@ -144,24 +144,13 @@ const PackageAnalytics = () => {
           title="Top Packages"
           description="Most inquired and converted packages"
         >
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {(data.mostInquired || []).map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-900">{item.name}</p>
-                  <p className="text-xs text-gray-600">Rating: {item.rating}★</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-blue-600">{item.inquiries}</p>
-                  <p className="text-xs text-gray-600">inquiries</p>
-                </div>
-                <div className="ml-4 text-right">
-                  <p className="text-sm font-bold text-green-600">{item.conversions}</p>
-                  <p className="text-xs text-gray-600">conversions</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <BarChartComponent
+            data={data.mostInquired}
+            bars={destinationBars}
+            xAxisKey="name"
+            height={350}
+            margin={{ top: 5, right: 30, left: 0, bottom: 100 }}
+          />
         </ChartContainer>
       </div>
     </div>

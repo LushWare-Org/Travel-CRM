@@ -808,8 +808,8 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
       timeRange: timeRange || 'monthly',
     });
 
-    // Get most inquired packages
-    const mostInquired = await PackageAnalyticsService.getMostInquired(5);
+    // Get most inquired packages with time range filter
+    const mostInquired = await PackageAnalyticsService.getMostInquired(5, timeRange);
 
     // Get destination performance with time range filter
     const destinationPerformance = await PackageAnalyticsService.getDestinationPerformance(100, timeRange);
