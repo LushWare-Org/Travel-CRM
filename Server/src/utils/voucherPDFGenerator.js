@@ -99,30 +99,41 @@ export function generateVoucherPDF(voucher, lead) {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // ===== HEADER =====
-      const headerHeight = 48;
-      const headerY = 8;
-      const headerX = 50;
-      const headerWidth = 495;
+      // ===== HEADER WITH WAVE DESIGN =====
+      const headerHeight = 100;
+      const headerY = 0;
+      const headerWidth = 595;
+      
+      // Draw black wave background
+      doc.rect(0, headerY, headerWidth, headerHeight).fillAndStroke('#000000', '#000000');
+      
+      // Draw bottom wave curve using bezier curves
+      doc.moveTo(0, headerHeight - 30)
+         .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
+         .lineTo(595, 0)
+         .lineTo(0, 0)
+         .fill('#000000');
+      
+      // Draw orange accent curve in top right
+      doc.moveTo(400, 0)
+         .bezierCurveTo(450, 40, 520, 60, 595, 50)
+         .lineTo(595, 0)
+         .fill('#F5A623');
 
-      doc
-        .roundedRect(headerX, headerY, headerWidth, headerHeight, 6, 6)
-        .fillColor('#0C0C0C')
-        .fill();
-
-      let cursorX = headerX + 14;
+      let cursorX = 50;
       const logoBuffer = loadLogo();
-
+      
+      // Add logo if available
       if (logoBuffer) {
         try {
-          const logoHeight = 14;
-          const logoWidth = 56;
-          doc.image(logoBuffer, cursorX, headerY + (headerHeight - logoHeight) / 2, {
+          const logoHeight = 20;
+          const logoWidth = 80;
+          doc.image(logoBuffer, cursorX, headerY + 25, {
             width: logoWidth,
             height: logoHeight,
             fit: [logoWidth, logoHeight],
           });
-          cursorX += logoWidth + 14;
+          cursorX += logoWidth + 12;
         } catch (error) {
           console.warn('[Voucher PDF] Failed to add logo:', error);
         }
@@ -130,144 +141,180 @@ export function generateVoucherPDF(voucher, lead) {
 
       doc
         .fillColor(COLORS.white)
-        .fontSize(12)
+        .fontSize(16)
         .font('Helvetica-Bold')
-        .text('Trip Sky Way', cursorX, headerY + 14)
-        .fontSize(8.5)
-        .font('Helvetica')
-        .fillColor('rgb(210, 210, 210)')
-        .text('Curating inspired journeys', cursorX, headerY + 30);
-
-      const voucherTextX = headerX + headerWidth - 80;
-      doc
-        .fillColor(COLORS.white)
+        .text('Trip Sky Way', cursorX, headerY + 25)
         .fontSize(9)
-        .font('Helvetica-Bold')
-        .text('TRAVEL VOUCHER', voucherTextX, headerY + 22);
-
-      // ===== COMPANY INFO =====
-      let yPos = 120;
-      doc
-        .fillColor(rgbToHex(PALETTE.secondaryText))
-        .fontSize(10)
         .font('Helvetica')
-        .text('Trip Sky Way Travel & Tours', 50, yPos)
-        .text('123 Business Street, City', 50, yPos + 15)
-        .text('Phone: +94 11 234 5678', 50, yPos + 30)
-        .text('Email: info@tripskyway.com', 50, yPos + 45);
+        .text('Curating inspired journeys', cursorX, headerY + 47);
 
-      // ===== VOUCHER INFO =====
-      yPos = 120;
+      // Add VOUCHER badge
+      const badgeX = 490;
+      const badgeY = headerY + 40;
+      doc.circle(badgeX, badgeY, 28).fillAndStroke(COLORS.white, COLORS.white);
+      
       doc
-        .fillColor(rgbToHex(PALETTE.primaryText))
+        .fillColor('#000000')
+        .fontSize(6)
+        .font('Helvetica-Bold')
+        .text('VOUCHER', badgeX - 20, badgeY - 3, { width: 40, align: 'center' });
+
+      // ===== INFO CARDS =====
+      let yPos = 125;
+      
+      doc.roundedRect(50, yPos, 235, 108, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(50, yPos, 235, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
+      doc
+        .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
-        .text('Voucher Details', 380, yPos)
-        .font('Helvetica')
-        .fontSize(10)
-        .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(`Voucher #: ${voucher.voucherNumber || 'N/A'}`, 380, yPos + 20)
-        .text(`Date: ${formatDate(voucher.createdAt)}`, 380, yPos + 35)
-        .text(`Status: ${voucher.status?.toUpperCase() || 'DRAFT'}`, 380, yPos + 50);
+        .text('CUSTOMER', 65, yPos + 11);
 
-      // ===== CUSTOMER INFO =====
-      yPos = 220;
       const customerName = voucher.customer?.name || lead?.name || '-';
       doc
         .fillColor(rgbToHex(PALETTE.primaryText))
         .fontSize(11)
         .font('Helvetica-Bold')
-        .text('Customer Information', 50, yPos)
+        .text(customerName, 65, yPos + 47, { width: 205 })
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor(rgbToHex(PALETTE.secondaryText))
+        .text(voucher.customer?.email || lead?.email || '-', 65, yPos + 66, { width: 205 })
+        .text(voucher.customer?.phone || lead?.phone || '-', 65, yPos + 82, { width: 205 });
+
+      doc.roundedRect(300, yPos, 245, 108, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(300, yPos, 245, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
+      doc
+        .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
+        .text('VOUCHER DETAILS', 315, yPos + 11);
+      
+      doc
         .fillColor(rgbToHex(PALETTE.primaryText))
-        .text(`Name: ${customerName}`, 50, yPos + 20)
-        .font('Helvetica')
         .fontSize(10)
-        .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(`Email: ${voucher.customer?.email || lead?.email || '-'}`, 50, yPos + 40)
-        .text(`Phone: ${voucher.customer?.phone || lead?.phone || '-'}`, 50, yPos + 55);
-      if (voucher.customer?.address || lead?.address) {
-        doc.text(`Address: ${voucher.customer?.address || lead?.address || ''}`, 50, yPos + 70);
-      }
+        .font('Helvetica')
+        .text(`Voucher #: ${voucher.voucherNumber || 'N/A'}`, 315, yPos + 47)
+        .text(`Date: ${formatDate(voucher.createdAt)}`, 315, yPos + 64);
+      
+      const statusColor = voucher.status === 'confirmed' ? '#F5A623' : '#FCD34D';
+      doc.roundedRect(315, yPos + 84, 72, 16, 5).fillAndStroke(statusColor, statusColor);
+      
+      doc
+        .fillColor(COLORS.white)
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .text(voucher.status?.toUpperCase() || 'DRAFT', 315, yPos + 88, { 
+          width: 72, 
+          align: 'center' 
+        });
 
       // ===== PACKAGE DETAILS =====
-      yPos = 320;
+      yPos = 255;
       const packageDetails = voucher.packageDetails || {};
+      
+      doc.roundedRect(50, yPos, 495, 110, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(50, yPos, 495, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
       doc
-        .fillColor(rgbToHex(PALETTE.primaryText))
+        .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
-        .text('Package Details', 50, yPos)
-        .font('Helvetica')
+        .text('PACKAGE DETAILS', 65, yPos + 11);
+        
+      doc
+        .fillColor(rgbToHex(PALETTE.primaryText))
         .fontSize(10)
+        .font('Helvetica-Bold')
+        .text(`${packageDetails.name || 'N/A'}`, 65, yPos + 47, { width: 465 })
+        .font('Helvetica')
+        .fontSize(9.5)
         .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(`Package: ${packageDetails.name || 'N/A'}`, 50, yPos + 20)
-        .text(`Destination: ${packageDetails.destination || 'N/A'}`, 50, yPos + 35)
-        .text(`Duration: ${packageDetails.duration || 'N/A'} days`, 50, yPos + 50)
-        .text(`Category: ${packageDetails.category || 'N/A'}`, 50, yPos + 65);
+        .text(`Destination: ${packageDetails.destination || 'N/A'}`, 65, yPos + 66)
+        .text(`Duration: ${packageDetails.duration || 'N/A'} days`, 270, yPos + 66)
+        .text(`Category: ${packageDetails.category || 'N/A'}`, 65, yPos + 84);
 
       // ===== TRAVEL DATES =====
-      yPos = 450;
+      yPos = 385;
+      
+      doc.roundedRect(50, yPos, 235, 80, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(50, yPos, 235, 30).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
       doc
-        .fillColor(rgbToHex(PALETTE.primaryText))
+        .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
-        .text('Travel Dates', 50, yPos)
+        .text('TRAVEL DATES', 65, yPos + 9);
+        
+      doc
+        .fillColor(rgbToHex(PALETTE.primaryText))
+        .fontSize(9.5)
         .font('Helvetica')
-        .fontSize(10)
-        .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(`Start Date: ${voucher.travelStartDate ? formatDate(voucher.travelStartDate) : '-'}`, 50, yPos + 20)
-        .text(`End Date: ${voucher.travelEndDate ? formatDate(voucher.travelEndDate) : '-'}`, 50, yPos + 35);
+        .text(`Departure: ${voucher.travelStartDate ? formatDate(voucher.travelStartDate) : '-'}`, 65, yPos + 44)
+        .text(`Return: ${voucher.travelEndDate ? formatDate(voucher.travelEndDate) : '-'}`, 65, yPos + 61);
 
       // ===== LOCATION DATES =====
-      let locationY = 520; // Initialize locationY
+      let locationY = 485; // Initialize locationY
       if (voucher.locationDates && voucher.locationDates.length > 0) {
-        yPos = 520;
+        yPos = 485;
+        
+        doc.roundedRect(50, yPos, 495, 30, 8).fillAndStroke('#FEF3C7', '#FEF3C7');
+        
         doc
-          .fillColor(rgbToHex(PALETTE.primaryText))
+          .fillColor('#D97706')
           .fontSize(11)
           .font('Helvetica-Bold')
-          .text('Location & Accommodation Dates', 50, yPos);
+          .text('Location & Accommodation Dates', 65, yPos + 9);
 
-        locationY = yPos + 25;
+        locationY = yPos + 45;
         voucher.locationDates.forEach((locationDate, index) => {
           if (locationY > 700) {
             doc.addPage();
             locationY = 50;
           }
+          
+          doc.roundedRect(50, locationY, 495, 55, 8).fillAndStroke('#FFFFFF', '#FCD34D');
+          
           doc
-            .font('Helvetica')
+            .font('Helvetica-Bold')
             .fontSize(10)
+            .fillColor(rgbToHex(PALETTE.primaryText))
+            .text(`${index + 1}. ${locationDate.location || '-'}`, 65, locationY + 10)
+            .font('Helvetica')
+            .fontSize(9)
             .fillColor(rgbToHex(PALETTE.secondaryText))
-            .text(`${index + 1}. ${locationDate.location || '-'}`, 50, locationY)
-            .text(`   Check-in: ${locationDate.checkIn ? formatDate(locationDate.checkIn) : '-'}`, 60, locationY + 15)
-            .text(`   Check-out: ${locationDate.checkOut ? formatDate(locationDate.checkOut) : '-'}`, 60, locationY + 30);
-          locationY += 50;
+            .text(`✓ Check-in: ${locationDate.checkIn ? formatDate(locationDate.checkIn) : '-'}`, 80, locationY + 28)
+            .text(`✓ Check-out: ${locationDate.checkOut ? formatDate(locationDate.checkOut) : '-'}`, 280, locationY + 28);
+          locationY += 65;
         });
       } else {
         // If no location dates, set locationY to the position after travel dates
-        locationY = 520; // Position after travel dates section
+        locationY = 485; // Position after travel dates section
       }
 
       // ===== MEAL PLANS =====
       // Initialize mealY - will be set if meal plans exist
-      let mealY = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 520 + 30;
+      let mealY = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 485 + 30;
       
       if (voucher.mealPlans && voucher.mealPlans.length > 0) {
         // Calculate yPos based on whether location dates were shown
-        yPos = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 520 + 30;
+        yPos = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 485 + 30;
         if (yPos > 700) {
           doc.addPage();
           yPos = 50;
         }
+        
+        doc.roundedRect(50, yPos, 495, 30, 8).fillAndStroke('#FEF3C7', '#FEF3C7');
+        
         doc
-          .fillColor(rgbToHex(PALETTE.primaryText))
+          .fillColor('#D97706')
           .fontSize(11)
           .font('Helvetica-Bold')
-          .text('Meal Plans (Day-wise)', 50, yPos);
+          .text('Meal Plans (Day-wise)', 65, yPos + 9);
 
-        mealY = yPos + 25;
+        mealY = yPos + 45;
         voucher.mealPlans.forEach((mealPlan) => {
           if (mealY > 700) {
             doc.addPage();
@@ -277,12 +324,16 @@ export function generateVoucherPDF(voucher, lead) {
           if (mealPlan.breakfast) meals.push('Breakfast');
           if (mealPlan.lunch) meals.push('Lunch');
           if (mealPlan.dinner) meals.push('Dinner');
+          
           doc
+            .font('Helvetica-Bold')
+            .fontSize(9.5)
+            .fillColor(rgbToHex(PALETTE.primaryText))
+            .text(`Day ${mealPlan.dayNumber}: ${mealPlan.dayTitle || ''}`, 65, mealY)
             .font('Helvetica')
-            .fontSize(10)
+            .fontSize(9)
             .fillColor(rgbToHex(PALETTE.secondaryText))
-            .text(`Day ${mealPlan.dayNumber}: ${mealPlan.dayTitle || ''}`, 50, mealY)
-            .text(`   Meals: ${meals.length > 0 ? meals.join(', ') : 'Not included'}`, 60, mealY + 15);
+            .text(meals.join('  •  '), 80, mealY + 16);
           mealY += 35;
         });
       }
@@ -298,25 +349,32 @@ export function generateVoucherPDF(voucher, lead) {
           doc.addPage();
           yPos = 50;
         }
+        
+        doc.roundedRect(50, yPos, 495, 30, 8).fillAndStroke('#FEF3C7', '#FEF3C7');
+        
         doc
-          .fillColor(rgbToHex(PALETTE.primaryText))
+          .fillColor('#D97706')
           .fontSize(11)
           .font('Helvetica-Bold')
-          .text('Itinerary Summary', 50, yPos);
+          .text('Itinerary Summary', 65, yPos + 9);
 
-        itineraryY = yPos + 25;
+        itineraryY = yPos + 45;
         voucher.itinerarySummary.forEach((day) => {
           if (itineraryY > 700) {
             doc.addPage();
             itineraryY = 50;
           }
           doc
-            .font('Helvetica')
-            .fontSize(10)
-            .fillColor(rgbToHex(PALETTE.secondaryText))
-            .text(`Day ${day.dayNumber}: ${day.title}`, 50, itineraryY, { bold: true });
+            .font('Helvetica-Bold')
+            .fontSize(9.5)
+            .fillColor(rgbToHex(PALETTE.primaryText))
+            .text(`Day ${day.dayNumber}: ${day.title}`, 65, itineraryY);
           if (day.locations && day.locations.length > 0) {
-            doc.text(`   Locations: ${day.locations.join(', ')}`, 60, itineraryY + 15);
+            doc
+              .font('Helvetica')
+              .fontSize(9)
+              .fillColor(rgbToHex(PALETTE.secondaryText))
+              .text(`${day.locations.join(', ')}`, 80, itineraryY + 16);
             itineraryY += 15;
           }
           if (day.activities && day.activities.length > 0) {
@@ -343,7 +401,7 @@ export function generateVoucherPDF(voucher, lead) {
           yPos = 50;
         }
         doc
-          .fillColor(rgbToHex(PALETTE.primaryText))
+          .fillColor('#D97706')
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('Package Inclusions', 50, yPos)
@@ -371,7 +429,7 @@ export function generateVoucherPDF(voucher, lead) {
           yPos = 50;
         }
         doc
-          .fillColor(rgbToHex(PALETTE.primaryText))
+          .fillColor('#D97706')
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('Special Instructions', 50, yPos)
@@ -381,14 +439,16 @@ export function generateVoucherPDF(voucher, lead) {
           .text(voucher.specialInstructions, 50, yPos + 25, { width: 495 });
       }
 
-      // ===== FOOTER =====
-      const pageHeight = doc.page.height;
-      doc
-        .fillColor(rgbToHex(PALETTE.mutedText))
-        .fontSize(8)
-        .font('Helvetica')
-        .text('Thank you for choosing Trip Sky Way!', 50, pageHeight - 40, { align: 'center' })
-        .text('For any queries, please contact us at info@tripskyway.com', 50, pageHeight - 25, { align: 'center' });
+      // ===== FOOTER WAVE =====
+      const pageHeight = 842;
+      const waveY = pageHeight - 80;
+      
+      // Draw orange wave at bottom
+      doc.moveTo(0, waveY)
+         .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
+         .lineTo(595, pageHeight)
+         .lineTo(0, pageHeight)
+         .fill('#F5A623');
 
       doc.end();
     } catch (error) {

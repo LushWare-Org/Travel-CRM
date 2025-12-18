@@ -22,106 +22,149 @@ export function generateInvoicePDF(invoice, user, booking) {
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
 
-      // Header
+      // Modern header with gradient
+      doc.rect(0, 0, 595, 120).fillAndStroke('#3B82F6', '#2563EB');
+      
       doc
-        .fontSize(20)
-        .text('TRIP SKY WAY', 50, 50)
-        .fontSize(10)
-        .text('India Travel Agency', 50, 75)
-        .text('Email: info@tripskyway.com', 50, 90)
-        .text('Phone: +91 XXX XXX XXXX', 50, 105);
-
-      // Invoice Title
-      doc
+        .fillColor('#FFFFFF')
         .fontSize(24)
-        .text('INVOICE', 400, 50);
-
-      // Invoice Details
-      doc
+        .font('Helvetica-Bold')
+        .text('TRIP SKY WAY', 50, 30)
         .fontSize(10)
-        .text(`Invoice #: ${invoice.invoiceNumber}`, 400, 80)
-        .text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, 400, 95)
-        .text(`Status: ${invoice.status.toUpperCase()}`, 400, 110);
+        .font('Helvetica')
+        .text('Premium Travel Agency', 50, 62)
+        .fontSize(9)
+        .text('Email: info@tripskyway.com', 50, 80)
+        .text('Phone: +91 XXX XXX XXXX', 50, 95);
 
-      // Line
+      // Invoice badge
+      doc.roundedRect(410, 25, 140, 75, 8).fillAndStroke('#FFFFFF', '#FFFFFF');
+      
       doc
-        .moveTo(50, 140)
-        .lineTo(550, 140)
-        .stroke();
+        .fillColor('#3B82F6')
+        .fontSize(20)
+        .font('Helvetica-Bold')
+        .text('INVOICE', 420, 38, { width: 120, align: 'center' });
+      
+      doc
+        .fontSize(9)
+        .fillColor('#6B7280')
+        .font('Helvetica')
+        .text(`#${invoice.invoiceNumber}`, 420, 65, { width: 120, align: 'center' })
+        .text(new Date(invoice.createdAt).toLocaleDateString(), 420, 80, { width: 120, align: 'center' });
 
-      // Customer Details
+      // Customer info card
+      doc.roundedRect(50, 145, 240, 90, 8).strokeColor('#E5E7EB').lineWidth(1.5).stroke();
+      
       doc
+        .fillColor('#1F2937')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('BILL TO', 65, 160)
+        .fontSize(11)
+        .text(user.name, 65, 182)
+        .fontSize(9)
+        .font('Helvetica')
+        .fillColor('#6B7280')
+        .text(user.email, 65, 200)
+        .text(user.phone || '', 65, 215);
+
+      // Package info card
+      doc.roundedRect(305, 145, 245, 90, 8).strokeColor('#E5E7EB').lineWidth(1.5).stroke();
+      
+      doc
+        .fillColor('#1F2937')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('PACKAGE DETAILS', 320, 160)
+        .fontSize(10)
+        .font('Helvetica')
+        .text(booking.package.name, 320, 182, { width: 215 })
+        .fontSize(9)
+        .fillColor('#6B7280')
+        .text(`Travel: ${new Date(booking.travelDate).toLocaleDateString()}`, 320, 200)
+        .text(`Travelers: ${booking.numberOfTravelers}`, 320, 215);
+
+      // Table header
+      const tableTop = 260;
+      doc.rect(50, tableTop, 500, 28).fillAndStroke('#3B82F6', '#3B82F6');
+      
+      doc
+        .fillColor('#FFFFFF')
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('Description', 60, tableTop + 9)
+        .text('Quantity', 310, tableTop + 9)
+        .text('Price', 400, tableTop + 9)
+        .text('Amount', 480, tableTop + 9);
+
+      // Table row
+      const itemY = tableTop + 38;
+      doc.rect(50, itemY, 500, 32).strokeColor('#E5E7EB').lineWidth(1).stroke();
+      
+      doc
+        .fillColor('#1F2937')
+        .fontSize(10)
+        .font('Helvetica')
+        .text(booking.package.name, 60, itemY + 11)
+        .text(booking.numberOfTravelers.toString(), 310, itemY + 11)
+        .text(`$${booking.package.price}`, 400, itemY + 11)
+        .font('Helvetica-Bold')
+        .text(`$${invoice.totalAmount}`, 480, itemY + 11);
+
+      // Totals card
+      const totalsTop = itemY + 55;
+      doc.roundedRect(330, totalsTop, 220, 115, 8).fillAndStroke('#F9FAFB', '#E5E7EB');
+      
+      doc
+        .fillColor('#6B7280')
+        .fontSize(10)
+        .font('Helvetica')
+        .text('Subtotal:', 345, totalsTop + 18)
+        .text(`$${invoice.totalAmount}`, 480, totalsTop + 18)
+        .text('Tax (0%):', 345, totalsTop + 40)
+        .text('$0.00', 480, totalsTop + 40);
+      
+      doc.rect(345, totalsTop + 65, 190, 35).fillAndStroke('#3B82F6', '#3B82F6');
+      
+      doc
+        .fillColor('#FFFFFF')
         .fontSize(12)
-        .text('Bill To:', 50, 160)
-        .fontSize(10)
-        .text(user.name, 50, 180)
-        .text(user.email, 50, 195)
-        .text(user.phone || '', 50, 210);
+        .font('Helvetica-Bold')
+        .text('TOTAL:', 355, totalsTop + 76)
+        .fontSize(14)
+        .text(`$${invoice.totalAmount}`, 470, totalsTop + 75);
 
-      // Package Details
-      doc
-        .fontSize(12)
-        .text('Package Details:', 50, 250)
-        .fontSize(10)
-        .text(`Package: ${booking.package.name}`, 50, 270)
-        .text(`Travel Date: ${new Date(booking.travelDate).toLocaleDateString()}`, 50, 285)
-        .text(`Travelers: ${booking.numberOfTravelers}`, 50, 300);
-
-      // Table Header
-      const tableTop = 350;
-      doc
-        .fontSize(10)
-        .text('Description', 50, tableTop)
-        .text('Quantity', 300, tableTop)
-        .text('Price', 400, tableTop)
-        .text('Amount', 480, tableTop);
-
-      // Line
-      doc
-        .moveTo(50, tableTop + 20)
-        .lineTo(550, tableTop + 20)
-        .stroke();
-
-      // Table Row
-      const itemY = tableTop + 30;
-      doc
-        .text(booking.package.name, 50, itemY)
-        .text(booking.numberOfTravelers.toString(), 300, itemY)
-        .text(`$${booking.package.price}`, 400, itemY)
-        .text(`$${invoice.totalAmount}`, 480, itemY);
-
-      // Totals
-      const totalsTop = itemY + 50;
-      doc
-        .moveTo(50, totalsTop)
-        .lineTo(550, totalsTop)
-        .stroke();
-
-      doc
-        .fontSize(10)
-        .text('Subtotal:', 400, totalsTop + 20)
-        .text(`$${invoice.totalAmount}`, 480, totalsTop + 20)
-        .text('Tax (0%):', 400, totalsTop + 40)
-        .text('$0.00', 480, totalsTop + 40)
-        .fontSize(12)
-        .text('Total:', 400, totalsTop + 60)
-        .text(`$${invoice.totalAmount}`, 480, totalsTop + 60);
-
-      // Payment Info
+      // Payment info
       if (invoice.paidAmount > 0) {
+        const payY = totalsTop + 200;
         doc
-          .fontSize(10)
-          .text('Paid:', 400, totalsTop + 90)
-          .text(`$${invoice.paidAmount}`, 480, totalsTop + 90)
-          .text('Balance Due:', 400, totalsTop + 110)
-          .text(`$${invoice.totalAmount - invoice.paidAmount}`, 480, totalsTop + 110);
+          .fillColor('#10B981')
+          .fontSize(9)
+          .font('Helvetica-Bold')
+          .text('Paid:', 345, payY)
+          .text(`$${invoice.paidAmount}`, 480, payY);
+        
+        if (invoice.totalAmount - invoice.paidAmount > 0) {
+          doc
+            .fillColor('#EF4444')
+            .text('Balance:', 345, payY + 18)
+            .text(`$${invoice.totalAmount - invoice.paidAmount}`, 480, payY + 18);
+        }
       }
 
       // Footer
+      doc.rect(0, 750, 595, 92).fillAndStroke('#F9FAFB', '#F9FAFB');
+      
       doc
-        .fontSize(10)
-        .text('Thank you for your business!', 50, 700, { align: 'center' })
-        .text('For any queries, contact us at info@tripskyway.com', 50, 715, { align: 'center' });
+        .fillColor('#1F2937')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('Thank You For Your Business!', 50, 770, { align: 'center', width: 495 })
+        .fillColor('#6B7280')
+        .fontSize(9)
+        .font('Helvetica')
+        .text('For queries: info@tripskyway.com | +91 XXX XXX XXXX', 50, 790, { align: 'center', width: 495 });
 
       doc.end();
 
