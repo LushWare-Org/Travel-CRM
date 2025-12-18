@@ -52,7 +52,6 @@ const WebsiteAnalytics = () => {
     },
     trend: [],
     topDestinations: [],
-    activityPreferences: [],
     accommodationTypes: [],
     durationPreferences: [],
     priceRanges: [],
@@ -193,16 +192,15 @@ const WebsiteAnalytics = () => {
         </ChartContainer>
 
         <ChartContainer
-          title="Activity Preferences"
-          description="Most inquired activities by customers"
+          title="Price Range Distribution"
+          description="Customer inquiries by package price range"
         >
-          <PieChartComponent
-            data={data.activityPreferences || []}
-            dataKey="value"
-            nameKey="name"
-            height={360}
-            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6366f1", "#22c55e"]}
-            legendProps={{ align: "bottom", verticalAlign: "bottom", layout: "horizontal" }}
+          <BarChartComponent
+            data={data.priceRanges || []}
+            bars={[{ dataKey: "searches", fill: "#8b5cf6", name: "Inquiries" }]}
+            xAxisKey="range"
+            height={320}
+            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
           />
         </ChartContainer>
       </div>
@@ -235,18 +233,6 @@ const WebsiteAnalytics = () => {
           />
         </ChartContainer>
       </div>
-
-      <ChartContainer
-        title="Price Range Distribution"
-        description="Customer inquiries by package price range"
-      >
-        <BarChartComponent
-          data={data.priceRanges || []}
-          bars={[{ dataKey: "searches", fill: "#8b5cf6", name: "Inquiries" }]}
-          xAxisKey="range"
-          height={300}
-        />
-      </ChartContainer>
     </div>
   );
 };

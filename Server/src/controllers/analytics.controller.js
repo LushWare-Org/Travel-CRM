@@ -1177,7 +1177,7 @@ export const getSalesRepPersonalPerformance = asyncHandler(async (req, res) => {
 
 /**
  * Get Website Analytics Overview
- * Returns comprehensive website analytics including lead trends, destination analysis, activity preferences
+ * Returns comprehensive website analytics including lead trends, destination analysis
  * Shows actual lead inquiries (searches), bookings (conversions), and customer preferences
  * @route GET /api/v1/analytics/website/overview
  * @access Private/Admin
@@ -1298,26 +1298,6 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
     searches: item.searches,
     conversions: item.conversions,
     conversionRate: item.searches > 0 ? parseFloat(((item.conversions / item.searches) * 100).toFixed(1)) : 0,
-  }));
-
-  // Get activity preferences from itineraries
-  const activityAggregation = await Itinerary.aggregate([
-    { $unwind: '$days' },
-    { $unwind: '$days.activities' },
-    { $match: { 'days.activities': { $exists: true, $ne: '' } } },
-    {
-      $group: {
-        _id: '$days.activities',
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { count: -1 } },
-    { $limit: 10 },
-  ]);
-
-  const activityPreferences = activityAggregation.map((item) => ({
-    name: item._id,
-    value: item.count,
   }));
 
   // Get accommodation types from itineraries
@@ -1448,7 +1428,8 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
   const totalLeads = await Lead.countDocuments();
   const totalBookings = await Booking.countDocuments();
   const uniqueDestinations = await Lead.distinct('destination');
-  const uniqueActivities = activityAggregation.length;
+  const uniqueActivitiesData = await Itinerary.distinct('days.activities');
+  const uniqueActivities = uniqueActivitiesData.filter((a) => a && a !== '').length;
   const convertedLeads = await Lead.countDocuments({ status: 'converted' });
 
   const stats = {
@@ -1470,7 +1451,6 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
       stats,
       trend: trendData,
       topDestinations,
-      activityPreferences,
       accommodationTypes,
       durationPreferences: durationData,
       priceRanges,
