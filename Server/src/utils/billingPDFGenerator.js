@@ -1418,9 +1418,9 @@ export function generateReceiptPDF(receipt, invoice, lead) {
           .fontSize(10)
           .text(`Invoice #: ${invoice.invoiceNumber || 'N/A'}`, 50, invoiceY + 20)
           .text(`Total Invoice Amount: ${formatCurrency(invoice.totalAmount || 0)}`, 50, invoiceY + 35)
-          .text(`Previous Outstanding: ${formatCurrency(receipt.previousBalance || invoice.outstandingAmount || 0)}`, 50, invoiceY + 50)
-          .fillColor('#000000')
-          .text(`Remaining Balance: ${formatCurrency(receipt.outstandingBalance || 0)}`, 50, invoiceY + 65);
+          .text(`Previous Outstanding: ${formatCurrency(receipt.previousBalance || invoice?.outstandingAmount || 0)}`, 50, invoiceY + 50)
+          .fillColor((receipt.outstandingBalance || invoice?.outstandingAmount || 0) > 0 ? COLORS.error : COLORS.success)
+          .text(`Remaining Balance: ${formatCurrency(receipt.outstandingBalance || invoice?.outstandingAmount || 0)}`, 50, invoiceY + 65);
       }
 
       // ===== NOTES =====
