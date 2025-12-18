@@ -23,19 +23,53 @@ const loadLogo = () => {
   }
 };
 
+// Color Scheme matching billingPDFGenerator.js
+const PALETTE = {
+  background: [249, 250, 251],      // Light gray
+  secondaryBackground: [209, 213, 219], // Medium gray
+  primaryText: [31, 41, 55],        // Very dark gray/black
+  secondaryText: [75, 85, 99],      // Medium gray
+  mutedText: [107, 114, 128],       // Light gray
+  accent: [234, 88, 12],            // Orange-red (primary accent)
+  accentDark: [234, 179, 8],        // Yellow
+  badgeBg: [234, 88, 12],           // Orange-red
+  badgeText: [255, 255, 255],       // White
+  cardBg: [245, 245, 245],          // Very light gray
+  cardBorder: [156, 163, 175],      // Gray border
+  pillBg: [209, 213, 219],          // Light gray
+  timeline: [0, 0, 0],              // Black
+};
+
+// Convert RGB array to hex for PDFKit
+const rgbToHex = (rgb) => {
+  const [r, g, b] = rgb;
+  return `#${[r, g, b].map(x => {
+    const hex = x.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  }).join('')}`;
+};
+
 const COLORS = {
-  primary: '#EA580C',      // Orange-red
-  primaryDark: '#B43C08',   // Darker orange
+  primary: rgbToHex(PALETTE.accent),      // Orange-red
+  primaryDark: rgbToHex([180, 60, 8]),    // Darker orange
+  primaryLight: rgbToHex([251, 146, 60]), // Lighter orange
+  accent: rgbToHex(PALETTE.accentDark),   // Yellow
   white: '#FFFFFF',
   gray100: '#F9FAFB',
+  gray200: '#E5E7EB',
   gray600: '#4B5563',
   gray700: '#374151',
   gray800: '#1F2937',
   gray900: '#111827',
   success: '#10B981',
-  warning: '#F59E0B',
+  warning: rgbToHex(PALETTE.accentDark),
   error: '#EF4444',
 };
+
+// Helper function to format currency
+function formatCurrency(amount, currency = 'LKR') {
+  return `${currency} ${parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 /**
  * Generate payment history PDF
@@ -59,174 +93,226 @@ export function generatePaymentHistoryPDF(paymentHistory) {
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
 
-      // ===== HEADER =====
-      const headerHeight = 48;
-      const headerY = 8;
-      const headerX = 50;
-      const headerWidth = 495;
+      // ===== HEADER WITH WAVE DESIGN =====
+      const headerHeight = 100;
+      const headerY = 0;
+      const headerWidth = 595;
       
-      doc
-        .roundedRect(headerX, headerY, headerWidth, headerHeight, 6, 6)
-        .fillColor('#0C0C0C')
-        .fill();
+      // Draw black wave background
+      doc.rect(0, headerY, headerWidth, headerHeight).fillAndStroke('#000000', '#000000');
+      
+      // Draw bottom wave curve using bezier curves
+      doc.moveTo(0, headerHeight - 30)
+         .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
+         .lineTo(595, 0)
+         .lineTo(0, 0)
+         .fill('#000000');
+      
+      // Draw orange accent curve in top right
+      doc.moveTo(400, 0)
+         .bezierCurveTo(450, 40, 520, 60, 595, 50)
+         .lineTo(595, 0)
+         .fill('#F5A623');
 
-      let cursorX = headerX + 14;
+      let cursorX = 50;
       const logoBuffer = loadLogo();
       
+      // Add logo if available
       if (logoBuffer) {
         try {
-          const logoHeight = 14;
-          const logoWidth = 56;
-          doc.image(logoBuffer, cursorX, headerY + (headerHeight - logoHeight) / 2, {
+          const logoHeight = 20;
+          const logoWidth = 80;
+          doc.image(logoBuffer, cursorX, headerY + 25, {
             width: logoWidth,
             height: logoHeight,
             fit: [logoWidth, logoHeight],
           });
-          cursorX += logoWidth + 14;
+          cursorX += logoWidth + 12;
         } catch (error) {
           console.warn('[Payment History PDF] Failed to add logo:', error);
         }
       }
 
       doc
-        .fontSize(14)
         .fillColor(COLORS.white)
-        .text('Trip Sky Way', cursorX, headerY + 12, { lineGap: 0 })
-        .fontSize(8)
-        .fillColor('#D1D5DB')
-        .text('Payment History Record', cursorX, headerY + 28, { lineGap: 0 });
+        .fontSize(16)
+        .font('Helvetica-Bold')
+        .text('Trip Sky Way', cursorX, headerY + 25)
+        .fontSize(9)
+        .font('Helvetica')
+        .text('Curating inspired journeys', cursorX, headerY + 47);
 
-      // ===== CONTENT =====
-      let yPos = headerY + headerHeight + 30;
-
-      // Title
+      // Add PAYMENT HISTORY badge
+      const badgeX = 490;
+      const badgeY = headerY + 40;
+      doc.circle(badgeX, badgeY, 28).fillAndStroke(COLORS.white, COLORS.white);
+      
       doc
-        .fontSize(24)
-        .fillColor(COLORS.gray900)
-        .text('Payment History', headerX, yPos);
-      yPos += 35;
+        .fillColor('#000000')
+        .fontSize(6)
+        .font('Helvetica-Bold')
+        .text('PAYMENT', badgeX - 22, badgeY - 6, { width: 44, align: 'center' })
+        .text('HISTORY', badgeX - 22, badgeY + 1, { width: 44, align: 'center' });
 
-      // Payment History Number
+      // ===== INFO CARDS =====
+      let yPos = 140;
+      const cardWidth = 495;
+      const cardX = 50;
+      
+      // Payment History Info Card
+      doc.roundedRect(cardX, yPos, cardWidth, 85, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
       doc
-        .fontSize(12)
-        .fillColor(COLORS.gray700)
-        .text(`Payment History #: ${paymentHistory.paymentHistoryNumber || 'N/A'}`, headerX, yPos);
-      yPos += 20;
-
-      // Receipt Number
+        .fillColor('#D97706')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('PAYMENT HISTORY INFO', cardX + 15, yPos + 11);
+        
+      doc
+        .fillColor(rgbToHex(PALETTE.primaryText))
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Payment History #: ${paymentHistory.paymentHistoryNumber || 'N/A'}`, cardX + 15, yPos + 47);
+      
       if (paymentHistory.receipt?.receiptNumber) {
-        doc
-          .fontSize(12)
-          .fillColor(COLORS.gray700)
-          .text(`Receipt #: ${paymentHistory.receipt.receiptNumber}`, headerX, yPos);
-        yPos += 20;
+        doc.text(`Receipt #: ${paymentHistory.receipt.receiptNumber}`, cardX + 15, yPos + 64, { continued: true });
       }
-
-      // Invoice Number
+      
       if (paymentHistory.invoice?.invoiceNumber) {
+        const separator = paymentHistory.receipt?.receiptNumber ? '  |  ' : '';
         doc
-          .fontSize(12)
-          .fillColor(COLORS.gray700)
-          .text(`Invoice #: ${paymentHistory.invoice.invoiceNumber}`, headerX, yPos);
-        yPos += 20;
+          .fillColor(rgbToHex(PALETTE.secondaryText))
+          .fontSize(9.5)
+          .text(separator, { continued: paymentHistory.receipt?.receiptNumber })
+          .text(`Invoice #: ${paymentHistory.invoice.invoiceNumber}`);
       }
 
-      yPos += 10;
+      yPos += 100;
 
-      // Divider
-      doc
-        .moveTo(headerX, yPos)
-        .lineTo(headerX + headerWidth, yPos)
-        .strokeColor(COLORS.gray600)
-        .lineWidth(1)
-        .stroke();
-      yPos += 20;
-
-      // Customer Information
-      doc
-        .fontSize(14)
-        .fillColor(COLORS.gray900)
-        .text('Customer Information', headerX, yPos);
-      yPos += 20;
-
+      // Customer Information Card
       const customer = paymentHistory.customer || paymentHistory.lead;
       if (customer) {
+        doc.roundedRect(cardX, yPos, cardWidth, 90, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+        doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+        
         doc
+          .fillColor('#D97706')
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .text('BILL TO', cardX + 15, yPos + 11);
+          
+        doc
+          .fillColor(rgbToHex(PALETTE.primaryText))
           .fontSize(10)
-          .fillColor(COLORS.gray700)
-          .text(`Name: ${customer.name || 'N/A'}`, headerX, yPos);
-        yPos += 15;
-        doc.text(`Email: ${customer.email || 'N/A'}`, headerX, yPos);
-        yPos += 15;
-        doc.text(`Phone: ${customer.phone || 'N/A'}`, headerX, yPos);
-        yPos += 20;
+          .font('Helvetica-Bold')
+          .text(customer.name || 'N/A', cardX + 15, yPos + 47)
+          .font('Helvetica')
+          .fontSize(9.5)
+          .fillColor(rgbToHex(PALETTE.secondaryText))
+          .text(customer.email || 'N/A', cardX + 15, yPos + 64)
+          .text(customer.phone || 'N/A', cardX + 15, yPos + 79);
+        
+        yPos += 105;
       }
 
-      // Payment Details
+      // Payment Details Card
+      doc.roundedRect(cardX, yPos, cardWidth, 145, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
       doc
+        .fillColor('#D97706')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('PAYMENT DETAILS', cardX + 15, yPos + 11);
+      
+      let detailY = yPos + 47;
+      
+      // Amount (Large, prominent)
+      doc
+        .fillColor('#F5A623')
         .fontSize(14)
-        .fillColor(COLORS.gray900)
-        .text('Payment Details', headerX, yPos);
-      yPos += 20;
-
-      doc
-        .fontSize(10)
-        .fillColor(COLORS.gray700)
-        .text(`Amount: ${paymentHistory.currency || 'LKR'} ${paymentHistory.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`, headerX, yPos);
-      yPos += 15;
-
+        .font('Helvetica-Bold')
+        .text('Amount:', cardX + 15, detailY)
+        .fontSize(16)
+        .text(formatCurrency(paymentHistory.amount, paymentHistory.currency || 'LKR'), cardX + 15, detailY + 18);
+      
+      detailY += 50;
+      
       const paymentDate = paymentHistory.paymentDate ? new Date(paymentHistory.paymentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
-      doc.text(`Payment Date: ${paymentDate}`, headerX, yPos);
-      yPos += 15;
-
       const paymentMethod = paymentHistory.paymentMethod ? paymentHistory.paymentMethod.charAt(0).toUpperCase() + paymentHistory.paymentMethod.slice(1).replace(/-/g, ' ') : 'N/A';
-      doc.text(`Payment Method: ${paymentMethod}`, headerX, yPos);
-      yPos += 15;
-
-      if (paymentHistory.transactionId) {
-        doc.text(`Transaction ID: ${paymentHistory.transactionId}`, headerX, yPos);
-        yPos += 15;
-      }
-
       const paymentType = paymentHistory.paymentType ? paymentHistory.paymentType.charAt(0).toUpperCase() + paymentHistory.paymentType.slice(1).replace(/-/g, ' ') : 'N/A';
-      doc.text(`Payment Type: ${paymentType}`, headerX, yPos);
-      yPos += 20;
-
-      // Status
+      
       doc
-        .fontSize(14)
-        .fillColor(COLORS.gray900)
-        .text('Status', headerX, yPos);
-      yPos += 20;
+        .fillColor(rgbToHex(PALETTE.secondaryText))
+        .fontSize(9.5)
+        .font('Helvetica')
+        .text(`Payment Date: ${paymentDate}`, cardX + 15, detailY)
+        .text(`Payment Method: ${paymentMethod}`, cardX + 15, detailY + 15)
+        .text(`Payment Type: ${paymentType}`, cardX + 15, detailY + 30);
+      
+      if (paymentHistory.transactionId) {
+        doc.text(`Transaction ID: ${paymentHistory.transactionId}`, cardX + 15, detailY + 45);
+      }
+      
+      yPos += 160;
 
+      // Status Card
       const status = paymentHistory.status ? paymentHistory.status.charAt(0).toUpperCase() + paymentHistory.status.slice(1) : 'Pending';
+      const statusColor = paymentHistory.status === 'completed' ? '#10B981' : paymentHistory.status === 'pending' ? '#F59E0B' : '#EF4444';
+      
+      doc.roundedRect(cardX, yPos, cardWidth, 60, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
       doc
-        .fontSize(10)
-        .fillColor(COLORS.gray700)
-        .text(`Status: ${status}`, headerX, yPos);
-      yPos += 20;
+        .fillColor('#D97706')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('STATUS', cardX + 15, yPos + 11);
+      
+      doc
+        .fontSize(12)
+        .fillColor(statusColor)
+        .font('Helvetica-Bold')
+        .text(status, cardX + 15, yPos + 45);
+      
+      yPos += 75;
 
-      // Notes
+      // Notes Card (if exists)
       if (paymentHistory.notes) {
+        doc.roundedRect(cardX, yPos, cardWidth, 100, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+        doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+        
         doc
-          .fontSize(14)
-          .fillColor(COLORS.gray900)
-          .text('Notes', headerX, yPos);
-        yPos += 20;
+          .fillColor('#D97706')
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .text('NOTES', cardX + 15, yPos + 11);
+        
         doc
-          .fontSize(10)
-          .fillColor(COLORS.gray700)
-          .text(paymentHistory.notes, headerX, yPos, { width: headerWidth });
-        yPos += 30;
+          .fillColor(rgbToHex(PALETTE.secondaryText))
+          .fontSize(9)
+          .font('Helvetica')
+          .text(paymentHistory.notes, cardX + 15, yPos + 47, { width: cardWidth - 30, lineGap: 2 });
       }
 
-      // Footer
-      const footerY = 750;
+      // ===== FOOTER WAVE =====
+      const pageHeight = 842;
+      const waveY = pageHeight - 80;
+      
+      // Draw orange wave at bottom
+      doc.moveTo(0, waveY)
+         .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
+         .lineTo(595, pageHeight)
+         .lineTo(0, pageHeight)
+         .fill('#F5A623');
+
+      // Footer text
       doc
         .fontSize(8)
-        .fillColor(COLORS.gray600)
-        .text('Generated by Trip Sky Way', headerX, footerY)
-        .text(`Generated on: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, headerX, footerY + 12);
+        .fillColor('#000000')
+        .text('Generated by Trip Sky Way', 50, waveY - 30)
+        .text(`Generated on: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 50, waveY - 18);
 
       doc.end();
 
@@ -266,58 +352,89 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
 
-      // ===== HEADER =====
-      const headerHeight = 48;
-      const headerY = 8;
-      const headerX = 50;
-      const headerWidth = 495;
+      // ===== HEADER WITH WAVE DESIGN =====
+      const headerHeight = 100;
+      const headerY = 0;
+      const headerWidth = 595;
       
-      doc
-        .roundedRect(headerX, headerY, headerWidth, headerHeight, 6, 6)
-        .fillColor('#0C0C0C')
-        .fill();
+      // Draw black wave background
+      doc.rect(0, headerY, headerWidth, headerHeight).fillAndStroke('#000000', '#000000');
+      
+      // Draw bottom wave curve using bezier curves
+      doc.moveTo(0, headerHeight - 30)
+         .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
+         .lineTo(595, 0)
+         .lineTo(0, 0)
+         .fill('#000000');
+      
+      // Draw orange accent curve in top right
+      doc.moveTo(400, 0)
+         .bezierCurveTo(450, 40, 520, 60, 595, 50)
+         .lineTo(595, 0)
+         .fill('#F5A623');
 
-      let cursorX = headerX + 14;
+      let cursorX = 50;
       const logoBuffer = loadLogo();
       
+      // Add logo if available
       if (logoBuffer) {
         try {
-          const logoHeight = 14;
-          const logoWidth = 56;
-          doc.image(logoBuffer, cursorX, headerY + (headerHeight - logoHeight) / 2, {
+          const logoHeight = 20;
+          const logoWidth = 80;
+          doc.image(logoBuffer, cursorX, headerY + 25, {
             width: logoWidth,
             height: logoHeight,
             fit: [logoWidth, logoHeight],
           });
-          cursorX += logoWidth + 14;
+          cursorX += logoWidth + 12;
         } catch (error) {
           console.warn('[Payment History List PDF] Failed to add logo:', error);
         }
       }
 
       doc
-        .fontSize(14)
         .fillColor(COLORS.white)
-        .text('Trip Sky Way', cursorX, headerY + 12, { lineGap: 0 })
-        .fontSize(8)
-        .fillColor('#D1D5DB')
-        .text('Payment History Report', cursorX, headerY + 28, { lineGap: 0 });
+        .fontSize(16)
+        .font('Helvetica-Bold')
+        .text('Trip Sky Way', cursorX, headerY + 25)
+        .fontSize(9)
+        .font('Helvetica')
+        .text('Curating inspired journeys', cursorX, headerY + 47);
+
+      // Add REPORT badge
+      const badgeX = 490;
+      const badgeY = headerY + 40;
+      doc.circle(badgeX, badgeY, 28).fillAndStroke(COLORS.white, COLORS.white);
+      
+      doc
+        .fillColor('#000000')
+        .fontSize(7)
+        .font('Helvetica-Bold')
+        .text('REPORT', badgeX - 20, badgeY - 3, { width: 40, align: 'center' });
 
       // ===== CONTENT =====
-      let yPos = headerY + headerHeight + 30;
+      let yPos = 140;
+      const cardX = 50;
+      const cardWidth = 495;
 
-      // Title
+      // Title Card
+      doc.roundedRect(cardX, yPos, cardWidth, 105, 10).fillAndStroke('#FFFFFF', '#FCD34D');
+      doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
+      
       doc
-        .fontSize(24)
-        .fillColor(COLORS.gray900)
-        .text('Payment History Report', headerX, yPos);
-      yPos += 25;
-
+        .fillColor('#D97706')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('PAYMENT HISTORY REPORT', cardX + 15, yPos + 11);
+      
+      yPos += 47;
+      
       // Date Range Info
       if (dateRange.startDate || dateRange.endDate) {
         doc
           .fontSize(10)
-          .fillColor(COLORS.gray700);
+          .fillColor(rgbToHex(PALETTE.secondaryText))
+          .font('Helvetica');
         
         let dateRangeText = 'Date Range: ';
         if (dateRange.startDate && dateRange.endDate) {
@@ -328,87 +445,111 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
           dateRangeText += `Until ${new Date(dateRange.endDate).toLocaleDateString()}`;
         }
         
-        doc.text(dateRangeText, headerX, yPos);
-        yPos += 20;
+        doc.text(dateRangeText, cardX + 15, yPos);
+        yPos += 18;
       }
 
       // Total Records
       doc
         .fontSize(10)
-        .fillColor(COLORS.gray700)
-        .text(`Total Records: ${paymentHistoryList.length}`, headerX, yPos);
-      yPos += 25;
+        .fillColor(rgbToHex(PALETTE.primaryText))
+        .font('Helvetica-Bold')
+        .text(`Total Records: ${paymentHistoryList.length}`, cardX + 15, yPos);
+      
+      yPos += 60;
 
-      // Divider
-      doc
-        .moveTo(headerX, yPos)
-        .lineTo(headerX + headerWidth, yPos)
-        .strokeColor(COLORS.gray600)
-        .lineWidth(1)
-        .stroke();
-      yPos += 20;
-
-      // Table Header
-      const tableStartY = yPos;
-      const rowHeight = 20;
+      // ===== TABLE =====
+      const tableTop = yPos;
+      const tableLeft = 50;
+      const tableWidth = 495;
+      const rowHeight = 35;
+      
+      // Define column widths and positions
       const colWidths = {
-        number: 50,
-        date: 80,
-        customer: 120,
-        amount: 80,
-        method: 80,
-        invoice: 70,
-        receipt: 70,
-        status: 60,
+        number: 30,
+        date: 70,
+        customer: 110,
+        amount: 70,
+        method: 75,
+        type: 70,
+        status: 70,
       };
       
-      let colX = headerX;
-      
-      // Header Background
-      doc
-        .roundedRect(headerX, yPos, headerWidth, rowHeight, 4, 4)
-        .fillColor(COLORS.gray100)
-        .fill();
+      // Orange table header
+      doc.rect(tableLeft, tableTop, tableWidth, 28).fillAndStroke('#F5A623', '#F5A623');
 
-      // Header Text
+      // Table Header Text
+      let colX = tableLeft + 5;
       doc
-        .fontSize(9)
-        .fillColor(COLORS.gray900)
-        .font('Helvetica-Bold');
+        .fillColor(COLORS.white)
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .text('#', colX, tableTop + 10)
+        colX += colWidths.number;
       
-      colX = headerX + 5;
-      doc.text('#', colX, yPos + 6);
-      colX += colWidths.number;
-      
-      doc.text('Date', colX, yPos + 6);
+      doc.text('DATE', colX, tableTop + 10);
       colX += colWidths.date;
       
-      doc.text('Customer', colX, yPos + 6);
+      doc.text('CUSTOMER', colX, tableTop + 10);
       colX += colWidths.customer;
       
-      doc.text('Amount', colX, yPos + 6);
+      doc.text('AMOUNT', colX, tableTop + 10);
       colX += colWidths.amount;
       
-      doc.text('Method', colX, yPos + 6);
+      doc.text('METHOD', colX, tableTop + 10);
       colX += colWidths.method;
       
-      doc.text('Invoice', colX, yPos + 6);
-      colX += colWidths.invoice;
+      doc.text('TYPE', colX, tableTop + 10);
+      colX += colWidths.type;
       
-      doc.text('Receipt', colX, yPos + 6);
-      colX += colWidths.receipt;
+      doc.text('STATUS', colX, tableTop + 10);
+
       
-      doc.text('Status', colX, yPos + 6);
+      let rowY = tableTop + 28;
+      const pageHeight = 842;
+      const pageMarginBottom = 100;
       
-      yPos += rowHeight + 5;
-      doc.font('Helvetica'); // Reset to normal font
+      // Helper function to add new page with table header
+      const addNewPageWithHeader = () => {
+        doc.addPage();
+        rowY = 50;
+        
+        // Re-draw table header
+        doc.rect(tableLeft, rowY, tableWidth, 28).fillAndStroke('#F5A623', '#F5A623');
+        
+        let colX = tableLeft + 5;
+        doc
+          .fillColor(COLORS.white)
+          .fontSize(8)
+          .font('Helvetica-Bold')
+          .text('#', colX, rowY + 10);
+        colX += colWidths.number;
+        
+        doc.text('DATE', colX, rowY + 10);
+        colX += colWidths.date;
+        
+        doc.text('CUSTOMER', colX, rowY + 10);
+        colX += colWidths.customer;
+        
+        doc.text('AMOUNT', colX, rowY + 10);
+        colX += colWidths.amount;
+        
+        doc.text('METHOD', colX, rowY + 10);
+        colX += colWidths.method;
+        
+        doc.text('TYPE', colX, rowY + 10);
+        colX += colWidths.type;
+        
+        doc.text('STATUS', colX, rowY + 10);
+        
+        rowY += 28;
+      };
 
       // Table Rows
       paymentHistoryList.forEach((record, index) => {
         // Check if we need a new page
-        if (yPos > 700) {
-          doc.addPage();
-          yPos = 50;
+        if (rowY + rowHeight > pageHeight - pageMarginBottom) {
+          addNewPageWithHeader();
         }
 
         const customer = record.customer || record.lead;
@@ -416,70 +557,93 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         const paymentDate = record.paymentDate 
           ? new Date(record.paymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           : 'N/A';
-        const amount = `${record.currency || 'LKR'} ${record.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`;
+        const amount = formatCurrency(record.amount, record.currency || 'LKR');
         const method = record.paymentMethod 
           ? record.paymentMethod.charAt(0).toUpperCase() + record.paymentMethod.slice(1).replace(/-/g, ' ')
           : 'N/A';
-        const invoiceNum = record.invoice?.invoiceNumber || 'N/A';
-        const receiptNum = record.receipt?.receiptNumber || 'N/A';
+        const type = record.paymentType 
+          ? record.paymentType.charAt(0).toUpperCase() + record.paymentType.slice(1).replace(/-/g, ' ')
+          : 'N/A';
         const status = record.status 
           ? record.status.charAt(0).toUpperCase() + record.status.slice(1)
           : 'Pending';
 
-        // Row background (alternating)
-        if (index % 2 === 0) {
-          doc
-            .rect(headerX, yPos - 2, headerWidth, rowHeight)
-            .fillColor(COLORS.gray100)
-            .fill();
-        }
+        // Row background - White
+        doc
+          .rect(tableLeft, rowY, tableWidth, rowHeight)
+          .fillColor('#FFFFFF')
+          .fill();
+
+        // Row Border
+        doc
+          .rect(tableLeft, rowY, tableWidth, rowHeight)
+          .strokeColor('#E5E7EB')
+          .lineWidth(0.5)
+          .stroke();
 
         // Row text
+        let colX = tableLeft + 5;
         doc
           .fontSize(8)
-          .fillColor(COLORS.gray700);
-
-        colX = headerX + 5;
-        doc.text(`${index + 1}`, colX, yPos + 4);
+          .fillColor(rgbToHex(PALETTE.primaryText))
+          .font('Helvetica');
+        
+        doc.text(`${index + 1}`, colX, rowY + 12);
         colX += colWidths.number;
         
-        doc.text(paymentDate, colX, yPos + 4);
+        doc.text(paymentDate, colX, rowY + 12, { width: colWidths.date - 5 });
         colX += colWidths.date;
         
         // Truncate customer name if too long
-        const maxCustomerWidth = colWidths.customer - 5;
-        const customerText = customerName.length > 20 ? customerName.substring(0, 17) + '...' : customerName;
-        doc.text(customerText, colX, yPos + 4, { width: maxCustomerWidth });
+        const customerText = customerName.length > 18 ? customerName.substring(0, 15) + '...' : customerName;
+        doc.text(customerText, colX, rowY + 12, { width: colWidths.customer - 5 });
         colX += colWidths.customer;
         
-        doc.text(amount, colX, yPos + 4);
+        doc
+          .fillColor('#F5A623')
+          .font('Helvetica-Bold')
+          .text(amount, colX, rowY + 12, { width: colWidths.amount - 5 })
+          .fillColor(rgbToHex(PALETTE.primaryText))
+          .font('Helvetica');
         colX += colWidths.amount;
         
-        doc.text(method, colX, yPos + 4, { width: colWidths.method - 5 });
+        doc.text(method, colX, rowY + 12, { width: colWidths.method - 5 });
         colX += colWidths.method;
         
-        doc.text(invoiceNum, colX, yPos + 4, { width: colWidths.invoice - 5 });
-        colX += colWidths.invoice;
+        doc.text(type, colX, rowY + 12, { width: colWidths.type - 5 });
+        colX += colWidths.type;
         
-        doc.text(receiptNum, colX, yPos + 4, { width: colWidths.receipt - 5 });
-        colX += colWidths.receipt;
-        
-        doc.text(status, colX, yPos + 4, { width: colWidths.status - 5 });
+        // Status with color
+        const statusColor = status === 'Completed' ? '#10B981' : status === 'Pending' ? '#F59E0B' : '#EF4444';
+        doc
+          .fillColor(statusColor)
+          .font('Helvetica-Bold')
+          .text(status, colX, rowY + 12, { width: colWidths.status - 5 });
 
-        yPos += rowHeight + 2;
+        rowY += rowHeight;
       });
 
-      // Footer
+      // ===== FOOTER WAVE =====
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
-        const footerY = 750;
+        
+        const waveY = pageHeight - 80;
+        
+        // Draw orange wave at bottom
+        doc.moveTo(0, waveY)
+           .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
+           .lineTo(595, pageHeight)
+           .lineTo(0, pageHeight)
+           .fill('#F5A623');
+
+        // Footer text
         doc
           .fontSize(8)
-          .fillColor(COLORS.gray600)
-          .text('Generated by Trip Sky Way', headerX, footerY)
-          .text(`Generated on: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, headerX, footerY + 12)
-          .text(`Page ${i + 1} of ${pages.count}`, headerX + headerWidth - 50, footerY);
+          .fillColor('#000000')
+          .text('Generated by Trip Sky Way', 50, waveY - 30)
+          .text(`Generated on: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 50, waveY - 18)
+          .text(`Page ${i + 1} of ${pages.count}`, tableLeft + tableWidth - 60, waveY - 30);
       }
 
       doc.end();
