@@ -5,7 +5,7 @@ import Itinerary from '../models/itinerary.model.js';
 import Package from '../models/package.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { COUNTRY_NAMES, normalizeString } from '../utils/countryUtils.js';
-import ItineraryAnalyticsService from '../services/itineraryAnalytics.service.js';
+import PackageAnalyticsService from '../services/itineraryAnalytics.service.js';
 
 const STATUS_LABELS = {
   new: 'New',
@@ -804,18 +804,15 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
 
   try {
     // Get analytics overview from service
-    const overview = await ItineraryAnalyticsService.getAnalyticsOverview({
+    const overview = await PackageAnalyticsService.getAnalyticsOverview({
       timeRange: timeRange || 'monthly',
     });
 
     // Get most inquired packages
-    const mostInquired = await ItineraryAnalyticsService.getMostInquired(5);
+    const mostInquired = await PackageAnalyticsService.getMostInquired(5);
 
-    // Get destination performance
-    const destinationPerformance = await ItineraryAnalyticsService.getDestinationPerformance(5);
-
-    // Get activity preferences
-    const activityPreferences = await ItineraryAnalyticsService.getActivityPreferences(5);
+    // Get destination performance with time range filter
+    const destinationPerformance = await PackageAnalyticsService.getDestinationPerformance(100, timeRange);
 
     return res.status(200).json({
       success: true,
@@ -826,7 +823,6 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
         trend: overview.trend,
         mostInquired,
         destinationPerformance,
-        activityPreferences,
       },
     });
   } catch (error) {

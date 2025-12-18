@@ -1,7 +1,12 @@
 /**
- * Itinerary Analytics Service
- * Handles all analytics calculations for itineraries including
- * trends, performance metrics, and aggregated data
+ * Package Analytics Service
+ * Handles analytics calculations for published packages including:
+ * - Inquiries: Leads created from booking/customization requests for published packages
+ * - Conversions: Leads with status='converted' for published packages
+ * - Trends, performance metrics, and aggregated data
+ * 
+ * Note: Only published packages (status='published') are included in analytics.
+ * Website contact form leads (no package reference) are excluded.
  */
 
 import Itinerary from '../models/itinerary.model.js';
@@ -10,12 +15,19 @@ import CustomizedPackage from '../models/customizedPackage.model.js';
 import Lead from '../models/lead.model.js';
 import logger from '../config/logger.js';
 
-class ItineraryAnalyticsService {
+class PackageAnalyticsService {
   /**
-   * Get overall itinerary analytics overview
-   * Includes total published packages, inquiries, and conversions
+   * Get overall package analytics overview
+   * Tracks published packages, inquiries (leads from bookings/customizations), and conversions
+   * 
    * @param {Object} filters - Filter options (timeRange, destination, category, etc.)
-   * @returns {Promise<Object>} Analytics overview data
+   * @returns {Promise<Object>} Analytics overview with stats and trend data
+   * 
+   * Metrics:
+   * - totalItineraries: Count of published packages
+   * - totalInquiries: Count of leads linked to published packages (booking/customization inquiries)
+   * - totalConversions: Count of leads with status='converted' for published packages
+   * - conversionRate: Percentage of inquiries that became conversions
    */
   static async getAnalyticsOverview(filters = {}) {
     try {
@@ -30,20 +42,21 @@ class ItineraryAnalyticsService {
       const totalPackages = await Package.countDocuments(query);
 
       // Get published package IDs for filtering leads
-      const publishedPackageIds = (await Package.find({ status: 'published' }).select('_id')).map(p => p._id);
+      const publishedPackageIds = (await Package.find(query).select('_id')).map(p => p._id);
 
-      // Count inquiries (leads with published packages only)
+      // Count inquiries = leads with published packages
+      // These are leads created from booking/customization requests (sources: 'booking', 'website')
       const totalInquiries = await Lead.countDocuments({
-        package: { $in: publishedPackageIds }
+        package: { $in: publishedPackageIds },
       });
 
-      // Count conversions (converted leads with published packages)
+      // Count conversions = leads with status='converted' for published packages
       const totalConversions = await Lead.countDocuments({
         package: { $in: publishedPackageIds },
-        status: 'converted'
+        status: 'converted',
       });
 
-      // Calculate conversion rate
+      // Calculate conversion rate: (conversions / inquiries) * 100
       const conversionRate = totalInquiries > 0
         ? ((totalConversions / totalInquiries) * 100).toFixed(2)
         : 0;
@@ -65,15 +78,21 @@ class ItineraryAnalyticsService {
 
   /**
    * Get most inquired published packages
-   * @param {number} limit - Number of results to return
-   * @returns {Promise<Array>} Top inquired packages
+   * Ranks packages by number of leads (booking/customization inquiries) received
+   * Only includes packages with status='published'
+   * 
+   * @param {number} limit - Number of results to return (default: 5)
+   * @returns {Promise<Array>} Top inquired packages with inquiry/conversion counts
    */
   static async getMostInquired(limit = 5) {
     try {
-      // Get all leads with published packages grouped by package
+      // Get published package IDs
+      const publishedPackageIds = (await Package.find({ status: 'published' }).select('_id')).map(p => p._id);
+
+      // Get leads with published packages grouped by package
       const leadAggregation = await Lead.aggregate([
         {
-          $match: { package: { $exists: true, $ne: null } },
+          $match: { package: { $in: publishedPackageIds } },
         },
         {
           $group: {
@@ -98,8 +117,8 @@ class ItineraryAnalyticsService {
           const pkg = await Package.findById(item._id)
             .select('name destination price rating status');
 
-          // Only include published packages
-          if (!pkg || pkg.status !== 'published') {
+          // Skip if package not found (should not happen since we filtered by published IDs)
+          if (!pkg) {
             return null;
           }
 
@@ -121,11 +140,31 @@ class ItineraryAnalyticsService {
 
   /**
    * Get destination performance from published packages
-   * @param {number} limit - Number of results to return
-   * @returns {Promise<Array>} Top destinations
+   * Shows inquiry and conversion metrics grouped by destination for all destinations
+   * Filters results based on time range and returns all destinations sorted by inquiries
+   * Only includes published packages and their associated leads
+   * 
+   * @param {number} limit - Maximum number of results to return (default: 5, not enforced for all destinations)
+   * @param {string} timeRange - Time range: 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
+   * @returns {Promise<Array>} All destinations with performance metrics sorted by inquiries
    */
-  static async getDestinationPerformance(limit = 5) {
+  static async getDestinationPerformance(limit = 5, timeRange = 'monthly') {
     try {
+      // Calculate time range
+      const now = new Date();
+      let startDate = new Date();
+
+      if (timeRange === 'daily') {
+        startDate.setDate(now.getDate() - 1);
+      } else if (timeRange === 'weekly') {
+        startDate.setDate(now.getDate() - 7);
+      } else if (timeRange === 'monthly') {
+        startDate.setMonth(now.getMonth() - 1);
+      } else if (timeRange === 'annual') {
+        startDate.setFullYear(now.getFullYear() - 1);
+      }
+
+      // Get all published packages grouped by destination (NO LIMIT on aggregation)
       const destinations = await Package.aggregate([
         {
           $match: { status: 'published' },
@@ -140,9 +179,6 @@ class ItineraryAnalyticsService {
         {
           $sort: { totalPackages: -1 },
         },
-        {
-          $limit: limit,
-        },
       ]);
 
       // Enrich with inquiry and conversion data from leads
@@ -156,19 +192,22 @@ class ItineraryAnalyticsService {
           
           const packageIds = packagesForDestination.map(p => p._id);
 
-          // Count leads that reference these packages
-          const leads = await Lead.countDocuments({
-            package: { $in: packageIds }
+          // Count leads (inquiries) that reference these packages within time range
+          const inquiries = await Lead.countDocuments({
+            package: { $in: packageIds },
+            createdAt: { $gte: startDate, $lte: now }
           });
 
+          // Count conversions for these packages within time range
           const conversions = await Lead.countDocuments({
             package: { $in: packageIds },
             status: 'converted',
+            createdAt: { $gte: startDate, $lte: now }
           });
 
           return {
             destination: dest._id || 'Unknown',
-            inquiries: leads || 0,
+            inquiries: inquiries || 0,
             conversions: conversions || 0,
             avgPrice: Math.round(dest.avgPrice || 0),
             totalPackages: dest.totalPackages || 0,
@@ -176,7 +215,9 @@ class ItineraryAnalyticsService {
         })
       );
 
-      return enriched.filter(item => item.destination !== 'Unknown');
+      return enriched
+        .filter(item => item.destination !== 'Unknown')
+        .sort((a, b) => b.inquiries - a.inquiries);
     } catch (error) {
       logger.error('Error in getDestinationPerformance:', error);
       throw error;
@@ -184,14 +225,12 @@ class ItineraryAnalyticsService {
   }
 
   /**
-   * Get activity preferences
-   * @param {number} limit - Number of results to return
-   * @returns {Promise<Array>} Top activities
-   */
-  /**
    * Get activity preferences from published packages
-   * @param {number} limit - Number of results to return
-   * @returns {Promise<Array>} Top activities
+   * Shows most common activities across all published itineraries
+   * and estimates conversion counts based on overall conversion ratio
+   * 
+   * @param {number} limit - Number of results to return (default: 5)
+   * @returns {Promise<Array>} Top activities with inquiry/conversion estimates
    */
   static async getActivityPreferences(limit = 5) {
     try {
@@ -224,11 +263,12 @@ class ItineraryAnalyticsService {
       ]);
 
       // Get conversion ratio from published packages
+      // This is used to estimate conversions per activity
       const totalPublishedInquiries = await Lead.countDocuments({ package: { $in: publishedPackageIds } });
       const totalPublishedConversions = await Lead.countDocuments({ package: { $in: publishedPackageIds }, status: 'converted' });
       const conversionRatio = totalPublishedInquiries > 0 ? totalPublishedConversions / totalPublishedInquiries : 0;
 
-      // Map activities with inquiry and actual conversion counts
+      // Map activities with inquiry count and estimated conversion count
       const result = activities.map((activity) => ({
         name: activity._id || 'Activity',
         inquiries: activity.count,
@@ -291,9 +331,11 @@ class ItineraryAnalyticsService {
   }
 
   /**
-   * Get trend data based on time range
-   * @param {string} timeRange - Time range (daily, weekly, monthly, annual)
-   * @returns {Promise<Array>} Trend data
+   * Get trend data showing inquiries and conversions over time
+   * Only includes leads for published packages in the specified time range
+   * 
+   * @param {string} timeRange - Time range: 'daily', 'weekly', 'monthly', 'annual' (default: 'monthly')
+   * @returns {Promise<Array>} Trend data with monthly inquiries and conversions
    */
   static async getTrendData(timeRange = 'monthly') {
     try {
@@ -315,7 +357,7 @@ class ItineraryAnalyticsService {
       // Get published package IDs
       const publishedPackageIds = (await Package.find({ status: 'published' }).select('_id')).map(p => p._id);
 
-      // Get leads created in the time range for published packages only
+      // Get leads (inquiries) created in the time range for published packages only
       const trendData = await Lead.aggregate([
         {
           $match: {
@@ -387,4 +429,4 @@ class ItineraryAnalyticsService {
   }
 }
 
-export default ItineraryAnalyticsService;
+export default PackageAnalyticsService;

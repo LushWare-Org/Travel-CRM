@@ -12,8 +12,12 @@ import AnalyticsService from "../../../../services/analytics.service";
 
 /**
  * PackageAnalytics Component
- * Displays package analytics for published packages only
- * Shows inquiries, conversions, and activity insights
+ * Displays analytics for published packages including:
+ * - Inquiries: Leads created from booking/customization requests
+ * - Conversions: Leads with status='converted'
+ * 
+ * Metrics are tracked only for published packages (status='published').
+ * Website contact form leads (without package reference) are excluded.
  */
 const PackageAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
@@ -63,7 +67,6 @@ const PackageAnalytics = () => {
     trend: [],
     mostInquired: [],
     destinationPerformance: [],
-    activityPreferences: [],
   };
 
   return (
@@ -72,7 +75,7 @@ const PackageAnalytics = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Package Analytics</h2>
-          <p className="text-gray-600 mt-1">Insights on published packages, inquiries, and conversions</p>
+          <p className="text-gray-600 mt-1">Track leads from published packages - booking/customization inquiries and conversions</p>
           {error && <p className="text-red-600 text-sm mt-1">Error: {error}</p>}
         </div>
         <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
@@ -82,7 +85,7 @@ const PackageAnalytics = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           icon={MapPin}
-          label="Total Packages"
+          label="Published Packages"
           value={data.stats.totalItineraries.toString()}
           trend="+12%"
           trendDirection="up"
@@ -91,7 +94,7 @@ const PackageAnalytics = () => {
         />
         <StatCard
           icon={TrendingUp}
-          label="Total Inquiries"
+          label="Lead Inquiries"
           value={data.stats.totalInquiries.toString()}
           trend="+8%"
           trendDirection="up"
@@ -100,7 +103,7 @@ const PackageAnalytics = () => {
         />
         <StatCard
           icon={ShoppingCart}
-          label="Conversions"
+          label="Conversions (Booked)"
           value={data.stats.totalConversions.toString()}
           trend="+5%"
           trendDirection="up"
@@ -111,8 +114,8 @@ const PackageAnalytics = () => {
 
       {/* Package Trend Chart */}
       <ChartContainer
-        title="Package Performance Trend"
-        description="Monthly inquiries and conversions"
+        title="Package Inquiry & Conversion Trend"
+        description="Monthly trends of booking/customization inquiries and conversions for published packages"
       >
         <LineChartComponent
           data={data.trend}
@@ -122,42 +125,19 @@ const PackageAnalytics = () => {
         />
       </ChartContainer>
 
-      {/* Additional breakdown charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Destination Performance and Top Packages */}
+      <div className="grid grid-cols-1 gap-6">
         <ChartContainer
           title="Destination Performance"
-          description="Most inquired and converted destinations"
+          description="Inquiries (leads) and conversions by destination from published packages"
         >
           <BarChartComponent
             data={data.destinationPerformance}
             bars={destinationBars}
             xAxisKey="destination"
-            height={320}
-            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+            height={400}
+            margin={{ top: 5, right: 30, left: 0, bottom: 100 }}
           />
-        </ChartContainer>
-
-        <ChartContainer
-          title="Activity Preferences"
-          description="Most inquired and converted activities"
-        >
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {(data.activityPreferences || []).map((activity, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-900">{activity.name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-blue-600">{activity.inquiries}</p>
-                  <p className="text-xs text-gray-600">inquiries</p>
-                </div>
-                <div className="ml-4 text-right">
-                  <p className="text-sm font-bold text-green-600">{activity.conversions}</p>
-                  <p className="text-xs text-gray-600">conversions</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </ChartContainer>
 
         <ChartContainer
