@@ -7,8 +7,10 @@ import {
   BarChartComponent,
 } from "../Common";
 import PieChartComponent, { DEFAULT_PIE_COLORS } from "../Common/Charts/PieChartComponent";
-import { BarChart3, TrendingUp, Users, Target } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Target, Download } from "lucide-react";
 import { analyticsAPI } from "../../../../services/api";
+import { exportLeadAnalyticsPDF } from "../../utils/exportAnalytics";
+import toast from "react-hot-toast";
 
 /**
  * LeadAnalytics Component
@@ -17,6 +19,7 @@ import { analyticsAPI } from "../../../../services/api";
 const LeadAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [stats, setStats] = useState({
     totalLeads: 0,
     contacted: 0,
@@ -102,6 +105,35 @@ const LeadAnalytics = () => {
     fetchLeadAnalytics();
   }, [timeRange]);
 
+  // Handle PDF export
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true);
+      const toastId = toast.loading("Preparing analytics PDF...");
+
+      const summaryMetrics = [
+        { label: "Total Leads", value: stats.totalLeads },
+        { label: "Contacted", value: stats.contacted },
+        { label: "Interested", value: stats.interested },
+        { label: "Converted", value: stats.converted },
+        { label: "Time Range", value: timeRange.toUpperCase() },
+      ];
+
+      await exportLeadAnalyticsPDF({
+        timeRange,
+        summaryMetrics,
+      });
+
+      toast.dismiss(toastId);
+      toast.success("Analytics PDF downloaded successfully!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export analytics PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Line chart configuration
   const leadLineChartLines = [
     { dataKey: "new", stroke: "#3b82f6", name: "New Leads" },
@@ -159,13 +191,23 @@ const LeadAnalytics = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Time Range Filter */}
+      {/* Header with Time Range Filter and Export Button */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Lead Analytics</h2>
           <p className="text-gray-600 mt-1">Comprehensive lead statistics and trends</p>
         </div>
-        <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+        <div className="flex items-center gap-4">
+          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+          >
+            <Download size={18} />
+            {exporting ? "Exporting..." : "Export PDF"}
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}
