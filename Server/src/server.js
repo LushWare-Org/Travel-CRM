@@ -135,6 +135,9 @@ app.use(`/api/${API_VERSION}/billing/payment-history`, paymentHistoryRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 app.use(`/api/${API_VERSION}/hotels`, hotelSuggestionRoutes);
 
+// Webhook routes (public endpoints for external services)
+app.use(`/api/${API_VERSION}/webhooks`, webhookRoutes);
+
 // Error handling
 app.use(notFound);
 app.use(errorHandler);
