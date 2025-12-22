@@ -11,6 +11,7 @@ const router = express.Router();
 // Security is handled via webhook signature verification
 
 // GET: Webhook verification (Facebook sends this to verify your endpoint)
+// Uses controller function to read verify token from environment variables
 router.get('/facebook', verifyWebhook);
 
 // POST: Receive lead data (Facebook sends this when a lead is generated)

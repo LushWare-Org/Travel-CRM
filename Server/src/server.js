@@ -45,6 +45,7 @@ import notificationRoutes from './routes/notification.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
 
 // Billing Module Routes
 import quotationRoutes from './routes/quotation.routes.js';
@@ -65,6 +66,8 @@ const app = express();
 // Trust proxy
 app.set('trust proxy', 1);
 app.set('request timeout', 45000);
+// Enable query parser
+app.set('query parser', 'extended');
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -93,6 +96,16 @@ app.get('/health', (req, res) => {
     message: 'Server is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
+  });
+});
+
+// Test route to verify query parameters are working
+app.get('/test-query', (req, res) => {
+  res.status(200).json({
+    message: 'Query parameters test',
+    query: req.query,
+    params: req.params,
+    url: req.url
   });
 });
 
