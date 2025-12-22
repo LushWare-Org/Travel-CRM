@@ -13,24 +13,55 @@ import logger from '../config/logger.js';
  * @access  Public (Facebook calls this)
  */
 export const verifyWebhook = asyncHandler(async (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+  // Workaround: Manually parse query string if req.query is empty
+  let mode, token, challenge;
+  
+  if (Object.keys(req.query).length === 0 && req.url.includes('?')) {
+    // Parse query string manually
+    const queryString = req.url.split('?')[1];
+    const params = new URLSearchParams(queryString);
+    mode = params.get('hub.mode');
+    token = params.get('hub.verify_token');
+    challenge = params.get('hub.challenge');
+    
+    logger.info('Manually parsed query parameters', { mode, token, challenge });
+  } else {
+    mode = req.query['hub.mode'];
+    token = req.query['hub.verify_token'];
+    challenge = req.query['hub.challenge'];
+  }
 
   const verifyToken = process.env.FACEBOOK_VERIFY_TOKEN;
 
+  logger.info('Facebook webhook verification attempt', { 
+    mode, 
+    hasToken: !!token, 
+    tokenMatch: token === verifyToken,
+    challenge: challenge ? 'present' : 'missing'
+  });
+
   // Check if mode and token are present
   if (!mode || !token) {
+    logger.error('Webhook verification failed - missing parameters', {
+      hasMode: !!mode,
+      hasToken: !!token,
+      hasChallenge: !!challenge,
+      queryParams: req.query
+    });
     throw new AppError('Missing mode or token', 403);
   }
 
   // Check if mode is 'subscribe' and token matches
   if (mode === 'subscribe' && token === verifyToken) {
-    logger.info('Facebook webhook verified successfully');
-    // Respond with challenge token
-    res.status(200).send(challenge);
+    logger.info('Facebook webhook verified successfully', { challenge });
+    // Respond with challenge token as plain text
+    res.status(200).type('text/plain').send(challenge);
   } else {
-    logger.warn('Facebook webhook verification failed - invalid token or mode');
+    logger.warn('Facebook webhook verification failed - invalid token or mode', {
+      expectedMode: 'subscribe',
+      actualMode: mode,
+      tokenMatches: token === verifyToken
+    });
     throw new AppError('Verification failed', 403);
   }
 });
@@ -44,6 +75,7 @@ export const handleLeadWebhook = asyncHandler(async (req, res) => {
   // Verify webhook signature
   const signature = req.get('X-Hub-Signature-256');
   const appSecret = process.env.FACEBOOK_APP_SECRET;
+  // Use stringified body for signature verification
   const rawBody = JSON.stringify(req.body);
 
   if (!signature || !appSecret) {
@@ -58,6 +90,7 @@ export const handleLeadWebhook = asyncHandler(async (req, res) => {
       logger.error('Facebook webhook signature verification failed');
       throw new AppError('Invalid webhook signature', 401);
     }
+    logger.info('Facebook webhook signature verified successfully');
   }
 
   // Handle webhook event
