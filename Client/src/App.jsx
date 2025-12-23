@@ -13,6 +13,9 @@ import Contact from './pages/Contact';
 import Login from './pages/Login';
 import MyAccount from './pages/MyAccount';
 import PlanYourTrip from './pages/PlanYourTrip';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import CancellationPolicy from './pages/CancellationPolicy';
 import { AuthProvider } from './context/AuthContext';
 
 function AppContent() {
@@ -61,6 +64,9 @@ function AppContent() {
           <Route path="/package/:id" element={<PackageDetails />} />
           <Route path="/package/:id/customize" element={<CustomizePackage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicy />} />
         </Routes>
       </div>
       <Footer onNavigate={handleNavigate} />

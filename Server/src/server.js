@@ -73,7 +73,12 @@ app.set('query parser', 'extended');
 app.use(helmet()); // Security headers
 app.use(cors(corsOptions)); // CORS
 app.use(compression()); // Compress responses
-app.use(express.json({ limit: '50mb' })); // Parse JSON bodies - increased for large chart images
+app.use(express.json({ 
+  limit: '50mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf; // This captures the exact bytes from Facebook
+  }
+})); // Parse JSON bodies - increased for large chart images
 app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Parse URL-encoded bodies
 app.use(cookieParser()); // Parse cookies
 app.use(mongoSanitize()); // Sanitize data against NoSQL injection

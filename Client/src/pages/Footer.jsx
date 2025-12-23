@@ -98,9 +98,9 @@ export default function Footer({ onNavigate }) {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
             <p>&copy; 2025 TripSkyWay. All rights reserved.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-yellow-400 transition">Privacy Policy</a>
-              <a href="#" className="hover:text-yellow-400 transition">Terms of Service</a>
-              <a href="#" className="hover:text-yellow-400 transition">Cancellation Policy</a>
+              <button onClick={() => onNavigate('privacy-policy')} className="hover:text-yellow-400 transition">Privacy Policy</button>
+              <button onClick={() => onNavigate('terms-of-service')} className="hover:text-yellow-400 transition">Terms of Service</button>
+              <button onClick={() => onNavigate('cancellation-policy')} className="hover:text-yellow-400 transition">Cancellation Policy</button>
             </div>
           </div>
         </div>

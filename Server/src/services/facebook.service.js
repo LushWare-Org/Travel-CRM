@@ -48,7 +48,7 @@ class FacebookService {
    */
   static async getLeadData(leadgenId, accessToken) {
     try {
-      const graphApiUrl = `https://graph.facebook.com/v18.0/${leadgenId}`;
+      const graphApiUrl = `https://graph.facebook.com/v24.0/${leadgenId}`;
       
       const response = await axios.get(graphApiUrl, {
         params: {
