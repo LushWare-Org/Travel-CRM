@@ -1,8 +1,24 @@
-import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Calculator, Eye, Download, Send, MessageCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { invoiceAPI, quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
-import PDFPreviewDialog from './PDFPreviewDialog';
+import { useState, useEffect } from "react";
+import {
+  X,
+  Plus,
+  Trash2,
+  Save,
+  Calculator,
+  Eye,
+  Download,
+  Send,
+  MessageCircle,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import {
+  invoiceAPI,
+  quotationAPI,
+  packageAPI,
+  customizedPackageAPI,
+  manualItineraryAPI,
+} from "../../../services/api";
+import PDFPreviewDialog from "./PDFPreviewDialog";
 
 const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -19,92 +35,97 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const [formData, setFormData] = useState({
     lead: lead?._id || lead?.id,
-    quotation: '',
-    package: '',
-    type: 'invoice',
+    quotation: "",
+    package: "",
+    type: "invoice",
     items: [
       {
-        description: '',
-        category: 'other',
+        description: "",
+        category: "other",
         quantity: 1,
         unitPrice: 0,
         totalPrice: 0,
         taxRate: 0,
-        notes: '',
+        notes: "",
       },
     ],
     taxRate: 0,
-    discountType: 'none',
+    discountType: "none",
     discountValue: 0,
-    issueDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    notes: '',
-    terms: '',
-    paymentTerms: '',
-    paymentInstructions: '',
+    issueDate: new Date().toISOString().split("T")[0],
+    dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+    notes: "",
+    terms: "",
+    paymentTerms: "",
+    paymentInstructions: "",
   });
-  const [quotationMode, setQuotationMode] = useState('summary');
-  const isDetailedMode = quotationMode === 'detailed';
-  const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
+  const [quotationMode, setQuotationMode] = useState("summary");
+  const isDetailedMode = quotationMode === "detailed";
+  const [sendEmailAddress, setSendEmailAddress] = useState(
+    lead?.email || lead?.customer?.email || ""
+  );
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const formatCurrency = (amount) => {
     if (amount === null || amount === undefined) {
-      return '0.00';
+      return "0.00";
     }
     const value = Number(amount) || 0;
-    return value.toLocaleString('en-IN', {
+    return value.toLocaleString("en-IN", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   };
 
   const formatDateLabel = (dateValue) => {
-    if (!dateValue) return 'N/A';
+    if (!dateValue) return "N/A";
     try {
-      return new Date(dateValue).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
+      return new Date(dateValue).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
       });
     } catch (error) {
-      return 'N/A';
+      return "N/A";
     }
   };
 
-  const getModeLabel = (mode) => (mode === 'detailed' ? 'Detailed' : 'Non Detailed');
+  const getModeLabel = (mode) =>
+    mode === "detailed" ? "Detailed" : "Non Detailed";
 
   const handleDownloadQuotationPDF = async (quotationId) => {
     if (!quotationId) return;
     try {
       await quotationAPI.downloadPDF(quotationId);
-      toast.success('Quotation PDF downloaded');
+      toast.success("Quotation PDF downloaded");
     } catch (error) {
-      console.error('Error downloading quotation PDF:', error);
-      toast.error('Failed to download quotation PDF');
+      console.error("Error downloading quotation PDF:", error);
+      toast.error("Failed to download quotation PDF");
     }
   };
 
   useEffect(() => {
     if (isOpen && lead) {
-      setQuotationMode('summary');
+      setQuotationMode("summary");
       // Auto-detect package type from lead
       detectPackageType();
-      
+
       // Reset form with lead data
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         lead: lead._id || lead.id,
-        package: lead.package?._id || lead.package || '',
+        package: lead.package?._id || lead.package || "",
       }));
 
-      setSendEmailAddress(lead?.email || lead?.customer?.email || '');
-      
+      setSendEmailAddress(lead?.email || lead?.customer?.email || "");
+
       // Fetch quotations
       fetchQuotations();
       // Fetch existing invoices for this lead
       fetchExistingInvoices();
-      
+
       // For manual itineraries, load simplified day items even in non-detailed mode
       if (lead.manualItinerary?._id || lead.manualItinerary) {
         loadManualItinerarySimple();
@@ -115,33 +136,39 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   // Load manual itinerary with simplified day descriptions (for non-detailed mode)
   const loadManualItinerarySimple = async () => {
     if (!lead) return;
-    
+
     try {
-      const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
-      if (manualResponse.success || manualResponse.status === 'success') {
+      const manualResponse = await manualItineraryAPI.getByLead(
+        lead._id || lead.id
+      );
+      if (manualResponse.success || manualResponse.status === "success") {
         const manualItinerary = manualResponse.data || manualResponse;
         if (manualItinerary?.days && Array.isArray(manualItinerary.days)) {
           // Create simplified items for each day
           const simplifiedItems = manualItinerary.days.map((day, index) => ({
             description: `Day ${day.dayNumber || index + 1}`,
-            category: 'other',
+            category: "other",
             quantity: 1,
             unitPrice: 0,
             totalPrice: 0,
             taxRate: 0,
-            notes: '',
+            notes: "",
           }));
-          
+
           // Keep package item if exists, then add simplified day items
-          setFormData(prev => {
-            const existingPackageItem = prev.items.find(item => item.category === 'package');
-            const newItems = existingPackageItem ? [existingPackageItem, ...simplifiedItems] : simplifiedItems;
+          setFormData((prev) => {
+            const existingPackageItem = prev.items.find(
+              (item) => item.category === "package"
+            );
+            const newItems = existingPackageItem
+              ? [existingPackageItem, ...simplifiedItems]
+              : simplifiedItems;
             return { ...prev, items: newItems };
           });
         }
       }
     } catch (error) {
-      console.error('Error loading manual itinerary:', error);
+      console.error("Error loading manual itinerary:", error);
     }
   };
 
@@ -152,19 +179,19 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     // Check for customized package first
     if (lead.customizedPackage?._id || lead.customizedPackage) {
       const packageId = lead.customizedPackage._id || lead.customizedPackage;
-      setDetectedPackageType('customized');
+      setDetectedPackageType("customized");
       try {
         const response = await customizedPackageAPI.getById(packageId);
-        if (response.success || response.status === 'success') {
+        if (response.success || response.status === "success") {
           setDetectedPackage(response.data || response);
           // Auto-populate package price
           if (response.data?.price || response.price) {
             const pkg = response.data || response;
-            addPackageItem(pkg.name, pkg.price, 'customized');
+            addPackageItem(pkg.name, pkg.price, "customized");
           }
         }
       } catch (error) {
-        console.error('Error loading customized package:', error);
+        console.error("Error loading customized package:", error);
       }
       return;
     }
@@ -172,20 +199,20 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     // Check for regular package
     if (lead.package?._id || lead.package || lead.packageName) {
       const packageId = lead.package?._id || lead.package;
-      setDetectedPackageType('package');
+      setDetectedPackageType("package");
       if (packageId) {
         try {
           const response = await packageAPI.getById(packageId);
-          if (response.success || response.status === 'success') {
+          if (response.success || response.status === "success") {
             const pkg = response.data || response;
             setDetectedPackage(pkg);
             // Auto-populate package price
             if (pkg.price) {
-              addPackageItem(pkg.name, pkg.price, 'package');
+              addPackageItem(pkg.name, pkg.price, "package");
             }
           }
         } catch (error) {
-          console.error('Error loading package:', error);
+          console.error("Error loading package:", error);
         }
       }
       return;
@@ -193,28 +220,31 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     // Check for manual itinerary
     if (lead.manualItinerary?._id || lead.manualItinerary) {
-      setDetectedPackageType('manual');
-      setDetectedPackage({ type: 'manual', name: 'Manual Itinerary' });
+      setDetectedPackageType("manual");
+      setDetectedPackage({ type: "manual", name: "Manual Itinerary" });
     }
   };
 
   // Add package item to invoice
-  const addPackageItem = (packageName, price, type = 'package') => {
+  const addPackageItem = (packageName, price, type = "package") => {
     const packageItem = {
-      description: `${packageName} ${type === 'customized' ? '(Customized)' : ''} Package`,
-      category: 'package',
+      description: `${packageName} ${
+        type === "customized" ? "(Customized)" : ""
+      } Package`,
+      category: "package",
       quantity: 1,
       unitPrice: price,
       totalPrice: price,
       taxRate: 0,
-      notes: type === 'customized' ? 'Customized package' : '',
+      notes: type === "customized" ? "Customized package" : "",
     };
 
-    setFormData(prev => {
+    setFormData((prev) => {
       // Check if package item already exists
-      const existingIndex = prev.items.findIndex(item => 
-        item.category === 'package' || 
-        item.description?.toLowerCase().includes('package')
+      const existingIndex = prev.items.findIndex(
+        (item) =>
+          item.category === "package" ||
+          item.description?.toLowerCase().includes("package")
       );
 
       if (existingIndex >= 0) {
@@ -224,8 +254,27 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         return { ...prev, items: updatedItems };
       } else {
         // Add new package item at the beginning, or as first item if no items exist
-        const currentItems = prev.items && prev.items.length > 0 ? prev.items : [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }];
-        return { ...prev, items: [packageItem, ...currentItems.filter(item => item.category !== 'package')] };
+        const currentItems =
+          prev.items && prev.items.length > 0
+            ? prev.items
+            : [
+                {
+                  description: "",
+                  category: "other",
+                  quantity: 1,
+                  unitPrice: 0,
+                  totalPrice: 0,
+                  taxRate: 0,
+                  notes: "",
+                },
+              ];
+        return {
+          ...prev,
+          items: [
+            packageItem,
+            ...currentItems.filter((item) => item.category !== "package"),
+          ],
+        };
       }
     });
   };
@@ -235,15 +284,17 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     try {
       setLoadingQuotations(true);
       const response = await quotationAPI.getByLead(lead._id || lead.id);
-      if (response.success || response.status === 'success') {
+      if (response.success || response.status === "success") {
         const quotesData = response.data?.quotations || response.data || [];
-        const filteredQuotes = quotesData.filter(q => q.status !== 'converted');
+        const filteredQuotes = quotesData.filter(
+          (q) => q.status !== "converted"
+        );
         setQuotations(filteredQuotes);
-        
+
         // If form has a quotation selected, reload the latest quotation data
         if (formData.quotation) {
-          const selectedQuote = filteredQuotes.find(q => 
-            (q._id || q.id) === formData.quotation
+          const selectedQuote = filteredQuotes.find(
+            (q) => (q._id || q.id) === formData.quotation
           );
           if (selectedQuote) {
             // Reload quotation data to get latest updates
@@ -252,7 +303,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         }
       }
     } catch (error) {
-      console.error('Error fetching quotations:', error);
+      console.error("Error fetching quotations:", error);
     } finally {
       setLoadingQuotations(false);
     }
@@ -263,74 +314,92 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     try {
       setLoadingExisting(true);
       const response = await invoiceAPI.getByLead(lead._id || lead.id);
-      if (response.success || response.status === 'success') {
-        const invoicesData = response.data?.invoices || response.data?.data || response.data || [];
+      if (response.success || response.status === "success") {
+        const invoicesData =
+          response.data?.invoices || response.data?.data || response.data || [];
         const invoicesArray = Array.isArray(invoicesData) ? invoicesData : [];
         setExistingInvoices(invoicesArray);
-        
+
         // Load the most recent invoice into form for editing
         if (invoicesArray.length > 0) {
           const latestInvoice = invoicesArray[0]; // Most recent first
           setCurrentInvoice(latestInvoice);
           setIsEditing(true);
-          
+
           // Populate form with existing invoice data
           setFormData({
             lead: lead._id || lead.id,
-            quotation: latestInvoice.quotation?._id || latestInvoice.quotation || '',
-            package: latestInvoice.package?._id || latestInvoice.package || '',
-            type: latestInvoice.type || 'invoice',
-            items: latestInvoice.items?.length > 0 ? latestInvoice.items.map(item => ({
-              description: item.description || '',
-              category: item.category || 'other',
-              quantity: item.quantity || 1,
-              unitPrice: item.unitPrice || 0,
-              totalPrice: item.totalPrice || 0,
-              taxRate: item.taxRate || 0,
-              notes: item.notes || '',
-            })) : [{
-              description: '',
-              category: 'other',
-              quantity: 1,
-              unitPrice: 0,
-              totalPrice: 0,
-              taxRate: 0,
-              notes: '',
-            }],
+            quotation:
+              latestInvoice.quotation?._id || latestInvoice.quotation || "",
+            package: latestInvoice.package?._id || latestInvoice.package || "",
+            type: latestInvoice.type || "invoice",
+            items:
+              latestInvoice.items?.length > 0
+                ? latestInvoice.items.map((item) => ({
+                    description: item.description || "",
+                    category: item.category || "other",
+                    quantity: item.quantity || 1,
+                    unitPrice: item.unitPrice || 0,
+                    totalPrice: item.totalPrice || 0,
+                    taxRate: item.taxRate || 0,
+                    notes: item.notes || "",
+                  }))
+                : [
+                    {
+                      description: "",
+                      category: "other",
+                      quantity: 1,
+                      unitPrice: 0,
+                      totalPrice: 0,
+                      taxRate: 0,
+                      notes: "",
+                    },
+                  ],
             taxRate: latestInvoice.taxRate || 0,
-            discountType: latestInvoice.discountType || 'none',
+            discountType: latestInvoice.discountType || "none",
             discountValue: latestInvoice.discountValue || 0,
-            issueDate: latestInvoice.issueDate ? new Date(latestInvoice.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            dueDate: latestInvoice.dueDate ? new Date(latestInvoice.dueDate).toISOString().split('T')[0] : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            notes: latestInvoice.notes || '',
-            terms: latestInvoice.terms || '',
-            paymentTerms: latestInvoice.paymentTerms || '',
-            paymentInstructions: latestInvoice.paymentInstructions || '',
+            issueDate: latestInvoice.issueDate
+              ? new Date(latestInvoice.issueDate).toISOString().split("T")[0]
+              : new Date().toISOString().split("T")[0],
+            dueDate: latestInvoice.dueDate
+              ? new Date(latestInvoice.dueDate).toISOString().split("T")[0]
+              : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000)
+                  .toISOString()
+                  .split("T")[0],
+            notes: latestInvoice.notes || "",
+            terms: latestInvoice.terms || "",
+            paymentTerms: latestInvoice.paymentTerms || "",
+            paymentInstructions: latestInvoice.paymentInstructions || "",
           });
-        setQuotationMode((latestInvoice.quotation && latestInvoice.quotation.mode) ? latestInvoice.quotation.mode : 'summary');
+          setQuotationMode(
+            latestInvoice.quotation && latestInvoice.quotation.mode
+              ? latestInvoice.quotation.mode
+              : "summary"
+          );
 
-        setSendEmailAddress(
-          latestInvoice.customer?.email ||
-            latestInvoice.lead?.email ||
-            lead?.email ||
-            '',
-        );
-          
+          setSendEmailAddress(
+            latestInvoice.customer?.email ||
+              latestInvoice.lead?.email ||
+              lead?.email ||
+              ""
+          );
+
           setCurrentInvoiceId(latestInvoice._id || latestInvoice.id);
-          
+
           // If invoice has a quotation, load the latest quotation data
           if (latestInvoice.quotation) {
-            const quotationId = latestInvoice.quotation._id || latestInvoice.quotation;
+            const quotationId =
+              latestInvoice.quotation._id || latestInvoice.quotation;
             loadQuotationData(quotationId);
           }
         } else {
           setIsEditing(false);
           setCurrentInvoice(null);
-        setQuotationMode('summary');
+          setQuotationMode("summary");
         }
       }
     } catch (error) {
-      console.error('Error fetching existing invoices:', error);
+      console.error("Error fetching existing invoices:", error);
     } finally {
       setLoadingExisting(false);
     }
@@ -338,27 +407,33 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const handleSendWhatsApp = (invoiceId) => {
     if (!lead?.whatsapp) {
-      toast.error('WhatsApp number not available for this lead');
+      toast.error("WhatsApp number not available for this lead");
       return;
     }
-    
-    const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
+
+    const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, "");
     if (!whatsappNumber) {
-      toast.error('Invalid WhatsApp number');
+      toast.error("Invalid WhatsApp number");
       return;
     }
-    
-    const invoiceNumber = currentInvoice?.invoiceNumber || `#${invoiceId?.slice(-6)}` || 'Invoice';
-    const totalAmount = currentInvoice?.totalAmount || formData.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
+
+    const invoiceNumber =
+      currentInvoice?.invoiceNumber || `#${invoiceId?.slice(-6)}` || "Invoice";
+    const totalAmount =
+      currentInvoice?.totalAmount ||
+      formData.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) ||
+      0;
     const message = encodeURIComponent(
-      `Hello ${lead.name || 'there'},\n\n` +
-      `Your invoice ${invoiceNumber} for ${totalAmount.toFixed(2)} is ready. ` +
-      `Please contact us for the detailed invoice document.\n\n` +
-      `Thank you for choosing Trip Sky Way!`
+      `Hello ${lead.name || "there"},\n\n` +
+        `Your invoice ${invoiceNumber} for ${totalAmount.toFixed(
+          2
+        )} is ready. ` +
+        `Please contact us for the detailed invoice document.\n\n` +
+        `Thank you for choosing Trip Sky Way!`
     );
-    
+
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(whatsappUrl, "_blank");
   };
 
   const handleSendInvoiceEmail = async () => {
@@ -366,23 +441,23 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       currentInvoiceId || currentInvoice?._id || currentInvoice?.id || null;
 
     if (!targetId) {
-      toast.error('Please save the invoice before sending the email');
+      toast.error("Please save the invoice before sending the email");
       return;
     }
 
     const trimmedEmail = sendEmailAddress.trim();
     if (!trimmedEmail) {
-      toast.error('Please provide a recipient email address');
+      toast.error("Please provide a recipient email address");
       return;
     }
 
     try {
       setSendingEmail(true);
       await invoiceAPI.send(targetId, { email: trimmedEmail });
-      toast.success('Invoice emailed successfully');
+      toast.success("Invoice emailed successfully");
       await fetchExistingInvoices();
     } catch (error) {
-      toast.error(error.message || 'Failed to send invoice email');
+      toast.error(error.message || "Failed to send invoice email");
     } finally {
       setSendingEmail(false);
     }
@@ -395,66 +470,85 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const loadQuotationData = async (quotationId) => {
     if (!quotationId) return;
-    
+
     try {
       // Always fetch fresh quotation data from API to get latest updates
       const response = await quotationAPI.getById(quotationId);
 
-      if (response.success || response.status === 'success' || response.data) {
+      if (response.success || response.status === "success" || response.data) {
         const quote = response.data || response;
-        
-        const quoteMode = quote.mode || 'summary';
+
+        const quoteMode = quote.mode || "summary";
         setQuotationMode(quoteMode);
-        
+
         // Update form with latest quotation data
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           quotation: quotationId, // Ensure quotation ID is set
-          items: quote.items?.length > 0 ? quote.items.map(item => ({
-            description: item.description || '',
-            category: item.category || 'other',
-            quantity: item.quantity || 1,
-            unitPrice: item.unitPrice || 0,
-            totalPrice: item.totalPrice || 0,
-            taxRate: item.taxRate || 0,
-            notes: item.notes || '',
-            // Preserve isManual flag if it exists, or mark as manual if it's an extra field in summary mode
-            isManual: item.isManual !== undefined ? item.isManual : 
-                     (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package'),
-          })) : prev.items,
+          items:
+            quote.items?.length > 0
+              ? quote.items.map((item) => ({
+                  description: item.description || "",
+                  category: item.category || "other",
+                  quantity: item.quantity || 1,
+                  unitPrice: item.unitPrice || 0,
+                  totalPrice: item.totalPrice || 0,
+                  taxRate: item.taxRate || 0,
+                  notes: item.notes || "",
+                  // Preserve isManual flag if it exists, or mark as manual if it's an extra field in summary mode
+                  isManual:
+                    item.isManual !== undefined
+                      ? item.isManual
+                      : quoteMode === "summary" &&
+                        item.category === "other" &&
+                        item.category !== "package",
+                }))
+              : prev.items,
           taxRate: quote.taxRate !== undefined ? quote.taxRate : prev.taxRate,
           discountType: quote.discountType || prev.discountType,
-          discountValue: quote.discountValue !== undefined ? quote.discountValue : prev.discountValue,
+          discountValue:
+            quote.discountValue !== undefined
+              ? quote.discountValue
+              : prev.discountValue,
           notes: quote.notes !== undefined ? quote.notes : prev.notes,
           terms: quote.terms !== undefined ? quote.terms : prev.terms,
-          paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms,
+          paymentTerms:
+            quote.paymentTerms !== undefined
+              ? quote.paymentTerms
+              : prev.paymentTerms,
         }));
-        
-        toast.success('Quotation data refreshed successfully');
+
+        toast.success("Quotation data refreshed successfully");
       }
     } catch (error) {
-      console.error('Error loading quotation:', error);
-      toast.error('Failed to load quotation data');
+      console.error("Error loading quotation:", error);
+      toast.error("Failed to load quotation data");
     }
   };
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Recalculate totalPrice for this item
-    if (field === 'quantity' || field === 'unitPrice') {
-      const qty = field === 'quantity' ? parseFloat(value) || 0 : newItems[index].quantity || 0;
-      const price = field === 'unitPrice' ? parseFloat(value) || 0 : newItems[index].unitPrice || 0;
+    if (field === "quantity" || field === "unitPrice") {
+      const qty =
+        field === "quantity"
+          ? parseFloat(value) || 0
+          : newItems[index].quantity || 0;
+      const price =
+        field === "unitPrice"
+          ? parseFloat(value) || 0
+          : newItems[index].unitPrice || 0;
       newItems[index].totalPrice = qty * price;
-    } else if (field === 'totalPrice') {
+    } else if (field === "totalPrice") {
       // When totalPrice is changed directly, update unitPrice and quantity to match
       const totalPrice = parseFloat(value) || 0;
       newItems[index].totalPrice = totalPrice;
       newItems[index].unitPrice = totalPrice;
       newItems[index].quantity = 1;
     }
-    
+
     setFormData({ ...formData, items: newItems });
   };
 
@@ -464,13 +558,13 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       items: [
         ...formData.items,
         {
-          description: '',
-          category: 'other',
+          description: "",
+          category: "other",
           quantity: 1,
           unitPrice: 0,
           totalPrice: 0,
           taxRate: 0,
-          notes: '',
+          notes: "",
           isManual: true, // Mark as manually added for summary mode
         },
       ],
@@ -482,56 +576,53 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       const newItems = formData.items.filter((_, i) => i !== index);
       setFormData({ ...formData, items: newItems });
     } else {
-      toast.error('At least one item is required');
+      toast.error("At least one item is required");
     }
   };
 
   const calculateTotals = () => {
     // When in detailed mode, exclude package items from calculation
     // When in summary mode, include package item + all extra fields (manually added items)
-    const itemsToCalculate = isDetailedMode 
-      ? formData.items.filter(item => item.category !== 'package')
-      : formData.items.filter(item => {
+    const itemsToCalculate = isDetailedMode
+      ? formData.items.filter((item) => item.category !== "package")
+      : formData.items.filter((item) => {
           // In summary mode, include package item and all manually added extra fields
           // Exclude read-only activities from itinerary
-          return item.category === 'package' || item.isManual === true;
+          return item.category === "package" || item.isManual === true;
         });
-    
+
     // Calculate subtotal - use totalPrice if available, otherwise calculate from quantity * unitPrice
     const subtotal = itemsToCalculate.reduce((sum, item) => {
-      const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null 
-        ? item.totalPrice 
-        : (item.quantity || 0) * (item.unitPrice || 0);
+      const itemTotal =
+        item.totalPrice !== undefined && item.totalPrice !== null
+          ? item.totalPrice
+          : (item.quantity || 0) * (item.unitPrice || 0);
       return sum + itemTotal;
     }, 0);
-    
+
     let discountAmount = 0;
-    if (formData.discountType === 'percentage') {
+    if (formData.discountType === "percentage") {
       discountAmount = (subtotal * (formData.discountValue || 0)) / 100;
-    } else if (formData.discountType === 'fixed') {
+    } else if (formData.discountType === "fixed") {
       discountAmount = formData.discountValue || 0;
     }
-    
+
     const taxableAmount = subtotal - discountAmount;
     const taxAmount = (taxableAmount * (formData.taxRate || 0)) / 100;
     const totalAmount = taxableAmount + taxAmount;
-    
+
     return { subtotal, discountAmount, taxAmount, totalAmount };
   };
 
-  const handleSubmit = async (status = 'draft') => {
+  const handleSubmit = async (status = "draft") => {
     // When in detailed mode, exclude package items from submission
-    const itemsToSubmit = isDetailedMode 
-      ? formData.items.filter(item => item.category !== 'package')
+    const itemsToSubmit = isDetailedMode
+      ? formData.items.filter((item) => item.category !== "package")
       : formData.items;
-    
-    if (!itemsToSubmit.some(item => item.description.trim())) {
-      toast.error('Please add at least one item with description');
-      return;
-    }
 
+   
     const totals = calculateTotals();
-    
+
     // Prepare payload and filter out empty strings
     const payload = {
       ...formData,
@@ -541,25 +632,25 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       outstandingAmount: totals.totalAmount,
       issueDate: new Date(formData.issueDate).toISOString(),
       dueDate: new Date(formData.dueDate).toISOString(),
-      status: status === 'send' ? 'sent' : 'draft',
-      paymentStatus: 'unpaid',
+      status: status === "send" ? "sent" : "draft",
+      paymentStatus: "unpaid",
     };
 
     // Remove empty strings from ObjectId fields (Mongoose can't cast empty strings)
-    if (payload.package === '' || !payload.package) {
+    if (payload.package === "" || !payload.package) {
       delete payload.package;
     }
-    if (payload.quotation === '' || !payload.quotation) {
+    if (payload.quotation === "" || !payload.quotation) {
       delete payload.quotation;
     }
-    if (payload.lead === '' || !payload.lead) {
+    if (payload.lead === "" || !payload.lead) {
       delete payload.lead;
     }
 
     try {
       setLoading(true);
       let response;
-      
+
       // Update existing invoice if editing, otherwise create new
       if (isEditing && currentInvoice) {
         const invoiceId = currentInvoice._id || currentInvoice.id;
@@ -567,18 +658,21 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         setCurrentInvoiceId(invoiceId);
       } else {
         response = await invoiceAPI.create(payload);
-        if (response.success || response.status === 'success') {
+        if (response.success || response.status === "success") {
           const invoiceId = response.data?._id || response.data?.id;
           setCurrentInvoiceId(invoiceId);
         }
       }
-      
-      if (response.success || response.status === 'success') {
-        toast.success(`Invoice ${isEditing ? 'updated' : 'created'} successfully!`);
-        
+
+      if (response.success || response.status === "success") {
+        toast.success(
+          `Invoice ${isEditing ? "updated" : "created"} successfully!`
+        );
+
         // Show PDF preview after successful save
-        if (currentInvoiceId || (response.data?._id || response.data?.id)) {
-          const idToPreview = currentInvoiceId || (response.data?._id || response.data?.id);
+        if (currentInvoiceId || response.data?._id || response.data?.id) {
+          const idToPreview =
+            currentInvoiceId || response.data?._id || response.data?.id;
           setCurrentInvoiceId(idToPreview);
           setShowPDFPreview(true);
         } else {
@@ -586,10 +680,15 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           onClose();
         }
       } else {
-        toast.error(response.message || `Failed to ${isEditing ? 'update' : 'create'} invoice`);
+        toast.error(
+          response.message ||
+            `Failed to ${isEditing ? "update" : "create"} invoice`
+        );
       }
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEditing ? 'update' : 'create'} invoice`);
+      toast.error(
+        error.message || `Failed to ${isEditing ? "update" : "create"} invoice`
+      );
     } finally {
       setLoading(false);
     }
@@ -600,22 +699,22 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-purple-600 to-purple-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-600 to-purple-700">
           <div>
             <h2 className="text-2xl font-bold text-white">
-              {isEditing ? 'Edit Invoice' : 'Create Invoice'}
+              {isEditing ? "Edit Invoice" : "Create Invoice"}
             </h2>
-            <p className="text-purple-100 text-sm mt-1">
+            <p className="mt-1 text-sm text-purple-100">
               {lead?.name && `For: ${lead.name}`}
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
+              className="text-white transition-colors hover:text-gray-200"
             >
               <X className="w-6 h-6" />
             </button>
@@ -623,29 +722,29 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 p-6 overflow-y-auto">
           <div className="space-y-6">
             {/* Package & Mode Information */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block mb-2 text-sm font-medium text-gray-700">
                 Detected Package
               </label>
               <div className="px-3 py-2 border border-gray-300 rounded bg-gray-50">
-                {detectedPackageType === 'customized' && (
+                {detectedPackageType === "customized" && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-purple-700">
-                      ✨ Customized Package: {detectedPackage?.name || 'N/A'}
+                      ✨ Customized Package: {detectedPackage?.name || "N/A"}
                     </span>
                   </div>
                 )}
-                {detectedPackageType === 'package' && (
+                {detectedPackageType === "package" && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700">
-                      📦 Package: {detectedPackage?.name || 'N/A'}
+                      📦 Package: {detectedPackage?.name || "N/A"}
                     </span>
                   </div>
                 )}
-                {detectedPackageType === 'manual' && (
+                {detectedPackageType === "manual" && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-blue-700">
                       📋 Manual Itinerary
@@ -653,18 +752,23 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   </div>
                 )}
                 {!detectedPackageType && (
-                  <span className="text-sm text-gray-500">No package detected</span>
+                  <span className="text-sm text-gray-500">
+                    No package detected
+                  </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Quotation mode: <span className="font-semibold text-gray-700">{getModeLabel(quotationMode)}</span>
-                {!formData.quotation && ' (no quotation selected)'}
+              <p className="mt-2 text-xs text-gray-500">
+                Quotation mode:{" "}
+                <span className="font-semibold text-gray-700">
+                  {getModeLabel(quotationMode)}
+                </span>
+                {!formData.quotation && " (no quotation selected)"}
               </p>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Recipient Email
                 </label>
                 <input
@@ -674,8 +778,9 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   placeholder="customer@example.com"
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  We will email the invoice PDF to this address using the configured mail server.
+                <p className="mt-1 text-xs text-gray-500">
+                  We will email the invoice PDF to this address using the
+                  configured mail server.
                 </p>
               </div>
               <div className="flex items-end gap-2">
@@ -683,16 +788,18 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   type="button"
                   onClick={handleSendInvoiceEmail}
                   disabled={sendingEmail || !sendEmailAddress.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white rounded hover:from-purple-700 hover:to-fuchsia-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center flex-1 gap-2 px-3 py-2 text-white transition-colors rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
-                  {sendingEmail ? 'Sending…' : 'Send Email'}
+                  {sendingEmail ? "Sending…" : "Send Email"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSendWhatsApp(currentInvoiceId || currentInvoice?._id)}
+                  onClick={() =>
+                    handleSendWhatsApp(currentInvoiceId || currentInvoice?._id)
+                  }
                   disabled={!currentInvoiceId || !lead?.whatsapp}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center flex-1 gap-2 px-3 py-2 text-white transition-colors bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Send via WhatsApp"
                 >
                   <MessageCircle className="w-4 h-4" />
@@ -704,7 +811,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             {/* Quotation Selection */}
             {quotations.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Convert from Quotation (Optional)
                 </label>
                 <div className="flex items-center gap-2">
@@ -713,33 +820,46 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     onChange={(e) => {
                       setFormData({ ...formData, quotation: e.target.value });
                       if (e.target.value) {
-                        setQuotationMode('summary');
+                        setQuotationMode("summary");
                         loadQuotationData(e.target.value);
                       } else {
                         // Reset items if no quotation selected
-                        setFormData(prev => ({
+                        setFormData((prev) => ({
                           ...prev,
-                          quotation: '',
-                          items: [{
-                            description: '',
-                            category: 'other',
-                            quantity: 1,
-                            unitPrice: 0,
-                            totalPrice: 0,
-                            taxRate: 0,
-                            notes: '',
-                          }],
+                          quotation: "",
+                          items: [
+                            {
+                              description: "",
+                              category: "other",
+                              quantity: 1,
+                              unitPrice: 0,
+                              totalPrice: 0,
+                              taxRate: 0,
+                              notes: "",
+                            },
+                          ],
                         }));
-                        setQuotationMode('summary');
+                        setQuotationMode("summary");
                       }
                     }}
                     disabled={loadingQuotations}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="">{loadingQuotations ? 'Loading...' : 'No Quotation'}</option>
+                    <option value="">
+                      {loadingQuotations ? "Loading..." : "No Quotation"}
+                    </option>
                     {quotations.map((quote) => (
-                      <option key={quote._id || quote.id} value={quote._id || quote.id}>
-                        {`${quote.quotationNumber || (quote._id || '')} • ${getModeLabel(quote.mode)} • INR ${formatCurrency(quote.totalAmount || 0)} • ${formatDateLabel(quote.issueDate || quote.createdAt)}`}
+                      <option
+                        key={quote._id || quote.id}
+                        value={quote._id || quote.id}
+                      >
+                        {`${
+                          quote.quotationNumber || quote._id || ""
+                        } • ${getModeLabel(quote.mode)} • INR ${formatCurrency(
+                          quote.totalAmount || 0
+                        )} • ${formatDateLabel(
+                          quote.issueDate || quote.createdAt
+                        )}`}
                       </option>
                     ))}
                   </select>
@@ -750,7 +870,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         // Refresh quotation data to get latest updates
                         loadQuotationData(formData.quotation);
                       }}
-                      className="px-3 py-2 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+                      className="px-3 py-2 text-purple-700 transition-colors bg-purple-100 rounded hover:bg-purple-200"
                       title="Refresh Quotation Data"
                     >
                       🔄
@@ -758,9 +878,11 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   )}
                   <button
                     type="button"
-                    onClick={() => handleDownloadQuotationPDF(formData.quotation)}
+                    onClick={() =>
+                      handleDownloadQuotationPDF(formData.quotation)
+                    }
                     disabled={!formData.quotation}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-2 transition-colors bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                     title="Download selected quotation PDF"
                   >
                     <Download className="w-4 h-4" />
@@ -773,12 +895,14 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             {/* Invoice Type and Dates */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Invoice Type
                 </label>
                 <select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, type: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="invoice">Invoice</option>
@@ -788,24 +912,28 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Issue Date
                 </label>
                 <input
                   type="date"
                   value={formData.issueDate}
-                  onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, issueDate: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Due Date
                 </label>
                 <input
                   type="date"
                   value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, dueDate: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
@@ -816,8 +944,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               /* Summary Mode: Package price input + All activities as read-only text + Editable extra fields */
               <div className="space-y-4">
                 {/* Package Price Input (Editable) */}
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <div className="p-4 border border-purple-200 rounded-lg bg-purple-50">
+                  <label className="block mb-2 text-sm font-semibold text-gray-700">
                     Package Total Price
                   </label>
                   <div className="flex items-center gap-2">
@@ -825,13 +953,19 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     <input
                       type="number"
                       value={(() => {
-                        const packageItem = formData.items.find(item => item.category === 'package');
-                        return packageItem ? (packageItem.totalPrice || packageItem.unitPrice || 0) : 0;
+                        const packageItem = formData.items.find(
+                          (item) => item.category === "package"
+                        );
+                        return packageItem
+                          ? packageItem.totalPrice || packageItem.unitPrice || 0
+                          : 0;
                       })()}
                       onChange={(e) => {
                         const price = parseFloat(e.target.value) || 0;
-                        setFormData(prev => {
-                          const packageItemIndex = prev.items.findIndex(item => item.category === 'package');
+                        setFormData((prev) => {
+                          const packageItemIndex = prev.items.findIndex(
+                            (item) => item.category === "package"
+                          );
                           if (packageItemIndex >= 0) {
                             const newItems = [...prev.items];
                             newItems[packageItemIndex] = {
@@ -846,14 +980,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                               ...prev,
                               items: [
                                 {
-                                  description: 'Package Total',
-                                  category: 'package',
+                                  description: "Package Total",
+                                  category: "package",
                                   quantity: 1,
                                   unitPrice: price,
                                   totalPrice: price,
-                                  notes: '',
+                                  notes: "",
                                 },
-                                ...prev.items.filter(item => item.category !== 'package'),
+                                ...prev.items.filter(
+                                  (item) => item.category !== "package"
+                                ),
                               ],
                             };
                           }
@@ -861,24 +997,31 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       }}
                       min="0"
                       step="0.01"
-                      className="flex-1 px-3 py-2 border border-purple-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="flex-1 px-3 py-2 text-sm font-semibold border border-purple-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                       placeholder="Enter package total price"
                     />
                   </div>
                 </div>
 
                 {/* Extra Fields Only - No included activities shown in summary mode */}
-                {formData.items.filter(item => item.category !== 'package' && item.isManual === true).length > 0 && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                {formData.items.filter(
+                  (item) =>
+                    item.category !== "package" && item.isManual === true
+                ).length > 0 && (
+                  <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <label className="block mb-3 text-sm font-semibold text-gray-700">
                       Extra Fields
                     </label>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                    <div className="space-y-2 overflow-y-auto max-h-60">
                       {formData.items
                         .map((item, originalIndex) => {
                           // Skip package items and non-manual items (activities from itinerary)
-                          if (item.category === 'package' || item.isManual !== true) return null;
-                          
+                          if (
+                            item.category === "package" ||
+                            item.isManual !== true
+                          )
+                            return null;
+
                           // Only show manually added extra fields
                           return (
                             <div
@@ -887,10 +1030,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             >
                               <input
                                 type="text"
-                                value={item.description || ''}
-                                onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                value={item.description || ""}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    originalIndex,
+                                    "description",
+                                    e.target.value
+                                  )
+                                }
                                 placeholder="Field description"
-                                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded"
                               />
                               <input
                                 type="number"
@@ -910,7 +1059,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                                 min="0"
                                 step="0.01"
                                 placeholder="Price"
-                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                                className="w-24 px-2 py-1 text-sm border border-gray-300 rounded"
                               />
                               <button
                                 onClick={() => removeItem(originalIndex)}
@@ -922,7 +1071,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             </div>
                           );
                         })
-                        .filter(item => item !== null)}
+                        .filter((item) => item !== null)}
                     </div>
                   </div>
                 )}
@@ -934,7 +1083,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   <h3 className="text-lg font-semibold text-gray-800">Items</h3>
                   <button
                     onClick={addItem}
-                    className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 text-white transition-colors bg-purple-600 rounded hover:bg-purple-700"
                   >
                     <Plus className="w-4 h-4" />
                     Add Item
@@ -944,10 +1093,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Price</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Actions</th>
+                      <tr className="border-b bg-gray-50">
+                        <th className="px-3 py-2 text-xs font-medium text-left text-gray-700">
+                          Description
+                        </th>
+                        <th className="px-3 py-2 text-xs font-medium text-left text-gray-700">
+                          Price
+                        </th>
+                        <th className="px-3 py-2 text-xs font-medium text-left text-gray-700">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -955,31 +1110,40 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         .map((item, originalIndex) => ({
                           item,
                           originalIndex,
-                          shouldShow: item.category !== 'package'
+                          shouldShow: item.category !== "package",
                         }))
                         .filter(({ shouldShow }) => shouldShow)
                         .map(({ item, originalIndex }) => {
-                          const displayPrice = item.totalPrice !== undefined && item.totalPrice !== null 
-                            ? item.totalPrice 
-                            : (item.quantity || 1) * (item.unitPrice || 0);
-                          
+                          const displayPrice =
+                            item.totalPrice !== undefined &&
+                            item.totalPrice !== null
+                              ? item.totalPrice
+                              : (item.quantity || 1) * (item.unitPrice || 0);
+
                           return (
                             <tr key={originalIndex} className="border-b">
                               <td className="px-3 py-2">
                                 <input
                                   type="text"
                                   value={item.description}
-                                  onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                  onChange={(e) =>
+                                    handleItemChange(
+                                      originalIndex,
+                                      "description",
+                                      e.target.value
+                                    )
+                                  }
                                   placeholder="Item description"
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                                 />
                               </td>
                               <td className="px-3 py-2">
                                 <input
                                   type="number"
-                                  value={displayPrice || ''}
+                                  value={displayPrice || ""}
                                   onChange={(e) => {
-                                    const price = parseFloat(e.target.value) || 0;
+                                    const price =
+                                      parseFloat(e.target.value) || 0;
                                     const newItems = [...formData.items];
                                     newItems[originalIndex] = {
                                       ...newItems[originalIndex],
@@ -987,18 +1151,25 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                                       unitPrice: price,
                                       quantity: 1,
                                     };
-                                    setFormData({ ...formData, items: newItems });
+                                    setFormData({
+                                      ...formData,
+                                      items: newItems,
+                                    });
                                   }}
                                   min="0"
                                   step="0.01"
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                                 />
                               </td>
                               <td className="px-3 py-2">
                                 <button
                                   onClick={() => removeItem(originalIndex)}
                                   className="text-red-600 hover:text-red-800"
-                                  disabled={formData.items.filter(i => i.category !== 'package').length === 1}
+                                  disabled={
+                                    formData.items.filter(
+                                      (i) => i.category !== "package"
+                                    ).length === 1
+                                  }
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -1016,13 +1187,18 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Tax Rate (%)
                   </label>
                   <input
                     type="number"
                     value={formData.taxRate}
-                    onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        taxRate: parseFloat(e.target.value) || 0,
+                      })
+                    }
                     min="0"
                     max="100"
                     step="0.01"
@@ -1030,12 +1206,18 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block mb-2 text-sm font-medium text-gray-700">
                     Discount Type
                   </label>
                   <select
                     value={formData.discountType}
-                    onChange={(e) => setFormData({ ...formData, discountType: e.target.value, discountValue: 0 })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        discountType: e.target.value,
+                        discountValue: 0,
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="none">None</option>
@@ -1043,15 +1225,20 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     <option value="fixed">Fixed Amount</option>
                   </select>
                 </div>
-                {formData.discountType !== 'none' && (
+                {formData.discountType !== "none" && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
                       Discount Value
                     </label>
                     <input
                       type="number"
                       value={formData.discountValue}
-                      onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          discountValue: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       min="0"
                       step="0.01"
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -1059,14 +1246,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   </div>
                 )}
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <div className="p-4 space-y-2 rounded-lg bg-gray-50">
+                <h4 className="flex items-center gap-2 mb-3 font-semibold text-gray-800">
                   <Calculator className="w-5 h-5" />
                   Summary
                 </h4>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{totals.subtotal.toFixed(2)}</span>
+                  <span className="font-medium">
+                    {totals.subtotal.toFixed(2)}
+                  </span>
                 </div>
                 {totals.discountAmount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
@@ -1077,16 +1266,22 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 {totals.taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tax:</span>
-                    <span className="font-medium">{totals.taxAmount.toFixed(2)}</span>
+                    <span className="font-medium">
+                      {totals.taxAmount.toFixed(2)}
+                    </span>
                   </div>
                 )}
-                <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
+                <div className="flex justify-between pt-2 mt-2 text-lg font-bold border-t">
                   <span>Total:</span>
-                  <span className="text-purple-600">{totals.totalAmount.toFixed(2)}</span>
+                  <span className="text-purple-600">
+                    {totals.totalAmount.toFixed(2)}
+                  </span>
                 </div>
-                <div className="flex justify-between text-sm text-gray-500 pt-2 border-t">
+                <div className="flex justify-between pt-2 text-sm text-gray-500 border-t">
                   <span>Outstanding:</span>
-                  <span className="font-medium">{totals.totalAmount.toFixed(2)}</span>
+                  <span className="font-medium">
+                    {totals.totalAmount.toFixed(2)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1094,24 +1289,31 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             {/* Notes & Terms */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Payment Terms
                 </label>
                 <textarea
                   value={formData.paymentTerms}
-                  onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, paymentTerms: e.target.value })
+                  }
                   rows="3"
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="Payment terms..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Payment Instructions
                 </label>
                 <textarea
                   value={formData.paymentInstructions}
-                  onChange={(e) => setFormData({ ...formData, paymentInstructions: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      paymentInstructions: e.target.value,
+                    })
+                  }
                   rows="3"
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="Bank details, payment methods..."
@@ -1122,12 +1324,12 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
           <div>
             {currentInvoiceId && (
               <button
                 onClick={() => handlePreviewPDF(currentInvoiceId)}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors font-medium"
+                className="flex items-center gap-2 px-4 py-2 font-medium text-white transition-colors bg-purple-600 rounded hover:bg-purple-700"
                 title="Preview/Download Invoice PDF"
               >
                 <Eye className="w-4 h-4" />
@@ -1138,17 +1340,17 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors"
+              className="px-4 py-2 text-gray-700 transition-colors border border-gray-300 rounded hover:bg-gray-100"
             >
               Cancel
             </button>
             <button
               onClick={() => handleSubmit()}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 text-white transition-colors bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              {isEditing ? 'Update Invoice' : 'Save Invoice'}
+              {isEditing ? "Update Invoice" : "Save Invoice"}
             </button>
           </div>
         </div>
@@ -1171,12 +1373,13 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             documentName="Invoice"
             onDownload={true}
             documents={existingInvoices}
-            currentIndex={existingInvoices.findIndex(inv => 
-              (inv._id || inv.id) === currentInvoiceId
+            currentIndex={existingInvoices.findIndex(
+              (inv) => (inv._id || inv.id) === currentInvoiceId
             )}
             onNavigate={(index) => {
               if (existingInvoices[index]) {
-                const invoiceId = existingInvoices[index]._id || existingInvoices[index].id;
+                const invoiceId =
+                  existingInvoices[index]._id || existingInvoices[index].id;
                 setCurrentInvoiceId(invoiceId);
               }
             }}
@@ -1188,4 +1391,3 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 };
 
 export default InvoiceDialog;
-
