@@ -62,15 +62,16 @@ class EmailService {
 
   async sendWelcomeEmail(user) {
     const subject = 'Welcome to Trip Sky Way!';
-    const html = `
-      <h1>Welcome to Trip Sky Way, ${user.name}!</h1>
-      <p>Thank you for registering with us. We're excited to help you plan your next adventure.</p>
-      <p>Start exploring our packages and book your dream vacation today!</p>
-      <p>If you have any questions, feel free to contact our support team.</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Welcome to Trip Sky Way, ${user.name}! 🎉</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Thank you for registering with us. We're excited to help you plan your next adventure!</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Start exploring our packages and book your dream vacation today!</p>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
+        <p style="color: #333333; font-size: 14px; margin: 0;">💡 <strong style="color: #FF8C00;">Pro Tip:</strong> Check out our featured destinations to get inspired for your next trip!</p>
+      </div>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 20px 0;">If you have any questions, feel free to contact our support team.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     return this.sendEmail({
       to: user.email,
@@ -81,23 +82,23 @@ class EmailService {
 
   async sendBookingConfirmation(booking, user) {
     const subject = `Booking Confirmation - ${booking.package.name}`;
-    const html = `
-      <h1>Booking Confirmation</h1>
-      <p>Dear ${user.name},</p>
-      <p>Your booking has been confirmed!</p>
-      <h2>Booking Details:</h2>
-      <ul>
-        <li><strong>Booking ID:</strong> ${booking.id}</li>
-        <li><strong>Package:</strong> ${booking.package.name}</li>
-        <li><strong>Date:</strong> ${booking.travelDate}</li>
-        <li><strong>Travelers:</strong> ${booking.numberOfTravelers}</li>
-        <li><strong>Total Amount:</strong> $${booking.totalAmount}</li>
-      </ul>
-      <p>We'll send you more details soon. Safe travels!</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Booking Confirmation ✅</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Great news! Your booking has been confirmed!</p>
+      <div style="background-color: #000000; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2 style="color: #FF8C00; font-size: 20px; margin: 0 0 15px 0;">Booking Details</h2>
+        <table style="width: 100%; color: #ffffff; font-size: 15px;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #333;"><strong style="color: #FF8C00;">Booking ID:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #333;">${booking.id}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #333;"><strong style="color: #FF8C00;">Package:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #333;">${booking.package.name}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #333;"><strong style="color: #FF8C00;">Date:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #333;">${booking.travelDate}</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #333;"><strong style="color: #FF8C00;">Travelers:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #333;">${booking.numberOfTravelers}</td></tr>
+          <tr><td style="padding: 8px 0;"><strong style="color: #FF8C00;">Total Amount:</strong></td><td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #FF8C00;">$${booking.totalAmount}</td></tr>
+        </table>
+      </div>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 20px 0;">We'll send you more details soon. Safe travels! 🌍✈️</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     return this.sendEmail({
       to: user.email,
@@ -109,17 +110,19 @@ class EmailService {
   async sendPasswordReset(user, resetToken) {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
     const subject = 'Password Reset Request';
-    const html = `
-      <h1>Password Reset</h1>
-      <p>Dear ${user.name},</p>
-      <p>You requested a password reset. Click the link below to reset your password:</p>
-      <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Reset Password</a>
-      <p>This link will expire in 10 minutes.</p>
-      <p>If you didn't request this, please ignore this email.</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Password Reset 🔒</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">You requested a password reset. Click the button below to reset your password:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        ${this.getButton('Reset Password', resetUrl)}
+      </div>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
+        <p style="color: #333333; font-size: 14px; margin: 0;">⏰ <strong style="color: #FF8C00;">Important:</strong> This link will expire in 10 minutes.</p>
+      </div>
+      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0;">If you didn't request this, please ignore this email and your password will remain unchanged.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     return this.sendEmail({
       to: user.email,
@@ -139,26 +142,29 @@ class EmailService {
       roleDisplay = role;
     }
     const subject = `Welcome to Trip Sky Way - Your ${roleDisplay} Account`;
-    const html = `
-      <h1>Welcome to Trip Sky Way!</h1>
-      <p>Dear ${user.name},</p>
-      <p>An account has been created for you as a <strong>${roleDisplay}</strong>.</p>
-      ${role === 'vendor' && user.businessName ? `<p><strong>Business:</strong> ${user.businessName}</p>` : ''}
-      ${role === 'vendor' && user.serviceType ? `<p><strong>Service Type:</strong> ${user.serviceType}</p>` : ''}
-      <h2>Your Login Credentials:</h2>
-      <ul>
-        <li><strong>Email:</strong> ${user.email}</li>
-        <li><strong>Temporary Password:</strong> ${tempPassword}</li>
-      </ul>
-      <p><strong>Important:</strong> You must change this temporary password on your first login for security reasons.</p>
-      <a href="${loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Login Now</a>
-      <br><br>
-      ${role === 'vendor' ? '<p><strong>Note:</strong> Your account is currently under verification. You will be notified once your account is verified and you can start offering your services.</p>' : ''}
-      <p>If you have any questions, please contact the administrator.</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Welcome to Trip Sky Way! 🎉</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">An account has been created for you as a <strong style="color: #FF8C00;">${roleDisplay}</strong>.</p>
+      ${role === 'vendor' && user.businessName ? `<p style="color: #333333; font-size: 16px; margin: 0 0 10px 0;"><strong>Business:</strong> ${user.businessName}</p>` : ''}
+      ${role === 'vendor' && user.serviceType ? `<p style="color: #333333; font-size: 16px; margin: 0 0 20px 0;"><strong>Service Type:</strong> ${user.serviceType}</p>` : ''}
+      <div style="background-color: #000000; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2 style="color: #FF8C00; font-size: 20px; margin: 0 0 15px 0;">Your Login Credentials</h2>
+        <table style="width: 100%; color: #ffffff; font-size: 15px;">
+          <tr><td style="padding: 10px 0; border-bottom: 1px solid #333;"><strong style="color: #FF8C00;">Email:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #333;">${user.email}</td></tr>
+          <tr><td style="padding: 10px 0;"><strong style="color: #FF8C00;">Temporary Password:</strong></td><td style="padding: 10px 0; font-family: monospace; color: #FF8C00; font-weight: bold;">${tempPassword}</td></tr>
+        </table>
+      </div>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
+        <p style="color: #333333; font-size: 14px; margin: 0;">🔒 <strong style="color: #FF8C00;">Security Notice:</strong> You must change this temporary password on your first login.</p>
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        ${this.getButton('Login Now', loginUrl)}
+      </div>
+      ${role === 'vendor' ? '<div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;"><p style="color: #333333; font-size: 14px; margin: 0;">📋 <strong style="color: #FF8C00;">Note:</strong> Your account is currently under verification. You will be notified once verified.</p></div>' : ''}
+      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0;">If you have any questions, please contact the administrator.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     return this.sendEmail({
       to: user.email,
@@ -169,15 +175,15 @@ class EmailService {
 
   async sendPasswordChanged(user) {
     const subject = 'Password Changed Successfully';
-    const html = `
-      <h1>Password Changed</h1>
-      <p>Dear ${user.name},</p>
-      <p>Your password has been changed successfully.</p>
-      <p>If you did not make this change, please contact our support team immediately.</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Password Changed ✅</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Your password has been changed successfully.</p>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
+        <p style="color: #333333; font-size: 14px; margin: 0;">⚠️ <strong style="color: #FF8C00;">Security Alert:</strong> If you did not make this change, please contact our support team immediately.</p>
+      </div>
     `;
+    const html = this.getEmailTemplate(content);
 
     return this.sendEmail({
       to: user.email,
@@ -189,17 +195,19 @@ class EmailService {
   async sendEmailVerification(user, verificationToken) {
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
     const subject = 'Verify Your Email Address';
-    const html = `
-      <h1>Email Verification</h1>
-      <p>Dear ${user.name},</p>
-      <p>Thank you for registering with Trip Sky Way. Please verify your email address by clicking the link below:</p>
-      <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">Verify Email</a>
-      <p>This link will expire in 24 hours.</p>
-      <p>If you didn't create an account, please ignore this email.</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Email Verification 📧</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Thank you for registering with Trip Sky Way. Please verify your email address by clicking the button below:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        ${this.getButton('Verify Email', verificationUrl)}
+      </div>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
+        <p style="color: #333333; font-size: 14px; margin: 0;">⏰ <strong style="color: #FF8C00;">Note:</strong> This link will expire in 24 hours.</p>
+      </div>
+      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0;">If you didn't create an account, please ignore this email.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     return this.sendEmail({
       to: user.email,
@@ -227,6 +235,65 @@ class EmailService {
     });
   }
 
+  getEmailTemplate(content) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px 0;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                <!-- Header -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 50px 32px; text-align: center; position: relative; border-bottom: 4px solid #FF9800;">
+                    <div style="position: relative; z-index: 1;">
+                      <div style="margin-bottom: 16px;">
+                        <span style="color: #ffffff; font-size: 42px; font-weight: 800; letter-spacing: 3px; text-shadow: 0 0 30px rgba(255, 152, 0, 0.5);">TRIP</span><span style="color: #FF9800; font-size: 42px; font-weight: 800; letter-spacing: 3px; margin: 0 16px; text-shadow: 0 0 20px rgba(255, 152, 0, 0.8); display: inline-block;">SKY</span><span style="color: #ffffff; font-size: 42px; font-weight: 800; letter-spacing: 3px; text-shadow: 0 0 30px rgba(255, 152, 0, 0.5);">WAY</span>
+                      </div>
+                      <div style="height: 2px; width: 120px; background: linear-gradient(90deg, transparent, #FF9800, transparent); margin: 12px auto; border-radius: 2px;"></div>
+                      <div style="color: #FF9800; font-size: 12px; margin-top: 12px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600;">✈ Your Journey, Our Passion ✈</div>
+                    </div>
+                  </td>
+                </tr>
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px 32px;">
+                    ${content}
+                  </td>
+                </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 32px; text-align: center; color: #ffffff;">
+                    <h3 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 8px;">Trip Sky Way</h3>
+                    <p style="color: #999999; font-size: 14px; margin-bottom: 16px; font-style: italic;">Your Journey, Our Passion</p>
+                    <div style="margin-bottom: 16px;">
+                      <a href="https://www.tripskyway.com" style="color: #FF9800; text-decoration: none; font-size: 14px;">www.tripskyway.com</a>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                      <a href="tel:+915591234567" style="color: #999999; text-decoration: none; font-size: 14px;">📞 +91 (559) 123-4567</a>
+                    </div>
+                    <div style="height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 20px auto; max-width: 200px;"></div>
+                    <p style="color: #666666; font-size: 12px; margin-bottom: 0;">© ${new Date().getFullYear()} Trip Sky Way. All rights reserved.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+  }
+
+  getButton(text, url) {
+    return `<a href="${url}" style="display: inline-block; background-color: #FF9800; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 500; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);">${text}</a>`;
+  }
+
   async sendQuotationEmail({ quotation, recipientEmail, pdfPath }) {
     const customerName = quotation.customer?.name || quotation.lead?.name || 'Customer';
     const quotationNumber = quotation.quotationNumber || quotation._id;
@@ -242,14 +309,35 @@ class EmailService {
       </ul>
     `;
 
-    const html = `
-      <p>Dear ${customerName},</p>
-      <p>Thank you for considering Trip Sky Way. Please find your quotation attached.</p>
-      <h3>Quotation Summary</h3>
-      ${totalsSection}
-      <p>If you have any questions or would like to proceed, simply reply to this email.</p>
-      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Quotation 📋</h1>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for considering Trip Sky Way. We're excited to help you plan your journey! Please find your quotation details below.</p>
+
+      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
+        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Quotation Summary</h2>
+        
+        <div style="margin-bottom: 16px;">
+          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Total Amount</div>
+          <div style="color: #ffffff; font-size: 32px; font-weight: 600;">${this.formatCurrency(quotation.totalAmount)}</div>
+        </div>
+
+        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+
+        <div style="margin-bottom: 12px;">
+          <span style="color: #FF9800; font-size: 14px;">Valid Until: </span>
+          <span style="color: #ffffff; font-size: 16px;">${this.formatDate(quotation.validUntil)}</span>
+        </div>
+
+        <div>
+          <span style="color: #FF9800; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${quotation.status?.toUpperCase() || 'DRAFT'}</span>
+        </div>
+      </div>
+
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions or would like to proceed with the booking, simply reply to this email. Our team is here to help you every step of the way.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     const text = `Dear ${customerName},\n\nPlease find your quotation attached.\nTotal Amount: ${this.formatCurrency(
       quotation.totalAmount,
@@ -278,20 +366,47 @@ class EmailService {
       ? `Trip Sky Way Invoice - ${invoiceNumber}`
       : 'Trip Sky Way Invoice';
 
-    const html = `
-      <p>Dear ${customerName},</p>
-      <p>Thank you for choosing Trip Sky Way. Please find your invoice attached.</p>
-      <h3>Invoice Summary</h3>
-      <ul>
-        <li><strong>Invoice Number:</strong> ${invoiceNumber}</li>
-        <li><strong>Issue Date:</strong> ${this.formatDate(invoice.issueDate || invoice.createdAt)}</li>
-        <li><strong>Due Date:</strong> ${this.formatDate(invoice.dueDate)}</li>
-        <li><strong>Total Amount:</strong> ${this.formatCurrency(invoice.totalAmount)}</li>
-        <li><strong>Status:</strong> ${invoice.status?.toUpperCase() || 'DRAFT'}</li>
-      </ul>
-      <p>Please review the attached invoice and let us know if you have any questions.</p>
-      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Invoice 💼</h1>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for choosing Trip Sky Way. Please find your invoice attached.</p>
+
+      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
+        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Invoice Summary</h2>
+        
+        <div style="margin-bottom: 16px;">
+          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Invoice Number</div>
+          <div style="color: #ffffff; font-size: 18px; font-weight: 600;">${invoiceNumber}</div>
+        </div>
+
+        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+
+        <div style="margin-bottom: 12px;">
+          <span style="color: #FF9800; font-size: 14px;">Issue Date: </span>
+          <span style="color: #ffffff; font-size: 16px;">${this.formatDate(invoice.issueDate || invoice.createdAt)}</span>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <span style="color: #FF9800; font-size: 14px;">Due Date: </span>
+          <span style="color: #ffffff; font-size: 16px;">${this.formatDate(invoice.dueDate)}</span>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Total Amount</div>
+          <div style="color: #ffffff; font-size: 32px; font-weight: 600;">${this.formatCurrency(invoice.totalAmount)}</div>
+        </div>
+
+        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+
+        <div>
+          <span style="color: #FF9800; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${invoice.status?.toUpperCase() || 'DRAFT'}</span>
+        </div>
+      </div>
+
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Please review the attached invoice and let us know if you have any questions.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     const text = `Dear ${customerName},\n\nPlease find your invoice attached.\nInvoice Number: ${invoiceNumber}\nTotal Amount: ${this.formatCurrency(
       invoice.totalAmount,
@@ -320,20 +435,47 @@ class EmailService {
       ? `Trip Sky Way Payment Receipt - ${receiptNumber}`
       : 'Trip Sky Way Payment Receipt';
 
-    const html = `
-      <p>Dear ${customerName},</p>
-      <p>Thank you for your payment. Please find your receipt attached for your records.</p>
-      <h3>Receipt Summary</h3>
-      <ul>
-        <li><strong>Receipt Number:</strong> ${receiptNumber}</li>
-        <li><strong>Payment Date:</strong> ${this.formatDate(receipt.paymentDate)}</li>
-        <li><strong>Amount:</strong> ${this.formatCurrency(receipt.amount)}</li>
-        ${invoice ? `<li><strong>Invoice:</strong> ${invoice.invoiceNumber}</li>` : ''}
-        <li><strong>Status:</strong> ${receipt.receiptStatus?.replace(/-/g, ' ').toUpperCase() || 'PAID'}</li>
-      </ul>
-      <p>If you have any questions, please reach out to us.</p>
-      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Payment Receipt ✅</h1>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for your payment. Please find your receipt attached for your records.</p>
+
+      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
+        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Receipt Summary</h2>
+        
+        <div style="margin-bottom: 16px;">
+          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Amount</div>
+          <div style="color: #ffffff; font-size: 32px; font-weight: 600;">${this.formatCurrency(receipt.amount)}</div>
+        </div>
+
+        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+
+        <div style="margin-bottom: 12px;">
+          <span style="color: #FF9800; font-size: 14px;">Receipt Number: </span>
+          <span style="color: #ffffff; font-size: 16px;">${receiptNumber}</span>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <span style="color: #FF9800; font-size: 14px;">Payment Date: </span>
+          <span style="color: #ffffff; font-size: 16px;">${this.formatDate(receipt.paymentDate)}</span>
+        </div>
+
+        ${invoice ? `<div style="margin-bottom: 12px;">
+          <span style="color: #FF9800; font-size: 14px;">Invoice: </span>
+          <span style="color: #ffffff; font-size: 16px;">${invoice.invoiceNumber}</span>
+        </div>` : ''}
+
+        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+
+        <div>
+          <span style="color: #FF9800; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${receipt.receiptStatus?.replace(/-/g, ' ').toUpperCase() || 'PAID'}</span>
+        </div>
+      </div>
+
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions, please reach out to us.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     const text = `Dear ${customerName},\n\nThank you for your payment of ${this.formatCurrency(
       receipt.amount,
@@ -362,21 +504,42 @@ class EmailService {
       ? `Trip Sky Way Travel Voucher - ${voucherNumber}`
       : 'Trip Sky Way Travel Voucher';
 
-    const html = `
-      <p>Dear ${customerName},</p>
-      <p>Thank you for choosing Trip Sky Way! We're excited to be part of your travel journey.</p>
-      <p>Please find your travel voucher attached. This voucher contains all the important details about your trip.</p>
-      <h3>Voucher Summary</h3>
-      <ul>
-        <li><strong>Voucher Number:</strong> ${voucherNumber}</li>
-        <li><strong>Package:</strong> ${packageName}</li>
-        <li><strong>Status:</strong> CONFIRMED</li>
-      </ul>
-      <p>Please review the attached voucher carefully. It contains your travel dates, accommodation details, meal plans, and itinerary.</p>
-      <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
-      <p>We wish you a wonderful and memorable journey!</p>
-      <p>Warm regards,<br/>Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Travel Voucher 🎫</h1>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 15px 0;">Thank you for choosing Trip Sky Way! We're excited to be part of your travel journey. ✈️🌍</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Please find your travel voucher attached. This voucher contains all the important details about your trip.</p>
+
+      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
+        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Voucher Summary</h2>
+        
+        <div style="margin-bottom: 16px;">
+          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Voucher Number</div>
+          <div style="color: #ffffff; font-size: 18px; font-weight: 600;">${voucherNumber}</div>
+        </div>
+
+        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+
+        <div style="margin-bottom: 12px;">
+          <span style="color: #FF9800; font-size: 14px;">Package: </span>
+          <span style="color: #ffffff; font-size: 16px;">${packageName}</span>
+        </div>
+
+        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+
+        <div>
+          <span style="color: #FF9800; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.3); padding: 4px 12px; border-radius: 6px; display: inline-block; font-weight: 600;">CONFIRMED</span>
+        </div>
+      </div>
+
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Please review the attached voucher carefully. It contains your travel dates, accommodation details, meal plans, and itinerary.</p>
+
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions or need assistance, please don't hesitate to contact us.</p>
+
+      <p style="color: #FF9800; font-size: 18px; font-weight: bold; margin: 20px 0; text-align: center;">We wish you a wonderful and memorable journey! 🎉</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     const text = `Dear ${customerName},\n\nThank you for choosing Trip Sky Way! Your travel voucher is attached.\nVoucher Number: ${voucherNumber}\nPackage: ${packageName}\n\nPlease review the attached voucher for all travel details.\n\nWarm regards,\nTrip Sky Way Team`;
 
@@ -424,20 +587,19 @@ class EmailService {
     }
 
     const loginUrl = `${process.env.CLIENT_URL}/login`;
-    const html = `
-      <h1>Vendor Account Status Update</h1>
-      <p>Dear ${vendor.name},</p>
-      ${vendor.businessName ? `<p><strong>Business:</strong> ${vendor.businessName}</p>` : ''}
-      <p>${message}</p>
-      <p><strong>New Status:</strong> ${status.replace('_', ' ').toUpperCase()}</p>
-      <p>${actionRequired}</p>
-      ${status === 'verified' ? `<a href="${loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Access Your Dashboard</a>` : ''}
-      <br><br>
-      <p>If you have any questions, please contact our support team.</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Vendor Account Status Update 📢</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${vendor.name},</p>
+      ${vendor.businessName ? `<p style="color: #333333; font-size: 16px; margin: 0 0 15px 0;"><strong>Business:</strong> ${vendor.businessName}</p>` : ''}
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">${message}</p>
+      <div style="background-color: #000000; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <p style="color: #ffffff; font-size: 16px; margin: 0;"><strong style="color: #FF8C00;">New Status:</strong> <span style="font-weight: bold; color: ${status === 'verified' ? '#00ff00' : '#FFD700'};">${status.replace('_', ' ').toUpperCase()}</span></p>
+      </div>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 20px 0;">${actionRequired}</p>
+      ${status === 'verified' ? `<div style="text-align: center; margin: 30px 0;">${this.getButton('Access Your Dashboard', loginUrl)}</div>` : ''}
+      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0;">If you have any questions, please contact our support team.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     return this.sendEmail({
       to: vendor.email,
@@ -506,24 +668,25 @@ class EmailService {
       </div>
     `;
 
-    const html = `
-      <h1 style="color: #333;">New Lead Assigned to You</h1>
-      <p>Dear ${salesRep.name},</p>
-      <p>A new lead has been ${assignmentType}${assignedByText}.</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">New Lead Assigned to You 🎯</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${salesRep.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">A new lead has been ${assignmentType}${assignedByText}.</p>
       ${leadDetails}
-      <p><strong>Next Steps:</strong></p>
-      <ul>
-        <li>Review the lead details above</li>
-        <li>Contact the lead as soon as possible</li>
-        <li>Update the lead status in your dashboard</li>
-      </ul>
-      <a href="${leadUrl}" style="display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0;">View Lead in Dashboard</a>
-      <br><br>
-      <p>If you have any questions or need assistance, please contact the administrator.</p>
-      <br>
-      <p>Best regards,</p>
-      <p>The Trip Sky Way Team</p>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
+        <p style="color: #333333; font-size: 16px; margin: 0 0 10px 0;"><strong style="color: #FF8C00;">Next Steps:</strong></p>
+        <ul style="color: #333333; font-size: 14px; margin: 0; padding-left: 20px;">
+          <li style="margin: 5px 0;">Review the lead details above</li>
+          <li style="margin: 5px 0;">Contact the lead as soon as possible</li>
+          <li style="margin: 5px 0;">Update the lead status in your dashboard</li>
+        </ul>
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        ${this.getButton('View Lead in Dashboard', leadUrl)}
+      </div>
+      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0;">If you have any questions or need assistance, please contact the administrator.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     const text = `Dear ${salesRep.name},\n\nA new lead has been ${assignmentType}${assignedByText}.\n\nLead Details:\n${lead.name ? `Name: ${lead.name}\n` : ''}${lead.email ? `Email: ${lead.email}\n` : ''}${lead.phone ? `Phone: ${lead.phone}\n` : ''}${lead.destination ? `Destination: ${lead.destination}\n` : ''}${lead.travelDate ? `Travel Date: ${this.formatDate(lead.travelDate)}\n` : ''}${lead.status ? `Status: ${lead.status.toUpperCase()}\n` : ''}\nView lead in dashboard: ${leadUrl}\n\nBest regards,\nThe Trip Sky Way Team`;
 
@@ -541,92 +704,30 @@ class EmailService {
 
   async sendOTPEmail(user, otp) {
     const subject = 'Your Trip Sky Way Login OTP Code';
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 20px auto; padding: 0; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
-            .content { padding: 30px 20px; }
-            .otp-box { 
-              background-color: #f8f9fa; 
-              padding: 25px; 
-              text-align: center; 
-              margin: 30px 0;
-              border-radius: 8px;
-              border: 2px dashed #667eea;
-            }
-            .otp-code { 
-              font-size: 42px; 
-              font-weight: bold; 
-              color: #667eea;
-              letter-spacing: 8px;
-              font-family: 'Courier New', monospace;
-              margin: 15px 0;
-            }
-            .otp-expires {
-              color: #666;
-              font-size: 14px;
-              margin-top: 10px;
-            }
-            .warning-box {
-              background-color: #fff3cd;
-              border-left: 4px solid #ffc107;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .warning-box strong { color: #856404; }
-            .warning-box p { margin: 5px 0; color: #856404; }
-            .info-list { list-style: none; padding: 0; margin: 20px 0; }
-            .info-list li { padding: 8px 0; border-bottom: 1px solid #eee; }
-            .info-list li:last-child { border-bottom: none; }
-            .footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666; border-radius: 0 0 8px 8px; }
-            .footer p { margin: 5px 0; }
-            a.button { display: inline-block; padding: 10px 20px; background-color: #667eea; color: white; text-decoration: none; border-radius: 5px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Trip Sky Way</h1>
-              <p style="margin: 10px 0 0 0; font-size: 14px;">Security Verification</p>
-            </div>
-            
-            <div class="content">
-              <p style="font-size: 16px; color: #333;">Dear ${user.name},</p>
-              
-              <p>Your one-time password (OTP) for logging into your Trip Sky Way account is:</p>
-              
-              <div class="otp-box">
-                <p style="margin: 0 0 10px 0; color: #666; font-size: 12px;">Your OTP Code</p>
-                <div class="otp-code">${otp}</div>
-                <p class="otp-expires">⏱️ Valid for 10 minutes</p>
-              </div>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 10px 0; text-align: center;">Security Verification 🔐</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Your one-time password (OTP) for logging into your Trip Sky Way account is:</p>
+      
+      <div style="background-color: #ffffff; padding: 30px; text-align: center; margin: 30px 0; border-radius: 8px; border: 2px dashed #FF8C00;">
+        <p style="margin: 0 0 15px 0; color: #666; font-size: 14px; font-weight: bold;">Your OTP Code</p>
+        <div style="background: linear-gradient(135deg, #FF8C00 0%, #FF6B00 100%); color: white; font-size: 48px; font-weight: bold; letter-spacing: 12px; font-family: 'Courier New', monospace; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0 4px 6px rgba(255, 140, 0, 0.3);">${otp}</div>
+        <p style="color: #666; font-size: 14px; margin: 15px 0 0 0;">⏱️ Valid for 10 minutes</p>
+      </div>
 
-              <div class="warning-box">
-                <p><strong>⚠️ Important Security Notice:</strong></p>
-                <p>• Never share this OTP with anyone</p>
-                <p>• Never reply to this email with sensitive information</p>
-                <p>• This code expires in 10 minutes</p>
-                <p>• If you didn't request this OTP, ignore this email</p>
-              </div>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 20px; margin: 30px 0; border-radius: 4px;">
+        <p style="color: #333333; font-size: 15px; margin: 0 0 12px 0;"><strong style="color: #FF8C00;">⚠️ Important Security Notice:</strong></p>
+        <ul style="color: #333333; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;">
+          <li>Never share this OTP with anyone</li>
+          <li>Never reply to this email with sensitive information</li>
+          <li>This code expires in 10 minutes</li>
+          <li>If you didn't request this OTP, ignore this email</li>
+        </ul>
+      </div>
 
-              <p style="color: #666; font-size: 14px; margin-top: 20px;">If you continue to have trouble logging in, please <a href="mailto:support@tripskyway.com" style="color: #667eea; text-decoration: none;">contact our support team</a>.</p>
-            </div>
-            
-            <div class="footer">
-              <p><strong>Trip Sky Way Management System</strong></p>
-              <p>© 2025 Trip Sky Way. All rights reserved.</p>
-              <p style="color: #999;">This is an automated message. Please do not reply to this email.</p>
-            </div>
-          </div>
-        </body>
-      </html>
+      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; text-align: center;">If you continue to have trouble logging in, please <a href="mailto:support@tripskyway.com" style="color: #FF8C00; text-decoration: none; font-weight: bold;">contact our support team</a>.</p>
     `;
+    const html = this.getEmailTemplate(content);
 
     const text = `Dear ${user.name},\n\nYour one-time password (OTP) for logging in is:\n\n${otp}\n\nThis code is valid for 10 minutes.\n\nIMPORTANT: Never share this OTP with anyone. If you didn't request this code, please ignore this email.\n\nBest regards,\nThe Trip Sky Way Team`;
 
@@ -640,23 +741,24 @@ class EmailService {
 
   async sendLoginNotification(user) {
     const subject = 'New Login Detected - Trip Sky Way';
-    const html = `
-      <p>Dear ${user.name},</p>
+    const content = `
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">New Login Detected 🔔</h1>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">We detected a new login to your Trip Sky Way account.</p>
       
-      <p>We detected a new login to your Trip Sky Way account.</p>
-      
-      <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <p><strong>Login Details:</strong></p>
-        <ul style="margin: 10px 0;">
-          <li><strong>Timestamp:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</li>
-          <li><strong>Account:</strong> ${user.email}</li>
-        </ul>
+      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #FF9800; font-size: 18px; margin: 0 0 15px 0;">Login Details</h3>
+        <table style="width: 100%; color: #ffffff; font-size: 15px;">
+          <tr><td style="padding: 10px 0; border-bottom: 1px solid #333;"><strong style="color: #FF9800;">Timestamp:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #333;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td></tr>
+          <tr><td style="padding: 10px 0;"><strong style="color: #FF9800;">Account:</strong></td><td style="padding: 10px 0;">${user.email}</td></tr>
+        </table>
       </div>
       
-      <p>If you didn't authorize this login, please change your password immediately and contact our support team.</p>
-      
-      <p>Best regards,<br/>The Trip Sky Way Team</p>
+      <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
+        <p style="color: #333333; font-size: 14px; margin: 0;">⚠️ <strong style="color: #FF8C00;">Security Alert:</strong> If you didn't authorize this login, please change your password immediately and contact our support team.</p>
+      </div>
     `;
+    const html = this.getEmailTemplate(content);
 
     const text = `Dear ${user.name},\n\nWe detected a new login to your Trip Sky Way account at ${new Date().toLocaleString()}.\n\nIf you didn't authorize this login, please contact support immediately.\n\nBest regards,\nThe Trip Sky Way Team`;
 
