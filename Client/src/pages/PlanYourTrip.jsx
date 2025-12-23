@@ -19,6 +19,8 @@ import {
   Bed,
   Loader2,
 } from "lucide-react";
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../utils/manualItineraryApi";
 import DestinationSelector from "../components/DestinationSelector";
 import LocationSelector from "../components/LocationSelector";
@@ -55,7 +57,6 @@ export default function PlanYourTrip() {
   // Default preferences (not shown in UI, but used for generating default values)
   const defaultAccommodation = "4-star";
   const defaultMealPlan = "breakfast";
-  const [specialRequest, setSpecialRequest] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -112,7 +113,6 @@ export default function PlanYourTrip() {
       const newDay = {
         dayNumber: nextDayNumber,
         title: `Day ${nextDayNumber}`,
-        description: '',
         locations: [],
         activities: [],
         accommodation: {
@@ -210,8 +210,8 @@ export default function PlanYourTrip() {
       setValidationMsg('Please select valid travel dates first.');
       return;
     }
-    if (step === 4 && (!name || !email || !phone)) {
-      setValidationMsg('Please fill in your name, email and phone to submit.');
+    if (step === 4 && !email) {
+      setValidationMsg('Please fill in your email address to submit.');
       return;
     }
     setValidationMsg('');
@@ -224,8 +224,8 @@ export default function PlanYourTrip() {
   const back = () => step > 1 && setStep(step - 1);
 
   const handleSubmit = async () => {
-    if (!name || !email || !phone) {
-      setValidationMsg('Please fill in your name, email and phone to submit.');
+    if (!email) {
+      setValidationMsg('Please fill in your email address to submit.');
       return;
     }
 
@@ -245,7 +245,7 @@ export default function PlanYourTrip() {
       const payload = {
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim(),
+        phone: phone ? phone.trim() : '',
         destination: destinationName,
         destinationCountry: destinationValue,
         region: '',
@@ -253,29 +253,36 @@ export default function PlanYourTrip() {
         endDate: endDate,
         numberOfTravelers: travelers,
         budget: '',
-        message: specialRequest.trim() || '',
-        days: itineraryDays.map(day => ({
-          dayNumber: day.dayNumber,
-          title: day.title || `Day ${day.dayNumber}`,
-          description: day.description || '',
-          locations: day.locations || [],
-          activities: day.activities || [],
-          accommodation: day.accommodation || {
-            name: '',
-            type: 'hotel',
-            rating: 0,
-            address: '',
-            contactNumber: '',
-          },
-          meals: day.meals || {
-            breakfast: false,
-            lunch: false,
-            dinner: false,
-          },
-          transport: day.transport || '',
-          places: day.places || [],
-          notes: day.notes || '',
-        })),
+        message: '',
+        days: itineraryDays.map(day => {
+          const dayData = {
+            dayNumber: day.dayNumber,
+            title: day.title || `Day ${day.dayNumber}`,
+            locations: day.locations || [],
+            activities: day.activities || [],
+            accommodation: day.accommodation || {
+              name: '',
+              type: 'hotel',
+              rating: 0,
+              address: '',
+              contactNumber: '',
+            },
+            meals: day.meals || {
+              breakfast: false,
+              lunch: false,
+              dinner: false,
+            },
+            places: day.places || [],
+            notes: day.notes || '',
+          };
+          
+          // Only include transport if it has a valid value (not empty string)
+          if (day.transport && day.transport.trim() !== '') {
+            dayData.transport = day.transport;
+          }
+          
+          return dayData;
+        }),
       };
 
       await submitManualItineraryRequest(payload);
@@ -684,21 +691,6 @@ export default function PlanYourTrip() {
                           />
                         </div>
 
-                        {/* Description */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Description *
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={itineraryDays[currentDayIndex].description || ''}
-                            onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'description', e.target.value)}
-                            placeholder="Describe what you'd like to do on this day..."
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                            required
-                          />
-                        </div>
-
                         {/* Locations */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -856,17 +848,6 @@ export default function PlanYourTrip() {
                 </div>
               )}
 
-              {/* Special Requests */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Overall Special Requests</label>
-                <textarea
-                  value={specialRequest}
-                  onChange={(e) => setSpecialRequest(e.target.value)}
-                  placeholder="Anniversary, dietary needs, accessibility requirements, etc."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                  rows={3}
-                />
-              </div>
             </div>
           )}
 
@@ -883,35 +864,44 @@ export default function PlanYourTrip() {
               <div className="grid md:grid-cols-2 gap-6 mb-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-semibold text-gray-700">Full Name</label>
+                      <span className="text-xs text-gray-500">(Optional)</span>
+                    </div>
                     <input
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-semibold text-gray-700">Email Address</label>
+                      <span className="px-2 py-0.5 text-xs font-bold text-orange-600 bg-orange-100 rounded-full">Required</span>
+                    </div>
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border-2 border-orange-500/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
-                    <input
-                      type="tel"
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-semibold text-gray-700">Phone Number</label>
+                      <span className="text-xs text-gray-500">(Optional)</span>
+                    </div>
+                    <PhoneInput
+                      international
+                      defaultCountry="LK"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      required
+                      onChange={(value) => setPhone(value || '')}
+                      className="phone-input-wrapper"
+                      placeholder="Enter phone number"
                     />
                   </div>
                 </div>
@@ -946,10 +936,6 @@ export default function PlanYourTrip() {
                       <div className="sm:col-span-2">
                         <div className="text-xs text-gray-500">Itinerary Days</div>
                         <div className="font-semibold">{itineraryDays.length} days planned</div>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <div className="text-xs text-gray-500">Special Requests</div>
-                        <div className="font-semibold">{specialRequest || '—'}</div>
                       </div>
                     </div>
                   </div>
@@ -986,14 +972,14 @@ export default function PlanYourTrip() {
                 (step === 1 && !selectedDest) ||
                 (step === 2 && (!startDate || !endDate)) ||
                 (step === 3 && duration === 0) ||
-                (step === 4 && (!name || !email || !phone))
+                (step === 4 && !email)
               }
               className={`flex-1 px-6 py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all ${
                 isSubmitting ||
                 (step === 1 && !selectedDest) ||
                 (step === 2 && (!startDate || !endDate)) ||
                 (step === 3 && duration === 0) ||
-                (step === 4 && (!name || !email || !phone))
+                (step === 4 && !email)
                   ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                   : 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white hover:shadow-xl transform hover:scale-[1.02]'
               }`}
@@ -1040,7 +1026,6 @@ export default function PlanYourTrip() {
                   setName('');
                   setEmail('');
                   setPhone('');
-                  setSpecialRequest('');
                   setItineraryDays([]);
                   setValidationMsg('');
                 }}

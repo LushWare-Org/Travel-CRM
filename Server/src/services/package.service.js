@@ -470,6 +470,7 @@ class PackageService {
       const packages = await Package.find({
         isFeatured: true,
         isActive: true,
+        status: 'published',
       })
         .populate('createdBy', 'name email')
         .populate('itinerary')
@@ -562,6 +563,7 @@ class PackageService {
         {
           $text: { $search: searchTerm },
           isActive: true,
+          status: 'published',
         },
         {
           score: { $meta: 'textScore' },
@@ -644,6 +646,7 @@ class PackageService {
       const packages = await Package.find({
         category,
         isActive: true,
+        status: 'published',
       })
         .populate('createdBy', 'name email')
         .populate('itinerary')
