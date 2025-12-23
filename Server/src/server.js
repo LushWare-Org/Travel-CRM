@@ -55,6 +55,7 @@ import billingRoutes from './routes/billing.routes.js';
 import voucherRoutes from './routes/voucher.routes.js';
 import paymentHistoryRoutes from './routes/paymentHistory.routes.js';
 import hotelSuggestionRoutes from './routes/hotelSuggestion.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
 
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';

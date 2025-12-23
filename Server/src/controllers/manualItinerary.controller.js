@@ -11,11 +11,34 @@ import logger from '../config/logger.js';
 
 const normalizePhone = (phone) => {
   if (!phone) return undefined;
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) {
-    return digits;
+  
+  // Trim and check if empty
+  const cleaned = phone.trim();
+  if (!cleaned) return undefined;
+  
+  // PhoneInput from react-phone-number-input returns E.164 format (e.g., +94771234567)
+  // Keep it as is if it starts with + (international format)
+  if (cleaned.startsWith('+')) {
+    return cleaned;
   }
-  return undefined;
+  
+  // If it's a valid phone number format, return it
+  // Extract digits to check length
+  const digits = cleaned.replace(/\D/g, '');
+  
+  // Accept phone numbers with at least 7 digits (minimum valid phone number)
+  if (digits.length >= 7) {
+    // If it has country code (more than 10 digits), add + prefix
+    if (digits.length > 10) {
+      return `+${digits}`;
+    }
+    // For 10-digit numbers, return as is (local format)
+    // For 7-9 digit numbers, return as is (might be partial or local)
+    return cleaned;
+  }
+  
+  // Return the original cleaned value if it has content
+  return cleaned.length > 0 ? cleaned : undefined;
 };
 
 // @desc    Create or update manual itinerary for a lead
@@ -231,8 +254,8 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
   const leadPayload = {
     name: sanitizedName,
     email: sanitizedEmail,
-    phone: normalizedPhone,
-    whatsapp: normalizedPhone,
+    phone: normalizedPhone || phone?.trim() || undefined,
+    whatsapp: normalizedPhone || phone?.trim() || undefined,
     source: 'website',
     platform: 'Website Form',
     destination: destination || '',
@@ -289,28 +312,36 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
       [
         {
           lead: newLead._id,
-          days: days.map((day) => ({
-            dayNumber: day.dayNumber || 1,
-            title: day.title || `Day ${day.dayNumber || 1}`,
-            description: day.description || '',
-            locations: day.locations || [],
-            activities: day.activities || [],
-            accommodation: day.accommodation || {
-              name: '',
-              type: 'hotel',
-              rating: 0,
-              address: '',
-              contactNumber: '',
-            },
-            meals: day.meals || {
-              breakfast: false,
-              lunch: false,
-              dinner: false,
-            },
-            transport: day.transport || '',
-            places: day.places || [],
-            notes: day.notes || '',
-          })),
+          days: days.map((day) => {
+            const dayData = {
+              dayNumber: day.dayNumber || 1,
+              title: day.title || `Day ${day.dayNumber || 1}`,
+              description: day.description || '',
+              locations: day.locations || [],
+              activities: day.activities || [],
+              accommodation: day.accommodation || {
+                name: '',
+                type: 'hotel',
+                rating: 0,
+                address: '',
+                contactNumber: '',
+              },
+              meals: day.meals || {
+                breakfast: false,
+                lunch: false,
+                dinner: false,
+              },
+              places: day.places || [],
+              notes: day.notes || '',
+            };
+            
+            // Only include transport if it has a valid non-empty value
+            if (day.transport && day.transport.trim() !== '') {
+              dayData.transport = day.transport;
+            }
+            
+            return dayData;
+          }),
           createdBy: user._id,
           status: 'draft',
           metadata: {
