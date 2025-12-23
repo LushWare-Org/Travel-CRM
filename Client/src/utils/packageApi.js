@@ -8,6 +8,7 @@ export const fetchPackages = async (params = {}) => {
     params: {
       limit: DEFAULT_LIMIT,
       isActive: true,
+      status: 'published',
       ...params,
     },
   });
