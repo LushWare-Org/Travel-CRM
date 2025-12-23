@@ -250,7 +250,24 @@ export default function PackageDetails() {
     if (!pkg) return;
     setIsDownloading(true);
     try {
-      await generateManagementPDF(pkg.raw || pkg);
+      // Get the package data - prefer raw (original API response) which has _id
+      // If raw doesn't exist, use pkg but ensure it has the ID
+      const packageData = pkg.raw || pkg;
+      
+      // Ensure the package has an ID for dynamic fetching
+      // The PDF service will fetch the latest package data from API using this ID
+      const packageWithId = {
+        ...packageData,
+        _id: packageData._id || packageData.id || id,
+        id: packageData.id || packageData._id || id,
+      };
+      
+      console.log('[PDF Download] Package ID:', packageWithId._id || packageWithId.id);
+      console.log('[PDF Download] Package name:', packageWithId.name || packageWithId.title);
+      
+      // Use the same approach as management side - pass package with ID
+      // The PDF service will fetch latest data dynamically
+      await generateManagementPDF(packageWithId);
     } catch (error) {
       console.error('Failed to generate itinerary PDF via management service.', error);
       window.alert('Unable to generate the itinerary PDF right now. Please try again later.');
