@@ -33,6 +33,7 @@ const SalesRepManagement = () => {
   const [repToDelete, setRepToDelete] = useState(null);
   const [repToResendInvite, setRepToResendInvite] = useState(null);
   const [repToResetPassword, setRepToResetPassword] = useState(null);
+  const [onlineStatus, setOnlineStatus] = useState({});
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -52,6 +53,11 @@ const SalesRepManagement = () => {
 
   const ITEMS_PER_PAGE = 10;
 
+  // Calculate online count from onlineStatus
+  const onlineCount = useMemo(() => {
+    return Object.values(onlineStatus).filter(status => status === true).length;
+  }, [onlineStatus]);
+
   // Load sales reps from backend on mount
   useEffect(() => {
     loadSalesReps();
@@ -67,6 +73,35 @@ const SalesRepManagement = () => {
     
     loadSalesReps();
   }, [currentPage, searchTerm]);
+
+  // Poll for online status every 60 seconds
+  useEffect(() => {
+    // Load online status immediately
+    loadOnlineStatus();
+    
+    // Set up polling interval
+    const interval = setInterval(() => {
+      loadOnlineStatus();
+    }, 60000); // Poll every 60 seconds
+    
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, []);
+
+  /**
+   * Load online status of sales reps
+   */
+  const loadOnlineStatus = async () => {
+    try {
+      const response = await salesRepService.getOnlineStatus();
+      if (response.status === 'success' && response.data) {
+        setOnlineStatus(response.data.onlineStatus || {});
+      }
+    } catch (error) {
+      // Silently fail for online status - non-critical feature
+      console.error('Failed to load online status:', error);
+    }
+  };
 
   /**
    * Load sales reps from backend API with pagination
@@ -109,7 +144,7 @@ const SalesRepManagement = () => {
           if (rep.isTempPassword || !rep.isEmailVerified) {
             status = 'invited';
           } else {
-            status = 'active';
+            status = 'verified';
           }
         }
         
@@ -492,7 +527,7 @@ const SalesRepManagement = () => {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <StatsCard label="Total Reps" value={stats.total} icon={User} color="blue" />
-            <StatsCard label="Active Reps" value={stats.active} icon={User} color="green" />
+            <StatsCard label="Active Reps" value={onlineCount} icon={User} color="green" />
             <StatsCard label="Total Leads" value={stats.totalLeads} icon={TrendingUp} color="purple" />
             <StatsCard label="Conv. Rate (%)" value={stats.avgConversion} icon={TrendingUp} color="orange" />
             <StatsCard 
@@ -516,6 +551,7 @@ const SalesRepManagement = () => {
             <>
               <SalesRepTable
                 reps={salesReps}
+                onlineStatus={onlineStatus}
                 onEdit={openEditDialog}
                 onDelete={handleDeleteRep}
                 onResendInvite={handleResendInvitation}

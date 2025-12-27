@@ -620,6 +620,59 @@ export const deleteSalesRep = asyncHandler(async (req, res, next) => {
 });
 
 /**
+ * @desc    Get online status of all sales representatives
+ * @route   GET /api/v1/sales-reps/online-status
+ * @access  Private/Admin
+ * @returns Object mapping sales rep IDs to their online status (boolean)
+ */
+export const getOnlineSalesReps = asyncHandler(async (req, res, next) => {
+  try {
+    // Consider a sales rep online if they had activity in the last 5 minutes
+    const onlineThresholdMinutes = 5;
+    const thresholdTime = new Date(Date.now() - onlineThresholdMinutes * 60 * 1000);
+
+    // Get all active sales reps
+    const salesReps = await User.find({
+      role: 'salesRep',
+      isActive: true,
+    })
+      .select('_id name email lastActivity')
+      .lean();
+
+    // Build online status map
+    const onlineStatus = {};
+    salesReps.forEach((rep) => {
+      // Rep is online if lastActivity exists and is within threshold
+      onlineStatus[rep._id.toString()] = rep.lastActivity && rep.lastActivity >= thresholdTime;
+    });
+
+    // Also return list of online reps with details for easier frontend consumption
+    const onlineReps = salesReps
+      .filter((rep) => rep.lastActivity && rep.lastActivity >= thresholdTime)
+      .map((rep) => ({
+        id: rep._id,
+        name: rep.name,
+        email: rep.email,
+        lastActivity: rep.lastActivity,
+      }));
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        onlineStatus, // Object: { repId: true/false }
+        onlineReps, // Array of online rep details
+        onlineCount: onlineReps.length,
+        totalCount: salesReps.length,
+        thresholdMinutes: onlineThresholdMinutes,
+      },
+    });
+  } catch (error) {
+    logger.error(`Error getting online sales reps: ${error.message}`);
+    return next(new AppError('Error retrieving online status', 500));
+  }
+});
+
+/**
  * Utility function to generate secure temporary password
  * @returns {string} 12-character temporary password with mixed case, numbers, and symbols
  */

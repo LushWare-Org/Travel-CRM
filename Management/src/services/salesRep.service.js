@@ -193,6 +193,24 @@ class SalesRepService {
   }
 
   /**
+   * Get online status of all sales representatives
+   * @returns {Promise<Object>} Online status data
+   * @returns {Object} response.data.onlineStatus - Object mapping rep IDs to online status (boolean)
+   * @returns {Array} response.data.onlineReps - Array of currently online reps with details
+   * @returns {number} response.data.onlineCount - Count of online reps
+   * @returns {number} response.data.totalCount - Total count of sales reps
+   */
+  async getOnlineStatus() {
+    try {
+      const response = await this.api.get(`${this.endpoint}/online-status`);
+      return response;
+    } catch (error) {
+      console.error('Error fetching online status:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * ==================== UTILITY METHODS ====================
    */
 
