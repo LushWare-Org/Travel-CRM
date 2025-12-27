@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut, BarChart3 } from "lucide-react";
+import { Menu, X, Home, Users, MapPin, DollarSign, User, LogOut, BarChart3, Briefcase } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
 import toast from "react-hot-toast";
@@ -31,23 +31,15 @@ const Sidebar = () => {
         return false;
       }
     },
+    { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
+    { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] },
     { 
-      icon: DollarSign, 
-      label: "Billing", 
-      path: "/billing", 
+      icon: Briefcase, 
+      label: "Career", 
+      path: "/career", 
       requiredPermission: null,
-      // Admins with manage_billing or sales reps with view_billing can access
-      customCheck: (userRole, userIsSuperAdmin, hasPermission) => {
-        // SuperAdmins always have access
-        if (userRole === 'superAdmin' && userIsSuperAdmin === true) return true;
-        // Sales reps can view billing with view_billing permission
-        if (userRole === 'salesRep') return hasPermission('view_billing');
-        // Regular admins need manage_billing permission
-        if (userRole === 'admin') return hasPermission('manage_billing');
-        return false;
-      }
-    },
-    { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] }
+      customCheck: (userRole) => userRole === 'superAdmin'
+    }
   ];
 
   // Filter navigation items based on permissions and roles

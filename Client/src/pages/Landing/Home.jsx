@@ -30,6 +30,7 @@ import { fetchPackages } from '../../utils/packageApi';
 import { fetchRecentBookings } from '../../utils/bookingApi';
 import { formatCurrency } from '../../utils/currency';
 import Stats from './Stats';
+import AboutSection from './AboutSection';
 
 const heroSlides = [
   { title: 'Discover Your Dream Destination', subtitle: 'Explore the world with our curated travel experiences' },
@@ -298,7 +299,7 @@ export default function Home() {
   return (
     <div className="min-h-screen with-fixed-header font-opensans">
       {/* HERO SECTION */}
-      <div className="relative h-[82vh] lg:h-[82vh] bg-black">
+      <div className="relative h-[80vh] lg:h-[80vh] bg-black">
         <div className="absolute bottom-0 left-0 right-0 z-20 bg-black/90 backdrop-blur-sm border-t border-white/10 overflow-hidden">
           <style>{`
             @keyframes scroll-left {
@@ -316,9 +317,9 @@ export default function Home() {
               animation-play-state: paused;
             }
           `}</style>
-          <div className="flex animate-scroll-continuous whitespace-nowrap py-5">
+          {/* <div className="flex animate-scroll-continuous whitespace-nowrap py-5"> */}
             {/* Tags */}
-            <div className="flex items-center">
+            {/* <div className="flex items-center">
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
                 <Globe className="w-5 h-5 text-orange-400 flex-shrink-0" /> Explore 100+ Destinations
               </span>
@@ -344,7 +345,6 @@ export default function Home() {
                 <Plane className="w-5 h-5 text-orange-400 flex-shrink-0" /> Hassle-Free Bookings
               </span>
             </div>
-            {/* Duplicate set */}
             <div className="flex items-center">
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
                 <Globe className="w-5 h-5 text-orange-400 flex-shrink-0" /> Explore 100+ Destinations
@@ -370,8 +370,8 @@ export default function Home() {
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
                 <Plane className="w-5 h-5 text-orange-400 flex-shrink-0" /> Hassle-Free Bookings
               </span>
-            </div>
-          </div>
+            </div> */}
+          {/* </div> */}
         </div>       
          {/* Video Slides */}
         {[0, 1, 2, 3, 4].map((i) => (
@@ -412,10 +412,10 @@ export default function Home() {
         </button>
 
         {/* Hero Content */}
-      <div className="relative z-30 h-full flex flex-col items-center justify-start pt-12 md:pt-24 px-4">          
+      <div className="relative z-30 h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">          
         <div className="max-w-7xl text-center mx-auto">
             <div className="max-w-4xl">
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight font-poppins">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-poppins">
                 {(() => {
                   const { title } = heroSlides[currentSlide % 4];
                   const words = title.split(' ');
@@ -428,23 +428,23 @@ export default function Home() {
                   );
                 })()}
               </h1>
-              <p className="text-xl text-gray-200 mb-6 md:mb-12">{heroSlides[currentSlide % 4].subtitle}</p>
+              <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{heroSlides[currentSlide % 4].subtitle}</p>             
 
               {/* Search bar */}
-              <div className="relative">
+              <div className="relative mt-16 md:mt-15 lg:mt-15">
                 <div className="bg-white/99 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 overflow-visible">
                   <div className="h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 animate-gradient-x" />
-                  <div className="p-5 overflow-visible">
+                  <div className="p-4 sm:p-5 overflow-visible">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
                       <div className="lg:col-span-5 relative group">
-                        <label className="flex items-center text-sm font-semibold text-white mb-3">
+                        <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
                           <MapPin className="w-4 h-4 mr-2 text-white" /> Where to?
                         </label>
                         <div className="relative">
                           <select
                             value={searchFilters.destination}
                             onChange={(e) => setSearchFilters(p => ({ ...p, destination: e.target.value }))}
-                            className="w-full px-5 py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium appearance-none cursor-pointer transition-all focus:border-orange-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
+                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium text-sm sm:text-base appearance-none cursor-pointer transition-all focus:border-orange-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
                           >
                             <option value="" disabled hidden>{destinationPlaceholder || 'Select Destination'}</option>
                             <optgroup label="🌏 International Destinations">
@@ -471,14 +471,14 @@ export default function Home() {
                       </div>
 
                       <div className="lg:col-span-4 relative group" ref={monthDropdownRef}>
-                        <label className="flex items-center text-sm font-semibold text-white mb-3">
+                        <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
                           <Calendar className="w-4 h-4 mr-2 text-white" /> When?
                         </label>
                         <div className="relative">
                           <button
                             type="button"
                             onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
-                            className="w-full px-5 py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-left text-gray-900 font-medium flex items-center justify-between transition-all focus:border-orange-500 focus:bg-white hover:border-gray-300"
+                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-left text-gray-900 font-medium text-sm sm:text-base flex items-center justify-between transition-all focus:border-orange-500 focus:bg-white hover:border-gray-300"
                           >
                             <span>
                               {searchFilters.when
@@ -527,7 +527,7 @@ export default function Home() {
                       <div className="lg:col-span-3">
                         <button
                           onClick={handleSearch}
-                          className="w-full group relative overflow-hidden px-8 py-3 bg-gradient-to-r from-orange-500 via-red-500 to-yellow-500 text-white rounded-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+                          className="w-full group relative overflow-hidden px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-black rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
                         >
                           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
                           <span className="relative flex items-center justify-center space-x-2">
@@ -547,6 +547,7 @@ export default function Home() {
       </div>
 
       <Stats/>
+      <AboutSection />
 
       {/* Deals of the Month */}
       {/* <section className="py-16 bg-white relative overflow-hidden font-opensans">
@@ -561,8 +562,8 @@ export default function Home() {
 
       <RecentlyBookedSlider items={recentItems} />
       <DestinationsSection destinations={destinations} localDestinations={localDestinations} />
-      <FeaturedPackages packages={packages} />
       <WhyChooseUs />
+      <FeaturedPackages packages={packages} />
       <TestimonialsSection />
       <FAQSection />
       <KeyPartnersSection />

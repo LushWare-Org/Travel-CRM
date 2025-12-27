@@ -49,7 +49,7 @@ export const uploadImage = async (filePath, options = {}) => {
     }
 
     return {
-      url: result.secure_url,
+      url: result.secure_url.replace('/image/upload/', '/raw/upload/'),
       publicId: result.public_id,
       width: result.width,
       height: result.height,

@@ -112,7 +112,7 @@ export default function AuthPage() {
                 onClick={() => setIsLogin(true)}
                 className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
                   isLogin
-                    ? 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white shadow-lg transform scale-105'
+                    ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white shadow-lg transform scale-105'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -122,7 +122,7 @@ export default function AuthPage() {
                 onClick={() => setIsLogin(false)}
                 className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
                   !isLogin
-                    ? 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white shadow-lg transform scale-105'
+                    ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white shadow-lg transform scale-105'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -303,7 +303,7 @@ export default function AuthPage() {
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-orange-600 via-orange-500 to-yellow-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center space-x-2 group mt-8 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center justify-center space-x-2 group mt-8 disabled:opacity-60 disabled:cursor-not-allowed"
                 disabled={isSubmitting}
               >
                 <span>{isSubmitting ? (isLogin ? 'Signing In...' : 'Creating Account...') : (isLogin ? 'Sign In' : 'Create Account')}</span>

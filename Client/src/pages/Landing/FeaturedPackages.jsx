@@ -15,7 +15,7 @@ export default function FeaturedPackages({ packages }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-poppins">
-            Begin Your Next Great Story With Our Featured Packages
+           Featured Packages You’ll Love
           </h2>
           <p className="text-lg text-gray-600">
             Unique itineraries, top deals, and traveller favourite getaways - all in one place.
@@ -57,10 +57,6 @@ export default function FeaturedPackages({ packages }) {
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-yellow-400" />
                           <span className="text-sm">{pkg.duration_days} Days</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="text-sm">{pkg.rating ? pkg.rating.toFixed(1) : '0.0'} ({pkg.numReviews || 0} reviews)</span>
                         </div>
                       </div>
                     </div>
