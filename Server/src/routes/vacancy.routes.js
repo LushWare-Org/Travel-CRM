@@ -11,13 +11,13 @@ import {
 
 const router = express.Router();
 router.get('/', getVacancies);
-router.get('/:id', getVacancyById);
+router.get('/admin/all', getAdminVacancies);
 
 router.use(protect, authorize('admin', 'superAdmin'));
 
 router.post('/', createVacancy);
+router.get('/:id', getVacancyById);
 router.patch('/:id', updateVacancy);
 router.delete('/:id', deleteVacancy);
-router.get('/admin/all', getAdminVacancies);
 
 export default router;

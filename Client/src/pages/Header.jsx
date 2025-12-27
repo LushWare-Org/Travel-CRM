@@ -120,7 +120,7 @@ export default function Header({ currentPage, onNavigate }) {
   ].filter(Boolean);
 
   const getColumnClass = len => len <= 7 ? 'grid-cols-2' : len <= 15 ? 'grid-cols-3' : 'grid-cols-4';
-  const getDropdownWidth = len => len <= 7 ? 'w-80' : len <= 15 ? 'w-[500px]' : 'w-[600px]';
+  const getDropdownWidth = len => 'w-80';
   const LONG_NAME_THRESHOLD = 18;
   const isItemActive = (item) => {
     if (item.page === 'home') return pathname === '/';
@@ -191,66 +191,31 @@ export default function Header({ currentPage, onNavigate }) {
                   {/* Dropdown Menu */}
                   {item.dropdown && activeDropdown === item.page && (
                     <div
-                      className={`absolute top-full left-1/2 -translate-x-1/2 mt-0 ${getDropdownWidth(item.dropdown.length)} bg-white rounded-xl shadow-2xl border border-gray-100 py-5 z-50 animate-fadeIn`}
+                      className={`absolute top-full left-1/2 -translate-x-1/2 mt-0 bg-white rounded-xl shadow-2xl border border-gray-100 py-5 z-50 animate-fadeIn w-max`}
                       onMouseEnter={() => setActiveDropdown(item.page)}
                       onMouseLeave={() => setActiveDropdown(null)}
-                      style={{ marginTop: '-2px', paddingTop: '10px' }}
+                      style={{ marginTop: '-2px', paddingTop: '10px', minWidth: '200px' }}
                     >
                       <div className="px-5">
-                        {(() => {
-                          const shortItems = item.dropdown.filter(sub => (sub.name || '').length <= LONG_NAME_THRESHOLD);
-                          const longItems = item.dropdown.filter(sub => (sub.name || '').length > LONG_NAME_THRESHOLD);
-
-                          return (
-                            <>
-                              {shortItems.length > 0 && (
-                                <div className={`grid ${getColumnClass(shortItems.length)} gap-3`}>
-                                  {shortItems.map(sub => {
-                                    const qVal = sub.slug;
-                                    return (
-                                      <a
-                                        key={sub.id}
-                                        href={`/packages?destination=${qVal}`}
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          onNavigate('packages', `destination=${qVal}`);
-                                          setActiveDropdown(null);
-                                        }}
-                                        className="px-4 py-2.5 text-left text-sm text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-all rounded-lg font-medium whitespace-nowrap block"
-                                      >
-                                        {sub.name}
-                                      </a>
-                                    );
-                                  })}
-                                </div>
-                              )}
-
-                              {longItems.length > 0 && (
-                                <div className="mt-3">
-                                  <div className="space-y-2">
-                                    {longItems.map(sub => {
-                                      const qVal = sub.slug;
-                                      return (
-                                        <a
-                                          key={sub.id}
-                                          href={`/packages?destination=${qVal}`}
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            onNavigate('packages', `destination=${qVal}`);
-                                            setActiveDropdown(null);
-                                          }}
-                                          className="block px-4 py-2.5 text-left text-sm text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-all rounded-lg font-medium whitespace-normal"
-                                        >
-                                          {sub.name}
-                                        </a>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
+                        <div className="space-y-2">
+                          {item.dropdown.map(sub => {
+                            const qVal = sub.slug;
+                            return (
+                              <a
+                                key={sub.id}
+                                href={`/packages?destination=${qVal}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  onNavigate('packages', `destination=${qVal}`);
+                                  setActiveDropdown(null);
+                                }}
+                                className="block px-4 py-2.5 text-left text-sm text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-all rounded-lg font-medium"
+                              >
+                                {sub.name}
+                              </a>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   )}
