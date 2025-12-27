@@ -117,6 +117,11 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     lastLogin: Date,
+    lastActivity: {
+      type: Date,
+      default: Date.now,
+      index: true, // Index for fast online status queries
+    },
     // Vendor-specific fields
     businessName: {
       type: String,

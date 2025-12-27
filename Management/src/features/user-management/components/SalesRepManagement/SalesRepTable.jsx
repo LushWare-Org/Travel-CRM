@@ -3,12 +3,13 @@ import { Edit, Trash, Mail, Key } from 'lucide-react';
 import { STATUS_COLORS } from '../../utils/constants';
 import { formatDate } from '../../utils/helpers';
 
-const SalesRepTable = ({ reps, onEdit, onDelete, onResendInvite, onForcePasswordReset }) => {
+const SalesRepTable = ({ reps, onlineStatus = {}, onEdit, onDelete, onResendInvite, onForcePasswordReset }) => {
   return (
     <div className="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
+            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Online</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Name</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Email</th>
             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Phone</th>
@@ -24,9 +25,18 @@ const SalesRepTable = ({ reps, onEdit, onDelete, onResendInvite, onForcePassword
         <tbody className="divide-y divide-gray-200">
           {reps.map((rep) => {
             const conversionRate = rep.leadsAssigned > 0 ? ((rep.leadsConverted / rep.leadsAssigned) * 100).toFixed(1) : 0;
+            const isOnline = onlineStatus[rep.id] === true;
             
             return (
               <tr key={rep.id} className="hover:bg-gray-50 transition-all duration-200">
+                <td className="px-4 py-3 text-sm border-r border-gray-200">
+                  <div className="flex items-center justify-center">
+                    <span 
+                      className={`h-3 w-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-300'}`}
+                      title={isOnline ? 'Online' : 'Offline'}
+                    ></span>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-sm font-semibold text-gray-900 border-r border-gray-200">{rep.name}</td>
                 <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{rep.email}</td>
                 <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{rep.phone}</td>
@@ -49,8 +59,8 @@ const SalesRepTable = ({ reps, onEdit, onDelete, onResendInvite, onForcePassword
                   <span className="text-gray-700 font-semibold">{rep.commissionRate}%</span>
                 </td>
                 <td className="px-4 py-3 text-sm border-r border-gray-200">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[rep.status] || STATUS_COLORS.active}`}>
-                    {rep.status.charAt(0).toUpperCase() + rep.status.slice(1)}
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STATUS_COLORS[rep.status] || STATUS_COLORS.verified}`}>
+                    {rep.status ? rep.status.charAt(0).toUpperCase() + rep.status.slice(1) : 'Inactive'}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm border-r border-gray-200">
