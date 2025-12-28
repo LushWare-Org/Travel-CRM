@@ -85,7 +85,7 @@ export const PermissionProvider = ({ children }) => {
   const [availablePermissions, setAvailablePermissions] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
   /**
    * Fetch available permissions from backend

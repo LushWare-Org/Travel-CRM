@@ -176,7 +176,7 @@ export default function MyAccount() {
       if (!token) {
         throw new Error('Authentication token not found');
       }
-      const baseUrl = 'http://localhost:5000/api/v1';
+      const baseUrl = 'https://api.harshkumar.space/api/v1';
       const response = await fetch(`${baseUrl}/users/profile`, {
         method: 'PUT',
         headers: {

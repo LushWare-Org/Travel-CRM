@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000/api/v1';
+const API_URL = import.meta.env.VITE_SERVER_URL || 'https://api.harshkumar.space/api/v1';
 
 const careerApi = {
   getActiveVacancies: async (filters = {}) => {
