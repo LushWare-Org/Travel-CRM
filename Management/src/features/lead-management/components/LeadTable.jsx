@@ -188,11 +188,11 @@ const LeadTable = ({
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[180px]">
                 E-mail ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">
-                Whatsapp
+               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">
+                Sales Rep
               </th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[130px]">
-                Sales Rep
+                Whatsapp
               </th>
               <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300 min-w-[110px]">
                 Travelers
@@ -269,10 +269,10 @@ const LeadTable = ({
                     {lead.email || "N/A"}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
-                    {lead.whatsapp || "N/A"}
+                    {lead.salesRep || lead.adviser || "N/A"}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
-                    {lead.salesRep || lead.adviser || "N/A"}
+                    {lead.whatsapp || "N/A"}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
                     {lead.numberOfTravelers || "N/A"}

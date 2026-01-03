@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }) => {
   );
 
   // Logout function
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (opts = {}) => {
     try {
       // Only call logout endpoint if we have a valid token
       if (token) {
@@ -116,10 +116,61 @@ export const AuthProvider = ({ children }) => {
 
       // Clear authorization header
       delete axios.defaults.headers.common['Authorization'];
-
-      toast.success('Logged out successfully');
+      const { silent = false } = opts || {};
+      if (!silent) {
+        toast.success('Logged out successfully');
+      }
     }
   }, [API_URL, token]);
+
+  const inactivityTimerRef = useRef(null);
+
+  useEffect(() => {
+    const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
+
+    const resetTimer = () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = setTimeout(() => {
+        try {
+          toast('You have been logged out due to inactivity');
+        } catch (e) {
+        }
+        logout({ silent: true });
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    const updateLastActivity = () => {
+      try {
+        localStorage.setItem('lastActivity', Date.now().toString());
+      } catch (e) {
+      }
+      resetTimer();
+    };
+
+    const storageListener = (e) => {
+      if (e.key === 'lastActivity') {
+        resetTimer();
+      }
+    };
+
+    if (isAuthenticated) {
+      updateLastActivity();
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+      events.forEach((ev) => window.addEventListener(ev, updateLastActivity));
+      window.addEventListener('storage', storageListener);
+    }
+
+    return () => {
+      const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+      events.forEach((ev) => window.removeEventListener(ev, updateLastActivity));
+      window.removeEventListener('storage', storageListener);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [isAuthenticated, logout]);
 
   // Update profile function
   const updateProfile = useCallback(

@@ -13,16 +13,18 @@ class AIPackageGenerationService {
    * @param {number} nights - Number of nights
    * @returns {Promise<Object>} Complete package object with all details
    */
-  async generatePackage(destination, packageType, category, nights) {
+  async generatePackage(destination, description, packageType, category, nights) {
     try {
       const days = nights + 1; // Convert nights to days
       
+      const descriptionLine = description ? `Description (user requirements): ${description}\n` : '';
       const prompt = `You are an expert travel package designer. Create a complete travel package based on the following requirements:
 
 Destination: ${destination}
 Package Type: ${packageType || 'Standard'}
 Category: ${category || 'Family'}
 Duration: ${nights} nights / ${days} days
+${descriptionLine}
 
 Generate a complete travel package with the following structure:
 

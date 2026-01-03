@@ -6,6 +6,8 @@ const LocationAutocomplete = ({
   onChange,
   placeholder = "e.g., Colombo, Sri Lanka",
   onSelect,
+  inputClassName,
+  iconColorClass,
 }) => {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState([]);
@@ -205,7 +207,7 @@ const LocationAutocomplete = ({
   return (
     <div className="relative">
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-orange-600" />
+        <MapPin className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${iconColorClass || 'text-orange-600'}`} />
         <input
           ref={inputRef}
           type="text"
@@ -218,7 +220,7 @@ const LocationAutocomplete = ({
             }
           }}
           placeholder={placeholder}
-          className="w-full pl-10 pr-8 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+          className={`w-full pl-10 pr-8 py-2.5 rounded-xl focus:outline-none text-sm ${inputClassName || 'border border-gray-300 focus:ring-2 focus:ring-orange-500'}`}
         />
         {query && (
           <button
@@ -252,7 +254,7 @@ const LocationAutocomplete = ({
               }`}
             >
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                <MapPin className={`w-4 h-4 ${iconColorClass || 'text-orange-600'} mt-0.5 flex-shrink-0`} />
                 <span className="text-sm text-gray-700">{suggestion.displayName}</span>
               </div>
             </button>

@@ -436,7 +436,51 @@ const LeadManagement = () => {
         </div>
 
         {/* Stats */}
-        <LeadStats totalLeads={leads.length} leads={leads} />
+        <LeadStats 
+          totalLeads={leads.length} 
+          leads={leads}
+          salesReps={salesReps}
+          onViewLead={(lead) => {
+            setSelectedLead(lead);
+            setLeadEditForm({
+              name: lead.name,
+              email: lead.email,
+              phone: lead.phone,
+              whatsapp: lead.whatsapp,
+              salesRep: lead.salesRep || lead.adviser,
+              destination: lead.destination,
+              platform: lead.platform,
+              travelDate: lead.travelDate
+                ? new Date(lead.travelDate).toISOString().split("T")[0]
+                : "",
+              status: lead.status,
+            });
+          }}
+          onAssignLead={async (lead, salesRepId, salesRepName) => {
+            try {
+              const response = await leadAPI.updateLead(lead._id || lead.id, {
+                salesRep: salesRepName
+              });
+              if (response.success) {
+                setLeads(prev => 
+                  prev.map(l => {
+                    const leadId = l._id || l.id;
+                    const assignedLeadId = lead._id || lead.id;
+                    if (leadId === assignedLeadId) {
+                      return { ...l, salesRep: salesRepName };
+                    }
+                    return l;
+                  })
+                );
+                return response;
+              } else {
+                throw new Error(response.message || 'Failed to assign lead');
+              }
+            } catch (error) {
+              throw error;
+            }
+          }}
+        />
       </div>
 
       {/* Content */}

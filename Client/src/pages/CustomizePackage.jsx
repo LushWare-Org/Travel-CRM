@@ -7,6 +7,8 @@ import { fetchPackageById } from '../utils/packageApi';
 import { submitCustomizationRequest } from '../utils/customizationApi';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
+import ActivitySelector from '../components/ActivitySelector';
+import LocationSelector from '../components/LocationSelector';
 
 const splitTextToList = (value) => {
   if (!value) return [];
@@ -29,8 +31,8 @@ const buildDayState = (day, index) => ({
   dayNumber: day?.dayNumber || index + 1,
   title: day?.title || `Day ${index + 1}`,
   description: day?.description || '',
-  activitiesText: combineListToText(day?.activities),
-  locationsText: combineListToText(day?.locations),
+  activities: Array.isArray(day?.activities) ? day.activities : (typeof day?.activities === 'string' ? splitTextToList(day.activities) : []),
+  locations: Array.isArray(day?.locations) ? day.locations : (typeof day?.locations === 'string' ? splitTextToList(day.locations) : []),
 });
 
 export default function CustomizePackage() {
@@ -156,8 +158,8 @@ export default function CustomizePackage() {
           dayNumber: nextIndex,
           title: `Day ${nextIndex}`,
           description: '',
-          activitiesText: '',
-          locationsText: '',
+          activities: [],
+          locations: [],
         },
       ];
     });
@@ -206,8 +208,8 @@ export default function CustomizePackage() {
       overrides: {
         days: dayOverrides.map((day, index) => ({
           dayNumber: Number(day.dayNumber) || index + 1,
-          activities: splitTextToList(day.activitiesText),
-          locations: splitTextToList(day.locationsText),
+          activities: Array.isArray(day.activities) ? day.activities : splitTextToList(day.activities || ''),
+          locations: Array.isArray(day.locations) ? day.locations : splitTextToList(day.locations || ''),
         })),
       },
     };
@@ -581,20 +583,11 @@ export default function CustomizePackage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                               </svg>
                               Activities
-                              <span className="text-xs font-normal text-black/60">(one per line)</span>
                             </label>
-                            <textarea
-                              rows={4}
-                              value={day.activitiesText}
-                              onChange={(e) => handleDayChange(index, 'activitiesText', e.target.value)}
-                              className="w-full px-4 py-3 text-sm border-2 border-black/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 resize-none bg-white shadow-sm"
-                              placeholder="Enter activities (one per line)"
+                            <ActivitySelector
+                              activities={day.activities || []}
+                              onChange={(activities) => handleDayChange(index, 'activities', activities)}
                             />
-                            {day.activitiesText && (
-                              <p className="text-xs text-black/60 mt-1">
-                                {day.activitiesText.split('\n').filter(Boolean).length} activity/activities
-                              </p>
-                            )}
                           </div>
                           <div className="space-y-2">
                             <label className="block text-sm font-semibold text-black mb-2 flex items-center gap-2">
@@ -603,20 +596,12 @@ export default function CustomizePackage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                               </svg>
                               Locations / Stops
-                              <span className="text-xs font-normal text-black/60">(one per line)</span>
                             </label>
-                            <textarea
-                              rows={4}
-                              value={day.locationsText}
-                              onChange={(e) => handleDayChange(index, 'locationsText', e.target.value)}
-                              className="w-full px-4 py-3 text-sm border-2 border-black/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 resize-none bg-white shadow-sm"
-                              placeholder="Enter locations (one per line)"
+                            <LocationSelector
+                              locations={day.locations || []}
+                              onChange={(locations) => handleDayChange(index, 'locations', locations)}
+                              destination={pkg.destination?.name || pkg.destinationRaw || ''}
                             />
-                            {day.locationsText && (
-                              <p className="text-xs text-black/60 mt-1">
-                                {day.locationsText.split('\n').filter(Boolean).length} location/locations
-                              </p>
-                            )}
                           </div>
                         </div>
                       </div>

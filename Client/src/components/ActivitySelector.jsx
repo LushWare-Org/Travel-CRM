@@ -59,7 +59,7 @@ const ActivitySelector = ({ activities = [], onChange }) => {
           {activitiesArray.map((activity, index) => (
             <span
               key={index}
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 rounded-full text-sm font-medium border border-purple-200"
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-green-800 rounded-full text-sm font-medium border border-green-200"
             >
               {activity}
               <button
@@ -78,7 +78,7 @@ const ActivitySelector = ({ activities = [], onChange }) => {
       <button
         type="button"
         onClick={() => setShowSelector(!showSelector)}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all text-sm font-semibold shadow-md"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-400 to-green-500 text-white rounded-xl transition-all text-sm font-semibold shadow-md"
       >
         <Plus size={16} />
         {showSelector ? 'Hide Activity Selector' : 'Add Activities'}
@@ -86,7 +86,7 @@ const ActivitySelector = ({ activities = [], onChange }) => {
 
       {/* Activity Selector Panel */}
       {showSelector && (
-        <div className="border-2 border-purple-200 rounded-xl p-4 bg-gradient-to-br from-purple-50 to-pink-50 space-y-4">
+        <div className="border-2 border-green-200 rounded-xl p-4 bg-green-50 space-y-4">
           {/* Custom Activity Input */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -99,13 +99,13 @@ const ActivitySelector = ({ activities = [], onChange }) => {
                 onChange={(e) => setCustomActivity(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type custom activity name..."
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
+                className="flex-1 px-4 py-2.5 border border-green-300 rounded-xl text-sm bg-white focus:border-green-300 focus:ring-0 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={handleAddCustomActivity}
                 disabled={!customActivity.trim()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-xl transition-colors disabled:cursor-not-allowed text-sm font-medium"
               >
                 <Plus size={14} />
                 Add
@@ -114,14 +114,14 @@ const ActivitySelector = ({ activities = [], onChange }) => {
           </div>
 
           {/* Category Filter */}
-          <div className="border-t border-purple-300 pt-4">
+          <div className="border-t border-green-300 pt-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Activity Category
             </label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
             >
               {ACTIVITY_CATEGORIES.map((category) => (
                 <option key={category.value} value={category.value}>
@@ -133,13 +133,13 @@ const ActivitySelector = ({ activities = [], onChange }) => {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-600" size={16} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-600" size={16} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search activities..."
-              className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
+              className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
             />
           </div>
 
@@ -157,12 +157,12 @@ const ActivitySelector = ({ activities = [], onChange }) => {
                       disabled={isSelected}
                       className={`px-3 py-2 text-left text-sm rounded-xl transition-colors ${
                         isSelected
-                          ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 cursor-not-allowed border border-purple-200'
-                          : 'bg-gray-50 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 text-gray-700 border border-gray-200 hover:border-purple-300'
+                          ? 'bg-green-100 text-green-800 cursor-not-allowed border border-green-200'
+                          : 'bg-gray-50 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-50 text-gray-700 border border-gray-200 hover:border-green-300'
                       }`}
                     >
                       {activity.label}
-                      {isSelected && <span className="ml-2 text-xs text-purple-600">✓ Added</span>}
+                      {isSelected && <span className="ml-2 text-xs text-green-600">✓ Added</span>}
                     </button>
                   );
                 })}

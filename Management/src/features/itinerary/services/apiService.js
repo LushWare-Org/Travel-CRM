@@ -87,7 +87,7 @@ class ApiService {
     return makeRequest(`/packages/${id}`);
   }
 
-  static async generateAIPackage(destination, packageType, category, nights) {
+  static async generateAIPackage(destination, packageType, category, nights, description = '') {
     return makeRequest('/packages/generate-ai', {
       method: 'POST',
       body: JSON.stringify({
@@ -95,6 +95,7 @@ class ApiService {
         packageType,
         category,
         nights: parseInt(nights, 10),
+        description,
       }),
     });
   }

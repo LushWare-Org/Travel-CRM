@@ -75,16 +75,15 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
           {locationsArray.map((location, index) => (
             <span
               key={index}
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-800 rounded-full text-sm font-medium border border-orange-200"
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-blue-800 rounded-full text-sm font-medium border border-blue-200"
             >
-              <MapPin size={12} className="text-orange-600" />
               {location}
               <button
                 type="button"
                 onClick={() => handleRemoveLocation(location)}
-                className="hover:bg-orange-200 rounded-full p-0.5 transition-colors ml-1"
+                className="hover:bg-blue-200 rounded-full p-0.5 transition-colors ml-1"
               >
-                <X size={14} className="text-orange-700" />
+                <X size={14} className="text-blue-700" />
               </button>
             </span>
           ))}
@@ -95,7 +94,7 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
       <button
         type="button"
         onClick={() => setShowSelector(!showSelector)}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all text-sm font-semibold shadow-md"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-500 text-white rounded-xl transition-all text-sm font-semibold shadow-md"
       >
         <Plus size={16} />
         {showSelector ? 'Hide Location Selector' : 'Add Locations'}
@@ -103,7 +102,7 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
 
       {/* Location Selector Panel */}
       {showSelector && (
-        <div className="border-2 border-orange-200 rounded-xl p-4 bg-gradient-to-br from-orange-50 to-yellow-50 space-y-4">
+        <div className="border-2 border-blue-200 rounded-xl p-4 bg-gray-50 space-y-4">
           {/* Custom Location Input */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -116,13 +115,15 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
                   onChange={(value) => setCustomLocation(value)}
                   onSelect={handleCustomLocationSelect}
                   placeholder="Type custom location name..."
+                  iconColorClass="text-blue-400"
+                  inputClassName="border border-blue-300 bg-white"
                 />
               </div>
               <button
                 type="button"
                 onClick={handleAddCustomLocation}
                 disabled={!customLocation.trim()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-yellow-600 text-white rounded-xl hover:from-orange-700 hover:to-yellow-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
               >
                 <Plus size={14} />
                 Add
@@ -131,7 +132,7 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
           </div>
 
           {/* Predefined Locations Section */}
-          <div className="border-t border-orange-300 pt-4">
+          <div className="border-t border-blue-300 pt-4">
             {hasDestinationLocations ? (
               <>
                 <div className="flex items-center justify-between mb-2">
@@ -141,7 +142,7 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
                   <button
                     type="button"
                     onClick={() => setShowAllLocations(!showAllLocations)}
-                    className="text-xs text-orange-700 hover:text-orange-800 underline font-medium"
+                    className="text-xs text-blue-700 hover:text-blue-800 underline font-medium"
                   >
                     {showAllLocations ? 'Show destination locations' : 'Show all locations'}
                   </button>
@@ -158,13 +159,13 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
 
             {/* Search */}
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-600" size={16} />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-600" size={16} />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search locations..."
-                className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm bg-white"
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
               />
             </div>
 
@@ -182,12 +183,12 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
                         disabled={isSelected}
                         className={`px-3 py-2 text-left text-sm rounded-xl transition-colors ${
                           isSelected
-                            ? 'bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-800 cursor-not-allowed border border-orange-200'
-                            : 'bg-gray-50 hover:bg-gradient-to-r hover:from-orange-50 hover:to-yellow-50 text-gray-700 border border-gray-200 hover:border-orange-300'
+                            ? 'bg-blue-100 text-blue-800 cursor-not-allowed border border-blue-200'
+                            : 'bg-gray-50 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 text-gray-700 border border-gray-200 hover:border-blue-300'
                         }`}
                       >
                         {location}
-                        {isSelected && <span className="ml-2 text-xs text-orange-600">✓ Added</span>}
+                        {isSelected && <span className="ml-2 text-xs text-blue-600">✓ Added</span>}
                       </button>
                     );
                   })}

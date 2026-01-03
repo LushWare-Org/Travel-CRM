@@ -8,7 +8,7 @@ import aiPackageGenerationService from '../services/aiPackageGeneration.service.
  * @access  Private
  */
 export const generateAIPackage = asyncHandler(async (req, res) => {
-  const { destination, packageType, category, nights } = req.body;
+  const { destination, packageType, category, nights, description } = req.body;
 
   // Validate required fields
   if (!destination) {
@@ -24,7 +24,8 @@ export const generateAIPackage = asyncHandler(async (req, res) => {
       destination,
       packageType,
       category,
-      parseInt(nights, 10)
+      parseInt(nights, 10),
+      description
     );
 
     res.status(200).json({

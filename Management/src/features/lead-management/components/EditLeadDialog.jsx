@@ -152,6 +152,8 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       }
 
       setCustomPackageId(customizedId || null);
+      const assignedToId = lead.assignedTo?._id || lead.assignedTo || lead.assignedTo?.id || '';
+      let salesRepName = lead.salesRep || lead.adviser || '';
 
       setFormData({
         name: lead.name || '',
@@ -160,8 +162,8 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         whatsapp: lead.whatsapp || '',
         numberOfTravelers: lead.numberOfTravelers || 1,
         city: lead.city || '',
-        salesRep: lead.salesRep || lead.adviser || '',
-        assignedTo: lead.assignedTo?._id || lead.assignedTo || '',
+        salesRep: salesRepName,
+        assignedTo: assignedToId || (salesRepName ? '__name_only' : ''),
         destination: lead.destination || '',
         platform: lead.platform || '',
         travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
@@ -177,7 +179,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       // Load manual itinerary if exists
       loadManualItinerary();
     }
-  }, [lead]);
+  }, [lead, salesReps]);
 
   const loadManualItinerary = async () => {
     if (!lead?._id && !lead?.id) return;
@@ -210,17 +212,20 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       setIsSubmitting(true);
       // Only Sales Reps cannot change the assigned sales rep
       // Admins/SuperAdmins with manage_leads permission can change it freely
-      const assignedTo = isSalesRep && !canManageLeads
-        ? (lead.assignedTo?._id || lead.assignedTo || formData.assignedTo) 
-        : (formData.assignedTo || undefined);
-      
+      const leadId = lead._id || lead.id;
+      if (formData.assignedTo === '') {
+        try {
+          await leadAPI.assignLead(leadId, null);
+        } catch (err) {
+          console.error('Failed to unassign on server:', err);
+          toast.error('Failed to unassign sales representative');
+        }
+      }
       const updateData = {
         name: formData.name?.trim() || undefined,
         phone: formData.phone || undefined,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
         city: formData.city || undefined,
-        salesRep: formData.salesRep || undefined,
-        assignedTo: assignedTo,
         destination: formData.destination || undefined,
         platform: formData.platform || undefined,
         travelDate: formData.travelDate || undefined,
@@ -231,10 +236,14 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         status: formData.status || 'new',
         remarks: remarks.length > 0 ? remarks : undefined,
       };
-      await leadAPI.updateLead(lead._id || lead.id, updateData);
+      if (formData.assignedTo && formData.assignedTo !== '' && formData.assignedTo !== '__name_only') {
+        const rep = salesReps.find(r => r.id === formData.assignedTo || r._id === formData.assignedTo);
+        updateData.assignedTo = formData.assignedTo;
+        updateData.salesRep = rep ? rep.name : formData.salesRep || undefined;
+      }
+      await leadAPI.updateLead(leadId, updateData);
 
       // Save manual itinerary if days exist
-      const leadId = lead._id || lead.id;
       if (showManualItinerary && itineraryDays.length > 0) {
         try {
           await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
@@ -255,6 +264,63 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       }
 
       toast.success('Lead updated successfully');
+      try {
+        const refreshed = await leadAPI.getLead(leadId);
+        const freshLead = refreshed?.data || refreshed;
+        if (freshLead) {
+          const primaryPackageId = freshLead.package?._id || freshLead.package || '';
+          const customizedId = freshLead.customizedPackage?._id || freshLead.customizedPackage || '';
+          const defaultPackageId = primaryPackageId || customizedId || '';
+          let defaultPackageName =
+            freshLead.packageName ||
+            freshLead.package?.name ||
+            freshLead.customizedPackage?.name ||
+            '';
+
+          if (customizedId) {
+            const sequence =
+              freshLead.customizedPackage?.customizationSequence ||
+              freshLead.customizationSequence ||
+              freshLead.customizedPackage?.sequence ||
+              1;
+            const baseName = freshLead.customizedPackage?.baseName || defaultPackageName;
+            defaultPackageName = formatCustomizedLabel(baseName, sequence);
+          } else if (primaryPackageId && defaultPackageName.includes('(Customized')) {
+            const baseName = defaultPackageName.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+            defaultPackageName = baseName;
+          }
+
+          setCustomPackageId(customizedId || null);
+          const refreshedAssignedId = freshLead.assignedTo?._id || freshLead.assignedTo || freshLead.assignedTo?.id || '';
+          let refreshedSalesRepName = freshLead.salesRep || freshLead.adviser || '';
+          if (!refreshedSalesRepName && refreshedAssignedId && Array.isArray(salesReps)) {
+            const matchedRef = salesReps.find(r => r.id === refreshedAssignedId || r._id === refreshedAssignedId);
+            if (matchedRef) refreshedSalesRepName = matchedRef.name || '';
+          }
+
+          setFormData({
+            name: freshLead.name || '',
+            email: freshLead.email || '',
+            phone: freshLead.phone || '',
+            whatsapp: freshLead.whatsapp || '',
+            numberOfTravelers: freshLead.numberOfTravelers || 1,
+            city: freshLead.city || '',
+            salesRep: refreshedSalesRepName,
+            assignedTo: refreshedAssignedId || (refreshedSalesRepName ? '__name_only' : ''),
+            destination: freshLead.destination || '',
+            platform: freshLead.platform || '',
+            travelDate: freshLead.travelDate ? new Date(freshLead.travelDate).toISOString().split('T')[0] : '',
+            endDate: freshLead.endDate ? new Date(freshLead.endDate).toISOString().split('T')[0] : '',
+            package: defaultPackageId,
+            packageName: defaultPackageName,
+            status: freshLead.status || 'new',
+          });
+
+          setRemarks(freshLead.remarks || []);
+        }
+      } catch (fetchErr) {
+        console.error('Failed to reload lead after save:', fetchErr);
+      }
       onSuccess?.();
       onClose();
     } catch (error) {
@@ -620,7 +686,14 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
         <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 flex justify-between items-center rounded-t-xl shadow-lg z-10">
           <div>
@@ -866,29 +939,33 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Sales Representative
                 </label>
-                {isSalesRep && !canManageLeads ? (
-                  <input
-                    type="text"
-                    value={formData.salesRep || ''}
-                    disabled
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                  />
-                ) : (
-                  <select
-                    value={formData.assignedTo || ''}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      const rep = salesReps.find(r => r.id === id);
-                      setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
-                    }}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
-                  >
-                    <option value="">Select Sales Rep</option>
-                    {salesReps.map((rep) => (
-                      <option key={rep.id} value={rep.id}>{rep.name}</option>
-                    ))}
-                  </select>
-                )}
+                <select
+                  value={formData.assignedTo || ''}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (id === '__name_only') {
+                      setFormData(prev => ({ ...prev, assignedTo: '__name_only' }));
+                      return;
+                    }
+
+                    if (id === '') {
+                      setFormData(prev => ({ ...prev, assignedTo: '', salesRep: '' }));
+                      return;
+                    }
+
+                    const rep = salesReps.find(r => r.id === id || r._id === id);
+                    setFormData(prev => ({ ...prev, assignedTo: id, salesRep: rep ? rep.name : '' }));
+                  }}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                >
+                  <option value="">Select Sales Rep</option>
+                  {formData.salesRep && (!formData.assignedTo || formData.assignedTo === '__name_only') && (
+                    <option value="__name_only">{formData.salesRep}</option>
+                  )}
+                  {salesReps.map((rep) => (
+                    <option key={rep.id || rep._id} value={rep.id || rep._id}>{rep.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

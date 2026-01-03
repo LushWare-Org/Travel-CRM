@@ -6,12 +6,14 @@
 import { useState } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
 import ApiService from '../services/apiService';
+import DestinationSelector from './DestinationSelector';
 import Swal from 'sweetalert2';
 import { PACKAGE_CATEGORY } from '../types';
 
 const AIPackageDialog = ({ isOpen, onClose, onPackageGenerated }) => {
   const [formData, setFormData] = useState({
     destination: '',
+    description: '',
     packageType: 'Standard',
     category: 'family',
     nights: 1,
@@ -60,7 +62,8 @@ const AIPackageDialog = ({ isOpen, onClose, onPackageGenerated }) => {
         formData.destination,
         formData.packageType,
         formData.category,
-        formData.nights
+        formData.nights,
+        formData.description
       );
 
       if (response.success && response.data) {
@@ -77,6 +80,7 @@ const AIPackageDialog = ({ isOpen, onClose, onPackageGenerated }) => {
         // Reset form
         setFormData({
           destination: '',
+          description: '',
           packageType: 'Standard',
           category: 'family',
           nights: 1,
@@ -103,6 +107,7 @@ const AIPackageDialog = ({ isOpen, onClose, onPackageGenerated }) => {
     if (!isGenerating) {
       setFormData({
         destination: '',
+        description: '',
         packageType: 'Standard',
         category: 'family',
         nights: 1,
@@ -113,9 +118,15 @@ const AIPackageDialog = ({ isOpen, onClose, onPackageGenerated }) => {
 
   if (!isOpen) return null;
 
+    const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleBackdropClick}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -134,21 +145,34 @@ const AIPackageDialog = ({ isOpen, onClose, onPackageGenerated }) => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto">
           <div className="space-y-4">
             {/* Destination */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Destination <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                name="destination"
-                value={formData.destination}
+              <div className={isGenerating ? 'pointer-events-none opacity-60' : ''}>
+                <DestinationSelector
+                  value={formData.destination}
+                  onChange={handleChange}
+                  name="destination"
+                />
+              </div>
+            </div>
+
+            {/* Package Details */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Package Details <span className="text-xs text-gray-500">(optional)</span>
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
                 onChange={handleChange}
-                placeholder="e.g., Sri Lanka, Maldives, Dubai"
-                required
+                placeholder="Any special requirements..."
                 disabled={isGenerating}
+                rows={4}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
