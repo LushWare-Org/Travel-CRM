@@ -277,7 +277,7 @@ export default function PackagesPage() {
                 ))}
               </div>
               <span className="text-white font-semibold">4.9/5</span>
-              <span className="text-white/60 text-sm">(250K+ reviews)</span>
+              <span className="text-white text-sm">(250 + Reviews)</span>
             </div>
           </div>
         </div>

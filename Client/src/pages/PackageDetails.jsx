@@ -665,7 +665,7 @@ export default function PackageDetails() {
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                 <Star className="w-5 h-5 text-yellow-400 fill-current" />
                 <span className="font-medium">4.9</span>
-                <span className="text-white/80">(250k+ Reviews)</span>
+                <span className="text-white/80">(250+ Reviews)</span>
               </div>
               <span className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-black rounded-full font-semibold capitalize">
                 {pkg.category}
@@ -762,7 +762,7 @@ export default function PackageDetails() {
                               </div>                          
                               <div>
                             <p className="font-bold text-black text-sm lg:text-base">Rated 4.9 on Google</p>
-                            <p className="text-black text-xs lg:text-sm mt-1">Trusted by 250k+ happy travelers</p>
+                            <p className="text-black text-xs lg:text-sm mt-1">Trusted by 250+ happy travelers</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-3">

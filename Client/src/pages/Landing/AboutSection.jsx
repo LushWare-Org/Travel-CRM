@@ -120,7 +120,7 @@ export default function AboutSection() {
                       <Star key={star} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                     ))}
                   </div>
-                  <span className="text-gray-600 text-sm font-medium">(250k+ reviews)</span>
+                  <span className="text-gray-600 text-sm font-medium">(250 + reviews)</span>
                 </div>
               </div>
             </div>

@@ -102,6 +102,7 @@ export default function Header({ currentPage, onNavigate }) {
     { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: domesticMenu },
     { name: 'About Us', page: 'about' },
     { name: 'Contact', page: 'contact' },
+    { name: 'Career', page: 'career' },
     user && { name: 'My Account', page: 'my-account' },
     !user && { name: 'Login', page: 'login' },
   ].filter(Boolean);
@@ -115,6 +116,7 @@ export default function Header({ currentPage, onNavigate }) {
     { name: 'Home', page: 'home' },
     { name: 'About Us', page: 'about' },
     { name: 'Contact', page: 'contact' },
+    { name: 'Career', page: 'career' },
     user && { name: 'My Account', page: 'my-account' },
     !user && { name: 'Login', page: 'login' },
   ].filter(Boolean);
