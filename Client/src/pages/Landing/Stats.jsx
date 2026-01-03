@@ -215,10 +215,10 @@ export default function RecommendedPackagesSection() {
                 <p>No packages available at the moment.</p>
               </div>
             ) : (
-              <div className="relative">
+              <div className="relative overflow-hidden">
 
             {/* Carousel Container */}
-            <div>
+            <div className="overflow-hidden">
               <div className="flex gap-4 transition-transform duration-1000 ease-in-out relative">
                 <button
                   onClick={prevSlide}
@@ -243,8 +243,8 @@ export default function RecommendedPackagesSection() {
                       className="flex-shrink-0 w-full sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)] cursor-pointer"
                       onClick={() => handlePackageClick(pkg.categoryName)}
                     >
-                      <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-105 border-2 border-orange-100 group">
-                        <div className="relative h-56 overflow-hidden">
+                      <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-orange-100 group h-full flex flex-col">
+                        <div className="relative h-56 overflow-hidden flex-shrink-0">
                           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
                           <img
                             src={pkg.image}
@@ -254,14 +254,14 @@ export default function RecommendedPackagesSection() {
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         </div>
-                        <div className="p-5">
+                        <div className="p-5 flex-1 flex flex-col">
                           <h3 className="text-xl font-bold text-gray-900 mb-3">
                             {pkg.categoryName.charAt(0).toUpperCase() + pkg.categoryName.slice(1)} Packages
                           </h3>
-                          <p className="text-sm text-gray-600 mb-8 line-clamp-2">
+                          <p className="text-sm text-gray-600 mb-3 line-clamp-2 flex-1">
                             {pkg.description}
                           </p>
-                          <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                             <span className="text-sm text-gray-600">Starting from</span>
                             <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
                               ₹ {pkg.price?.toLocaleString() || '0'}
