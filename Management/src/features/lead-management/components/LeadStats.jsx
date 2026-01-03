@@ -15,10 +15,8 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const thisMonthLeads = leads.filter(lead => {
-    const leadDate = new Date(lead.createdAt || lead.leadDateTime || lead.createdAt);
-    return leadDate >= startOfMonth;
-  });
+  const safeLeads = leads.length > 0 ? leads : [];
+  const thisMonthLeads = leads.length > 0 ? safeLeads : [];
 
   // Calculate conversion rate for this month
   const convertedThisMonth = thisMonthLeads.filter(lead => lead.status === 'converted').length;
