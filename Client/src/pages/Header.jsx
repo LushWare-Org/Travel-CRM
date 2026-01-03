@@ -319,6 +319,9 @@ export default function Header({ currentPage, onNavigate }) {
                         if (!item.dropdown) {
                           onNavigate(item.page, null, null);
                           setMobileMenuOpen(false);
+                        } else {
+                          onNavigate(item.page, null, null);
+                          setMobileMenuOpen(false);
                         }
                       }}
                       className={`flex-1 text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
@@ -347,7 +350,7 @@ export default function Header({ currentPage, onNavigate }) {
                         <button
                           key={dest.id}
                           onClick={() => {
-                            onNavigate(item.page, dest.slug);
+                            onNavigate('packages', `destination=${dest.slug}`);
                             setMobileMenuOpen(false);
                             setMobileDropdownOpen(null);
                           }}

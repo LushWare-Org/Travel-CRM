@@ -53,6 +53,26 @@ function ReviewsVideoSlider() {
 
   return (
     <section className="relative py-16 bg-[#051C35] overflow-hidden">
+      <style jsx>{`
+        @keyframes twinkle {
+          0%, 100% { opacity: 0; transform: scale(0.5); }
+          50% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Tablet Video Columns (768px - 1024px) */
+        @media (min-width: 768px) and (max-width: 1024px) {
+          .columns-2.md\\:columns-3.lg\\:columns-4 {
+            columns: 2;
+          }
+        }
+
+        /* Large Tablet Video Columns (1024px - 1366px) */
+        @media (min-width: 1024px) and (max-width: 1366px) {
+          .columns-2.md\\:columns-3.lg\\:columns-4 {
+            columns: 3;
+          }
+        }
+      `}</style>
       {/* Twinkling Stars */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(50)].map((_, i) => (
@@ -142,14 +162,6 @@ function ReviewsVideoSlider() {
             </div>
           )}
       </div>
-      
-
-      <style jsx>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0; transform: scale(0.5); }
-          50% { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
     </section>
   )
 }
@@ -172,7 +184,23 @@ function InternationalGrid({ destinations, loading }) {
     navigate(`/packages?destination=${dest.slug}`)
   }
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <>
+      <style>{`
+        /* Tablet Destinations Grid (768px - 1024px) */
+        @media (min-width: 768px) and (max-width: 1024px) {
+          .grid.grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-6 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+
+        /* Large Tablet Destinations Grid (1024px - 1366px) */
+        @media (min-width: 1024px) and (max-width: 1366px) {
+          .grid.grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-6 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+        }
+      `}</style>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
       {internationalDests.map((dest) => (
         <button
           key={dest.id}
@@ -196,6 +224,7 @@ function InternationalGrid({ destinations, loading }) {
         </button>
       ))}
     </div>
+    </>
   )
 }
 
@@ -238,6 +267,29 @@ function LocalSlider({ destinations, loading }) {
 
   return (
     <div className="relative px-0 md:px-16">
+      <style>{`
+        /* Tablet Local Destinations Grid (768px - 1024px) */
+        @media (min-width: 768px) and (max-width: 1024px) {
+          .relative.px-0.md\\:px-16 {
+            padding-left: 0;
+            padding-right: 0;
+          }
+          .grid.grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-6 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+
+        /* Large Tablet Local Destinations Grid (1024px - 1366px) */
+        @media (min-width: 1024px) and (max-width: 1366px) {
+          .relative.px-0.md\\:px-16 {
+            padding-left: 2rem;
+            padding-right: 2rem;
+          }
+          .grid.grid-cols-2.md\\:grid-cols-3.lg\\:grid-cols-6 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+        }
+      `}</style>
       {canGoLeft && (
         <button onClick={goToPrevious} className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg items-center justify-center hover:bg-white transition-all">
           <ChevronLeft className="w-6 h-6 text-gray-800" />
@@ -284,6 +336,17 @@ export default function DestinationsSection() {
 
   return (
     <div className="bg-gradient-to-b from-gray-50 to-white">
+      <style>{`
+        /* Prevent horizontal overflow on tablets */
+        @media (min-width: 768px) and (max-width: 1366px) {
+          * {
+            overflow-x: hidden;
+          }
+          body {
+            overflow-x: hidden;
+          }
+        }
+      `}</style>
       {/* International Section */}
       <section className="py-28 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
         <div className="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">

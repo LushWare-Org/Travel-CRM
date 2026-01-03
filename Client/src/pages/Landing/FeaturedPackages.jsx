@@ -26,18 +26,20 @@ export default function FeaturedPackages({ packages }) {
             <p>No packages available yet. Please check back soon.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredPackages.map((pkg) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
+            {featuredPackages.map((pkg, idx) => (
               <Link 
                 key={pkg.id} 
                 to={`/package/${pkg.id}`} 
-                className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+                className={`group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
+                  featuredPackages.length === 3 && idx === 2 && 'md:col-span-2 lg:col-span-1 md:mx-auto'
+                } w-full md:max-w-sm lg:max-w-none`}
               >
                 <div className="relative overflow-hidden aspect-[4/3]">
                   <img 
                     src={pkg.image_url || pkg.images?.[0]} 
                     alt={pkg.title} 
-                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" 
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10"></div>
                     <div className="absolute top-0 left-0 right-0 p-6 text-white">

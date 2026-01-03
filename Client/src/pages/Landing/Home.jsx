@@ -316,6 +316,18 @@ export default function Home() {
             .animate-scroll-continuous:hover {
               animation-play-state: paused;
             }
+            @media (min-width: 768px) and (max-width: 1024px) {
+              .relative.h-\\[80vh\\] {
+                height: 65vh;
+              }
+              button[aria-label="Previous"],
+              button[aria-label="Next"] {
+                display: none !important;
+              }
+              .relative.mt-16 {
+                margin-top: 2rem;
+              }
+            }
           `}</style>
           {/* <div className="flex animate-scroll-continuous whitespace-nowrap py-5"> */}
             {/* Tags */}
@@ -374,16 +386,43 @@ export default function Home() {
           {/* </div> */}
         </div>       
          {/* Video Slides */}
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div
-            key={`video-${i}`}
-            className={`absolute inset-0 transition-opacity duration-1000 ${i === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-          >
-            <video className="absolute inset-0 w-full h-full object-cover" src={`/v${i + 1}.mp4`} autoPlay muted loop playsInline />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
-            <div className="absolute inset-0 bg-black/20" />
-          </div>
-        ))}
+       {[0, 1, 2, 3, 4].map((i) => {
+  const isActive = i === currentSlide;
+
+  return (
+    <div
+      key={`video-${i}`}
+      className={`absolute inset-0 transition-opacity duration-1000 ${
+        isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
+      }`}
+    >
+      <img
+        src={`/v${i + 1}-poster.webp`}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        loading={i === 0 ? 'eager' : 'lazy'}
+        fetchPriority={i === 0 ? 'high' : 'auto'}
+      />
+
+      {/* Video loads */}
+      {isActive && (
+        <video
+          className="absolute inset-0 w-full h-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="none"
+        >
+          <source src={`/v${i + 1}.mp4`} type="video/mp4" />
+        </video>
+      )}
+
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
+      <div className="absolute inset-0 bg-black/20" />
+    </div>
+  );
+})}
 
         {/* Image Slides */}
         {/* <div className="absolute inset-0">

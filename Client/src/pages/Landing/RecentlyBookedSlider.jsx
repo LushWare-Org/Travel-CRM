@@ -7,16 +7,37 @@ export default function RecentlyBookedSlider({ items = [] }) {
   const [slideIdx, setSlideIdx] = useState(0);
   const [enableTransition, setEnableTransition] = useState(true);
   const animatingRef = useRef(false);
+  const [cardsPerView, setCardsPerView] = useState(4);
+  const [isTabletRange, setIsTabletRange] = useState(false);
 
   const getCardsPerView = () => {
     if (typeof window === 'undefined') return 5;
-    if (window.innerWidth < 640) return 1; 
-    if (window.innerWidth < 768) return 2; 
-    if (window.innerWidth < 1280) return 4;  
-    return 4; 
+    if (window.innerWidth < 440) return 1;
+    if (window.innerWidth < 640) return 2;
+    if (window.innerWidth < 769) return 2;
+    if (window.innerWidth < 1024) return 3;
+    if (window.innerWidth < 1366) return 3;
+    return 4;
   };
-
-  const cardsPerView = getCardsPerView();
+  useEffect(() => {
+    const handleResize = () => {
+      const newCardsPerView = getCardsPerView();
+      const isTablet = window.innerWidth >= 768 && window.innerWidth < 1025;
+      setCardsPerView(newCardsPerView);
+      setSlideIdx(0);
+      setIsTabletRange(isTablet);
+      
+      console.log('[RecentlyBookedSlider] Resize Event:', {
+        windowWidth: window.innerWidth,
+        isTabletRange: isTablet,
+        cardsPerView: newCardsPerView,
+        timestamp: new Date().toLocaleTimeString()
+      });
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const totalSlides = Math.max(items.length, 1);
   const extendedItems = items.length > 0 ? [...items, ...items] : [];
 
@@ -24,6 +45,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
   useEffect(() => {
     if (totalSlides <= cardsPerView) return;
 
+    if (window.innerWidth >= 768 && window.innerWidth < 1025) return;
     const interval = setInterval(() => {
       if (animatingRef.current) return;
       animatingRef.current = true;
@@ -57,7 +79,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
 
   const formatDurationString = (value) => {
     if (!value) return '';
-    const dn = value.match(/(\d+)\s*[Dd]\s*\/\s*(\d+)\s*[Nn]/i);
+    const dn = value.match(/(\d+)\s*[Dd]\s*(\d+)\s*[Nn]/i);
     if (dn) return `${dn[1]} Days / ${dn[2]} Nights`;
     const days = value.match(/(\d+)\s*[Dd]ays?/i);
     const nights = value.match(/(\d+)\s*[Nn]ights?/i);
@@ -88,6 +110,17 @@ export default function RecentlyBookedSlider({ items = [] }) {
   const showControls = totalSlides > cardsPerView;
   const translateX = -(slideIdx * (100 / cardsPerView));
 
+  useEffect(() => {
+    console.log('[Tablet Arrows Debug]', {
+      isTabletRange,
+      showControls,
+      totalSlides,
+      cardsPerView,
+      shouldDisplay: isTabletRange && showControls,
+      windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'N/A'
+    });
+  }, [isTabletRange, showControls, totalSlides, cardsPerView]);
+  
   return (
     <section className="py-16 bg-[#051C35] relative overflow-hidden font-opensans">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -101,7 +134,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
         </div>
 
         <div className="relative max-w-6xl mx-auto">
-          <div className="hidden md:flex absolute -top-12 right-0 gap-3 z-10">
+          <div className={`absolute -top-12 right-0 gap-3 z-10 flex ${!isTabletRange && window.innerWidth >= 1025 ? '' : 'hidden'}`}>
             <button
               onClick={goPrev}
               className="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all border-2 border-white hover:border-yellow-500"

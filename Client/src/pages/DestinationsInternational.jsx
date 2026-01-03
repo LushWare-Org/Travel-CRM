@@ -48,7 +48,7 @@ export default function DestinationsInternational() {
   const [selectedPriceRange, setSelectedPriceRange] = useState(null);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState('popularity');
-  const [showFilters, setShowFilters] = useState(typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
+  const [showFilters, setShowFilters] = useState(typeof window !== 'undefined' ? window.innerWidth > 1280 : false);
   const [favorites, setFavorites] = useState([]);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -59,7 +59,7 @@ export default function DestinationsInternational() {
 
   useEffect(() => {
     const handleResize = () => {
-      setShowFilters(window.innerWidth >= 768);
+      setShowFilters(window.innerWidth > 1280);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -310,11 +310,14 @@ export default function DestinationsInternational() {
             </div>
           </div>
         </div>
+        {showFilters && (
+          <div className="hidden md:block lg:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setShowFilters(false)} />
+        )}
 
-        <div className="flex flex-col md:flex-row gap-4 md:gap-8">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-8 relative">
           {showFilters && (
-            <div className="w-full md:w-72 md:flex-shrink-0">
-              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 md:sticky md:top-32">
+            <div className="w-full md:w-96 md:flex-shrink-0 md:fixed md:inset-0 md:top-0 md:left-0 md:bottom-0 md:right-auto md:z-50 md:h-screen md:rounded-none lg:static lg:w-72 lg:h-auto lg:fixed:none lg:inset-auto lg:rounded-2xl">
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col lg:sticky lg:top-32 lg:rounded-2xl lg:h-auto">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Filter className="w-5 h-5 text-orange-600" /> 
                 </h3>
@@ -533,7 +536,7 @@ export default function DestinationsInternational() {
                             </h3>
                           </div>
                         </div>
-                        <p className="text-gray-600 mb-5 leading-relaxed">{dest.description}</p>
+                        <p className="text-gray-600 mb-5 line-clamp-2">{dest.description}</p>
                         <div className="flex flex-wrap gap-6 text-sm text-gray-600 mb-6">
                           <div className="flex items-center space-x-2">
                             <Clock className="w-4 h-4" />
