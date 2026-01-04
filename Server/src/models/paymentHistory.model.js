@@ -38,7 +38,6 @@ const paymentHistorySchema = new mongoose.Schema(
       },
       phone: {
         type: String,
-        required: true,
       },
       address: String,
     },

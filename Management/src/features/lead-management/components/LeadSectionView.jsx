@@ -126,9 +126,15 @@ const LeadSectionView = ({ lead, onClose }) => {
 
   if (!lead) return null;
 
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50">
+      <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50" onClick={handleBackdropClick}>
         <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-5xl p-6 overflow-auto max-h-[80vh]">
           <div className="flex items-center justify-between mb-4">
             <div>

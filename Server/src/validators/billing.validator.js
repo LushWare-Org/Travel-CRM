@@ -124,8 +124,7 @@ export const createInvoiceValidator = [
     .withMessage('Invalid email address'),
 
   body('customer.phone')
-    .notEmpty()
-    .withMessage('Customer phone is required')
+    .optional()
     .trim()
     .matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/)
     .withMessage('Invalid phone number'),
