@@ -44,7 +44,7 @@ export default function DestinationsDomestic() {
   const [selectedPriceRange, setSelectedPriceRange] = useState(null);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState('popularity');
-  const [showFilters, setShowFilters] = useState(typeof window !== 'undefined' ? window.innerWidth > 1280 : false);
+  const [showFilters, setShowFilters] = useState(typeof window !== 'undefined' ? window.innerWidth > 1400 : false);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,7 +54,7 @@ export default function DestinationsDomestic() {
 
   useEffect(() => {
     const handleResize = () => {
-      setShowFilters(window.innerWidth > 1280);
+      setShowFilters(window.innerWidth > 1400);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -296,17 +296,25 @@ export default function DestinationsDomestic() {
           </div>
         </div>
         {showFilters && (
-          <div className="hidden md:block lg:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setShowFilters(false)} />
+          <div className="block 2xl:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setShowFilters(false)} />
         )}
 
         <div className="flex flex-col md:flex-row gap-4 md:gap-8 relative">
           {/* Filters */}
           {showFilters && (
-            <div className="w-full md:w-96 md:flex-shrink-0 md:fixed md:inset-0 md:top-0 md:left-0 md:bottom-0 md:right-auto md:z-50 md:h-screen md:rounded-none lg:static lg:w-72 lg:h-auto lg:fixed:none lg:inset-auto lg:rounded-2xl">
-              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col lg:sticky lg:top-32 lg:rounded-2xl lg:h-auto">
-                <h3 className="text-lg md:text-xl font-bold mb-4 md:mb-6 flex items-center gap-2">
-                  <Filter className="w-4 md:w-5 h-4 md:h-5 text-orange-600" />
-                </h3>
+            <div className="w-72 fixed top-0 left-0 max-h-screen z-50 md:w-96 md:flex-shrink-0 md:fixed md:top-0 md:left-0 md:bottom-0 md:right-auto md:h-screen md:rounded-none 2xl:static 2xl:w-64 2xl:flex-shrink-0 2xl:h-auto 2xl:inset-auto 2xl:rounded-2xl 2xl:z-auto">
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-screen md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-32 2xl:rounded-2xl 2xl:h-auto 2xl:w-64 overflow-y-auto">
+                <div className="flex items-center justify-between mb-4 md:mb-6 2xl:mb-6">
+                  <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                    <Filter className="w-4 md:w-5 h-4 md:h-5 text-orange-600" />
+                  </h3>
+                  <button
+                    onClick={() => setShowFilters(false)}
+                    className="2xl:hidden p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-600 hover:text-gray-900" />
+                  </button>
+                </div>
                 
                 {/* Search */}
                 <div className="mb-4 md:mb-6">
@@ -412,21 +420,22 @@ export default function DestinationsDomestic() {
                 <p className="text-gray-600">Try adjusting your filters</p>
               </div>
             ) : viewMode === 'grid' ? (
-              <div className={`grid gap-4 md:gap-5 md:gap-6 ${showFilters ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
+              <div className={`grid gap-4 md:gap-5 lg:gap-6 ${showFilters ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 {filteredDestinations.map(dest => (
                   <Link
                     key={dest.id}
                     to={`/packages?destination=${dest.slug}`}
-                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 transform"
+                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 transition-all duration-300 transform flex flex-col h-full"
                   >
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
-                    <div className="relative overflow-hidden aspect-[5/3]">
+                    <div className="relative overflow-hidden h-48">
                       <img
                         src={dest.image_url}
                         alt={dest.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
@@ -436,30 +445,28 @@ export default function DestinationsDomestic() {
                         </div>
                       </div>
                     </div>
-                    <div className="p-4 space-y-3">
-                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+                    <div className="p-4 flex flex-col flex-grow">
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-2 mb-2">
                         {dest.name}, India
                       </h3>
-                      <p className="text-gray-600 text-sm line-clamp-2">{dest.description}</p>
-                      <div className="flex items-center justify-between py-2 border-t border-b border-gray-200">
-                        <div className="text-left">
-                          <div className="flex items-center gap-1 text-gray-700 mb-1">
-                            <Clock className="w-4 h-4" />
-                            <span className="font-bold text-gray-900">{dest.duration}</span>
-                          </div>
+                      <p className="text-gray-600 text-sm line-clamp-2 mb-3 h-10 overflow-hidden">{dest.description}</p>
+                      <div className="flex items-center justify-between py-3 border-t border-gray-200 mb-3">
+                        <div className="text-center flex-1">
+                          <div className="text-sm font-bold text-gray-900">{dest.duration}</div>
                           <p className="text-xs text-gray-500">Duration</p>
                         </div>
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-gray-900">{dest.packagesCount}</div>
+                        <div className="border-l border-gray-200"></div>
+                        <div className="text-center flex-1">
+                          <div className="text-sm font-bold text-gray-900">{dest.packagesCount}</div>
                           <p className="text-xs text-gray-500">Packages</p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pt-2">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm text-gray-500">Starting from</p>
-                          <p className="text-xl font-bold text-orange-600">{formatCurrency(dest.price)}</p>
+                          <p className="text-xs text-gray-500">Starting from</p>
+                          <p className="text-lg font-bold text-orange-600">{formatCurrency(dest.price)}</p>
                         </div>
-                        <button className="px-4 py-2 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-xl text-sm">
+                        <button className="px-4 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-xl text-xs whitespace-nowrap">
                           View Details
                         </button>
                       </div>
