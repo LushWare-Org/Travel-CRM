@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Phone, Mail, MapPin, Plane, LogOut, Menu, X } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../utils/packageApi';
 import { useAuth } from '../context/AuthContext';
+import LazyIcon from '../components/LazyIcon';
+import { ChevronDown } from 'lucide-react';
 
 const MAX_NAV_ITEMS = 12;
 
@@ -21,11 +22,24 @@ export default function Header({ currentPage, onNavigate }) {
   const userMenuRef = useRef(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
+  const [destinationsLoaded, setDestinationsLoaded] = useState(false);
+  const destinationsLoadRef = useRef(null);
 
   useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    let rafId = null;
+    const handleScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        setScrollY(window.scrollY);
+        rafId = null;
+      });
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {
@@ -67,12 +81,11 @@ export default function Header({ currentPage, onNavigate }) {
     }
   }, [userMenuOpen]);
 
-  useEffect(() => {
-    let isMounted = true;
-    fetchPackages({ limit: 100 })
+  const loadDestinationsOnDemand = useCallback(() => {
+    if (destinationsLoadRef.current || destinationsLoaded || internationalMenu.length) return;
+    destinationsLoadRef.current = fetchPackages({ limit: 100 })
       .then(({ destinations }) => {
-        if (!isMounted) return;
-        const sorted = destinations.slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
+        const sorted = (destinations || []).slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
         setInternationalMenu(
           sorted
             .filter((dest) => dest.type !== 'domestic')
@@ -85,18 +98,19 @@ export default function Header({ currentPage, onNavigate }) {
             .slice(0, MAX_NAV_ITEMS)
             .map((dest) => ({ id: dest.id, name: dest.name, slug: dest.slug }))
         );
+        setDestinationsLoaded(true);
       })
       .catch(() => {
-        if (!isMounted) return;
         setInternationalMenu([]);
         setDomesticMenu([]);
+        setDestinationsLoaded(true);
+      })
+      .finally(() => {
+        destinationsLoadRef.current = null;
       });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [destinationsLoaded, internationalMenu.length]);
 
-  const navItems = [
+  const navItems = useMemo(() => [
     { name: 'Home', page: 'home' },
     { name: 'International Destinations', page: 'destinations-international', dropdown: internationalMenu },
     { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: domesticMenu },
@@ -105,26 +119,26 @@ export default function Header({ currentPage, onNavigate }) {
     { name: 'Career', page: 'career' },
     user && { name: 'My Account', page: 'my-account' },
     !user && { name: 'Login', page: 'login' },
-  ].filter(Boolean);
+  ].filter(Boolean), [user, internationalMenu, domesticMenu]);
 
-  const leftNavItems = [
+  const leftNavItems = useMemo(() => [
     { name: 'International Destinations', page: 'destinations-international', dropdown: internationalMenu },
     { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: domesticMenu },
-  ];
+  ], [internationalMenu, domesticMenu]);
 
-  const sideMenuItems = [
+  const sideMenuItems = useMemo(() => [
     { name: 'Home', page: 'home' },
     { name: 'About Us', page: 'about' },
     { name: 'Contact', page: 'contact' },
     { name: 'Career', page: 'career' },
     user && { name: 'My Account', page: 'my-account' },
     !user && { name: 'Login', page: 'login' },
-  ].filter(Boolean);
+  ].filter(Boolean), [user]);
 
   const getColumnClass = len => len <= 7 ? 'grid-cols-2' : len <= 15 ? 'grid-cols-3' : 'grid-cols-4';
   const getDropdownWidth = len => 'w-80';
   const LONG_NAME_THRESHOLD = 18;
-  const isItemActive = (item) => {
+  const isItemActive = useCallback((item) => {
     if (item.page === 'home') return pathname === '/';
     if (pathname.startsWith(`/${item.page}`)) return true;
 
@@ -135,7 +149,7 @@ export default function Header({ currentPage, onNavigate }) {
       if (item.page === 'destinations-domestic' && domesticMenu.some(d => d.slug === destination)) return true;
     }
     return false;
-  };
+  }, [pathname, searchParams, internationalMenu, domesticMenu]);
 
   return (
     <header className="relative z-50 overflow-visible transition-all duration-300 bg-black shadow-lg font-opensans">
@@ -153,7 +167,10 @@ export default function Header({ currentPage, onNavigate }) {
                 <div
                   key={item.page}
                   className="relative group"
-                  onMouseEnter={() => item.dropdown && setActiveDropdown(item.page)}
+                  onMouseEnter={() => {
+                    if (item.dropdown) loadDestinationsOnDemand();
+                    if (item.dropdown) setActiveDropdown(item.page);
+                  }}
                   onMouseLeave={() => setActiveDropdown(null)}
                 >
                   <a
@@ -170,20 +187,11 @@ export default function Header({ currentPage, onNavigate }) {
                       }
                       ${item.page === 'login' ? 'border border-orange-500/50 hover:border-orange-400' : ''}
                     `}
-                    onMouseEnter={(e) => {
-                      if (!isActive && item.page !== 'login') {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.backgroundColor = '';
-                      }
-                    }}
                   >
                     {item.name}
                     {item.dropdown && (
-                      <ChevronDown
+                      <LazyIcon
+                        name="ChevronDown"
                         size={16}
                         className={`transition-transform duration-200 ${activeDropdown === item.page ? 'rotate-180' : ''}`}
                       />
@@ -232,7 +240,7 @@ export default function Header({ currentPage, onNavigate }) {
             >
               <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="relative flex items-center justify-center gap-1.5">
-                <Plane className="w-3.5 h-3.5" />
+                <LazyIcon name="Plane" size={14} className="w-3.5 h-3.5" />
                 <span className="text-xs">Plan Your Trip</span>
               </div>
             </a>
@@ -269,7 +277,7 @@ export default function Header({ currentPage, onNavigate }) {
                       }}
                       className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors flex items-center gap-3"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LazyIcon name="LogOut" size={16} className="w-4 h-4" />
                       <span>Logout</span>
                     </button>
                   </div>
@@ -282,7 +290,7 @@ export default function Header({ currentPage, onNavigate }) {
               className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-orange-500 transition-all flex-shrink-0"
               aria-label="Toggle side menu"
             >
-              {sideMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {sideMenuOpen ? <LazyIcon name="X" size={20} className="w-5 h-5" /> : <LazyIcon name="Menu" size={20} className="w-5 h-5" />}
             </button>
           </div>
           <button
@@ -290,7 +298,7 @@ export default function Header({ currentPage, onNavigate }) {
             className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-orange-500 transition-all"
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {mobileMenuOpen ? <LazyIcon name="X" size={20} className="w-5 h-5" /> : <LazyIcon name="Menu" size={20} className="w-5 h-5" />}
           </button>
         </div>
 
@@ -302,7 +310,7 @@ export default function Header({ currentPage, onNavigate }) {
               onClick={() => setMobileMenuOpen(false)}
               className="p-2 hover:bg-gray-800 rounded-lg transition-all"
             >
-              <X className="w-5 h-5 text-white" />
+              <LazyIcon name="X" size={20} className="w-5 h-5 text-white" />
             </button>
           </div>
 
@@ -335,10 +343,13 @@ export default function Header({ currentPage, onNavigate }) {
                     </button>
                     {item.dropdown && (
                       <button
-                        onClick={() => setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page)}
+                        onClick={() => {
+                          loadDestinationsOnDemand();
+                          setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page);
+                        }}
                         className="px-3 py-3 text-gray-300 hover:text-orange-400 transition-all"
                       >
-                        <ChevronDown size={16} className={`transition-transform ${isMobileDropdownOpen ? 'rotate-180' : ''}`} />
+                        <LazyIcon name="ChevronDown" size={16} className={`transition-transform ${isMobileDropdownOpen ? 'rotate-180' : ''}`} />
                       </button>
                     )}
                   </div>
@@ -386,7 +397,7 @@ export default function Header({ currentPage, onNavigate }) {
                   }}
                   className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-orange-400 hover:bg-white/5 rounded-lg transition-all flex items-center gap-3"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LazyIcon name="LogOut" size={16} className="w-4 h-4" />
                   <span>Logout</span>
                 </button>
               </div>
@@ -409,7 +420,7 @@ export default function Header({ currentPage, onNavigate }) {
               onClick={() => setSideMenuOpen(false)}
               className="p-2 hover:bg-gray-800 rounded-lg transition-all"
             >
-              <X className="w-5 h-5 text-white" />
+              <LazyIcon name="X" size={20} className="w-5 h-5 text-white" />
             </button>
           </div>
 

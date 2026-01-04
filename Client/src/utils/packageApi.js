@@ -1,7 +1,7 @@
 import apiClient from './apiClient';
 import { normalizePackage, aggregateDestinations } from './packageTransform';
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 6;
 
 export const fetchPackages = async (params = {}) => {
   const response = await apiClient.get('/packages', {

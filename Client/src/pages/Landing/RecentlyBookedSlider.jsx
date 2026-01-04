@@ -26,13 +26,6 @@ export default function RecentlyBookedSlider({ items = [] }) {
       setCardsPerView(newCardsPerView);
       setSlideIdx(0);
       setIsTabletRange(isTablet);
-      
-      console.log('[RecentlyBookedSlider] Resize Event:', {
-        windowWidth: window.innerWidth,
-        isTabletRange: isTablet,
-        cardsPerView: newCardsPerView,
-        timestamp: new Date().toLocaleTimeString()
-      });
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -110,17 +103,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
   const showControls = totalSlides > cardsPerView;
   const translateX = -(slideIdx * (100 / cardsPerView));
 
-  useEffect(() => {
-    console.log('[Tablet Arrows Debug]', {
-      isTabletRange,
-      showControls,
-      totalSlides,
-      cardsPerView,
-      shouldDisplay: isTabletRange && showControls,
-      windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'N/A'
-    });
-  }, [isTabletRange, showControls, totalSlides, cardsPerView]);
-  
+
   return (
     <section className="py-16 bg-[#051C35] relative overflow-hidden font-opensans">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -175,6 +158,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
                           src={item.image}
                           alt={item.packageName}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          placeholderClassName="w-full h-full"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                         

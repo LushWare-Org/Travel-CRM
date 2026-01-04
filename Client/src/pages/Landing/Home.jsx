@@ -1,24 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  MapPin,
-  Calendar,
-  Search,
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  X,
-  Globe,
-  Zap,
-  Target,
-  Crown,
-  Award,
-  Headphones,
-  Gift,
-  Plane,
-} from 'lucide-react';
-import DealSlider from './DealSlider';
 import RecentlyBookedSlider from './RecentlyBookedSlider';
 import DestinationsSection from './DestinationsSection';
 import FeaturedPackages from './FeaturedPackages';
@@ -31,6 +12,14 @@ import { fetchRecentBookings } from '../../utils/bookingApi';
 import { formatCurrency } from '../../utils/currency';
 import Stats from './Stats';
 import AboutSection from './AboutSection';
+
+const InlineMapPin = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+const InlineCalendar = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+const InlineSearch = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
+const InlineChevronLeft = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>;
+const InlineChevronRight = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>;
+const InlineX = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+const InlineArrowRight = () => <svg className="ml-3 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>;
 
 const heroSlides = [
   { title: 'Discover Your Dream Destination', subtitle: 'Explore the world with our curated travel experiences' },
@@ -153,22 +142,47 @@ export default function Home() {
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    fetchPackages({ limit: 100 })
-      .then(({ packages: pkg, destinations: dest }) => {
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
         if (!mounted) return;
-        const sorted = dest.slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
-        setPackages(pkg);
-        setDestinations(sorted.filter((d) => d.type !== 'domestic'));
-        setLocalDestinations(sorted.filter((d) => d.type === 'domestic'));
-      })
-      .catch((err) => {
-        if (!mounted) return;
-        setError(err.message || 'Failed to load travel data');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
+        setLoading(true);
+        fetchPackages({ limit: 6 })
+          .then(({ packages: pkg, destinations: dest }) => {
+            if (!mounted) return;
+            const sorted = dest.slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
+            setPackages(pkg);
+            setDestinations(sorted.filter((d) => d.type !== 'domestic'));
+            setLocalDestinations(sorted.filter((d) => d.type === 'domestic'));
+          })
+          .catch((err) => {
+            if (!mounted) return;
+            setError(err.message || 'Failed to load travel data');
+          })
+          .finally(() => {
+            if (mounted) setLoading(false);
+          });
       });
+    } else {
+      setTimeout(() => {
+        if (!mounted) return;
+        setLoading(true);
+        fetchPackages({ limit: 6 })
+          .then(({ packages: pkg, destinations: dest }) => {
+            if (!mounted) return;
+            const sorted = dest.slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
+            setPackages(pkg);
+            setDestinations(sorted.filter((d) => d.type !== 'domestic'));
+            setLocalDestinations(sorted.filter((d) => d.type === 'domestic'));
+          })
+          .catch((err) => {
+            if (!mounted) return;
+            setError(err.message || 'Failed to load travel data');
+          })
+          .finally(() => {
+            if (mounted) setLoading(false);
+          });
+      }, 0);
+    }
     return () => (mounted = false);
   }, []);
 
@@ -177,7 +191,6 @@ export default function Home() {
     fetchRecentBookings(8)
       .then((bookingsData) => {
         if (!mounted) return;
-        console.log('Fetched bookings:', bookingsData);
         setBookings(bookingsData || []);
       })
       .catch((err) => {
@@ -274,15 +287,7 @@ export default function Home() {
     }).filter(item => item !== null);
   }, [bookings]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" />
-      </div>
-    );
-  }
-
-  if (error) {
+  if (error && packages.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 text-center">
         <div className="max-w-md">
@@ -401,7 +406,7 @@ export default function Home() {
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         loading={i === 0 ? 'eager' : 'lazy'}
-        fetchPriority={i === 0 ? 'high' : 'auto'}
+        decoding={i === 0 ? 'auto' : 'async'}
       />
 
       {/* Video loads */}
@@ -444,10 +449,10 @@ export default function Home() {
         </div> */}
 
         <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
-          <ChevronLeft className="w-6 h-6" />
+          <InlineChevronLeft />
         </button>
         <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Next">
-          <ChevronRight className="w-6 h-6" />
+          <InlineChevronRight />
         </button>
 
         {/* Hero Content */}
@@ -477,7 +482,7 @@ export default function Home() {
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
                       <div className="lg:col-span-5 relative group">
                         <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
-                          <MapPin className="w-4 h-4 mr-2 text-white" /> Where to?
+                          <InlineMapPin /> Where to?
                         </label>
                         <div className="relative">
                           <select
@@ -511,7 +516,7 @@ export default function Home() {
 
                       <div className="lg:col-span-4 relative group" ref={monthDropdownRef}>
                         <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
-                          <Calendar className="w-4 h-4 mr-2 text-white" /> When?
+                          <InlineCalendar /> When?
                         </label>
                         <div className="relative">
                           <button
@@ -570,9 +575,8 @@ export default function Home() {
                         >
                           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
                           <span className="relative flex items-center justify-center space-x-2">
-                            <Search className="w-5 h-5" />
+                            <InlineSearch />
                             <span>Search</span>
-                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                           </span>
                         </button>
                       </div>
@@ -625,7 +629,7 @@ export default function Home() {
           <div className="w-full max-w-3xl mx-auto rounded-2xl py-2 px-0 lg:py-6">
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
               <Link to="/planner" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
-                Customize Your Trip <ArrowRight className="ml-3 w-5 h-5" />
+                Customize Your Trip <InlineArrowRight />
               </Link>
               <Link to="/contact" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold shadow-sm border border-gray-200 hover:shadow-lg hover:border-gray-300 transform hover:scale-105 transition-all duration-300">
                 Still Have Questions?

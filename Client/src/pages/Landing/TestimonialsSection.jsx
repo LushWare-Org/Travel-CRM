@@ -1,5 +1,5 @@
 import { Star } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 export default function TestimonialsSection() {
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
@@ -16,14 +16,48 @@ export default function TestimonialsSection() {
   }, []);
 
 
+  const elRef = useRef(null);
+
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://elfsightcdn.com/platform.js';
-    script.async = true;
-    document.body.appendChild(script);
+    const loadScript = () => {
+      if (document.querySelector('script[src="https://elfsightcdn.com/platform.js"]')) return;
+      const script = document.createElement('script');
+      script.src = 'https://elfsightcdn.com/platform.js';
+      script.async = true;
+      document.body.appendChild(script);
+      script.onload = () => {
+        window.__ELFSIGHT_SCRIPT_LOADED = true;
+      };
+    };
+
+    const el = elRef.current;
+    if (!el) return;
+
+    let observer;
+    if ('IntersectionObserver' in window) {
+      observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            if (window.requestIdleCallback) {
+              requestIdleCallback(loadScript, { timeout: 3000 });
+            } else {
+              setTimeout(loadScript, 2000);
+            }
+            observer.disconnect();
+          }
+        });
+      });
+      observer.observe(el);
+    } else {
+      if (window.requestIdleCallback) {
+        requestIdleCallback(loadScript, { timeout: 3000 });
+      } else {
+        setTimeout(loadScript, 2000);
+      }
+    }
 
     return () => {
-      document.body.removeChild(script);
+      if (observer) observer.disconnect();
     };
   }, []);
 
@@ -42,8 +76,9 @@ export default function TestimonialsSection() {
             </p>
           </div>
           <div className="flex justify-center">
-            <div 
-              className="elfsight-app-73d66682-048c-42cd-bfa6-d33c02611cb3" 
+            <div
+              ref={elRef}
+              className="elfsight-app-73d66682-048c-42cd-bfa6-d33c02611cb3"
               data-elfsight-app-lazy
             ></div>
           </div>

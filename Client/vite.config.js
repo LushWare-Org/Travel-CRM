@@ -15,14 +15,50 @@ export default defineConfig({
   },
   server: {
     open: true,
-    proxy: {
-      // "/api": "http://localhost:5001/api",
-    },
     fs: {
       allow: [resolve(__dirname, "..")],
     },
-    hmr: {
-      overlay: false,
+    proxy: {
+      // "/api": "http://localhost:5001/api",
     },
   },
+
+  build: {
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    reportCompressedSize: true,
+    chunkSizeWarningLimit: 500, 
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom"],
+          "router-vendor": ["react-router-dom"],
+          "ui-vendor": ["@mui/material", "@mui/icons-material", "@headlessui/react"],
+          "chart-vendor": ["recharts"],
+          "utils-vendor": ["lodash", "axios", "date-fns", "framer-motion"],
+          "pdf-vendor": ["jspdf", "html2canvas", "json2csv", "file-saver"],
+          "icons-vendor": ["lucide-react", "react-phone-number-input"],
+        },
+      },
+    },
+  },
+
+  optimizeDeps: {
+    include: [
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "axios",
+      "date-fns",
+      "lodash",
+      "framer-motion",
+    ],
+  },
+
+
 });

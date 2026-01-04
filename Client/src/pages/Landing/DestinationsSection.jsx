@@ -53,7 +53,7 @@ function ReviewsVideoSlider() {
 
   return (
     <section className="relative py-16 bg-[#051C35] overflow-hidden">
-      <style jsx>{`
+      <style>{`
         @keyframes twinkle {
           0%, 100% { opacity: 0; transform: scale(0.5); }
           50% { opacity: 1; transform: scale(1); }
@@ -212,6 +212,7 @@ function InternationalGrid({ destinations, loading }) {
             src={dest.image_url || "/placeholder.svg"}
             alt={dest.name}
             className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+            placeholderClassName="w-full h-full"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
           <div className="absolute inset-0 flex flex-col justify-end p-3 md:p-6">
@@ -305,7 +306,12 @@ function LocalSlider({ destinations, loading }) {
           <div key={dest.id} className="w-full">
             <button onClick={() => handleDestinationClick(dest)} className="w-full group relative overflow-hidden rounded-2xl aspect-[5/7] hover:shadow-2xl transition-all duration-300 cursor-pointer">
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
-              <img src={dest.image_url || "/placeholder.svg"} alt={dest.name} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500" />
+              <img 
+                src={dest.image_url || "/placeholder.svg"} 
+                alt={dest.name} 
+                className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                placeholderClassName="w-full h-full"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
               <div className="absolute top-4 left-4 right-4"><h3 className="text-xl font-bold text-white drop-shadow-lg text-left">{dest.name}</h3></div>
               <div className="absolute bottom-4 left-4 right-4">

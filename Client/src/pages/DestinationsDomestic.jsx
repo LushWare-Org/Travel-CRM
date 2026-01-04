@@ -49,6 +49,8 @@ export default function DestinationsDomestic() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   useEffect(() => setIsVisible(true), []);
 
@@ -130,6 +132,7 @@ export default function DestinationsDomestic() {
     if (selectedPriceRange) count += 1;
     if (minRating > 0) count += 1;
     setActiveFiltersCount(count);
+    setCurrentPage(1);
   }, [preparedDestinations, searchQuery, selectedDestinations, selectedPriceRange, minRating, sortBy]);
 
   const toggleDestination = d => setSelectedDestinations(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d]);
@@ -138,7 +141,16 @@ export default function DestinationsDomestic() {
     setSelectedDestinations([]); 
     setSelectedPriceRange(null); 
     setMinRating(0);
+    setCurrentPage(1);
   };
+
+  const paginatedDestinations = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredDestinations.slice(startIndex, endIndex);
+  }, [filteredDestinations, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredDestinations.length / itemsPerPage);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" /></div>;
   if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load domestic destinations</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700">Try again</button></div></div>;
@@ -148,13 +160,25 @@ export default function DestinationsDomestic() {
       {/* Hero Section */}
       <div className="relative w-full py-24 overflow-hidden">
         <div className="absolute inset-0">
-          <video
-            src="/v5.mp4"
-            className="w-full h-full object-cover"
-            autoPlay
-            loop
-            muted
+          <img
+            src="/v5-poster.webp"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="eager"
+            decoding="auto"
+            fetchPriority="high"
+            sizes="100vw"
           />
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="none"
+          >
+            <source src="/v5.mp4" type="video/mp4" />
+          </video>
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
         </div>
@@ -421,7 +445,7 @@ export default function DestinationsDomestic() {
               </div>
             ) : viewMode === 'grid' ? (
               <div className={`grid gap-4 md:gap-5 lg:gap-6 ${showFilters ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
-                {filteredDestinations.map(dest => (
+                {paginatedDestinations.map(dest => (
                   <Link
                     key={dest.id}
                     to={`/packages?destination=${dest.slug}`}
@@ -429,11 +453,19 @@ export default function DestinationsDomestic() {
                   >
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
                     <div className="relative overflow-hidden h-48">
-                      <img
-                        src={dest.image_url}
-                        alt={dest.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      />
+                      <picture>
+                        <source
+                          srcSet={dest.image_url?.replace(/\.(jpg|jpeg|png)$/i, '.webp') || ''}
+                          type="image/webp"
+                        />
+                        <img
+                          src={dest.image_url}
+                          alt={dest.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        />
+                      </picture>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
@@ -476,7 +508,7 @@ export default function DestinationsDomestic() {
               </div>
             ) : (
               <div className="space-y-6">
-                {filteredDestinations.map((dest) => (
+                {paginatedDestinations.map((dest) => (
                   <div
                     key={dest.id}
                     onClick={() => navigate(`/packages?destination=${dest.slug}`)}
@@ -490,6 +522,8 @@ export default function DestinationsDomestic() {
                         <img
                           src={dest.image_url}
                           alt={dest.name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
@@ -531,6 +565,39 @@ export default function DestinationsDomestic() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+            {filteredDestinations.length > itemsPerPage && (
+              <div className="flex items-center justify-between mt-12 pt-8 border-t border-gray-200">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-6 py-3 bg-gray-100 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
+                >
+                  ← Previous
+                </button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${
+                        currentPage === page
+                          ? 'bg-orange-600 text-white shadow-lg'
+                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-6 py-3 bg-gray-100 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
+                >
+                  Next →
+                </button>
               </div>
             )}
           </div>
