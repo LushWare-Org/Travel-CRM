@@ -22,6 +22,7 @@ export default function Header({ currentPage, onNavigate }) {
   const userMenuRef = useRef(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
+  const sideMenuRef = useRef(null);
   const [destinationsLoaded, setDestinationsLoaded] = useState(false);
   const destinationsLoadRef = useRef(null);
 
@@ -81,8 +82,21 @@ export default function Header({ currentPage, onNavigate }) {
     }
   }, [userMenuOpen]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sideMenuRef.current && !sideMenuRef.current.contains(event.target)) {
+        setSideMenuOpen(false);
+      }
+    };
+
+    if (sideMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [sideMenuOpen]);
+
   const loadDestinationsOnDemand = useCallback(() => {
-    if (destinationsLoadRef.current || destinationsLoaded || internationalMenu.length) return;
+    if (destinationsLoadRef.current || destinationsLoaded) return;
     destinationsLoadRef.current = fetchPackages({ limit: 100 })
       .then(({ destinations }) => {
         const sorted = (destinations || []).slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
@@ -108,7 +122,10 @@ export default function Header({ currentPage, onNavigate }) {
       .finally(() => {
         destinationsLoadRef.current = null;
       });
-  }, [destinationsLoaded, internationalMenu.length]);
+  }, [destinationsLoaded]);
+  useEffect(() => {
+    loadDestinationsOnDemand();
+  }, [loadDestinationsOnDemand]);
 
   const navItems = useMemo(() => [
     { name: 'Home', page: 'home' },
@@ -167,10 +184,7 @@ export default function Header({ currentPage, onNavigate }) {
                 <div
                   key={item.page}
                   className="relative group"
-                  onMouseEnter={() => {
-                    if (item.dropdown) loadDestinationsOnDemand();
-                    if (item.dropdown) setActiveDropdown(item.page);
-                  }}
+                  onMouseEnter={() => setActiveDropdown(item.page)}
                   onMouseLeave={() => setActiveDropdown(null)}
                 >
                   <a
@@ -343,10 +357,7 @@ export default function Header({ currentPage, onNavigate }) {
                     </button>
                     {item.dropdown && (
                       <button
-                        onClick={() => {
-                          loadDestinationsOnDemand();
-                          setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page);
-                        }}
+                        onClick={() => setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page)}
                         className="px-3 py-3 text-gray-300 hover:text-orange-400 transition-all"
                       >
                         <LazyIcon name="ChevronDown" size={16} className={`transition-transform ${isMobileDropdownOpen ? 'rotate-180' : ''}`} />
@@ -413,7 +424,7 @@ export default function Header({ currentPage, onNavigate }) {
         )}
 
         {/* Side Menu */}
-        <div className={`fixed top-0 right-0 h-screen w-80 bg-gray-950 border-l border-gray-800 shadow-2xl z-[100] transform transition-transform duration-300 ${sideMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div ref={sideMenuRef} className={`fixed top-0 right-0 h-screen w-80 bg-gray-950 border-l border-gray-800 shadow-2xl z-[100] transform transition-transform duration-300 ${sideMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="flex items-center justify-between p-4 border-b border-gray-800">
             <h2 className="text-lg font-bold text-white">Menu</h2>
             <button
