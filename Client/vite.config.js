@@ -41,7 +41,7 @@ export default defineConfig({
           "ui-vendor": ["@mui/material", "@mui/icons-material", "@headlessui/react"],
           "chart-vendor": ["recharts"],
           "utils-vendor": ["lodash", "axios", "date-fns", "framer-motion"],
-          "pdf-vendor": ["jspdf", "html2canvas", "json2csv", "file-saver"],
+          "pdf-vendor": ["jspdf", "html2canvas", "file-saver"],
           "icons-vendor": ["lucide-react", "react-phone-number-input"],
         },
       },
