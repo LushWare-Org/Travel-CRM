@@ -11,21 +11,30 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+  const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
 
   // Initialize auth from localStorage
   useEffect(() => {
     const initializeAuth = () => {
-      const savedToken = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
+      const savedToken = sessionStorage.getItem('token');
+      const savedUser = sessionStorage.getItem('user');
+      const lastActivity = sessionStorage.getItem('lastActivity');
 
       if (savedToken) {
-        setToken(savedToken);
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
+        const now = Date.now();
+        if (lastActivity && now - Number(lastActivity) > INACTIVITY_LIMIT_MS) {
+          // Session expired due to inactivity
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          sessionStorage.removeItem('lastActivity');
+        } else {
+          setToken(savedToken);
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          }
+          setIsAuthenticated(true);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
         }
-        setIsAuthenticated(true);
-        // Set default authorization header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
       }
       setLoading(false);
     };
@@ -64,8 +73,8 @@ export const AuthProvider = ({ children }) => {
         const { token: authToken, user: userData } = response.data.data;
 
         // Save to localStorage
-        localStorage.setItem('token', authToken);
-        localStorage.setItem('user', JSON.stringify(userData));
+        sessionStorage.setItem('token', authToken);
+        sessionStorage.setItem('user', JSON.stringify(userData));
 
         // Update state
         setToken(authToken);
@@ -106,8 +115,9 @@ export const AuthProvider = ({ children }) => {
       }
     } finally {
       // Clear localStorage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('lastActivity');
 
       // Clear state
       setToken(null);
@@ -126,8 +136,6 @@ export const AuthProvider = ({ children }) => {
   const inactivityTimerRef = useRef(null);
 
   useEffect(() => {
-    const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
-
     const resetTimer = () => {
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
@@ -143,15 +151,21 @@ export const AuthProvider = ({ children }) => {
 
     const updateLastActivity = () => {
       try {
-        localStorage.setItem('lastActivity', Date.now().toString());
+        sessionStorage.setItem('lastActivity', Date.now().toString());
       } catch (e) {
       }
       resetTimer();
     };
 
-    const storageListener = (e) => {
-      if (e.key === 'lastActivity') {
-        resetTimer();
+    const visibilityListener = () => {
+      try {
+        const last = sessionStorage.getItem('lastActivity');
+        if (last && Date.now() - Number(last) > INACTIVITY_LIMIT_MS) {
+          logout({ silent: true });
+        } else {
+          resetTimer();
+        }
+      } catch (e) {
       }
     };
 
@@ -159,13 +173,15 @@ export const AuthProvider = ({ children }) => {
       updateLastActivity();
       const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
       events.forEach((ev) => window.addEventListener(ev, updateLastActivity));
-      window.addEventListener('storage', storageListener);
+      document.addEventListener('visibilitychange', visibilityListener);
+      window.addEventListener('focus', visibilityListener);
     }
 
     return () => {
       const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
       events.forEach((ev) => window.removeEventListener(ev, updateLastActivity));
-      window.removeEventListener('storage', storageListener);
+      document.removeEventListener('visibilitychange', visibilityListener);
+      window.removeEventListener('focus', visibilityListener);
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
       }

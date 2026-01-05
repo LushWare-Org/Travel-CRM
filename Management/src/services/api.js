@@ -8,7 +8,7 @@ class ApiService {
 
   // Helper method to get auth token
   getAuthHeaders() {
-    const token = localStorage.getItem("token");
+    const token = (sessionStorage && sessionStorage.getItem("token")) || localStorage.getItem("token");
     const headers = {
       "Content-Type": "application/json",
     };
@@ -81,7 +81,12 @@ class ApiService {
         // Special handling for 401 (authentication errors)
         if (response.status === 401) {
           // Clear invalid token
+          try {
+            sessionStorage.removeItem("token");
+            sessionStorage.removeItem("user");
+          } catch (e) {}
           localStorage.removeItem("token");
+          localStorage.removeItem("user");
           errorMessage =
             data.message || "Your session has expired. Please login again.";
         }

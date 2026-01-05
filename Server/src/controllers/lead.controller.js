@@ -606,13 +606,15 @@ export const unassignLead = asyncHandler(async (req, res, next) => {
   }
 
   lead.assignedTo = null;
+  lead.salesRep = undefined;
   lead.assignedBy = req.user._id;
 
   await lead.save();
 
+  const updatedLead = await Lead.findById(req.params.id).populate('assignedTo', 'name email role');
   res.status(200).json({
     success: true,
-    data: lead,
+    data: updatedLead,
   });
 });
 

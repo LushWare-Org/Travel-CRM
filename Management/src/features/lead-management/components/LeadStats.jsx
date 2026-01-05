@@ -25,16 +25,16 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
     : '0.0';
 
   // Assigned and unassigned leads
-  const assignedLeads = leads.filter(lead => lead.salesRep || lead.adviser);
-  const unassignedLeads = leads.filter(lead => !lead.salesRep && !lead.adviser);
+  const assignedLeads = leads.filter(lead => lead.assignedTo && (lead.assignedTo._id || lead.assignedTo));
+  const unassignedLeads = leads.filter(lead => !lead.assignedTo || (!lead.assignedTo._id && !lead.assignedTo));
   useEffect(() => {
     if (!showModal || !modalType) return;
     if (modalType === 'total') {
       setFilteredLeads(leads);
     } else if (modalType === 'assigned') {
-      setFilteredLeads(leads.filter(lead => lead.salesRep || lead.adviser));
+      setFilteredLeads(leads.filter(lead => lead.assignedTo && (lead.assignedTo._id || lead.assignedTo)));
     } else if (modalType === 'unassigned') {
-      setFilteredLeads(leads.filter(lead => !lead.salesRep && !lead.adviser));
+      setFilteredLeads(leads.filter(lead => !lead.assignedTo || (!lead.assignedTo._id && !lead.assignedTo)));
     }
   }, [leads, modalType, showModal]);
 
@@ -143,8 +143,11 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
   const displayedLeads = filteredLeads
     .filter(lead => {
       // Filter by sales rep
-      if (selectedSalesRep !== 'all' && (lead.salesRep || lead.adviser) !== selectedSalesRep) {
-        return false;
+      if (selectedSalesRep !== 'all') {
+        const leadRepId = lead.assignedTo?._id || lead.assignedTo;
+        if (leadRepId !== selectedSalesRep) {
+          return false;
+        }
       }
       if (searchTerm.trim()) {
         const searchLower = searchTerm.toLowerCase();
@@ -160,8 +163,10 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
   const getLeadsCountPerRep = () => {
     const counts = {};
     filteredLeads.forEach(lead => {
-      const repName = lead.salesRep || lead.adviser || 'Unassigned';
-      counts[repName] = (counts[repName] || 0) + 1;
+      const repId = lead.assignedTo?._id || lead.assignedTo;
+      if (repId) {
+        counts[repId] = (counts[repId] || 0) + 1;
+      }
     });
     return counts;
   };
@@ -169,9 +174,9 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
   const getTotalLeadsPerRep = () => {
     const counts = {};
     leads.forEach(lead => {
-      const repName = lead.salesRep || lead.adviser;
-      if (repName) {
-        counts[repName] = (counts[repName] || 0) + 1;
+      const repId = lead.assignedTo?._id || lead.assignedTo;
+      if (repId) {
+        counts[repId] = (counts[repId] || 0) + 1;
       }
     });
     return counts;
@@ -415,7 +420,7 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
                   >
                     All ({filteredLeads.length})
                   </button>
-                  {salesReps.map(rep => (
+                  {salesReps.filter(rep => rep.role === 'salesRep').map(rep => (
                     <button
                       key={rep.id}
                       onClick={() => {
@@ -423,19 +428,19 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
                           handleBulkAssign(rep.id, rep.name);
                         } else {
                           // Just filter the view
-                          setSelectedSalesRep(rep.name);
+                          setSelectedSalesRep(rep.id);
                         }
                       }}
-                      disabled={isAssigningBulk || (modalType === 'unassigned' && selectedLeadsForBulkAssign.size === 0 && selectedSalesRep !== rep.name)}
+                      disabled={isAssigningBulk || (modalType === 'unassigned' && selectedLeadsForBulkAssign.size === 0 && selectedSalesRep !== rep.id)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         modalType === 'unassigned' && selectedLeadsForBulkAssign.size > 0
                           ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50'
-                          : selectedSalesRep === rep.name
+                          : selectedSalesRep === rep.id
                           ? 'bg-green-600 text-white'
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
                     >
-                      {isAssigningBulk && selectedLeadsForBulkAssign.size > 0 ? `${rep.name}...` : `${rep.name} (${totalLeadsPerRep[rep.name] || 0})`}
+                      {isAssigningBulk && selectedLeadsForBulkAssign.size > 0 ? `${rep.name}...` : `${rep.name} (${totalLeadsPerRep[rep.id] || 0})`}
                       </button>
                     ))}
                 </div>
@@ -492,7 +497,9 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
                         <td className="px-6 py-4 text-sm font-semibold text-gray-900 cursor-pointer" onClick={() => onViewLead && onViewLead(lead)}>
                           {lead.name}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap cursor-pointer" onClick={() => onViewLead && onViewLead(lead)}>{lead.salesRep || lead.adviser || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap cursor-pointer" onClick={() => onViewLead && onViewLead(lead)}>
+                          {lead.assignedTo ? (lead.assignedTo.name || lead.salesRep || lead.adviser || '-') : '-'}
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-600 cursor-pointer" onClick={() => onViewLead && onViewLead(lead)}>{lead.email}</td>
                         <td className="px-6 py-4 text-sm text-gray-600 cursor-pointer" onClick={() => onViewLead && onViewLead(lead)}>{lead.phone}</td>
                         <td className="px-6 py-4 text-sm cursor-pointer" onClick={() => onViewLead && onViewLead(lead)}>
@@ -570,7 +577,7 @@ const LeadStats = ({ totalLeads, leads = [], onViewLead = null, salesReps = [], 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Select Sales Rep</label>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {salesReps.map(rep => (
+                  {salesReps.filter(rep => rep.role === 'salesRep').map(rep => (
                     <button
                       key={rep.id}
                       onClick={() => handleAssignLead(selectedAssignLead, rep.id, rep.name)}

@@ -136,7 +136,7 @@ const LeadManagement = () => {
         const res = await adminAPI.getSalesRepsAndAdmins();
         if (res.status === "success" && res.data?.users) {
           setSalesReps(
-            res.data.users.map((u) => ({ id: u._id || u.id, name: u.name }))
+            res.data.users.map((u) => ({ id: u._id || u.id, name: u.name, role: u.role }))
           );
         }
       } catch (e) {
@@ -458,16 +458,18 @@ const LeadManagement = () => {
           }}
           onAssignLead={async (lead, salesRepId, salesRepName) => {
             try {
-              const response = await leadAPI.updateLead(lead._id || lead.id, {
-                salesRep: salesRepName
-              });
+              const response = await leadAPI.assignLead(lead._id || lead.id, salesRepId);
               if (response.success) {
                 setLeads(prev => 
                   prev.map(l => {
                     const leadId = l._id || l.id;
                     const assignedLeadId = lead._id || lead.id;
                     if (leadId === assignedLeadId) {
-                      return { ...l, salesRep: salesRepName };
+                      return { 
+                        ...l, 
+                        assignedTo: salesRepId,
+                        salesRep: salesRepName 
+                      };
                     }
                     return l;
                   })
