@@ -147,15 +147,16 @@ const connectDB = async () => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
+const HOST = '127.0.0.1';
 
 const startServer = async () => {
   await connectDB();
 
-  const server = app.listen(PORT, async () => {
-    logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-    console.log(`🚀 Server is running on http://localhost:${PORT}`);
-    console.log(`📚 API Documentation: http://localhost:${PORT}/api/${API_VERSION}`);
-    
+  const server = app.listen(PORT, HOST, async () => {
+    logger.info(`Server running in ${process.env.NODE_ENV} mode on ${HOST}:${PORT}`);
+    console.log(`🚀 Server is running on http://${HOST}:${PORT}`);
+    console.log(`📚 API Documentation: http://${HOST}:${PORT}/api/${API_VERSION}`);
+
     // Verify email service after server starts
     await emailService.verifyConnection();
   });
