@@ -16,14 +16,16 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth from localStorage
   useEffect(() => {
     const initializeAuth = () => {
-      const savedToken = sessionStorage.getItem('token');
-      const savedUser = sessionStorage.getItem('user');
+      const savedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
       const lastActivity = sessionStorage.getItem('lastActivity');
 
       if (savedToken) {
         const now = Date.now();
         if (lastActivity && now - Number(lastActivity) > INACTIVITY_LIMIT_MS) {
           // Session expired due to inactivity
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
           sessionStorage.removeItem('token');
           sessionStorage.removeItem('user');
           sessionStorage.removeItem('lastActivity');
@@ -73,6 +75,8 @@ export const AuthProvider = ({ children }) => {
         const { token: authToken, user: userData } = response.data.data;
 
         // Save to localStorage
+        localStorage.setItem('token', authToken);
+        localStorage.setItem('user', JSON.stringify(userData));
         sessionStorage.setItem('token', authToken);
         sessionStorage.setItem('user', JSON.stringify(userData));
 
@@ -115,6 +119,8 @@ export const AuthProvider = ({ children }) => {
       }
     } finally {
       // Clear localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       sessionStorage.removeItem('token');
       sessionStorage.removeItem('user');
       sessionStorage.removeItem('lastActivity');

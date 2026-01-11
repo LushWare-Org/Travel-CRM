@@ -26,16 +26,25 @@ const PDFPreviewDialog = ({
         setPdfBlobUrl(null);
       }
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const fullUrl = pdfUrl.startsWith('http') ? pdfUrl : `${API_BASE_URL}${pdfUrl}`;
 
-      fetch(fullUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
+      if (!token) {
+        console.error('No authentication token found. Please login again.');
+        setLoading(false);
+        return;
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+      };
+
+      fetch(fullUrl, { headers })
         .then(response => {
-          if (!response.ok) throw new Error('Failed to load PDF');
+          if (!response.ok) {
+            console.error(`HTTP Error: ${response.status}. Token: ${token ? 'present' : 'missing'}`);
+            throw new Error('Failed to load PDF');
+          }
           return response.blob();
         })
         .then(blob => {

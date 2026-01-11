@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import axios from 'axios';
+import api from '../services/api';
 
 const PermissionContext = createContext();
 
@@ -85,7 +85,6 @@ export const PermissionProvider = ({ children }) => {
   const [availablePermissions, setAvailablePermissions] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
   /**
    * Fetch available permissions from backend
@@ -97,14 +96,14 @@ export const PermissionProvider = ({ children }) => {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/admin/permissions/available`);
-      if (response.data?.data?.permissions) {
-        setAvailablePermissions(response.data.data.permissions);
+      const response = await api.get('/admin/permissions/available');
+      if (response?.data?.permissions) {
+        setAvailablePermissions(response.data.permissions);
       }
     } catch (error) {
       console.error('Failed to fetch available permissions:', error);
     }
-  }, [API_URL, user?.role]);
+  }, [user?.role]);
 
   /**
    * Load user's permissions on mount or when user changes

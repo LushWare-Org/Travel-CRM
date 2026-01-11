@@ -8,7 +8,7 @@ class ApiService {
 
   // Helper method to get auth token
   getAuthHeaders() {
-    const token = (sessionStorage && sessionStorage.getItem("token")) || localStorage.getItem("token");
+    const token = localStorage.getItem("token") || (sessionStorage && sessionStorage.getItem("token"));
     const headers = {
       "Content-Type": "application/json",
     };
