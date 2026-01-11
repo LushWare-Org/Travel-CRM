@@ -6,6 +6,7 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
 import * as packageAIController from '../controllers/packageAI.controller.js';
+import { aiLimiter, apiLimiter } from '../config/rateLimiter.js';
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.get(
 router.post(
   '/generate-from-title',
   protect,
+  aiLimiter,
   packageAIController.generateFromTitle
 );
 
@@ -30,6 +32,7 @@ router.post(
   '/:id/generate-ai-content',
   protect,
   authorize('admin', 'salesRep'),
+  aiLimiter,
   packageAIController.generateAIContent
 );
 
@@ -38,6 +41,7 @@ router.get(
   '/:id/preview-ai-content',
   protect,
   authorize('admin', 'salesRep'),
+  apiLimiter,
   packageAIController.previewAIContent
 );
 
@@ -46,6 +50,7 @@ router.get(
   '/:id/ai-pdf',
   protect,
   authorize('admin', 'salesRep'),
+  apiLimiter,
   packageAIController.generateAIPDF
 );
 
