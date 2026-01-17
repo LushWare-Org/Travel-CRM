@@ -22,10 +22,10 @@ export const generateAIPackage = asyncHandler(async (req, res) => {
   try {
     const packageData = await aiPackageGenerationService.generatePackage(
       destination,
+      description,
       packageType,
       category,
-      parseInt(nights, 10),
-      description
+      parseInt(nights, 10)
     );
 
     res.status(200).json({
