@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, RefreshCw } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { leadAPI, adminAPI } from "../services/api";
 import {
@@ -406,6 +406,19 @@ const LeadManagement = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={fetchLeads}
+              disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 font-medium text-gray-700 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh leads"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Refresh
+            </button>
             {settings && (
               <button
                 onClick={() => setShowSettingsDialog(true)}

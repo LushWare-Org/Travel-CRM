@@ -27,6 +27,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
     phone,
     travelers,
     travelDate,
+    endDate,
     message,
     packageId,
   } = req.body || {};
@@ -56,6 +57,14 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
   const parsedTravelDate = travelDate ? new Date(travelDate) : null;
   if (!parsedTravelDate || Number.isNaN(parsedTravelDate.getTime())) {
     throw new AppError('A valid travelDate is required', 400);
+  }
+
+  const parsedEndDate = endDate ? new Date(endDate) : null;
+  if (parsedEndDate && Number.isNaN(parsedEndDate.getTime())) {
+    throw new AppError('endDate is invalid', 400);
+  }
+  if (parsedEndDate && parsedEndDate < parsedTravelDate) {
+    throw new AppError('endDate cannot be before travelDate', 400);
   }
 
   let user = await User.findOne({ email: sanitizedEmail });
@@ -97,6 +106,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
       destination: pkg.destination,
       destinationCountry: pkg.destination,
       travelDate: parsedTravelDate,
+      endDate: parsedEndDate || undefined,
       numberOfTravelers: parsedTravelers,
       budget: pkg.price ? `${pkg.price}` : undefined,
       message: message?.trim() || undefined,
@@ -136,6 +146,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
       user: user._id,
       package: pkg._id,
       travelDate: parsedTravelDate,
+      endDate: parsedEndDate || undefined,
       numberOfTravelers: parsedTravelers,
       totalAmount: pkg.price || 0,
       paidAmount: 0,

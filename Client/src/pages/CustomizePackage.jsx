@@ -43,6 +43,8 @@ export default function CustomizePackage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successModalMessage, setSuccessModalMessage] = useState('');
 
   const [contact, setContact] = useState({
     name: '',
@@ -217,8 +219,9 @@ export default function CustomizePackage() {
     setIsSubmitting(true);
     try {
       await submitCustomizationRequest(payload);
-      alert('Thank you! Our travel experts will connect with you shortly to finalize your customized itinerary.');
-      navigate(`/package/${id}`);
+      const successMsg = 'Thank you! Our travel experts will connect with you shortly to finalize your customized itinerary.';
+      setSuccessModalMessage(successMsg);
+      setSuccessModalVisible(true);
     } catch (err) {
       alert(err.message || 'Unable to submit customization request. Please try again later.');
     } finally {
@@ -812,6 +815,30 @@ export default function CustomizePackage() {
               </form>
             </div>
         </div>
+
+      {successModalVisible && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all duration-300">
+            <div className="px-8 py-10">
+              <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">Thank you!</h2>
+              <p className="text-gray-700 text-center leading-relaxed">{successModalMessage}</p>
+            </div>
+            <div className="px-8 py-6 bg-gray-50 border-t border-gray-200 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccessModalVisible(false);
+                  navigate(`/package/${id}`);
+                }}
+                className="px-16 py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white font-bold rounded-2xl hover:from-orange-700 hover:to-amber-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
   );
 }
