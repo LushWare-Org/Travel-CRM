@@ -20,7 +20,7 @@ class EmailService {
       return;
     }
     this.verificationAttempted = true;
-    
+
     try {
       const transporter = this.getTransporter();
       await transporter.verify();
@@ -132,12 +132,15 @@ class EmailService {
   }
 
   async sendStaffCredentials(user, tempPassword, role) {
-    const loginUrl = `${process.env.CLIENT_URL}/login`;
+    // Use MANAGEMENT_URL for staff/admin accounts, CLIENT_URL for customers
+    const loginUrl = `${process.env.MANAGEMENT_URL || process.env.CLIENT_URL}/login`;
     let roleDisplay;
     if (role === 'salesRep') {
       roleDisplay = 'Sales Representative';
     } else if (role === 'vendor') {
       roleDisplay = 'Vendor';
+    } else if (role === 'admin') {
+      roleDisplay = 'Administrator';
     } else {
       roleDisplay = role;
     }
@@ -341,7 +344,7 @@ class EmailService {
 
     const text = `Dear ${customerName},\n\nPlease find your quotation attached.\nTotal Amount: ${this.formatCurrency(
       quotation.totalAmount,
-    )}\nValid Until: ${this.formatDate(quotation.validUntil)}\n`; 
+    )}\nValid Until: ${this.formatDate(quotation.validUntil)}\n`;
 
     return this.sendEmail({
       to: recipientEmail,
@@ -350,11 +353,11 @@ class EmailService {
       text,
       attachments: pdfPath
         ? [
-            {
-              filename: `quotation-${quotationNumber}.pdf`,
-              path: pdfPath,
-            },
-          ]
+          {
+            filename: `quotation-${quotationNumber}.pdf`,
+            path: pdfPath,
+          },
+        ]
         : [],
     });
   }
@@ -419,11 +422,11 @@ class EmailService {
       text,
       attachments: pdfPath
         ? [
-            {
-              filename: `invoice-${invoiceNumber}.pdf`,
-              path: pdfPath,
-            },
-          ]
+          {
+            filename: `invoice-${invoiceNumber}.pdf`,
+            path: pdfPath,
+          },
+        ]
         : [],
     });
   }
@@ -490,11 +493,11 @@ class EmailService {
       text,
       attachments: pdfPath
         ? [
-            {
-              filename: `receipt-${receiptNumber}.pdf`,
-              path: pdfPath,
-            },
-          ]
+          {
+            filename: `receipt-${receiptNumber}.pdf`,
+            path: pdfPath,
+          },
+        ]
         : [],
     });
   }
@@ -550,11 +553,11 @@ class EmailService {
       text,
       attachments: pdfBuffer
         ? [
-            {
-              filename: fileName || `voucher-${voucherNumber}.pdf`,
-              content: pdfBuffer,
-            },
-          ]
+          {
+            filename: fileName || `voucher-${voucherNumber}.pdf`,
+            content: pdfBuffer,
+          },
+        ]
         : [],
     });
   }
@@ -631,16 +634,16 @@ class EmailService {
     const managementUrl = `${process.env.MANAGEMENT_URL || process.env.CLIENT_URL || 'http://localhost:3001'}`;
     const leadUrl = `${managementUrl}/leads/${lead._id || lead.id}`;
     const subject = `New Lead Assigned: ${lead.name || 'Lead'}`;
-    
+
     const assignmentType = assignmentMode === 'auto' ? 'automatically assigned' : 'manually assigned';
     const assignedByText = assignedBy ? ` by ${assignedBy.name || 'an administrator'}` : '';
-    
+
     logger.info(`Preparing lead assignment email for ${salesRep.email}`, {
       leadId: lead._id || lead.id,
       leadName: lead.name,
       assignmentMode,
     });
-    
+
     const leadDetails = `
       <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="margin-top: 0; color: #333;">Lead Details</h3>

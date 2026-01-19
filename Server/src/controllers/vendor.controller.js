@@ -164,13 +164,13 @@ export const getVendorById = asyncHandler(async (req, res, next) => {
  * @body    { name, email, phone, businessName, serviceType, businessRegistrationNumber, address, contactPerson }
  */
 export const createVendor = asyncHandler(async (req, res, next) => {
-  const { 
-    name, 
-    email, 
-    phone, 
+  const {
+    name,
+    email,
+    phone,
     phoneCountry,
-    businessName, 
-    serviceType, 
+    businessName,
+    serviceType,
     businessRegistrationNumber,
     address,
     contactPerson,
@@ -195,9 +195,9 @@ export const createVendor = asyncHandler(async (req, res, next) => {
 
     // Check if business registration number already exists
     if (businessRegistrationNumber) {
-      const existingBusiness = await User.findOne({ 
+      const existingBusiness = await User.findOne({
         businessRegistrationNumber,
-        role: 'vendor' 
+        role: 'vendor'
       });
       if (existingBusiness) {
         return next(new AppError('Business registration number already exists', 400));
@@ -305,13 +305,13 @@ export const createVendor = asyncHandler(async (req, res, next) => {
  */
 export const updateVendor = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  const { 
-    name, 
-    email, 
+  const {
+    name,
+    email,
     phone,
     phoneCountry,
-    businessName, 
-    serviceType, 
+    businessName,
+    serviceType,
     address,
     contactPerson,
     bankDetails,
@@ -344,7 +344,7 @@ export const updateVendor = asyncHandler(async (req, res, next) => {
 
     // Check if business registration number is being changed
     if (businessRegistrationNumber && businessRegistrationNumber !== vendor.businessRegistrationNumber) {
-      const existingBusiness = await User.findOne({ 
+      const existingBusiness = await User.findOne({
         businessRegistrationNumber,
         role: 'vendor',
         _id: { $ne: id },
@@ -590,7 +590,7 @@ export const resetVendorPassword = asyncHandler(async (req, res, next) => {
 
     // Send password reset email
     try {
-      await emailService.sendPasswordReset(vendor, tempPassword);
+      await emailService.sendStaffCredentials(vendor, tempPassword, 'vendor');
       logger.info(`Password reset email sent to ${vendor.email} by ${req.user.email}`);
     } catch (emailError) {
       logger.error(
@@ -764,8 +764,8 @@ export const getVendorsByServiceType = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    const vendors = await User.find({ 
-      role: 'vendor', 
+    const vendors = await User.find({
+      role: 'vendor',
       serviceType,
       isActive: true,
     })

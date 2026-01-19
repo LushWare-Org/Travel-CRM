@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, Loader2, X } from 'lucide-react';
+import { getCountryCodeFromDestination } from '../../itinerary/utils/destinationMapping';
 
 const LocationAutocomplete = ({
   value,
   onChange,
   placeholder = "e.g., Colombo, Sri Lanka",
   onSelect,
+  // NEW: Context props for destination-aware suggestions
+  destination = null,      // Package/lead destination (e.g., "Dubai", "Bali")
+  country = null,          // Optional: Direct country code override (e.g., "AE", "ID")
+  prioritizeRegion = true, // Prioritize results in the destination's region
 }) => {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState([]);
@@ -32,9 +37,25 @@ const LocationAutocomplete = ({
     setIsLoading(true);
     
     try {
+      // NEW: Get country code from destination for context-aware filtering
+      const countryCode = country || getCountryCodeFromDestination(destination);
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        q: searchQuery,
+        format: 'json',
+        limit: countryCode ? 10 : 5, // More results when filtering by country
+        addressdetails: 1,
+      });
+      
+      // Add country filter if available (ISO 3166-1 alpha-2 code)
+      if (countryCode) {
+        params.append('countrycodes', countryCode.toLowerCase());
+      }
+      
       // Use Nominatim API with proper headers
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?${params.toString()}`,
         {
           headers: {
             'User-Agent': 'Trip-Sky-Way/1.0', // Nominatim requires a User-Agent
@@ -48,7 +69,7 @@ const LocationAutocomplete = ({
       }
 
       const data = await response.json();
-      
+
       // Format results
       const formattedSuggestions = data.map((item, index) => {
         // Build a readable location string
@@ -56,7 +77,7 @@ const LocationAutocomplete = ({
         if (item.name && item.name !== item.display_name.split(',')[0]) {
           parts.push(item.name);
         }
-        
+
         // Add city/town
         if (item.address?.city) {
           parts.push(item.address.city);
@@ -65,19 +86,19 @@ const LocationAutocomplete = ({
         } else if (item.address?.village) {
           parts.push(item.address.village);
         }
-        
+
         // Add state/region
         if (item.address?.state) {
           parts.push(item.address.state);
         }
-        
+
         // Add country
         if (item.address?.country) {
           parts.push(item.address.country);
         }
 
-        const displayText = parts.length > 0 
-          ? parts.join(', ') 
+        const displayText = parts.length > 0
+          ? parts.join(', ')
           : item.display_name;
 
         return {
@@ -103,7 +124,7 @@ const LocationAutocomplete = ({
     const newValue = e.target.value;
     setQuery(newValue);
     setSelectedIndex(-1);
-    
+
     // Clear previous timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -147,7 +168,7 @@ const LocationAutocomplete = ({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev < suggestions.length - 1 ? prev + 1 : prev
         );
         break;
@@ -247,9 +268,8 @@ const LocationAutocomplete = ({
               key={suggestion.id}
               type="button"
               onClick={() => handleSelect(suggestion)}
-              className={`w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors ${
-                index === selectedIndex ? 'bg-blue-50' : ''
-              }`}
+              className={`w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors ${index === selectedIndex ? 'bg-blue-50' : ''
+                }`}
             >
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />

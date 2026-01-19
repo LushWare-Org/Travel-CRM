@@ -3,23 +3,33 @@
  * Allows selecting from predefined activities and adding custom ones
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, X, Search } from 'lucide-react';
 import { DEFAULT_ACTIVITIES, ACTIVITY_CATEGORIES } from '../utils/activities';
+import { getActivitiesForDestination } from '../utils/destinationActivities';
 
-const ActivitySelector = ({ activities = [], onChange }) => {
+const ActivitySelector = ({
+  activities = [],
+  onChange,
+  destination = null, // NEW: Destination context for context-aware suggestions
+}) => {
   const [showSelector, setShowSelector] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [customActivity, setCustomActivity] = useState('');
 
   // Convert activities to array if it's a string
-  const activitiesArray = Array.isArray(activities) 
-    ? activities 
+  const activitiesArray = Array.isArray(activities)
+    ? activities
     : (typeof activities === 'string' ? activities.split(',').map(a => a.trim()).filter(Boolean) : []);
 
+  // NEW: Get destination-specific activities (memoized for performance)
+  const availableActivities = useMemo(() => {
+    return getActivitiesForDestination(destination, true);
+  }, [destination]);
+
   // Filter activities based on category and search
-  const filteredActivities = DEFAULT_ACTIVITIES.filter(activity => {
+  const filteredActivities = availableActivities.filter(activity => {
     const matchesCategory = selectedCategory === 'all' || activity.category === selectedCategory;
     const matchesSearch = activity.label.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -156,11 +166,10 @@ const ActivitySelector = ({ activities = [], onChange }) => {
                         type="button"
                         onClick={() => handleAddActivity(activity.label)}
                         disabled={isSelected}
-                        className={`px-3 py-2 text-left text-sm rounded transition-colors ${
-                          isSelected
+                        className={`px-3 py-2 text-left text-sm rounded transition-colors ${isSelected
                             ? 'bg-green-100 text-green-800 cursor-not-allowed'
                             : 'bg-gray-50 hover:bg-blue-100 text-gray-700'
-                        }`}
+                          }`}
                       >
                         {activity.label}
                         {isSelected && <span className="ml-2 text-xs">✓ Added</span>}
@@ -177,7 +186,8 @@ const ActivitySelector = ({ activities = [], onChange }) => {
 
             {/* Results Count */}
             <div className="text-xs text-gray-600 mt-2">
-              Showing {filteredActivities.length} of {DEFAULT_ACTIVITIES.length} activities
+              Showing {filteredActivities.length} of {availableActivities.length} activities
+              {destination && <span className="ml-1 text-blue-600">(filtered for {destination})</span>}
             </div>
           </div>
         </div>

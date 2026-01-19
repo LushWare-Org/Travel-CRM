@@ -92,7 +92,7 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
       salesReps.map(async (rep) => {
         // Count leads assigned to this sales rep
         const leadsAssigned = await Lead.countDocuments({ assignedTo: rep._id });
-        
+
         // Count converted leads (status = 'converted')
         const leadsConverted = await Lead.countDocuments({
           assignedTo: rep._id,
@@ -461,7 +461,7 @@ export const resetSalesRepPassword = asyncHandler(async (req, res, next) => {
 
     // Send password reset email
     try {
-      await emailService.sendPasswordReset(salesRep, tempPassword);
+      await emailService.sendStaffCredentials(salesRep, tempPassword, 'salesRep');
       logger.info(`Password reset email sent to ${salesRep.email} by ${req.user.email}`);
     } catch (emailError) {
       logger.error(

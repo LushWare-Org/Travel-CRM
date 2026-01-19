@@ -31,7 +31,20 @@ const NewEditPackageForm = ({
   const [showItinerary, setShowItinerary] = useState(false);
 
   useEffect(() => {
-    setLocalFormData(formData);
+    // Initialize localFormData with formData
+    let initialData = { ...formData };
+    
+    // If days array is empty but duration exists, create default days
+    if ((!initialData.days || initialData.days.length === 0) && initialData.duration && initialData.duration > 0) {
+      console.log('[Form] Initializing empty days array with', initialData.duration, 'days');
+      const newDays = [];
+      for (let i = 1; i <= initialData.duration; i++) {
+        newDays.push(createDefaultDay(i));
+      }
+      initialData.days = newDays;
+    }
+    
+    setLocalFormData(initialData);
   }, [formData]);
 
   const handleBasicInfoChange = (data) => {
@@ -51,7 +64,7 @@ const NewEditPackageForm = ({
       }));
       return;
     }
-    
+
     const nightsCount = parseInt(nights, 10);
     // Only proceed if we have a valid number >= 1
     if (isNaN(nightsCount) || nightsCount < 1) {
@@ -59,7 +72,7 @@ const NewEditPackageForm = ({
       const minNights = 1;
       const minDays = minNights + 1; // 1 night = 2 days
       let newDays = [...(localFormData.days || [])];
-      
+
       // Ensure at least 2 days exist (1 night = 2 days)
       if (newDays.length === 0) {
         newDays = [createDefaultDay(1), createDefaultDay(2)];
@@ -68,7 +81,7 @@ const NewEditPackageForm = ({
           newDays.push(createDefaultDay(i));
         }
       }
-      
+
       setLocalFormData((prev) => ({
         ...prev,
         duration: minDays, // Store days in duration field
@@ -76,7 +89,7 @@ const NewEditPackageForm = ({
       }));
       return;
     }
-    
+
     // Convert nights to days: n nights = n+1 days
     const daysCount = nightsCount + 1;
     let newDays = [...(localFormData.days || [])];
@@ -159,13 +172,13 @@ const NewEditPackageForm = ({
   const handleSave = (status) => {
     // Ensure we preserve _id and id fields
     const packageId = localFormData._id || localFormData.id;
-    
+
     const dataToSave = {
       ...localFormData,
       status,
       updatedDate: new Date().toISOString().split('T')[0],
     };
-    
+
     // Ensure _id is explicitly included if it exists
     if (packageId) {
       dataToSave._id = packageId;
@@ -173,10 +186,12 @@ const NewEditPackageForm = ({
         dataToSave.id = localFormData.id;
       }
     }
-    
+
     console.log('[Form] handleSave called with status:', status);
+    console.log('[Form] localFormData.days:', localFormData.days);
+    console.log('[Form] dataToSave.days:', dataToSave.days);
     console.log('[Form] dataToSave status:', dataToSave.status);
-    
+
     setFormData(dataToSave);
     // Pass the updated data directly to onSave instead of relying on state update
     onSave?.(dataToSave);
@@ -188,8 +203,8 @@ const NewEditPackageForm = ({
       {!onlyItineraryEditable ? (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
-          <BasicPackageInfo 
-            formData={localFormData} 
+          <BasicPackageInfo
+            formData={localFormData}
             onChange={handleBasicInfoChange}
             packageId={localFormData._id || localFormData.id || null}
           />
