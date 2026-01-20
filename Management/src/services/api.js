@@ -1,5 +1,6 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "https://api.harshkumar.space/api/v1";
+  // import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
 
 class ApiService {
   constructor() {
@@ -84,7 +85,7 @@ class ApiService {
           try {
             sessionStorage.removeItem("token");
             sessionStorage.removeItem("user");
-          } catch (e) {}
+          } catch (e) { }
           localStorage.removeItem("token");
           localStorage.removeItem("user");
           errorMessage =
@@ -687,7 +688,7 @@ export const paymentHistoryAPI = {
     const queryParams = new URLSearchParams();
     if (params.startDate) queryParams.append('startDate', params.startDate);
     if (params.endDate) queryParams.append('endDate', params.endDate);
-    
+
     const url = `${API_BASE_URL}/billing/payment-history/pdf/list${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await fetch(url, { headers: api.getAuthHeaders() });
     if (!response.ok) {
@@ -698,7 +699,7 @@ export const paymentHistoryAPI = {
     const urlBlob = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = urlBlob;
-    const dateStr = params.startDate || params.endDate 
+    const dateStr = params.startDate || params.endDate
       ? `-${params.startDate || 'all'}-${params.endDate || 'all'}`
       : '';
     a.download = `payment-history-list${dateStr}.pdf`;
@@ -782,6 +783,29 @@ export const itineraryAPI = {
     const api = new ApiService();
     return api.get(`/itineraries/package/${packageId}`);
   },
+};
+
+// Upload API Methods
+export const uploadAPI = {
+  uploadSingle: async (file) => {
+    const api = new ApiService();
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const token = localStorage.getItem("token") || (sessionStorage && sessionStorage.getItem("token"));
+    const headers = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${api.baseURL}/upload/single`, {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+
+    return await response.json();
+  }
 };
 
 export default new ApiService();
