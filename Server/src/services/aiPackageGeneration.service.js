@@ -423,7 +423,8 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
         'wild safari': 'wild safari',
       };
       
-      const validCategory = categoryMap[category?.toLowerCase()] || 'family';
+      const categoryStr = category ? String(category).toLowerCase() : 'family';
+      const validCategory = categoryMap[categoryStr];
 
       // Format and validate the package data
       const formattedPackage = {

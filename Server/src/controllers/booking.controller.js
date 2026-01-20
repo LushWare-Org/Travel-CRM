@@ -27,6 +27,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
     phone,
     travelers,
     travelDate,
+    endDate,
     message,
     packageId,
   } = req.body || {};
@@ -58,6 +59,14 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
     throw new AppError('A valid travelDate is required', 400);
   }
 
+  const parsedEndDate = endDate ? new Date(endDate) : null;
+  if (parsedEndDate && Number.isNaN(parsedEndDate.getTime())) {
+    throw new AppError('endDate is invalid', 400);
+  }
+  if (parsedEndDate && parsedEndDate < parsedTravelDate) {
+    throw new AppError('endDate cannot be before travelDate', 400);
+  }
+
   let user = await User.findOne({ email: sanitizedEmail });
   if (!user) {
     const randomPassword = crypto.randomBytes(12).toString('hex');
@@ -87,32 +96,33 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
 
   let booking = null;
   const leadPayload = {
-    name: sanitizedName,
-    email: sanitizedEmail,
-    phone: normalizedPhone || '',
-    source: 'booking',
-    platform: 'Website Form',
-    package: pkg._id,
-    packageName: pkg.name,
-    destination: pkg.destination,
-    destinationCountry: pkg.destination,
-    travelDate: parsedTravelDate,
-    numberOfTravelers: parsedTravelers,
-    budget: pkg.price ? `${pkg.price}` : undefined,
-    message: message?.trim() || undefined,
-    status: 'new',
-    tags: ['website-booking'],
-  };
+      name: sanitizedName,
+      email: sanitizedEmail,
+      phone: normalizedPhone || '',
+      source: 'booking',
+      platform: 'Website Form',
+      package: pkg._id,
+      packageName: pkg.name,
+      destination: pkg.destination,
+      destinationCountry: pkg.destination,
+      travelDate: parsedTravelDate,
+      endDate: parsedEndDate || undefined,
+      numberOfTravelers: parsedTravelers,
+      budget: pkg.price ? `${pkg.price}` : undefined,
+      message: message?.trim() || undefined,
+      status: 'new',
+      tags: ['website-booking'],
+    };
 
-  if (message?.trim()) {
-    leadPayload.remarks = [
-      {
-        text: `Website inquiry: ${message.trim()}`,
-        date: new Date(),
-        addedBy: null,
-      },
-    ];
-  }
+    if (message?.trim()) {
+      leadPayload.remarks = [
+        {
+          text: `Website inquiry: ${message.trim()}`,
+          date: new Date(),
+          addedBy: null,
+        },
+      ];
+    }
 
   let assignedSalesRepId = null;
   let assignmentResult = null;
@@ -136,6 +146,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
       user: user._id,
       package: pkg._id,
       travelDate: parsedTravelDate,
+      endDate: parsedEndDate || undefined,
       numberOfTravelers: parsedTravelers,
       totalAmount: pkg.price || 0,
       paidAmount: 0,

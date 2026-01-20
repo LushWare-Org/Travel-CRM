@@ -67,8 +67,12 @@ const AIPackageDialog = ({ isOpen, onClose, onPackageGenerated }) => {
       );
 
       if (response.success && response.data) {
+        const packageDataWithCategory = {
+          ...response.data,
+          category: formData.category,
+        };
         // Call the callback with the generated package data
-        onPackageGenerated(response.data);
+        onPackageGenerated(packageDataWithCategory);
         
         Swal.fire({
           icon: 'success',
