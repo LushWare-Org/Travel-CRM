@@ -42,6 +42,10 @@ const quotationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Package',
     },
+    itinerary: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ManualItinerary',
+    },
     items: {
       type: [
         {
@@ -144,6 +148,11 @@ const quotationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Invoice',
     },
+    coverImage: String, // Legacy field - kept for backward compatibility
+    images: [{
+      url: String,
+      isCover: { type: Boolean, default: false }
+    }], // Multiple images for manual/custom quotations
     pdfUrl: String,
     sentAt: Date,
     emailSent: {

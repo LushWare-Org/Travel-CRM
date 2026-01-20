@@ -229,6 +229,7 @@ const ItineraryEditor = ({
               <ActivitySelector
                 activities={day.activities || []}
                 onChange={(activities) => onDayChange(day.dayNumber, { activities })}
+                destination={destination}
               />
             </div>
 

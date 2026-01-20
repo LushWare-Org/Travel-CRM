@@ -11,6 +11,7 @@ import { uploadPackageImages } from '../../../services/cloudinaryService';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import LocationAutocomplete from './LocationAutocomplete';
+import { getCountryCodeFromDestination } from '../../itinerary/utils/destinationMapping';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import DestinationSelector from '../../itinerary/components/DestinationSelector';
 import { createDefaultDay } from '../../itinerary/types/index.js';
@@ -18,7 +19,7 @@ import { createDefaultDay } from '../../itinerary/types/index.js';
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const { user } = useAuth();
   const { hasPermission } = usePermission();
-  
+
   // Determine if user can edit leads
   // Sales Reps can view/edit their own assigned leads
   // Admins/SuperAdmins with manage_leads permission can edit any lead
@@ -76,11 +77,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     try {
       setLoadingPackages(true);
       const response = await packageAPI.getAll();
-      
+
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
         // Filter to only show active and published packages
-        packagesList = packagesList.filter((pkg) => 
+        packagesList = packagesList.filter((pkg) =>
           pkg.isActive !== false && pkg.status === 'published'
         );
 
@@ -183,12 +184,12 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
   const loadManualItinerary = async () => {
     if (!lead?._id && !lead?.id) return;
-    
+
     try {
       setLoadingItinerary(true);
       const leadId = lead._id || lead.id;
       const response = await manualItineraryAPI.getByLead(leadId);
-      
+
       if (response.success && response.data) {
         setItineraryDays(response.data.days || []);
         setShowManualItinerary(response.data.days && response.data.days.length > 0);
@@ -207,7 +208,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
   const handleSave = async () => {
     if (!lead) return;
-    
+
     try {
       setIsSubmitting(true);
       // Only Sales Reps cannot change the assigned sales rep
@@ -337,8 +338,15 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     }
 
     const selectedPackageId = formData.package;
+    console.log('🎯 handleEditPackage called');
+    console.log('🎯 formData.package:', formData.package);
+    console.log('🎯 customPackageId state:', customPackageId);
+    console.log('🎯 selectedPackageId:', selectedPackageId);
+
     const isCustomizedSelected =
       !!customPackageId && selectedPackageId === customPackageId;
+
+    console.log('🎯 isCustomizedSelected:', isCustomizedSelected);
 
     const confirmationHtml = isCustomizedSelected
       ? `
@@ -380,20 +388,35 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     }
 
     try {
+      console.log('🔍 Loading package for editing. Selected ID:', selectedPackageId);
+      console.log('🔍 Is customized package?', isCustomizedSelected);
+
       const response = isCustomizedSelected
         ? await customizedPackageAPI.getById(selectedPackageId)
         : await packageAPI.getById(selectedPackageId);
 
+      console.log('📦 API Response:', response);
+
       const pkg = response?.data?.data || response?.data || response;
+
+      console.log('📦 Extracted package:', pkg);
+      console.log('📦 Package itinerary:', pkg?.itinerary);
+      console.log('📦 Package days:', pkg?.days);
 
       if (response?.success && pkg) {
         let days = [];
-        
+
         if (pkg.itinerary?.days) {
           days = pkg.itinerary.days;
+          console.log('✅ Loaded days from pkg.itinerary.days:', days.length, 'days');
         } else if (Array.isArray(pkg.days)) {
           days = pkg.days;
+          console.log('✅ Loaded days from pkg.days:', days.length, 'days');
+        } else {
+          console.warn('⚠️ No days found in package!');
         }
+
+        console.log('📋 Final days array:', days);
 
         // Format images
         const formattedImages = (pkg.images || []).map(img => {
@@ -446,25 +469,29 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           customizationSequence: sequence,
         };
 
+        console.log('📝 Setting editData with', editData.days?.length || 0, 'days');
+        console.log('📝 Edit data:', editData);
+
         setEditPackageData(editData);
         setImages(formattedImages);
         setShowEditPackageDialog(true);
       } else {
+        console.error('❌ Failed to load package. Response:', response);
         toast.error('Failed to load package data');
       }
     } catch (error) {
-      console.error('Error loading package:', error);
+      console.error('❌ Error loading package:', error);
       toast.error('Failed to load package for editing');
     }
   };
 
   const handleImageUpload = async (files) => {
     if (!files || files.length === 0) return;
-    
+
     setIsUploadingImages(true);
     try {
       const uploadedImages = await uploadPackageImages(files);
-      
+
       // Format as expected by the form
       const formattedImages = uploadedImages.map(img => ({
         url: img.url,
@@ -486,6 +513,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   };
 
   const handleSaveEditedPackage = async (updatedPackageData) => {
+    console.log('🎁 handleSaveEditedPackage received data:', updatedPackageData);
+    console.log('🎁 updatedPackageData.days:', updatedPackageData.days);
+    console.log('🎁 updatedPackageData.days length:', updatedPackageData.days?.length || 0);
+
     try {
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -508,24 +539,41 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         return;
       }
 
-      const cleanDays = (updatedPackageData.days || [])
-        .filter((day) => day.title && day.description)
-        .map((day) => {
-          const cleanDay = { ...day };
-          if (!cleanDay.transport || cleanDay.transport === '') {
-            delete cleanDay.transport;
+      console.log('📦 updatedPackageData.days before cleaning:', updatedPackageData.days);
+
+      // Don't filter out days - save all days to preserve customizations
+      // Users might add locations/activities without filling title/description
+      const cleanDays = (updatedPackageData.days || []).map((day, index) => {
+        const cleanDay = { ...day };
+        // Ensure dayNumber exists for backend validation
+        if (!cleanDay.dayNumber) cleanDay.dayNumber = index + 1;
+
+        // Clean up transport if empty
+        if (!cleanDay.transport || cleanDay.transport === '') {
+          delete cleanDay.transport;
+        }
+
+        // Clean up activities
+        if (cleanDay.activities && Array.isArray(cleanDay.activities)) {
+          cleanDay.activities = cleanDay.activities.filter(a => a && typeof a === 'string' && a.trim() !== '');
+        }
+
+        // Clean up accommodation if no valid data
+        if (cleanDay.accommodation) {
+          if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
+            delete cleanDay.accommodation.type;
           }
-          if (cleanDay.accommodation) {
-            if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
-              delete cleanDay.accommodation.type;
-            }
-            const hasValidData = Object.values(cleanDay.accommodation).some((v) => v && v !== '');
-            if (!hasValidData) {
-              delete cleanDay.accommodation;
-            }
+          const hasValidData = Object.values(cleanDay.accommodation).some((v) => v && v !== '');
+          if (!hasValidData) {
+            delete cleanDay.accommodation;
           }
-          return cleanDay;
-        });
+        }
+
+        return cleanDay;
+      });
+
+      console.log('📦 Saving customized package with days:', cleanDays.length);
+      console.log('📦 cleanDays:', cleanDays);
 
       const validImages = images.filter((img) => !img.isTemp && img.url && img.public_id);
 
@@ -547,6 +595,20 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         'Customized Package';
       const sanitizedBaseName = `${baseName}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
 
+      const sanitizeCategory = (cat) => {
+        if (!cat) return 'family';
+        const validCategories = ['honeymoon', 'couple', 'family', 'group', 'wild safari'];
+        const lowered = cat.toLowerCase();
+        return validCategories.includes(lowered) ? lowered : 'family';
+      };
+
+      const sanitizePackageType = (pt) => {
+        if (!pt) return 'Standard';
+        // Ensure Title Case: 'standard' -> 'Standard'
+        const lower = pt.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      };
+
       const basePayload = {
         ...updatedPackageData,
         _id: undefined,
@@ -559,8 +621,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         days: cleanDays,
         images: validImages,
         baseName: sanitizedBaseName,
+        category: sanitizeCategory(updatedPackageData.category),
+        packageType: sanitizePackageType(updatedPackageData.packageType),
+        name: sanitizedBaseName, // Ensure name is set
       };
-      basePayload.name = sanitizedBaseName;
 
       const customizedForLead = lead._id || lead.id;
       const isUpdatingExistingCustom =
@@ -569,9 +633,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           formData.package === customPackageId);
 
       if (isUpdatingExistingCustom) {
+        // UPDATE EXISTING CUSTOMIZED PACKAGE
         const updatePayload = {
           ...basePayload,
           customizedForLead,
+          days: cleanDays, // ✅ Explicitly include days for update
         };
         updatePayload.customizationSequence =
           editPackageData?.customizationSequence || lead.customizedPackage?.customizationSequence || 1;
@@ -584,11 +650,15 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           updatePayload.customizationNotes = `Customized for lead "${lead.name || customizedForLead}"`;
         }
 
+        console.log('🔄 Updating customized package:', customPackageId, 'with', cleanDays.length, 'days');
+
         const response = await customizedPackageAPI.update(customPackageId, updatePayload);
 
         if (response?.success && response.data) {
           const updatedPackage = response.data.data || response.data;
           const updatedPackageId = updatedPackage._id || updatedPackage.id;
+
+          console.log('✅ Customized package updated successfully:', updatedPackageId);
 
           await leadAPI.updateLead(lead._id || lead.id, {
             customizedPackage: updatedPackageId,
@@ -608,27 +678,34 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           setImages([]);
 
           Swal.fire('Success', 'Customized package updated successfully!', 'success');
-        await fetchPackages();
-        onSuccess?.();
+          await fetchPackages();
+          onSuccess?.();
         } else {
+          console.error('❌ Update failed:', response);
           Swal.fire('Error', response?.message || 'Failed to update customized package', 'error');
         }
       } else {
+        // CREATE NEW CUSTOMIZED PACKAGE
         const creationPayload = {
           ...basePayload,
           customizedForLead,
           originalPackage: originalPackageRef,
           customizedBy: undefined,
+          days: cleanDays, // ✅ Explicitly include days for creation
           customizationNotes:
             basePayload.customizationNotes ||
             `Customized from package "${updatedPackageData.name?.replace(' (Customized)', '') || 'Original'}" for lead "${lead.name || customizedForLead}"`,
         };
+
+        console.log('➕ Creating new customized package with', cleanDays.length, 'days');
 
         const response = await packageAPI.create(creationPayload);
 
         if (response.success && response.data) {
           const newPackage = response.data;
           const newPackageId = newPackage._id || newPackage.id;
+
+          console.log('✅ New customized package created:', newPackageId);
 
           await leadAPI.updateLead(lead._id || lead.id, {
             customizedPackage: newPackageId,
@@ -648,14 +725,15 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           setImages([]);
 
           Swal.fire('Success', 'Package customized and saved! A new package has been created.', 'success');
-        await fetchPackages();
-        onSuccess?.();
+          await fetchPackages();
+          onSuccess?.();
         } else {
+          console.error('❌ Creation failed:', response);
           Swal.fire('Error', response.message || 'Failed to create customized package', 'error');
         }
       }
     } catch (error) {
-      console.error('Error saving customized package:', error);
+      console.error('❌ Error saving customized package:', error);
       Swal.fire('Error', error.message || 'Failed to save customized package', 'error');
     }
   };
@@ -686,7 +764,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   );
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -720,7 +798,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   placeholder="Enter full name"
                 />
@@ -732,7 +810,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   placeholder="email@example.com"
                 />
@@ -794,8 +872,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 </label>
                 <LocationAutocomplete
                   value={formData.city}
-                  onChange={(value) => setFormData({...formData, city: value})}
+                  onChange={(value) => setFormData({ ...formData, city: value })}
                   placeholder="e.g., Colombo, Sri Lanka"
+                  destination={formData.destination}
                 />
               </div>
               <div>
@@ -818,7 +897,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <input
                   type="date"
                   value={formData.travelDate}
-                  onChange={(e) => setFormData({...formData, travelDate: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
               </div>
@@ -829,7 +908,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <input
                   type="date"
                   value={formData.endDate}
-                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                   min={formData.travelDate || undefined}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 />
@@ -861,7 +940,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 </label>
                 <select
                   value={formData.platform}
-                  onChange={(e) => setFormData({...formData, platform: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
                 >
                   <option value="">Select Platform</option>
@@ -892,8 +971,8 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     onChange={(e) => {
                       const packageId = e.target.value;
                       const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-                      setFormData({ 
-                        ...formData, 
+                      setFormData({
+                        ...formData,
                         package: packageId,
                         packageName: selectedPackage?.name || '',
                         destination: selectedPackage?.destination || formData.destination
@@ -1191,7 +1270,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
                 >
                   <Calendar className="w-4 h-4" />
-                  {showManualItinerary ? 'Hide Itinerary' : 'Add Manual Itinerary'}
+                  {showManualItinerary ? 'Hide Itinerary' : (itineraryDays.length > 0 ? 'Show Manual Itinerary' : 'Add Manual Itinerary')}
                 </button>
               )}
             </div>

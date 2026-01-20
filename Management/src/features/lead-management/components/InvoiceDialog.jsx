@@ -90,7 +90,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       setQuotationMode('summary');
       // Auto-detect package type from lead
       detectPackageType();
-      
+
       // Reset form with lead data
       setFormData(prev => ({
         ...prev,
@@ -99,12 +99,12 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       }));
 
       setSendEmailAddress(lead?.email || lead?.customer?.email || '');
-      
+
       // Fetch quotations
       fetchQuotations();
       // Fetch existing invoices for this lead
       fetchExistingInvoices();
-      
+
       // For manual itineraries, load simplified day items even in non-detailed mode
       if (lead.manualItinerary?._id || lead.manualItinerary) {
         loadManualItinerarySimple();
@@ -115,7 +115,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   // Load manual itinerary with simplified day descriptions (for non-detailed mode)
   const loadManualItinerarySimple = async () => {
     if (!lead) return;
-    
+
     try {
       const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
       if (manualResponse.success || manualResponse.status === 'success') {
@@ -131,7 +131,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             taxRate: 0,
             notes: '',
           }));
-          
+
           // Keep package item if exists, then add simplified day items
           setFormData(prev => {
             const existingPackageItem = prev.items.find(item => item.category === 'package');
@@ -212,8 +212,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     setFormData(prev => {
       // Check if package item already exists
-      const existingIndex = prev.items.findIndex(item => 
-        item.category === 'package' || 
+      const existingIndex = prev.items.findIndex(item =>
+        item.category === 'package' ||
         item.description?.toLowerCase().includes('package')
       );
 
@@ -239,10 +239,10 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         const quotesData = response.data?.quotations || response.data || [];
         const filteredQuotes = quotesData.filter(q => q.status !== 'converted');
         setQuotations(filteredQuotes);
-        
+
         // If form has a quotation selected, reload the latest quotation data
         if (formData.quotation) {
-          const selectedQuote = filteredQuotes.find(q => 
+          const selectedQuote = filteredQuotes.find(q =>
             (q._id || q.id) === formData.quotation
           );
           if (selectedQuote) {
@@ -267,28 +267,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         const invoicesData = response.data?.invoices || response.data?.data || response.data || [];
         const invoicesArray = Array.isArray(invoicesData) ? invoicesData : [];
         setExistingInvoices(invoicesArray);
-        
+
         // Load the most recent invoice into form for editing
         if (invoicesArray.length > 0) {
           const latestInvoice = invoicesArray[0]; // Most recent first
           setCurrentInvoice(latestInvoice);
           setIsEditing(true);
-          
-          // Populate form with existing invoice data
-          setFormData({
-            lead: lead._id || lead.id,
-            quotation: latestInvoice.quotation?._id || latestInvoice.quotation || '',
-            package: latestInvoice.package?._id || latestInvoice.package || '',
-            type: latestInvoice.type || 'invoice',
-            items: latestInvoice.items?.length > 0 ? latestInvoice.items.map(item => ({
-              description: item.description || '',
-              category: item.category || 'other',
-              quantity: item.quantity || 1,
-              unitPrice: item.unitPrice || 0,
-              totalPrice: item.totalPrice || 0,
-              taxRate: item.taxRate || 0,
-              notes: item.notes || '',
-            })) : [{
+
+          // DEDUPLICATION: Remove duplicate items when loading from database
+          const deduplicateItems = (items) => {
+            if (!items || items.length === 0) return [{
               description: '',
               category: 'other',
               quantity: 1,
@@ -296,7 +284,47 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               totalPrice: 0,
               taxRate: 0,
               notes: '',
-            }],
+            }];
+
+            const uniqueMap = new Map();
+            const uniqueItems = [];
+
+            items.forEach(item => {
+              const normalizedDesc = (item.description || '').trim().toLowerCase();
+              if (!normalizedDesc) return;
+
+              if (!uniqueMap.has(normalizedDesc)) {
+                uniqueMap.set(normalizedDesc, true);
+                uniqueItems.push({
+                  description: item.description || '',
+                  category: item.category || 'other',
+                  quantity: item.quantity || 1,
+                  unitPrice: item.unitPrice || 0,
+                  totalPrice: item.totalPrice || 0,
+                  taxRate: item.taxRate || 0,
+                  notes: item.notes || '',
+                });
+              }
+            });
+
+            return uniqueItems.length > 0 ? uniqueItems : [{
+              description: '',
+              category: 'other',
+              quantity: 1,
+              unitPrice: 0,
+              totalPrice: 0,
+              taxRate: 0,
+              notes: '',
+            }];
+          };
+
+          // Populate form with existing invoice data (deduplicated)
+          setFormData({
+            lead: lead._id || lead.id,
+            quotation: latestInvoice.quotation?._id || latestInvoice.quotation || '',
+            package: latestInvoice.package?._id || latestInvoice.package || '',
+            type: latestInvoice.type || 'invoice',
+            items: deduplicateItems(latestInvoice.items),
             taxRate: latestInvoice.taxRate || 0,
             discountType: latestInvoice.discountType || 'none',
             discountValue: latestInvoice.discountValue || 0,
@@ -307,17 +335,17 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             paymentTerms: latestInvoice.paymentTerms || '',
             paymentInstructions: latestInvoice.paymentInstructions || '',
           });
-        setQuotationMode((latestInvoice.quotation && latestInvoice.quotation.mode) ? latestInvoice.quotation.mode : 'summary');
+          setQuotationMode((latestInvoice.quotation && latestInvoice.quotation.mode) ? latestInvoice.quotation.mode : 'summary');
 
-        setSendEmailAddress(
-          latestInvoice.customer?.email ||
+          setSendEmailAddress(
+            latestInvoice.customer?.email ||
             latestInvoice.lead?.email ||
             lead?.email ||
             '',
-        );
-          
+          );
+
           setCurrentInvoiceId(latestInvoice._id || latestInvoice.id);
-          
+
           // If invoice has a quotation, load the latest quotation data
           if (latestInvoice.quotation) {
             const quotationId = latestInvoice.quotation._id || latestInvoice.quotation;
@@ -326,7 +354,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         } else {
           setIsEditing(false);
           setCurrentInvoice(null);
-        setQuotationMode('summary');
+          setQuotationMode('summary');
         }
       }
     } catch (error) {
@@ -341,13 +369,13 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       toast.error('WhatsApp number not available for this lead');
       return;
     }
-    
+
     const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
     if (!whatsappNumber) {
       toast.error('Invalid WhatsApp number');
       return;
     }
-    
+
     const invoiceNumber = currentInvoice?.invoiceNumber || `#${invoiceId?.slice(-6)}` || 'Invoice';
     const totalAmount = currentInvoice?.totalAmount || formData.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
     const message = encodeURIComponent(
@@ -356,7 +384,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       `Please contact us for the detailed invoice document.\n\n` +
       `Thank you for choosing Trip Sky Way!`
     );
-    
+
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -395,33 +423,56 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const loadQuotationData = async (quotationId) => {
     if (!quotationId) return;
-    
+
     try {
       // Always fetch fresh quotation data from API to get latest updates
       const response = await quotationAPI.getById(quotationId);
 
       if (response.success || response.status === 'success' || response.data) {
         const quote = response.data || response;
-        
+
         const quoteMode = quote.mode || 'summary';
         setQuotationMode(quoteMode);
-        
-        // Update form with latest quotation data
+
+        // DEDUPLICATION: Remove duplicate items based on normalized description
+        const deduplicateItems = (items) => {
+          if (!items || items.length === 0) return [];
+
+          const uniqueMap = new Map();
+          const uniqueItems = [];
+
+          items.forEach(item => {
+            // Normalize description for comparison (trim and lowercase)
+            const normalizedDesc = (item.description || '').trim().toLowerCase();
+
+            // Skip empty descriptions
+            if (!normalizedDesc) return;
+
+            // If we haven't seen this description before, add it
+            if (!uniqueMap.has(normalizedDesc)) {
+              uniqueMap.set(normalizedDesc, true);
+              uniqueItems.push({
+                description: item.description || '',
+                category: item.category || 'other',
+                quantity: item.quantity || 1,
+                unitPrice: item.unitPrice || 0,
+                totalPrice: item.totalPrice || 0,
+                taxRate: item.taxRate || 0,
+                notes: item.notes || '',
+                isManual: item.isManual !== undefined ? item.isManual :
+                  (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package'),
+              });
+            }
+          });
+
+          return uniqueItems;
+        };
+
+        // Update form with deduplicated quotation data
         setFormData(prev => ({
           ...prev,
-          quotation: quotationId, // Ensure quotation ID is set
-          items: quote.items?.length > 0 ? quote.items.map(item => ({
-            description: item.description || '',
-            category: item.category || 'other',
-            quantity: item.quantity || 1,
-            unitPrice: item.unitPrice || 0,
-            totalPrice: item.totalPrice || 0,
-            taxRate: item.taxRate || 0,
-            notes: item.notes || '',
-            // Preserve isManual flag if it exists, or mark as manual if it's an extra field in summary mode
-            isManual: item.isManual !== undefined ? item.isManual : 
-                     (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package'),
-          })) : prev.items,
+          quotation: quotationId,
+          items: deduplicateItems(quote.items),
           taxRate: quote.taxRate !== undefined ? quote.taxRate : prev.taxRate,
           discountType: quote.discountType || prev.discountType,
           discountValue: quote.discountValue !== undefined ? quote.discountValue : prev.discountValue,
@@ -429,8 +480,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           terms: quote.terms !== undefined ? quote.terms : prev.terms,
           paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms,
         }));
-        
-        toast.success('Quotation data refreshed successfully');
+
+        toast.success('Quotation data loaded (duplicates removed)');
       }
     } catch (error) {
       console.error('Error loading quotation:', error);
@@ -441,7 +492,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Recalculate totalPrice for this item
     if (field === 'quantity' || field === 'unitPrice') {
       const qty = field === 'quantity' ? parseFloat(value) || 0 : newItems[index].quantity || 0;
@@ -454,7 +505,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       newItems[index].unitPrice = totalPrice;
       newItems[index].quantity = 1;
     }
-    
+
     setFormData({ ...formData, items: newItems });
   };
 
@@ -489,49 +540,49 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const calculateTotals = () => {
     // When in detailed mode, exclude package items from calculation
     // When in summary mode, include package item + all extra fields (manually added items)
-    const itemsToCalculate = isDetailedMode 
+    const itemsToCalculate = isDetailedMode
       ? formData.items.filter(item => item.category !== 'package')
       : formData.items.filter(item => {
-          // In summary mode, include package item and all manually added extra fields
-          // Exclude read-only activities from itinerary
-          return item.category === 'package' || item.isManual === true;
-        });
-    
+        // In summary mode, include package item and all manually added extra fields
+        // Exclude read-only activities from itinerary
+        return item.category === 'package' || item.isManual === true;
+      });
+
     // Calculate subtotal - use totalPrice if available, otherwise calculate from quantity * unitPrice
     const subtotal = itemsToCalculate.reduce((sum, item) => {
-      const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null 
-        ? item.totalPrice 
+      const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null
+        ? item.totalPrice
         : (item.quantity || 0) * (item.unitPrice || 0);
       return sum + itemTotal;
     }, 0);
-    
+
     let discountAmount = 0;
     if (formData.discountType === 'percentage') {
       discountAmount = (subtotal * (formData.discountValue || 0)) / 100;
     } else if (formData.discountType === 'fixed') {
       discountAmount = formData.discountValue || 0;
     }
-    
+
     const taxableAmount = subtotal - discountAmount;
     const taxAmount = (taxableAmount * (formData.taxRate || 0)) / 100;
     const totalAmount = taxableAmount + taxAmount;
-    
+
     return { subtotal, discountAmount, taxAmount, totalAmount };
   };
 
   const handleSubmit = async (status = 'draft') => {
     // When in detailed mode, exclude package items from submission
-    const itemsToSubmit = isDetailedMode 
+    const itemsToSubmit = isDetailedMode
       ? formData.items.filter(item => item.category !== 'package')
       : formData.items;
-    
+
     if (!itemsToSubmit.some(item => item.description.trim())) {
       toast.error('Please add at least one item with description');
       return;
     }
 
     const totals = calculateTotals();
-    
+
     // Prepare payload and filter out empty strings
     const payload = {
       ...formData,
@@ -559,7 +610,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     try {
       setLoading(true);
       let response;
-      
+
       // Update existing invoice if editing, otherwise create new
       if (isEditing && currentInvoice) {
         const invoiceId = currentInvoice._id || currentInvoice.id;
@@ -572,10 +623,10 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           setCurrentInvoiceId(invoiceId);
         }
       }
-      
+
       if (response.success || response.status === 'success') {
         toast.success(`Invoice ${isEditing ? 'updated' : 'created'} successfully!`);
-        
+
         // Show PDF preview after successful save
         if (currentInvoiceId || (response.data?._id || response.data?.id)) {
           const idToPreview = currentInvoiceId || (response.data?._id || response.data?.id);
@@ -599,7 +650,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   if (!isOpen) return null;
 
-    const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
@@ -884,7 +935,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         .map((item, originalIndex) => {
                           // Skip package items and non-manual items (activities from itinerary)
                           if (item.category === 'package' || item.isManual !== true) return null;
-                          
+
                           // Only show manually added extra fields
                           return (
                             <div
@@ -934,10 +985,10 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 )}
               </div>
             ) : (
-              /* Detailed Mode: All items with editable price inputs */
+              /* Detailed Mode: All items with editable price inputs (Grouped by Day) */
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">Items</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">Items (Detailed Mode - Grouped by Day)</h3>
                   <button
                     onClick={addItem}
                     className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
@@ -948,72 +999,137 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Price</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {formData.items
-                        .map((item, originalIndex) => ({
-                          item,
-                          originalIndex,
-                          shouldShow: item.category !== 'package'
-                        }))
-                        .filter(({ shouldShow }) => shouldShow)
-                        .map(({ item, originalIndex }) => {
-                          const displayPrice = item.totalPrice !== undefined && item.totalPrice !== null 
-                            ? item.totalPrice 
-                            : (item.quantity || 1) * (item.unitPrice || 0);
-                          
-                          return (
-                            <tr key={originalIndex} className="border-b">
-                              <td className="px-3 py-2">
-                                <input
-                                  type="text"
-                                  value={item.description}
-                                  onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                  placeholder="Item description"
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <input
-                                  type="number"
-                                  value={displayPrice || ''}
-                                  onChange={(e) => {
-                                    const price = parseFloat(e.target.value) || 0;
-                                    const newItems = [...formData.items];
-                                    newItems[originalIndex] = {
-                                      ...newItems[originalIndex],
-                                      totalPrice: price,
-                                      unitPrice: price,
-                                      quantity: 1,
-                                    };
-                                    setFormData({ ...formData, items: newItems });
-                                  }}
-                                  min="0"
-                                  step="0.01"
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                />
-                              </td>
-                              <td className="px-3 py-2">
-                                <button
-                                  onClick={() => removeItem(originalIndex)}
-                                  className="text-red-600 hover:text-red-800"
-                                  disabled={formData.items.filter(i => i.category !== 'package').length === 1}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
+                  {(() => {
+                    const items = formData.items.filter(i => i.category !== 'package');
+                    if (items.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-gray-500 text-sm border-t">
+                          No items added yet. Click "Add Item" to populate.
+                        </div>
+                      );
+                    }
+
+                    // Group by Day
+                    const grouped = {};
+                    const others = [];
+
+                    items.forEach((item) => {
+                      const originalIndex = formData.items.indexOf(item);
+                      const match = item.description?.match(/^Day\s*(\d+)/i);
+                      if (match) {
+                        const dayNum = parseInt(match[1]);
+                        if (!grouped[dayNum]) grouped[dayNum] = [];
+                        grouped[dayNum].push({ ...item, originalIndex });
+                      } else {
+                        others.push({ ...item, originalIndex });
+                      }
+                    });
+
+                    const dayKeys = Object.keys(grouped).sort((a, b) => a - b);
+
+                    return (
+                      <div className="space-y-6">
+                        {dayKeys.map(day => (
+                          <div key={day} className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                            <div className="bg-purple-50 px-4 py-2 border-b flex justify-between items-center">
+                              <h4 className="font-bold text-gray-700">Day {day}</h4>
+                              <span className="text-xs text-gray-500">{grouped[day].length} items</span>
+                            </div>
+                            <table className="w-full border-collapse">
+                              <tbody className="divide-y divide-gray-100">
+                                {grouped[day].map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
+                                  <tr key={originalIndex} className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 w-full">
+                                      <input
+                                        type="text"
+                                        value={description || ''}
+                                        onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                        className="w-full px-2 py-1 border-0 bg-transparent focus:ring-0 text-sm text-gray-700"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">INR</span>
+                                        <input
+                                          type="number"
+                                          value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
+                                          onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            const newItems = [...formData.items];
+                                            newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
+                                            setFormData({ ...formData, items: newItems });
+                                          }}
+                                          className="w-24 px-2 py-1 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-purple-500"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 w-10 text-center">
+                                      <button
+                                        onClick={() => removeItem(originalIndex)}
+                                        className="text-gray-400 hover:text-red-500 transition-colors"
+                                        title="Remove item"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+
+                        {others.length > 0 && (
+                          <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                            <div className="bg-gray-50 px-4 py-2 border-b">
+                              <h4 className="font-bold text-gray-700">General Items</h4>
+                            </div>
+                            <table className="w-full border-collapse">
+                              <tbody className="divide-y divide-gray-100">
+                                {others.map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
+                                  <tr key={originalIndex} className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 w-full">
+                                      <input
+                                        type="text"
+                                        value={description || ''}
+                                        onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                        className="w-full px-2 py-1 border-0 bg-transparent focus:ring-0 text-sm text-gray-700"
+                                        placeholder="Item description"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">INR</span>
+                                        <input
+                                          type="number"
+                                          value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
+                                          onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            const newItems = [...formData.items];
+                                            newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
+                                            setFormData({ ...formData, items: newItems });
+                                          }}
+                                          className="w-24 px-2 py-1 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-purple-500"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 w-10 text-center">
+                                      <button
+                                        onClick={() => removeItem(originalIndex)}
+                                        className="text-gray-400 hover:text-red-500 transition-colors"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -1177,7 +1293,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             documentName="Invoice"
             onDownload={true}
             documents={existingInvoices}
-            currentIndex={existingInvoices.findIndex(inv => 
+            currentIndex={existingInvoices.findIndex(inv =>
               (inv._id || inv.id) === currentInvoiceId
             )}
             onNavigate={(index) => {

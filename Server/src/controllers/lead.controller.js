@@ -28,7 +28,7 @@ const parseTravelerCount = (value, defaultValue = undefined) => {
 export const createLead = asyncHandler(async (req, res, next) => {
   // Add user who created the lead
   req.body.createdBy = req.user._id;
-  
+
   // If user is a sales rep, automatically assign lead to themselves
   if (req.user.role === 'salesRep') {
     req.body.assignedTo = req.user._id;
@@ -36,7 +36,7 @@ export const createLead = asyncHandler(async (req, res, next) => {
     req.body.assignedBy = req.user._id;
     req.body.salesRep = req.user.name;
   }
-  
+
   const travelerCount = parseTravelerCount(req.body.numberOfTravelers, undefined);
   if (travelerCount !== undefined) {
     req.body.numberOfTravelers = travelerCount;
@@ -113,10 +113,10 @@ export const createLead = asyncHandler(async (req, res, next) => {
     try {
       const salesRep = assignmentResult?.salesRep || await User.findById(lead.assignedTo).select('name email').lean();
       const assignedBy = isManualMode && req.body.assignedBy ? await User.findById(req.body.assignedBy).select('name').lean() : null;
-      
+
       if (salesRep && salesRep.email) {
         logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${lead._id}`);
-        
+
         emailService
           .sendLeadAssignmentEmail({
             salesRep,
@@ -153,17 +153,22 @@ export const createLead = asyncHandler(async (req, res, next) => {
 export const getLeads = asyncHandler(async (req, res, next) => {
   // Build base query - filter by assignedTo for sales reps
   let baseQuery = Lead.find();
-  
+
   // If user is a sales rep, only show leads assigned to them
   if (req.user.role === 'salesRep') {
     baseQuery = baseQuery.where('assignedTo').equals(req.user._id);
   }
   // Admin can see all leads (no filter)
 
+  // Select only necessary fields for list view
+  // Exclude heavy arrays and descriptions that aren't needed in the table
+  const excludedFields = '-communicationLogs -statusHistory -itineraryVersions -remarks -__v';
+
   const features = new APIFeatures(
     baseQuery
+      .select(excludedFields)
       .populate('assignedTo', 'name email role')
-      .populate('currentItinerary')
+      // Removed .populate('currentItinerary') as it's huge and not used in list view
       .populate('package', 'name customizedForLead originalPackage customizedBy')
       .populate('customizedPackage', 'name originalPackage customizedForLead')
       .populate('manualItinerary', 'days'),
@@ -184,8 +189,8 @@ export const getLeads = asyncHandler(async (req, res, next) => {
   const limit = parseInt(req.query.limit, 10) || 10;
   features.paginate();
 
-  // Execute query
-  const leads = await features.query;
+  // Execute query with lean() for better performance
+  const leads = await features.query.lean();
 
   // Get pagination metadata - apply same filter for count
   let countQuery = Lead.find();
@@ -225,8 +230,8 @@ export const getLead = asyncHandler(async (req, res, next) => {
 
   // Check permissions - sales rep can only access leads assigned to them
   // Admins/SuperAdmins with manage_leads permission can access any lead
-  const canManageLeads = 
-    req.user.role === 'superAdmin' || 
+  const canManageLeads =
+    req.user.role === 'superAdmin' ||
     req.user.role === 'admin' ||
     (req.user.permissions && req.user.permissions.includes('manage_leads'));
 
@@ -256,12 +261,12 @@ export const updateLead = asyncHandler(async (req, res, next) => {
     const currentAssignment = lead.assignedTo?.toString() || lead.assignedTo;
     const newAssignment = req.body.assignedTo?.toString() || req.body.assignedTo;
     const userId = req.user._id.toString();
-    
+
     // If trying to change assignment and it's not to themselves, prevent it
     if (newAssignment && newAssignment !== currentAssignment && newAssignment !== userId) {
       throw new AppError('Sales representatives cannot change lead assignment', 403);
     }
-    
+
     // If trying to assign to themselves, allow it
     if (newAssignment === userId) {
       req.body.assignedTo = req.user._id;
@@ -329,7 +334,7 @@ export const updateLead = asyncHandler(async (req, res, next) => {
   // Validate endDate >= travelDate if both are provided
   const travelDateToCheck = req.body.travelDate !== undefined ? req.body.travelDate : lead.travelDate;
   const endDateToCheck = req.body.endDate !== undefined ? req.body.endDate : lead.endDate;
-  
+
   if (travelDateToCheck && endDateToCheck) {
     const travelDate = new Date(travelDateToCheck);
     const endDate = new Date(endDateToCheck);
@@ -343,8 +348,8 @@ export const updateLead = asyncHandler(async (req, res, next) => {
   // 2. Admin with manage_leads permission
   // 3. Regular admin role
   // 4. Sales rep assigned to the lead
-  const canManageLeads = 
-    req.user.role === 'superAdmin' || 
+  const canManageLeads =
+    req.user.role === 'superAdmin' ||
     req.user.role === 'admin' ||
     (req.user.permissions && req.user.permissions.includes('manage_leads'));
 
@@ -391,11 +396,11 @@ export const updateLead = asyncHandler(async (req, res, next) => {
     try {
       const salesRep = await User.findById(newAssignedTo).select('name email').lean();
       logger.info(`Assignment email check: salesRep=${salesRep?._id}, email=${salesRep?.email}`);
-      
+
       if (salesRep && salesRep.email) {
         const assignedBy = req.body.assignedBy ? await User.findById(req.body.assignedBy).select('name').lean() : null;
         logger.info(`📧 Sending lead assignment email to ${salesRep.email} for lead ${lead._id} (via update)`);
-        
+
         emailService
           .sendLeadAssignmentEmail({
             salesRep,
@@ -526,23 +531,23 @@ export const assignLead = asyncHandler(async (req, res, next) => {
     lead.assignedTo = req.body.assignedTo;
     lead.assignedBy = req.user._id;
     lead.assignmentMode = 'manual';
-    
+
     // Get sales rep details for email and UI
     const rep = await User.findById(req.body.assignedTo).select('name email').lean();
     if (rep) {
       lead.salesRep = rep.name;
-      
+
       await lead.save();
       const updatedLead = await Lead.findById(req.params.id).populate('assignedTo', 'name email role');
 
       // Send assignment email notification if a new sales rep was assigned (different from previous)
       logger.info(`Assignment check: newAssignedTo=${newAssignedTo}, previousAssignedTo=${previousAssignedTo}, rep=${rep?._id}, repEmail=${rep?.email}`);
-      
+
       if (newAssignedTo && newAssignedTo !== previousAssignedTo && rep && rep.email) {
         try {
           const assignedBy = await User.findById(req.user._id).select('name').lean();
           logger.info(`📧 Sending lead assignment email to ${rep.email} for lead ${lead._id} (manually assigned)`);
-          
+
           emailService
             .sendLeadAssignmentEmail({
               salesRep: rep,
@@ -576,7 +581,7 @@ export const assignLead = asyncHandler(async (req, res, next) => {
           logger.warn(`⚠️  Email not sent: Sales rep ${rep.name} (${newAssignedTo}) has no email address`);
         }
       }
-      
+
       res.status(200).json({
         success: true,
         data: updatedLead,
@@ -801,7 +806,7 @@ export const createWebsiteContactLead = asyncHandler(async (req, res, next) => {
 
   const sanitizedEmail = String(email).trim().toLowerCase();
   const sanitizedName = String(name).trim();
-  
+
   // Normalize phone number (remove non-digits)
   const normalizePhone = (phoneNum) => {
     if (!phoneNum) return undefined;
@@ -873,7 +878,7 @@ export const createWebsiteContactLead = asyncHandler(async (req, res, next) => {
     message?.trim() ? `Message: ${message.trim()}` : '',
     locations?.trim() ? `Locations: ${locations.trim()}` : '',
   ].filter(Boolean).join(' | ');
-  
+
   leadPayload.remarks = [
     {
       text: remarkText,

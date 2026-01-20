@@ -78,6 +78,32 @@ const customizedPackageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Itinerary',
     },
+    days: [
+      {
+        dayNumber: Number,
+        title: String,
+        description: String,
+        locations: [String],
+        activities: [String],
+        accommodation: {
+          name: String,
+          type: String,
+          address: String,
+        },
+        transport: String,
+        meals: {
+          breakfast: { type: Boolean, default: false },
+          lunch: { type: Boolean, default: false },
+          dinner: { type: Boolean, default: false },
+        },
+        places: [
+          {
+            name: String,
+            description: String,
+          },
+        ],
+      },
+    ],
     highlights: [String],
     terms: [String],
     isActive: {

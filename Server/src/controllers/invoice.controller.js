@@ -30,7 +30,7 @@ const formatInvoiceForResponse = (invoiceDoc) => {
 export const getAllInvoices = asyncHandler(async (req, res) => {
   // Build base query - filter by lead assignedTo for sales reps
   let baseQuery = Invoice.find();
-  
+
   // If user is a sales rep, only show invoices for leads assigned to them
   if (req.user.role === 'salesRep') {
     const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
@@ -67,9 +67,9 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
     }
   }
 
-  const invoiceDocs = await features.query;
+  const invoiceDocs = await features.query.lean();
   const invoices = invoiceDocs.map((invoice) => formatInvoiceForResponse(invoice));
-  
+
   // Get total count with same filter
   let countQuery = Invoice.find();
   if (req.user.role === 'salesRep') {
@@ -77,7 +77,7 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
     const leadIds = assignedLeadIds.map((lead) => lead._id);
     countQuery = countQuery.where('lead').in(leadIds);
   }
-  
+
   // Apply date range filter to count query
   if (req.query.startDate || req.query.endDate) {
     const dateFilter = {};
@@ -93,7 +93,7 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
       countQuery = countQuery.find({ createdAt: dateFilter });
     }
   }
-  
+
   const total = await countQuery.countDocuments();
 
   res.status(200).json({
@@ -111,7 +111,7 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
  */
 export const getInvoiceById = asyncHandler(async (req, res, next) => {
   const invoiceDoc = await Invoice.findById(req.params.id)
-    .populate('lead', 'name email phone status destination assignedTo')
+    .populate('lead', 'name email phone status destination assignedTo adults children travelers')
     .populate('quotation', 'quotationNumber')
     .populate('booking')
     .populate('payments')
@@ -156,7 +156,8 @@ export const getInvoiceByLeadId = asyncHandler(async (req, res, next) => {
     .populate('quotation', 'quotationNumber')
     .populate('createdBy', 'name email')
     .populate('payments')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   const invoices = invoiceDocs.map((invoice) => formatInvoiceForResponse(invoice));
 
@@ -317,7 +318,11 @@ export const cancelInvoice = asyncHandler(async (req, res, next) => {
  */
 export const sendInvoice = asyncHandler(async (req, res, next) => {
   const invoiceDoc = await Invoice.findById(req.params.id)
-    .populate('lead', 'name email phone')
+    .populate({
+      path: 'lead',
+      select: 'name email phone status destination assignedTo adults children travelers customizedPackage',
+      populate: { path: 'customizedPackage', select: 'name' }
+    })
     .populate('quotation');
 
   if (!invoiceDoc) {
@@ -346,7 +351,7 @@ export const sendInvoice = asyncHandler(async (req, res, next) => {
       pdfPath,
     });
 
-    await fs.promises.unlink(pdfPath).catch(() => {});
+    await fs.promises.unlink(pdfPath).catch(() => { });
   } catch (error) {
     return next(new AppError(`Error sending invoice email: ${error.message}`, 500));
   }
@@ -500,8 +505,13 @@ export const getInvoiceStats = asyncHandler(async (req, res, next) => {
  */
 export const downloadInvoicePDF = asyncHandler(async (req, res, next) => {
   const invoice = await Invoice.findById(req.params.id)
-    .populate('lead')
+    .populate({
+      path: 'lead',
+      select: 'name email phone status destination assignedTo adults children travelers customizedPackage',
+      populate: { path: 'customizedPackage', select: 'name' }
+    })
     .populate('quotation')
+    .populate('booking')
     .populate('createdBy');
 
   if (!invoice) {
@@ -514,7 +524,7 @@ export const downloadInvoicePDF = asyncHandler(async (req, res, next) => {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="invoice-${invoice.invoiceNumber || invoice._id}.pdf"`);
-    
+
     const fileStream = fs.createReadStream(pdfPath);
     fileStream.pipe(res);
 

@@ -28,7 +28,7 @@ class PackageService {
     try {
       // Extract days array if present
       const { days, ...pkgData } = packageData;
-      
+
       // Debug logging
       logger.info(`Creating package. Days count: ${days?.length || 0}`);
       if (days && days.length > 0) {
@@ -52,7 +52,7 @@ class PackageService {
       // If this is a customized package, store in CustomizedPackage collection
       if (pkgData.customizedForLead || pkgData.originalPackage) {
         packagePayload.customizedBy = userId;
-        
+
         // Ensure required fields for customized package
         if (!pkgData.customizedForLead) {
           throw new Error('customizedForLead is required for customized packages');
@@ -118,15 +118,15 @@ class PackageService {
       if (days && Array.isArray(days) && days.length > 0) {
         try {
           logger.info(`Creating itinerary for package ${newPackage._id} with ${days.length} days`);
-          
+
           // Ensure all days have required fields (dayNumber is required by model)
           const validatedDays = days
             .filter(day => day && (day.dayNumber !== undefined || day.title || day.dayNumber))
             .map((day, index) => {
-              const dayNumber = day.dayNumber !== undefined && day.dayNumber !== null 
-                ? parseInt(day.dayNumber, 10) 
+              const dayNumber = day.dayNumber !== undefined && day.dayNumber !== null
+                ? parseInt(day.dayNumber, 10)
                 : (index + 1);
-              
+
               return {
                 dayNumber: dayNumber,
                 title: day.title || `Day ${dayNumber}`,
@@ -141,12 +141,12 @@ class PackageService {
                 notes: day.notes || '',
               };
             });
-          
+
           // Sort days by dayNumber to ensure proper order
           validatedDays.sort((a, b) => a.dayNumber - b.dayNumber);
-          
+
           logger.info(`Validated days sample: ${JSON.stringify(validatedDays[0])}`);
-          
+
           const itinerary = await Itinerary.create({
             package: newPackage._id,
             packageModel: 'Package',
@@ -160,7 +160,7 @@ class PackageService {
           // Link itinerary to package
           newPackage.itinerary = itinerary._id;
           await newPackage.save();
-          
+
           logger.info(`Package ${newPackage._id} linked to itinerary ${itinerary._id}`);
         } catch (itineraryError) {
           logger.error(`Itinerary creation error for package ${newPackage._id}: ${itineraryError.message}`);
@@ -278,10 +278,11 @@ class PackageService {
       // Execute query
       const packages = await Package.find(query)
         .populate('createdBy', 'name email role')
-        .populate('itinerary')
+        // removed .populate('itinerary') - huge performance win for list view
         .sort(sortObj)
         .skip(skip)
-        .limit(parseInt(limit));
+        .limit(parseInt(limit))
+        .lean();
 
       // Get total count for pagination
       const total = await Package.countDocuments(query);
@@ -313,15 +314,15 @@ class PackageService {
       const pkg = await Package.findById(packageId)
         .populate('createdBy', 'name email role')
         .populate('itinerary');
-        // Reviews population commented out until Review model is created
-        // .populate({
-        //   path: 'reviews',
-        //   select: 'rating comment author createdAt',
-        //   populate: {
-        //     path: 'author',
-        //     select: 'name email',
-        //   },
-        // });
+      // Reviews population commented out until Review model is created
+      // .populate({
+      //   path: 'reviews',
+      //   select: 'rating comment author createdAt',
+      //   populate: {
+      //     path: 'author',
+      //     select: 'name email',
+      //   },
+      // });
 
       if (!pkg) {
         throw new AppError('Package not found', 404);
@@ -473,9 +474,10 @@ class PackageService {
         status: 'published',
       })
         .populate('createdBy', 'name email')
-        .populate('itinerary')
+        // removed .populate('itinerary')
         .limit(parseInt(limit))
-        .sort('-createdAt');
+        .sort('-createdAt')
+        .lean();
 
       return packages;
     } catch (error) {
@@ -522,7 +524,7 @@ class PackageService {
         draft: 0,
         archived: 0,
       };
-      
+
       statusCounts.forEach(item => {
         if (item._id && statusMap.hasOwnProperty(item._id)) {
           statusMap[item._id] = item.count;
@@ -649,9 +651,10 @@ class PackageService {
         status: 'published',
       })
         .populate('createdBy', 'name email')
-        .populate('itinerary')
+        // removed .populate('itinerary')
         .limit(parseInt(limit))
-        .sort('-rating');
+        .sort('-rating')
+        .lean();
 
       return packages;
     } catch (error) {
