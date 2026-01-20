@@ -187,6 +187,9 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+// Index for role-based queries
+userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ email: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function hashPassword(next) {
@@ -211,19 +214,19 @@ userSchema.pre('save', function ensureRoleConsistency(next) {
       this.permissions = [];
     }
   }
-  
+
   // If role is changed to superAdmin but isSuperAdmin is not explicitly set, set it
   if (this.isModified('role') && this.role === 'superAdmin' && !this.isSuperAdmin) {
     this.isSuperAdmin = true;
   }
-  
+
   // If demoting from superAdmin to non-superAdmin, ensure canBeDeleted is true
   if (this.isModified('role') && this.role !== 'superAdmin') {
     if (!this.isModified('canBeDeleted')) {
       this.canBeDeleted = true;
     }
   }
-  
+
   next();
 });
 

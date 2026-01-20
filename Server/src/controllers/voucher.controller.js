@@ -23,7 +23,7 @@ const dirname = path.dirname(filename);
 export const getAllVouchers = asyncHandler(async (req, res) => {
   // Build base query - filter by lead assignedTo for sales reps
   let baseQuery = Voucher.find();
-  
+
   // If user is a sales rep, only show vouchers for leads assigned to them
   if (req.user.role === 'salesRep') {
     const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
@@ -61,7 +61,7 @@ export const getAllVouchers = asyncHandler(async (req, res) => {
   }
 
   const vouchers = await features.query;
-  
+
   // Get total count with same filter
   let countQuery = Voucher.find();
   if (req.user.role === 'salesRep') {
@@ -69,7 +69,7 @@ export const getAllVouchers = asyncHandler(async (req, res) => {
     const leadIds = assignedLeadIds.map((lead) => lead._id);
     countQuery = countQuery.where('lead').in(leadIds);
   }
-  
+
   // Apply date range filter to count query
   if (req.query.startDate || req.query.endDate) {
     const dateFilter = {};
@@ -85,7 +85,7 @@ export const getAllVouchers = asyncHandler(async (req, res) => {
       countQuery = countQuery.find({ createdAt: dateFilter });
     }
   }
-  
+
   const total = await countQuery.countDocuments();
 
   res.status(200).json({
@@ -194,20 +194,71 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
   // Get package data if package or customizedPackage is provided
   let packageData = null;
   let itineraryData = null;
+  let quotationData = null;
+  let shouldExtractFromBackend = false;
 
   if (req.body.package) {
     packageData = await Package.findById(req.body.package);
     if (packageData && packageData.itinerary) {
       itineraryData = await Itinerary.findById(packageData.itinerary);
     }
+    shouldExtractFromBackend = true; // Always extract for packages
   } else if (req.body.customizedPackage) {
     packageData = await CustomizedPackage.findById(req.body.customizedPackage);
     if (packageData && packageData.itinerary) {
       itineraryData = await Itinerary.findById(packageData.itinerary);
     }
+    shouldExtractFromBackend = true; // Always extract for customized packages
+  } else {
+    // MANUAL ITINERARY: Check if frontend already provided the data
+    const hasFrontendData = req.body.packageDetails?.name &&
+      req.body.mealPlans?.length > 0 &&
+      req.body.itinerarySummary?.length > 0;
+
+    if (!hasFrontendData) {
+      // Frontend didn't provide complete data, try to extract from quotations
+      const Quotation = (await import('../models/quotation.model.js')).default;
+      const quotations = await Quotation.find({ lead: req.body.lead }).sort({ createdAt: -1 }).limit(1);
+
+      if (quotations && quotations.length > 0) {
+        quotationData = quotations[0];
+
+        // Try to get itinerary from quotation
+        if (quotationData.itinerary) {
+          itineraryData = await Itinerary.findById(quotationData.itinerary);
+        }
+
+        // If no itinerary on quotation, check lead directly
+        if (!itineraryData && lead.itinerary) {
+          itineraryData = await Itinerary.findById(lead.itinerary);
+        }
+
+        // Populate packageDetails from quotation
+        if (!req.body.packageDetails || !req.body.packageDetails.name) {
+          req.body.packageDetails = {
+            name: quotationData.package?.name || 'Manual Itinerary',
+            destination: lead.destination || 'Custom Destination',
+            duration: itineraryData?.days?.length || 0,
+            category: 'Custom',
+            price: quotationData.totalAmount || 0,
+            inclusions: quotationData.includedServices || [],
+            exclusions: quotationData.excludedServices || [],
+            highlights: [],
+            coverImage: quotationData.coverImage ? { url: quotationData.coverImage } : null,
+            images: (quotationData.images || []).map(img => ({
+              url: img.url,
+              isCover: img.isCover || false
+            }))
+          };
+        }
+
+        shouldExtractFromBackend = true; // Extract meal plans and itinerary from backend
+      }
+    }
+    // If frontend provided data, we'll use it as-is (shouldExtractFromBackend remains false)
   }
 
-  // Extract package details
+  // Extract package details from package (if exists) - this overrides any manual data
   if (packageData) {
     req.body.packageDetails = {
       name: packageData.name,
@@ -218,11 +269,14 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
       inclusions: packageData.inclusions || [],
       exclusions: packageData.exclusions || [],
       highlights: packageData.highlights || [],
+      // Snapshot images for consistency
+      coverImage: packageData.coverImage || null,
+      images: packageData.images || []
     };
   }
 
-  // Extract meal plans from itinerary (day-wise)
-  if (itineraryData && itineraryData.days) {
+  // Extract meal plans from itinerary ONLY if we should extract from backend
+  if (shouldExtractFromBackend && itineraryData && itineraryData.days) {
     req.body.mealPlans = itineraryData.days.map((day) => ({
       dayNumber: day.dayNumber,
       dayTitle: day.title,
@@ -232,8 +286,8 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
     }));
   }
 
-  // Extract itinerary summary
-  if (itineraryData && itineraryData.days) {
+  // Extract itinerary summary ONLY if we should extract from backend
+  if (shouldExtractFromBackend && itineraryData && itineraryData.days) {
     req.body.itinerarySummary = itineraryData.days.map((day) => ({
       dayNumber: day.dayNumber,
       title: day.title || '',
@@ -241,13 +295,13 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
       activities: day.activities || [],
       accommodation: day.accommodation && typeof day.accommodation === 'object'
         ? {
-            name: day.accommodation.name || '',
-            type: day.accommodation.type || '',
-          }
+          name: day.accommodation.name || '',
+          type: day.accommodation.type || '',
+        }
         : {
-            name: '',
-            type: '',
-          },
+          name: '',
+          type: '',
+        },
     }));
   }
 
@@ -260,13 +314,13 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
       activities: Array.isArray(day.activities) ? day.activities.map(act => String(act)) : [],
       accommodation: day.accommodation && typeof day.accommodation === 'object' && !Array.isArray(day.accommodation)
         ? {
-            name: String(day.accommodation.name || ''),
-            type: String(day.accommodation.type || ''),
-          }
+          name: String(day.accommodation.name || ''),
+          type: String(day.accommodation.type || ''),
+        }
         : {
-            name: '',
-            type: '',
-          },
+          name: '',
+          type: '',
+        },
     }));
   }
 
@@ -357,16 +411,16 @@ export const deleteVoucher = asyncHandler(async (req, res, next) => {
  */
 export const downloadVoucherPDF = asyncHandler(async (req, res, next) => {
   const voucher = await Voucher.findById(req.params.id)
-    .populate('lead', 'name email phone address')
-    .populate('package', 'name description destination duration price category inclusions exclusions highlights')
-    .populate('customizedPackage', 'name description destination duration price category inclusions exclusions highlights')
+    .populate('lead', 'name email phone address assignedTo')
+    .populate('package', 'name description destination duration price category inclusions exclusions highlights coverImage images')
+    .populate('customizedPackage', 'name description destination duration price category inclusions exclusions highlights coverImage images')
     .populate('createdBy', 'name email');
 
   if (!voucher) {
     return next(new AppError('Voucher not found', 404));
   }
 
-  // Check permissions
+  // Check permissions - FIXED: Now lead.assignedTo is populated
   if (req.user.role === 'salesRep' && voucher.lead?.assignedTo?.toString() !== req.user._id.toString()) {
     return next(new AppError('Not authorized to access this voucher', 403));
   }
@@ -406,15 +460,15 @@ export const downloadVoucherPDF = asyncHandler(async (req, res, next) => {
  */
 export const sendVoucherEmail = asyncHandler(async (req, res, next) => {
   const voucher = await Voucher.findById(req.params.id)
-    .populate('lead', 'name email phone')
-    .populate('package', 'name')
-    .populate('customizedPackage', 'name');
+    .populate('lead', 'name email phone address assignedTo')
+    .populate('package', 'name description destination duration price category inclusions exclusions highlights coverImage images')
+    .populate('customizedPackage', 'name description destination duration price category inclusions exclusions highlights coverImage images');
 
   if (!voucher) {
     return next(new AppError('Voucher not found', 404));
   }
 
-  // Check permissions
+  // Check permissions - FIXED: Now lead.assignedTo is populated
   if (req.user.role === 'salesRep' && voucher.lead?.assignedTo?.toString() !== req.user._id.toString()) {
     return next(new AppError('Not authorized to send this voucher', 403));
   }

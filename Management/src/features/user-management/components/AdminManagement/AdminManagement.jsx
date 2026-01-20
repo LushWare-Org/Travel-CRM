@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Edit, Trash, Shield, Mail, AlertCircle, CheckCircle, RotateCcw, Clock, Loader, Lock } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import { 
-  UserTableHeader, 
-  Pagination, 
-  UserFormDialog, 
+import {
+  UserTableHeader,
+  Pagination,
+  UserFormDialog,
   ConfirmationDialog,
   StatsCard,
   FormGroup,
@@ -71,8 +71,8 @@ const AdminManagement = () => {
 
       if (response.status === 'success') {
         // Handle different response data structures
-        const adminsData = Array.isArray(response.data) 
-          ? response.data 
+        const adminsData = Array.isArray(response.data)
+          ? response.data
           : (response.data?.users || response.data?.data || []);
 
         // Transform backend data to frontend format
@@ -164,7 +164,7 @@ const AdminManagement = () => {
       
       ─────────────────────────────────────────────────────────────
     `);
-    
+
     // TODO: Replace with actual email service (SendGrid, AWS SES, Nodemailer, etc.)
   };
 
@@ -186,7 +186,7 @@ const AdminManagement = () => {
       A password reset has been initiated for your admin account.
       
       🔑 NEW TEMPORARY PASSWORD: ${tempPassword}
-      🔗 Reset Link: https://tripskiway.com/auth/reset/${admin.id}
+      🔗 Login Link: http://localhost:3000/login (Management App)
       
       ⏰ This temporary password expires in 48 hours
       
@@ -274,7 +274,7 @@ const AdminManagement = () => {
       if (response.status === 'success') {
         // Get user data from response
         const userData = response.data?.user || response.data;
-        
+
         // Verify we have the ID field
         if (!userData._id && !userData.id) {
           throw new Error('Invalid response: missing user ID');
@@ -319,7 +319,7 @@ const AdminManagement = () => {
         setAdmins(prev => [...prev, newAdmin]);
         setShowNewAdminDialog(false);
         setSearchTerm(''); // Clear search bar after creation
-        
+
         // ✅ Show success in DIALOG (form-related: creation success)
         setSuccessMessage(`Admin created! Invitation sent to ${newAdmin.email}`);
         setTimeout(() => setSuccessMessage(''), 5000);
@@ -374,27 +374,27 @@ const AdminManagement = () => {
       }
 
       if (response.status === 'success') {
-        setAdmins(admins.map(a => 
-          a.id === selectedAdmin.id 
+        setAdmins(admins.map(a =>
+          a.id === selectedAdmin.id
             ? {
-                ...a,
-                name: formData.name,
-                email: formData.email,
-                phone: phoneFormatted.e164,
-                permissions: isEditingSelf ? a.permissions : (formData.permissions || [])
-              }
+              ...a,
+              name: formData.name,
+              email: formData.email,
+              phone: phoneFormatted.e164,
+              permissions: isEditingSelf ? a.permissions : (formData.permissions || [])
+            }
             : a
         ));
         setSelectedAdmin(null);
         setShowEditAdminDialog(false);
-        
+
         // ✅ Show success in DIALOG (form-related: edit success)
         if (isEditingSelf) {
           setSuccessMessage(`Profile updated successfully (permissions cannot be self-modified)`);
         } else {
           setSuccessMessage(`Admin updated successfully`);
         }
-        
+
         setTimeout(() => setSuccessMessage(''), 5000);
         resetForm();
       }
@@ -418,15 +418,15 @@ const AdminManagement = () => {
       setIsSubmitting(true);
 
       const tempPassword = generateTemporaryPassword();
-      
+
       // In a real app, you'd call an API to resend the invitation
       // For now, we'll just update the local state and log
-      setAdmins(admins.map(a => 
-        a.id === adminToResendInvite.id 
+      setAdmins(admins.map(a =>
+        a.id === adminToResendInvite.id
           ? { ...a, invitationSentAt: new Date().toISOString() }
           : a
       ));
-      
+
       setShowInviteResendConfirm(false);
       setAdminToResendInvite(null);
 
@@ -441,7 +441,7 @@ const AdminManagement = () => {
       });
     } catch (err) {
       console.error('Error resending invitation:', err);
-      
+
       // ✅ Show error as TOAST notification (action failure)
       toast.error(err.message || 'Failed to resend invitation', {
         duration: 4000,
@@ -467,17 +467,17 @@ const AdminManagement = () => {
 
       if (response.status === 'success') {
         // Update admin status to reflect password reset
-        setAdmins(admins.map(a => 
-          a.id === adminToResetPassword.id 
-            ? { 
-                ...a, 
-                status: 'password_reset_required',
-                accountStatus: 'pending_password_change',
-                isTempPassword: true
-              }
+        setAdmins(admins.map(a =>
+          a.id === adminToResetPassword.id
+            ? {
+              ...a,
+              status: 'password_reset_required',
+              accountStatus: 'pending_password_change',
+              isTempPassword: true
+            }
             : a
         ));
-        
+
         setShowPasswordResetConfirm(false);
         setAdminToResetPassword(null);
 
@@ -494,14 +494,14 @@ const AdminManagement = () => {
       }
     } catch (err) {
       console.error('Error sending password reset:', err);
-      
+
       // Provide better error messages
       let errorMessage = err.message || 'Failed to send password reset email';
-      
+
       if (err.message.includes('Cannot reset other admin passwords')) {
         errorMessage = '🔒 Security Policy: Admins can only reset their own password or non-admin user passwords.';
       }
-      
+
       // ✅ Show error as TOAST notification (action failure)
       toast.error(errorMessage, {
         duration: 4000,
@@ -537,7 +537,7 @@ const AdminManagement = () => {
         setShowDeleteConfirm(false);
         setAdminToDelete(null);
         setSelectedAdmin(null);
-        
+
         // ✅ Show success as TOAST notification (table action result)
         toast.success(`Admin "${adminToDelete.name}" deleted successfully`, {
           duration: 4000,
@@ -546,7 +546,7 @@ const AdminManagement = () => {
       }
     } catch (err) {
       console.error('Error deleting admin:', err);
-      
+
       // ✅ Show error as TOAST notification (action failure)
       toast.error(err.message || 'Failed to delete admin', {
         duration: 4000,
@@ -566,9 +566,9 @@ const AdminManagement = () => {
       });
       return;
     }
-    
+
     setSelectedAdmin(admin);
-    
+
     // Parse phone number if it's in E.164 format
     let phoneCountry = 'US';
     let phoneNumber = '';
@@ -579,7 +579,7 @@ const AdminManagement = () => {
         // Get the calling code for this country
         const country = COUNTRIES.find(c => c.code === phoneCountry);
         const callingCode = country?.callingCode?.replace('+', '') || '';
-        
+
         // Extract only the local phone number by removing the calling code prefix
         if (callingCode && admin.phone.startsWith('+' + callingCode)) {
           phoneNumber = admin.phone.substring(callingCode.length + 1);
@@ -590,7 +590,7 @@ const AdminManagement = () => {
         phoneNumber = admin.phone;
       }
     }
-    
+
     setFormData({
       name: admin.name,
       email: admin.email,
@@ -670,51 +670,51 @@ const AdminManagement = () => {
                 </button>
               </div>
 
-          {/* Info Banner - Password & Security Policy */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-blue-900">Password & Security Policy</p>
-              <p className="text-sm text-blue-800 mt-1">
-                New admins receive temporary passwords via email. They must set a permanent password on first login. 
-                Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
-              </p>
-            </div>
-          </div>
+              {/* Info Banner - Password & Security Policy */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">Password & Security Policy</p>
+                  <p className="text-sm text-blue-800 mt-1">
+                    New admins receive temporary passwords via email. They must set a permanent password on first login.
+                    Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
+                  </p>
+                </div>
+              </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatsCard label="Total Admins" value={stats.total} icon={Shield} color="purple" />
-            <StatsCard label="Active" value={stats.active} icon={Shield} color="green" />
-            <StatsCard label="Invited" value={stats.invited} icon={Mail} color="blue" />
-            <StatsCard label="Inactive" value={stats.inactive} icon={Shield} color="red" />
-          </div>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <StatsCard label="Total Admins" value={stats.total} icon={Shield} color="purple" />
+                <StatsCard label="Active" value={stats.active} icon={Shield} color="green" />
+                <StatsCard label="Invited" value={stats.invited} icon={Mail} color="blue" />
+                <StatsCard label="Inactive" value={stats.inactive} icon={Shield} color="red" />
+              </div>
 
-          {/* Table Section */}
-          <UserTableHeader
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            onFilterClick={() => {}}
-            title="Admins List"
-            subtitle="View and manage all system administrators"
-          />
+              {/* Table Section */}
+              <UserTableHeader
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onFilterClick={() => { }}
+                title="Admins List"
+                subtitle="View and manage all system administrators"
+              />
 
-          <AdminTable
-            admins={paginatedData.data}
-            onEdit={openEditDialog}
-            onDelete={handleDeleteAdmin}
-            onSelectAdmin={setSelectedAdmin}
-            onResendInvite={handleResendInvitation}
-            onForcePasswordReset={handleForcePasswordReset}
-          />
+              <AdminTable
+                admins={paginatedData.data}
+                onEdit={openEditDialog}
+                onDelete={handleDeleteAdmin}
+                onSelectAdmin={setSelectedAdmin}
+                onResendInvite={handleResendInvitation}
+                onForcePasswordReset={handleForcePasswordReset}
+              />
 
-          <Pagination
-            currentPage={currentPage}
-            totalPages={paginatedData.pages}
-            onPageChange={setCurrentPage}
-            itemsPerPage={ITEMS_PER_PAGE}
-            totalItems={filteredAdmins.length}
-          />
+              <Pagination
+                currentPage={currentPage}
+                totalPages={paginatedData.pages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={ITEMS_PER_PAGE}
+                totalItems={filteredAdmins.length}
+              />
             </>
           )}
         </>
@@ -879,7 +879,7 @@ const AdminManagement = () => {
 
           <div className="bg-gray-50 p-4 rounded-lg">
             <p className="text-sm font-semibold text-gray-900 mb-3">Permissions</p>
-            
+
             {/* Warning for self-edit */}
             {isEditingSelf() && (
               <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
@@ -889,16 +889,15 @@ const AdminManagement = () => {
                 </div>
               </div>
             )}
-            
+
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {ADMIN_PERMISSIONS_LIST.map(perm => (
-                <label 
-                  key={perm.id} 
-                  className={`flex items-center gap-2 text-sm p-2 rounded transition-colors ${
-                    isEditingSelf() 
-                      ? 'opacity-60 cursor-not-allowed bg-gray-100' 
+                <label
+                  key={perm.id}
+                  className={`flex items-center gap-2 text-sm p-2 rounded transition-colors ${isEditingSelf()
+                      ? 'opacity-60 cursor-not-allowed bg-gray-100'
                       : 'cursor-pointer hover:bg-white'
-                  }`}
+                    }`}
                 >
                   <input
                     type="checkbox"

@@ -24,7 +24,7 @@ export default function Career() {
     agreeTerms: false,
   });
   const [errors, setErrors] = useState({});
-  const [submitStatus, setSubmitStatus] = useState(null); 
+  const [submitStatus, setSubmitStatus] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -126,13 +126,13 @@ export default function Career() {
     try {
       setUploadProgress(20);
       let resumeUrl = null;
-      
+
       if (formData.resume) {
         console.log('Starting imgbb upload with file:', formData.resume.name, formData.resume.size);
-        
+
         const imgbbFormData = new FormData();
         imgbbFormData.append('image', formData.resume);
-        
+
         setUploadProgress(40);
         try {
           console.log('Sending to imgbb API...');
@@ -145,7 +145,7 @@ export default function Career() {
           );
 
           console.log('imgbb Response status:', imgbbResponse.status);
-          
+
           if (!imgbbResponse.ok) {
             const errorText = await imgbbResponse.text();
             console.error('imgbb error response:', errorText);
@@ -154,7 +154,7 @@ export default function Career() {
 
           const imgbbData = await imgbbResponse.json();
           console.log('imgbb full response:', imgbbData);
-          
+
           if (!imgbbData.success) {
             console.error('imgbb success false:', imgbbData);
             throw new Error(imgbbData.error?.message || 'imgbb upload failed - success is false');
@@ -193,6 +193,7 @@ export default function Career() {
         coverLetter: formData.coverLetter?.trim() || '',
         agreeTerms: formData.agreeTerms === true,
         resumeUrl: resumeUrl,
+        resumeFileName: formData.resume.name,
       };
 
       console.log('✓ Submit data ready:', submitData);
@@ -236,7 +237,7 @@ export default function Career() {
     <div className="min-h-screen bg-gray-50">
       <section className="relative py-16 overflow-hidden bg-black text-white">
         <div className="relative max-w-7xl mx-auto px-6 text-center">
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">Join With Us</h1>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">Join With Us</h1>
           <p className="text-xl max-w-3xl mx-auto opacity-95">
             Help millions of travelers create unforgettable memories. Be part of a passionate team that loves what they do.
           </p>
@@ -261,13 +262,13 @@ export default function Career() {
                 >
                   <h3 className="text-xl font-semibold text-gray-900 mb-4">{job.position}</h3>
                   <div className="space-y-2 mb-4 text-sm text-gray-600">
-                     <p>{job.type}</p>
-                     <p>{job.location}</p>
+                    <p>{job.type}</p>
+                    <p>{job.location}</p>
                     {job.experience?.min !== undefined && (
                       <p>{job.experience.min}+ years experience</p>
                     )}
                   </div>
-                  <a 
+                  <a
                     href="#apply-form"
                     onClick={(e) => {
                       e.preventDefault();
@@ -307,7 +308,7 @@ export default function Career() {
                 <div className="p-8 space-y-7">
                   <div>
                     <ul className="space-y-3 text-gray-700">
-                        <li className="flex items-start gap-3">
+                      <li className="flex items-start gap-3">
                         <span className="text-orange-600 mt-1">✓</span>
                         Freshers & Experienced Welcome
                       </li>
@@ -367,11 +368,10 @@ export default function Career() {
                       name="fullName"
                       value={formData.fullName}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition ${
-                        errors.fullName
+                      className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.fullName
                           ? 'border-red-400 bg-red-50'
                           : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
-                      }`}
+                        }`}
                       placeholder="John Doe"
                     />
                     {errors.fullName && <p className="text-red-600 text-sm mt-1">{errors.fullName}</p>}
@@ -388,11 +388,10 @@ export default function Career() {
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 rounded-lg border-2 transition ${
-                          errors.email
+                        className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.email
                             ? 'border-red-400 bg-red-50'
                             : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
-                        }`}
+                          }`}
                         placeholder="john@example.com"
                       />
                       {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
@@ -406,11 +405,10 @@ export default function Career() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 rounded-lg border-2 transition ${
-                          errors.phone
+                        className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.phone
                             ? 'border-red-400 bg-red-50'
                             : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
-                        }`}
+                          }`}
                         placeholder="+91 98765 43210"
                       />
                       {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
@@ -426,11 +424,10 @@ export default function Career() {
                       name="position"
                       value={formData.position}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition ${
-                        errors.position
+                      className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.position
                           ? 'border-red-400 bg-red-50'
                           : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
-                      }`}
+                        }`}
                     >
                       <option value="">-- Choose a position --</option>
                       {vacancies.map((pos) => (
@@ -452,11 +449,10 @@ export default function Career() {
                       value={formData.coverLetter}
                       onChange={handleInputChange}
                       rows={6}
-                      className={`w-full px-4 py-3 rounded-lg border-2 transition resize-none ${
-                        errors.coverLetter
+                      className={`w-full px-4 py-3 rounded-lg border-2 transition resize-none ${errors.coverLetter
                           ? 'border-red-400 bg-red-50'
                           : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
-                      }`}
+                        }`}
                       placeholder="Tell us why you'd be a great fit for this position..."
                     />
                     {errors.coverLetter && <p className="text-red-600 text-sm mt-1">{errors.coverLetter}</p>}
@@ -470,11 +466,10 @@ export default function Career() {
                     {!formData.resume ? (
                       <label
                         htmlFor="resumeInput"
-                        className={`block border-2 border-dashed rounded-xl px-6 py-10 text-center cursor-pointer transition ${
-                          errors.resume
+                        className={`block border-2 border-dashed rounded-xl px-6 py-10 text-center cursor-pointer transition ${errors.resume
                             ? 'border-red-400 bg-red-50'
                             : 'border-gray-300 hover:border-orange-500 hover:bg-orange-50'
-                        }`}
+                          }`}
                       >
                         <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                         <p className="font-medium text-gray-700">Drop your file here or click to browse</p>

@@ -65,11 +65,11 @@ router.post(
 );
 
 /**
- * @route   DELETE /api/v1/upload/:publicId
- * @desc    Delete single image
+ * @route   DELETE /api/v1/upload?publicId=folder/image
+ * @desc    Delete single image (using query param to support IDs with slashes)
  * @access  Private
  */
-router.delete('/:publicId', uploadController.deleteImage);
+router.delete('/', uploadController.deleteImage);
 
 /**
  * @route   POST /api/v1/upload/delete-multiple

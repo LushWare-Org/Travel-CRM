@@ -20,7 +20,7 @@ const normalizePhone = (phone) => {
   return undefined;
 };
 
-export const createWebsiteBooking = asyncHandler(async (req, res) => {  
+export const createWebsiteBooking = asyncHandler(async (req, res) => {
   const {
     name,
     email,
@@ -87,49 +87,49 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
 
   let booking = null;
   const leadPayload = {
-      name: sanitizedName,
-      email: sanitizedEmail,
-      phone: normalizedPhone || '',
-      source: 'booking',
-      platform: 'Website Form',
-      package: pkg._id,
-      packageName: pkg.name,
-      destination: pkg.destination,
-      destinationCountry: pkg.destination,
-      travelDate: parsedTravelDate,
-      numberOfTravelers: parsedTravelers,
-      budget: pkg.price ? `${pkg.price}` : undefined,
-      message: message?.trim() || undefined,
-      status: 'new',
-      tags: ['website-booking'],
-    };
+    name: sanitizedName,
+    email: sanitizedEmail,
+    phone: normalizedPhone || '',
+    source: 'booking',
+    platform: 'Website Form',
+    package: pkg._id,
+    packageName: pkg.name,
+    destination: pkg.destination,
+    destinationCountry: pkg.destination,
+    travelDate: parsedTravelDate,
+    numberOfTravelers: parsedTravelers,
+    budget: pkg.price ? `${pkg.price}` : undefined,
+    message: message?.trim() || undefined,
+    status: 'new',
+    tags: ['website-booking'],
+  };
 
-    if (message?.trim()) {
-      leadPayload.remarks = [
-        {
-          text: `Website inquiry: ${message.trim()}`,
-          date: new Date(),
-          addedBy: null,
-        },
-      ];
-    }
+  if (message?.trim()) {
+    leadPayload.remarks = [
+      {
+        text: `Website inquiry: ${message.trim()}`,
+        date: new Date(),
+        addedBy: null,
+      },
+    ];
+  }
 
-    let assignedSalesRepId = null;
-    let assignmentResult = null;
-    try {
-      assignmentResult = await assignSalesRepIfNeeded(leadPayload);
-      if (assignmentResult.assigned && assignmentResult.salesRepId) {
-        assignedSalesRepId = assignmentResult.salesRepId;
-        if (!leadPayload.salesRep) {
-          const rep = assignmentResult.salesRep || await User.findById(assignmentResult.salesRepId).select('name');
-          if (rep?.name) {
-            leadPayload.salesRep = rep.name;
-          }
+  let assignedSalesRepId = null;
+  let assignmentResult = null;
+  try {
+    assignmentResult = await assignSalesRepIfNeeded(leadPayload);
+    if (assignmentResult.assigned && assignmentResult.salesRepId) {
+      assignedSalesRepId = assignmentResult.salesRepId;
+      if (!leadPayload.salesRep) {
+        const rep = assignmentResult.salesRep || await User.findById(assignmentResult.salesRepId).select('name');
+        if (rep?.name) {
+          leadPayload.salesRep = rep.name;
         }
       }
-    } catch (assignmentError) {
-      logger.warn(`Sales rep auto-assignment failed for website booking lead: ${assignmentError.message}`);
     }
+  } catch (assignmentError) {
+    logger.warn(`Sales rep auto-assignment failed for website booking lead: ${assignmentError.message}`);
+  }
 
   try {
     booking = await Booking.create({
@@ -145,51 +145,51 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
       assignedTo: assignedSalesRepId || undefined,
     });
 
-      const session = await mongoose.startSession();
-      try {
-        session.startTransaction();
-        const lead = await Lead.create([leadPayload], { session });
-        const newLead = lead[0];
+    const session = await mongoose.startSession();
+    try {
+      session.startTransaction();
+      const lead = await Lead.create([leadPayload], { session });
+      const newLead = lead[0];
 
-        await packageService.incrementBookings(pkg._id);
-        await session.commitTransaction();
+      await packageService.incrementBookings(pkg._id);
+      await session.commitTransaction();
 
-        // Send assignment email notification if a sales rep was assigned
-        if (newLead.assignedTo && assignmentResult?.assigned) {
-          try {
-            const salesRep = assignmentResult.salesRep || await User.findById(newLead.assignedTo).select('name email').lean();
-            if (salesRep && salesRep.email) {
-              logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${newLead._id} (from booking)`);
-              
-              emailService
-                .sendLeadAssignmentEmail({
-                  salesRep,
-                  lead: newLead.toObject(),
-                  assignedBy: null,
-                  assignmentMode: 'auto',
-                })
-                .then(() => {
-                  logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email}`);
-                })
-                .catch((err) => {
-                  logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
-                  logger.error(`Email error details:`, err);
-                });
-            } else {
-              logger.warn(`⚠️  Cannot send assignment email: sales rep ${newLead.assignedTo} has no email address`);
-            }
-          } catch (error) {
-            logger.error(`Error preparing lead assignment email: ${error.message}`);
-            logger.error(`Error stack:`, error.stack);
+      // Send assignment email notification if a sales rep was assigned
+      if (newLead.assignedTo && assignmentResult?.assigned) {
+        try {
+          const salesRep = assignmentResult.salesRep || await User.findById(newLead.assignedTo).select('name email').lean();
+          if (salesRep && salesRep.email) {
+            logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${newLead._id} (from booking)`);
+
+            emailService
+              .sendLeadAssignmentEmail({
+                salesRep,
+                lead: newLead.toObject(),
+                assignedBy: null,
+                assignmentMode: 'auto',
+              })
+              .then(() => {
+                logger.info(`✅ Lead assignment email sent successfully to ${salesRep.email}`);
+              })
+              .catch((err) => {
+                logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
+                logger.error(`Email error details:`, err);
+              });
+          } else {
+            logger.warn(`⚠️  Cannot send assignment email: sales rep ${newLead.assignedTo} has no email address`);
           }
+        } catch (error) {
+          logger.error(`Error preparing lead assignment email: ${error.message}`);
+          logger.error(`Error stack:`, error.stack);
         }
+      }
 
-        logger.info(`Website booking created for package ${pkg._id} by ${sanitizedEmail}`);
+      logger.info(`Website booking created for package ${pkg._id} by ${sanitizedEmail}`);
 
-        res.status(201).json({
-          success: true,
-          message: 'Booking request submitted successfully',
-          data: {
+      res.status(201).json({
+        success: true,
+        message: 'Booking request submitted successfully',
+        data: {
           bookingId: booking._id,
           leadId: lead[0]?._id,
           salesRepId: assignedSalesRepId || null,
@@ -217,8 +217,12 @@ export const getUserBookings = asyncHandler(async (req, res) => {
   }
 
   const bookings = await Booking.find({ user: userId })
-    .populate('package')
-    .sort({ createdAt: -1 });
+    .populate({
+      path: 'package',
+      select: 'name destination duration price coverImage slug',
+    })
+    .sort({ createdAt: -1 })
+    .lean();
 
   res.status(200).json({
     success: true,
@@ -234,7 +238,7 @@ export const getRecentBookings = asyncHandler(async (req, res) => {
   })
     .populate({
       path: 'package',
-      select: 'name description price duration coverImage images slug destination maxGroupSize category inclusions exclusions highlights terms isActive isFeatured rating numReviews views bookings createdBy availableFrom createdAt updatedAt itinerary',
+      select: 'name description price duration coverImage images slug destination maxGroupSize category inclusions exclusions highlights terms isActive isFeatured rating numReviews views bookings createdBy availableFrom createdAt updatedAt',
     })
     .populate({
       path: 'user',

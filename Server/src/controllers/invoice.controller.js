@@ -67,7 +67,7 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
     }
   }
 
-  const invoiceDocs = await features.query;
+  const invoiceDocs = await features.query.lean();
   const invoices = invoiceDocs.map((invoice) => formatInvoiceForResponse(invoice));
 
   // Get total count with same filter
@@ -156,7 +156,8 @@ export const getInvoiceByLeadId = asyncHandler(async (req, res, next) => {
     .populate('quotation', 'quotationNumber')
     .populate('createdBy', 'name email')
     .populate('payments')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   const invoices = invoiceDocs.map((invoice) => formatInvoiceForResponse(invoice));
 

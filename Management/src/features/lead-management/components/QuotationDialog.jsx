@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Save, Calculator, Eye, ToggleLeft, ToggleRight, Download, Send, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
+import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI, uploadAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 
 const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
@@ -41,6 +41,8 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     paymentTerms: '',
     includedServices: [],
     excludedServices: [],
+    coverImage: '',
+    images: [], // Array of {url: string, isCover: boolean}
   });
 
   const [formData, setFormData] = useState(buildDefaultFormData(lead));
@@ -215,6 +217,8 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       paymentTerms: selectedQuote.paymentTerms || '',
       includedServices: selectedQuote.includedServices || [],
       excludedServices: selectedQuote.excludedServices || [],
+      coverImage: selectedQuote.coverImage || '',
+      images: selectedQuote.images || (selectedQuote.coverImage ? [{ url: selectedQuote.coverImage, isCover: true }] : []),
     });
 
     setSendEmailAddress(
@@ -1027,6 +1031,101 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     try {
       setLoading(true);
+
+      // For manual/custom quotations, create an itinerary from the items
+      let itineraryId = null;
+      if (selectedPlanType === 'manual' && itemsToSubmit.length > 0) {
+        console.log('[Quotation] Creating itinerary for manual quotation');
+
+        // Group items by day
+        const dayGroups = {};
+        itemsToSubmit.forEach(item => {
+          const dayMatch = item.description?.match(/Day\s+(\d+)/i);
+          if (dayMatch) {
+            const dayNum = parseInt(dayMatch[1]);
+            if (!dayGroups[dayNum]) {
+              dayGroups[dayNum] = [];
+            }
+            dayGroups[dayNum].push(item);
+          }
+        });
+
+        console.log('[Quotation] Grouped items into', Object.keys(dayGroups).length, 'days');
+
+        // Convert to itinerary days format
+        const itineraryDays = Object.keys(dayGroups).sort((a, b) => parseInt(a) - parseInt(b)).map(dayNum => {
+          const dayItems = dayGroups[dayNum];
+          const dayNumber = parseInt(dayNum);
+
+          // Extract title (first item description or default)
+          const titleItem = dayItems[0];
+          const title = titleItem?.description?.split(':')[0]?.trim() || `Day ${dayNumber}`;
+
+          // Extract locations
+          const locations = [];
+          dayItems.forEach(item => {
+            if (item.category === 'hotel' || item.category === 'accommodation') {
+              const locationMatch = item.description?.match(/([^-:]+)(?:\s*-|\s*:)/);
+              if (locationMatch) {
+                locations.push(locationMatch[1].trim());
+              }
+            }
+          });
+
+          // Extract accommodation
+          const hotelItem = dayItems.find(item => item.category === 'hotel' || item.category === 'accommodation');
+          const accommodation = hotelItem ? {
+            name: hotelItem.description?.split('-')[0]?.trim() || '',
+            type: 'hotel'
+          } : null;
+
+          // Extract activities
+          const activities = dayItems
+            .filter(item => !['hotel', 'accommodation', 'transport', 'meal'].includes(item.category))
+            .map(item => item.description?.split(':').pop()?.trim() || item.description)
+            .filter(Boolean);
+
+          // Extract meals
+          const mealItems = dayItems.filter(item => item.category === 'meal');
+          const meals = {
+            breakfast: mealItems.some(m => m.description?.toLowerCase().includes('breakfast')),
+            lunch: mealItems.some(m => m.description?.toLowerCase().includes('lunch')),
+            dinner: mealItems.some(m => m.description?.toLowerCase().includes('dinner'))
+          };
+
+          return {
+            dayNumber,
+            title,
+            locations: locations.length > 0 ? locations : ['TBD'],
+            activities,
+            accommodation,
+            meals
+          };
+        });
+
+        console.log('[Quotation] Created', itineraryDays.length, 'itinerary days');
+
+        // Create itinerary via API
+        if (itineraryDays.length > 0) {
+          try {
+            const leadId = lead?._id || lead?.id;
+            const itineraryResponse = await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
+
+            if (itineraryResponse.success || itineraryResponse.status === 'success') {
+              itineraryId = itineraryResponse.data?._id || itineraryResponse.data?.id;
+              console.log('[Quotation] Created itinerary:', itineraryId);
+            }
+          } catch (error) {
+            console.error('[Quotation] Failed to create itinerary:', error);
+          }
+        }
+      }
+
+      // Add itinerary to payload if created
+      if (itineraryId) {
+        payload.itinerary = itineraryId;
+      }
+
       const response = await quotationAPI.create(payload);
 
       if (response.success || response.status === 'success') {
@@ -1382,6 +1481,181 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 </p>
               </div>
             </div>
+
+            {/* MANUAL ASSETS SECTION - Only for Pure Manual Itineraries (No Package Linked) */}
+            {((detectedPackageType === 'manual' || selectedPlanType === 'manual') && !formData.package && !lead?.package) && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="text-blue-600">🖼️</span>
+                  Quotation Assets (Manual Plan)
+                </h3>
+                <div className="space-y-4">
+                  {/* Multiple Images Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Package Images
+                    </label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files);
+                          if (files.length === 0) return;
+
+                          try {
+                            const loadingToast = toast.loading(`Uploading ${files.length} image(s)...`);
+
+                            // Upload all files
+                            const uploadPromises = files.map(file => uploadAPI.uploadSingle(file));
+                            const results = await Promise.all(uploadPromises);
+
+                            toast.dismiss(loadingToast);
+
+                            const newImages = [];
+                            let successCount = 0;
+
+                            results.forEach(result => {
+                              if (result.success || result.status === 'success') {
+                                const imageUrl = result.data?.image?.url || result.data?.url || result.url || result.data;
+
+                                if (typeof imageUrl === 'string') {
+                                  newImages.push({
+                                    url: imageUrl,
+                                    isCover: formData.images.length === 0 && newImages.length === 0 // First image is cover by default
+                                  });
+                                  successCount++;
+                                }
+                              }
+                            });
+
+                            if (successCount > 0) {
+                              setFormData({
+                                ...formData,
+                                images: [...formData.images, ...newImages],
+                                coverImage: formData.images.length === 0 ? newImages[0]?.url : formData.coverImage
+                              });
+                              toast.success(`${successCount} image(s) uploaded successfully`);
+                            } else {
+                              toast.error('Failed to upload images');
+                            }
+                          } catch (error) {
+                            console.error('Upload error:', error);
+                            toast.error('Error uploading images');
+                          }
+                        }}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                    </div>
+
+                    {/* Image Gallery */}
+                    {formData.images && formData.images.length > 0 && (
+                      <div className="mt-3 grid grid-cols-3 gap-3">
+                        {formData.images.map((img, index) => (
+                          <div key={index} className="relative group">
+                            <div className={`relative h-32 bg-gray-100 rounded-md overflow-hidden border-2 ${img.isCover ? 'border-orange-500' : 'border-gray-200'}`}>
+                              <img
+                                src={img.url}
+                                alt={`Image ${index + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.target.style.display = 'none' }}
+                              />
+
+                              {/* Cover Badge */}
+                              {img.isCover && (
+                                <div className="absolute top-1 left-1 bg-orange-500 text-white text-xs px-2 py-1 rounded">
+                                  Cover
+                                </div>
+                              )}
+
+                              {/* Action Buttons */}
+                              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {!img.isCover && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updatedImages = formData.images.map((image, i) => ({
+                                        ...image,
+                                        isCover: i === index
+                                      }));
+                                      setFormData({
+                                        ...formData,
+                                        images: updatedImages,
+                                        coverImage: img.url
+                                      });
+                                      toast.success('Cover image updated');
+                                    }}
+                                    className="bg-orange-500 text-white rounded-full p-1 hover:bg-orange-600 shadow-sm text-xs"
+                                    title="Set as cover"
+                                  >
+                                    ★
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedImages = formData.images.filter((_, i) => i !== index);
+                                    // If we deleted the cover image, set first image as cover
+                                    if (img.isCover && updatedImages.length > 0) {
+                                      updatedImages[0].isCover = true;
+                                    }
+                                    setFormData({
+                                      ...formData,
+                                      images: updatedImages,
+                                      coverImage: updatedImages.find(i => i.isCover)?.url || ''
+                                    });
+                                  }}
+                                  className="bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm"
+                                  title="Remove image"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 text-center">Image {index + 1}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-500 mt-2">
+                      Upload multiple images for the itinerary. Click ★ to set an image as the cover. The cover image will appear on the first page of the quotation PDF.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Inclusions */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Inclusions
+                      </label>
+                      <textarea
+                        value={formData.includedServices?.join('\n') || ''}
+                        onChange={(e) => setFormData({ ...formData, includedServices: e.target.value.split('\n') })}
+                        placeholder="Enter inclusions (one per line)"
+                        rows={4}
+                        className="w-full px-3 py-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {/* Exclusions */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Exclusions
+                      </label>
+                      <textarea
+                        value={formData.excludedServices?.join('\n') || ''}
+                        onChange={(e) => setFormData({ ...formData, excludedServices: e.target.value.split('\n') })}
+                        placeholder="Enter exclusions (one per line)"
+                        rows={4}
+                        className="w-full px-3 py-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Valid Until */}
             <div className="grid grid-cols-2 gap-4">

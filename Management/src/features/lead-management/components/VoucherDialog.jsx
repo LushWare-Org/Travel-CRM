@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Save, Eye, Send, MessageCircle, Download, Plus, Trash2, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { voucherAPI, packageAPI, customizedPackageAPI, itineraryAPI } from '../../../services/api';
+import { voucherAPI, packageAPI, customizedPackageAPI, itineraryAPI, quotationAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 
 const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
@@ -53,32 +53,53 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   useEffect(() => {
     if (isOpen && lead) {
-      // Auto-populate travel dates from lead if available
-      const travelStartDate = lead.travelDate 
-        ? new Date(lead.travelDate).toISOString().split('T')[0] 
-        : '';
-      const travelEndDate = lead.endDate 
-        ? new Date(lead.endDate).toISOString().split('T')[0] 
-        : '';
-
-      setFormData(prev => ({
-        ...prev,
+      // RESET FORM DATA to initial state to prevent data mix-up between leads
+      setFormData({
         lead: lead._id || lead.id,
+        package: '',
+        customizedPackage: '',
         customer: {
           name: lead.name || '',
           email: lead.email || '',
           phone: lead.phone || '',
           address: lead.address || '',
         },
-        travelStartDate: travelStartDate,
-        travelEndDate: travelEndDate,
-      }));
+        locationDates: [],
+        travelStartDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
+        travelEndDate: lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
+        mealPlans: [],
+        itinerarySummary: [],
+        packageDetails: {
+          name: '',
+          destination: '',
+          duration: 0,
+          category: '',
+          inclusions: [],
+          exclusions: [],
+          highlights: [],
+          images: [],
+          coverImage: null,
+          price: 0
+        },
+        notes: '',
+        terms: [],
+        specialInstructions: '',
+      });
+
+      // Reset other states
+      setPackageData(null);
+      setItineraryData(null);
+      setAllLocations([]);
+      setCurrentVoucher(null);
+      setIsEditing(false);
       setSendEmailAddress(lead?.email || lead?.customer?.email || '');
+
+      // Load fresh data
       fetchExistingVouchers();
       fetchAllVouchers();
       loadPackageAndItinerary();
     }
-  }, [isOpen, lead]);
+  }, [isOpen, lead?._id]); // Depend on lead._id specifically to trigger on lead change
 
   const loadPackageAndItinerary = async () => {
     if (!lead) return;
@@ -133,24 +154,122 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           // Extract itinerary ID - handle both populated object and ID string
           itineraryId = pkg.itinerary?._id || pkg.itinerary?.id || pkg.itinerary;
         }
+      } else {
+        // MANUAL ITINERARY: Check for quotations with manual itinerary
+        console.log('[Voucher] No package found, checking for manual itinerary in quotations');
+        try {
+          const quotationResponse = await quotationAPI.getByLead(lead._id || lead.id);
+          console.log('[Voucher] Quotation response:', quotationResponse);
+
+          if (quotationResponse.success || quotationResponse.status === 'success') {
+            const quotations = quotationResponse.data?.quotations || quotationResponse.data || [];
+            console.log('[Voucher] Found quotations:', quotations.length);
+
+            // Find the most recent quotation (prefer ones with itinerary, but fallback to any)
+            let selectedQuotation = quotations.find(q => q.itinerary);
+            if (!selectedQuotation && quotations.length > 0) {
+              selectedQuotation = quotations[0]; // Fallback to most recent
+            }
+
+            console.log('[Voucher] Selected quotation:', selectedQuotation);
+
+            if (selectedQuotation) {
+              itineraryId = selectedQuotation.itinerary?._id || selectedQuotation.itinerary;
+              console.log('[Voucher] Itinerary ID from quotation:', itineraryId);
+
+              // If no itinerary on quotation, check if lead has one
+              if (!itineraryId && (lead.itinerary?._id || lead.itinerary)) {
+                itineraryId = lead.itinerary._id || lead.itinerary;
+                console.log('[Voucher] Itinerary ID from lead:', itineraryId);
+              }
+
+              // Extract images
+              const quoteImages = selectedQuotation.images && selectedQuotation.images.length > 0
+                ? selectedQuotation.images.map(img => ({
+                  url: img.url,
+                  isCover: img.isCover || false
+                }))
+                : (selectedQuotation.coverImage ? [{ url: selectedQuotation.coverImage, isCover: true }] : []);
+
+              // Find cover image
+              const coverImg = quoteImages.find(img => img.isCover) || quoteImages[0];
+              const coverImgUrl = coverImg ? coverImg.url : null;
+
+              console.log('[Voucher] Extracted images:', quoteImages.length);
+              console.log('[Voucher] Quotation includedServices:', selectedQuotation.includedServices);
+              console.log('[Voucher] Quotation excludedServices:', selectedQuotation.excludedServices);
+
+              // Set package details from quotation
+              // We'll update duration after loading the itinerary
+              setFormData(prev => ({
+                ...prev,
+                packageDetails: {
+                  name: selectedQuotation.package?.name || 'Manual Itinerary',
+                  destination: lead.destination || 'Custom Destination',
+                  duration: 0, // Will be updated after itinerary loads
+                  category: 'Custom',
+                  inclusions: selectedQuotation.includedServices || [],
+                  exclusions: selectedQuotation.excludedServices || [],
+                  highlights: [],
+                  // Ensure images are passed
+                  images: quoteImages,
+                  coverImage: coverImgUrl ? { url: coverImgUrl } : null,
+                  price: selectedQuotation.totalAmount || 0
+                },
+              }));
+
+              console.log('[Voucher] Using manual quotation:', selectedQuotation._id, 'Itinerary:', itineraryId);
+            } else {
+              console.warn('[Voucher] No quotation found for manual itinerary lead');
+            }
+          }
+        } catch (error) {
+          console.error('[Voucher] Error loading manual itinerary:', error);
+        }
       }
 
       // Load itinerary if available
       if (itineraryId) {
-        // Ensure itineraryId is a string, not an object
-        const itineraryIdString = typeof itineraryId === 'object' 
-          ? (itineraryId._id || itineraryId.id || null)
-          : itineraryId;
-        
-        if (!itineraryIdString) {
-          console.warn('Invalid itinerary ID:', itineraryId);
-          return;
-        }
+        console.log('[Voucher] Loading itinerary:', itineraryId);
         try {
-          const itineraryResponse = await itineraryAPI.getById(itineraryIdString);
+          // For manual itineraries, we need to fetch by lead ID, not itinerary ID
+          // because manualItineraryAPI doesn't have a getById method
+          let itineraryResponse;
+
+          if (!lead.package && !lead.customizedPackage) {
+            // Manual itinerary - fetch by lead
+            console.log('[Voucher] Fetching manual itinerary by lead ID');
+            itineraryResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
+          } else {
+            // Regular itinerary - fetch by ID
+            const itineraryIdString = typeof itineraryId === 'object'
+              ? (itineraryId._id || itineraryId.id || null)
+              : itineraryId;
+
+            if (!itineraryIdString) {
+              console.warn('Invalid itinerary ID:', itineraryId);
+              return;
+            }
+            itineraryResponse = await itineraryAPI.getById(itineraryIdString);
+          }
+
+          console.log('[Voucher] Itinerary response:', itineraryResponse);
+
           if (itineraryResponse.success || itineraryResponse.status === 'success') {
             const itinerary = itineraryResponse.data || itineraryResponse;
+            console.log('[Voucher] Loaded itinerary with', itinerary.days?.length, 'days');
             setItineraryData(itinerary);
+
+            // Update duration for manual itineraries
+            if (!lead.package && !lead.customizedPackage && itinerary.days?.length) {
+              setFormData(prev => ({
+                ...prev,
+                packageDetails: {
+                  ...prev.packageDetails,
+                  duration: itinerary.days.length
+                }
+              }));
+            }
 
             // Extract locations from all days
             const locationsSet = new Set();
@@ -162,40 +281,98 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             const uniqueLocations = Array.from(locationsSet);
             setAllLocations(uniqueLocations);
 
-            // Initialize location dates automatically from itinerary
-            if (uniqueLocations.length > 0) {
+            // Initialize location dates automatically from itinerary with SMART HOTEL DETECTION
+            if (itinerary.days && itinerary.days.length > 0) {
+              const hotelBookings = [];
+              let currentStay = null;
+
+              // Helper to calculate date from start date + day offset (0-indexed)
+              // Use lead's travel date directly to avoid stale closure data
+              const travelStartDate = lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '';
+              const getDate = (offset) => {
+                if (!travelStartDate) return '';
+                const date = new Date(travelStartDate);
+                date.setDate(date.getDate() + offset);
+                return date.toISOString().split('T')[0];
+              };
+
+              itinerary.days.forEach((day, index) => {
+                const hotelName = day.accommodation?.name;
+                const location = day.locations && day.locations.length > 0 ? day.locations[0] : '';
+
+                if (hotelName) {
+                  if (currentStay && currentStay.hotelName === hotelName) {
+                    // Continue current stay
+                    currentStay.endDayNum = day.dayNumber;
+                  } else {
+                    // Push previous stay if exists
+                    if (currentStay) hotelBookings.push(currentStay);
+
+                    // Start new stay
+                    currentStay = {
+                      location: location || (currentStay ? currentStay.location : ''), // Fallback to prev location if missing
+                      hotelName: hotelName,
+                      startDayNum: day.dayNumber,
+                      endDayNum: day.dayNumber
+                    };
+                  }
+                } else if (currentStay) {
+                  // If hotel name is missing but we have a current stay, should we end it? 
+                  // Let's assume if no hotel is listed, the previous stay ended.
+                  hotelBookings.push(currentStay);
+                  currentStay = null;
+                }
+              });
+              // Push last stay
+              if (currentStay) hotelBookings.push(currentStay);
+
+              console.log('[Voucher] Detected', hotelBookings.length, 'hotel bookings');
+
+              // Map to form data structure
+              const newLocationDates = hotelBookings.map(stay => ({
+                location: stay.location,
+                hotelName: stay.hotelName,
+                checkIn: getDate(stay.startDayNum - 1), // Day 1 is offset 0
+                checkOut: getDate(stay.endDayNum) // Check-out is the day AFTER the last night usually? 
+                // OR if Day 1 is stay, Check-out is Day 2.
+                // If stay is Day 1 & 2. Check-in Day 1. Check-out Day 3.
+                // Let's assume endDayNum is the last day BY NUMBER.
+                // So Check-out is (endDayNum - 1) + 1 = endDayNum offset.
+              }));
+
+              // If no hotels found, fallback to unique locations
+              if (newLocationDates.length === 0 && uniqueLocations.length > 0) {
+                uniqueLocations.forEach(loc => {
+                  newLocationDates.push({
+                    location: loc,
+                    hotelName: '',
+                    checkIn: '',
+                    checkOut: ''
+                  });
+                });
+              }
+
+              setFormData(prev => ({
+                ...prev,
+                locationDates: newLocationDates.length > 0 ? newLocationDates : prev.locationDates
+              }));
+            } else if (uniqueLocations.length > 0) {
               setFormData(prev => {
-                // Only update if locationDates is empty or if we have new locations
-                const existingLocations = prev.locationDates.map(ld => ld.location);
-                const newLocations = uniqueLocations.filter(loc => !existingLocations.includes(loc));
-                
                 if (prev.locationDates.length === 0) {
-                  // First time - populate all locations
                   return {
                     ...prev,
                     locationDates: uniqueLocations.map(location => ({
                       location,
+                      hotelName: '',
                       checkIn: '',
                       checkOut: '',
                     })),
-                  };
-                } else if (newLocations.length > 0) {
-                  // Add new locations that weren't there before
-                  return {
-                    ...prev,
-                    locationDates: [
-                      ...prev.locationDates,
-                      ...newLocations.map(location => ({
-                        location,
-                        checkIn: '',
-                        checkOut: '',
-                      })),
-                    ],
                   };
                 }
                 return prev;
               });
             }
+
 
             // Extract meal plans
             const mealPlans = itinerary.days?.map(day => ({
@@ -205,6 +382,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               lunch: day.meals?.lunch || false,
               dinner: day.meals?.dinner || false,
             })) || [];
+            console.log('[Voucher] Extracted', mealPlans.length, 'meal plans');
             setFormData(prev => ({ ...prev, mealPlans }));
 
             // Extract itinerary summary
@@ -218,11 +396,16 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 type: day.accommodation?.type || '',
               },
             })) || [];
+            console.log('[Voucher] Extracted', itinerarySummary.length, 'itinerary days');
             setFormData(prev => ({ ...prev, itinerarySummary }));
+          } else {
+            console.warn('[Voucher] Failed to load itinerary:', itineraryResponse);
           }
         } catch (error) {
           console.error('Error loading itinerary:', error);
         }
+      } else {
+        console.warn('[Voucher] No itinerary ID found');
       }
     } catch (error) {
       console.error('Error loading package:', error);
@@ -271,6 +454,8 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       const newLocationDates = [...prev.locationDates];
       if (field === 'location') {
         newLocationDates[index] = { ...newLocationDates[index], location: value };
+      } else if (field === 'hotelName') {
+        newLocationDates[index] = { ...newLocationDates[index], hotelName: value };
       } else if (field === 'checkIn') {
         newLocationDates[index] = { ...newLocationDates[index], checkIn: value };
       } else if (field === 'checkOut') {
@@ -287,6 +472,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         ...prev.locationDates,
         {
           location: '',
+          hotelName: '',
           checkIn: '',
           checkOut: '',
         },
@@ -307,7 +493,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     try {
       setLoading(true);
-      
+
       // Clean up form data before sending
       const cleanedFormData = {
         ...formData,
@@ -320,15 +506,15 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           title: day.title || '',
           locations: day.locations || [],
           activities: day.activities || [],
-          accommodation: day.accommodation && typeof day.accommodation === 'object' 
+          accommodation: day.accommodation && typeof day.accommodation === 'object'
             ? {
-                name: day.accommodation.name || '',
-                type: day.accommodation.type || '',
-              }
+              name: day.accommodation.name || '',
+              type: day.accommodation.type || '',
+            }
             : {
-                name: '',
-                type: '',
-              },
+              name: '',
+              type: '',
+            },
         })) || [],
         // Convert empty date strings to null
         travelStartDate: formData.travelStartDate && formData.travelStartDate.trim() !== '' ? formData.travelStartDate : null,
@@ -363,12 +549,12 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const handleDownloadPDF = async (voucherId = null) => {
     const idToDownload = voucherId || currentVoucherId || selectedVoucherForDownload;
-    
+
     if (!idToDownload) {
       toast.error('Please select a voucher to download');
       return;
     }
-    
+
     try {
       await voucherAPI.downloadPDF(idToDownload);
       toast.success('Voucher PDF downloaded');
@@ -463,14 +649,14 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   if (!isOpen) return null;
 
-    const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"onClick={handleBackdropClick}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={handleBackdropClick}>
       <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[95vh] overflow-y-auto my-4">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex justify-between items-center rounded-t-lg z-10">
@@ -499,7 +685,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <option value="">Select a voucher to download...</option>
                 {allVouchers.map((voucher) => (
                   <option key={voucher._id || voucher.id} value={voucher._id || voucher.id}>
-                    {voucher.voucherNumber || 'Voucher'} - {voucher.customer?.name || voucher.lead?.name || 'N/A'} 
+                    {voucher.voucherNumber || 'Voucher'} - {voucher.customer?.name || voucher.lead?.name || 'N/A'}
                     {voucher.travelStartDate ? ` (${new Date(voucher.travelStartDate).toLocaleDateString()})` : ''}
                   </option>
                 ))}
@@ -610,24 +796,24 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             </div>
           </div>
 
-          {/* Location Dates */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          {/* Hotel Bookings */}
+          <div className="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-5">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-700">Location Dates</h3>
+              <h3 className="text-lg font-bold text-orange-800">Hotel Bookings</h3>
               <button
                 type="button"
                 onClick={addLocationDate}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium shadow-sm"
               >
                 <Plus className="w-4 h-4" />
-                Add Location
+                Add Hotel Booking
               </button>
             </div>
             <div className="space-y-4">
               {formData.locationDates.map((locationDate, index) => (
-                <div key={index} className="bg-white border border-gray-200 rounded-lg p-4">
+                <div key={index} className="bg-white border-2 border-orange-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-semibold text-gray-700">Location {index + 1}</h4>
+                    <h4 className="font-bold text-orange-700">Hotel Booking {index + 1}</h4>
                     <button
                       type="button"
                       onClick={() => removeLocationDate(index)}
@@ -636,32 +822,43 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">City/Location</label>
                       <input
                         type="text"
                         value={locationDate.location}
-                        readOnly
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                        onChange={(e) => handleLocationDateChange(index, 'location', e.target.value)}
+                        placeholder="Enter city"
+                        className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Check-in Date</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Hotel Name</label>
+                      <input
+                        type="text"
+                        value={locationDate.hotelName || ''}
+                        onChange={(e) => handleLocationDateChange(index, 'hotelName', e.target.value)}
+                        placeholder="Enter hotel name"
+                        className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Check-in Date</label>
                       <input
                         type="date"
                         value={locationDate.checkIn}
                         onChange={(e) => handleLocationDateChange(index, 'checkIn', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Check-out Date</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Check-out Date</label>
                       <input
                         type="date"
                         value={locationDate.checkOut}
                         onChange={(e) => handleLocationDateChange(index, 'checkOut', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       />
                     </div>
                   </div>
@@ -799,15 +996,21 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     disabled={sendingEmail || !sendEmailAddress.trim()}
                     className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium text-sm"
                   >
-                    <Send className="w-4 h-4" />
-                    {sendingEmail ? 'Sending...' : 'Send'}
+                    {sendingEmail ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send Email
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"
                     onClick={handleSendWhatsApp}
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm font-medium text-sm"
                   >
-                    <MessageCircle className="w-5 h-5" />
+                    <MessageCircle className="w-4 h-4" />
                     WhatsApp
                   </button>
                 </div>
@@ -824,6 +1027,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           onClose={() => setShowPDFPreview(false)}
           pdfUrl={`/billing/vouchers/${currentVoucherId}/pdf`}
           documentName={`voucher-${currentVoucherId}`}
+          onDownload={() => handleDownloadPDF(currentVoucherId)}
         />
       )}
     </div>

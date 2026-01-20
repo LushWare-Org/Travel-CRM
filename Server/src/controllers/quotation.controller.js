@@ -64,7 +64,7 @@ export const getAllQuotations = asyncHandler(async (req, res) => {
     }
   }
 
-  const quotationDocs = await features.query;
+  const quotationDocs = await features.query.lean();
   const quotations = quotationDocs.map((quotation) => formatQuotationForResponse(quotation));
 
   // Get total count with same filter

@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import axios from 'axios';
 
 // Helper function to convert RGB array to hex
 const rgbToHex = (rgb) => {
@@ -32,428 +33,471 @@ const loadLogo = () => {
   }
 };
 
-// Color Scheme matching billingPDFGenerator
-const PALETTE = {
-  background: [249, 250, 251],
-  secondaryBackground: [209, 213, 219],
-  primaryText: [31, 41, 55],
-  secondaryText: [75, 85, 99],
-  mutedText: [107, 114, 128],
-  accent: [234, 88, 12],
-  accentDark: [234, 179, 8],
-  badgeBg: [234, 88, 12],
-  badgeText: [255, 255, 255],
-  cardBg: [245, 245, 245],
-  cardBorder: [156, 163, 175],
-  pillBg: [209, 213, 219],
-  timeline: [0, 0, 0],
+// Helper: Fetch remote image with SSRF protection
+const fetchImage = async (url) => {
+  if (!url) return null;
+
+  // SECURITY FIX: Validate URL to prevent SSRF attacks
+  const ALLOWED_DOMAINS = [
+    'res.cloudinary.com',
+    'cloudinary.com',
+    'tripskyway.com',
+    'localhost'
+  ];
+
+  // Handle relative paths (uploads) or full URLs
+  let imageUrl = url;
+  if (!url.startsWith('http')) {
+    // Assuming local server or adjust base URL as needed. 
+    // Ideally, this should be a full URL/cloud storage link. 
+    // For now, if it's a relative path in uploads, we might try to read locally if possible, 
+    // otherwise we skip or try to construct a localhost URL if running locally?
+    // Let's assume for production/cloud these are full URLs or we try to resolve against the server's public URL if configured.
+    // For this environment, let's try to handle local file system if it starts with 'uploads/'
+    if (url.startsWith('uploads/') || url.startsWith('/uploads/')) {
+      const localPath = path.join(dirname, '../../', url.replace(/^\//, ''));
+      if (fs.existsSync(localPath)) {
+        return fs.readFileSync(localPath);
+      }
+      return null;
+    }
+    return null;
+  }
+
+  try {
+    // Validate URL domain
+    const urlObj = new URL(imageUrl);
+    const isAllowed = ALLOWED_DOMAINS.some(domain =>
+      urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain)
+    );
+
+    if (!isAllowed) {
+      console.warn('[Voucher PDF] Blocked request to untrusted domain:', urlObj.hostname);
+      return null;
+    }
+
+    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    return response.data;
+  } catch (error) {
+    console.warn('[Voucher PDF] Failed to fetch image:', url);
+    return null;
+  }
 };
 
+// Color Scheme
 const COLORS = {
-  primary: rgbToHex(PALETTE.accent),
-  primaryDark: rgbToHex([180, 60, 8]),
-  primaryLight: rgbToHex([251, 146, 60]),
-  accent: rgbToHex(PALETTE.accentDark),
+  primary: '#EA580C', // Orange
+  primaryDark: '#C2410C',
+  secondary: '#1F2937', // Dark Gray
+  text: '#374151',
+  textLight: '#6B7280',
+  background: '#F9FAFB',
   white: '#FFFFFF',
-  gray100: '#F9FAFB',
-  gray200: '#E5E7EB',
-  gray600: '#4B5563',
-  gray700: '#374151',
-  gray800: '#1F2937',
-  gray900: '#111827',
-  success: '#10B981',
-  warning: rgbToHex(PALETTE.accentDark),
-  error: '#EF4444',
-};
-
-const formatCurrency = (amount) => {
-  if (amount === null || amount === undefined) return 'INR 0.00';
-  return `INR ${Number(amount).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  border: '#E5E7EB',
+  accentBg: '#FFF7ED', // Light orange bg
 };
 
 const formatDate = (date) => {
-  if (!date) return 'N/A';
+  if (!date) return 'TBD';
   return new Date(date).toLocaleDateString('en-IN', {
-    year: 'numeric',
-    month: 'long',
     day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
 };
 
-/**
- * Generate voucher PDF
- */
-export function generateVoucherPDF(voucher, lead) {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        margin: 0,
-        size: 'A4',
-      });
+export async function generateVoucherPDF(voucher, lead) {
+  // FIXED: Removed async from Promise constructor to prevent anti-pattern
+  // All async operations are now handled before creating the Promise
+  try {
+    // --- ASSETS PRE-LOADING (async operations done first) ---
+    const logoBuffer = loadLogo();
 
-      const chunks = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
+    // Get Package Image (Cover)
+    let heroImageBuffer = null;
+    let galleryImages = [];
+    const pkg = voucher.package || voucher.customizedPackage || {};
+    const packageDetails = voucher.packageDetails || {};
 
-      // ===== HEADER WITH WAVE DESIGN =====
-      const headerHeight = 100;
-      const headerY = 0;
-      const headerWidth = 595;
-      
-      // Draw black wave background
-      doc.rect(0, headerY, headerWidth, headerHeight).fillAndStroke('#000000', '#000000');
-      
-      // Draw bottom wave curve using bezier curves
-      doc.moveTo(0, headerHeight - 30)
-         .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
-         .lineTo(595, 0)
-         .lineTo(0, 0)
-         .fill('#000000');
-      
-      // Draw orange accent curve in top right
-      doc.moveTo(400, 0)
-         .bezierCurveTo(450, 40, 520, 60, 595, 50)
-         .lineTo(595, 0)
-         .fill('#F5A623');
-
-      let cursorX = 50;
-      const logoBuffer = loadLogo();
-      
-      // Add logo if available
-      if (logoBuffer) {
-        try {
-          const logoHeight = 20;
-          const logoWidth = 80;
-          doc.image(logoBuffer, cursorX, headerY + 25, {
-            width: logoWidth,
-            height: logoHeight,
-            fit: [logoWidth, logoHeight],
-          });
-          cursorX += logoWidth + 12;
-        } catch (error) {
-          console.warn('[Voucher PDF] Failed to add logo:', error);
-        }
-      }
-
-      doc
-        .fillColor(COLORS.white)
-        .fontSize(16)
-        .font('Helvetica-Bold')
-        .text('Trip Sky Way', cursorX, headerY + 25)
-        .fontSize(9)
-        .font('Helvetica')
-        .text('Curating inspired journeys', cursorX, headerY + 47);
-
-      // Add VOUCHER badge
-      const badgeX = 490;
-      const badgeY = headerY + 40;
-      doc.circle(badgeX, badgeY, 28).fillAndStroke(COLORS.white, COLORS.white);
-      
-      doc
-        .fillColor('#000000')
-        .fontSize(6)
-        .font('Helvetica-Bold')
-        .text('VOUCHER', badgeX - 20, badgeY - 3, { width: 40, align: 'center' });
-
-      // ===== INFO CARDS =====
-      let yPos = 125;
-      
-      doc.roundedRect(50, yPos, 235, 108, 10).fillAndStroke('#FFFFFF', '#FCD34D');
-      doc.rect(50, yPos, 235, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
-      doc
-        .fillColor('#D97706')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('CUSTOMER', 65, yPos + 11);
-
-      const customerName = voucher.customer?.name || lead?.name || '-';
-      doc
-        .fillColor(rgbToHex(PALETTE.primaryText))
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text(customerName, 65, yPos + 47, { width: 205 })
-        .font('Helvetica')
-        .fontSize(9)
-        .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(voucher.customer?.email || lead?.email || '-', 65, yPos + 66, { width: 205 })
-        .text(voucher.customer?.phone || lead?.phone || '-', 65, yPos + 82, { width: 205 });
-
-      doc.roundedRect(300, yPos, 245, 108, 10).fillAndStroke('#FFFFFF', '#FCD34D');
-      doc.rect(300, yPos, 245, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
-      doc
-        .fillColor('#D97706')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('VOUCHER DETAILS', 315, yPos + 11);
-      
-      doc
-        .fillColor(rgbToHex(PALETTE.primaryText))
-        .fontSize(10)
-        .font('Helvetica')
-        .text(`Voucher #: ${voucher.voucherNumber || 'N/A'}`, 315, yPos + 47)
-        .text(`Date: ${formatDate(voucher.createdAt)}`, 315, yPos + 64);
-      
-      const statusColor = voucher.status === 'confirmed' ? '#F5A623' : '#FCD34D';
-      doc.roundedRect(315, yPos + 84, 72, 16, 5).fillAndStroke(statusColor, statusColor);
-      
-      doc
-        .fillColor(COLORS.white)
-        .fontSize(8)
-        .font('Helvetica-Bold')
-        .text(voucher.status?.toUpperCase() || 'DRAFT', 315, yPos + 88, { 
-          width: 72, 
-          align: 'center' 
-        });
-
-      // ===== PACKAGE DETAILS =====
-      yPos = 255;
-      const packageDetails = voucher.packageDetails || {};
-      
-      doc.roundedRect(50, yPos, 495, 110, 10).fillAndStroke('#FFFFFF', '#FCD34D');
-      doc.rect(50, yPos, 495, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
-      doc
-        .fillColor('#D97706')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('PACKAGE DETAILS', 65, yPos + 11);
-        
-      doc
-        .fillColor(rgbToHex(PALETTE.primaryText))
-        .fontSize(10)
-        .font('Helvetica-Bold')
-        .text(`${packageDetails.name || 'N/A'}`, 65, yPos + 47, { width: 465 })
-        .font('Helvetica')
-        .fontSize(9.5)
-        .fillColor(rgbToHex(PALETTE.secondaryText))
-        .text(`Destination: ${packageDetails.destination || 'N/A'}`, 65, yPos + 66)
-        .text(`Duration: ${packageDetails.duration || 'N/A'} days`, 270, yPos + 66)
-        .text(`Category: ${packageDetails.category || 'N/A'}`, 65, yPos + 84);
-
-      // ===== TRAVEL DATES =====
-      yPos = 385;
-      
-      doc.roundedRect(50, yPos, 235, 80, 10).fillAndStroke('#FFFFFF', '#FCD34D');
-      doc.rect(50, yPos, 235, 30).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
-      doc
-        .fillColor('#D97706')
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .text('TRAVEL DATES', 65, yPos + 9);
-        
-      doc
-        .fillColor(rgbToHex(PALETTE.primaryText))
-        .fontSize(9.5)
-        .font('Helvetica')
-        .text(`Departure: ${voucher.travelStartDate ? formatDate(voucher.travelStartDate) : '-'}`, 65, yPos + 44)
-        .text(`Return: ${voucher.travelEndDate ? formatDate(voucher.travelEndDate) : '-'}`, 65, yPos + 61);
-
-      // ===== LOCATION DATES =====
-      let locationY = 485; // Initialize locationY
-      if (voucher.locationDates && voucher.locationDates.length > 0) {
-        yPos = 485;
-        
-        doc.roundedRect(50, yPos, 495, 30, 8).fillAndStroke('#FEF3C7', '#FEF3C7');
-        
-        doc
-          .fillColor('#D97706')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('Location & Accommodation Dates', 65, yPos + 9);
-
-        locationY = yPos + 45;
-        voucher.locationDates.forEach((locationDate, index) => {
-          if (locationY > 700) {
-            doc.addPage();
-            locationY = 50;
-          }
-          
-          doc.roundedRect(50, locationY, 495, 55, 8).fillAndStroke('#FFFFFF', '#FCD34D');
-          
-          doc
-            .font('Helvetica-Bold')
-            .fontSize(10)
-            .fillColor(rgbToHex(PALETTE.primaryText))
-            .text(`${index + 1}. ${locationDate.location || '-'}`, 65, locationY + 10)
-            .font('Helvetica')
-            .fontSize(9)
-            .fillColor(rgbToHex(PALETTE.secondaryText))
-            .text(`✓ Check-in: ${locationDate.checkIn ? formatDate(locationDate.checkIn) : '-'}`, 80, locationY + 28)
-            .text(`✓ Check-out: ${locationDate.checkOut ? formatDate(locationDate.checkOut) : '-'}`, 280, locationY + 28);
-          locationY += 65;
-        });
-      } else {
-        // If no location dates, set locationY to the position after travel dates
-        locationY = 485; // Position after travel dates section
-      }
-
-      // ===== MEAL PLANS =====
-      // Initialize mealY - will be set if meal plans exist
-      let mealY = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 485 + 30;
-      
-      if (voucher.mealPlans && voucher.mealPlans.length > 0) {
-        // Calculate yPos based on whether location dates were shown
-        yPos = (voucher.locationDates && voucher.locationDates.length > 0) ? locationY + 30 : 485 + 30;
-        if (yPos > 700) {
-          doc.addPage();
-          yPos = 50;
-        }
-        
-        doc.roundedRect(50, yPos, 495, 30, 8).fillAndStroke('#FEF3C7', '#FEF3C7');
-        
-        doc
-          .fillColor('#D97706')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('Meal Plans (Day-wise)', 65, yPos + 9);
-
-        mealY = yPos + 45;
-        voucher.mealPlans.forEach((mealPlan) => {
-          if (mealY > 700) {
-            doc.addPage();
-            mealY = 50;
-          }
-          const meals = [];
-          if (mealPlan.breakfast) meals.push('Breakfast');
-          if (mealPlan.lunch) meals.push('Lunch');
-          if (mealPlan.dinner) meals.push('Dinner');
-          
-          doc
-            .font('Helvetica-Bold')
-            .fontSize(9.5)
-            .fillColor(rgbToHex(PALETTE.primaryText))
-            .text(`Day ${mealPlan.dayNumber}: ${mealPlan.dayTitle || ''}`, 65, mealY)
-            .font('Helvetica')
-            .fontSize(9)
-            .fillColor(rgbToHex(PALETTE.secondaryText))
-            .text(meals.join('  •  '), 80, mealY + 16);
-          mealY += 35;
-        });
-      }
-
-      // ===== ITINERARY SUMMARY =====
-      // Initialize itineraryY - will be set if itinerary exists
-      let itineraryY = mealY;
-      
-      if (voucher.itinerarySummary && voucher.itinerarySummary.length > 0) {
-        // Calculate yPos based on whether meal plans were shown
-        yPos = (voucher.mealPlans && voucher.mealPlans.length > 0) ? mealY + 30 : mealY;
-        if (yPos > 700) {
-          doc.addPage();
-          yPos = 50;
-        }
-        
-        doc.roundedRect(50, yPos, 495, 30, 8).fillAndStroke('#FEF3C7', '#FEF3C7');
-        
-        doc
-          .fillColor('#D97706')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('Itinerary Summary', 65, yPos + 9);
-
-        itineraryY = yPos + 45;
-        voucher.itinerarySummary.forEach((day) => {
-          if (itineraryY > 700) {
-            doc.addPage();
-            itineraryY = 50;
-          }
-          doc
-            .font('Helvetica-Bold')
-            .fontSize(9.5)
-            .fillColor(rgbToHex(PALETTE.primaryText))
-            .text(`Day ${day.dayNumber}: ${day.title}`, 65, itineraryY);
-          if (day.locations && day.locations.length > 0) {
-            doc
-              .font('Helvetica')
-              .fontSize(9)
-              .fillColor(rgbToHex(PALETTE.secondaryText))
-              .text(`${day.locations.join(', ')}`, 80, itineraryY + 16);
-            itineraryY += 15;
-          }
-          if (day.activities && day.activities.length > 0) {
-            doc.text(`   Activities: ${day.activities.slice(0, 3).join(', ')}${day.activities.length > 3 ? '...' : ''}`, 60, itineraryY + 15);
-            itineraryY += 15;
-          }
-          if (day.accommodation?.name) {
-            doc.text(`   Accommodation: ${day.accommodation.name}`, 60, itineraryY + 15);
-            itineraryY += 15;
-          }
-          itineraryY += 25;
-        });
-      }
-
-      // ===== INCLUSIONS =====
-      // Initialize inclusionY - will be set if inclusions exist
-      let inclusionY = itineraryY;
-      
-      if (packageDetails.inclusions && packageDetails.inclusions.length > 0) {
-        // Calculate yPos based on whether itinerary was shown
-        yPos = (voucher.itinerarySummary && voucher.itinerarySummary.length > 0) ? itineraryY + 30 : itineraryY;
-        if (yPos > 700) {
-          doc.addPage();
-          yPos = 50;
-        }
-        doc
-          .fillColor('#D97706')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('Package Inclusions', 50, yPos)
-          .font('Helvetica')
-          .fontSize(10)
-          .fillColor(rgbToHex(PALETTE.secondaryText));
-
-        inclusionY = yPos + 25;
-        packageDetails.inclusions.forEach((inclusion) => {
-          if (inclusionY > 700) {
-            doc.addPage();
-            inclusionY = 50;
-          }
-          doc.text(`• ${inclusion}`, 60, inclusionY);
-          inclusionY += 15;
-        });
-      }
-
-      // ===== SPECIAL INSTRUCTIONS =====
-      if (voucher.specialInstructions) {
-        // Calculate yPos based on whether inclusions were shown
-        yPos = (packageDetails.inclusions && packageDetails.inclusions.length > 0) ? inclusionY + 30 : inclusionY;
-        if (yPos > 700) {
-          doc.addPage();
-          yPos = 50;
-        }
-        doc
-          .fillColor('#D97706')
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .text('Special Instructions', 50, yPos)
-          .font('Helvetica')
-          .fontSize(10)
-          .fillColor(rgbToHex(PALETTE.secondaryText))
-          .text(voucher.specialInstructions, 50, yPos + 25, { width: 495 });
-      }
-
-      // ===== FOOTER WAVE =====
-      const pageHeight = 842;
-      const waveY = pageHeight - 80;
-      
-      // Draw orange wave at bottom
-      doc.moveTo(0, waveY)
-         .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
-         .lineTo(595, pageHeight)
-         .lineTo(0, pageHeight)
-         .fill('#F5A623');
-
-      doc.end();
-    } catch (error) {
-      reject(error);
+    // Determine Cover Image Source
+    let coverImageUrl = null;
+    if (packageDetails.coverImage?.url) {
+      coverImageUrl = packageDetails.coverImage.url;
+    } else if (pkg.coverImage) {
+      coverImageUrl = pkg.coverImage?.url || (typeof pkg.coverImage === 'string' ? pkg.coverImage : null);
     }
-  });
-}
 
+    if (coverImageUrl) {
+      heroImageBuffer = await fetchImage(coverImageUrl);
+    }
+
+    // Determine Gallery Images Source
+    let imagesSource = [];
+    if (packageDetails.images && packageDetails.images.length > 0) {
+      imagesSource = packageDetails.images;
+    } else if (pkg.images && pkg.images.length > 0) {
+      imagesSource = pkg.images;
+    }
+
+    // Fetch gallery images (limit to 3)
+    if (imagesSource.length > 0) {
+      const imagesToFetch = imagesSource.slice(0, 3);
+      for (const img of imagesToFetch) {
+        const imgUrl = img?.url || (typeof img === 'string' ? img : null);
+        if (imgUrl) {
+          const imgBuf = await fetchImage(imgUrl);
+          if (imgBuf) galleryImages.push(imgBuf);
+        }
+      }
+    }
+
+    // Now create the Promise with all async work done
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          margin: 0,
+          size: 'A4',
+          bufferPages: true, // Enable buffer pages for improved performance if needed
+        });
+
+        const chunks = [];
+        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        // --- LAYOUT CONSTANTS ---
+        const margin = 40;
+        const contentWidth = 595 - (margin * 2);
+        let y = 0;
+
+        // --- 1. HEADER SECTION ---
+        // Logo and Company Name Background
+        doc.rect(0, 0, 595, 80).fill(COLORS.white);
+
+        if (logoBuffer) {
+          doc.image(logoBuffer, margin, 20, { height: 40 });
+        } else {
+          doc.fillColor(COLORS.primary).fontSize(20).font('Helvetica-Bold').text('Trip Sky Way', margin, 30);
+        }
+
+        // Voucher Title & Number (Right Aligned)
+        doc.fontSize(24).font('Helvetica-Bold').fillColor(COLORS.secondary)
+          .text('TRAVEL VOUCHER', 0, 25, { align: 'right', width: 595 - margin });
+
+        doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
+          .text(`#${voucher.voucherNumber || 'DRAFT'}`, 0, 55, { align: 'right', width: 595 - margin });
+
+        y = 80;
+
+        // --- 2. PACKAGE INFO BANNER (Consistent for all vouchers) ---
+        doc.rect(0, y, 595, 100).fill(COLORS.secondary);
+        doc.fillColor(COLORS.white).fontSize(22).font('Helvetica-Bold')
+          .text(packageDetails.name || 'Your Trip', margin, y + 35);
+        doc.fontSize(12).font('Helvetica')
+          .text(`${packageDetails.destination || ''}  |  ${packageDetails.duration || 0} Days`, margin, y + 65);
+        y += 120;
+
+        // --- 3. TRIP INFO GRID ---
+        // Grid configuration
+        const col1X = margin;
+        const col2X = 300;
+        const startY = y;
+
+        // Guest Details (Left Col)
+        doc.fillColor(COLORS.primary).fontSize(10).font('Helvetica-Bold').text('GUEST DETAILS', col1X, y);
+        y += 15;
+        doc.rect(col1X, y, 240, 0.5).fill(COLORS.border); // separator
+        y += 10;
+
+        doc.fillColor(COLORS.secondary).fontSize(12).font('Helvetica-Bold').text(voucher.customer?.name || lead.name || 'Guest', col1X, y);
+        y += 15;
+        doc.fillColor(COLORS.textLight).fontSize(10).font('Helvetica')
+          .text(voucher.customer?.email || lead.email || '', col1X, y)
+          .text(voucher.customer?.phone || lead.phone || '', col1X, y + 12);
+
+        y += 30; // Spacing
+
+        // Booking Details (Right Col)
+        let rightY = startY;
+        doc.fillColor(COLORS.primary).fontSize(10).font('Helvetica-Bold').text('BOOKING DETAILS', col2X, rightY);
+        rightY += 15;
+        doc.rect(col2X, rightY, 240, 0.5).fill(COLORS.border);
+        rightY += 10;
+
+        // Data pairs helper
+        const drawDataPair = (label, value, x, y) => {
+          doc.fillColor(COLORS.textLight).fontSize(9).font('Helvetica').text(label, x, y);
+          doc.fillColor(COLORS.secondary).fontSize(10).font('Helvetica-Bold').text(value, x + 80, y);
+        };
+
+        drawDataPair('Check-in:', voucher.travelStartDate ? formatDate(voucher.travelStartDate) : 'TBD', col2X, rightY);
+        rightY += 15;
+        drawDataPair('Check-out:', voucher.travelEndDate ? formatDate(voucher.travelEndDate) : 'TBD', col2X, rightY);
+        rightY += 15;
+        drawDataPair('Status:', (voucher.status || 'DRAFT').toUpperCase(), col2X, rightY);
+        rightY += 20;
+
+        // Update main Y to below the lowest column
+        y = Math.max(y, rightY) + 20;
+
+        // --- 4. FLIGHT / TRANSPORT / LOCATION DETAILS ---
+        // If we have location dates, show them nicely
+        if (voucher.locationDates && voucher.locationDates.length > 0) {
+          doc.roundedRect(margin, y, contentWidth, 30, 4).fill(COLORS.accentBg);
+          doc.fillColor(COLORS.primaryDark).fontSize(11).font('Helvetica-Bold').text('HOTEL BOOKINGS & LOCATIONS', margin + 10, y + 9);
+          y += 40;
+
+          // Table Header
+          doc.fillColor(COLORS.textLight).fontSize(9).font('Helvetica-Bold');
+          doc.text('CITY / LOCATION', margin + 10, y);
+          doc.text('HOTEL NAME', margin + 180, y);
+          doc.text('CHECK-IN', margin + 340, y);
+          doc.text('CHECK-OUT', margin + 430, y);
+          y += 12;
+          doc.rect(margin, y, contentWidth, 0.5).fill(COLORS.border);
+          y += 10;
+
+          // Table Rows
+          doc.font('Helvetica').fontSize(10).fillColor(COLORS.text);
+          voucher.locationDates.forEach(loc => {
+            // Check for page break
+            if (y > 750) {
+              doc.addPage();
+              y = 50;
+            }
+            if (!loc.location) return;
+            doc.text(loc.location, margin + 10, y, { width: 160 });
+            doc.text(loc.hotelName || 'TBD', margin + 180, y, { width: 150 });
+            doc.text(formatDate(loc.checkIn), margin + 340, y);
+            doc.text(formatDate(loc.checkOut), margin + 430, y);
+            y += 20;
+          });
+          y += 20;
+        }
+
+        // --- 5. ITINERARY SUMMARY (Enhanced UI) ---
+        if (voucher.itinerarySummary && voucher.itinerarySummary.length > 0) {
+          // Check for page break if starting new section near bottom
+          if (y > 680) {
+            doc.addPage();
+            y = 50;
+          }
+
+          doc.roundedRect(margin, y, contentWidth, 30, 4).fill(COLORS.accentBg);
+          doc.fillColor(COLORS.primaryDark).fontSize(11).font('Helvetica-Bold').text('DAY-BY-DAY ITINERARY', margin + 10, y + 9);
+          y += 40;
+
+          for (let i = 0; i < voucher.itinerarySummary.length; i++) {
+            const day = voucher.itinerarySummary[i];
+
+            // --- CALC HEIGHT ---
+            const textWidth = contentWidth - 50;
+            const titleHeight = 15;
+
+            let locationHeight = 0;
+            if (day.locations && day.locations.length > 0) {
+              locationHeight = doc.heightOfString(`Location: ${day.locations.join(', ')}`, { width: textWidth }) + 5;
+            }
+
+            let activitiesText = '';
+            let activitiesHeight = 0;
+            if (day.activities && day.activities.length > 0) {
+              activitiesText = `Activities: ${day.activities.join(', ')}`;
+              if (activitiesText.length > 350) activitiesText = activitiesText.substring(0, 350) + '...';
+              activitiesHeight = doc.heightOfString(activitiesText, { width: textWidth }) + 5;
+            }
+
+            let hotelHeight = 0;
+            if (day.accommodation && day.accommodation.name) {
+              hotelHeight = doc.heightOfString(`Hotel: ${day.accommodation.name}`, { width: textWidth }) + 5;
+            }
+
+            const cardPadding = 25;
+            const cardHeight = titleHeight + locationHeight + activitiesHeight + hotelHeight + cardPadding;
+
+            // --- PAGE BREAK CHECK ---
+            if (y + cardHeight > 750) {
+              doc.addPage();
+              y = 50;
+            }
+
+            // Day card with subtle background
+            // --- RENDER ---
+            // Background
+            doc.roundedRect(margin, y, contentWidth, cardHeight, 3).fillAndStroke('#FFF7ED', '#FED7AA');
+
+            // Badge
+            doc.circle(margin + 15, y + 20, 12).fill(COLORS.primary);
+            doc.fillColor(COLORS.white).fontSize(10).font('Helvetica-Bold')
+              .text(day.dayNumber.toString(), margin + 10, y + 15, { width: 10, align: 'center' });
+
+            let currentTextY = y + 15;
+
+            // Title
+            doc.fillColor(COLORS.secondary).fontSize(11).font('Helvetica-Bold')
+              .text(day.title || `Day ${day.dayNumber}`, margin + 35, currentTextY, { width: textWidth });
+            currentTextY += titleHeight;
+
+            // Location
+            if (locationHeight > 0) {
+              doc.font('Helvetica-Bold').fillColor(COLORS.textLight).fontSize(9)
+                .text('Location: ', margin + 35, currentTextY, { continued: true })
+                .font('Helvetica').text(day.locations.join(', '), { width: textWidth });
+              currentTextY += locationHeight;
+            }
+
+            // Activities
+            if (activitiesHeight > 0) {
+              // Strip "Activities: " prefix for cleaner display if we are using the label manually
+              const cleanActText = activitiesText.replace(/^Activities:\s*/, '');
+              doc.font('Helvetica-Bold').fillColor(COLORS.text).fontSize(9)
+                .text('Activities: ', margin + 35, currentTextY, { continued: true })
+                .font('Helvetica').text(cleanActText, { width: textWidth });
+              currentTextY += activitiesHeight;
+            }
+
+            // Hotel
+            if (hotelHeight > 0) {
+              doc.font('Helvetica-Bold').fillColor('#C2410C').fontSize(9)
+                .text('Hotel: ', margin + 35, currentTextY, { continued: true })
+                .font('Helvetica').text(day.accommodation.name, { width: textWidth });
+              currentTextY += hotelHeight;
+            }
+
+            y += cardHeight + 15; // Gap
+          }
+          y += 20;
+        }
+
+        // --- 6. MEAL PLANS ---
+        if (voucher.mealPlans && voucher.mealPlans.some(m => m.breakfast || m.lunch || m.dinner)) {
+          // Check for page break
+          if (y > 650) {
+            doc.addPage();
+            y = 50;
+          }
+
+          doc.roundedRect(margin, y, contentWidth, 30, 4).fill(COLORS.accentBg);
+          doc.fillColor(COLORS.primaryDark).fontSize(11).font('Helvetica-Bold').text('MEAL PLAN', margin + 10, y + 9);
+          y += 40;
+
+          doc.font('Helvetica').fontSize(10).fillColor(COLORS.text);
+          voucher.mealPlans.forEach(plan => {
+            const meals = [];
+            if (plan.breakfast) meals.push('Breakfast');
+            if (plan.lunch) meals.push('Lunch');
+            if (plan.dinner) meals.push('Dinner');
+
+            if (meals.length > 0) {
+              if (y > 750) {
+                doc.addPage();
+                y = 50;
+              }
+              doc.font('Helvetica-Bold').text(`Day ${plan.dayNumber}: `, margin + 10, y, { continued: true });
+              doc.font('Helvetica').text(meals.join(', '));
+              y += 15;
+            }
+          });
+          y += 30;
+        }
+
+        // Check for page break
+        if (y > 650) {
+          doc.addPage();
+          y = 50;
+        }
+
+        // --- 7. INCLUSIONS & EXCLUSIONS (Side by side) ---
+        const hasInclusions = packageDetails.inclusions && packageDetails.inclusions.length > 0;
+        const hasExclusions = packageDetails.exclusions && packageDetails.exclusions.length > 0;
+
+        if (hasInclusions || hasExclusions) {
+          const startListY = y;
+
+          // Inclusions
+          if (hasInclusions) {
+            doc.fillColor(COLORS.primary).fontSize(11).font('Helvetica-Bold').text('INCLUSIONS', margin, y);
+            y += 15;
+            doc.font('Helvetica').fontSize(9).fillColor(COLORS.text);
+            packageDetails.inclusions.forEach(item => {
+              if (typeof item === 'string') {
+                doc.text(`•  ${item}`, { width: 240 });
+              }
+            });
+          }
+
+          // Exclusions
+          let rightListY = startListY;
+          if (hasExclusions) {
+            doc.fillColor(COLORS.primary).fontSize(11).font('Helvetica-Bold').text('EXCLUSIONS', 300, rightListY);
+            rightListY += 15;
+            doc.font('Helvetica').fontSize(9).fillColor(COLORS.text);
+            packageDetails.exclusions.forEach(item => {
+              if (typeof item === 'string') {
+                doc.text(`•  ${item}`, 300, rightListY, { width: 240 });
+                rightListY += doc.heightOfString(`•  ${item}`, { width: 240 });
+              }
+            });
+          }
+
+          y = Math.max(y, rightListY) + 30;
+        }
+
+        // --- 8. GALLERY SECTION (Commented out as requested) ---
+        // if (galleryImages.length > 0) {
+        //   // Check space
+        //   if (y + 150 > 750) {
+        //     doc.addPage();
+        //     y = 50;
+        //   }
+        //
+        //   doc.fillColor(COLORS.primary).fontSize(11).font('Helvetica-Bold').text('EXPERIENCE', margin, y);
+        //   y += 20;
+        //
+        //   const imgWidth = 160;
+        //   const imgGap = 15;
+        //   let imgX = margin;
+        //
+        //   galleryImages.forEach(imgBuf => {
+        //     doc.image(imgBuf, imgX, y, { width: imgWidth, height: 100, fit: [imgWidth, 100] });
+        //     imgX += imgWidth + imgGap;
+        //   });
+        //
+        //   y += 120;
+        // }
+
+        // --- 8. SPECIAL INSTRUCTIONS ---
+        if (voucher.specialInstructions && voucher.specialInstructions.trim() !== '') {
+          // Check for page break
+          if (y > 650) {
+            doc.addPage();
+            y = 50;
+          }
+
+          doc.roundedRect(margin, y, contentWidth, 30, 4).fill('#FEF3C7');
+          doc.fillColor('#92400E').fontSize(11).font('Helvetica-Bold').text('SPECIAL INSTRUCTIONS', margin + 10, y + 9);
+          y += 40;
+
+          doc.fillColor(COLORS.text).fontSize(10).font('Helvetica')
+            .text(voucher.specialInstructions, margin + 10, y, { width: contentWidth - 20, align: 'left' });
+          y += doc.heightOfString(voucher.specialInstructions, { width: contentWidth - 20 }) + 30;
+        }
+
+        // --- 9. FOOTER ---
+        // Ensure footer is at bottom
+        doc.rect(0, 780, 595, 62).fill(COLORS.secondary);
+        doc.fillColor(COLORS.white).fontSize(10).font('Helvetica-Bold')
+          .text('Thank you for choosing Trip Sky Way!', 0, 795, { align: 'center' });
+        doc.fontSize(8).font('Helvetica')
+          .text('www.tripskyway.com  |  support@tripskyway.com', 0, 810, { align: 'center' });
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  } catch (error) {
+    // Handle errors from async operations (image fetching, etc.)
+    throw error;
+  }
+}

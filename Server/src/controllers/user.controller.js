@@ -401,10 +401,10 @@ export const updateUser = asyncHandler(async (req, res, next) => {
         if (!validRoles.includes(role)) {
           return next(new AppError(`Invalid role: ${role}. Use dedicated endpoints for superAdmin operations.`, 400));
         }
-        
+
         const oldRole = user.role;
         user.role = role;
-        
+
         // Clear superAdmin flags when changing role
         if (oldRole === 'admin') {
           user.isSuperAdmin = false;
@@ -663,7 +663,9 @@ export const getUsersByRole = asyncHandler(async (req, res, next) => {
     .sort()
     .paginate();
 
-  const users = await apiFeatures.query;
+
+
+  const users = await apiFeatures.query.lean();
   const totalUsers = await User.countDocuments({ role });
 
   res.status(200).json({
@@ -702,7 +704,7 @@ export const assignUserRole = asyncHandler(async (req, res, next) => {
 
   const oldRole = user.role;
   user.role = role;
-  
+
   // Reset superAdmin flags and adjust permissions when changing role
   if (oldRole === 'admin') {
     user.isSuperAdmin = false;
@@ -711,7 +713,7 @@ export const assignUserRole = asyncHandler(async (req, res, next) => {
     // If promoting to admin but not superAdmin, clear the flag
     user.isSuperAdmin = false;
   }
-  
+
   await user.save();
 
   logger.info(`User role updated: ${user.email} (${oldRole} -> ${role})`);

@@ -60,12 +60,12 @@ const ItineraryGenerationContainer = () => {
     packageData: null,
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState(null);
   const [itemsPerPage] = useState(12); // 12 items per page for better grid layout (3 columns x 4 rows)
-  
+
   // Stats state - fetch from API instead of calculating from local packages
   const [stats, setStats] = useState({
     total: 0,
@@ -124,25 +124,25 @@ const ItineraryGenerationContainer = () => {
     const loadPackages = async (page = 1) => {
       try {
         // Build query params with pagination and status filter
-        const params = { 
-          page, 
-          limit: itemsPerPage 
+        const params = {
+          page,
+          limit: itemsPerPage
         };
-        
+
         // Add status filter if selected
         if (statusFilter) {
           params.status = statusFilter;
         }
-        
+
         // For salesReps, use the protected endpoint which will automatically filter published packages
         // For other roles, use the standard endpoint
-        const response = isSalesRep 
+        const response = isSalesRep
           ? await ApiService.getPackagesProtected(params)
           : await ApiService.getPackages(params);
-        
+
         if (response.success && Array.isArray(response.data)) {
           setPackages(response.data);
-          
+
           // Store pagination metadata
           if (response.pagination) {
             setPagination(response.pagination);
@@ -166,7 +166,7 @@ const ItineraryGenerationContainer = () => {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
       return;
     }
-    
+
     setNewFormData(createDefaultPackage());
     setImages([]);
     setShowNewPackageDialog(true);
@@ -178,7 +178,7 @@ const ItineraryGenerationContainer = () => {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
       return;
     }
-    
+
     setShowAIPackageDialog(true);
   };
 
@@ -191,58 +191,91 @@ const ItineraryGenerationContainer = () => {
       price: 0, // Leave price empty for manual entry
       images: [], // Leave images empty for manual upload
     });
-    
+
     // Close AI dialog and open the package form for editing
     setShowAIPackageDialog(false);
     setShowNewPackageDialog(true);
   };
 
-  const handleViewPackage = (pkg) => {
-    setSelectedPackage(pkg);
+  const handleViewPackage = async (pkg) => {
+    try {
+      // Fetch full package details to ensure we have complete data including itinerary
+      const packageId = pkg._id || pkg.id;
+      const response = await ApiService.getPackage(packageId);
+
+      if (response.success && response.data) {
+        setSelectedPackage(response.data);
+      } else {
+        // Fallback to the partial data if fetch fails
+        console.warn('Failed to fetch full package details, using partial data');
+        setSelectedPackage(pkg);
+      }
+    } catch (error) {
+      console.error('Error fetching package details:', error);
+      // Fallback to the partial data if fetch fails
+      setSelectedPackage(pkg);
+    }
   };
 
-  const handleEditPackage = (pkg) => {
+  const handleEditPackage = async (pkg) => {
     // Prevent salesReps from editing packages
     if (isSalesRep) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to edit packages.', 'info');
       return;
     }
 
-    console.log('[DEBUG] Edit package clicked. Package object:', pkg);
-    console.log('[DEBUG] Package _id:', pkg._id, 'Package id:', pkg.id);
-    console.log('[DEBUG] Package images:', pkg.images);
-    
-    // Extract days from itinerary if present
-    const days = pkg.days || pkg.itinerary?.days || [];
-    
-    // Ensure images are properly formatted - no blob URLs for existing images
-    const formattedImages = (pkg.images || []).map(img => {
-      // If it's already an image object with url and public_id, keep it
-      if (typeof img === 'object' && img.url) {
+    try {
+      // CRITICAL FIX: Fetch full package details to ensure we have complete data including itinerary
+      // The list view API excludes itinerary data for performance, but we need it for editing
+      const packageId = pkg._id || pkg.id;
+      console.log('[DEBUG] Edit package clicked. Fetching full details for ID:', packageId);
+      
+      const response = await ApiService.getPackage(packageId);
+      
+      if (!response.success || !response.data) {
+        throw new Error('Failed to fetch package details');
+      }
+      
+      const fullPackage = response.data;
+      console.log('[DEBUG] Full package data fetched:', fullPackage);
+      console.log('[DEBUG] Package images:', fullPackage.images);
+      
+      // Extract days from itinerary if present
+      const days = fullPackage.days || fullPackage.itinerary?.days || [];
+      console.log('[DEBUG] Extracted days count:', days.length);
+      
+      // Ensure images are properly formatted - no blob URLs for existing images
+      const formattedImages = (fullPackage.images || []).map(img => {
+        // If it's already an image object with url and public_id, keep it
+        if (typeof img === 'object' && img.url) {
+          return img;
+        }
+        // If it's a string URL, convert to object format
+        if (typeof img === 'string') {
+          return {
+            url: img,
+            public_id: img.split('/').pop()?.split('.')[0] || 'unknown',
+          };
+        }
         return img;
-      }
-      // If it's a string URL, convert to object format
-      if (typeof img === 'string') {
-        return {
-          url: img,
-          public_id: img.split('/').pop()?.split('.')[0] || 'unknown',
-        };
-      }
-      return img;
-    });
-    
-    const editData = {
-      ...pkg,
-      days: [...days],
-      images: [...formattedImages],
-    };
-    
-    console.log('[DEBUG] Edit data prepared:', editData);
-    console.log('[DEBUG] Formatted images:', formattedImages);
-    
-    setEditPackageData(editData);
-    setShowEditPackageDialog(true);
-    setImages(formattedImages); // Use formatted images, not raw pkg.images
+      });
+      
+      const editData = {
+        ...fullPackage,
+        days: [...days],
+        images: [...formattedImages],
+      };
+      
+      console.log('[DEBUG] Edit data prepared with', days.length, 'days');
+      console.log('[DEBUG] Formatted images:', formattedImages.length);
+      
+      setEditPackageData(editData);
+      setShowEditPackageDialog(true);
+      setImages(formattedImages); // Use formatted images, not raw pkg.images
+    } catch (error) {
+      console.error('[ERROR] Failed to fetch package for editing:', error);
+      Swal.fire('Error', 'Failed to load package details for editing. Please try again.', 'error');
+    }
   };
 
   const handleSaveNewPackage = async (formData) => {
@@ -250,7 +283,7 @@ const ItineraryGenerationContainer = () => {
       // Debug: Log incoming status
       console.log('[Container] handleSaveNewPackage called');
       console.log('[Container] formData.status:', formData.status);
-      
+
       // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -259,7 +292,7 @@ const ItineraryGenerationContainer = () => {
 
       // Filter out any temporary images (safety check)
       const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
-      
+
       console.log('[DEBUG] handleSaveNewPackage - All images:', images);
       console.log('[DEBUG] handleSaveNewPackage - Valid images:', validImages);
 
@@ -297,29 +330,29 @@ const ItineraryGenerationContainer = () => {
         .filter(day => day && (day.title || day.dayNumber)) // Include days with title or dayNumber
         .map(day => {
           const cleanDay = { ...day };
-          
+
           // Ensure dayNumber exists
           if (!cleanDay.dayNumber && cleanDay.title) {
             // Try to extract day number from title, or use index
             const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
             cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
           }
-          
+
           // Ensure title exists
           if (!cleanDay.title && cleanDay.dayNumber) {
             cleanDay.title = `Day ${cleanDay.dayNumber}`;
           }
-          
+
           // Ensure description exists (can be empty string)
           if (cleanDay.description === undefined || cleanDay.description === null) {
             cleanDay.description = '';
           }
-          
+
           // Remove empty transport enum
           if (!cleanDay.transport || cleanDay.transport === '') {
             delete cleanDay.transport;
           }
-          
+
           // Remove or fix accommodation with empty type
           if (cleanDay.accommodation) {
             if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
@@ -331,7 +364,7 @@ const ItineraryGenerationContainer = () => {
               delete cleanDay.accommodation;
             }
           }
-          
+
           return cleanDay;
         });
 
@@ -396,13 +429,13 @@ const ItineraryGenerationContainer = () => {
       }
     } catch (error) {
       console.error('Error creating package:', error);
-      
+
       // Show detailed validation errors if available
       if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
         const errorList = error.errors
           .map((err) => `• ${err.param || err.field}: ${err.msg}`)
           .join('\n');
-        
+
         console.log('%c=== VALIDATION ERRORS ===', 'color: red; font-weight: bold; font-size: 14px;');
         error.errors.forEach((err, idx) => {
           console.log(`%c❌ Error ${idx + 1}:`, 'color: red; font-weight: bold;');
@@ -412,7 +445,7 @@ const ItineraryGenerationContainer = () => {
           console.log('   Type:', typeof err.value);
           console.log('   Location:', err.location || 'body');
         });
-        
+
         Swal.fire('Validation Error', `Please fix the following:\n\n${errorList}`, 'error');
       } else {
         Swal.fire('Error', error.message || 'Failed to save package to database', 'error');
@@ -425,7 +458,7 @@ const ItineraryGenerationContainer = () => {
       // Debug: Log incoming status
       console.log('[Container] handleSaveEditPackage called');
       console.log('[Container] formData.status:', formData.status);
-      
+
       // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -434,14 +467,14 @@ const ItineraryGenerationContainer = () => {
 
       // Filter out any temporary images (safety check)
       const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
-      
+
       console.log('[DEBUG] handleSaveEditPackage - All images:', images);
       console.log('[DEBUG] handleSaveEditPackage - Valid images:', validImages);
 
       console.log('[DEBUG] handleSaveEditPackage called');
       console.log('[DEBUG] formData received:', formData);
       console.log('[DEBUG] formData._id:', formData._id, 'formData.id:', formData.id);
-      
+
       // Validate field lengths only (no required fields)
       const validationErrors = [];
 
@@ -479,35 +512,35 @@ const ItineraryGenerationContainer = () => {
 
       const packageId = formData._id || formData.id;
       console.log('[DEBUG] Using packageId:', packageId);
-      
+
       // Clean up days data - remove invalid enum values and incomplete days
       const cleanDays = (formData.days || [])
         .filter(day => day && (day.title || day.dayNumber)) // Include days with title or dayNumber
         .map(day => {
           const cleanDay = { ...day };
-          
+
           // Ensure dayNumber exists
           if (!cleanDay.dayNumber && cleanDay.title) {
             // Try to extract day number from title, or use index
             const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
             cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
           }
-          
+
           // Ensure title exists
           if (!cleanDay.title && cleanDay.dayNumber) {
             cleanDay.title = `Day ${cleanDay.dayNumber}`;
           }
-          
+
           // Ensure description exists (can be empty string)
           if (cleanDay.description === undefined || cleanDay.description === null) {
             cleanDay.description = '';
           }
-          
+
           // Remove empty transport enum
           if (!cleanDay.transport || cleanDay.transport === '') {
             delete cleanDay.transport;
           }
-          
+
           // Remove or fix accommodation with empty type
           if (cleanDay.accommodation) {
             if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
@@ -519,10 +552,10 @@ const ItineraryGenerationContainer = () => {
               delete cleanDay.accommodation;
             }
           }
-          
+
           return cleanDay;
         });
-      
+
       // Map category to valid backend enum values
       const categoryMap = {
         'adventure': 'family',
@@ -566,7 +599,7 @@ const ItineraryGenerationContainer = () => {
       console.log('[DEBUG] Valid images to save:', validImages);
       console.log('[DEBUG] Images count:', validImages?.length);
       console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
-      
+
       const response = await ApiService.updatePackage(packageId, sanitizedData);
 
       if (response.success) {
@@ -680,7 +713,7 @@ const ItineraryGenerationContainer = () => {
             rating: 0,
             reviews: 0,
           };
-          
+
           // Remove _id to let backend create a new one
           delete duplicateData._id;
 
@@ -705,10 +738,10 @@ const ItineraryGenerationContainer = () => {
     if (!files || files.length === 0) return;
 
     const fileArray = Array.from(files);
-    
+
     // Set uploading state to prevent saving during upload
     setIsUploadingImages(true);
-    
+
     // Create temporary image objects for immediate feedback
     const tempImages = fileArray.map(file => ({
       url: URL.createObjectURL(file),
@@ -719,7 +752,7 @@ const ItineraryGenerationContainer = () => {
 
     try {
       console.log('[DEBUG] Starting upload for', fileArray.length, 'files');
-      
+
       // Upload all images to Cloudinary - now returns full image objects
       const uploadedImages = await uploadPackageImages(files, (progress) => {
         console.log(`Upload progress: ${progress.current}/${progress.total}`);
@@ -736,7 +769,7 @@ const ItineraryGenerationContainer = () => {
         console.log('[DEBUG] Final images state after upload:', finalImages);
         return finalImages;
       });
-      
+
       // Clean up temporary URLs
       tempImages.forEach(img => URL.revokeObjectURL(img.url));
 
@@ -745,11 +778,11 @@ const ItineraryGenerationContainer = () => {
       console.error('[DEBUG] Upload error:', error);
       console.error('[DEBUG] Error message:', error.message);
       console.error('[DEBUG] Error stack:', error.stack);
-      
+
       // Remove temporary images on error
       setImages((prev) => prev.filter(img => !img.isTemp));
       tempImages.forEach(img => URL.revokeObjectURL(img.url));
-      
+
       // Show more specific error message
       let errorMessage = 'Failed to upload images';
       if (error.message.includes('500')) {
@@ -757,7 +790,7 @@ const ItineraryGenerationContainer = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       Swal.fire(
         'Error',
         errorMessage,
@@ -802,15 +835,15 @@ const ItineraryGenerationContainer = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <PageHeader 
+      <PageHeader
         onNewPackage={handleNewPackageDialogOpen}
         onAIPackage={handleAIPackageDialogOpen}
       />
 
       {/* Stats */}
       <div className="bg-white border-b border-gray-200 px-8 py-4">
-        <PackageStats 
-          stats={stats} 
+        <PackageStats
+          stats={stats}
           onFilterChange={handleStatusFilterChange}
           activeFilter={statusFilter}
         />

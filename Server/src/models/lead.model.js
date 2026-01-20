@@ -198,7 +198,7 @@ const leadSchema = new mongoose.Schema(
 
 // Index for efficient queries
 leadSchema.index({ status: 1, createdAt: -1 });
-leadSchema.index({ assignedTo: 1 });
+leadSchema.index({ assignedTo: 1, status: 1, createdAt: -1 }); // Compound index for sales rep dashboard
 leadSchema.index({ followUpDate: 1 });
 leadSchema.index({ source: 1, createdAt: -1 });
 leadSchema.index({ platform: 1 });

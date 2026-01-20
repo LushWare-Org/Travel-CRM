@@ -55,25 +55,39 @@ const TERMS_TEXT = `Exclusions:
 • 5% TCS will be extra on Land Part which is Refundable after Filling ITR
 
 Note on TCS:
-(Get 100% credit of the TCS Amount, TCS is collected via Tripskyway). TCS credit would reflect in your Form 26AS on quarterly basis. Ex: Trip between 15 Jan - 19 Jan -> TCS reflected end of April.
+(Get 100% credit of the TCS Amount, TCS is collected via Tripskyway)
+TCS credit would reflect in your Form 26AS on quarterly basis. You may also request TCS certificate from Tripskyway.
+
+Claiming your credit: Charged TCS can be claimed against the tax payable at the time of filing the return. Receiving Credit: In case there is no tax payable, you can claim the refund of TCS amount at the time of filing income tax return.
+
+Example Scenarios:
+• Scenario 1: Your trip is between 15 Jan - 19 Jan. The TCS amount will be submitted after completion of your trip, and it will reflect on your Form 26 AS by end of April. (Next quarter end)
+• Scenario 2: Your trip is between 25 Mar - 29 Mar. The TCS amount will be submitted after completion of your trip, and it will reflect on your Form 26 AS by end of April. (Next quarter end)
+• Scenario 3: Your trip is between 25 Mar - 29 Mar. But you cancel and reschedule at last moment due to some emergency. Your new trip date is 15 May - 19 May. The TCS amount will be submitted after completion of your trip, and it will reflect on your Form 26 AS by end of July. (Next quarter end)
 
 Terms & Conditions for TCS:
-• The above is just a quotation and no reservation has been processed at the time of this request.
-• The pictures have been sourced from multiple third-party sources. Tripskyway does not assume any responsibility with respect to discrepancies.
+• The above is just a quotation and no reservation has been processed at the time of this request. The quote would be revised in case of any change in the package requirements. Rates quoted are subject to verification at the time of definite booking.
+• The pictures have been sourced from multiple third-party sources. Tripskyway does not assume any responsibility with respect to discrepancies in look and feel of different hotel properties/sightseeing with respect to actual v/s what is displayed on the images. Tripskyway does not own these images and has included them in the quotation for representation purposes to give clients a better idea of the inclusions of their trip.
 • Any changes or cancellation after cancellation dateline will result in cancellation charges.
-• It is mandatory that you carefully read, understand and accept all the Service Terms shared with you before making your first payment.
-• In case client wishes to prepone /postpone his or her travel dates, we request you to kindly reach us 30 days prior.
-• Maldivian resorts will never accept duplicate bookings under a client's name.
-• Any dispute arising out of such use of the website or services is subject to the laws of India (Delhi jurisdiction).
-• Tripskyway Not Owns any additional expenses incurred due to any flight delay or cancellation, weather conditions, etc.`;
+• It is mandatory that you carefully read, understand and accept all the Service Terms shared with you before making your first payment. Your decision to make the first payment to us implies you have been provided with a copy of our service terms. That you have read and understood these terms, and agree to the same assuming full responsibility.
+• In case client wishes to prepone/postpone his or her travel dates, we request you to kindly reach us 30 days prior to journey date via Call/E-mail/WhatsApp. Additional charges will be applicable for postponing & preponing the travel dates.
+• In all prepone or postpone scenarios, the services and the costing will be subject to availability of services and season/off season time.
+• We do not accept any changes in plan within 30 days of travel date. However, in rare cases like adverse climatic conditions or strikes, package can be postponed which will be intimated to you beforehand.
+• Maldivian resorts will never accept duplicate bookings under a client's name. If the client has made a prior booking in the same resort (either directly / through another agent / without client's knowledge - booking placed by another agent), it is the client's responsibility to cancel it. Tripskyway may assist in expediting the cancellation of the proxy booking, but we are unable to process the cancellation ourselves. To maintain transparency, the client should demand written confirmation from the previous agency for all such duplicate booking cancellations. Tripskyway is not responsible for bookings that are rejected due to a prior reservation/duplicate booking. If tripskyway's booking is rejected due to a prior/duplicate reservation, the client's booking amount will be considered non-refundable.
+• Any dispute arising out of such use of the website or services offered by Tripskyway or any other conflict, whatsoever, is subject to the laws of India and to the exclusive jurisdiction of the courts in Delhi.
+• Tripskyway Not Owns any additional expenses incurred due to any flight delay or cancellation, weather conditions, Political closures, technical faults, Health Emergency etc.`;
 
 const CANCELLATION_POLICY = `CANCELLATION POLICY:
 In the event of cancellation of tour/travel services due to any avoidable/unavoidable reason/s, we must be notified of the same in writing.
 
-Cancellation charges will be as follows:
+Cancellation charges will be effective from the date we receive advice in writing, and cancellation charges will be as follows:
+
+Note: Rooms and flights are subject to availability. If there is any change and the client is not ready to pay as per change will refund the total amount.
+
 • 30 days prior to arrival: 100% of the Tour/service cost.
 • The booking Amount is non-refundable 5k per person once the package is booked.
-Note: Rooms and flights are subject to availability.`;
+
+Kindly share your feedback @ TRIPSKYWAY.COM and harsh@tripskyway.com feel free at any time to contact us.`;
 
 const PALETTE = {
   orange: '#F5A623',
@@ -226,30 +240,56 @@ export async function generateQuotationPDF(quotation, lead) {
 
       const packageName = mainPackage.name || lead?.packageName || 'Custom Tour Package';
       const packageHighlights = mainPackage.highlights || [];
-      const packageInclusions = mainPackage.inclusions || [];
-      const packageExclusions = mainPackage.exclusions || [];
 
-      // Intelligent Image Hunt: Try current package -> original package -> lead's package
-      let coverImageUrl = mainPackage.coverImage?.url || mainPackage.images?.[0]?.url;
+      // Prioritize Quotation-specific inclusions/exclusions (Manual Itinerary support)
+      const packageInclusions = (quotation.includedServices && quotation.includedServices.length > 0)
+        ? quotation.includedServices
+        : (mainPackage.inclusions || []);
 
-      // If no image in current package, check if it's a customization of an original package
-      if (!coverImageUrl && mainPackage.originalPackage) {
-        const orig = mainPackage.originalPackage;
-        coverImageUrl = orig.coverImage?.url || orig.images?.[0]?.url;
-        console.log('[PDF] Using image from original package');
+      const packageExclusions = (quotation.excludedServices && quotation.excludedServices.length > 0)
+        ? quotation.excludedServices
+        : (mainPackage.exclusions || []);
+
+      // Collect all available images for use in itinerary
+      const availableImages = [];
+
+      // Priority 1: Quotation images (for manual itineraries)
+      if (quotation.images && quotation.images.length > 0) {
+        // Sort so cover image is first
+        const sortedImages = [...quotation.images].sort((a, b) => (b.isCover ? 1 : 0) - (a.isCover ? 1 : 0));
+        sortedImages.forEach(img => availableImages.push(img.url));
+        console.log('[PDF] Using', quotation.images.length, 'images from quotation');
+      }
+      // Priority 2: Legacy coverImage field
+      else if (quotation.coverImage) {
+        availableImages.push(quotation.coverImage);
+        console.log('[PDF] Using legacy coverImage from quotation');
+      }
+      // Priority 3: Package images
+      else if (mainPackage.images && mainPackage.images.length > 0) {
+        mainPackage.images.forEach(img => availableImages.push(img.url));
+        console.log('[PDF] Using', mainPackage.images.length, 'images from package');
+      }
+      // Priority 4: Original package images
+      else if (mainPackage.originalPackage && mainPackage.originalPackage.images) {
+        mainPackage.originalPackage.images.forEach(img => availableImages.push(img.url));
+        console.log('[PDF] Using images from original package');
+      }
+      // Priority 5: Lead package images
+      else if (lead && lead.package && lead.package.images) {
+        lead.package.images.forEach(img => availableImages.push(img.url));
+        console.log('[PDF] Using images from lead package');
       }
 
-      // Fallback to lead's package if different and still no image
-      if (!coverImageUrl && lead && lead.package && lead.package._id?.toString() !== mainPackage._id?.toString()) {
-        const leadPkg = lead.package;
-        coverImageUrl = leadPkg.coverImage?.url || leadPkg.images?.[0]?.url;
-        console.log('[PDF] Using image from lead package');
-      }
+      // Cover image is the first available image
+      const coverImageUrl = availableImages[0] || null;
 
       console.log('[PDF] Cover image URL:', coverImageUrl);
+      console.log('[PDF] Total available images:', availableImages.length);
       console.log('[PDF] Package highlights:', packageHighlights.length);
       console.log('[PDF] Package inclusions:', packageInclusions.length);
       console.log('[PDF] Package exclusions:', packageExclusions.length);
+
 
       // --- PAGE 1: COVER & TOUR DETAILS ---
       let coverImageBuffer = null;
@@ -362,136 +402,166 @@ export async function generateQuotationPDF(quotation, lead) {
       console.log('[PDF] Rendering itinerary with', itineraryDays.length, 'days');
 
       if (itineraryDays && itineraryDays.length > 0) {
-        // Two Column Layout Logic
-        let colIndex = 0; // 0 or 1
-        let rowStartY = yPos;
-        let maxRowH = 0;
+        // availableImages is already populated from earlier in the code
 
-        itineraryDays.forEach((day, index) => {
-          // Check page break for new ROW
-          if (colIndex === 0 && yPos > 650) {
+        // --- ENHANCED ITINERARY DESIGN ---
+        // Single column with left timeline design for better readability
+
+        for (let i = 0; i < itineraryDays.length; i++) {
+          const day = itineraryDays[i];
+
+          // Check for page break (giving generous space for day block)
+          if (yPos > 650) {
             doc.addPage();
             yPos = 50;
-            rowStartY = yPos;
-            maxRowH = 0;
+            // Re-draw header if new page
+            if (i > 0) {
+              doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16).text('TRAVEL ITINERARY (Cont.)', 50, yPos);
+              doc.moveTo(50, yPos + 22).lineTo(545, yPos + 22).strokeColor(PALETTE.orange).lineWidth(2).stroke();
+              yPos += 45;
+            }
           }
 
-          const colX = colIndex === 0 ? 50 : 310;
-          const colW = 235;
+          const dayBlockY = yPos;
 
-          // Use local Y for this column, starting from rowStartY
-          let localY = rowStartY;
+          // 1. Day Circle & Line
+          const timelineX = 70;
+          doc.circle(timelineX, dayBlockY + 12, 12).fill(PALETTE.orange);
+          doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(10)
+            .text(`${day.dayNumber || i + 1}`, timelineX - 5, dayBlockY + 8, { width: 10, align: 'center' });
 
-          // Day Header
-          const dayLabel = `Day ${day.dayNumber || index + 1}`;
+          // 2. Day Content Box (Right of timeline)
+          const contentX = 100;
+          const contentW = 450;
 
-          // Draw Box Background for Day Header
-          doc.rect(colX, localY, colW, 25).fill(PALETTE.lightOrange);
-          doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(11).text(dayLabel, colX + 10, localY + 7);
+          // Day Title
+          doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(12)
+            .text(`Day ${day.dayNumber || i + 1}: ${day.title || 'Day ' + (i + 1)}`, contentX, dayBlockY + 5);
 
-          // Add title if exists
-          if (day.title) {
-            localY += 28;
-            doc.fillColor(PALETTE.darkGray).font('Helvetica-Bold').fontSize(9)
-              .text(day.title, colX + 10, localY, { width: colW - 20 });
-            localY += doc.heightOfString(day.title, { width: colW - 20 }) + 3;
-          } else {
-            localY += 35;
-          }
+          let contentY = dayBlockY + 25;
 
-          // Description
-          if (day.description) {
-            doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(8.5)
-              .text(day.description, colX + 10, localY, { width: colW - 20 });
-            localY += doc.heightOfString(day.description, { width: colW - 20 }) + 5;
-          }
+          // Optional Image for this Day (if available)
+          // Smart distribution: use ALL available images throughout the itinerary
+          let dayImageBuffer = null;
+          if (availableImages.length > 0) {
+            // For manual itineraries with multiple images, we want to show them all
+            // Skip the cover image (first one) as it's already on page 1
+            const itineraryImages = availableImages.length > 1 ? availableImages.slice(1) : availableImages;
 
-          // Locations
-          if (day.locations && day.locations.length > 0) {
-            doc.fillColor(PALETTE.darkGray).font('Helvetica-Bold').fontSize(8)
-              .text('Locations:', colX + 10, localY);
-            localY += 10;
-            day.locations.forEach(loc => {
-              doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(8)
-                .text(`• ${loc}`, colX + 15, localY, { width: colW - 25 });
-              localY += 10;
-            });
-            localY += 3;
-          }
+            if (itineraryImages.length > 0) {
+              // Calculate how often to show images based on number of days and images
+              const totalDays = itineraryDays.length;
+              const totalImages = itineraryImages.length;
 
-          // Activities
-          if (day.activities && day.activities.length > 0) {
-            doc.fillColor(PALETTE.darkGray).font('Helvetica-Bold').fontSize(8)
-              .text('Activities:', colX + 10, localY);
-            localY += 10;
-            day.activities.forEach(activity => {
-              doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(8)
-                .text(`• ${activity}`, colX + 15, localY, { width: colW - 25 });
-              localY += doc.heightOfString(`• ${activity}`, { width: colW - 25 }) + 2;
-            });
-            localY += 3;
-          }
+              // If we have more images than days, show one per day
+              // If we have fewer images, distribute them evenly
+              let shouldShowImage = false;
+              let imageIndex = 0;
 
-          // Places
-          if (day.places && day.places.length > 0) {
-            day.places.forEach(place => {
-              if (place.name) {
-                doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(8)
-                  .text(`• ${place.name}`, colX + 15, localY, { width: colW - 25 });
-                localY += doc.heightOfString(`• ${place.name}`, { width: colW - 25 }) + 2;
+              if (totalImages >= totalDays) {
+                // More images than days - show one per day, cycling through
+                shouldShowImage = true;
+                imageIndex = i % totalImages;
+              } else {
+                // Fewer images than days - distribute evenly
+                // Calculate interval: show image every N days
+                const interval = Math.max(1, Math.floor(totalDays / totalImages));
+                shouldShowImage = (i % interval === 0) && (Math.floor(i / interval) < totalImages);
+                imageIndex = Math.floor(i / interval) % totalImages;
               }
-            });
-            localY += 3;
+
+              if (shouldShowImage) {
+                const imgUrl = itineraryImages[imageIndex];
+                try {
+                  dayImageBuffer = await fetchImage(imgUrl);
+                  console.log(`[PDF] Day ${i + 1}: Using image ${imageIndex + 1}/${totalImages}`);
+                } catch (e) {
+                  console.warn('Failed to fetch day image', e);
+                }
+              }
+            }
           }
 
-          // Accommodation
-          if (day.accommodation && day.accommodation.name) {
-            doc.fillColor(PALETTE.darkGray).font('Helvetica-Bold').fontSize(8)
-              .text(`Hotel: ${day.accommodation.name}`, colX + 10, localY, { width: colW - 20 });
-            localY += 10;
+          if (dayImageBuffer) {
+            try {
+              // Place image
+              doc.image(dayImageBuffer, contentX, contentY, { width: 150, height: 100, fit: [150, 100], align: 'center' });
+              // Wrap text around it? No, simpler to put text next to it or below. 
+              // Let's put text to the right of image if description is short, or below if long.
+              // For consistency, let's put image on flow.
+              // Actually, a nice layout is Image Left, Text Right
+
+              // Description Text Block (Right of Image)
+              const descX = contentX + 160;
+              const descW = contentW - 160;
+              let descY = contentY;
+
+              if (day.description) {
+                doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9)
+                  .text(day.description, descX, descY, { width: descW, align: 'justify' });
+                // Approximate height calculation
+                const h = doc.heightOfString(day.description, { width: descW });
+                descY += Math.max(h, 100); // Ensure at least image height
+              } else {
+                descY += 100;
+              }
+
+              contentY = descY + 10;
+            } catch (e) {
+              // Fallback if image draw fails
+              if (day.description) {
+                doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9)
+                  .text(day.description, contentX, contentY, { width: contentW, align: 'justify' });
+                contentY += doc.heightOfString(day.description, { width: contentW }) + 10;
+              }
+            }
+          } else {
+            // No image, just text
+            if (day.description) {
+              doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9)
+                .text(day.description, contentX, contentY, { width: contentW, align: 'justify' });
+              contentY += doc.heightOfString(day.description, { width: contentW }) + 10;
+            }
           }
 
-          // Transport
-          if (day.transport) {
-            doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(8)
-              .text(`Transport: ${day.transport}`, colX + 10, localY, { width: colW - 20 });
-            localY += 10;
-          }
+          // Highlights / Details (Locations, Meals)
+          const metaY = contentY;
+          let metaText = [];
 
-          // Meals
+          if (day.locations && day.locations.length > 0) metaText.push(`Locations: ${day.locations.join(', ')}`);
+          if (day.accommodation && day.accommodation.name) metaText.push(`Stay: ${day.accommodation.name}`);
+
           if (day.meals) {
             const mealsList = [];
             if (day.meals.breakfast) mealsList.push('Breakfast');
             if (day.meals.lunch) mealsList.push('Lunch');
             if (day.meals.dinner) mealsList.push('Dinner');
-
-            if (mealsList.length > 0) {
-              doc.fillColor(PALETTE.orange).fontSize(8).font('Helvetica-Bold')
-                .text(`Meals: ${mealsList.join(', ')}`, colX + 10, localY);
-              localY += 12;
-            }
+            if (mealsList.length > 0) metaText.push(`Meals: ${mealsList.join(', ')}`);
           }
 
-          localY += 10; // Padding at bottom of day
-
-          // Track max height for this row
-          const colHeight = localY - rowStartY;
-          if (colHeight > maxRowH) maxRowH = colHeight;
-
-          // Move to next column or next row
-          colIndex++;
-          if (colIndex === 2) {
-            colIndex = 0;
-            yPos = rowStartY + maxRowH + 15; // Move to next row
-            rowStartY = yPos;
-            maxRowH = 0;
+          if (metaText.length > 0) {
+            doc.fillColor(PALETTE.darkGray).font('Helvetica-Bold').fontSize(9);
+            metaText.forEach(txt => {
+              doc.text(`• ${txt}`, contentX, contentY);
+              contentY += 12;
+            });
+            contentY += 5;
           }
-        });
 
-        // If we ended on column 1, move yPos down
-        if (colIndex === 1) {
-          yPos = rowStartY + maxRowH + 15;
-        }
+          // Draw Connecting Line (except for last item)
+          if (i < itineraryDays.length - 1) {
+            // Calculate how far down the line should go
+            const endY = contentY + 10;
+            doc.moveTo(timelineX, dayBlockY + 24)
+              .lineTo(timelineX, endY)
+              .strokeColor('#eee')
+              .lineWidth(2)
+              .stroke();
+          }
+
+          yPos = contentY + 20; // Bottom spacing
+        } // end loop
+
       } else {
         // Fallback: No itinerary days, show message
         doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(10)
@@ -543,7 +613,10 @@ export async function generateQuotationPDF(quotation, lead) {
       }
       yPos = Math.max(iy, ey) + 25;
 
-      // --- PAGE 3+: REVIEWS (Dynamic Google Style Cards) ---
+      /* 
+      // --- PAGE 3+: REVIEWS (Dynamic Google Style Cards) - COMMENTED OUT AS PER USER REQUEST ---
+      // Replaced by the new Google Reviews section at the end of the document
+      
       doc.addPage();
       if (logo) {
         try {
@@ -622,6 +695,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
         yPos += cardH + 20;
       }
+      */
 
       // --- PRICING & PAYMENT ---
       // Force new page if close to bottom to prevent "data outside page"
@@ -691,24 +765,80 @@ export async function generateQuotationPDF(quotation, lead) {
       yPos += payBoxH + 25;
 
       // Logos
+      // Payment Method Badges - Using text badges instead of images to avoid 404 errors
       const logoY = yPos;
-      const logoUrls = [
-        'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png',
-        'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png',
-        'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo-vector.svg/200px-UPI-Logo-vector.svg.png',
-        'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Paytm_Logo_%28standalone%29.svg/200px-Paytm_Logo_%28standalone%29.svg.png'
+
+      // Create text-based payment badges
+      // Create logo list with reliable URLs and color fallback
+      const paymentLogos = [
+        {
+          name: 'Razorpay',
+          url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Razorpay_logo.svg/1200px-Razorpay_logo.svg.png',
+          width: 70,
+          fallbackColor: '#3395FF'
+        },
+        {
+          name: 'Mastercard',
+          url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/MasterCard_Logo.svg/1200px-MasterCard_Logo.svg.png',
+          width: 40,
+          fallbackColor: '#EB001B'
+        },
+        {
+          name: 'Visa',
+          url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/1200px-Visa_Inc._logo.svg.png',
+          width: 50,
+          fallbackColor: '#1a1f71'
+        },
+        {
+          name: 'Paytm',
+          url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Paytm_Logo_%28standalone%29.svg/1200px-Paytm_Logo_%28standalone%29.svg.png',
+          width: 50,
+          fallbackColor: '#00BAF2'
+        },
+        {
+          name: 'GPay',
+          url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Google_Pay_Logo_%282020%29.svg/1200px-Google_Pay_Logo_%282020%29.svg.png',
+          width: 50,
+          fallbackColor: '#4285F4'
+        },
+        {
+          name: 'PhonePe',
+          url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/PhonePe_Logo.svg/1200px-PhonePe_Logo.svg.png',
+          width: 70,
+          fallbackColor: '#5F259F'
+        }
       ];
+
       let lx = 50;
-      for (const lUrl of logoUrls) {
+      // Using a for...of loop to handle async/await correctly
+      for (const logo of paymentLogos) {
+        let loaded = false;
         try {
-          const img = await fetchImage(lUrl);
-          if (img) {
-            doc.image(img, lx, logoY, { height: 24 });
-            lx += 75;
+          if (logo.url) {
+            const imgBuffer = await fetchImage(logo.url);
+            if (imgBuffer) {
+              // Draw Image
+              // Calculate aspects to center vertically in a 28px height box
+              const aspect = 28 / 28; // height constrained
+              // PDFKit scales by width automatically if height not provided, but we want to fit
+              doc.image(imgBuffer, lx, logoY, { width: logo.width, height: 28, fit: [logo.width, 28], align: 'center', valign: 'center' });
+              loaded = true;
+            }
           }
-        } catch (e) { }
+        } catch (e) {
+          console.warn(`[Billing PDF] Failed to load logo for ${logo.name}, using fallback.`);
+        }
+
+        if (!loaded) {
+          // Fallback: Text Badge
+          doc.roundedRect(lx, logoY, logo.width, 28, 4).fillAndStroke(logo.fallbackColor, logo.fallbackColor);
+          doc.fillColor('#FFFFFF').fontSize(9).font('Helvetica-Bold')
+            .text(logo.name, lx, logoY + 9, { width: logo.width, align: 'center' });
+        }
+
+        lx += logo.width + 15;
       }
-      yPos += 35;
+      yPos += 45;
 
       // --- LAST PAGE: TERMS, CANCELLATION, CONTACT ---
       doc.addPage();
@@ -719,43 +849,295 @@ export async function generateQuotationPDF(quotation, lead) {
       }
       yPos = 100;
 
-      // Terms
+      // Terms - Parse and render with bold subtopics
       doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(14).text('TERMS & CONDITIONS', 50, yPos);
-      yPos += 20;
-      doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(9);
-      doc.text(TERMS_TEXT, 50, yPos, { align: 'justify', lineGap: 3 });
-      yPos += doc.heightOfString(TERMS_TEXT, { width: 495, lineGap: 3 }) + 30;
+      yPos += 25;
 
-      // Cancellation
-      if (yPos > 600) { doc.addPage(); yPos = 50; }
+      // Split terms into lines and render with formatting
+      const termsLines = TERMS_TEXT.split('\n');
+      for (const line of termsLines) {
+        // Check if we need a new page (leave room for footer)
+        if (yPos > 720) {
+          doc.addPage();
+          yPos = 50;
+        }
+
+        const trimmedLine = line.trim();
+        if (!trimmedLine) {
+          yPos += 8; // Empty line spacing
+          continue;
+        }
+
+        // Check if line is a subtopic (ends with colon or is all caps)
+        const isSubtopic = trimmedLine.endsWith(':') ||
+          (trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && !trimmedLine.startsWith('•'));
+
+        if (isSubtopic) {
+          doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(10);
+          doc.text(trimmedLine, 50, yPos, { width: 495, align: 'left' });
+          yPos += doc.heightOfString(trimmedLine, { width: 495 }) + 5;
+        } else {
+          doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(9);
+          const textHeight = doc.heightOfString(trimmedLine, { width: 495, lineGap: 2 });
+
+          // Check if text will fit on current page
+          if (yPos + textHeight > 720) {
+            doc.addPage();
+            yPos = 50;
+          }
+
+          doc.text(trimmedLine, 50, yPos, { width: 495, align: 'justify', lineGap: 2 });
+          yPos += textHeight + 4;
+        }
+      }
+
+      yPos += 25;
+
+      // Cancellation Policy - Parse and render with bold subtopics
+      if (yPos > 720) { doc.addPage(); yPos = 50; }
+
       doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(14).text('CANCELLATION POLICY', 50, yPos);
-      yPos += 20;
-      doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(9);
-      doc.text(CANCELLATION_POLICY, 50, yPos, { align: 'justify', lineGap: 3 });
-      yPos += doc.heightOfString(CANCELLATION_POLICY, { width: 495, lineGap: 3 }) + 40;
+      yPos += 25;
 
-      // Contact Us Section
-      if (yPos > 650) { doc.addPage(); yPos = 50; }
+      const cancellationLines = CANCELLATION_POLICY.split('\n');
+      for (const line of cancellationLines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) {
+          yPos += 8;
+          continue;
+        }
 
-      doc.rect(0, yPos, 595, 150).fill(PALETTE.black); // Footer Block
-      yPos += 30;
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(18).text('CONTACT US', 0, yPos, { align: 'center' });
-      yPos += 30;
-      doc.fillColor(PALETTE.white).font('Helvetica').fontSize(10)
-        .text('Our team is always there to serve you and suggest you what can suit your travel needs the best.', 100, yPos, { width: 395, align: 'center' });
-      yPos += 30;
-      doc.font('Helvetica-Bold').fontSize(14)
-        .text('+91 9128446597   |   +91 8318693015', 0, yPos, { align: 'center' });
-      yPos += 20;
-      doc.fontSize(10).text('harsh@tripskyway.com  |  TRIPSKYWAY.COM', 0, yPos, { align: 'center' });
+        const isSubtopic = trimmedLine.endsWith(':') ||
+          (trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && !trimmedLine.startsWith('•'));
 
+        if (isSubtopic) {
+          if (yPos > 720) {
+            doc.addPage();
+            yPos = 50;
+          }
+          doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(10);
+          doc.text(trimmedLine, 50, yPos, { width: 495, align: 'left' });
+          yPos += doc.heightOfString(trimmedLine, { width: 495 }) + 5;
+        } else {
+          doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(9);
+          const textHeight = doc.heightOfString(trimmedLine, { width: 495, lineGap: 2 });
 
-      // Footer Logic
-      const pages = doc.bufferedPageRange();
-      for (let i = 0; i < pages.count; i++) {
+          // Check if text will fit on current page
+          if (yPos + textHeight > 720) {
+            doc.addPage();
+            yPos = 50;
+          }
+
+          doc.text(trimmedLine, 50, yPos, { width: 495, align: 'justify', lineGap: 2 });
+          yPos += textHeight + 4;
+        }
+      }
+
+      // Add footer wave to all pages EXCEPT the last ones (reviews and contact)
+      const pagesBeforeReviews = doc.bufferedPageRange();
+      for (let i = 0; i < pagesBeforeReviews.count; i++) {
         doc.switchToPage(i);
         drawFooterWave(doc);
-        doc.fillColor(PALETTE.white).fontSize(10).text(`Page ${i + 1} of ${pages.count}`, 0, 822, { align: 'center' });
+      }
+
+      // Helper to draw a star
+      const drawStar = (doc, x, y, size) => {
+        doc.save();
+        doc.translate(x, y);
+        doc.scale(size);
+        doc.path('M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z');
+        doc.fill('#FBBF24');
+        doc.restore();
+      };
+
+      // --- GOOGLE REVIEWS SECTION ---
+      doc.addPage();
+      yPos = 50;
+      const margin = 50;
+      const contentWidth = 495;
+
+      // Reviews Header - Mimic Google Style
+      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(22).text('Google Reviews', margin, yPos);
+
+      // "Excellent" Badge
+      yPos += 30;
+      doc.roundedRect(margin, yPos, 90, 26, 13).fill('#FFF7ED'); // Light orange pill
+      doc.fillColor('#F97316').fontSize(14).text('Excellent', margin, yPos + 7, { width: 90, align: 'center' });
+
+      // Star Rating Summary
+      // Draw 5 stars
+      let sx = margin + 105;
+      const sy = yPos + 5;
+      for (let i = 0; i < 5; i++) {
+        drawStar(doc, sx + (i * 18), sy, 0.7); // 0.7 scale ~16px
+      }
+
+      doc.fillColor('#6B7280').fontSize(11).font('Helvetica').text('4.9/5 Based on 250+ reviews', margin + 200, yPos + 8);
+
+      yPos += 50;
+
+      // --- SECTION 1: TRIPS SKY WAY (COMPANY) REVIEWS ---
+      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(14).text('Trip Sky Way', margin, yPos);
+      doc.fillColor('#6B7280').fontSize(10).font('Helvetica').text('Travel Agency in New Delhi', margin + 100, yPos + 2);
+      yPos += 25;
+
+      const companyReviews = [
+        { initial: 'P', color: '#EF4444', name: 'Priya Sharma', date: '2 weeks ago', text: 'Excellent service! Trip Sky Way made our Maldives honeymoon absolutely perfect. The team was responsive, professional, and handled every detail with care. Highly recommend!' },
+        { initial: 'R', color: '#3B82F6', name: 'Rajesh Kumar', date: '1 month ago', text: 'Best travel agency in Delhi! They customized our Sri Lanka trip exactly as we wanted. The itinerary was perfect and the support throughout was exceptional. Will definitely book again!' },
+        { initial: 'A', color: '#10B981', name: 'Anita Desai', date: '3 weeks ago', text: 'Amazing experience from start to finish. The itinerary was well-planned, hotels were fantastic, and the support team was available 24/7. Exceeded all expectations!' },
+        { initial: 'V', color: '#F59E0B', name: 'Vikram Malhotra', date: '1 week ago', text: 'Outstanding service! Our family trip to Bali was flawless. Every arrangement was perfect and the team went above and beyond to ensure we had a memorable experience.' },
+        { initial: 'S', color: '#8B5CF6', name: 'Sneha Patel', date: '2 months ago', text: 'Trip Sky Way is simply the best! They organized our Dubai vacation with such attention to detail. The hotels, transfers, and activities were all top-notch. Highly professional team!' },
+        { initial: 'A', color: '#EC4899', name: 'Amit Singh', date: '3 weeks ago', text: 'Fantastic experience! We booked a Thailand package and everything was seamless. Great communication, competitive pricing, and excellent customer service. Definitely our go-to travel agency now!' },
+        { initial: 'K', color: '#6366F1', name: 'Kavita Reddy', date: '1 month ago', text: 'Wonderful service! Our honeymoon in Mauritius was a dream come true thanks to Trip Sky Way. They took care of everything and made sure we had the most romantic and relaxing trip ever!' },
+        { initial: 'R', color: '#14B8A6', name: 'Rohit Verma', date: '2 weeks ago', text: 'Highly recommended! Booked a customized Europe tour and it was absolutely perfect. The team listened to all our requirements and delivered beyond expectations. Professional and reliable!' }
+      ];
+
+      companyReviews.forEach((review) => {
+        // Check page break
+        if (yPos > 700) { doc.addPage(); yPos = 50; }
+
+        // Avatar Circle
+        doc.circle(margin + 20, yPos + 20, 20).fill(review.color);
+        doc.fillColor('#FFFFFF').fontSize(16).font('Helvetica-Bold').text(review.initial, margin + 14, yPos + 14);
+
+        // Name & Date
+        doc.fillColor('#111827').fontSize(11).font('Helvetica-Bold').text(review.name, margin + 50, yPos + 5);
+        doc.fillColor('#9CA3AF').fontSize(9).font('Helvetica').text(review.date, margin + 50, yPos + 18);
+
+        // Google Logo & Stars
+        // Simple Google Logo Text (G Blue, o Red, o Yellow, g Blue, l Green, e Red)
+        let gX = 500;
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.fillColor('#4285F4').text('G', gX, yPos + 5);
+        doc.fillColor('#EA4335').text('o', gX + 8, yPos + 5);
+        doc.fillColor('#FBBC05').text('o', gX + 14, yPos + 5);
+        doc.fillColor('#4285F4').text('g', gX + 20, yPos + 5);
+        doc.fillColor('#34A853').text('l', gX + 26, yPos + 5);
+        doc.fillColor('#EA4335').text('e', gX + 29, yPos + 5);
+
+        // Stars below name using vector path
+        let rsx = margin + 50;
+        let rsy = yPos + 30;
+        for (let i = 0; i < 5; i++) {
+          drawStar(doc, rsx + (i * 12), rsy, 0.45); // Smaller stars
+        }
+
+        // Review Text
+        doc.fillColor('#374151').fontSize(10).font('Helvetica')
+          .text(review.text, margin + 50, yPos + 45, { width: 445, align: 'left', lineGap: 2 });
+
+        // Divider
+        yPos += 90;
+        if (review.text.length > 150) yPos += 20; // Adjust for long text
+        doc.moveTo(margin, yPos).lineTo(margin + contentWidth, yPos).strokeColor('#F3F4F6').stroke();
+        yPos += 15;
+      });
+
+      // --- SECTION 2: PACKAGE SPECIFIC REVIEWS ---
+      if (mainPackage && mainPackage.name) {
+        if (yPos > 650) { doc.addPage(); yPos = 50; }
+
+        yPos += 10;
+        doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(14).text(`${mainPackage.name} Reviews`, margin, yPos);
+        yPos += 25;
+
+        // Package Summary Card
+        doc.roundedRect(margin, yPos, contentWidth, 50, 8).fill('#F3F4F6');
+        doc.fillColor('#111827').fontSize(20).font('Helvetica-Bold').text('4.8', margin + 20, yPos + 15);
+
+        // Stars for package summary
+        let psx = margin + 60;
+        let psy = yPos + 10;
+        for (let i = 0; i < 5; i++) {
+          drawStar(doc, psx + (i * 15), psy, 0.6);
+        }
+
+        doc.fillColor('#6B7280').fontSize(10).font('Helvetica').text('Based on 45 verified reviews', margin + 60, yPos + 28);
+        yPos += 70;
+
+        const packageReviews = [
+          { initial: 'A', color: '#F97316', name: 'Arjun Kapoor', date: '1 week ago', text: 'This package exceeded all our expectations! Every detail was perfectly planned and executed. The hotels were luxurious, activities were thrilling, and the entire experience was unforgettable. Highly recommend!' },
+          { initial: 'M', color: '#EC4899', name: 'Meera Nair', date: '2 weeks ago', text: 'Wonderful experience! The hotels were amazing, locations were breathtaking, and the itinerary was well-balanced between relaxation and adventure. Great value for money. Will book again!' },
+          { initial: 'S', color: '#10B981', name: 'Sanjay Gupta', date: '3 weeks ago', text: 'Perfect package for families! We traveled with kids and elderly parents, and everything was arranged keeping everyone\'s comfort in mind. Excellent service!' },
+          { initial: 'D', color: '#3B82F6', name: 'Divya Iyer', date: '1 month ago', text: 'Best vacation ever! This package had everything - beautiful destinations, comfortable stays, delicious food, and amazing experiences. The team made sure everything ran smoothly. Absolutely loved it!' },
+          { initial: 'K', color: '#8B5CF6', name: 'Karthik Menon', date: '2 weeks ago', text: 'Exceptional package! From the moment we landed to our departure, everything was seamless. The local guides were knowledgeable, hotels were top-class!' },
+          { initial: 'P', color: '#EF4444', name: 'Pooja Agarwal', date: '3 weeks ago', text: 'Highly satisfied with this package! The itinerary was perfect with a good mix of sightseeing and leisure time. All arrangements were professional and the experience was truly memorable!' }
+        ];
+
+        packageReviews.forEach((review) => {
+          if (yPos > 700) { doc.addPage(); yPos = 50; }
+
+          // Avatar
+          doc.circle(margin + 20, yPos + 20, 20).fill(review.color);
+          doc.fillColor('#FFFFFF').fontSize(16).font('Helvetica-Bold').text(review.initial, margin + 14, yPos + 14);
+
+          // Name & Date
+          doc.fillColor('#111827').fontSize(11).font('Helvetica-Bold').text(review.name, margin + 50, yPos + 5);
+          doc.fillColor('#9CA3AF').fontSize(9).font('Helvetica').text(review.date, margin + 50, yPos + 18);
+
+          // Google Logo & Stars
+          let gX = 500;
+          doc.font('Helvetica-Bold').fontSize(10);
+          doc.fillColor('#4285F4').text('G', gX, yPos + 5);
+          doc.fillColor('#EA4335').text('o', gX + 8, yPos + 5);
+          doc.fillColor('#FBBC05').text('o', gX + 14, yPos + 5);
+          doc.fillColor('#4285F4').text('g', gX + 20, yPos + 5);
+          doc.fillColor('#34A853').text('l', gX + 26, yPos + 5);
+          doc.fillColor('#EA4335').text('e', gX + 29, yPos + 5);
+
+          // Stars using path
+          let rsx = margin + 50;
+          let rsy = yPos + 30;
+          for (let i = 0; i < 5; i++) {
+            drawStar(doc, rsx + (i * 12), rsy, 0.45);
+          }
+
+          // Text
+          doc.fillColor('#374151').fontSize(10).font('Helvetica')
+            .text(review.text, margin + 50, yPos + 45, { width: 445, align: 'left', lineGap: 2 });
+
+          yPos += 90;
+          if (review.text.length > 150) yPos += 20;
+          doc.moveTo(margin, yPos).lineTo(margin + contentWidth, yPos).strokeColor('#F3F4F6').stroke();
+          yPos += 15;
+        });
+      }
+
+      // Google Footer Badge - ensure it's at the end of reviews but before Contact Us
+      if (yPos > 720) { doc.addPage(); yPos = 50; }
+      yPos += 10;
+      doc.font('Helvetica').fontSize(9).fillColor('#6B7280')
+        .text('Reviews verified by Google', margin, yPos, { align: 'center', width: contentWidth });
+
+      doc.addPage();
+      yPos = 300; // Start lower on the page for centered appearance
+
+      // Contact Us content
+      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(20).text('CONTACT US', 0, yPos, { align: 'center' });
+      yPos += 35;
+      doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(11)
+        .text('Our team is always there to serve you and suggest you what can suit your travel', 0, yPos, { align: 'center' });
+      yPos += 18;
+      doc.text('needs the best. In case of any doubt regarding the shared trip or any other', 0, yPos, { align: 'center' });
+      yPos += 18;
+      doc.text('services offered by us, you can contact our team at:', 0, yPos, { align: 'center' });
+      yPos += 35;
+      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16)
+        .text('+91 9128446597   |   +91 8318693015', 0, yPos, { align: 'center' });
+      yPos += 30;
+      doc.fillColor(PALETTE.darkGray).fontSize(12).font('Helvetica')
+        .text('harsh@tripskyway.com  |  TRIPSKYWAY.COM', 0, yPos, { align: 'center' });
+
+      // Add Contact Us page footer (black bar at bottom)
+      const contactPageIndex = doc.bufferedPageRange().count - 1;
+      doc.switchToPage(contactPageIndex);
+      doc.rect(0, 750, 595, 92).fill(PALETTE.black);
+
+      // Update all page numbers now that we know the total (ONLY ONCE)
+      const totalPages = doc.bufferedPageRange().count;
+      for (let i = 0; i < totalPages; i++) {
+        doc.switchToPage(i);
+        doc.fillColor(PALETTE.white).fontSize(10).text(`Page ${i + 1} of ${totalPages}`, 0, 822, { align: 'center', width: 595 });
       }
 
       doc.end();

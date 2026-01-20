@@ -43,6 +43,9 @@ const voucherSchema = new mongoose.Schema(
         location: {
           type: String,
         },
+        hotelName: {
+          type: String, // Added for manual vouchers
+        },
         checkIn: {
           type: Date,
         },
@@ -60,6 +63,19 @@ const voucherSchema = new mongoose.Schema(
       inclusions: [String],
       exclusions: [String],
       highlights: [String],
+      price: Number,
+      // Added for manual vouchers to store images directly
+      coverImage: {
+        url: String,
+        public_id: String
+      },
+      images: [
+        {
+          url: String,
+          public_id: String,
+          isCover: Boolean
+        }
+      ]
     },
     // Meal plans from itinerary (day-wise)
     mealPlans: [
