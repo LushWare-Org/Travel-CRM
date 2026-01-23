@@ -229,21 +229,21 @@ const ItineraryGenerationContainer = () => {
       // The list view API excludes itinerary data for performance, but we need it for editing
       const packageId = pkg._id || pkg.id;
       console.log('[DEBUG] Edit package clicked. Fetching full details for ID:', packageId);
-      
+
       const response = await ApiService.getPackage(packageId);
-      
+
       if (!response.success || !response.data) {
         throw new Error('Failed to fetch package details');
       }
-      
+
       const fullPackage = response.data;
       console.log('[DEBUG] Full package data fetched:', fullPackage);
       console.log('[DEBUG] Package images:', fullPackage.images);
-      
+
       // Extract days from itinerary if present
       const days = fullPackage.days || fullPackage.itinerary?.days || [];
       console.log('[DEBUG] Extracted days count:', days.length);
-      
+
       // Ensure images are properly formatted - no blob URLs for existing images
       const formattedImages = (fullPackage.images || []).map(img => {
         // If it's already an image object with url and public_id, keep it
@@ -259,16 +259,16 @@ const ItineraryGenerationContainer = () => {
         }
         return img;
       });
-      
+
       const editData = {
         ...fullPackage,
         days: [...days],
         images: [...formattedImages],
       };
-      
+
       console.log('[DEBUG] Edit data prepared with', days.length, 'days');
       console.log('[DEBUG] Formatted images:', formattedImages.length);
-      
+
       setEditPackageData(editData);
       setShowEditPackageDialog(true);
       setImages(formattedImages); // Use formatted images, not raw pkg.images
@@ -326,6 +326,10 @@ const ItineraryGenerationContainer = () => {
       }
 
       // Clean up days data - remove invalid enum values and incomplete days
+      console.log('[Container] ========== DAYS PROCESSING DEBUG ==========');
+      console.log('[Container] formData.days BEFORE cleaning:', formData.days);
+      console.log('[Container] formData.days length BEFORE:', formData.days?.length);
+
       const cleanDays = (formData.days || [])
         .filter(day => day && (day.title || day.dayNumber)) // Include days with title or dayNumber
         .map(day => {
@@ -367,6 +371,10 @@ const ItineraryGenerationContainer = () => {
 
           return cleanDay;
         });
+
+      console.log('[Container] cleanDays AFTER cleaning:', cleanDays);
+      console.log('[Container] cleanDays length AFTER:', cleanDays?.length);
+      console.log('[Container] ================================================');
 
       // Map category to valid backend enum values
       const categoryMap = {

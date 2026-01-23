@@ -186,8 +186,10 @@ const NewEditPackageForm = ({
     // Ensure we preserve _id and id fields
     const packageId = localFormData._id || localFormData.id;
 
+    // IMPORTANT: Always include days array, even if empty
     const dataToSave = {
       ...localFormData,
+      days: localFormData.days || [], // Ensure days is always an array
       status,
       updatedDate: new Date().toISOString().split('T')[0],
     };
@@ -200,10 +202,14 @@ const NewEditPackageForm = ({
       }
     }
 
+    console.log('[Form] ========== SAVE DEBUG ==========');
     console.log('[Form] handleSave called with status:', status);
     console.log('[Form] localFormData.days:', localFormData.days);
+    console.log('[Form] localFormData.days length:', localFormData.days?.length);
     console.log('[Form] dataToSave.days:', dataToSave.days);
-    console.log('[Form] dataToSave status:', dataToSave.status);
+    console.log('[Form] dataToSave.days length:', dataToSave.days?.length);
+    console.log('[Form] Full dataToSave:', JSON.stringify(dataToSave, null, 2));
+    console.log('[Form] ====================================');
 
     setFormData(dataToSave);
     // Pass the updated data directly to onSave instead of relying on state update
