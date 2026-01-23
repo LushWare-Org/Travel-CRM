@@ -57,8 +57,8 @@ export const createPackageValidator = [
 
   body('inclusions.*')
     .trim()
-    .isLength({ min: 2, max: 200 })
-    .withMessage('Each inclusion must be between 2 and 200 characters'),
+    .isLength({ min: 2, max: 1000 })
+    .withMessage('Each inclusion must be between 2 and 1000 characters'),
 
   body('exclusions')
     .optional()
@@ -67,8 +67,8 @@ export const createPackageValidator = [
 
   body('exclusions.*')
     .trim()
-    .isLength({ min: 2, max: 200 })
-    .withMessage('Each exclusion must be between 2 and 200 characters'),
+    .isLength({ min: 2, max: 1000 })
+    .withMessage('Each exclusion must be between 2 and 1000 characters'),
 
   body('highlights')
     .optional()
@@ -77,8 +77,8 @@ export const createPackageValidator = [
 
   body('highlights.*')
     .trim()
-    .isLength({ min: 2, max: 200 })
-    .withMessage('Each highlight must be between 2 and 200 characters'),
+    .isLength({ min: 2, max: 1000 })
+    .withMessage('Each highlight must be between 2 and 1000 characters'),
 
   body('terms')
     .optional()

@@ -22,7 +22,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
       try {
         const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
         const token = localStorage.getItem('token');
-        
+
         if (!token) {
           setAiConfigured(false);
           return;
@@ -104,10 +104,10 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         duration: formData.duration || null,
         category: formData.category || null,
       });
-      
+
       if (response.success && response.data) {
         const aiContent = response.data;
-        
+
         // Update form with AI-generated content
         onChange({
           ...formData,
@@ -116,7 +116,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
           inclusions: aiContent.inclusions || formData.inclusions,
           exclusions: aiContent.exclusions || formData.exclusions,
         });
-        
+
         if (!autoGenerateEnabled) {
           toast.success('AI content generated and applied successfully!');
         }
@@ -134,20 +134,20 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         data: error.data,
         isNetworkError: error.isNetworkError,
       });
-      
+
       // Check if it's a network/connection error
       if (error.isNetworkError || error.status === 0 || error.message.includes('Cannot connect to server') || error.message.includes('ERR_CONNECTION_REFUSED')) {
         toast.error('Cannot connect to server. Please make sure the server is running on port 5000.');
         return;
       }
-      
+
       // Check if it's an authentication error (401)
       if (error.status === 401 || error.statusCode === 401) {
         const errorMessage = error.data?.message || error.message || 'Your session has expired';
         toast.error(`${errorMessage}. Please login again.`);
         return;
       }
-      
+
       // Check if it's a service unavailable error (503) - models not available
       if (error.status === 503 || error.statusCode === 503) {
         const errorMessage = error.data?.error || error.data?.message || error.message;
@@ -162,7 +162,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         }
         return;
       }
-      
+
       // Show error message
       if (!autoGenerateEnabled) {
         const errorMessage = error.data?.error || error.data?.message || error.message || 'Failed to generate AI content. Please check your API key.';
@@ -294,7 +294,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
               disabled={isGenerating || aiConfigured === false}
               className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               title={
-                aiConfigured === false 
+                aiConfigured === false
                   ? "AI not configured. Add GEMINI_API_KEY to Server/.env and restart server."
                   : "Generate description, highlights, inclusions, and exclusions using AI"
               }
@@ -314,9 +314,9 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
                 </p>
                 <p className="text-gray-600 font-normal text-xs">
                   <strong>Quick Fix:</strong> Get a NEW API key from{' '}
-                  <a 
-                    href="https://makersuite.google.com/app/apikey" 
-                    target="_blank" 
+                  <a
+                    href="https://makersuite.google.com/app/apikey"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 underline font-semibold"
                   >
@@ -326,9 +326,9 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
                 </p>
                 <p className="text-gray-600 font-normal text-xs mt-1">
                   <strong>Alternative:</strong> If using Google Cloud Console, enable{' '}
-                  <a 
-                    href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" 
-                    target="_blank" 
+                  <a
+                    href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 underline"
                   >
@@ -411,10 +411,10 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
           value={getArrayFieldValue('inclusions')}
           onChange={(e) => handleArrayFieldChange('inclusions', e.target.value)}
           onBlur={(e) => handleArrayFieldBlur('inclusions', e.target.value)}
-          rows="2"
+          rows="4"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <p className="text-xs text-gray-500 mt-1">Separate each inclusion with a comma</p>
+        <p className="text-xs text-gray-500 mt-1">Separate each inclusion with a comma (up to 1000 characters each)</p>
       </div>
 
       {/* Exclusions */}
@@ -428,10 +428,10 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
           value={getArrayFieldValue('exclusions')}
           onChange={(e) => handleArrayFieldChange('exclusions', e.target.value)}
           onBlur={(e) => handleArrayFieldBlur('exclusions', e.target.value)}
-          rows="2"
+          rows="4"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <p className="text-xs text-gray-500 mt-1">Separate each exclusion with a comma</p>
+        <p className="text-xs text-gray-500 mt-1">Separate each exclusion with a comma (up to 1000 characters each)</p>
       </div>
     </div>
   );

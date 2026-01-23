@@ -33,7 +33,7 @@ const NewEditPackageForm = ({
   useEffect(() => {
     // Initialize localFormData with formData
     let initialData = { ...formData };
-    
+
     // If days array is empty but duration exists, create default days
     if ((!initialData.days || initialData.days.length === 0) && initialData.duration && initialData.duration > 0) {
       console.log('[Form] Initializing empty days array with', initialData.duration, 'days');
@@ -43,7 +43,7 @@ const NewEditPackageForm = ({
       }
       initialData.days = newDays;
     }
-    
+
     setLocalFormData(initialData);
   }, [formData]);
 
@@ -152,12 +152,25 @@ const NewEditPackageForm = ({
     const errors = validateItinerary(localFormData.days);
 
     if (Object.keys(errors).length > 0) {
-      Swal.fire('Error', VALIDATION_MESSAGES.ITINERARY_INCOMPLETE, 'error');
+      Swal.fire({
+        title: 'Incomplete Itinerary',
+        html: `
+          <p>Some itinerary fields are incomplete:</p>
+          <ul style="text-align: left; margin-top: 10px;">
+            ${Object.entries(errors).map(([day, fields]) =>
+          `<li><strong>Day ${day}:</strong> ${fields.join(', ')}</li>`
+        ).join('')}
+          </ul>
+          <p style="margin-top: 15px;"><em>You can still save as draft with incomplete data.</em></p>
+        `,
+        icon: 'warning',
+        confirmButtonText: 'OK'
+      });
       return;
     }
 
     setShowItinerary(true);
-    Swal.fire('Success', VALIDATION_MESSAGES.ITINERARY_SUBMITTED, 'success');
+    Swal.fire('Success', 'Itinerary is complete and ready for preview!', 'success');
   };
 
   const handleResetItinerary = () => {
@@ -330,7 +343,7 @@ const NewEditPackageForm = ({
                   onClick={handleItinerarySubmit}
                   className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
                 >
-                  Submit Itinerary
+                  Validate & Preview Itinerary
                 </button>
                 <button
                   onClick={handleResetItinerary}
@@ -356,25 +369,33 @@ const NewEditPackageForm = ({
 
       {/* Action Buttons */}
       {!hideLeadManagementButtons ? (
-        <div className="flex gap-3 pt-6 border-t border-gray-200">
-          <button
-            onClick={() => handleSave('draft')}
-            className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
-          >
-            Save as Draft
-          </button>
-          <button
-            onClick={() => handleSave('published')}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
-          >
-            Publish
-          </button>
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-200 transition-colors font-medium"
-          >
-            Cancel
-          </button>
+        <div className="space-y-3 pt-6 border-t border-gray-200">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              <strong>💡 Tip:</strong> You can save as draft at any time, even with incomplete itinerary data.
+              Your progress will be preserved and you can continue editing later.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleSave('draft')}
+              className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
+            >
+              Save as Draft
+            </button>
+            <button
+              onClick={() => handleSave('published')}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+            >
+              Publish
+            </button>
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-200 transition-colors font-medium"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       ) : (
         <div className="flex gap-3 pt-6 border-t border-gray-200">
