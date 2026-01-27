@@ -25,6 +25,7 @@ export default function Header({ currentPage, onNavigate }) {
   const sideMenuRef = useRef(null);
   const [destinationsLoaded, setDestinationsLoaded] = useState(false);
   const destinationsLoadRef = useRef(null);
+  const dropdownTimeoutRef = useRef(null);
 
   useEffect(() => {
     let rafId = null;
@@ -152,9 +153,6 @@ export default function Header({ currentPage, onNavigate }) {
     !user && { name: 'Login', page: 'login' },
   ].filter(Boolean), [user]);
 
-  const getColumnClass = len => len <= 7 ? 'grid-cols-2' : len <= 15 ? 'grid-cols-3' : 'grid-cols-4';
-  const getDropdownWidth = len => 'w-80';
-  const LONG_NAME_THRESHOLD = 18;
   const isItemActive = useCallback((item) => {
     if (item.page === 'home') return pathname === '/';
     if (pathname.startsWith(`/${item.page}`)) return true;
@@ -183,9 +181,16 @@ export default function Header({ currentPage, onNavigate }) {
               return (
                 <div
                   key={item.page}
-                  className="relative group"
-                  onMouseEnter={() => setActiveDropdown(item.page)}
-                  onMouseLeave={() => setActiveDropdown(null)}
+                  className="relative"
+                  onMouseEnter={() => {
+                    if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+                    setActiveDropdown(item.page);
+                  }}
+                  onMouseLeave={() => {
+                    dropdownTimeoutRef.current = setTimeout(() => {
+                      setActiveDropdown(null);
+                    }, 80);
+                  }}
                 >
                   <a
                     href="/"
@@ -215,30 +220,34 @@ export default function Header({ currentPage, onNavigate }) {
                   {/* Dropdown Menu */}
                   {item.dropdown && activeDropdown === item.page && (
                     <div
-                      className={`absolute top-full left-1/2 -translate-x-1/2 mt-0 bg-white rounded-xl shadow-2xl border border-gray-100 py-5 z-50 animate-fadeIn w-max`}
-                      onMouseEnter={() => setActiveDropdown(item.page)}
-                      onMouseLeave={() => setActiveDropdown(null)}
-                      style={{ marginTop: '-2px', paddingTop: '10px', minWidth: '200px' }}
+                      className="absolute top-full left-0 pt-0 z-50"
+                      onMouseEnter={() => {
+                        if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+                      }}
+                      onMouseLeave={() => {
+                        dropdownTimeoutRef.current = setTimeout(() => setActiveDropdown(null), 80);
+                      }}
                     >
-                      <div className="px-5">
-                        <div className="space-y-2">
-                          {item.dropdown.map(sub => {
-                            const qVal = sub.slug;
-                            return (
-                              <a
-                                key={sub.id}
-                                href={`/packages?destination=${qVal}`}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  onNavigate('packages', `destination=${qVal}`);
-                                  setActiveDropdown(null);
-                                }}
-                                className="block px-4 py-2.5 text-left text-sm text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-all rounded-lg font-medium"
-                              >
-                                {sub.name}
-                              </a>
-                            );
-                          })}
+                      <div className="bg-white border border-gray-200 rounded-xl shadow-xl min-w-[240px] max-w-[340px] overflow-hidden mt-1">
+                        <div className="py-2 max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-500/60 scrollbar-track-gray-100">
+                          {item.dropdown.map((sub, idx) => (
+                            <a
+                              key={sub.id}
+                              href={`/packages?destination=${sub.slug}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                onNavigate('packages', `destination=${sub.slug}`);
+                                setActiveDropdown(null);
+                              }}
+                              className="group flex items-center gap-3 px-4 py-2.5 text-gray-800 hover:text-orange-600 hover:bg-orange-50 transition-colors rounded-lg mx-1.5"
+                              style={{
+                                animation: `fadeInRight 0.35s ease-out ${idx * 0.035}s both`,
+                              }}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400/60 group-hover:bg-orange-500 transition-colors flex-shrink-0" />
+                              <span className="text-sm font-medium truncate">{sub.name}</span>
+                            </a>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -458,22 +467,37 @@ export default function Header({ currentPage, onNavigate }) {
               );
             })}
           </nav>
-
-          {sideMenuOpen && (
-            <div
-              className="fixed inset-0 bg-black/40 z-[-1]"
-              onClick={() => setSideMenuOpen(false)}
-            />
-          )}
         </div>
       </div>
+
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes fadeInRight {
+          from {
+            opacity: 0;
+            transform: translateX(-12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
         }
-        .animate-fadeIn {
-          animation: fadeIn 0.25s ease-out;
+
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 5px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: #f3f4f6;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background-color: #f97316;
+          border-radius: 10px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background-color: #ea580c;
+        }
+        .scrollbar-thin {
+          scrollbar-width: thin;
+          scrollbar-color: #f97316 #f3f4f6;
         }
       `}</style>
     </header>

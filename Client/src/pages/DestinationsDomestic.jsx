@@ -177,7 +177,7 @@ export default function DestinationsDomestic() {
             playsInline
             preload="none"
           >
-            <source src="/v5.mp4" type="video/mp4" />
+            <source src="/v3.mp4" type="video/mp4" />
           </video>
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />

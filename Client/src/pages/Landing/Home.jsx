@@ -57,7 +57,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const totalSlides = 5;
+  const totalSlides = 4;
 
   // Search
   const [searchFilters, setSearchFilters] = useState({ destination: '', when: '' });
@@ -391,7 +391,7 @@ export default function Home() {
           {/* </div> */}
         </div>       
          {/* Video Slides */}
-       {[0, 1, 2, 3, 4].map((i) => {
+       {[0, 1, 2, 3].map((i) => {
   const isActive = i === currentSlide;
 
   return (
