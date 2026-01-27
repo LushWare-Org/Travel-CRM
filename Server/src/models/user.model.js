@@ -189,7 +189,7 @@ const userSchema = new mongoose.Schema(
 );
 // Index for role-based queries
 userSchema.index({ role: 1, isActive: 1 });
-userSchema.index({ email: 1 });
+// Note: email index is automatically created by unique: true, no need for explicit index
 
 // Hash password before saving
 userSchema.pre('save', async function hashPassword(next) {
