@@ -299,12 +299,33 @@ export async function generateVoucherPDF(voucher, lead) {
               locationHeight = doc.heightOfString(`Location: ${day.locations.join(', ')}`, { width: textWidth }) + 5;
             }
 
-            let activitiesText = '';
             let activitiesHeight = 0;
             if (day.activities && day.activities.length > 0) {
-              activitiesText = `Activities: ${day.activities.join(', ')}`;
-              if (activitiesText.length > 350) activitiesText = activitiesText.substring(0, 350) + '...';
-              activitiesHeight = doc.heightOfString(activitiesText, { width: textWidth }) + 5;
+              activitiesHeight = 12; // "Activities:" label
+
+              if (day.activities.length >= 4) {
+                // Two-column layout - calculate height for each column
+                const columnWidth = (textWidth - 20) / 2;
+                let leftHeight = 0;
+                let rightHeight = 0;
+
+                day.activities.forEach((activity, idx) => {
+                  const actHeight = doc.heightOfString(`• ${activity}`, { width: columnWidth - 5 }) + 2;
+                  if (idx % 2 === 0) {
+                    leftHeight += actHeight;
+                  } else {
+                    rightHeight += actHeight;
+                  }
+                });
+
+                activitiesHeight += Math.max(leftHeight, rightHeight) + 3;
+              } else {
+                // Single column for 1-3 activities
+                day.activities.forEach(activity => {
+                  activitiesHeight += doc.heightOfString(`• ${activity}`, { width: textWidth - 10 }) + 2;
+                });
+                activitiesHeight += 3;
+              }
             }
 
             let hotelHeight = 0;
@@ -312,8 +333,8 @@ export async function generateVoucherPDF(voucher, lead) {
               hotelHeight = doc.heightOfString(`Hotel: ${day.accommodation.name}`, { width: textWidth }) + 5;
             }
 
-            const cardPadding = 25;
-            const cardHeight = titleHeight + locationHeight + activitiesHeight + hotelHeight + cardPadding;
+            const cardPadding = 30; // Increased padding for better spacing
+            const cardHeight = titleHeight + 3 + locationHeight + 2 + activitiesHeight + hotelHeight + cardPadding;
 
             // --- PAGE BREAK CHECK ---
             if (y + cardHeight > 750) {
@@ -336,24 +357,59 @@ export async function generateVoucherPDF(voucher, lead) {
             // Title
             doc.fillColor(COLORS.secondary).fontSize(11).font('Helvetica-Bold')
               .text(day.title || `Day ${day.dayNumber}`, margin + 35, currentTextY, { width: textWidth });
-            currentTextY += titleHeight;
+            currentTextY += titleHeight + 3; // Extra spacing after title
 
             // Location
             if (locationHeight > 0) {
               doc.font('Helvetica-Bold').fillColor(COLORS.textLight).fontSize(9)
                 .text('Location: ', margin + 35, currentTextY, { continued: true })
                 .font('Helvetica').text(day.locations.join(', '), { width: textWidth });
-              currentTextY += locationHeight;
+              currentTextY += locationHeight + 2;
             }
 
-            // Activities
-            if (activitiesHeight > 0) {
-              // Strip "Activities: " prefix for cleaner display if we are using the label manually
-              const cleanActText = activitiesText.replace(/^Activities:\s*/, '');
+            // Activities - Display ALL activities with smart two-column layout
+            if (activitiesHeight > 0 && day.activities && day.activities.length > 0) {
               doc.font('Helvetica-Bold').fillColor(COLORS.text).fontSize(9)
-                .text('Activities: ', margin + 35, currentTextY, { continued: true })
-                .font('Helvetica').text(cleanActText, { width: textWidth });
-              currentTextY += activitiesHeight;
+                .text('Activities:', margin + 35, currentTextY);
+              currentTextY += 12;
+
+              // Use two columns if there are 4+ activities
+              if (day.activities.length >= 4) {
+                const columnWidth = (textWidth - 20) / 2; // Two columns with gap
+                const leftColumnX = margin + 45;
+                const rightColumnX = margin + 45 + columnWidth + 10; // 10px gap
+
+                let leftY = currentTextY;
+                let rightY = currentTextY;
+
+                day.activities.forEach((activity, idx) => {
+                  const isLeftColumn = idx % 2 === 0;
+                  const xPos = isLeftColumn ? leftColumnX : rightColumnX;
+                  const currentY = isLeftColumn ? leftY : rightY;
+
+                  doc.font('Helvetica').fontSize(9).fillColor(COLORS.text)
+                    .text(`• ${activity}`, xPos, currentY, { width: columnWidth - 5 });
+                  const activityHeight = doc.heightOfString(`• ${activity}`, { width: columnWidth - 5 });
+
+                  if (isLeftColumn) {
+                    leftY += activityHeight + 2;
+                  } else {
+                    rightY += activityHeight + 2;
+                  }
+                });
+
+                // Move currentTextY to the bottom of the tallest column
+                currentTextY = Math.max(leftY, rightY) + 3;
+              } else {
+                // Single column for 1-3 activities
+                day.activities.forEach((activity) => {
+                  doc.font('Helvetica').fontSize(9).fillColor(COLORS.text)
+                    .text(`• ${activity}`, margin + 45, currentTextY, { width: textWidth - 10 });
+                  const activityHeight = doc.heightOfString(`• ${activity}`, { width: textWidth - 10 });
+                  currentTextY += activityHeight + 2;
+                });
+                currentTextY += 3; // Extra spacing after activities
+              }
             }
 
             // Hotel

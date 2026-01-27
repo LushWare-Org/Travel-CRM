@@ -209,9 +209,10 @@ export async function generateQuotationPDF(quotation, lead) {
         } else {
           itineraryDays = [];
         }
-        // For manual, try to get package info from lead.package (base) or quotation.package
-        mainPackage = lead.package || quotation.package || {};
+        // For manual, try to get package info from lead.customizedPackage (priority) or lead.package (base) or quotation.package
+        mainPackage = lead.customizedPackage || lead.package || quotation.package || {};
         console.log('[PDF] Using manual itinerary (by type) with', itineraryDays.length, 'days');
+        console.log('[PDF] Base package for manual:', mainPackage.name || 'No package');
       }
       // 2. Check for customized package
       else if (lead?.customizedPackage) {
@@ -228,8 +229,8 @@ export async function generateQuotationPDF(quotation, lead) {
       // 3. Check for manual itinerary (Fallback if custom type not set but data exists)
       else if (lead?.manualItinerary) {
         itineraryDays = lead.manualItinerary.days || [];
-        // For manual itinerary, try to get package info from lead.package for images/inclusions
-        mainPackage = lead.package || quotation.package || {};
+        // For manual itinerary, try to get package info from lead.customizedPackage or lead.package for images/inclusions
+        mainPackage = lead.customizedPackage || lead.package || quotation.package || {};
         console.log('[PDF] Using manual itinerary (fallback) with', itineraryDays.length, 'days');
       }
       // 4. Fallback to regular package
@@ -238,7 +239,12 @@ export async function generateQuotationPDF(quotation, lead) {
         console.log('[PDF] Using regular package:', mainPackage.name);
       }
 
-      const packageName = mainPackage.name || lead?.packageName || 'Custom Tour Package';
+
+      let packageName = mainPackage.name || lead?.packageName || 'Custom Tour Package';
+      // Append "(Manual Itinerary)" if using manual itinerary with a base package
+      if (quotation.type === 'custom' && mainPackage.name) {
+        packageName = `${packageName} (Manual Itinerary)`;
+      }
       const packageHighlights = mainPackage.highlights || [];
 
       // Prioritize Quotation-specific inclusions/exclusions (Manual Itinerary support)
@@ -757,8 +763,24 @@ export async function generateQuotationPDF(quotation, lead) {
       const qrX = 355;
       doc.fillColor(PALETTE.blue).fontSize(13).font('Helvetica-Bold').text('Scan to pay via', qrX, qrY);
       doc.fillColor('#4caf50').fontSize(15).text('UPI', qrX + 105, qrY);
-      doc.rect(qrX + 8, qrY + 28, 95, 95).stroke(PALETTE.black);
-      doc.fillColor(PALETTE.black).fontSize(8).text('UPI QR Code', qrX + 32, qrY + 70);
+      
+      // Add actual QR code image
+      try {
+        const qrCodePath = path.join(dirname, '../assets/payment-qr.png');
+        if (fs.existsSync(qrCodePath)) {
+          doc.image(qrCodePath, qrX + 8, qrY + 28, { width: 95, height: 95 });
+        } else {
+          // Fallback: draw rectangle if image not found
+          doc.rect(qrX + 8, qrY + 28, 95, 95).stroke(PALETTE.black);
+          doc.fillColor(PALETTE.black).fontSize(8).text('QR Code', qrX + 32, qrY + 70);
+        }
+      } catch (error) {
+        console.warn('[PDF] QR code image error:', error.message);
+        // Fallback: draw rectangle
+        doc.rect(qrX + 8, qrY + 28, 95, 95).stroke(PALETTE.black);
+        doc.fillColor(PALETTE.black).fontSize(8).text('QR Code', qrX + 32, qrY + 70);
+      }
+      
       doc.fillColor(PALETTE.black).fontSize(9).text(`UPI: ${pd.upiId}`, qrX, qrY + 135);
       doc.text(`Mobile: ${pd.phone}`, qrX, qrY + 150);
 
@@ -984,12 +1006,7 @@ export async function generateQuotationPDF(quotation, lead) {
       const companyReviews = [
         { initial: 'P', color: '#EF4444', name: 'Priya Sharma', date: '2 weeks ago', text: 'Excellent service! Trip Sky Way made our Maldives honeymoon absolutely perfect. The team was responsive, professional, and handled every detail with care. Highly recommend!' },
         { initial: 'R', color: '#3B82F6', name: 'Rajesh Kumar', date: '1 month ago', text: 'Best travel agency in Delhi! They customized our Sri Lanka trip exactly as we wanted. The itinerary was perfect and the support throughout was exceptional. Will definitely book again!' },
-        { initial: 'A', color: '#10B981', name: 'Anita Desai', date: '3 weeks ago', text: 'Amazing experience from start to finish. The itinerary was well-planned, hotels were fantastic, and the support team was available 24/7. Exceeded all expectations!' },
-        { initial: 'V', color: '#F59E0B', name: 'Vikram Malhotra', date: '1 week ago', text: 'Outstanding service! Our family trip to Bali was flawless. Every arrangement was perfect and the team went above and beyond to ensure we had a memorable experience.' },
-        { initial: 'S', color: '#8B5CF6', name: 'Sneha Patel', date: '2 months ago', text: 'Trip Sky Way is simply the best! They organized our Dubai vacation with such attention to detail. The hotels, transfers, and activities were all top-notch. Highly professional team!' },
-        { initial: 'A', color: '#EC4899', name: 'Amit Singh', date: '3 weeks ago', text: 'Fantastic experience! We booked a Thailand package and everything was seamless. Great communication, competitive pricing, and excellent customer service. Definitely our go-to travel agency now!' },
-        { initial: 'K', color: '#6366F1', name: 'Kavita Reddy', date: '1 month ago', text: 'Wonderful service! Our honeymoon in Mauritius was a dream come true thanks to Trip Sky Way. They took care of everything and made sure we had the most romantic and relaxing trip ever!' },
-        { initial: 'R', color: '#14B8A6', name: 'Rohit Verma', date: '2 weeks ago', text: 'Highly recommended! Booked a customized Europe tour and it was absolutely perfect. The team listened to all our requirements and delivered beyond expectations. Professional and reliable!' }
+        { initial: 'A', color: '#10B981', name: 'Anita Desai', date: '3 weeks ago', text: 'Amazing experience from start to finish. The itinerary was well-planned, hotels were fantastic, and the support team was available 24/7. Exceeded all expectations!' }
       ];
 
       companyReviews.forEach((review) => {
@@ -1057,11 +1074,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
         const packageReviews = [
           { initial: 'A', color: '#F97316', name: 'Arjun Kapoor', date: '1 week ago', text: 'This package exceeded all our expectations! Every detail was perfectly planned and executed. The hotels were luxurious, activities were thrilling, and the entire experience was unforgettable. Highly recommend!' },
-          { initial: 'M', color: '#EC4899', name: 'Meera Nair', date: '2 weeks ago', text: 'Wonderful experience! The hotels were amazing, locations were breathtaking, and the itinerary was well-balanced between relaxation and adventure. Great value for money. Will book again!' },
-          { initial: 'S', color: '#10B981', name: 'Sanjay Gupta', date: '3 weeks ago', text: 'Perfect package for families! We traveled with kids and elderly parents, and everything was arranged keeping everyone\'s comfort in mind. Excellent service!' },
-          { initial: 'D', color: '#3B82F6', name: 'Divya Iyer', date: '1 month ago', text: 'Best vacation ever! This package had everything - beautiful destinations, comfortable stays, delicious food, and amazing experiences. The team made sure everything ran smoothly. Absolutely loved it!' },
-          { initial: 'K', color: '#8B5CF6', name: 'Karthik Menon', date: '2 weeks ago', text: 'Exceptional package! From the moment we landed to our departure, everything was seamless. The local guides were knowledgeable, hotels were top-class!' },
-          { initial: 'P', color: '#EF4444', name: 'Pooja Agarwal', date: '3 weeks ago', text: 'Highly satisfied with this package! The itinerary was perfect with a good mix of sightseeing and leisure time. All arrangements were professional and the experience was truly memorable!' }
+          { initial: 'M', color: '#EC4899', name: 'Meera Nair', date: '2 weeks ago', text: 'Wonderful experience! The hotels were amazing, locations were breathtaking, and the itinerary was well-balanced between relaxation and adventure. Great value for money. Will book again!' }
         ];
 
         packageReviews.forEach((review) => {

@@ -523,6 +523,25 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         locationDates: formData.locationDates?.filter(ld => ld.location && ld.location.trim() !== '') || [],
       };
 
+      // For manual itineraries (no package/customizedPackage), only send meal plans if they have data
+      // This allows backend to extract them from quotation/itinerary
+      if (!cleanedFormData.package && !cleanedFormData.customizedPackage) {
+        // Only include mealPlans if they have actual data
+        if (!formData.mealPlans || formData.mealPlans.length === 0) {
+          delete cleanedFormData.mealPlans;
+        }
+
+        // Only include packageDetails inclusions/exclusions if they have data
+        if (cleanedFormData.packageDetails) {
+          if (!cleanedFormData.packageDetails.inclusions || cleanedFormData.packageDetails.inclusions.length === 0) {
+            delete cleanedFormData.packageDetails.inclusions;
+          }
+          if (!cleanedFormData.packageDetails.exclusions || cleanedFormData.packageDetails.exclusions.length === 0) {
+            delete cleanedFormData.packageDetails.exclusions;
+          }
+        }
+      }
+
       let response;
       if (isEditing && currentVoucherId) {
         response = await voucherAPI.update(currentVoucherId, cleanedFormData);

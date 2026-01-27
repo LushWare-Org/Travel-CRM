@@ -1019,7 +1019,10 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     };
 
     // Remove empty strings from ObjectId fields (Mongoose can't cast empty strings)
-    if (payload.package === '' || !payload.package) {
+    // IMPORTANT: For manual itinerary with a base package, preserve the package reference
+    // so the PDF can access package images and inclusions/exclusions
+    const hasBasePackage = lead?.package || lead?.customizedPackage;
+    if (payload.package === '' || (!payload.package && !(selectedPlanType === 'manual' && hasBasePackage))) {
       delete payload.package;
     }
     if (payload.quotation === '' || !payload.quotation) {
@@ -1483,7 +1486,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             </div>
 
             {/* MANUAL ASSETS SECTION - Only for Pure Manual Itineraries (No Package Linked) */}
-            {((detectedPackageType === 'manual' || selectedPlanType === 'manual') && !formData.package && !lead?.package) && (
+            {((detectedPackageType === 'manual' || selectedPlanType === 'manual') && !formData.package && !lead?.package && !lead?.customizedPackage) && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <span className="text-blue-600">🖼️</span>
