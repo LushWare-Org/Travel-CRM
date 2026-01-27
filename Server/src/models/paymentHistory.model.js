@@ -12,7 +12,6 @@ const paymentHistorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'PaymentReceipt',
       required: [true, 'Payment history must be linked to a receipt'],
-      index: true,
     },
     lead: {
       type: mongoose.Schema.Types.ObjectId,

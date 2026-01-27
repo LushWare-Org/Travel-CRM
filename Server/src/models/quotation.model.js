@@ -129,7 +129,6 @@ const quotationSchema = new mongoose.Schema(
       type: String,
       enum: ['draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired', 'converted'],
       default: 'draft',
-      index: true,
     },
     issueDate: {
       type: Date,

@@ -6,7 +6,6 @@ const voucherSchema = new mongoose.Schema(
       type: String,
       required: false, // Auto-generated in pre-save hook
       unique: true,
-      index: true,
     },
     lead: {
       type: mongoose.Schema.Types.ObjectId,
@@ -116,7 +115,6 @@ const voucherSchema = new mongoose.Schema(
       type: String,
       enum: ['draft', 'sent', 'viewed', 'confirmed', 'cancelled'],
       default: 'draft',
-      index: true,
     },
     // Email and WhatsApp tracking
     emailSent: {
