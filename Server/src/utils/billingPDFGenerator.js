@@ -766,7 +766,7 @@ export async function generateQuotationPDF(quotation, lead) {
       
       // Add actual QR code image
       try {
-        const qrCodePath = path.join(dirname, '../assets/payment-qr.png');
+        const qrCodePath = path.join(dirname, '../assets/payment-qr.jpeg');
         if (fs.existsSync(qrCodePath)) {
           doc.image(qrCodePath, qrX + 8, qrY + 28, { width: 95, height: 95 });
         } else {
