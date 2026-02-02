@@ -247,7 +247,7 @@ export default function DestinationsDomestic() {
                 ))}
               </div>
               <span className="text-white font-semibold">4.9/5</span>
-              <span className="text-white text-sm">(250 + Reviews)</span>
+              {/* <span className="text-white text-sm">(250 + Reviews)</span> */}
             </div>
           </div>
         </div>

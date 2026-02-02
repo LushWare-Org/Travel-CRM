@@ -38,23 +38,23 @@ export default function ContactUs() {
     {
       icon: Phone,
       title: 'Call Us',
-      info: '+1 (555) 123-4567',
-      subtext: 'Mon-Fri, 9AM-6PM EST',
+      info: '+91 987 6543 210',
+      subtext: 'Mon-Fri, 10AM - 7PM EST',
       color: 'from-blue-500 to-cyan-500',
-      action: 'tel:+15551234567'
+      action: 'tel:+919876543210'
     },
     {
       icon: Mail,
       title: 'Email Us',
-      info: 'hello@tripskyway.com',
+      info: 'info@tripskyway.com',
       subtext: 'We reply within 24 hours',
       color: 'from-purple-500 to-pink-500',
-      action: 'mailto:hello@tripskyway.com'
+      action: 'mailto:info@tripskyway.com'
     },
     {
       icon: MapPin,
       title: 'Visit Us',
-      info: '123 Travel Street, NY 10001',
+      info: '2/73, near Gurudwara, Lalita Park, Laxmi Nagar, New Delhi, Delhi, 110092',
       subtext: 'By appointment only',
       color: 'from-orange-500 to-red-500',
       action: ''
@@ -132,7 +132,7 @@ export default function ContactUs() {
           preload="auto"
           aria-hidden="true"
         >
-          <source src="/v5.mp4" type="video/mp4" />
+          <source src="/v4.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/70 z-10" aria-hidden="true"></div>
 
@@ -172,7 +172,7 @@ export default function ContactUs() {
               <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-orange-600 group-hover:to-yellow-600 transition-all duration-300">
                 {method.title}
               </h3>
-              <p className="text-lg font-semibold text-gray-700 mb-1">{method.info}</p>
+              <p className="text-md font-semibold text-gray-700 mb-1">{method.info}</p>
               <p className="text-sm text-gray-500">{method.subtext}</p>
               <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
                 <ArrowRight className="w-6 h-6 text-orange-600" />
@@ -403,15 +403,15 @@ export default function ContactUs() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-3 border-b border-blue-200">
                   <span className="font-semibold text-gray-700">Monday - Friday</span>
-                  <span className="text-gray-900 font-bold">9:00 AM - 6:00 PM</span>
+                  <span className="text-gray-900 font-bold">10:00 AM - 7:00 PM</span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b border-blue-200">
                   <span className="font-semibold text-gray-700">Saturday</span>
-                  <span className="text-gray-900 font-bold">10:00 AM - 4:00 PM</span>
+                  <span className="text-gray-900 font-bold">10:00 AM - 7:00 PM</span>
                 </div>
                 <div className="flex justify-between items-center py-3">
                   <span className="font-semibold text-gray-700">Sunday</span>
-                  <span className="text-gray-900 font-bold">10:00 AM - 4:00 PM</span>
+                  <span className="text-red-700 font-bold">Closed</span>
                 </div>
               </div>
             </div>

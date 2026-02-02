@@ -57,7 +57,7 @@ export default function AboutUs() {
       name: 'Amit Patel',
       role: 'Lead Travel Designer',
       image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Crafting unforgettable journeys since 2010',
+      bio: 'Crafting unforgettable journeys since 2021',
     },
     {
       name: 'Sneha Reddy',
@@ -102,7 +102,7 @@ export default function AboutUs() {
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/60 z-10"></div>
           <video
             className="absolute inset-0 w-full h-full object-cover"
-            src="/v5.mp4"
+            src="/v3.mp4"
             autoPlay
             muted
             loop
@@ -114,7 +114,7 @@ export default function AboutUs() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
               Crafting Dream
               <span className="block bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400">
-                Journeys Since 2010
+                Journeys Since 2021
               </span>
             </h1>
             <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
@@ -222,7 +222,6 @@ export default function AboutUs() {
                     <div className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-yellow-600 mb-3">
                       {member.role}
                     </div>
-                    <p className="text-sm text-gray-600 leading-relaxed">{member.bio}</p>
                   </div>
                 </div>
               </div>

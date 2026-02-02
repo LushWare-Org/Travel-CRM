@@ -12,7 +12,7 @@ export default function Footer({ onNavigate }) {
               </div>
             </div>
             <p className="text-sm mb-4">
-              Creating unforgettable travel experiences worldwide. Your trusted partner for international and domestic holidays since 2010.
+              Creating unforgettable travel experiences worldwide. Your trusted partner for international and domestic holidays since 2021.
             </p>
             <div className="flex gap-3">
               <a href="https://www.facebook.com/tripskyway" target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
