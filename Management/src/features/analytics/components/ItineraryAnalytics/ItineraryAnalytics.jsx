@@ -5,21 +5,15 @@ import {
   ChartContainer,
   LineChartComponent,
   BarChartComponent,
-  PieChartComponent,
 } from "../Common";
-import { MapPin, ShoppingCart, TrendingUp, Download } from "lucide-react";
+import { MapPin, ShoppingCart, TrendingUp, Download, Briefcase, Globe, Star } from "lucide-react";
 import AnalyticsService from "../../../../services/analytics.service";
 import { exportPackageAnalyticsPDF } from "../../utils/exportAnalytics";
 import toast from "react-hot-toast";
 
 /**
- * PackageAnalytics Component
- * Displays analytics for published packages including:
- * - Inquiries: Leads created from booking/customization requests
- * - Conversions: Leads with status='converted'
- * 
- * Metrics are tracked only for published packages (status='published').
- * Website contact form leads (without package reference) are excluded.
+ * PackageAnalytics Component - Redesigned
+ * Modern layout for package performance metrics
  */
 const PackageAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
@@ -28,19 +22,16 @@ const PackageAnalytics = () => {
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
 
-  // Line chart configuration
   const packageLines = [
-    { dataKey: "inquiries", stroke: "#3b82f6", name: "Inquiries" },
+    { dataKey: "inquiries", stroke: "#f59e0b", name: "Inquiries" },
     { dataKey: "conversions", stroke: "#10b981", name: "Conversions" },
   ];
 
-  // Bar chart configuration for destinations
   const destinationBars = [
-    { dataKey: "inquiries", fill: "#3b82f6", name: "Inquiries" },
+    { dataKey: "inquiries", fill: "#f59e0b", name: "Inquiries" },
     { dataKey: "conversions", fill: "#10b981", name: "Conversions" },
   ];
 
-  // Fetch analytics data
   useEffect(() => {
     const fetchAnalyticsData = async () => {
       try {
@@ -56,28 +47,20 @@ const PackageAnalytics = () => {
         setLoading(false);
       }
     };
-
     fetchAnalyticsData();
   }, [timeRange]);
 
-  // Handle PDF export
   const handleExportPDF = async () => {
     try {
       setExporting(true);
       const toastId = toast.loading("Preparing package analytics PDF...");
-
       const summaryMetrics = [
         { label: "Published Packages", value: data.stats.totalItineraries },
         { label: "Lead Inquiries", value: data.stats.totalInquiries },
         { label: "Conversions", value: data.stats.totalConversions },
         { label: "Time Range", value: timeRange.toUpperCase() },
       ];
-
-      await exportPackageAnalyticsPDF({
-        timeRange,
-        summaryMetrics,
-      });
-
+      await exportPackageAnalyticsPDF({ timeRange, summaryMetrics });
       toast.dismiss(toastId);
       toast.success("Package analytics PDF downloaded successfully!");
     } catch (error) {
@@ -88,112 +71,168 @@ const PackageAnalytics = () => {
     }
   };
 
-  // Use fetched data or show empty state
   const data = analyticsData || {
-    stats: {
-      totalItineraries: 0,
-      totalInquiries: 0,
-      totalConversions: 0,
-    },
+    stats: { totalItineraries: 0, totalInquiries: 0, totalConversions: 0 },
     trend: [],
     mostInquired: [],
     destinationPerformance: [],
   };
 
+  const conversionRate = data.stats.totalInquiries > 0
+    ? ((data.stats.totalConversions / data.stats.totalInquiries) * 100).toFixed(1)
+    : 0;
+
   return (
-    <div className="space-y-6">
-      {/* Header with Time Range Filter */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Package Analytics</h2>
-          <p className="text-gray-600 mt-1">Track leads from published packages - booking/customization inquiries and conversions</p>
-          {error && <p className="text-red-600 text-sm mt-1">Error: {error}</p>}
+          <h2 className="text-xl font-bold text-slate-800">Package Performance</h2>
+          <p className="text-sm text-slate-500 mt-1">Track inquiries and conversions for published packages</p>
+          {error && <p className="text-sm text-rose-500 mt-1">{error}</p>}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
           <button
             onClick={handleExportPDF}
             disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-amber-500/25"
           >
-            <Download size={18} />
-            {exporting ? "Exporting..." : "Export PDF"}
+            <Download size={16} />
+            {exporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon={MapPin}
-          label="Published Packages"
-          value={data.stats.totalItineraries.toString()}
-          trend="+12%"
-          trendDirection="up"
-          color="blue"
-          loading={loading}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Lead Inquiries"
-          value={data.stats.totalInquiries.toString()}
-          trend="+8%"
-          trendDirection="up"
-          color="green"
-          loading={loading}
-        />
-        <StatCard
-          icon={ShoppingCart}
-          label="Conversions (Booked)"
-          value={data.stats.totalConversions.toString()}
-          trend="+5%"
-          trendDirection="up"
-          color="purple"
-          loading={loading}
-        />
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Briefcase className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Packages</span>
+          </div>
+          <p className="text-3xl font-bold">{data.stats.totalItineraries}</p>
+          <p className="text-xs mt-2 opacity-70">Published & active</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Inquiries</span>
+          </div>
+          <p className="text-3xl font-bold">{data.stats.totalInquiries}</p>
+          <p className="text-xs mt-2 opacity-70">Leads generated</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <ShoppingCart className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Conversions</span>
+          </div>
+          <p className="text-3xl font-bold">{data.stats.totalConversions}</p>
+          <p className="text-xs mt-2 opacity-70">Bookings made</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Conversion Rate</span>
+          </div>
+          <p className="text-3xl font-bold">{conversionRate}%</p>
+          <p className="text-xs mt-2 opacity-70">Inquiry to booking</p>
+        </div>
       </div>
 
-      {/* Package Trend Chart */}
+      {/* Trend Chart - Full Width */}
       <ChartContainer
-        title="Package Inquiry & Conversion Trend"
-        description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} trends of booking/customization inquiries and conversions for published packages`}
+        title="Inquiry & Conversion Trends"
+        description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} performance trends`}
       >
-        <LineChartComponent
-          data={data.trend}
-          lines={packageLines}
-          xAxisKey="month"
-          height={350}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <div className="animate-spin w-8 h-8 border-4 border-amber-200 border-t-amber-600 rounded-full" />
+          </div>
+        ) : data.trend.length > 0 ? (
+          <LineChartComponent
+            data={data.trend}
+            lines={packageLines}
+            xAxisKey="month"
+            height={300}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-[300px] text-slate-400">
+            No trend data available
+          </div>
+        )}
       </ChartContainer>
 
-      {/* Destination Performance and Top Packages */}
-      <div className="grid grid-cols-1 gap-6">
-        <ChartContainer
-          title="Destination Performance"
-          description="Inquiries (leads) and conversions by destination from published packages"
-        >
+      {/* Destination Performance - Full Width */}
+      <ChartContainer
+        title="Destination Performance"
+        description="Inquiries and conversions by destination"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center h-[320px]">
+            <div className="animate-spin w-8 h-8 border-4 border-amber-200 border-t-amber-600 rounded-full" />
+          </div>
+        ) : data.destinationPerformance.length > 0 ? (
           <BarChartComponent
             data={data.destinationPerformance}
             bars={destinationBars}
             xAxisKey="destination"
-            height={400}
-            margin={{ top: 5, right: 30, left: 0, bottom: 100 }}
+            height={320}
           />
-        </ChartContainer>
+        ) : (
+          <div className="flex items-center justify-center h-[320px] text-slate-400">
+            No destination data available
+          </div>
+        )}
+      </ChartContainer>
 
-        <ChartContainer
-          title="Top Packages"
-          description="Most inquired and converted packages"
-        >
-          <BarChartComponent
-            data={data.mostInquired}
-            bars={destinationBars}
-            xAxisKey="name"
-            height={350}
-            margin={{ top: 5, right: 30, left: 0, bottom: 100 }}
-          />
-        </ChartContainer>
-      </div>
+      {/* Top Packages */}
+      <ChartContainer
+        title="Top Packages"
+        description="Most inquired and converted packages"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <div className="animate-spin w-8 h-8 border-4 border-amber-200 border-t-amber-600 rounded-full" />
+          </div>
+        ) : data.mostInquired.length > 0 ? (
+          <div className="space-y-4">
+            <BarChartComponent
+              data={data.mostInquired}
+              bars={destinationBars}
+              xAxisKey="name"
+              height={280}
+            />
+            {/* Package List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-4 border-t border-slate-100">
+              {data.mostInquired.slice(0, 6).map((pkg, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold">
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 truncate max-w-[150px]">{pkg.name}</p>
+                      <p className="text-xs text-slate-400">{pkg.inquiries} inquiries</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-emerald-600">{pkg.conversions}</p>
+                    <p className="text-xs text-slate-400">converted</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-[300px] text-slate-400">
+            No package data available
+          </div>
+        )}
+      </ChartContainer>
     </div>
   );
 };

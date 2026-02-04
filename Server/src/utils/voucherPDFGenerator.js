@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import axios from 'axios';
+import BRANDING from '../config/branding.js';
 
 // Helper function to convert RGB array to hex
 const rgbToHex = (rgb) => {
@@ -41,7 +42,6 @@ const fetchImage = async (url) => {
   const ALLOWED_DOMAINS = [
     'res.cloudinary.com',
     'cloudinary.com',
-    'tripskyway.com',
     'localhost'
   ];
 
@@ -177,7 +177,7 @@ export async function generateVoucherPDF(voucher, lead) {
         if (logoBuffer) {
           doc.image(logoBuffer, margin, 20, { height: 40 });
         } else {
-          doc.fillColor(COLORS.primary).fontSize(20).font('Helvetica-Bold').text('Trip Sky Way', margin, 30);
+          doc.fillColor(COLORS.primary).fontSize(20).font('Helvetica-Bold').text(BRANDING.company.name, margin, 30);
         }
 
         // Voucher Title & Number (Right Aligned)
@@ -543,9 +543,9 @@ export async function generateVoucherPDF(voucher, lead) {
         // Ensure footer is at bottom
         doc.rect(0, 780, 595, 62).fill(COLORS.secondary);
         doc.fillColor(COLORS.white).fontSize(10).font('Helvetica-Bold')
-          .text('Thank you for choosing Trip Sky Way!', 0, 795, { align: 'center' });
+          .text(`Thank you for choosing ${BRANDING.company.name}!`, 0, 795, { align: 'center' });
         doc.fontSize(8).font('Helvetica')
-          .text('www.tripskyway.com  |  support@tripskyway.com', 0, 810, { align: 'center' });
+          .text(`${BRANDING.urls.website.replace('https://', '').replace('http://', '')}  |  ${BRANDING.contact.supportEmail}`, 0, 810, { align: 'center' });
 
         doc.end();
       } catch (error) {

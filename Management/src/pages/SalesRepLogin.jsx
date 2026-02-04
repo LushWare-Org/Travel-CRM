@@ -4,6 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { Eye, EyeOff, Mail, Clock } from 'lucide-react';
+import BRANDING, { getLoginBranding } from '../config/branding';
+
+// Only show test credentials in development when explicitly enabled
+const showTestCredentials = import.meta.env.VITE_SHOW_TEST_CREDENTIALS === 'true';
 
 export default function SalesRepLogin() {
   const navigate = useNavigate();
@@ -241,7 +245,7 @@ export default function SalesRepLogin() {
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Trip Sky Way</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">{getLoginBranding().title}</h1>
           <p className="text-gray-600">Sales Representative Portal</p>
         </div>
 
@@ -390,11 +394,10 @@ export default function SalesRepLogin() {
                     type="button"
                     onClick={handleResendOtp}
                     disabled={!canResendOtp || isSubmitting || timer === 0}
-                    className={`font-medium transition ${
-                      canResendOtp && timer > 0
+                    className={`font-medium transition ${canResendOtp && timer > 0
                         ? 'text-blue-600 hover:text-blue-700 cursor-pointer'
                         : 'text-gray-400 cursor-not-allowed'
-                    }`}
+                      }`}
                   >
                     {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
                   </button>
@@ -479,13 +482,13 @@ export default function SalesRepLogin() {
           </div>
         </div>
 
-        {/* Test Credentials Info */}
-        {step === 'credentials' && (
+        {/* Test Credentials Info - Only shown in development when enabled */}
+        {step === 'credentials' && showTestCredentials && (
           <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-800 font-medium mb-2">Test Sales Rep Credentials:</p>
+            <p className="text-sm text-yellow-800 font-medium mb-2">Test Sales Rep Credentials (Development Only):</p>
             <div className="grid grid-cols-1 gap-1 text-xs text-yellow-700">
               <p>
-                Email: <code className="bg-white px-2 py-1 rounded">amal@tripskyway.com</code>
+                Email: <code className="bg-white px-2 py-1 rounded">salesrep@example.com</code>
               </p>
               <p>
                 Password: <code className="bg-white px-2 py-1 rounded">Sales@123456</code>

@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import BRANDING from '../config/branding.js';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -24,28 +25,28 @@ export function generateInvoicePDF(invoice, user, booking) {
 
       // Modern header with gradient
       doc.rect(0, 0, 595, 120).fillAndStroke('#3B82F6', '#2563EB');
-      
+
       doc
         .fillColor('#FFFFFF')
         .fontSize(24)
         .font('Helvetica-Bold')
-        .text('TRIP SKY WAY', 50, 30)
+        .text(BRANDING.company.name.toUpperCase(), 50, 30)
         .fontSize(10)
         .font('Helvetica')
-        .text('Premium Travel Agency', 50, 62)
+        .text(BRANDING.company.tagline || 'Premium Travel Agency', 50, 62)
         .fontSize(9)
-        .text('Email: info@tripskyway.com', 50, 80)
-        .text('Phone: +91 XXX XXX XXXX', 50, 95);
+        .text(`Email: ${BRANDING.contact.email}`, 50, 80)
+        .text(`Phone: ${BRANDING.contact.phone}`, 50, 95);
 
       // Invoice badge
       doc.roundedRect(410, 25, 140, 75, 8).fillAndStroke('#FFFFFF', '#FFFFFF');
-      
+
       doc
         .fillColor('#3B82F6')
         .fontSize(20)
         .font('Helvetica-Bold')
         .text('INVOICE', 420, 38, { width: 120, align: 'center' });
-      
+
       doc
         .fontSize(9)
         .fillColor('#6B7280')
@@ -55,7 +56,7 @@ export function generateInvoicePDF(invoice, user, booking) {
 
       // Customer info card
       doc.roundedRect(50, 145, 240, 90, 8).strokeColor('#E5E7EB').lineWidth(1.5).stroke();
-      
+
       doc
         .fillColor('#1F2937')
         .fontSize(11)
@@ -71,7 +72,7 @@ export function generateInvoicePDF(invoice, user, booking) {
 
       // Package info card
       doc.roundedRect(305, 145, 245, 90, 8).strokeColor('#E5E7EB').lineWidth(1.5).stroke();
-      
+
       doc
         .fillColor('#1F2937')
         .fontSize(11)
@@ -88,7 +89,7 @@ export function generateInvoicePDF(invoice, user, booking) {
       // Table header
       const tableTop = 260;
       doc.rect(50, tableTop, 500, 28).fillAndStroke('#3B82F6', '#3B82F6');
-      
+
       doc
         .fillColor('#FFFFFF')
         .fontSize(10)
@@ -101,7 +102,7 @@ export function generateInvoicePDF(invoice, user, booking) {
       // Table row
       const itemY = tableTop + 38;
       doc.rect(50, itemY, 500, 32).strokeColor('#E5E7EB').lineWidth(1).stroke();
-      
+
       doc
         .fillColor('#1F2937')
         .fontSize(10)
@@ -115,7 +116,7 @@ export function generateInvoicePDF(invoice, user, booking) {
       // Totals card
       const totalsTop = itemY + 55;
       doc.roundedRect(330, totalsTop, 220, 115, 8).fillAndStroke('#F9FAFB', '#E5E7EB');
-      
+
       doc
         .fillColor('#6B7280')
         .fontSize(10)
@@ -124,9 +125,9 @@ export function generateInvoicePDF(invoice, user, booking) {
         .text(`$${invoice.totalAmount}`, 480, totalsTop + 18)
         .text('Tax (0%):', 345, totalsTop + 40)
         .text('$0.00', 480, totalsTop + 40);
-      
+
       doc.rect(345, totalsTop + 65, 190, 35).fillAndStroke('#3B82F6', '#3B82F6');
-      
+
       doc
         .fillColor('#FFFFFF')
         .fontSize(12)
@@ -144,7 +145,7 @@ export function generateInvoicePDF(invoice, user, booking) {
           .font('Helvetica-Bold')
           .text('Paid:', 345, payY)
           .text(`$${invoice.paidAmount}`, 480, payY);
-        
+
         if (invoice.totalAmount - invoice.paidAmount > 0) {
           doc
             .fillColor('#EF4444')
@@ -155,7 +156,7 @@ export function generateInvoicePDF(invoice, user, booking) {
 
       // Footer
       doc.rect(0, 750, 595, 92).fillAndStroke('#F9FAFB', '#F9FAFB');
-      
+
       doc
         .fillColor('#1F2937')
         .fontSize(11)
@@ -164,7 +165,7 @@ export function generateInvoicePDF(invoice, user, booking) {
         .fillColor('#6B7280')
         .fontSize(9)
         .font('Helvetica')
-        .text('For queries: info@tripskyway.com | +91 XXX XXX XXXX', 50, 790, { align: 'center', width: 495 });
+        .text(`For queries: ${BRANDING.contact.email} | ${BRANDING.contact.phone}`, 50, 790, { align: 'center', width: 495 });
 
       doc.end();
 
@@ -296,11 +297,11 @@ export function generateLeadItineraryPDF(lead, itinerary) {
       doc
         .fillColor(primary)
         .fontSize(24)
-        .text('TRIP SKY WAY', { align: 'left' })
+        .text(BRANDING.company.name.toUpperCase(), { align: 'left' })
         .moveDown(0.2)
         .fontSize(10)
         .fillColor(gray)
-        .text('Travel & Tours', { align: 'left' })
+        .text(BRANDING.company.tagline || 'Travel & Tours', { align: 'left' })
         .moveDown(0.5);
 
       // Title
@@ -393,7 +394,7 @@ export function generateLeadItineraryPDF(lead, itinerary) {
         .moveDown(1)
         .fontSize(9)
         .fillColor(gray)
-        .text('Thank you for choosing Trip Sky Way. For assistance, contact support@tripskyway.com', 50, 760, { align: 'center' });
+        .text(`Thank you for choosing ${BRANDING.company.name}. For assistance, contact ${BRANDING.contact.supportEmail}`, 50, 760, { align: 'center' });
 
       doc.end();
 

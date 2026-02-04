@@ -54,7 +54,7 @@ export const DESTINATION_OPTIONS = [
   { value: 'Prague', label: 'Prague, Czech Republic', region: 'Europe' },
   { value: 'Santorini', label: 'Santorini, Greece', region: 'Europe' },
   { value: 'Venice', label: 'Venice, Italy', region: 'Europe' },
-  
+
   // Asia
   { value: 'Tokyo', label: 'Tokyo, Japan', region: 'Asia' },
   { value: 'Bali', label: 'Bali, Indonesia', region: 'Asia' },
@@ -66,14 +66,14 @@ export const DESTINATION_OPTIONS = [
   { value: 'Colombo', label: 'Colombo, Sri Lanka', region: 'Asia' },
   { value: 'Delhi', label: 'Delhi, India', region: 'Asia' },
   { value: 'Mumbai', label: 'Mumbai, India', region: 'Asia' },
-  
+
   // Middle East
   { value: 'Dubai', label: 'Dubai, UAE', region: 'Middle East' },
   { value: 'Abu Dhabi', label: 'Abu Dhabi, UAE', region: 'Middle East' },
   { value: 'Doha', label: 'Doha, Qatar', region: 'Middle East' },
   { value: 'Istanbul', label: 'Istanbul, Turkey', region: 'Middle East' },
   { value: 'Jerusalem', label: 'Jerusalem, Israel', region: 'Middle East' },
-  
+
   // Americas
   { value: 'New York', label: 'New York, USA', region: 'Americas' },
   { value: 'Los Angeles', label: 'Los Angeles, USA', region: 'Americas' },
@@ -83,7 +83,7 @@ export const DESTINATION_OPTIONS = [
   { value: 'Cancun', label: 'Cancun, Mexico', region: 'Americas' },
   { value: 'Rio de Janeiro', label: 'Rio de Janeiro, Brazil', region: 'Americas' },
   { value: 'Buenos Aires', label: 'Buenos Aires, Argentina', region: 'Americas' },
-  
+
   // Africa
   { value: 'Cairo', label: 'Cairo, Egypt', region: 'Africa' },
   { value: 'Marrakech', label: 'Marrakech, Morocco', region: 'Africa' },
@@ -100,7 +100,7 @@ export const ACTIVITY_OPTIONS = [
   { value: 'Cultural Show', label: 'Cultural Show', category: 'Culture' },
   { value: 'Heritage Walk', label: 'Heritage Walk', category: 'Culture' },
   { value: 'Local Market Tour', label: 'Local Market Tour', category: 'Culture' },
-  
+
   // Adventure
   { value: 'Hiking', label: 'Hiking/Trekking', category: 'Adventure' },
   { value: 'Safari', label: 'Safari', category: 'Adventure' },
@@ -110,14 +110,14 @@ export const ACTIVITY_OPTIONS = [
   { value: 'Rock Climbing', label: 'Rock Climbing', category: 'Adventure' },
   { value: 'Paragliding', label: 'Paragliding', category: 'Adventure' },
   { value: 'White Water Rafting', label: 'White Water Rafting', category: 'Adventure' },
-  
+
   // Water Activities
   { value: 'Beach Activities', label: 'Beach Activities', category: 'Water' },
   { value: 'Boat Cruise', label: 'Boat Cruise', category: 'Water' },
   { value: 'Yacht Tour', label: 'Yacht Tour', category: 'Water' },
   { value: 'Jet Skiing', label: 'Jet Skiing', category: 'Water' },
   { value: 'Kayaking', label: 'Kayaking', category: 'Water' },
-  
+
   // Entertainment
   { value: 'Theme Park', label: 'Theme Park Visit', category: 'Entertainment' },
   { value: 'Shopping', label: 'Shopping', category: 'Entertainment' },
@@ -125,13 +125,13 @@ export const ACTIVITY_OPTIONS = [
   { value: 'Food Tour', label: 'Food Tour', category: 'Entertainment' },
   { value: 'Wine Tasting', label: 'Wine Tasting', category: 'Entertainment' },
   { value: 'Spa & Wellness', label: 'Spa & Wellness', category: 'Entertainment' },
-  
+
   // Nature
   { value: 'Wildlife Watching', label: 'Wildlife Watching', category: 'Nature' },
   { value: 'Nature Walk', label: 'Nature Walk', category: 'Nature' },
   { value: 'Photography Tour', label: 'Photography Tour', category: 'Nature' },
   { value: 'Mountain View', label: 'Mountain Viewing', category: 'Nature' },
-  
+
   // Religious/Spiritual
   { value: 'Temple Visit', label: 'Temple Visit', category: 'Religious' },
   { value: 'Church Visit', label: 'Church Visit', category: 'Religious' },
@@ -166,18 +166,20 @@ export const TRANSPORT_OPTIONS = [
 export const IMAGE_UPLOAD_API_KEY = '4e08e03047ee0d48610586ad270e2b39';
 export const IMAGE_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
 
+import BRANDING from '../../../config/branding';
+
 export const PDF_CONFIG = {
   pageWidth: null, // Set dynamically
   pageHeight: null, // Set dynamically
   margin: 20,
   lineHeight: 7,
   headerBgColor: [0, 0, 255],
-  company: 'Trip Sky Way.',
-  tagline: 'Your Ultimate Travel Partner',
-  contact: 'Contact us: info@tripskyway.com | +1-800-TRAVEL',
-  email: 'info@tripskyway.com',
-  phone: '+1-800-TRAVEL',
-  website: 'https://www.tripskyway.com',
+  company: BRANDING.pdf.company,
+  tagline: BRANDING.pdf.tagline,
+  contact: BRANDING.pdf.contact,
+  email: BRANDING.pdf.email,
+  phone: BRANDING.pdf.phone,
+  website: BRANDING.pdf.website,
 };
 
 export const VALIDATION_MESSAGES = {

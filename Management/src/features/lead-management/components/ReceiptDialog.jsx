@@ -3,6 +3,7 @@ import { X, Save, DollarSign, Eye, Send, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
+import { getThankYouMessage } from '../../../config/branding';
 
 const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -77,7 +78,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       setCurrentReceiptId(null);
       setCurrentReceipt(null);
       setIsEditing(false);
-      
+
       // Fetch invoices first, then receipts (receipts need invoices loaded)
       fetchInvoices().then(() => {
         // Fetch existing receipts for this lead after invoices are loaded (for display only)
@@ -134,22 +135,22 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       toast.error('WhatsApp number not available for this lead');
       return;
     }
-    
+
     const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
     if (!whatsappNumber) {
       toast.error('Invalid WhatsApp number');
       return;
     }
-    
+
     const receiptNumber = currentReceipt?.receiptNumber || `#${receiptId?.slice(-6)}` || 'Receipt';
     const amount = currentReceipt?.amount || formData.amount || 0;
     const message = encodeURIComponent(
       `Hello ${lead.name || 'there'},\n\n` +
       `Your payment receipt ${receiptNumber} for ${amount.toFixed(2)} is ready. ` +
       `Please contact us for the detailed receipt document.\n\n` +
-      `Thank you for choosing Trip Sky Way!`
+      getThankYouMessage()
     );
-    
+
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -188,11 +189,11 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
   const handleInvoiceSelect = async (invoiceId) => {
     setFormData({ ...formData, invoice: invoiceId });
-    
+
     if (invoiceId) {
       const invoice = invoices.find(inv => (inv._id || inv.id) === invoiceId);
       setSelectedInvoice(invoice);
-      
+
       // Set default amount to outstanding balance
       if (invoice) {
         const outstanding = invoice.outstandingAmount || invoice.totalAmount - (invoice.paidAmount || 0);
@@ -233,9 +234,9 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
 
     if (selectedInvoice) {
-      const outstanding = selectedInvoice.outstandingAmount || 
+      const outstanding = selectedInvoice.outstandingAmount ||
         (selectedInvoice.totalAmount - (selectedInvoice.paidAmount || 0));
-      
+
       if (formData.amount > outstanding) {
         toast.error(`Payment amount cannot exceed outstanding balance of ${outstanding.toFixed(2)}`);
         return;
@@ -275,20 +276,20 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
     try {
       setLoading(true);
-      
+
       // Always create a new receipt (never update existing ones)
       const response = await receiptAPI.create(payload);
       if (response.success || response.status === 'success') {
         const receiptId = response.data?._id || response.data?.id;
         setCurrentReceiptId(receiptId);
         toast.success('Payment receipt created successfully!');
-        
+
         // Refresh invoices to get updated outstanding amounts
         await fetchInvoices();
-        
+
         // Refresh existing receipts list
         await fetchExistingReceipts();
-        
+
         // Update selected invoice if it still exists
         if (formData.invoice) {
           const updatedInvoice = invoices.find(inv => (inv._id || inv.id) === formData.invoice);
@@ -307,7 +308,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             }
           }
         }
-        
+
         // Show PDF preview after successful save
         if (currentReceiptId || (response.data?._id || response.data?.id)) {
           const idToPreview = currentReceiptId || (response.data?._id || response.data?.id);
@@ -327,13 +328,13 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
-  const outstandingBalance = selectedInvoice 
+  const outstandingBalance = selectedInvoice
     ? (selectedInvoice.outstandingAmount || (selectedInvoice.totalAmount - (selectedInvoice.paidAmount || 0)))
     : 0;
 
   if (!isOpen) return null;
 
-    const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
@@ -383,7 +384,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   {invoices.map((invoice) => (
                     <option key={invoice._id || invoice.id} value={invoice._id || invoice.id}>
                       {invoice.invoiceNumber || invoice._id} - Outstanding: INR {(
-                        invoice.outstandingAmount || 
+                        invoice.outstandingAmount ||
                         (invoice.totalAmount - (invoice.paidAmount || 0))
                       ).toFixed(2)}
                     </option>
@@ -853,7 +854,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             documentName="Payment Receipt"
             onDownload={true}
             documents={existingReceipts}
-            currentIndex={existingReceipts.findIndex(rec => 
+            currentIndex={existingReceipts.findIndex(rec =>
               (rec._id || rec.id) === currentReceiptId
             )}
             onNavigate={(index) => {

@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Save, Calculator, Eye, Download, Send, MessageCircle }
 import toast from 'react-hot-toast';
 import { invoiceAPI, quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
+import { getThankYouMessage } from '../../../config/branding';
 
 const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -382,7 +383,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       `Hello ${lead.name || 'there'},\n\n` +
       `Your invoice ${invoiceNumber} for ${totalAmount.toFixed(2)} is ready. ` +
       `Please contact us for the detailed invoice document.\n\n` +
-      `Thank you for choosing Trip Sky Way!`
+      getThankYouMessage()
     );
 
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;

@@ -1,7 +1,7 @@
 {
-  "name": "trip-sky-way-server",
+  "name": "travel-crm-server",
   "version": "1.0.0",
-  "description": "Trip Sky Way - Travel Agency Management System Backend API",
+  "description": "Travel CRM - Travel Agency Management System Backend API",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -20,7 +20,7 @@
     "booking",
     "management"
   ],
-  "author": "Trip Sky Way Team",
+  "author": "Your Company",
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

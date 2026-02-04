@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { Clock } from 'lucide-react';
+import { getLoginBranding } from '../config/branding';
 
 export default function SalesRepLoginOTP() {
   const navigate = useNavigate();
@@ -112,7 +113,7 @@ export default function SalesRepLoginOTP() {
 
       if (response.data.status === 'success') {
         console.log('Login successful, user data:', response.data.data.user); // Debug log
-        
+
         // Store token and user data directly in localStorage
         localStorage.setItem('token', response.data.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.data.user));
@@ -125,7 +126,7 @@ export default function SalesRepLoginOTP() {
         localStorage.removeItem('otpMaskedEmail');
 
         toast.success('Login successful!');
-        
+
         // Wait a moment, then navigate to dashboard
         setTimeout(() => {
           window.location.href = '/'; // Force page reload to update context
@@ -198,7 +199,7 @@ export default function SalesRepLoginOTP() {
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Trip Sky Way</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">{getLoginBranding().title}</h1>
           <p className="text-gray-600">Verify Your Identity</p>
         </div>
 
@@ -251,11 +252,10 @@ export default function SalesRepLoginOTP() {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={!canResendOtp || isSubmitting || timer === 0}
-                className={`font-medium transition ${
-                  canResendOtp && timer > 0
+                className={`font-medium transition ${canResendOtp && timer > 0
                     ? 'text-blue-600 hover:text-blue-700 cursor-pointer'
                     : 'text-gray-400 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
               </button>

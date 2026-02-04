@@ -1,9 +1,10 @@
 /**
- * Image Upload Component
+ * Image Upload Component - Redesigned
+ * Modern drag-and-drop interface with premium styling
  * Handles image selection and display with Cloudinary upload
  */
 
-import { Trash2, Upload, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Upload, Image as ImageIcon, Cloud, Check, Loader2, X } from 'lucide-react';
 
 const ImageUpload = ({
   images,
@@ -26,77 +27,127 @@ const ImageUpload = ({
         />
         <label
           htmlFor="image-upload-input"
-          className={`flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors ${
-            isUploading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className={`flex flex-col items-center justify-center gap-4 px-8 py-10 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${isUploading
+              ? 'border-violet-300 bg-violet-50/50 cursor-not-allowed'
+              : 'border-slate-300 bg-slate-50 hover:border-violet-400 hover:bg-violet-50'
+            }`}
         >
-          <Upload className="w-5 h-5 text-gray-500" />
-          <span className="text-sm text-gray-600">
-            {isUploading ? 'Uploading...' : 'Click to upload images (or drag and drop)'}
-          </span>
+          {isUploading ? (
+            <>
+              <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-violet-700">Uploading to Cloudinary...</p>
+                <p className="text-xs text-violet-500 mt-1">Please wait while we process your images</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl flex items-center justify-center">
+                <Upload className="w-8 h-8 text-violet-600" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-slate-700">
+                  <span className="text-violet-600">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-xs text-slate-500 mt-1">PNG, JPG, JPEG up to 5MB each</p>
+              </div>
+            </>
+          )}
         </label>
       </div>
 
-      {/* Upload Status */}
-      {isUploading && (
-        <div className="flex items-center gap-2 text-sm text-blue-600">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-          <span>Uploading images to Cloudinary...</span>
-        </div>
-      )}
-
       {/* Image Grid */}
       {images && images.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {images.map((img, idx) => {
-            // Handle both string URLs (old format) and image objects (new format)
-            const imageUrl = typeof img === 'string' ? img : img.url;
-            const publicId = typeof img === 'object' ? img.public_id : null;
-            
-            return (
-              <div key={publicId || idx} className="relative group">
-                <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-colors">
-                  <img
-                    src={imageUrl}
-                    alt={`Package Image ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
-                    }}
-                  />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-slate-700">Uploaded Images ({images.length})</h4>
+            <div className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+              <Cloud className="w-3 h-3" />
+              <span>Cloudinary</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {images.map((img, idx) => {
+              const imageUrl = typeof img === 'string' ? img : img.url;
+              const publicId = typeof img === 'object' ? img.public_id : null;
+              const isTemp = typeof img === 'object' && img.isTemp;
+
+              return (
+                <div key={publicId || idx} className="relative group">
+                  <div className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${isTemp
+                      ? 'border-violet-300 ring-2 ring-violet-100'
+                      : 'border-slate-200 hover:border-violet-400 hover:shadow-lg'
+                    }`}>
+                    <img
+                      src={imageUrl}
+                      alt={`Package Image ${idx + 1}`}
+                      className={`w-full h-full object-cover ${isTemp ? 'opacity-60' : ''}`}
+                      onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+
+                    {/* Loading overlay for temp images */}
+                    {isTemp && (
+                      <div className="absolute inset-0 bg-violet-900/30 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Remove button */}
+                  <button
+                    onClick={() => onImageRemove(idx)}
+                    className="absolute -top-2 -right-2 w-7 h-7 bg-rose-500 text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-colors shadow-lg opacity-0 group-hover:opacity-100"
+                    type="button"
+                    aria-label="Remove image"
+                    title="Remove image"
+                  >
+                    <X size={14} />
+                  </button>
+
+                  {/* Image number badge */}
+                  <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-lg">
+                    {!isTemp && <Check className="w-3 h-3 text-emerald-400" />}
+                    <span>{idx + 1}</span>
+                  </div>
                 </div>
-                <button
-                  onClick={() => onImageRemove(idx)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg opacity-0 group-hover:opacity-100"
-                  type="button"
-                  aria-label="Remove image"
-                  title="Remove image"
-                >
-                  <Trash2 size={16} />
-                </button>
-                {/* Image number badge */}
-                <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                  {idx + 1}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* Empty State */}
       {(!images || images.length === 0) && !isUploading && (
-        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-          <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">No images uploaded yet</p>
-          <p className="text-xs text-gray-400 mt-1">Click above to upload package images</p>
+        <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+          <ImageIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm font-medium text-slate-500">No images uploaded yet</p>
+          <p className="text-xs text-slate-400 mt-1">Click above to upload package images</p>
         </div>
       )}
 
       {/* Helper Text */}
-      <p className="text-xs text-gray-500">
-        Supported formats: JPEG, PNG, JPG • Max size: 5MB per image • Uploaded to Cloudinary
-      </p>
+      <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-md">
+          <span>JPEG</span>
+        </div>
+        <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-md">
+          <span>PNG</span>
+        </div>
+        <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-md">
+          <span>JPG</span>
+        </div>
+        <span className="text-slate-400">•</span>
+        <span>Max 5MB per image</span>
+        <span className="text-slate-400">•</span>
+        <span className="flex items-center gap-1">
+          <Cloud className="w-3 h-3" /> Uploaded to Cloudinary
+        </span>
+      </div>
     </div>
   );
 };

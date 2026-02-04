@@ -7,14 +7,14 @@ import {
   BarChartComponent,
 } from "../Common";
 import PieChartComponent, { DEFAULT_PIE_COLORS } from "../Common/Charts/PieChartComponent";
-import { BarChart3, TrendingUp, Users, Target, Download } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Target, Download, Activity, Zap } from "lucide-react";
 import { analyticsAPI } from "../../../../services/api";
 import { exportLeadAnalyticsPDF } from "../../utils/exportAnalytics";
 import toast from "react-hot-toast";
 
 /**
- * LeadAnalytics Component
- * Displays comprehensive lead statistics and trends
+ * LeadAnalytics Component - Completely Redesigned
+ * Modern layout with unique component structure
  */
 const LeadAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
@@ -56,16 +56,15 @@ const LeadAnalytics = () => {
         setTrendData(payload?.trend || []);
         setStatusData(payload?.statusDistribution || []);
         setCategoryData(payload?.categoryDistribution || []);
-        const priceRanges = payload?.priceRangeDistribution || [];
-        setPriceRangeData(priceRanges);
+        setPriceRangeData(payload?.priceRangeDistribution || []);
 
         const countries = (payload?.topCountries || []).map((item) => ({
           ...item,
           country: item?.country
             ? item.country
-                .split(' ')
-                .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                .join(' ')
+              .split(' ')
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ')
             : 'Unknown',
         }));
         setCountryData(countries);
@@ -74,23 +73,16 @@ const LeadAnalytics = () => {
           ...item,
           destination: item?.destination
             ? item.destination
-                .split(' ')
-                .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                .join(' ')
+              .split(' ')
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ')
             : 'Unknown',
         }));
         setDestinationData(destinations);
       } catch (error) {
         console.error("Failed to load lead analytics", error);
         setErrorMessage(error.message || "Failed to load lead analytics data.");
-        setStats({
-          totalLeads: 0,
-          contacted: 0,
-          interested: 0,
-          converted: 0,
-          new: 0,
-          quoted: 0,
-        });
+        setStats({ totalLeads: 0, contacted: 0, interested: 0, converted: 0, new: 0, quoted: 0 });
         setTrendData([]);
         setStatusData([]);
         setCategoryData([]);
@@ -105,12 +97,10 @@ const LeadAnalytics = () => {
     fetchLeadAnalytics();
   }, [timeRange]);
 
-  // Handle PDF export
   const handleExportPDF = async () => {
     try {
       setExporting(true);
       const toastId = toast.loading("Preparing analytics PDF...");
-
       const summaryMetrics = [
         { label: "Total Leads", value: stats.totalLeads },
         { label: "Contacted", value: stats.contacted },
@@ -118,12 +108,7 @@ const LeadAnalytics = () => {
         { label: "Converted", value: stats.converted },
         { label: "Time Range", value: timeRange.toUpperCase() },
       ];
-
-      await exportLeadAnalyticsPDF({
-        timeRange,
-        summaryMetrics,
-      });
-
+      await exportLeadAnalyticsPDF({ timeRange, summaryMetrics });
       toast.dismiss(toastId);
       toast.success("Analytics PDF downloaded successfully!");
     } catch (error) {
@@ -134,7 +119,6 @@ const LeadAnalytics = () => {
     }
   };
 
-  // Line chart configuration
   const leadLineChartLines = [
     { dataKey: "new", stroke: "#3b82f6", name: "New Leads" },
     { dataKey: "contacted", stroke: "#10b981", name: "Contacted" },
@@ -142,275 +126,215 @@ const LeadAnalytics = () => {
     { dataKey: "converted", stroke: "#8b5cf6", name: "Converted" },
   ];
 
-  // Palette helpers
   const categoryColors = [
-    DEFAULT_PIE_COLORS[0],
-    DEFAULT_PIE_COLORS[1],
-    DEFAULT_PIE_COLORS[2],
-    "#ef4444", // Adventure
-    "#a855f7", // Wildlife
-    "#ec4899", // Family
-    "#6366f1", // Beach
-    "#22c55e", // Heritage
-    "#f97316", // Religious
-    DEFAULT_PIE_COLORS[5],
+    "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#a855f7",
+    "#ec4899", "#3b82f6", "#22c55e", "#f97316", "#8b5cf6",
   ];
 
   const statusColors = [
-    "#3b82f6", // New
-    "#10b981", // Contacted
-    "#f59e0b", // Interested
-    "#ef4444", // Quoted
-    "#8b5cf6", // Converted
-    "#ec4899", // Lost
-    "#6366f1", // Not Interested
+    "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6366f1",
   ];
 
-  const renderLegendList = (items, colors) => (
-    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm text-gray-700">
-      {items.map((item, index) => (
-        <li key={`${item.name}-${index}`} className="flex items-center gap-2">
-          <span
-            className="w-3 h-3 rounded-full border border-gray-200"
-            style={{ backgroundColor: colors[index % colors.length] }}
-          />
-          <span className="text-gray-600">
-            {item.name}:{" "}
-            <span className="font-semibold text-gray-900">{numberFormatter.format(item.value || 0)}</span>
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-
-  // Bar chart configuration
-  const leadByCountryBars = [
-    { dataKey: "leads", fill: "#3b82f6", name: "Leads" },
-    { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
+  // Quick stats for header
+  const quickStats = [
+    { label: 'Total', value: stats.totalLeads, color: 'text-slate-800' },
+    { label: 'Contacted', value: stats.contacted, color: 'text-blue-600' },
+    { label: 'Interested', value: stats.interested, color: 'text-amber-600' },
+    { label: 'Converted', value: stats.converted, color: 'text-emerald-600' },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header with Time Range Filter and Export Button */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Lead Analytics</h2>
-          <p className="text-gray-600 mt-1">Comprehensive lead statistics and trends</p>
+          <h2 className="text-xl font-bold text-slate-800">Lead Performance</h2>
+          <p className="text-sm text-slate-500 mt-1">Track your lead pipeline and conversions</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
           <button
             onClick={handleExportPDF}
             disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-indigo-500/25"
           >
-            <Download size={18} />
-            {exporting ? "Exporting..." : "Export PDF"}
+            <Download size={16} />
+            {exporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Quick Stats Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {quickStats.map((stat, idx) => (
+          <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{stat.label}</p>
+            <p className={`text-2xl font-bold ${stat.color} mt-1`}>{numberFormatter.format(stat.value)}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Main Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         <StatCard
           icon={Users}
           label="Total Leads"
-          value={numberFormatter.format(stats.totalLeads || 0)}
-          trend={null}
+          value={numberFormatter.format(stats.totalLeads)}
           color="blue"
+          loading={loading}
         />
         <StatCard
           icon={Target}
-          label="Contacted Leads"
-          value={numberFormatter.format(stats.contacted || 0)}
-          trend={null}
+          label="Contacted"
+          value={numberFormatter.format(stats.contacted)}
           color="green"
+          loading={loading}
         />
         <StatCard
-          icon={TrendingUp}
+          icon={Zap}
           label="Interested"
-          value={numberFormatter.format(stats.interested || 0)}
-          trend={null}
+          value={numberFormatter.format(stats.interested)}
           color="purple"
+          loading={loading}
         />
         <StatCard
-          icon={BarChart3}
+          icon={Activity}
           label="Converted"
-          value={numberFormatter.format(stats.converted || 0)}
-          trend={null}
+          value={numberFormatter.format(stats.converted)}
           color="orange"
+          loading={loading}
         />
       </div>
 
-      {/* Lead Conversion Funnel Chart */}
+      {/* Lead Funnel Chart - Full Width */}
       <ChartContainer
         title="Lead Conversion Funnel"
         description="Track lead progression through sales stages"
       >
         {loading ? (
-          <div className="flex items-center justify-center h-[350px] text-gray-500">
-            Loading lead trend...
+          <div className="flex items-center justify-center h-[320px]">
+            <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
           </div>
         ) : trendData.length > 0 ? (
           <LineChartComponent
             data={trendData}
             lines={leadLineChartLines}
             xAxisKey="label"
-            height={350}
+            height={320}
           />
         ) : (
-          <div className="flex items-center justify-center h-[350px] text-gray-500">
+          <div className="flex items-center justify-center h-[320px] text-slate-400">
             {errorMessage || "No lead trend data available for the selected range."}
           </div>
         )}
       </ChartContainer>
 
-      {/* Additional breakdown charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Distribution Charts - 2 Column Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ChartContainer
           title="Leads by Category"
-          description="Distribution of leads across categories"
+          description="Distribution across categories"
         >
           {loading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">
-              Loading category distribution...
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
             </div>
           ) : categoryData.length > 0 ? (
-            <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 min-h-[320px]">
-              <div className="w-full lg:w-1/2 flex justify-center">
-                <PieChartComponent
-                  data={categoryData}
-                  dataKey="value"
-                  nameKey="name"
-                  height={260}
-                  colors={categoryColors}
-                  legendProps={false}
-                  pieProps={{
-                    innerRadius: 70,
-                    outerRadius: 110,
-                    label: false,
-                    cx: "50%",
-                    cy: "50%",
-                  }}
-                />
-              </div>
-              <div className="w-full lg:w-1/2">
-                {renderLegendList(categoryData, categoryColors)}
-              </div>
-            </div>
+            <PieChartComponent
+              data={categoryData}
+              dataKey="value"
+              nameKey="name"
+              height={280}
+              colors={categoryColors}
+            />
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">
-              {errorMessage || "No lead category data available for the selected range."}
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No category data available
             </div>
           )}
         </ChartContainer>
 
         <ChartContainer
           title="Leads by Status"
-          description="Breakdown of leads by current status"
+          description="Current status breakdown"
         >
           {loading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">
-              Loading status distribution...
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
             </div>
           ) : statusData.length > 0 ? (
-            <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 min-h-[320px]">
-              <div className="w-full lg:w-1/2 flex justify-center">
-                <PieChartComponent
-                  data={statusData}
-                  dataKey="value"
-                  nameKey="name"
-                  height={260}
-                  colors={statusColors}
-                  legendProps={false}
-                  pieProps={{
-                    innerRadius: 65,
-                    outerRadius: 105,
-                    label: false,
-                    cx: "50%",
-                    cy: "50%",
-                  }}
-                />
-              </div>
-              <div className="w-full lg:w-1/2">
-                {renderLegendList(statusData, statusColors)}
-              </div>
-            </div>
+            <PieChartComponent
+              data={statusData}
+              dataKey="value"
+              nameKey="name"
+              height={280}
+              colors={statusColors}
+            />
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">
-              {errorMessage || "No lead status data available for the selected range."}
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No status data available
             </div>
           )}
         </ChartContainer>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Country and Price Range - 2 Column Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ChartContainer
           title="Top Countries"
-          description="Leads by origin country and conversion rates"
+          description="Leads by origin country"
         >
           {countryData.length > 0 ? (
-            <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 min-h-[320px]">
-              <div className="w-full lg:w-2/3">
-                <BarChartComponent
-                  data={countryData}
-                  bars={leadByCountryBars}
-                  xAxisKey="country"
-                  height={300}
-                />
-              </div>
-              <div className="w-full lg:w-1/3">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 h-full">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Top Countries</h4>
-                  <ul className="space-y-3 text-sm text-gray-700 max-h-[260px] overflow-y-auto">
-                    {countryData.map((country, index) => (
-                      <li key={`${country.country}-${index}`} className="flex justify-between items-start gap-4">
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {country.country || "Unknown"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Conversion {country.conversion ? `${country.conversion}%` : "0%"}
-                          </p>
-                        </div>
-                        <span className="text-sm font-semibold text-blue-600">
-                          {numberFormatter.format(country.leads || 0)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            <div className="space-y-4">
+              <BarChartComponent
+                data={countryData}
+                bars={[
+                  { dataKey: "leads", fill: "#6366f1", name: "Leads" },
+                  { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
+                ]}
+                xAxisKey="country"
+                height={260}
+              />
+              {/* Country List */}
+              <div className="grid grid-cols-2 gap-2 pt-4 border-t border-slate-100">
+                {countryData.slice(0, 6).map((country, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600 truncate">{country.country}</span>
+                    <span className="font-semibold text-slate-800">{country.leads}</span>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-gray-500">
-              {errorMessage || "No country-wise lead data available for the selected range."}
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No country data available
             </div>
           )}
         </ChartContainer>
 
         <ChartContainer
           title="Price Range Distribution"
-          description="Lead distribution by price range"
+          description="Lead distribution by budget"
         >
           {priceRangeData.length > 0 ? (
             <BarChartComponent
               data={priceRangeData}
               bars={[{ dataKey: "value", fill: "#8b5cf6", name: "Leads" }]}
               xAxisKey="range"
-              height={300}
+              height={280}
             />
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-gray-500">
-              {errorMessage || "No price range data available for the selected range."}
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No price range data available
             </div>
           )}
         </ChartContainer>
       </div>
 
+      {/* Top Destinations - Full Width */}
       <ChartContainer
         title="Top Destinations"
-        description="Leads by destination and conversion rates"
+        description="Leads by destination with conversion rates"
       >
         {destinationData.length > 0 ? (
           <BarChartComponent
@@ -423,8 +347,8 @@ const LeadAnalytics = () => {
             height={300}
           />
         ) : (
-          <div className="flex items-center justify-center h-[300px] text-gray-500">
-            {errorMessage || "No destination-wise lead data available for the selected range."}
+          <div className="flex items-center justify-center h-[300px] text-slate-400">
+            No destination data available
           </div>
         )}
       </ChartContainer>

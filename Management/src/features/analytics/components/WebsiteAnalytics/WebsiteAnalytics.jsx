@@ -7,16 +7,14 @@ import {
   BarChartComponent,
   PieChartComponent,
 } from "../Common";
-import { Search, MapPin, Activity, TrendingUp, Download } from "lucide-react";
+import { Search, MapPin, Activity, TrendingUp, Download, Globe, MousePointer, Target } from "lucide-react";
 import { exportWebsiteAnalyticsPDF } from "../../utils/exportAnalytics";
 import toast from "react-hot-toast";
 import AnalyticsService from "../../../../services/analytics.service";
 
 /**
- * WebsiteAnalytics Component
- * Displays customer inquiry patterns and booking conversion metrics
- * Shows actual lead inquiries (customer searches), bookings, destination preferences,
- * activities, duration preferences, and price ranges
+ * WebsiteAnalytics Component - Redesigned
+ * Modern layout for website traffic and engagement metrics
  */
 const WebsiteAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
@@ -25,7 +23,6 @@ const WebsiteAnalytics = () => {
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
 
-  // Fetch analytics data from backend
   useEffect(() => {
     const fetchAnalyticsData = async () => {
       try {
@@ -40,16 +37,13 @@ const WebsiteAnalytics = () => {
         setLoading(false);
       }
     };
-
     fetchAnalyticsData();
   }, [timeRange]);
 
-  // Handle PDF export
   const handleExportPDF = async () => {
     try {
       setExporting(true);
       const toastId = toast.loading("Preparing website analytics PDF...");
-
       const summaryMetrics = [
         { label: "Total Inquiries", value: data.stats.totalSearches || 0 },
         { label: "Total Bookings", value: data.stats.totalBookings || 0 },
@@ -57,12 +51,7 @@ const WebsiteAnalytics = () => {
         { label: "Activities Offered", value: data.stats.uniqueActivities || 0 },
         { label: "Time Range", value: timeRange.toUpperCase() },
       ];
-
-      await exportWebsiteAnalyticsPDF({
-        timeRange,
-        summaryMetrics,
-      });
-
+      await exportWebsiteAnalyticsPDF({ timeRange, summaryMetrics });
       toast.dismiss(toastId);
       toast.success("Website analytics PDF downloaded successfully!");
     } catch (error) {
@@ -73,7 +62,6 @@ const WebsiteAnalytics = () => {
     }
   };
 
-  // Use fetched data or show empty state
   const data = analyticsData || {
     stats: {
       totalSearches: 0,
@@ -89,37 +77,39 @@ const WebsiteAnalytics = () => {
     priceRanges: [],
   };
 
-  // Line chart configuration
   const searchLines = [
-    { dataKey: "searches", stroke: "#3b82f6", name: "Lead Inquiries" },
+    { dataKey: "searches", stroke: "#06b6d4", name: "Inquiries" },
     { dataKey: "conversions", stroke: "#10b981", name: "Bookings" },
   ];
 
-  // Bar chart configuration
   const destinationBars = [
-    { dataKey: "searches", fill: "#3b82f6", name: "Inquiries" },
+    { dataKey: "searches", fill: "#06b6d4", name: "Inquiries" },
     { dataKey: "conversions", fill: "#10b981", name: "Conversions" },
   ];
 
   const durationBars = [
-    { dataKey: "searches", fill: "#3b82f6", name: "Inquiries" },
+    { dataKey: "searches", fill: "#6366f1", name: "Inquiries" },
     { dataKey: "bookings", fill: "#10b981", name: "Bookings" },
   ];
 
+  const conversionRate = data.stats.totalSearches > 0
+    ? ((data.stats.totalBookings / data.stats.totalSearches) * 100).toFixed(1)
+    : 0;
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-8">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Website Analytics</h2>
-            <p className="text-gray-600 mt-1">Customer inquiry and booking patterns</p>
+            <h2 className="text-xl font-bold text-slate-800">Website Analytics</h2>
+            <p className="text-sm text-slate-500 mt-1">Customer inquiry and booking patterns</p>
           </div>
-          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} disabled={loading} />
+          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
         </div>
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading analytics data...</p>
+            <div className="animate-spin w-12 h-12 border-4 border-cyan-200 border-t-cyan-600 rounded-full mx-auto mb-4" />
+            <p className="text-slate-500">Loading analytics data...</p>
           </div>
         </div>
       </div>
@@ -128,151 +118,177 @@ const WebsiteAnalytics = () => {
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-8">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Website Analytics</h2>
-            <p className="text-gray-600 mt-1">Customer inquiry and booking patterns</p>
+            <h2 className="text-xl font-bold text-slate-800">Website Analytics</h2>
+            <p className="text-sm text-slate-500 mt-1">Customer inquiry and booking patterns</p>
           </div>
           <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800 font-semibold">Error Loading Analytics</p>
-          <p className="text-red-600 text-sm mt-1">{error}</p>
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6">
+          <p className="text-rose-800 font-semibold">Error Loading Analytics</p>
+          <p className="text-rose-600 text-sm mt-1">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header with Time Range Filter */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Website Analytics</h2>
-          <p className="text-gray-600 mt-1">Customer inquiry and booking conversion patterns</p>
+          <h2 className="text-xl font-bold text-slate-800">Website Analytics</h2>
+          <p className="text-sm text-slate-500 mt-1">Customer inquiry and booking conversion patterns</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
           <button
             onClick={handleExportPDF}
             disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-cyan-500/25"
           >
-            <Download size={18} />
-            {exporting ? "Exporting..." : "Export PDF"}
+            <Download size={16} />
+            {exporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon={Search}
-          label="Total Inquiries"
-          value={data.stats.totalSearches?.toString() || "0"}
-          trend="+12%"
-          trendDirection="up"
-          color="blue"
-          loading={loading}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Total Bookings"
-          value={data.stats.totalBookings?.toString() || "0"}
-          trend="+8%"
-          trendDirection="up"
-          color="green"
-          loading={loading}
-        />
-        <StatCard
-          icon={MapPin}
-          label="Top Destinations"
-          value={data.stats.uniqueDestinations?.toString() || "0"}
-          trend="+5%"
-          trendDirection="up"
-          color="purple"
-          loading={loading}
-        />
-        <StatCard
-          icon={Activity}
-          label="Activities Offered"
-          value={data.stats.uniqueActivities?.toString() || "0"}
-          trend="+3%"
-          trendDirection="up"
-          color="orange"
-          loading={loading}
-        />
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-cyan-500 to-teal-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Search className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Inquiries</span>
+          </div>
+          <p className="text-3xl font-bold">{data.stats.totalSearches || 0}</p>
+          <p className="text-xs mt-2 opacity-70">Lead inquiries</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Bookings</span>
+          </div>
+          <p className="text-3xl font-bold">{data.stats.totalBookings || 0}</p>
+          <p className="text-xs mt-2 opacity-70">Confirmed bookings</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <MapPin className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Destinations</span>
+          </div>
+          <p className="text-3xl font-bold">{data.stats.uniqueDestinations || 0}</p>
+          <p className="text-xs mt-2 opacity-70">Unique locations</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Conversion</span>
+          </div>
+          <p className="text-3xl font-bold">{conversionRate}%</p>
+          <p className="text-xs mt-2 opacity-70">Inquiry to booking</p>
+        </div>
       </div>
 
-      {/* Inquiry & Booking Trends Chart */}
+      {/* Trend Chart - Full Width */}
       <ChartContainer
-        title="Lead Inquiry & Booking Trends"
-        description="Customer inquiries and booking conversions over time"
+        title="Inquiry & Booking Trends"
+        description="Customer engagement over time"
       >
-        <LineChartComponent
-          data={data.trend || []}
-          lines={searchLines}
-          xAxisKey="label"
-          height={350}
-        />
+        {data.trend?.length > 0 ? (
+          <LineChartComponent
+            data={data.trend}
+            lines={searchLines}
+            xAxisKey="label"
+            height={300}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-[300px] text-slate-400">
+            No trend data available
+          </div>
+        )}
       </ChartContainer>
 
-      {/* Additional breakdown charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Destination & Price Range - 2 Columns */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ChartContainer
-          title="Top Destination Inquiries"
-          description="Most inquired destinations with conversion rates"
+          title="Top Destinations"
+          description="Most inquired destinations"
         >
-          <BarChartComponent
-            data={data.topDestinations || []}
-            bars={destinationBars}
-            xAxisKey="destination"
-            height={320}
-            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
-          />
+          {data.topDestinations?.length > 0 ? (
+            <BarChartComponent
+              data={data.topDestinations}
+              bars={destinationBars}
+              xAxisKey="destination"
+              height={280}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No destination data available
+            </div>
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Price Range Distribution"
-          description="Customer inquiries by package price range"
+          description="Inquiries by budget"
         >
-          <BarChartComponent
-            data={data.priceRanges || []}
-            bars={[{ dataKey: "searches", fill: "#8b5cf6", name: "Inquiries" }]}
-            xAxisKey="range"
-            height={320}
-            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
-          />
+          {data.priceRanges?.length > 0 ? (
+            <BarChartComponent
+              data={data.priceRanges}
+              bars={[{ dataKey: "searches", fill: "#8b5cf6", name: "Inquiries" }]}
+              xAxisKey="range"
+              height={280}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No price range data available
+            </div>
+          )}
         </ChartContainer>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Accommodation & Duration - 2 Columns */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ChartContainer
-          title="Accommodation Type Distribution"
-          description="Popular accommodation types in inquired packages"
+          title="Accommodation Preferences"
+          description="Popular accommodation types"
         >
-          <PieChartComponent
-            data={data.accommodationTypes || []}
-            dataKey="value"
-            nameKey="name"
-            height={360}
-            colors={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"]}
-            legendProps={{ align: "bottom", verticalAlign: "bottom", layout: "horizontal" }}
-          />
+          {data.accommodationTypes?.length > 0 ? (
+            <PieChartComponent
+              data={data.accommodationTypes}
+              dataKey="value"
+              nameKey="name"
+              height={280}
+              colors={["#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No accommodation data available
+            </div>
+          )}
         </ChartContainer>
 
         <ChartContainer
-          title="Package Duration Preferences"
-          description="Inquiry volume and bookings by package duration"
+          title="Duration Preferences"
+          description="Package duration popularity"
         >
-          <BarChartComponent
-            data={data.durationPreferences || []}
-            bars={durationBars}
-            xAxisKey="duration"
-            height={320}
-            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
-          />
+          {data.durationPreferences?.length > 0 ? (
+            <BarChartComponent
+              data={data.durationPreferences}
+              bars={durationBars}
+              xAxisKey="duration"
+              height={280}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No duration data available
+            </div>
+          )}
         </ChartContainer>
       </div>
     </div>

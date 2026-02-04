@@ -17,6 +17,7 @@ import AdminTable from './AdminTable';
 import adminService from '../../../../services/admin.service';
 import { usePermission } from '../../../../contexts/PermissionContext';
 import { getPermissionDeniedMessage } from '../../utils/permissionUtils';
+import BRANDING from '../../../../config/branding';
 
 const AdminManagement = () => {
   // Permission context
@@ -123,13 +124,13 @@ const AdminManagement = () => {
       ╚════════════════════════════════════════════════════════════╝
       
       To: ${admin.email}
-      Subject: Welcome to Trip Sky Way - Admin Account Created
+      Subject: Welcome to ${BRANDING.company.name} - Admin Account Created
       
       ─────────────────────────────────────────────────────────────
       
       Dear ${admin.name},
       
-      Your admin account has been successfully created in Trip Sky Way.
+      Your admin account has been successfully created in ${BRANDING.company.name}.
       
       📋 ACCOUNT DETAILS:
       ├─ Email: ${admin.email}
@@ -159,8 +160,8 @@ const AdminManagement = () => {
       contact the support team immediately.
       
       Best regards,
-      Trip Sky Way Admin Team
-      https://tripskiway.com/support
+      ${BRANDING.company.name} Admin Team
+      ${BRANDING.urls.website}/support
       
       ─────────────────────────────────────────────────────────────
     `);
@@ -177,7 +178,7 @@ const AdminManagement = () => {
       ╚════════════════════════════════════════════════════════════╝
       
       To: ${admin.email}
-      Subject: Password Reset - Trip Sky Way Admin Account
+      Subject: Password Reset - ${BRANDING.company.name} Admin Account
       
       ─────────────────────────────────────────────────────────────
       
@@ -201,7 +202,7 @@ const AdminManagement = () => {
       your system administrator immediately.
       
       Best regards,
-      Trip Sky Way Admin Team
+      ${BRANDING.company.name} Admin Team
       
       ─────────────────────────────────────────────────────────────
     `);
@@ -895,8 +896,8 @@ const AdminManagement = () => {
                 <label
                   key={perm.id}
                   className={`flex items-center gap-2 text-sm p-2 rounded transition-colors ${isEditingSelf()
-                      ? 'opacity-60 cursor-not-allowed bg-gray-100'
-                      : 'cursor-pointer hover:bg-white'
+                    ? 'opacity-60 cursor-not-allowed bg-gray-100'
+                    : 'cursor-pointer hover:bg-white'
                     }`}
                 >
                   <input

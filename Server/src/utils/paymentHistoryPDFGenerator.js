@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { BRANDING } from '../config/branding.js';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -97,26 +98,26 @@ export function generatePaymentHistoryPDF(paymentHistory) {
       const headerHeight = 100;
       const headerY = 0;
       const headerWidth = 595;
-      
+
       // Draw black wave background
       doc.rect(0, headerY, headerWidth, headerHeight).fillAndStroke('#000000', '#000000');
-      
+
       // Draw bottom wave curve using bezier curves
       doc.moveTo(0, headerHeight - 30)
-         .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
-         .lineTo(595, 0)
-         .lineTo(0, 0)
-         .fill('#000000');
-      
+        .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
+        .lineTo(595, 0)
+        .lineTo(0, 0)
+        .fill('#000000');
+
       // Draw orange accent curve in top right
       doc.moveTo(400, 0)
-         .bezierCurveTo(450, 40, 520, 60, 595, 50)
-         .lineTo(595, 0)
-         .fill('#F5A623');
+        .bezierCurveTo(450, 40, 520, 60, 595, 50)
+        .lineTo(595, 0)
+        .fill('#F5A623');
 
       let cursorX = 50;
       const logoBuffer = loadLogo();
-      
+
       // Add logo if available
       if (logoBuffer) {
         try {
@@ -137,16 +138,16 @@ export function generatePaymentHistoryPDF(paymentHistory) {
         .fillColor(COLORS.white)
         .fontSize(16)
         .font('Helvetica-Bold')
-        .text('Trip Sky Way', cursorX, headerY + 25)
+        .text(BRANDING.company.name, cursorX, headerY + 25)
         .fontSize(9)
         .font('Helvetica')
-        .text('Curating inspired journeys', cursorX, headerY + 47);
+        .text(BRANDING.company.tagline, cursorX, headerY + 47);
 
       // Add PAYMENT HISTORY badge
       const badgeX = 490;
       const badgeY = headerY + 40;
       doc.circle(badgeX, badgeY, 28).fillAndStroke(COLORS.white, COLORS.white);
-      
+
       doc
         .fillColor('#000000')
         .fontSize(6)
@@ -158,27 +159,27 @@ export function generatePaymentHistoryPDF(paymentHistory) {
       let yPos = 140;
       const cardWidth = 495;
       const cardX = 50;
-      
+
       // Payment History Info Card
       doc.roundedRect(cardX, yPos, cardWidth, 85, 10).fillAndStroke('#FFFFFF', '#FCD34D');
       doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
+
       doc
         .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
         .text('PAYMENT HISTORY INFO', cardX + 15, yPos + 11);
-        
+
       doc
         .fillColor(rgbToHex(PALETTE.primaryText))
         .fontSize(10)
         .font('Helvetica')
         .text(`Payment History #: ${paymentHistory.paymentHistoryNumber || 'N/A'}`, cardX + 15, yPos + 47);
-      
+
       if (paymentHistory.receipt?.receiptNumber) {
         doc.text(`Receipt #: ${paymentHistory.receipt.receiptNumber}`, cardX + 15, yPos + 64, { continued: true });
       }
-      
+
       if (paymentHistory.invoice?.invoiceNumber) {
         const separator = paymentHistory.receipt?.receiptNumber ? '  |  ' : '';
         doc
@@ -195,13 +196,13 @@ export function generatePaymentHistoryPDF(paymentHistory) {
       if (customer) {
         doc.roundedRect(cardX, yPos, cardWidth, 90, 10).fillAndStroke('#FFFFFF', '#FCD34D');
         doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-        
+
         doc
           .fillColor('#D97706')
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('BILL TO', cardX + 15, yPos + 11);
-          
+
         doc
           .fillColor(rgbToHex(PALETTE.primaryText))
           .fontSize(10)
@@ -212,22 +213,22 @@ export function generatePaymentHistoryPDF(paymentHistory) {
           .fillColor(rgbToHex(PALETTE.secondaryText))
           .text(customer.email || 'N/A', cardX + 15, yPos + 64)
           .text(customer.phone || 'N/A', cardX + 15, yPos + 79);
-        
+
         yPos += 105;
       }
 
       // Payment Details Card
       doc.roundedRect(cardX, yPos, cardWidth, 145, 10).fillAndStroke('#FFFFFF', '#FCD34D');
       doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
+
       doc
         .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
         .text('PAYMENT DETAILS', cardX + 15, yPos + 11);
-      
+
       let detailY = yPos + 47;
-      
+
       // Amount (Large, prominent)
       doc
         .fillColor('#F5A623')
@@ -236,13 +237,13 @@ export function generatePaymentHistoryPDF(paymentHistory) {
         .text('Amount:', cardX + 15, detailY)
         .fontSize(16)
         .text(formatCurrency(paymentHistory.amount, paymentHistory.currency || 'LKR'), cardX + 15, detailY + 18);
-      
+
       detailY += 50;
-      
+
       const paymentDate = paymentHistory.paymentDate ? new Date(paymentHistory.paymentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
       const paymentMethod = paymentHistory.paymentMethod ? paymentHistory.paymentMethod.charAt(0).toUpperCase() + paymentHistory.paymentMethod.slice(1).replace(/-/g, ' ') : 'N/A';
       const paymentType = paymentHistory.paymentType ? paymentHistory.paymentType.charAt(0).toUpperCase() + paymentHistory.paymentType.slice(1).replace(/-/g, ' ') : 'N/A';
-      
+
       doc
         .fillColor(rgbToHex(PALETTE.secondaryText))
         .fontSize(9.5)
@@ -250,45 +251,45 @@ export function generatePaymentHistoryPDF(paymentHistory) {
         .text(`Payment Date: ${paymentDate}`, cardX + 15, detailY)
         .text(`Payment Method: ${paymentMethod}`, cardX + 15, detailY + 15)
         .text(`Payment Type: ${paymentType}`, cardX + 15, detailY + 30);
-      
+
       if (paymentHistory.transactionId) {
         doc.text(`Transaction ID: ${paymentHistory.transactionId}`, cardX + 15, detailY + 45);
       }
-      
+
       yPos += 160;
 
       // Status Card
       const status = paymentHistory.status ? paymentHistory.status.charAt(0).toUpperCase() + paymentHistory.status.slice(1) : 'Pending';
       const statusColor = paymentHistory.status === 'completed' ? '#10B981' : paymentHistory.status === 'pending' ? '#F59E0B' : '#EF4444';
-      
+
       doc.roundedRect(cardX, yPos, cardWidth, 60, 10).fillAndStroke('#FFFFFF', '#FCD34D');
       doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
+
       doc
         .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
         .text('STATUS', cardX + 15, yPos + 11);
-      
+
       doc
         .fontSize(12)
         .fillColor(statusColor)
         .font('Helvetica-Bold')
         .text(status, cardX + 15, yPos + 45);
-      
+
       yPos += 75;
 
       // Notes Card (if exists)
       if (paymentHistory.notes) {
         doc.roundedRect(cardX, yPos, cardWidth, 100, 10).fillAndStroke('#FFFFFF', '#FCD34D');
         doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-        
+
         doc
           .fillColor('#D97706')
           .fontSize(11)
           .font('Helvetica-Bold')
           .text('NOTES', cardX + 15, yPos + 11);
-        
+
         doc
           .fillColor(rgbToHex(PALETTE.secondaryText))
           .fontSize(9)
@@ -299,19 +300,18 @@ export function generatePaymentHistoryPDF(paymentHistory) {
       // ===== FOOTER WAVE =====
       const pageHeight = 842;
       const waveY = pageHeight - 80;
-      
+
       // Draw orange wave at bottom
       doc.moveTo(0, waveY)
-         .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
-         .lineTo(595, pageHeight)
-         .lineTo(0, pageHeight)
-         .fill('#F5A623');
+        .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
+        .lineTo(595, pageHeight)
+        .lineTo(0, pageHeight)
+        .fill('#F5A623');
 
-      // Footer text
       doc
         .fontSize(8)
         .fillColor('#000000')
-        .text('Generated by Trip Sky Way', 50, waveY - 30)
+        .text(`Generated by ${BRANDING.company.name}`, 50, waveY - 30)
         .text(`Generated on: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 50, waveY - 18);
 
       doc.end();
@@ -356,26 +356,26 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
       const headerHeight = 100;
       const headerY = 0;
       const headerWidth = 595;
-      
+
       // Draw black wave background
       doc.rect(0, headerY, headerWidth, headerHeight).fillAndStroke('#000000', '#000000');
-      
+
       // Draw bottom wave curve using bezier curves
       doc.moveTo(0, headerHeight - 30)
-         .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
-         .lineTo(595, 0)
-         .lineTo(0, 0)
-         .fill('#000000');
-      
+        .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
+        .lineTo(595, 0)
+        .lineTo(0, 0)
+        .fill('#000000');
+
       // Draw orange accent curve in top right
       doc.moveTo(400, 0)
-         .bezierCurveTo(450, 40, 520, 60, 595, 50)
-         .lineTo(595, 0)
-         .fill('#F5A623');
+        .bezierCurveTo(450, 40, 520, 60, 595, 50)
+        .lineTo(595, 0)
+        .fill('#F5A623');
 
       let cursorX = 50;
       const logoBuffer = loadLogo();
-      
+
       // Add logo if available
       if (logoBuffer) {
         try {
@@ -396,16 +396,16 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         .fillColor(COLORS.white)
         .fontSize(16)
         .font('Helvetica-Bold')
-        .text('Trip Sky Way', cursorX, headerY + 25)
+        .text(BRANDING.company.name, cursorX, headerY + 25)
         .fontSize(9)
         .font('Helvetica')
-        .text('Curating inspired journeys', cursorX, headerY + 47);
+        .text(BRANDING.company.tagline, cursorX, headerY + 47);
 
       // Add REPORT badge
       const badgeX = 490;
       const badgeY = headerY + 40;
       doc.circle(badgeX, badgeY, 28).fillAndStroke(COLORS.white, COLORS.white);
-      
+
       doc
         .fillColor('#000000')
         .fontSize(7)
@@ -420,22 +420,22 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
       // Title Card
       doc.roundedRect(cardX, yPos, cardWidth, 105, 10).fillAndStroke('#FFFFFF', '#FCD34D');
       doc.rect(cardX, yPos, cardWidth, 32).fillAndStroke('#FEF3C7', '#FEF3C7');
-      
+
       doc
         .fillColor('#D97706')
         .fontSize(11)
         .font('Helvetica-Bold')
         .text('PAYMENT HISTORY REPORT', cardX + 15, yPos + 11);
-      
+
       yPos += 47;
-      
+
       // Date Range Info
       if (dateRange.startDate || dateRange.endDate) {
         doc
           .fontSize(10)
           .fillColor(rgbToHex(PALETTE.secondaryText))
           .font('Helvetica');
-        
+
         let dateRangeText = 'Date Range: ';
         if (dateRange.startDate && dateRange.endDate) {
           dateRangeText += `${new Date(dateRange.startDate).toLocaleDateString()} - ${new Date(dateRange.endDate).toLocaleDateString()}`;
@@ -444,7 +444,7 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         } else if (dateRange.endDate) {
           dateRangeText += `Until ${new Date(dateRange.endDate).toLocaleDateString()}`;
         }
-        
+
         doc.text(dateRangeText, cardX + 15, yPos);
         yPos += 18;
       }
@@ -455,7 +455,7 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         .fillColor(rgbToHex(PALETTE.primaryText))
         .font('Helvetica-Bold')
         .text(`Total Records: ${paymentHistoryList.length}`, cardX + 15, yPos);
-      
+
       yPos += 60;
 
       // ===== TABLE =====
@@ -463,7 +463,7 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
       const tableLeft = 50;
       const tableWidth = 495;
       const rowHeight = 35;
-      
+
       // Define column widths and positions
       const colWidths = {
         number: 30,
@@ -474,7 +474,7 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         type: 70,
         status: 70,
       };
-      
+
       // Orange table header
       doc.rect(tableLeft, tableTop, tableWidth, 28).fillAndStroke('#F5A623', '#F5A623');
 
@@ -485,38 +485,38 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         .fontSize(8)
         .font('Helvetica-Bold')
         .text('#', colX, tableTop + 10)
-        colX += colWidths.number;
-      
+      colX += colWidths.number;
+
       doc.text('DATE', colX, tableTop + 10);
       colX += colWidths.date;
-      
+
       doc.text('CUSTOMER', colX, tableTop + 10);
       colX += colWidths.customer;
-      
+
       doc.text('AMOUNT', colX, tableTop + 10);
       colX += colWidths.amount;
-      
+
       doc.text('METHOD', colX, tableTop + 10);
       colX += colWidths.method;
-      
+
       doc.text('TYPE', colX, tableTop + 10);
       colX += colWidths.type;
-      
+
       doc.text('STATUS', colX, tableTop + 10);
 
-      
+
       let rowY = tableTop + 28;
       const pageHeight = 842;
       const pageMarginBottom = 100;
-      
+
       // Helper function to add new page with table header
       const addNewPageWithHeader = () => {
         doc.addPage();
         rowY = 50;
-        
+
         // Re-draw table header
         doc.rect(tableLeft, rowY, tableWidth, 28).fillAndStroke('#F5A623', '#F5A623');
-        
+
         let colX = tableLeft + 5;
         doc
           .fillColor(COLORS.white)
@@ -524,24 +524,24 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
           .font('Helvetica-Bold')
           .text('#', colX, rowY + 10);
         colX += colWidths.number;
-        
+
         doc.text('DATE', colX, rowY + 10);
         colX += colWidths.date;
-        
+
         doc.text('CUSTOMER', colX, rowY + 10);
         colX += colWidths.customer;
-        
+
         doc.text('AMOUNT', colX, rowY + 10);
         colX += colWidths.amount;
-        
+
         doc.text('METHOD', colX, rowY + 10);
         colX += colWidths.method;
-        
+
         doc.text('TYPE', colX, rowY + 10);
         colX += colWidths.type;
-        
+
         doc.text('STATUS', colX, rowY + 10);
-        
+
         rowY += 28;
       };
 
@@ -554,17 +554,17 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
 
         const customer = record.customer || record.lead;
         const customerName = customer?.name || 'N/A';
-        const paymentDate = record.paymentDate 
+        const paymentDate = record.paymentDate
           ? new Date(record.paymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           : 'N/A';
         const amount = formatCurrency(record.amount, record.currency || 'LKR');
-        const method = record.paymentMethod 
+        const method = record.paymentMethod
           ? record.paymentMethod.charAt(0).toUpperCase() + record.paymentMethod.slice(1).replace(/-/g, ' ')
           : 'N/A';
-        const type = record.paymentType 
+        const type = record.paymentType
           ? record.paymentType.charAt(0).toUpperCase() + record.paymentType.slice(1).replace(/-/g, ' ')
           : 'N/A';
-        const status = record.status 
+        const status = record.status
           ? record.status.charAt(0).toUpperCase() + record.status.slice(1)
           : 'Pending';
 
@@ -587,18 +587,18 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
           .fontSize(8)
           .fillColor(rgbToHex(PALETTE.primaryText))
           .font('Helvetica');
-        
+
         doc.text(`${index + 1}`, colX, rowY + 12);
         colX += colWidths.number;
-        
+
         doc.text(paymentDate, colX, rowY + 12, { width: colWidths.date - 5 });
         colX += colWidths.date;
-        
+
         // Truncate customer name if too long
         const customerText = customerName.length > 18 ? customerName.substring(0, 15) + '...' : customerName;
         doc.text(customerText, colX, rowY + 12, { width: colWidths.customer - 5 });
         colX += colWidths.customer;
-        
+
         doc
           .fillColor('#F5A623')
           .font('Helvetica-Bold')
@@ -606,13 +606,13 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
           .fillColor(rgbToHex(PALETTE.primaryText))
           .font('Helvetica');
         colX += colWidths.amount;
-        
+
         doc.text(method, colX, rowY + 12, { width: colWidths.method - 5 });
         colX += colWidths.method;
-        
+
         doc.text(type, colX, rowY + 12, { width: colWidths.type - 5 });
         colX += colWidths.type;
-        
+
         // Status with color
         const statusColor = status === 'Completed' ? '#10B981' : status === 'Pending' ? '#F59E0B' : '#EF4444';
         doc
@@ -627,21 +627,20 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
-        
+
         const waveY = pageHeight - 80;
-        
+
         // Draw orange wave at bottom
         doc.moveTo(0, waveY)
-           .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
-           .lineTo(595, pageHeight)
-           .lineTo(0, pageHeight)
-           .fill('#F5A623');
+          .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
+          .lineTo(595, pageHeight)
+          .lineTo(0, pageHeight)
+          .fill('#F5A623');
 
-        // Footer text
         doc
           .fontSize(8)
           .fillColor('#000000')
-          .text('Generated by Trip Sky Way', 50, waveY - 30)
+          .text(`Generated by ${BRANDING.company.name}`, 50, waveY - 30)
           .text(`Generated on: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 50, waveY - 18)
           .text(`Page ${i + 1} of ${pages.count}`, tableLeft + tableWidth - 60, waveY - 30);
       }

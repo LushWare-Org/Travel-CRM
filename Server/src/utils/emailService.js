@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import emailConfig from '../config/email.js';
 import logger from '../config/logger.js';
+import BRANDING, { getCopyrightText } from '../config/branding.js';
 
 class EmailService {
   constructor() {
@@ -61,9 +62,9 @@ class EmailService {
   }
 
   async sendWelcomeEmail(user) {
-    const subject = 'Welcome to Trip Sky Way!';
+    const subject = `Welcome to ${BRANDING.company.name}!`;
     const content = `
-      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Welcome to Trip Sky Way, ${user.name}! 🎉</h1>
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Welcome to ${BRANDING.company.name}, ${user.name}! 🎉</h1>
       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Thank you for registering with us. We're excited to help you plan your next adventure!</p>
       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Start exploring our packages and book your dream vacation today!</p>
       <div style="background-color: #FFF5E6; border-left: 4px solid #FF8C00; padding: 15px; margin: 20px 0;">
@@ -144,9 +145,9 @@ class EmailService {
     } else {
       roleDisplay = role;
     }
-    const subject = `Welcome to Trip Sky Way - Your ${roleDisplay} Account`;
+    const subject = `Welcome to ${BRANDING.company.name} - Your ${roleDisplay} Account`;
     const content = `
-      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Welcome to Trip Sky Way! 🎉</h1>
+      <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Welcome to ${BRANDING.company.name}! 🎉</h1>
       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">An account has been created for you as a <strong style="color: #FF8C00;">${roleDisplay}</strong>.</p>
       ${role === 'vendor' && user.businessName ? `<p style="color: #333333; font-size: 16px; margin: 0 0 10px 0;"><strong>Business:</strong> ${user.businessName}</p>` : ''}
@@ -201,7 +202,7 @@ class EmailService {
     const content = `
       <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">Email Verification 📧</h1>
       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
-      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Thank you for registering with Trip Sky Way. Please verify your email address by clicking the button below:</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">Thank you for registering with ${BRANDING.company.name}. Please verify your email address by clicking the button below:</p>
       <div style="text-align: center; margin: 30px 0;">
         ${this.getButton('Verify Email', verificationUrl)}
       </div>
@@ -239,6 +240,11 @@ class EmailService {
   }
 
   getEmailTemplate(content) {
+    const companyName = BRANDING.company.name;
+    const tagline = BRANDING.company.tagline;
+    const website = BRANDING.urls.website;
+    const phone = BRANDING.contact.phone;
+
     return `
       <!DOCTYPE html>
       <html>
@@ -256,10 +262,10 @@ class EmailService {
                   <td style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 50px 32px; text-align: center; position: relative; border-bottom: 4px solid #FF9800;">
                     <div style="position: relative; z-index: 1;">
                       <div style="margin-bottom: 16px;">
-                        <span style="color: #ffffff; font-size: 42px; font-weight: 800; letter-spacing: 3px; text-shadow: 0 0 30px rgba(255, 152, 0, 0.5);">TRIP</span><span style="color: #FF9800; font-size: 42px; font-weight: 800; letter-spacing: 3px; margin: 0 16px; text-shadow: 0 0 20px rgba(255, 152, 0, 0.8); display: inline-block;">SKY</span><span style="color: #ffffff; font-size: 42px; font-weight: 800; letter-spacing: 3px; text-shadow: 0 0 30px rgba(255, 152, 0, 0.5);">WAY</span>
+                        <span style="color: #FF9800; font-size: 36px; font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 20px rgba(255, 152, 0, 0.8);">${companyName}</span>
                       </div>
                       <div style="height: 2px; width: 120px; background: linear-gradient(90deg, transparent, #FF9800, transparent); margin: 12px auto; border-radius: 2px;"></div>
-                      <div style="color: #FF9800; font-size: 12px; margin-top: 12px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600;">✈ Your Journey, Our Passion ✈</div>
+                      <div style="color: #FF9800; font-size: 12px; margin-top: 12px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600;">✈ ${tagline} ✈</div>
                     </div>
                   </td>
                 </tr>
@@ -272,16 +278,16 @@ class EmailService {
                 <!-- Footer -->
                 <tr>
                   <td style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 32px; text-align: center; color: #ffffff;">
-                    <h3 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 8px;">Trip Sky Way</h3>
-                    <p style="color: #999999; font-size: 14px; margin-bottom: 16px; font-style: italic;">Your Journey, Our Passion</p>
+                    <h3 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 8px;">${companyName}</h3>
+                    <p style="color: #999999; font-size: 14px; margin-bottom: 16px; font-style: italic;">${tagline}</p>
                     <div style="margin-bottom: 16px;">
-                      <a href="https://www.tripskyway.com" style="color: #FF9800; text-decoration: none; font-size: 14px;">www.tripskyway.com</a>
+                      <a href="${website}" style="color: #FF9800; text-decoration: none; font-size: 14px;">${website.replace('https://', '').replace('http://', '')}</a>
                     </div>
                     <div style="margin-bottom: 16px;">
-                      <a href="tel:+915591234567" style="color: #999999; text-decoration: none; font-size: 14px;">📞 +91 (559) 123-4567</a>
+                      <a href="tel:${phone.replace(/[^+\d]/g, '')}" style="color: #999999; text-decoration: none; font-size: 14px;">📞 ${phone}</a>
                     </div>
                     <div style="height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 20px auto; max-width: 200px;"></div>
-                    <p style="color: #666666; font-size: 12px; margin-bottom: 0;">© ${new Date().getFullYear()} Trip Sky Way. All rights reserved.</p>
+                    <p style="color: #666666; font-size: 12px; margin-bottom: 0;">${getCopyrightText()}</p>
                   </td>
                 </tr>
               </table>
@@ -301,8 +307,8 @@ class EmailService {
     const customerName = quotation.customer?.name || quotation.lead?.name || 'Customer';
     const quotationNumber = quotation.quotationNumber || quotation._id;
     const subject = quotationNumber
-      ? `Trip Sky Way Quotation - ${quotationNumber}`
-      : 'Trip Sky Way Quotation';
+      ? `${BRANDING.company.name} Quotation - ${quotationNumber}`
+      : `${BRANDING.company.name} Quotation`;
 
     const totalsSection = `
       <ul>
@@ -315,7 +321,7 @@ class EmailService {
     const content = `
       <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Quotation 📋</h1>
       <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for considering Trip Sky Way. We're excited to help you plan your journey! Please find your quotation details below.</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for considering ${BRANDING.company.name}. We're excited to help you plan your journey! Please find your quotation details below.</p>
 
       <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
         <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Quotation Summary</h2>
@@ -366,13 +372,13 @@ class EmailService {
     const customerName = invoice.customer?.name || invoice.lead?.name || 'Customer';
     const invoiceNumber = invoice.invoiceNumber || invoice._id;
     const subject = invoiceNumber
-      ? `Trip Sky Way Invoice - ${invoiceNumber}`
-      : 'Trip Sky Way Invoice';
+      ? `${BRANDING.company.name} Invoice - ${invoiceNumber}`
+      : `${BRANDING.company.name} Invoice`;
 
     const content = `
       <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Invoice 💼</h1>
       <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for choosing Trip Sky Way. Please find your invoice attached.</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for choosing ${BRANDING.company.name}. Please find your invoice attached.</p>
 
       <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
         <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Invoice Summary</h2>
@@ -435,8 +441,8 @@ class EmailService {
     const customerName = receipt.customer?.name || receipt.lead?.name || 'Customer';
     const receiptNumber = receipt.receiptNumber || receipt._id;
     const subject = receiptNumber
-      ? `Trip Sky Way Payment Receipt - ${receiptNumber}`
-      : 'Trip Sky Way Payment Receipt';
+      ? `${BRANDING.company.name} Payment Receipt - ${receiptNumber}`
+      : `${BRANDING.company.name} Payment Receipt`;
 
     const content = `
       <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Payment Receipt ✅</h1>
@@ -504,13 +510,13 @@ class EmailService {
 
   async sendVoucherEmail({ to, voucherNumber, customerName, packageName, pdfBuffer, fileName }) {
     const subject = voucherNumber
-      ? `Trip Sky Way Travel Voucher - ${voucherNumber}`
-      : 'Trip Sky Way Travel Voucher';
+      ? `${BRANDING.company.name} Travel Voucher - ${voucherNumber}`
+      : `${BRANDING.company.name} Travel Voucher`;
 
     const content = `
       <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Travel Voucher 🎫</h1>
       <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 15px 0;">Thank you for choosing Trip Sky Way! We're excited to be part of your travel journey. ✈️🌍</p>
+      <p style="color: #666666; line-height: 1.6; margin: 0 0 15px 0;">Thank you for choosing ${BRANDING.company.name}! We're excited to be part of your travel journey. ✈️🌍</p>
       <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Please find your travel voucher attached. This voucher contains all the important details about your trip.</p>
 
       <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
@@ -544,7 +550,7 @@ class EmailService {
     `;
     const html = this.getEmailTemplate(content);
 
-    const text = `Dear ${customerName},\n\nThank you for choosing Trip Sky Way! Your travel voucher is attached.\nVoucher Number: ${voucherNumber}\nPackage: ${packageName}\n\nPlease review the attached voucher for all travel details.\n\nWarm regards,\nTrip Sky Way Team`;
+    const text = `Dear ${customerName},\n\nThank you for choosing ${BRANDING.company.name}! Your travel voucher is attached.\nVoucher Number: ${voucherNumber}\nPackage: ${packageName}\n\nPlease review the attached voucher for all travel details.\n\nWarm regards,\n${BRANDING.company.name} Team`;
 
     return this.sendEmail({
       to,
@@ -691,7 +697,7 @@ class EmailService {
     `;
     const html = this.getEmailTemplate(content);
 
-    const text = `Dear ${salesRep.name},\n\nA new lead has been ${assignmentType}${assignedByText}.\n\nLead Details:\n${lead.name ? `Name: ${lead.name}\n` : ''}${lead.email ? `Email: ${lead.email}\n` : ''}${lead.phone ? `Phone: ${lead.phone}\n` : ''}${lead.destination ? `Destination: ${lead.destination}\n` : ''}${lead.travelDate ? `Travel Date: ${this.formatDate(lead.travelDate)}\n` : ''}${lead.status ? `Status: ${lead.status.toUpperCase()}\n` : ''}\nView lead in dashboard: ${leadUrl}\n\nBest regards,\nThe Trip Sky Way Team`;
+    const text = `Dear ${salesRep.name},\n\nA new lead has been ${assignmentType}${assignedByText}.\n\nLead Details:\n${lead.name ? `Name: ${lead.name}\n` : ''}${lead.email ? `Email: ${lead.email}\n` : ''}${lead.phone ? `Phone: ${lead.phone}\n` : ''}${lead.destination ? `Destination: ${lead.destination}\n` : ''}${lead.travelDate ? `Travel Date: ${this.formatDate(lead.travelDate)}\n` : ''}${lead.status ? `Status: ${lead.status.toUpperCase()}\n` : ''}\nView lead in dashboard: ${leadUrl}\n\nBest regards,\nThe ${BRANDING.company.name} Team`;
 
     return this.sendEmail({
       to: salesRep.email,
@@ -706,11 +712,11 @@ class EmailService {
   // ==========================================
 
   async sendOTPEmail(user, otp) {
-    const subject = 'Your Trip Sky Way Login OTP Code';
+    const subject = `Your ${BRANDING.company.name} Login OTP Code`;
     const content = `
       <h1 style="color: #000000; font-size: 28px; margin: 0 0 10px 0; text-align: center;">Security Verification 🔐</h1>
       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
-      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Your one-time password (OTP) for logging into your Trip Sky Way account is:</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Your one-time password (OTP) for logging into your ${BRANDING.company.name} account is:</p>
       
       <div style="background-color: #ffffff; padding: 30px; text-align: center; margin: 30px 0; border-radius: 8px; border: 2px dashed #FF8C00;">
         <p style="margin: 0 0 15px 0; color: #666; font-size: 14px; font-weight: bold;">Your OTP Code</p>
@@ -728,11 +734,11 @@ class EmailService {
         </ul>
       </div>
 
-      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; text-align: center;">If you continue to have trouble logging in, please <a href="mailto:support@tripskyway.com" style="color: #FF8C00; text-decoration: none; font-weight: bold;">contact our support team</a>.</p>
+      <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; text-align: center;">If you continue to have trouble logging in, please <a href="mailto:${BRANDING.contact.supportEmail}" style="color: #FF8C00; text-decoration: none; font-weight: bold;">contact our support team</a>.</p>
     `;
     const html = this.getEmailTemplate(content);
 
-    const text = `Dear ${user.name},\n\nYour one-time password (OTP) for logging in is:\n\n${otp}\n\nThis code is valid for 10 minutes.\n\nIMPORTANT: Never share this OTP with anyone. If you didn't request this code, please ignore this email.\n\nBest regards,\nThe Trip Sky Way Team`;
+    const text = `Dear ${user.name},\n\nYour one-time password (OTP) for logging in is:\n\n${otp}\n\nThis code is valid for 10 minutes.\n\nIMPORTANT: Never share this OTP with anyone. If you didn't request this code, please ignore this email.\n\nBest regards,\nThe ${BRANDING.company.name} Team`;
 
     return this.sendEmail({
       to: user.email,
@@ -743,11 +749,11 @@ class EmailService {
   }
 
   async sendLoginNotification(user) {
-    const subject = 'New Login Detected - Trip Sky Way';
+    const subject = `New Login Detected - ${BRANDING.company.name}`;
     const content = `
       <h1 style="color: #000000; font-size: 28px; margin: 0 0 20px 0;">New Login Detected 🔔</h1>
       <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">Dear ${user.name},</p>
-      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">We detected a new login to your Trip Sky Way account.</p>
+      <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">We detected a new login to your ${BRANDING.company.name} account.</p>
       
       <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="color: #FF9800; font-size: 18px; margin: 0 0 15px 0;">Login Details</h3>
@@ -763,7 +769,7 @@ class EmailService {
     `;
     const html = this.getEmailTemplate(content);
 
-    const text = `Dear ${user.name},\n\nWe detected a new login to your Trip Sky Way account at ${new Date().toLocaleString()}.\n\nIf you didn't authorize this login, please contact support immediately.\n\nBest regards,\nThe Trip Sky Way Team`;
+    const text = `Dear ${user.name},\n\nWe detected a new login to your ${BRANDING.company.name} account at ${new Date().toLocaleString()}.\n\nIf you didn't authorize this login, please contact support immediately.\n\nBest regards,\nThe ${BRANDING.company.name} Team`;
 
     return this.sendEmail({
       to: user.email,

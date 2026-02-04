@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../config/logger.js';
+import { BRANDING } from '../config/branding.js';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -117,7 +118,7 @@ async function generateAnalyticsPDF(options) {
 function generateHTMLTemplate({ title, timeRange, stats, charts, summary }) {
   const logoBase64 = loadLogo();
   const logoTag = logoBase64
-    ? `<img src="data:image/png;base64,${logoBase64}" alt="Trip Sky Way" style="height: 24px; margin-right: 8px;">`
+    ? `<img src="data:image/png;base64,${logoBase64}" alt="${BRANDING.company.name}" style="height: 24px; margin-right: 8px;">`
     : '';
 
   const statsHTML = stats
@@ -134,13 +135,13 @@ function generateHTMLTemplate({ title, timeRange, stats, charts, summary }) {
 
   // Organize charts in 2-column grid for better space utilization
   let chartsHTML = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">';
-  
+
   charts.forEach((chart, idx) => {
     // Close current grid and start new one every 4 charts (2 rows of 2)
     if (idx > 0 && idx % 4 === 0) {
       chartsHTML += '</div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; page-break-before: auto;">';
     }
-    
+
     chartsHTML += `
       <div style="page-break-inside: avoid;">
         <h3 style="margin: 0 0 8px 0; font-size: 14px; color: ${COLORS.primaryText}; border-bottom: 2px solid ${COLORS.accent}; padding-bottom: 6px;">
@@ -151,7 +152,7 @@ function generateHTMLTemplate({ title, timeRange, stats, charts, summary }) {
       </div>
     `;
   });
-  
+
   chartsHTML += '</div>';
 
   const summaryHTML = summary.data
@@ -293,7 +294,7 @@ function generateHTMLTemplate({ title, timeRange, stats, charts, summary }) {
           ${logoTag}
           <div class="header-content">
             <h1>${title}</h1>
-            <p>Trip Sky Way Analytics</p>
+            <p>${BRANDING.company.name} Analytics</p>
           </div>
         </div>
         <div class="header-right">
@@ -313,7 +314,7 @@ function generateHTMLTemplate({ title, timeRange, stats, charts, summary }) {
 
       <!-- Footer -->
       <div class="footer">
-        <p>© 2025 Trip Sky Way. All rights reserved. | Confidential Analytics Report</p>
+        <p>© ${new Date().getFullYear()} ${BRANDING.company.name}. All rights reserved. | Confidential Analytics Report</p>
       </div>
     </body>
     </html>

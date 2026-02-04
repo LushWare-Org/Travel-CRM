@@ -1,11 +1,15 @@
 /**
- * New/Edit Package Form Component
- * Main form component combining all package sections
- * Aligned with backend day-based structure
+ * New/Edit Package Form Component - Redesigned
+ * Modern form layout with sections, cards, and premium styling
+ * Preserves all original functionality
  */
 
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
+import {
+  Save, Send, X, Info, ChevronDown, ChevronUp,
+  FileText, DollarSign, Image, Calendar, Sparkles, Eye
+} from 'lucide-react';
 import BasicPackageInfo from './BasicPackageInfo';
 import PackageDetails from './PackageDetails';
 import ImageUpload from '../ImageUpload';
@@ -22,19 +26,23 @@ const NewEditPackageForm = ({
   onCancel,
   onImageUpload,
   onImageRemove,
-  images, // Images state from parent container
-  isUploadingImages, // Upload state from parent
-  hideLeadManagementButtons = false, // Hide buttons when used in lead management
-  onlyItineraryEditable = false, // When true, only itinerary is editable, all other fields are read-only
+  images,
+  isUploadingImages,
+  hideLeadManagementButtons = false,
+  onlyItineraryEditable = false,
 }) => {
   const [localFormData, setLocalFormData] = useState(formData);
   const [showItinerary, setShowItinerary] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    basic: true,
+    details: true,
+    images: true,
+    itinerary: true,
+  });
 
   useEffect(() => {
-    // Initialize localFormData with formData
     let initialData = { ...formData };
 
-    // If days array is empty but duration exists, create default days
     if ((!initialData.days || initialData.days.length === 0) && initialData.duration && initialData.duration > 0) {
       console.log('[Form] Initializing empty days array with', initialData.duration, 'days');
       const newDays = [];
@@ -47,6 +55,10 @@ const NewEditPackageForm = ({
     setLocalFormData(initialData);
   }, [formData]);
 
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
   const handleBasicInfoChange = (data) => {
     setLocalFormData(data);
   };
@@ -56,24 +68,17 @@ const NewEditPackageForm = ({
   };
 
   const handleDurationChange = (nights) => {
-    // Allow empty string for editing
     if (nights === '' || nights === null || nights === undefined) {
-      setLocalFormData((prev) => ({
-        ...prev,
-        duration: '',
-      }));
+      setLocalFormData((prev) => ({ ...prev, duration: '' }));
       return;
     }
 
     const nightsCount = parseInt(nights, 10);
-    // Only proceed if we have a valid number >= 1
     if (isNaN(nightsCount) || nightsCount < 1) {
-      // If invalid, set to 1 night (2 days) as minimum
       const minNights = 1;
-      const minDays = minNights + 1; // 1 night = 2 days
+      const minDays = minNights + 1;
       let newDays = [...(localFormData.days || [])];
 
-      // Ensure at least 2 days exist (1 night = 2 days)
       if (newDays.length === 0) {
         newDays = [createDefaultDay(1), createDefaultDay(2)];
       } else if (newDays.length < minDays) {
@@ -82,34 +87,22 @@ const NewEditPackageForm = ({
         }
       }
 
-      setLocalFormData((prev) => ({
-        ...prev,
-        duration: minDays, // Store days in duration field
-        days: newDays,
-      }));
+      setLocalFormData((prev) => ({ ...prev, duration: minDays, days: newDays }));
       return;
     }
 
-    // Convert nights to days: n nights = n+1 days
     const daysCount = nightsCount + 1;
     let newDays = [...(localFormData.days || [])];
 
-    // Add new days if needed
     if (newDays.length < daysCount) {
       for (let i = newDays.length + 1; i <= daysCount; i++) {
         newDays.push(createDefaultDay(i));
       }
-    }
-    // Remove extra days if needed
-    else if (newDays.length > daysCount) {
+    } else if (newDays.length > daysCount) {
       newDays = newDays.slice(0, daysCount);
     }
 
-    setLocalFormData((prev) => ({
-      ...prev,
-      duration: daysCount, // Store days in duration field (nights + 1)
-      days: newDays,
-    }));
+    setLocalFormData((prev) => ({ ...prev, duration: daysCount, days: newDays }));
   };
 
   const handleDayChange = (dayNumber, dayData) => {
@@ -135,16 +128,11 @@ const NewEditPackageForm = ({
   const handleRemoveDay = (dayNumber) => {
     setLocalFormData((prev) => {
       const filteredDays = prev.days.filter((day) => day.dayNumber !== dayNumber);
-      // Renumber remaining days
       const renumberedDays = filteredDays.map((day, index) => ({
         ...day,
         dayNumber: index + 1,
       }));
-      return {
-        ...prev,
-        duration: renumberedDays.length,
-        days: renumberedDays,
-      };
+      return { ...prev, duration: renumberedDays.length, days: renumberedDays };
     });
   };
 
@@ -174,27 +162,20 @@ const NewEditPackageForm = ({
   };
 
   const handleResetItinerary = () => {
-    setLocalFormData((prev) => ({
-      ...prev,
-      duration: 1,
-      days: [],
-    }));
+    setLocalFormData((prev) => ({ ...prev, duration: 1, days: [] }));
     setShowItinerary(false);
   };
 
   const handleSave = (status) => {
-    // Ensure we preserve _id and id fields
     const packageId = localFormData._id || localFormData.id;
 
-    // IMPORTANT: Always include days array, even if empty
     const dataToSave = {
       ...localFormData,
-      days: localFormData.days || [], // Ensure days is always an array
+      days: localFormData.days || [],
       status,
       updatedDate: new Date().toISOString().split('T')[0],
     };
 
-    // Ensure _id is explicitly included if it exists
     if (packageId) {
       dataToSave._id = packageId;
       if (localFormData.id) {
@@ -212,100 +193,161 @@ const NewEditPackageForm = ({
     console.log('[Form] ====================================');
 
     setFormData(dataToSave);
-    // Pass the updated data directly to onSave instead of relying on state update
     onSave?.(dataToSave);
   };
 
+  // Section Card Component
+  const SectionCard = ({ id, icon: Icon, title, description, children, gradient = 'from-slate-500 to-slate-600' }) => (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
+      <button
+        type="button"
+        onClick={() => toggleSection(id)}
+        className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white hover:from-slate-100 hover:to-slate-50 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className={`w-10 h-10 bg-gradient-to-br ${gradient} rounded-xl flex items-center justify-center shadow-sm`}>
+            <Icon className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+            <p className="text-sm text-slate-500">{description}</p>
+          </div>
+        </div>
+        <div className={`w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center transition-transform ${expandedSections[id] ? 'rotate-180' : ''}`}>
+          <ChevronDown className="w-5 h-5 text-slate-500" />
+        </div>
+      </button>
+
+      {expandedSections[id] && (
+        <div className="px-6 pb-6 pt-2 border-t border-slate-100">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      {/* Basic Info Section - Read-only when onlyItineraryEditable is true */}
+      {/* Basic Info Section */}
       {!onlyItineraryEditable ? (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+        <SectionCard
+          id="basic"
+          icon={FileText}
+          title="Basic Information"
+          description="Package name, destination, and description"
+          gradient="from-blue-500 to-indigo-600"
+        >
           <BasicPackageInfo
             formData={localFormData}
             onChange={handleBasicInfoChange}
             packageId={localFormData._id || localFormData.id || null}
           />
-        </div>
+        </SectionCard>
       ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">Basic Information (Read-Only)</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Package Name:</span>
-              <span className="ml-2 font-medium text-gray-900">{localFormData.name || 'N/A'}</span>
+        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-slate-200 rounded-xl flex items-center justify-center">
+              <FileText className="w-5 h-5 text-slate-500" />
             </div>
             <div>
-              <span className="text-gray-500">Category:</span>
-              <span className="ml-2 font-medium text-gray-900">{localFormData.category || 'N/A'}</span>
+              <h3 className="text-lg font-semibold text-slate-700">Basic Information</h3>
+              <p className="text-xs text-slate-500">Read-only</p>
             </div>
-            <div className="col-span-2">
-              <span className="text-gray-500">Destination:</span>
-              <span className="ml-2 font-medium text-gray-900">{localFormData.destination || 'N/A'}</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl p-4 border border-slate-200">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Package Name</p>
+              <p className="font-medium text-slate-800">{localFormData.name || 'N/A'}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-slate-200">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Category</p>
+              <p className="font-medium text-slate-800">{localFormData.category || 'N/A'}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-slate-200 md:col-span-2">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Destination</p>
+              <p className="font-medium text-slate-800">{localFormData.destination || 'N/A'}</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Package Details Section - Read-only when onlyItineraryEditable is true */}
+      {/* Package Details Section */}
       {!onlyItineraryEditable ? (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Details</h3>
+        <SectionCard
+          id="details"
+          icon={DollarSign}
+          title="Package Details"
+          description="Pricing, duration, and package type"
+          gradient="from-emerald-500 to-teal-600"
+        >
           <PackageDetails
             formData={localFormData}
             nightsInput={(() => {
-              // Convert days to nights for display: nights = days - 1
-              // If duration is null/undefined/0, default to 1 night
               if (localFormData.duration === null || localFormData.duration === undefined || localFormData.duration === '' || localFormData.duration === 0) {
                 return '';
               }
-              // Convert days to nights: if duration is days, nights = days - 1
               const nights = localFormData.duration - 1;
               return nights >= 1 ? nights : '';
             })()}
             onFormChange={handleDetailsChange}
             onNightsChange={handleDurationChange}
           />
-        </div>
+        </SectionCard>
       ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">Package Details (Read-Only)</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Duration:</span>
-              <span className="ml-2 font-medium text-gray-900">{localFormData.duration || 0} Days</span>
+        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-slate-200 rounded-xl flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-slate-500" />
             </div>
             <div>
-              <span className="text-gray-500">Price:</span>
-              <span className="ml-2 font-medium text-gray-900">INR {localFormData.price?.toFixed(2) || '0.00'}</span>
+              <h3 className="text-lg font-semibold text-slate-700">Package Details</h3>
+              <p className="text-xs text-slate-500">Read-only</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl p-4 border border-slate-200">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Duration</p>
+              <p className="font-medium text-slate-800">{localFormData.duration || 0} Days</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-slate-200">
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Price</p>
+              <p className="font-medium text-slate-800">₹ {localFormData.price?.toFixed(2) || '0.00'}</p>
             </div>
             {localFormData.highlights && localFormData.highlights.length > 0 && (
-              <div className="col-span-2">
-                <span className="text-gray-500">Highlights:</span>
-                <ul className="mt-1 list-disc list-inside text-gray-700">
+              <div className="bg-white rounded-xl p-4 border border-slate-200 md:col-span-2">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Highlights</p>
+                <ul className="space-y-1">
                   {localFormData.highlights.map((highlight, idx) => (
-                    <li key={idx}>{highlight}</li>
+                    <li key={idx} className="text-sm text-slate-700 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                      {highlight}
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
             {localFormData.inclusions && localFormData.inclusions.length > 0 && (
-              <div className="col-span-2">
-                <span className="text-gray-500">Inclusions:</span>
-                <ul className="mt-1 list-disc list-inside text-gray-700">
+              <div className="bg-white rounded-xl p-4 border border-slate-200 md:col-span-2">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Inclusions</p>
+                <ul className="space-y-1">
                   {localFormData.inclusions.map((inclusion, idx) => (
-                    <li key={idx}>{inclusion}</li>
+                    <li key={idx} className="text-sm text-slate-700 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                      {inclusion}
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
             {localFormData.exclusions && localFormData.exclusions.length > 0 && (
-              <div className="col-span-2">
-                <span className="text-gray-500">Exclusions:</span>
-                <ul className="mt-1 list-disc list-inside text-gray-700">
+              <div className="bg-white rounded-xl p-4 border border-slate-200 md:col-span-2">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Exclusions</p>
+                <ul className="space-y-1">
                   {localFormData.exclusions.map((exclusion, idx) => (
-                    <li key={idx}>{exclusion}</li>
+                    <li key={idx} className="text-sm text-slate-700 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full" />
+                      {exclusion}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -314,24 +356,34 @@ const NewEditPackageForm = ({
         </div>
       )}
 
-      {/* Images Section - Hidden when onlyItineraryEditable is true */}
+      {/* Images Section */}
       {!onlyItineraryEditable && (
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Images</h3>
+        <SectionCard
+          id="images"
+          icon={Image}
+          title="Package Images"
+          description="Upload attractive images for your package"
+          gradient="from-violet-500 to-purple-600"
+        >
           <ImageUpload
             images={images || localFormData.images || []}
             onImageUpload={onImageUpload}
             onImageRemove={onImageRemove}
             isUploading={isUploadingImages}
           />
-        </div>
+        </SectionCard>
       )}
 
       {/* Itinerary Section */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Itinerary</h3>
+      <SectionCard
+        id="itinerary"
+        icon={Calendar}
+        title="Day-wise Itinerary"
+        description="Plan activities and experiences for each day"
+        gradient="from-amber-500 to-orange-600"
+      >
         {!showItinerary ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <ItineraryEditor
               days={localFormData.days || []}
               onDayChange={handleDayChange}
@@ -347,74 +399,86 @@ const NewEditPackageForm = ({
               <div className="flex gap-3">
                 <button
                   onClick={handleItinerarySubmit}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+                  className="flex-1 px-5 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
                 >
+                  <Eye className="w-5 h-5" />
                   Validate & Preview Itinerary
                 </button>
                 <button
                   onClick={handleResetItinerary}
-                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
+                  className="px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
                 >
-                  Reset Itinerary
+                  Reset
                 </button>
               </div>
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <ItineraryDisplay days={localFormData.days || []} />
             <button
               onClick={() => setShowItinerary(false)}
-              className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
+              className="w-full px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
             >
               Edit Itinerary
             </button>
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {/* Action Buttons */}
       {!hideLeadManagementButtons ? (
-        <div className="space-y-3 pt-6 border-t border-gray-200">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="space-y-4 pt-6 border-t border-slate-200">
+          {/* Tip Box */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100 flex items-start gap-3">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Info className="w-4 h-4 text-blue-600" />
+            </div>
             <p className="text-sm text-blue-800">
-              <strong>💡 Tip:</strong> You can save as draft at any time, even with incomplete itinerary data.
+              <strong>Tip:</strong> You can save as draft at any time, even with incomplete itinerary data.
               Your progress will be preserved and you can continue editing later.
             </p>
           </div>
+
+          {/* Action Buttons */}
           <div className="flex gap-3">
             <button
               onClick={() => handleSave('draft')}
-              className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors font-medium"
+              className="flex-1 px-6 py-3.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium flex items-center justify-center gap-2"
             >
+              <Save className="w-5 h-5" />
               Save as Draft
             </button>
             <button
               onClick={() => handleSave('published')}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl hover:from-emerald-600 hover:to-teal-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
             >
+              <Send className="w-5 h-5" />
               Publish
             </button>
             <button
               onClick={onCancel}
-              className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-200 transition-colors font-medium"
+              className="px-6 py-3.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors font-medium flex items-center justify-center gap-2"
             >
+              <X className="w-5 h-5" />
               Cancel
             </button>
           </div>
         </div>
       ) : (
-        <div className="flex gap-3 pt-6 border-t border-gray-200">
+        <div className="flex gap-3 pt-6 border-t border-slate-200">
           <button
             onClick={() => handleSave('published')}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+            className="flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
           >
+            <Save className="w-5 h-5" />
             Save Customized Package
           </button>
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-200 transition-colors font-medium"
+            className="px-6 py-3.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors font-medium flex items-center justify-center gap-2"
           >
+            <X className="w-5 h-5" />
             Cancel
           </button>
         </div>

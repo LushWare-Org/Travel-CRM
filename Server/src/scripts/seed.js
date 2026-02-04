@@ -13,7 +13,7 @@ dotenv.config();
 const users = [
   {
     name: 'Admin User',
-    email: 'admin@tripskyway.com',
+    email: 'admin@example.com',
     password: 'Admin@123456',
     role: 'admin',
     phone: '9876543210',
@@ -22,7 +22,7 @@ const users = [
   },
   {
     name: 'Amal',
-    email: 'amal@tripskyway.com',
+    email: 'amal@example.com',
     password: 'Sales@123456',
     role: 'salesRep',
     phone: '9876543211',
@@ -31,7 +31,7 @@ const users = [
   },
   {
     name: 'Kamal',
-    email: 'kamal@tripskyway.com',
+    email: 'kamal@example.com',
     password: 'Sales@123456',
     role: 'salesRep',
     phone: '9876543213',
@@ -40,7 +40,7 @@ const users = [
   },
   {
     name: 'Nimal',
-    email: 'nimal@tripskyway.com',
+    email: 'nimal@example.com',
     password: 'Sales@123456',
     role: 'salesRep',
     phone: '9876543214',
@@ -49,7 +49,7 @@ const users = [
   },
   {
     name: 'Sunil',
-    email: 'sunil@tripskyway.com',
+    email: 'sunil@example.com',
     password: 'Sales@123456',
     role: 'salesRep',
     phone: '9876543215',
@@ -244,10 +244,10 @@ const seedDatabase = async () => {
 
     console.log('Test Credentials:\n');
     console.log('Admin Account:');
-    console.log('  Email: admin@tripskyway.com');
+    console.log('  Email: admin@example.com');
     console.log('  Password: Admin@123456\n');
     console.log('Sales Rep Account:');
-    console.log('  Email: sales@tripskyway.com');
+    console.log('  Email: amal@example.com');
     console.log('  Password: Sales@123456\n');
     console.log('Customer Account:');
     console.log('  Email: customer@example.com');
@@ -262,7 +262,7 @@ const seedDatabase = async () => {
 
 /**
  * Reset Admin Password Utility
- * Use this to reset admin@tripskyway.com password back to original
+ * Use this to reset admin@example.com password back to original
  * Run with: node resetAdminPassword.js
  */
 export const resetAdminPassword = async () => {
@@ -270,8 +270,8 @@ export const resetAdminPassword = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✓ Connected to MongoDB');
 
-    const admin = await User.findOne({ email: 'admin@tripskyway.com' });
-    
+    const admin = await User.findOne({ email: 'admin@example.com' });
+
     if (!admin) {
       console.error('❌ Admin user not found');
       process.exit(1);
@@ -282,11 +282,11 @@ export const resetAdminPassword = async () => {
     admin.isTempPassword = false;
     admin.mustChangePassword = false;
     admin.passwordChangedAt = Date.now();
-    
+
     await admin.save();
 
     console.log('✅ Admin password reset successfully!');
-    console.log('\n✓ Email: admin@tripskyway.com');
+    console.log('\n✓ Email: admin@example.com');
     console.log('✓ Password: Admin@123456');
     console.log('\nYou can now log in to the admin panel.\n');
 

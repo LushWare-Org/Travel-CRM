@@ -1,9 +1,14 @@
 /**
- * Package Details Modal Component
- * Displays detailed information about a package
+ * Package Details Modal Component - Redesigned
+ * Modern premium modal for viewing package details
+ * Displays comprehensive information about a package
  */
 
-import { Star } from 'lucide-react';
+import {
+  X, Star, MapPin, Calendar, Users, Briefcase,
+  Tag, DollarSign, Check, XCircle, Sparkles,
+  Image as ImageIcon, CalendarDays, BookOpen, TrendingUp
+} from 'lucide-react';
 import ItineraryDisplay from './ItineraryDisplay';
 import { formatPriceINR } from '../utils/helpers';
 import { STATUS_COLORS } from '../utils/constants';
@@ -12,168 +17,262 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
   if (!pkg) return null;
 
   const formattedPrice = formatPriceINR(pkg.price);
+  const days = pkg.days || pkg.itinerary?.days || [];
+  const nights = pkg.duration ? pkg.duration - 1 : 0;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  // Info Card Component
+  const InfoCard = ({ label, value, icon: Icon, gradient = 'from-slate-500 to-slate-600' }) => (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-all">
+      <div className="flex items-start gap-3">
+        <div className={`w-10 h-10 bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center flex-shrink-0`}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <p className="text-xs text-slate-500 uppercase tracking-wider">{label}</p>
+          <p className="font-semibold text-slate-800 mt-0.5">{value || 'N/A'}</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Section Component
+  const Section = ({ title, icon: Icon, children, className = '' }) => (
+    <div className={className}>
+      <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+        {Icon && <Icon className="w-4 h-4 text-slate-400" />}
+        {title}
+      </h4>
+      {children}
+    </div>
+  );
+
+  // Get status color and icon
+  const getStatusBadge = (status) => {
+    const styles = {
+      published: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      draft: 'bg-amber-100 text-amber-700 border-amber-200',
+      archived: 'bg-slate-100 text-slate-700 border-slate-200',
+    };
+    return styles[status] || 'bg-slate-100 text-slate-700 border-slate-200';
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto relative">
-        {/* Close Button - Top Right Corner */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors text-2xl text-gray-500 hover:text-gray-700 z-10"
-          aria-label="Close modal"
-        >
-          ✕
-        </button>
-        
+    <div
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      {/* Decorative background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-slate-200/50">
         {/* Header */}
-        <div className="border-b border-gray-200 p-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 pr-8">{pkg.name}</h2>
-            <p className="text-gray-600 mt-1">{pkg.description}</p>
+        <div className="relative bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-8 py-6">
+          {/* Decorative pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full transform translate-x-1/2 -translate-y-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full transform -translate-x-1/2 translate-y-1/2" />
+          </div>
+
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-2xl font-bold text-white">{pkg.name}</h2>
+                {pkg.status && (
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(pkg.status)}`}>
+                    {pkg.status.charAt(0).toUpperCase() + pkg.status.slice(1)}
+                  </span>
+                )}
+              </div>
+              {pkg.description && (
+                <p className="text-violet-100 text-sm line-clamp-2">{pkg.description}</p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center transition-all text-white"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Status Badge */}
-          <div className="flex justify-end">
-            {pkg.status && (
-              <span
-                className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                  STATUS_COLORS[pkg.status] || 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {pkg.status.charAt(0).toUpperCase() + pkg.status.slice(1)}
-              </span>
+        <div className="overflow-y-auto max-h-[calc(92vh-140px)] bg-gradient-to-b from-slate-50 to-white">
+          <div className="p-8 space-y-6">
+            {/* Quick Info Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <InfoCard
+                label="Category"
+                value={pkg.category ? pkg.category.charAt(0).toUpperCase() + pkg.category.slice(1) : 'N/A'}
+                icon={Tag}
+                gradient="from-blue-500 to-indigo-600"
+              />
+              <InfoCard
+                label="Destination"
+                value={pkg.destination}
+                icon={MapPin}
+                gradient="from-emerald-500 to-teal-600"
+              />
+              <InfoCard
+                label="Duration"
+                value={pkg.duration ? `${pkg.duration}D / ${nights}N` : 'N/A'}
+                icon={Calendar}
+                gradient="from-amber-500 to-orange-600"
+              />
+              <InfoCard
+                label="Price"
+                value={formattedPrice}
+                icon={DollarSign}
+                gradient="from-violet-500 to-purple-600"
+              />
+              <InfoCard
+                label="Max Group"
+                value={pkg.maxGroupSize || 10}
+                icon={Users}
+                gradient="from-rose-500 to-pink-600"
+              />
+              <InfoCard
+                label="Type"
+                value={pkg.packageType || 'N/A'}
+                icon={Briefcase}
+                gradient="from-cyan-500 to-blue-600"
+              />
+            </div>
+
+            {/* Highlights, Inclusions, Exclusions */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Highlights */}
+              {pkg.highlights && pkg.highlights.length > 0 && (
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-5">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-800 mb-4">
+                    <Sparkles className="w-4 h-4" />
+                    Highlights
+                  </h4>
+                  <ul className="space-y-2">
+                    {pkg.highlights.map((highlight, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-blue-700">
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>{highlight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Inclusions */}
+              {pkg.inclusions && pkg.inclusions.length > 0 && (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100 p-5">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-emerald-800 mb-4">
+                    <Check className="w-4 h-4" />
+                    Inclusions
+                  </h4>
+                  <ul className="space-y-2">
+                    {pkg.inclusions.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-emerald-700">
+                        <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Exclusions */}
+              {pkg.exclusions && pkg.exclusions.length > 0 && (
+                <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-xl border border-rose-100 p-5">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-rose-800 mb-4">
+                    <XCircle className="w-4 h-4" />
+                    Exclusions
+                  </h4>
+                  <ul className="space-y-2">
+                    {pkg.exclusions.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-rose-700">
+                        <XCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Images */}
+            {pkg.images && pkg.images.length > 0 && (
+              <Section title="Package Images" icon={ImageIcon}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {pkg.images.map((image, index) => {
+                    const imageUrl = typeof image === 'string' ? image : image.url;
+                    return (
+                      <div
+                        key={index}
+                        className="aspect-square rounded-xl overflow-hidden border-2 border-slate-200 hover:border-violet-400 transition-all shadow-sm hover:shadow-md group"
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={`Package Image ${index + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
             )}
-          </div>
 
-          {/* Basic Info Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Category</label>
-              <p className="text-sm text-gray-900 mt-1 capitalize">{pkg.category || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Destination</label>
-              <p className="text-sm text-gray-900 mt-1">{pkg.destination || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Duration</label>
-              <p className="text-sm text-gray-900 mt-1">{pkg.duration ? `${pkg.duration} days` : 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Price</label>
-              <p className="text-sm font-bold text-blue-600 mt-1">{formattedPrice || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Max Group Size</label>
-              <p className="text-sm text-gray-900 mt-1">{pkg.maxGroupSize || 10}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Package Type</label>
-              <p className="text-sm text-gray-900 mt-1 capitalize">{pkg.packageType || 'N/A'}</p>
-            </div>
-          </div>
-
-          {/* Highlights */}
-          {pkg.highlights && pkg.highlights.length > 0 && (
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Highlights
-              </label>
-              <div className="space-y-1">
-                {pkg.highlights.map((highlight, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></span>
-                    <span>{highlight}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Inclusions */}
-          {pkg.inclusions && pkg.inclusions.length > 0 && (
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Inclusions
-              </label>
-              <div className="space-y-1">
-                {pkg.inclusions.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                    <span className="text-green-500">✓</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Exclusions */}
-          {pkg.exclusions && pkg.exclusions.length > 0 && (
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Exclusions
-              </label>
-              <div className="space-y-1">
-                {pkg.exclusions.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                    <span className="text-red-500">✗</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Images */}
-          {pkg.images && pkg.images.length > 0 && (
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Images
-              </label>
-              <div className="flex space-x-2 mt-2 flex-wrap gap-2">
-                {pkg.images.map((image, index) => {
-                  // Handle both string URLs and image objects
-                  const imageUrl = typeof image === 'string' ? image : image.url;
-                  return (
-                    <img
-                      key={index}
-                      src={imageUrl}
-                      alt={`Package Image ${index}`}
-                      className="w-24 h-24 object-cover rounded"
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Itinerary */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-3">
-              Day-wise Itinerary
-            </label>
-            {/* Check for days in multiple possible locations */}
-            {(() => {
-              const days = pkg.days || pkg.itinerary?.days || [];
-              return Array.isArray(days) && days.length > 0 ? (
+            {/* Itinerary */}
+            <Section title="Day-wise Itinerary" icon={CalendarDays}>
+              {Array.isArray(days) && days.length > 0 ? (
                 <ItineraryDisplay days={days} />
               ) : (
-                <p className="text-sm text-gray-600">No itinerary specified</p>
-              );
-            })()}
-          </div>
+                <div className="bg-slate-50 rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                  <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500">No itinerary specified</p>
+                </div>
+              )}
+            </Section>
 
-          {/* Rating and Reviews */}
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              <span className="font-semibold">{pkg.rating || 0}</span>
-              <span className="text-sm text-gray-600">({pkg.numReviews || 0} reviews)</span>
+            {/* Rating and Reviews */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100 p-5">
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <Star className="w-6 h-6 fill-amber-500 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-700">{pkg.rating || 0}</p>
+                    <p className="text-xs text-amber-600">out of 5</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <BookOpen className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-700">{pkg.numReviews || 0}</p>
+                    <p className="text-xs text-amber-600">reviews</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-700">{pkg.bookings || 0}</p>
+                    <p className="text-xs text-amber-600">bookings</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-gray-600">Bookings: {pkg.bookings || 0}</p>
           </div>
         </div>
       </div>

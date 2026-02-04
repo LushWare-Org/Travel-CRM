@@ -21,10 +21,10 @@ const loadImageAsBase64 = (url) => {
       resolve(null);
       return;
     }
-    
+
     const img = new Image();
     img.crossOrigin = 'Anonymous';
-    
+
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
@@ -39,12 +39,12 @@ const loadImageAsBase64 = (url) => {
         resolve(null);
       }
     };
-    
+
     img.onerror = () => {
       console.warn('Failed to load image:', url);
       resolve(null);
     };
-    
+
     img.src = url;
   });
 };
@@ -59,7 +59,7 @@ const loadPackageImages = async (pkg) => {
     packageImages: [],
     dayImages: {}
   };
-  
+
   try {
     // Load main package images
     if (pkg.images && Array.isArray(pkg.images) && pkg.images.length > 0) {
@@ -67,11 +67,11 @@ const loadPackageImages = async (pkg) => {
         const url = img.url || img;
         return loadImageAsBase64(url);
       });
-      
+
       const loadedImages = await Promise.all(imagePromises);
       images.packageImages = loadedImages.filter(img => img !== null);
     }
-    
+
     // Load day-specific images
     const dayEntries = pkg.days || pkg.itinerary?.days || [];
     if (dayEntries && dayEntries.length > 0) {
@@ -86,7 +86,7 @@ const loadPackageImages = async (pkg) => {
         }
       }
     }
-    
+
     console.log('[PDF Service] Loaded images:', {
       packageImages: images.packageImages.length,
       dayImages: Object.keys(images.dayImages).length
@@ -94,7 +94,7 @@ const loadPackageImages = async (pkg) => {
   } catch (error) {
     console.warn('[PDF Service] Error loading images:', error);
   }
-  
+
   return images;
 };
 
@@ -205,42 +205,42 @@ function legacyBuildPDFDocument(pkg, images) {
       // Footer background
       doc.setFillColor(...lightBg);
       doc.rect(0, pageHeight - 25, pageWidth, 25, 'F');
-      
+
       // Decorative line
       doc.setDrawColor(...primaryColor);
       doc.setLineWidth(0.8);
       doc.line(margin, pageHeight - 23, pageWidth - margin, pageHeight - 23);
-      
+
       // Contact info
       doc.setFontSize(9);
       doc.setTextColor(...secondaryColor);
       doc.setFont(undefined, 'normal');
-      
+
       const footerY = pageHeight - 15;
-      
+
       // Email (clickable)
       doc.setTextColor(41, 128, 185);
       const emailText = PDF_CONFIG.email;
       const emailWidth = doc.getTextWidth(emailText);
       doc.textWithLink(emailText, margin, footerY, { url: `mailto:${PDF_CONFIG.email}` });
-      
+
       // Phone
       doc.setTextColor(...secondaryColor);
       doc.text(` | ${PDF_CONFIG.phone}`, margin + emailWidth, footerY);
-      
+
       // Website (clickable, right-aligned)
       doc.setTextColor(41, 128, 185);
       const websiteText = PDF_CONFIG.website.replace('https://', '');
       const websiteWidth = doc.getTextWidth(websiteText);
-      doc.textWithLink(websiteText, pageWidth - margin - websiteWidth, footerY, { 
-        url: PDF_CONFIG.website 
+      doc.textWithLink(websiteText, pageWidth - margin - websiteWidth, footerY, {
+        url: PDF_CONFIG.website
       });
-      
+
       // Page number (center)
       doc.setTextColor(...secondaryColor);
       doc.setFontSize(8);
       doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
-      
+
       doc.setTextColor(0, 0, 0);
       pageNumber++;
     };
@@ -260,17 +260,17 @@ function legacyBuildPDFDocument(pkg, images) {
     // Helper function for section titles with icon-like design
     const addSectionTitle = (title, color = primaryColor) => {
       ensureSpace(18);
-      
+
       // Background box with rounded effect
       doc.setFillColor(...color);
       doc.roundedRect(margin, yPos, contentWidth, 10, 2, 2, 'F');
-      
+
       // White text
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
       doc.text(title, margin + 4, yPos + 7);
-      
+
       // Reset
       doc.setFont(undefined, 'normal');
       doc.setTextColor(0, 0, 0);
@@ -280,23 +280,23 @@ function legacyBuildPDFDocument(pkg, images) {
     // Helper function for info boxes
     const addInfoBox = (label, value, icon = '●') => {
       if (!value) return;
-      
+
       ensureSpace(10);
-      
+
       // Light background
       doc.setFillColor(250, 250, 250);
       doc.roundedRect(margin, yPos, contentWidth, 8, 1, 1, 'F');
-      
+
       // Icon/bullet
       doc.setTextColor(...primaryColor);
       doc.setFontSize(10);
       doc.text(icon, margin + 2, yPos + 5.5);
-      
+
       // Label (bold)
       doc.setTextColor(...secondaryColor);
       doc.setFont(undefined, 'bold');
       doc.text(label + ': ', margin + 6, yPos + 5.5);
-      
+
       // Value
       doc.setFont(undefined, 'normal');
       doc.setTextColor(0, 0, 0);
@@ -304,7 +304,7 @@ function legacyBuildPDFDocument(pkg, images) {
       const valueText = String(value).trim();
       const lines = doc.splitTextToSize(valueText, contentWidth - labelWidth - 12);
       doc.text(lines[0], margin + 8 + labelWidth, yPos + 5.5);
-      
+
       yPos += 10;
     };
 
@@ -481,11 +481,11 @@ function legacyBuildPDFDocument(pkg, images) {
     const highlightItems = (Array.isArray(pkg.highlights) && pkg.highlights.length
       ? pkg.highlights
       : [
-          `Guided explorations of ${pkg.destination || 'signature attractions'}`,
-          'Curated accommodations with local character',
-          'Authentic culinary experiences & cultural immersions',
-          'Dedicated travel specialist and concierge support',
-        ]).slice(0, 6);
+        `Guided explorations of ${pkg.destination || 'signature attractions'}`,
+        'Curated accommodations with local character',
+        'Authentic culinary experiences & cultural immersions',
+        'Dedicated travel specialist and concierge support',
+      ]).slice(0, 6);
 
     leftY = addSectionLabel('Highlights', leftX, leftY);
     leftY = addBulletColumn(highlightItems, {
@@ -499,22 +499,22 @@ function legacyBuildPDFDocument(pkg, images) {
     const inclusionItems = (Array.isArray(pkg.inclusions) && pkg.inclusions.length
       ? pkg.inclusions
       : [
-          'Premium hotel accommodation',
-          'Daily breakfast & signature meals',
-          'Private guided excursions',
-          'All arranged ground transfers',
-          'Entrance fees to listed attractions',
-        ]).slice(0, 6);
+        'Premium hotel accommodation',
+        'Daily breakfast & signature meals',
+        'Private guided excursions',
+        'All arranged ground transfers',
+        'Entrance fees to listed attractions',
+      ]).slice(0, 6);
 
     const exclusionItems = (Array.isArray(pkg.exclusions) && pkg.exclusions.length
       ? pkg.exclusions
       : [
-          'International airfare',
-          'Personal expenses & shopping',
-          'Travel insurance policies',
-          'Gratuities for guides & drivers',
-          'Optional excursions not listed',
-        ]).slice(0, 6);
+        'International airfare',
+        'Personal expenses & shopping',
+        'Travel insurance policies',
+        'Gratuities for guides & drivers',
+        'Optional excursions not listed',
+      ]).slice(0, 6);
 
     const basePairY = leftY;
     const inclusionLabelBottom = addSectionLabel('Inclusions', leftX, basePairY);
@@ -707,27 +707,27 @@ function legacyBuildPDFDocument(pkg, images) {
 
     // ========== DAY-WISE ITINERARY ==========
     ensureSpace(30);
-    
+
     // Itinerary header page
     doc.setFillColor(...accentColor);
     doc.rect(0, yPos - 3, pageWidth, 18, 'F');
-    
+
     doc.setFontSize(18);
     doc.setTextColor(255, 255, 255);
     doc.setFont(undefined, 'bold');
     doc.text('DETAILED ITINERARY', pageWidth / 2, yPos + 8, { align: 'center' });
-    
+
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
     yPos += 23;
 
     // Process each day
     const days = pkg.days || pkg.itinerary?.days || [];
-    
+
     if (days && days.length > 0) {
       days.forEach((day, dayIndex) => {
         ensureSpace(40);
-        
+
         doc.setFillColor(...coverPalette.cardBg);
         doc.roundedRect(margin, yPos, contentWidth, 16, 3, 3, 'F');
 
@@ -746,7 +746,7 @@ function legacyBuildPDFDocument(pkg, images) {
         doc.setFont(undefined, 'normal');
         doc.setTextColor(92, 74, 58);
         yPos += 20;
-        
+
         // Day image if available
         const dayNumber = day.dayNumber || dayIndex + 1;
         if (images.dayImages[dayNumber]) {
@@ -773,31 +773,31 @@ function legacyBuildPDFDocument(pkg, images) {
 
           yPos += legacyImageHeight + legacyTopMargin + 2;
         }
-        
+
         // Description
         if (day.description) {
           ensureSpace(15);
-          
+
           doc.setFillColor(253, 247, 235);
           const descLines = doc.splitTextToSize(String(day.description).trim(), contentWidth - 8);
           const boxHeight = descLines.length * 5 + 6;
-          
+
           doc.roundedRect(margin, yPos, contentWidth, boxHeight, 2, 2, 'F');
           doc.setDrawColor(...coverPalette.divider);
           doc.roundedRect(margin, yPos, contentWidth, boxHeight, 2, 2, 'S');
-          
+
           doc.setFontSize(10);
           doc.setTextColor(92, 74, 58);
           doc.text(descLines, margin + 4, yPos + 5);
-          
+
           yPos += boxHeight + 5;
           doc.setTextColor(92, 74, 58);
         }
-        
+
         // Locations
         if (day.locations && day.locations.length > 0) {
           ensureSpace(10);
-          
+
           doc.setFillColor(250, 241, 226);
           const locLines = doc.splitTextToSize(
             day.locations.map((l) => String(l).trim()).join('  •  '),
@@ -818,11 +818,11 @@ function legacyBuildPDFDocument(pkg, images) {
 
           yPos += locHeight + 4;
         }
-        
+
         // Activities
         if (day.activities && day.activities.length > 0) {
           ensureSpace(10);
-          
+
           doc.setFillColor(245, 232, 210);
           const actLines = doc.splitTextToSize(
             day.activities.map((a) => String(a).trim()).join('  •  '),
@@ -843,92 +843,92 @@ function legacyBuildPDFDocument(pkg, images) {
 
           yPos += actHeight + 4;
         }
-        
+
         // Accommodation
         if (day.accommodation && day.accommodation.name) {
           ensureSpace(10);
-          
+
           doc.setFillColor(253, 247, 235);
           doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
-          
+
           doc.setFontSize(10);
           doc.setFont(undefined, 'bold');
           doc.setTextColor(176, 134, 80);
           doc.text('Stay', margin + 4, yPos + 7);
-          
+
           doc.setFont(undefined, 'normal');
           doc.setTextColor(92, 74, 58);
-          
+
           let accText = String(day.accommodation.name).trim();
           if (day.accommodation.type) accText += ` (${day.accommodation.type})`;
           if (day.accommodation.rating) {
             accText += ` - ${day.accommodation.rating} stars`;
           }
-          
+
           doc.text(accText, margin + 26, yPos + 7);
           yPos += 14;
         }
-        
+
         // Meals
         if (day.meals && (day.meals.breakfast || day.meals.lunch || day.meals.dinner)) {
           ensureSpace(10);
-          
+
           doc.setFillColor(246, 232, 224);
           doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
-          
+
           doc.setFontSize(10);
           doc.setFont(undefined, 'bold');
           doc.setTextColor(193, 102, 80);
           doc.text('Meals', margin + 4, yPos + 7);
-          
+
           doc.setFont(undefined, 'normal');
           doc.setTextColor(92, 74, 58);
-          
+
           const meals = [];
           if (day.meals.breakfast) meals.push('Breakfast');
           if (day.meals.lunch) meals.push('Lunch');
           if (day.meals.dinner) meals.push('Dinner');
-          
+
           doc.text(meals.join('  •  '), margin + 26, yPos + 7);
           yPos += 14;
         }
-        
+
         // Transport
         if (day.transport) {
           ensureSpace(10);
-          
+
           doc.setFillColor(232, 239, 233);
           doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
-          
+
           doc.setFontSize(10);
           doc.setFont(undefined, 'bold');
           doc.setTextColor(...coverPalette.accent);
           doc.text('Transport', margin + 4, yPos + 7);
-          
+
           doc.setFont(undefined, 'normal');
           doc.setTextColor(92, 74, 58);
-          
+
           const transportText = String(day.transport).charAt(0).toUpperCase() + String(day.transport).slice(1);
           doc.text(transportText, margin + 26, yPos + 7);
           yPos += 14;
         }
-        
+
         // Notes
         if (day.notes) {
           ensureSpace(12);
-          
+
           doc.setFontSize(9);
           doc.setFont(undefined, 'italic');
           doc.setTextColor(142, 116, 94);
-          
+
           const notesLines = doc.splitTextToSize('Note: ' + String(day.notes).trim(), contentWidth - 6);
           doc.text(notesLines, margin + 3, yPos + 5);
-          
+
           yPos += notesLines.length * 4.5 + 5;
           doc.setFont(undefined, 'normal');
           doc.setTextColor(92, 74, 58);
         }
-        
+
         // Separator between days
         yPos += 8;
         if (dayIndex < days.length - 1) {
@@ -949,19 +949,19 @@ function legacyBuildPDFDocument(pkg, images) {
     if (pkg.terms && pkg.terms.length > 0) {
       ensureSpace(20);
       addSectionTitle('Terms & Conditions', [149, 165, 166]);
-      
+
       doc.setFontSize(9);
       doc.setTextColor(80, 80, 80);
-      
+
       pkg.terms.forEach((term, index) => {
         const termText = String(term).trim();
         const lines = doc.splitTextToSize(`${index + 1}. ${termText}`, contentWidth - 4);
-        
+
         ensureSpace(lines.length * 4 + 3);
         doc.text(lines, margin + 2, yPos);
         yPos += lines.length * 4 + 3;
       });
-      
+
       doc.setTextColor(0, 0, 0);
     }
 
@@ -1273,19 +1273,18 @@ function buildPDFDocument(pkg, images) {
       const { innerPadding: customPadding } = options;
       const summaryText =
         overview ||
-        `Experience a bespoke journey with guided experiences, curated stays, and unforgettable highlights in ${
-          pkg.destination || 'your chosen destination'
+        `Experience a bespoke journey with guided experiences, curated stays, and unforgettable highlights in ${pkg.destination || 'your chosen destination'
         }.`;
 
       const sanitizedHighlights = (
         Array.isArray(highlightItems) && highlightItems.length
           ? highlightItems
           : [
-              `Guided explorations of ${pkg.destination || 'signature attractions'}`,
-              'Curated accommodations with local character',
-              'Authentic culinary experiences & cultural immersions',
-              'Dedicated travel specialist and concierge support',
-            ]
+            `Guided explorations of ${pkg.destination || 'signature attractions'}`,
+            'Curated accommodations with local character',
+            'Authentic culinary experiences & cultural immersions',
+            'Dedicated travel specialist and concierge support',
+          ]
       )
         .map((item) => String(item).trim())
         .filter(Boolean)
@@ -1367,12 +1366,12 @@ function buildPDFDocument(pkg, images) {
       doc.setFont(undefined, 'bold');
       doc.setFontSize(12);
       doc.setTextColor(255, 255, 255);
-      doc.text('Trip Sky Way', cursorX, headerY + 14);
+      doc.text(PDF_CONFIG.company, cursorX, headerY + 14);
 
       doc.setFont(undefined, 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(210, 210, 210);
-      doc.text('Curating inspired journeys', cursorX, headerY + 21);
+      doc.text(PDF_CONFIG.tagline, cursorX, headerY + 21);
 
       setBodyFont();
       return headerY + headerHeight;
@@ -1572,8 +1571,8 @@ function buildPDFDocument(pkg, images) {
       typeof pkg.duration === 'string'
         ? pkg.duration
         : pkg.duration
-        ? `${pkg.duration} Day Trip`
-        : `${normalizeDays().length || 5} Day Trip`;
+          ? `${pkg.duration} Day Trip`
+          : `${normalizeDays().length || 5} Day Trip`;
 
     const headerBottom = drawBrandHeader(images.brandLogo);
 
@@ -1660,7 +1659,7 @@ function buildPDFDocument(pkg, images) {
 
     const { highlightItems, innerPadding: highlightPadding } = drawOverviewHighlightsCard(
       pkg.description ||
-        `Experience the very best of ${destinationTitle} with a professionally curated program balancing exploration, culture, and moments of pure relaxation.`,
+      `Experience the very best of ${destinationTitle} with a professionally curated program balancing exploration, culture, and moments of pure relaxation.`,
       pkg.highlights,
       { innerPadding: 14 },
     );
@@ -1716,12 +1715,12 @@ function buildPDFDocument(pkg, images) {
     const inclusionItems = (Array.isArray(pkg.inclusions) && pkg.inclusions.length
       ? pkg.inclusions
       : [
-          'Premium hotel accommodation',
-          'Daily breakfast and curated dining',
-          'Private guided excursions',
-          'All arranged ground transfers',
-          'Entrance fees to listed experiences',
-        ]
+        'Premium hotel accommodation',
+        'Daily breakfast and curated dining',
+        'Private guided excursions',
+        'All arranged ground transfers',
+        'Entrance fees to listed experiences',
+      ]
     ).map((item) => String(item).trim());
 
     drawBulletListCard('Inclusions', inclusionItems, {

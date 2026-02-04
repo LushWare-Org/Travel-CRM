@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Itinerary from '../models/itinerary.model.js';
 import AppError from '../utils/appError.js';
+import BRANDING from '../config/branding.js';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -165,13 +166,13 @@ class ItineraryService {
       .fillColor(brandColor)
       .fontSize(32)
       .font('Helvetica-Bold')
-      .text('TRIP SKY WAY', 50, 80, { align: 'center' });
+      .text(BRANDING.company.name.toUpperCase(), 50, 80, { align: 'center' });
 
     doc
       .fillColor('#64748B')
       .fontSize(12)
       .font('Helvetica')
-      .text('Your Journey, Our Passion', 50, 120, { align: 'center' });
+      .text(BRANDING.company.tagline || 'Your Journey, Our Passion', 50, 120, { align: 'center' });
 
     // Decorative line
     doc
@@ -226,8 +227,8 @@ class ItineraryService {
       .font('Helvetica')
       .text('📧 Email:', 90, contactBoxY + 45)
       .fillColor(brandColor)
-      .text('info@tripskyway.com', 180, contactBoxY + 45, {
-        link: 'mailto:info@tripskyway.com',
+      .text(BRANDING.contact.email, 180, contactBoxY + 45, {
+        link: `mailto:${BRANDING.contact.email}`,
         underline: true,
       });
 
@@ -236,8 +237,8 @@ class ItineraryService {
       .font('Helvetica')
       .text('📞 Phone:', 90, contactBoxY + 65)
       .fillColor(brandColor)
-      .text('+91 9876543210', 180, contactBoxY + 65, {
-        link: 'tel:+919876543210',
+      .text(BRANDING.contact.phone, 180, contactBoxY + 65, {
+        link: `tel:${BRANDING.contact.phone.replace(/[^+\d]/g, '')}`,
         underline: true,
       });
 
@@ -246,8 +247,8 @@ class ItineraryService {
       .font('Helvetica')
       .text('🌐 Website:', 90, contactBoxY + 85)
       .fillColor(brandColor)
-      .text('www.tripskyway.com', 180, contactBoxY + 85, {
-        link: 'https://www.tripskyway.com',
+      .text(BRANDING.urls.website.replace('https://', '').replace('http://', ''), 180, contactBoxY + 85, {
+        link: BRANDING.urls.website,
         underline: true,
       });
 
@@ -256,7 +257,7 @@ class ItineraryService {
       .font('Helvetica')
       .text('📍 Address:', 90, contactBoxY + 105)
       .fillColor('#64748B')
-      .text('123 Travel Street, Mumbai, India 400001', 180, contactBoxY + 105, {
+      .text(BRANDING.address.full || `${BRANDING.address.street || ''}, ${BRANDING.address.city || ''} ${BRANDING.address.postalCode || ''}`, 180, contactBoxY + 105, {
         width: 310,
       });
 
@@ -696,8 +697,8 @@ class ItineraryService {
       .fillColor(brandColor)
       .fontSize(11)
       .font('Helvetica')
-      .text('info@tripskyway.com', 70, yPos + 28, {
-        link: 'mailto:info@tripskyway.com',
+      .text(BRANDING.contact.email, 70, yPos + 28, {
+        link: `mailto:${BRANDING.contact.email}`,
         underline: true,
       });
     doc
@@ -718,8 +719,8 @@ class ItineraryService {
       .fillColor(brandColor)
       .fontSize(11)
       .font('Helvetica')
-      .text('+91 9876543210', 70, yPos + 28, {
-        link: 'tel:+919876543210',
+      .text(BRANDING.contact.phone, 70, yPos + 28, {
+        link: `tel:${BRANDING.contact.phone.replace(/[^+\d]/g, '')}`,
         underline: true,
       });
     doc
@@ -738,8 +739,8 @@ class ItineraryService {
       .fillColor(brandColor)
       .fontSize(11)
       .font('Helvetica')
-      .text('+91 9876543210', 325, yPos + 28, {
-        link: 'https://wa.me/919876543210',
+      .text(BRANDING.contact.whatsapp || BRANDING.contact.phone, 325, yPos + 28, {
+        link: `https://wa.me/${(BRANDING.contact.whatsapp || BRANDING.contact.phone).replace(/[^\d]/g, '')}`,
         underline: true,
       });
     doc
@@ -760,8 +761,8 @@ class ItineraryService {
       .fillColor(brandColor)
       .fontSize(11)
       .font('Helvetica')
-      .text('www.tripskyway.com', 70, yPos + 28, {
-        link: 'https://www.tripskyway.com',
+      .text(BRANDING.urls.website.replace('https://', '').replace('http://', ''), 70, yPos + 28, {
+        link: BRANDING.urls.website,
         underline: true,
       });
 
@@ -778,9 +779,9 @@ class ItineraryService {
       .fillColor('#64748B')
       .fontSize(10)
       .font('Helvetica')
-      .text('Trip Sky Way Travel & Tourism Pvt. Ltd.', 70, yPos + 30)
-      .text('123 Travel Street, Andheri West', 70, yPos + 45)
-      .text('Mumbai, Maharashtra 400001, India', 70, yPos + 60);
+      .text(BRANDING.company.legalName || BRANDING.company.name, 70, yPos + 30)
+      .text(BRANDING.address.street || '', 70, yPos + 45)
+      .text(`${BRANDING.address.city || ''}, ${BRANDING.address.state || ''} ${BRANDING.address.postalCode || ''}`.trim() || BRANDING.address.full || '', 70, yPos + 60);
 
     yPos += 100;
 
@@ -808,7 +809,7 @@ class ItineraryService {
       .fontSize(10)
       .font('Helvetica')
       .text('Facebook', 70, yPos + 12, {
-        link: 'https://facebook.com/tripskyway',
+        link: BRANDING.social.facebook || '#',
         underline: true,
         continued: true,
       })
@@ -816,7 +817,7 @@ class ItineraryService {
       .text('  |  ', { continued: true, link: null })
       .fillColor(brandColor)
       .text('Instagram', {
-        link: 'https://instagram.com/tripskyway',
+        link: BRANDING.social.instagram || '#',
         underline: true,
         continued: true,
       })
@@ -824,7 +825,7 @@ class ItineraryService {
       .text('  |  ', { continued: true, link: null })
       .fillColor(brandColor)
       .text('Twitter', {
-        link: 'https://twitter.com/tripskyway',
+        link: BRANDING.social.twitter || '#',
         underline: true,
         continued: true,
       })
@@ -832,7 +833,7 @@ class ItineraryService {
       .text('  |  ', { continued: true, link: null })
       .fillColor(brandColor)
       .text('LinkedIn', {
-        link: 'https://linkedin.com/company/tripskyway',
+        link: BRANDING.social.linkedin || '#',
         underline: true,
       });
 
@@ -857,8 +858,8 @@ class ItineraryService {
       .fillColor('#EF4444')
       .fontSize(12)
       .font('Helvetica-Bold')
-      .text('+91 9876543210', 70, yPos + 26, {
-        link: 'tel:+919876543210',
+      .text(BRANDING.contact.phone, 70, yPos + 26, {
+        link: `tel:${BRANDING.contact.phone.replace(/[^+\d]/g, '')}`,
         underline: true,
       });
 
@@ -868,7 +869,7 @@ class ItineraryService {
       .fillColor('#64748B')
       .fontSize(11)
       .font('Helvetica-Oblique')
-      .text('Thank you for choosing Trip Sky Way!', 50, yPos, { align: 'center' })
+      .text(`Thank you for choosing ${BRANDING.company.name}!`, 50, yPos, { align: 'center' })
       .text('We look forward to making your travel dreams come true.', 50, yPos + 18, { align: 'center' });
   }
 
@@ -883,25 +884,25 @@ class ItineraryService {
       .fontSize(8)
       .fillColor(secondaryColor)
       .font('Helvetica-Bold')
-      .text('Trip Sky Way', 50, footerY, { continued: true })
+      .text(BRANDING.company.name, 50, footerY, { continued: true })
       .font('Helvetica')
       .text(' | ', { continued: true, link: null })
       .fillColor('#1E40AF')
-      .text('www.tripskyway.com', {
+      .text(BRANDING.urls.website.replace('https://', '').replace('http://', ''), {
         continued: true,
-        link: 'https://www.tripskyway.com',
+        link: BRANDING.urls.website,
         underline: true,
       })
       .fillColor(secondaryColor)
       .text(' | ', { continued: true, link: null })
-      .text('info@tripskyway.com', {
+      .text(BRANDING.contact.email, {
         continued: true,
-        link: 'mailto:info@tripskyway.com',
+        link: `mailto:${BRANDING.contact.email}`,
         underline: true,
       })
       .text(' | ', { continued: true, link: null })
-      .text('+91 9876543210', {
-        link: 'tel:+919876543210',
+      .text(BRANDING.contact.phone, {
+        link: `tel:${BRANDING.contact.phone.replace(/[^+\d]/g, '')}`,
         underline: true,
       });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   TimeRangeFilter,
   StatCard,
@@ -7,15 +7,14 @@ import {
   PieChartComponent,
   BarChartComponent,
 } from "../Common";
-import { DollarSign, Wallet, TrendingUp, AlertCircle, Download } from "lucide-react";
+import { DollarSign, Wallet, TrendingUp, AlertCircle, Download, CreditCard, Receipt } from "lucide-react";
 import { analyticsAPI } from "../../../../services/api";
 import { exportBillingAnalyticsPDF } from "../../utils/exportAnalytics";
 import toast from "react-hot-toast";
 
 /**
- * BillingAnalytics Component
- * Displays revenue and billing statistics with support for multiple time ranges
- * Includes: daily, weekly, monthly, and annual metrics
+ * BillingAnalytics Component - Redesigned
+ * Modern layout with unique component structure
  */
 const BillingAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
@@ -44,18 +43,20 @@ const BillingAnalytics = () => {
   );
 
   const formatCurrency = (value) => currencyFormatter.format(value || 0);
+  const formatShort = (value) => {
+    if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
+    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
+    return `₹${value}`;
+  };
 
   const calculateTrend = (current, previous) => {
-    if (!previous || previous === 0) {
-      return current ? "100.0" : "0.0";
-    }
+    if (!previous || previous === 0) return current ? "100.0" : "0.0";
     return (((current - previous) / previous) * 100).toFixed(1);
   };
 
   const getLastTwoValues = (data, key) => {
-    if (!data || data.length < 2) {
-      return { current: 0, previous: 0 };
-    }
+    if (!data || data.length < 2) return { current: 0, previous: 0 };
     const previous = data[data.length - 2]?.[key] || 0;
     const current = data[data.length - 1]?.[key] || 0;
     return { current, previous };
@@ -87,12 +88,7 @@ const BillingAnalytics = () => {
       } catch (error) {
         console.error("Failed to load billing analytics", error);
         setErrorMessage(error.message || "Failed to load billing analytics data.");
-        setStats({
-          totalRevenue: 0,
-          totalOutstanding: 0,
-          totalPotentialRevenue: 0,
-          pendingInvoices: 0,
-        });
+        setStats({ totalRevenue: 0, totalOutstanding: 0, totalPotentialRevenue: 0, pendingInvoices: 0 });
         setRevenueTrendData([]);
         setOutstandingTrendData([]);
         setPaymentStatusData([]);
@@ -101,16 +97,13 @@ const BillingAnalytics = () => {
         setLoading(false);
       }
     };
-
     fetchBillingAnalytics();
   }, [timeRange]);
 
-  // Handle PDF export
   const handleExportPDF = async () => {
     try {
       setExporting(true);
       const toastId = toast.loading("Preparing billing analytics PDF...");
-
       const summaryMetrics = [
         { label: "Total Revenue", value: formatCurrency(stats.totalRevenue) },
         { label: "Outstanding Amount", value: formatCurrency(stats.totalOutstanding) },
@@ -118,12 +111,7 @@ const BillingAnalytics = () => {
         { label: "Pending Invoices", value: stats.pendingInvoices },
         { label: "Time Range", value: timeRange.toUpperCase() },
       ];
-
-      await exportBillingAnalyticsPDF({
-        timeRange,
-        summaryMetrics,
-      });
-
+      await exportBillingAnalyticsPDF({ timeRange, summaryMetrics });
       toast.dismiss(toastId);
       toast.success("Billing analytics PDF downloaded successfully!");
     } catch (error) {
@@ -137,194 +125,165 @@ const BillingAnalytics = () => {
   const revenueTrend = getLastTwoValues(revenueTrendData, "revenue");
   const outstandingTrend = getLastTwoValues(outstandingTrendData, "outstanding");
   const potentialRevenueTrend = getLastTwoValues(revenueTrendData, "target");
-  const pendingInvoicesTrend = outstandingTrendData.length
-    ? outstandingTrendData[outstandingTrendData.length - 1]?.outstanding -
-      (outstandingTrendData[outstandingTrendData.length - 2]?.outstanding || 0)
-    : 0;
 
-  // Area chart configuration
   const revenueAreas = [
-    {
-      dataKey: "revenue",
-      fill: "#3b82f6",
-      stroke: "#1e40af",
-      name: "Actual Revenue",
-    },
-    { dataKey: "target", fill: "#e5e7eb", stroke: "#9ca3af", name: "Target" },
-  ];
-
-  // Bar chart configuration
-  const invoiceBars = [
-    { dataKey: "revenue", fill: "#3b82f6", name: "Revenue" },
-    { dataKey: "invoices", fill: "#10b981", name: "Invoices" },
+    { dataKey: "revenue", fill: "#10b981", stroke: "#059669", name: "Revenue" },
+    { dataKey: "target", fill: "#e2e8f0", stroke: "#94a3b8", name: "Target" },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header with Time Range Filter and Export Button */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Billing & Invoicing Analytics</h2>
-          <p className="text-gray-600 mt-1">Revenue and payment tracking</p>
+          <h2 className="text-xl font-bold text-slate-800">Billing & Revenue</h2>
+          <p className="text-sm text-slate-500 mt-1">Track invoices, payments, and financial performance</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
           <button
             onClick={handleExportPDF}
             disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/25"
           >
-            <Download size={18} />
-            {exporting ? "Exporting..." : "Export PDF"}
+            <Download size={16} />
+            {exporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon={DollarSign}
-          label="Total Revenue"
-          value={formatCurrency(stats.totalRevenue)}
-          trend={`${calculateTrend(revenueTrend.current, revenueTrend.previous)}%`}
-          trendDirection={revenueTrend.current >= revenueTrend.previous ? "up" : "down"}
-          color="green"
-        />
-        <StatCard
-          icon={Wallet}
-          label="Outstanding Amount"
-          value={formatCurrency(stats.totalOutstanding)}
-          trend={`${calculateTrend(outstandingTrend.current, outstandingTrend.previous)}%`}
-          trendDirection={outstandingTrend.current <= outstandingTrend.previous ? "down" : "up"}
-          color="orange"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Potential Revenue"
-          value={formatCurrency(stats.totalPotentialRevenue)}
-          trend={`${calculateTrend(potentialRevenueTrend.current, potentialRevenueTrend.previous)}%`}
-          trendDirection={potentialRevenueTrend.current >= potentialRevenueTrend.previous ? "up" : "down"}
-          color="purple"
-        />
-        <StatCard
-          icon={AlertCircle}
-          label="Pending Invoices"
-          value={stats.pendingInvoices}
-          trend={`${pendingInvoicesTrend > 0 ? `+${pendingInvoicesTrend}` : pendingInvoicesTrend}`}
-          trendDirection={pendingInvoicesTrend <= 0 ? "down" : "up"}
-          color="blue"
-        />
+      {/* Revenue Summary Cards - Unique 2x2 Grid with Large Numbers */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Total Revenue</span>
+          </div>
+          <p className="text-3xl font-bold">{formatShort(stats.totalRevenue)}</p>
+          <p className="text-xs mt-2 opacity-70">
+            {calculateTrend(revenueTrend.current, revenueTrend.previous)}% from last period
+          </p>
+        </div>
+        
+        <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Wallet className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Outstanding</span>
+          </div>
+          <p className="text-3xl font-bold">{formatShort(stats.totalOutstanding)}</p>
+          <p className="text-xs mt-2 opacity-70">{stats.pendingInvoices} pending invoices</p>
+        </div>
+        
+        <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Potential</span>
+          </div>
+          <p className="text-3xl font-bold">{formatShort(stats.totalPotentialRevenue)}</p>
+          <p className="text-xs mt-2 opacity-70">Available to collect</p>
+        </div>
+        
+        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Receipt className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Invoices</span>
+          </div>
+          <p className="text-3xl font-bold">{stats.pendingInvoices}</p>
+          <p className="text-xs mt-2 opacity-70">Awaiting payment</p>
+        </div>
       </div>
 
-      {/* Revenue Trend Chart */}
+      {/* Revenue Trend - Full Width */}
       <ChartContainer
         title="Revenue Trend"
-        description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} revenue comparison with targets`}
+        description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} revenue vs targets`}
       >
         {loading ? (
-          <div className="flex items-center justify-center h-[350px] text-gray-500">
-            Loading revenue trend...
+          <div className="flex items-center justify-center h-[320px]">
+            <div className="animate-spin w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full" />
           </div>
         ) : revenueTrendData.length > 0 ? (
-          <AreaChartComponent data={revenueTrendData} areas={revenueAreas} xAxisKey="label" height={350} />
+          <AreaChartComponent data={revenueTrendData} areas={revenueAreas} xAxisKey="label" height={320} />
         ) : (
-          <div className="flex items-center justify-center h-[350px] text-gray-500">
-            {errorMessage || "No revenue data available for the selected range."}
+          <div className="flex items-center justify-center h-[320px] text-slate-400">
+            {errorMessage || "No revenue data available"}
           </div>
         )}
       </ChartContainer>
 
-      {/* Additional breakdown charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Payment Status & Outstanding - 2 Columns */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ChartContainer
-          title="Payment Status Overview"
-          description="Paid vs Outstanding invoices"
+          title="Payment Status"
+          description="Distribution of payment statuses"
         >
           {loading ? (
-            <div className="flex items-center justify-center h-[320px] text-gray-500">
-              Loading payment status data...
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="animate-spin w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full" />
             </div>
           ) : paymentStatusData.some((item) => item.value > 0) ? (
             <PieChartComponent
               data={paymentStatusData}
               dataKey="value"
               nameKey="name"
-              height={320}
+              height={280}
               colors={["#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#8b5cf6"]}
-              legendProps={false}
-              pieProps={{
-                innerRadius: 70,
-                outerRadius: 110,
-                cx: "45%",
-                cy: "50%",
-                label: ({ name, value }) => (value > 0 ? `${name}: ${formatCurrency(value)}` : ""),
-              }}
             />
           ) : (
-            <div className="flex items-center justify-center h-[320px] text-gray-500">
-              {errorMessage || "No payment status data available for the selected range."}
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No payment status data available
             </div>
           )}
         </ChartContainer>
 
         <ChartContainer
-          title="Outstanding Amounts Trend"
-          description={`${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)} pending payments and potential revenues`}
+          title="Outstanding Trend"
+          description="Pending payments over time"
         >
           {loading ? (
-            <div className="flex items-center justify-center h-[320px] text-gray-500">
-              Loading outstanding data...
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="animate-spin w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full" />
             </div>
           ) : outstandingTrendData.length > 0 ? (
             <AreaChartComponent
               data={outstandingTrendData}
               areas={[
-                {
-                  dataKey: "outstanding",
-                  fill: "#ef4444",
-                  stroke: "#991b1b",
-                  name: "Outstanding (₹)",
-                },
-                {
-                  dataKey: "potentialRevenue",
-                  fill: "#8b5cf6",
-                  stroke: "#6d28d9",
-                  name: "Potential Revenue (₹)",
-                },
+                { dataKey: "outstanding", fill: "#ef4444", stroke: "#dc2626", name: "Outstanding" },
+                { dataKey: "potentialRevenue", fill: "#8b5cf6", stroke: "#7c3aed", name: "Potential" },
               ]}
               xAxisKey="label"
-              height={320}
+              height={280}
             />
           ) : (
-            <div className="flex items-center justify-center h-[320px] text-gray-500">
-              {errorMessage || "No outstanding data available for the selected range."}
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No outstanding data available
             </div>
           )}
         </ChartContainer>
       </div>
 
+      {/* Invoice Breakdown - Full Width */}
       <ChartContainer
-        title="Invoice Breakdown by Category"
-        description="Revenue and invoices by service category"
+        title="Invoice Breakdown"
+        description="Revenue and invoices by category"
       >
         {loading ? (
-          <div className="flex items-center justify-center h-[300px] text-gray-500">
-            Loading invoice breakdown...
+          <div className="flex items-center justify-center h-[280px]">
+            <div className="animate-spin w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full" />
           </div>
         ) : invoiceBreakdownData.length > 0 ? (
           <BarChartComponent
             data={invoiceBreakdownData}
             bars={[
-              { dataKey: "revenue", fill: "#3b82f6", name: "Revenue" },
+              { dataKey: "revenue", fill: "#6366f1", name: "Revenue" },
               { dataKey: "invoices", fill: "#10b981", name: "Invoices" },
             ]}
             xAxisKey="name"
-            height={300}
-            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+            height={280}
           />
         ) : (
-          <div className="flex items-center justify-center h-[300px] text-gray-500">
-            {errorMessage || "No invoice category data available for the selected range."}
+          <div className="flex items-center justify-center h-[280px] text-slate-400">
+            No invoice data available
           </div>
         )}
       </ChartContainer>

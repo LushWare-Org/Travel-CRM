@@ -3,26 +3,25 @@ import {
   Pie,
   Cell,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 
 export const DEFAULT_PIE_COLORS = [
-  "#3b82f6",
+  "#6366f1",
   "#10b981",
   "#f59e0b",
   "#ef4444",
   "#8b5cf6",
   "#ec4899",
-  "#6366f1",
+  "#3b82f6",
   "#22c55e",
   "#f97316",
   "#a855f7",
 ];
 
 /**
- * PieChartComponent
- * Reusable pie chart for distribution visualization
+ * PieChartComponent - Completely Redesigned
+ * Modern donut chart with center label and external legend list
  */
 const PieChartComponent = ({
   data,
@@ -35,73 +34,89 @@ const PieChartComponent = ({
   tooltipFormatter,
   labelFormatter,
 }) => {
-  const defaultLegend = ({ payload = [] }) => {
-    if (!payload || payload.length === 0) return null;
-    const isHorizontal = legendProps?.layout === "horizontal";
-    return (
-      <ul className={`${isHorizontal ? "flex flex-wrap justify-center gap-x-6 gap-y-2" : "flex flex-col gap-2"} text-xs text-gray-700`}>
-        {payload.map((entry, index) => (
-          <li key={`${entry.value}-${index}`} className="flex items-center gap-1.5 whitespace-nowrap">
-            <span
-              className="w-2.5 h-2.5 rounded-full border border-gray-200 flex-shrink-0"
-              style={{ backgroundColor: entry.color || entry.payload?.fill }}
-            />
-            <span className="truncate">
-              {entry.payload?.[nameKey] ?? entry.value}:{" "}
-              <span className="font-semibold text-gray-900">
-                {entry.payload?.[dataKey] ?? entry.value}
-              </span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    );
-  };
+  // Calculate total for center label
+  const total = data.reduce((sum, item) => sum + (item[dataKey] || 0), 0);
 
   const shouldRenderLegend = legendProps !== false;
-  const effectiveLegendProps = shouldRenderLegend
-    ? { align: "right", verticalAlign: "middle", ...(legendProps === true ? {} : legendProps) }
-    : null;
+
+  // Custom label renderer - positioned outside
+  const renderCustomLabel = ({ cx, cy, midAngle, outerRadius, percent, name }) => {
+    if (percent < 0.05) return null; // Skip small segments
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 20;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return null; // We use external legend instead
+  };
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <PieChart margin={legendProps?.layout === "horizontal" ? { left: 0, right: 0, top: 8, bottom: 60 } : { left: 0, right: 0, top: 16, bottom: 16 }}>
-        <Pie
-          data={data}
-          labelLine={false}
-          dataKey={dataKey}
-          cx="50%"
-          cy="40%"
-          innerRadius={Math.min(height * 0.15, 60)}
-          outerRadius={Math.min(height * 0.35, 110)}
-          {...pieProps}
-          label={
-            pieProps.label !== undefined
-              ? pieProps.label
-              : ((entry) => {
-                  if (typeof labelFormatter === "function") {
-                    return labelFormatter(entry);
-                  }
-                  const value = entry?.[dataKey];
-                  const label = entry?.[nameKey];
-                  return value > 0 ? `${label}: ${value}` : "";
-                })
-          }
-        >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+    <div className="flex items-center justify-center gap-6 h-full">
+      {/* Chart */}
+      <div className="relative" style={{ width: height * 0.8, height: height * 0.9 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey={dataKey}
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="85%"
+              paddingAngle={2}
+              stroke="none"
+              {...pieProps}
+            >
+              {data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colors[index % colors.length]}
+                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={tooltipFormatter || ((value) => `${value}`)}
+              contentStyle={{
+                backgroundColor: 'rgba(255,255,255,0.95)',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
+                padding: '12px 16px'
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+
+        {/* Center Label */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-2xl font-bold text-slate-800">{total}</span>
+          <span className="text-xs text-slate-400">Total</span>
+        </div>
+      </div>
+
+      {/* Legend */}
+      {shouldRenderLegend && (
+        <div className="flex flex-col gap-2 max-h-full overflow-y-auto pr-2">
+          {data.map((item, index) => (
+            <div key={`legend-${index}`} className="flex items-center gap-2.5">
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: colors[index % colors.length] }}
+              />
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm text-slate-600 truncate max-w-[120px]">
+                  {item[nameKey]}
+                </span>
+                <span className="text-sm font-semibold text-slate-800">
+                  {item[dataKey]}
+                </span>
+              </div>
+            </div>
           ))}
-        </Pie>
-        <Tooltip formatter={tooltipFormatter || ((value) => `${value}`)} />
-        {shouldRenderLegend && effectiveLegendProps && (
-          <Legend
-            layout="vertical"
-            content={effectiveLegendProps?.content || defaultLegend}
-            {...effectiveLegendProps}
-          />
-        )}
-      </PieChart>
-    </ResponsiveContainer>
+        </div>
+      )}
+    </div>
   );
 };
 

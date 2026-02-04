@@ -1,96 +1,87 @@
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 /**
- * StatCard Component - Redesigned
- * Displays a single statistic with icon, value, label, and trend
- * Compact and modern with gradient backgrounds
+ * StatCard Component - Completely Redesigned
+ * Unique horizontal layout with left accent border
  */
-const StatCard = ({ 
-  icon: Icon, 
-  label, 
-  value, 
-  trend, 
+const StatCard = ({
+  icon: Icon,
+  label,
+  value,
+  trend,
   trendDirection = "up",
   unit = "",
   color = "blue",
   loading = false
 }) => {
-  const gradientClasses = {
-    blue: "from-blue-500 to-blue-600",
-    green: "from-green-500 to-green-600",
-    purple: "from-purple-500 to-purple-600",
-    orange: "from-orange-500 to-orange-600",
-    red: "from-red-500 to-red-600",
-    pink: "from-pink-500 to-pink-600",
-    cyan: "from-cyan-500 to-cyan-600",
-    indigo: "from-indigo-500 to-indigo-600",
+  const colorConfig = {
+    blue: { accent: '#3b82f6', bg: 'bg-blue-500/10', text: 'text-blue-600' },
+    green: { accent: '#10b981', bg: 'bg-emerald-500/10', text: 'text-emerald-600' },
+    purple: { accent: '#8b5cf6', bg: 'bg-violet-500/10', text: 'text-violet-600' },
+    orange: { accent: '#f59e0b', bg: 'bg-amber-500/10', text: 'text-amber-600' },
+    red: { accent: '#ef4444', bg: 'bg-red-500/10', text: 'text-red-600' },
+    pink: { accent: '#ec4899', bg: 'bg-pink-500/10', text: 'text-pink-600' },
+    cyan: { accent: '#06b6d4', bg: 'bg-cyan-500/10', text: 'text-cyan-600' },
+    indigo: { accent: '#6366f1', bg: 'bg-indigo-500/10', text: 'text-indigo-600' },
   };
 
-  const lightBgClasses = {
-    blue: "bg-blue-50 border-blue-100",
-    green: "bg-green-50 border-green-100",
-    purple: "bg-purple-50 border-purple-100",
-    orange: "bg-orange-50 border-orange-100",
-    red: "bg-red-50 border-red-100",
-    pink: "bg-pink-50 border-pink-100",
-    cyan: "bg-cyan-50 border-cyan-100",
-    indigo: "bg-indigo-50 border-indigo-100",
-  };
-
-  const iconColorClasses = {
-    blue: "text-blue-600",
-    green: "text-green-600",
-    purple: "text-purple-600",
-    orange: "text-orange-600",
-    red: "text-red-600",
-    pink: "text-pink-600",
-    cyan: "text-cyan-600",
-    indigo: "text-indigo-600",
-  };
-
-  const trendClasses = {
-    up: "text-green-600",
-    down: "text-red-600",
-    neutral: "text-gray-600",
-  };
-
+  const config = colorConfig[color] || colorConfig.blue;
   const TrendIcon = trendDirection === "up" ? TrendingUp : TrendingDown;
 
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-slate-200 rounded-xl" />
+          <div className="flex-1">
+            <div className="w-24 h-3 bg-slate-200 rounded mb-2" />
+            <div className="w-16 h-6 bg-slate-200 rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`${lightBgClasses[color]} rounded-2xl border p-5 hover:shadow-md transition-all hover:scale-105 duration-300 cursor-pointer`}>
-      {/* Header with Icon */}
-      <div className="flex justify-between items-start mb-3">
-        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{label}</h3>
-        <div className={`bg-gradient-to-br ${gradientClasses[color]} p-2 rounded-xl shadow-sm`}>
-          {loading ? (
-            <div className="w-5 h-5 bg-white rounded-full animate-pulse" />
-          ) : (
-            <Icon className="w-5 h-5 text-white" />
-          )}
+    <div
+      className="group relative bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+    >
+      {/* Left Accent Bar */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1.5"
+        style={{ backgroundColor: config.accent }}
+      />
+
+      <div className="p-5 pl-6">
+        <div className="flex items-start justify-between gap-4">
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{label}</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-800">
+                {value}
+                {unit && <span className="text-sm ml-1 font-medium text-slate-500">{unit}</span>}
+              </span>
+            </div>
+
+            {/* Trend */}
+            {trend && (
+              <div className={`flex items-center gap-1.5 mt-2 text-xs font-semibold ${trendDirection === 'up' ? 'text-emerald-600' : 'text-rose-600'
+                }`}>
+                <TrendIcon className="w-3.5 h-3.5" />
+                <span>{trend}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Icon */}
+          <div
+            className={`w-12 h-12 rounded-xl ${config.bg} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}
+          >
+            <Icon className={`w-5 h-5 ${config.text}`} />
+          </div>
         </div>
       </div>
-      
-      {/* Value */}
-      <div className="mb-3">
-        <p className="text-xl font-bold text-gray-900 break-words">
-          {loading ? (
-            <span className="inline-block w-20 h-7 bg-gray-200 rounded animate-pulse" />
-          ) : (
-            <>
-              {value}
-              {unit && <span className="text-sm ml-1 font-semibold text-gray-600">{unit}</span>}
-            </>
-          )}
-        </p>
-      </div>
-      
-      {/* Trend */}
-      {trend && !loading && (
-        <div className={`flex items-center gap-1.5 ${trendClasses[trendDirection]} text-xs font-bold`}>
-          <TrendIcon className="w-4 h-4" />
-          <span>{trend}</span>
-        </div>
-      )}
     </div>
   );
 };

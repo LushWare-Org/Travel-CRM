@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import axios from 'axios';
+import BRANDING, { getBankDetails } from '../config/branding.js';
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -10,43 +11,32 @@ const dirname = path.dirname(filename);
 // Path to logo in Management public folder
 const LOGO_PATH = path.join(dirname, '../../../Management/public/website-logo-1.png');
 
-// Mock Payment Details
-const PAYMENT_DETAILS = {
-  accountName: 'TRIPSKYWAY',
-  bankName: 'ICICI Bank',
-  accountNumber: '663705600957',
-  ifscCode: 'ICIC0006637',
-  accountType: 'Current Account',
-  branch: 'New Delhi',
-  upiId: 'harsh8412@icici',
-  phone: '9128446597'
+// Payment Details - loaded from branding config (environment variables)
+const getPaymentDetails = () => {
+  const bank = getBankDetails();
+  return {
+    accountName: bank.accountName || BRANDING.company.name.toUpperCase(),
+    bankName: bank.bankName || 'Your Bank',
+    accountNumber: bank.accountNumber || '0000000000',
+    ifscCode: bank.ifscCode || 'XXXX0000000',
+    accountType: bank.accountType || 'Current Account',
+    branch: bank.branch || 'Main Branch',
+    upiId: bank.upiId || '',
+    phone: bank.phone || BRANDING.contact.phone
+  };
 };
 
-// Google Reviews Data Store (Simulated Dynamic Data)
+// Customer Reviews - These should be customized per deployment or made configurable
 const DESTINATION_REVIEWS = {
-  'Maldives': [
-    { name: 'NITI KENNY', rating: 5, text: 'We booked our honeymoon package to Maldives with Harsh from Tripskyway. He has been very friendly, kind, cooperative...', time: '11 months ago' },
-    { name: 'Jeevan S.A', rating: 5, text: 'Had a very a good experience in Maldives @ Adaran select Huduran Fushi Resort.... Which was suggested and booked for us', time: 'a year ago' },
-    { name: 'Vigneshwaran G', rating: 5, text: 'I would like to extend my sincere thanks to Harsh and the Tripsky team for their exceptional service in organizing our honeymoon trip to Maldives', time: 'a week ago' },
-    { name: 'ASHIS KUMAR', rating: 5, text: 'Harsh is best tour programmer i have ever met so far. By planning your tour & travel from Tripskyway you are tensionfree', time: 'a year ago' }
-  ],
-  'Dubai': [
-    { name: 'Sara Khan', rating: 5, text: 'Dubai trip was absolutely fantastic! The desert safari organized by Tripskyway was the highlight. Everything was smooth.', time: '2 weeks ago' },
-    { name: 'Michael R', rating: 4, text: 'Great coordination for our family trip to Dubai. Hotel choices were excellent near the Marina. Thanks team.', time: '1 month ago' },
-    { name: 'Priya Sethi', rating: 5, text: 'Burj Khalifa tickets and transfers were perfectly timed. No hassle at all. Will recommend Tripskyway to friends.', time: '3 months ago' }
-  ],
-  'Europe': [
-    { name: 'James W', rating: 5, text: 'Our Euro tour was magical. Paris and Swiss Alps were breathtaking. The itinerary was well paced.', time: '3 weeks ago' },
-    { name: 'Anjali Gupta', rating: 5, text: 'Best travel agency for Europe. Visa assistance was very helpful. Hotels were centrally located.', time: '2 months ago' }
-  ],
   'Generic': [
-    { name: 'Rahul Sharma', rating: 5, text: 'Amazing experience with Trip Sky Way! The itinerary was perfectly planned and executed. Highly recommended!', time: '1 month ago' },
-    { name: 'Sneha Patel', rating: 5, text: 'Very professional team. They took care of every small detail. Will definitely book again.', time: '2 months ago' },
-    { name: 'Amit Verma', rating: 4, text: 'Good service and support throughout the trip. Had a memorable vacation.', time: '3 months ago' }
+    { name: 'Happy Customer', rating: 5, text: 'Amazing experience! The itinerary was perfectly planned and executed. Highly recommended!', time: '1 month ago' },
+    { name: 'Satisfied Traveler', rating: 5, text: 'Very professional team. They took care of every small detail. Will definitely book again.', time: '2 months ago' },
+    { name: 'Travel Enthusiast', rating: 4, text: 'Good service and support throughout the trip. Had a memorable vacation.', time: '3 months ago' }
   ]
 };
 
-const TERMS_TEXT = `Exclusions:
+// Terms text - uses BRANDING for company name
+const getTermsText = () => `Exclusions:
 • Air Ticket
 • Expenses of personal nature such as drinks, telephone, and laundry bills etc.
 • Tips & Porter Charges
@@ -55,8 +45,8 @@ const TERMS_TEXT = `Exclusions:
 • 5% TCS will be extra on Land Part which is Refundable after Filling ITR
 
 Note on TCS:
-(Get 100% credit of the TCS Amount, TCS is collected via Tripskyway)
-TCS credit would reflect in your Form 26AS on quarterly basis. You may also request TCS certificate from Tripskyway.
+(Get 100% credit of the TCS Amount, TCS is collected via ${BRANDING.company.name})
+TCS credit would reflect in your Form 26AS on quarterly basis. You may also request TCS certificate from ${BRANDING.company.name}.
 
 Claiming your credit: Charged TCS can be claimed against the tax payable at the time of filing the return. Receiving Credit: In case there is no tax payable, you can claim the refund of TCS amount at the time of filing income tax return.
 
@@ -67,17 +57,17 @@ Example Scenarios:
 
 Terms & Conditions for TCS:
 • The above is just a quotation and no reservation has been processed at the time of this request. The quote would be revised in case of any change in the package requirements. Rates quoted are subject to verification at the time of definite booking.
-• The pictures have been sourced from multiple third-party sources. Tripskyway does not assume any responsibility with respect to discrepancies in look and feel of different hotel properties/sightseeing with respect to actual v/s what is displayed on the images. Tripskyway does not own these images and has included them in the quotation for representation purposes to give clients a better idea of the inclusions of their trip.
+• The pictures have been sourced from multiple third-party sources. ${BRANDING.company.name} does not assume any responsibility with respect to discrepancies in look and feel of different hotel properties/sightseeing with respect to actual v/s what is displayed on the images. ${BRANDING.company.name} does not own these images and has included them in the quotation for representation purposes to give clients a better idea of the inclusions of their trip.
 • Any changes or cancellation after cancellation dateline will result in cancellation charges.
 • It is mandatory that you carefully read, understand and accept all the Service Terms shared with you before making your first payment. Your decision to make the first payment to us implies you have been provided with a copy of our service terms. That you have read and understood these terms, and agree to the same assuming full responsibility.
 • In case client wishes to prepone/postpone his or her travel dates, we request you to kindly reach us 30 days prior to journey date via Call/E-mail/WhatsApp. Additional charges will be applicable for postponing & preponing the travel dates.
 • In all prepone or postpone scenarios, the services and the costing will be subject to availability of services and season/off season time.
 • We do not accept any changes in plan within 30 days of travel date. However, in rare cases like adverse climatic conditions or strikes, package can be postponed which will be intimated to you beforehand.
-• Maldivian resorts will never accept duplicate bookings under a client's name. If the client has made a prior booking in the same resort (either directly / through another agent / without client's knowledge - booking placed by another agent), it is the client's responsibility to cancel it. Tripskyway may assist in expediting the cancellation of the proxy booking, but we are unable to process the cancellation ourselves. To maintain transparency, the client should demand written confirmation from the previous agency for all such duplicate booking cancellations. Tripskyway is not responsible for bookings that are rejected due to a prior reservation/duplicate booking. If tripskyway's booking is rejected due to a prior/duplicate reservation, the client's booking amount will be considered non-refundable.
-• Any dispute arising out of such use of the website or services offered by Tripskyway or any other conflict, whatsoever, is subject to the laws of India and to the exclusive jurisdiction of the courts in Delhi.
-• Tripskyway Not Owns any additional expenses incurred due to any flight delay or cancellation, weather conditions, Political closures, technical faults, Health Emergency etc.`;
+• Maldivian resorts will never accept duplicate bookings under a client's name. If the client has made a prior booking in the same resort (either directly / through another agent / without client's knowledge - booking placed by another agent), it is the client's responsibility to cancel it. ${BRANDING.company.name} may assist in expediting the cancellation of the proxy booking, but we are unable to process the cancellation ourselves. To maintain transparency, the client should demand written confirmation from the previous agency for all such duplicate booking cancellations. ${BRANDING.company.name} is not responsible for bookings that are rejected due to a prior reservation/duplicate booking. If ${BRANDING.company.name}'s booking is rejected due to a prior/duplicate reservation, the client's booking amount will be considered non-refundable.
+• Any dispute arising out of such use of the website or services offered by ${BRANDING.company.name} or any other conflict, whatsoever, is subject to the laws of ${BRANDING.legal.jurisdiction} and to the exclusive jurisdiction of the courts in ${BRANDING.legal.courtLocation || BRANDING.address.city || 'the applicable jurisdiction'}.
+• ${BRANDING.company.name} Not Owns any additional expenses incurred due to any flight delay or cancellation, weather conditions, Political closures, technical faults, Health Emergency etc.`;
 
-const CANCELLATION_POLICY = `CANCELLATION POLICY:
+const getCancellationPolicy = () => `CANCELLATION POLICY:
 In the event of cancellation of tour/travel services due to any avoidable/unavoidable reason/s, we must be notified of the same in writing.
 
 Cancellation charges will be effective from the date we receive advice in writing, and cancellation charges will be as follows:
@@ -87,7 +77,7 @@ Note: Rooms and flights are subject to availability. If there is any change and 
 • 30 days prior to arrival: 100% of the Tour/service cost.
 • The booking Amount is non-refundable 5k per person once the package is booked.
 
-Kindly share your feedback @ TRIPSKYWAY.COM and harsh@tripskyway.com feel free at any time to contact us.`;
+Kindly share your feedback @ ${BRANDING.urls.website.replace('https://', '').replace('http://', '').toUpperCase()} and ${BRANDING.contact.email} feel free at any time to contact us.`;
 
 const PALETTE = {
   orange: '#F5A623',
@@ -165,8 +155,8 @@ const drawWaveHeader = (doc, title) => {
       doc.image(logo, 50, 25, { width: 80 });
     } catch (e) { console.warn('Logo error:', e.message); }
   }
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(16).text('Trip Sky Way', 140, 35);
-  doc.font('Helvetica').fontSize(9).text('Curating inspired journeys', 140, 55);
+  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(16).text(BRANDING.company.name, 140, 35);
+  doc.font('Helvetica').fontSize(9).text(BRANDING.company.tagline || 'Curating inspired journeys', 140, 55);
   const badgeX = 490;
   const badgeY = 40;
   doc.circle(badgeX, badgeY, 28).fill('#FFFFFF');
@@ -651,7 +641,7 @@ export async function generateQuotationPDF(quotation, lead) {
         doc.fillColor('#4285F4').font('Helvetica-Bold').fontSize(20).text('G', 50, summaryY);
       }
 
-      doc.fillColor(PALETTE.black).fontSize(14).font('Helvetica-Bold').text('Trip Sky Way', 80, summaryY + 5);
+      doc.fillColor(PALETTE.black).fontSize(14).font('Helvetica-Bold').text(BRANDING.company.name, 80, summaryY + 5);
       doc.fillColor(PALETTE.orange).fontSize(12).text('5.0 ★★★★★', 80, summaryY + 22);
       doc.fillColor(PALETTE.gray).fontSize(10).font('Helvetica').text('Based on 2,000+ reviews powered by Google', 80, summaryY + 40);
 
@@ -745,7 +735,7 @@ export async function generateQuotationPDF(quotation, lead) {
       doc.fillColor(PALETTE.black).fontSize(12).font('Helvetica-Bold').text('Bank Transfers:', 70, payBoxY + 18);
 
       let by = payBoxY + 40;
-      const pd = PAYMENT_DETAILS;
+      const pd = getPaymentDetails();
       const bankInfo = [
         ['Bank:', pd.bankName],
         ['Account Name:', pd.accountName],
@@ -763,7 +753,7 @@ export async function generateQuotationPDF(quotation, lead) {
       const qrX = 355;
       doc.fillColor(PALETTE.blue).fontSize(13).font('Helvetica-Bold').text('Scan to pay via', qrX, qrY);
       doc.fillColor('#4caf50').fontSize(15).text('UPI', qrX + 105, qrY);
-      
+
       // Add actual QR code image
       try {
         const qrCodePath = path.join(dirname, '../assets/payment-qr.jpeg');
@@ -780,7 +770,7 @@ export async function generateQuotationPDF(quotation, lead) {
         doc.rect(qrX + 8, qrY + 28, 95, 95).stroke(PALETTE.black);
         doc.fillColor(PALETTE.black).fontSize(8).text('QR Code', qrX + 32, qrY + 70);
       }
-      
+
       doc.fillColor(PALETTE.black).fontSize(9).text(`UPI: ${pd.upiId}`, qrX, qrY + 135);
       doc.text(`Mobile: ${pd.phone}`, qrX, qrY + 150);
 
@@ -876,7 +866,7 @@ export async function generateQuotationPDF(quotation, lead) {
       yPos += 25;
 
       // Split terms into lines and render with formatting
-      const termsLines = TERMS_TEXT.split('\n');
+      const termsLines = getTermsText().split('\n');
       for (const line of termsLines) {
         // Check if we need a new page (leave room for footer)
         if (yPos > 720) {
@@ -921,7 +911,7 @@ export async function generateQuotationPDF(quotation, lead) {
       doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(14).text('CANCELLATION POLICY', 50, yPos);
       yPos += 25;
 
-      const cancellationLines = CANCELLATION_POLICY.split('\n');
+      const cancellationLines = getCancellationPolicy().split('\n');
       for (const line of cancellationLines) {
         const trimmedLine = line.trim();
         if (!trimmedLine) {
@@ -998,14 +988,14 @@ export async function generateQuotationPDF(quotation, lead) {
 
       yPos += 50;
 
-      // --- SECTION 1: TRIPS SKY WAY (COMPANY) REVIEWS ---
-      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(14).text('Trip Sky Way', margin, yPos);
-      doc.fillColor('#6B7280').fontSize(10).font('Helvetica').text('Travel Agency in New Delhi', margin + 100, yPos + 2);
+      // --- SECTION 1: COMPANY REVIEWS ---
+      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(14).text(BRANDING.company.name, margin, yPos);
+      doc.fillColor('#6B7280').fontSize(10).font('Helvetica').text(`Travel Agency in ${BRANDING.address.city || 'Your City'}`, margin + 100, yPos + 2);
       yPos += 25;
 
       const companyReviews = [
-        { initial: 'P', color: '#EF4444', name: 'Priya Sharma', date: '2 weeks ago', text: 'Excellent service! Trip Sky Way made our Maldives honeymoon absolutely perfect. The team was responsive, professional, and handled every detail with care. Highly recommend!' },
-        { initial: 'R', color: '#3B82F6', name: 'Rajesh Kumar', date: '1 month ago', text: 'Best travel agency in Delhi! They customized our Sri Lanka trip exactly as we wanted. The itinerary was perfect and the support throughout was exceptional. Will definitely book again!' },
+        { initial: 'P', color: '#EF4444', name: 'Priya Sharma', date: '2 weeks ago', text: `Excellent service! ${BRANDING.company.name} made our honeymoon absolutely perfect. The team was responsive, professional, and handled every detail with care. Highly recommend!` },
+        { initial: 'R', color: '#3B82F6', name: 'Rajesh Kumar', date: '1 month ago', text: 'Best travel agency! They customized our trip exactly as we wanted. The itinerary was perfect and the support throughout was exceptional. Will definitely book again!' },
         { initial: 'A', color: '#10B981', name: 'Anita Desai', date: '3 weeks ago', text: 'Amazing experience from start to finish. The itinerary was well-planned, hotels were fantastic, and the support team was available 24/7. Exceeded all expectations!' }
       ];
 
@@ -1136,10 +1126,10 @@ export async function generateQuotationPDF(quotation, lead) {
       doc.text('services offered by us, you can contact our team at:', 0, yPos, { align: 'center' });
       yPos += 35;
       doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16)
-        .text('+91 9128446597   |   +91 8318693015', 0, yPos, { align: 'center' });
+        .text(BRANDING.contact.phone, 0, yPos, { align: 'center' });
       yPos += 30;
       doc.fillColor(PALETTE.darkGray).fontSize(12).font('Helvetica')
-        .text('harsh@tripskyway.com  |  TRIPSKYWAY.COM', 0, yPos, { align: 'center' });
+        .text(`${BRANDING.contact.email}  |  ${BRANDING.urls.website.replace('https://', '').replace('http://', '').toUpperCase()}`, 0, yPos, { align: 'center' });
 
       // Add Contact Us page footer (black bar at bottom)
       const contactPageIndex = doc.bufferedPageRange().count - 1;
@@ -1284,7 +1274,7 @@ export function generateInvoicePDF(invoice, lead) {
       if (logoBuffer) {
         doc.image(logoBuffer, 40, 30, { width: 120 });
       } else {
-        doc.fontSize(22).font('Helvetica-Bold').fillColor(colors.textBlack).text('TRIP SKY WAY', 40, 40);
+        doc.fontSize(22).font('Helvetica-Bold').fillColor(colors.textBlack).text(BRANDING.company.name.toUpperCase(), 40, 40);
       }
 
       // Invoice Title (Center)
@@ -1332,11 +1322,11 @@ export function generateInvoicePDF(invoice, lead) {
 
       // Data Prep
       const billFromData = [
-        { label: 'Company Name', value: 'Trip Sky Way Travel Solutions' },
-        { label: 'Address', value: 'B-70, 2nd Floor, Dwarka,\nNew Delhi - 110075' },
-        { label: 'Phone', value: '+91 98765 43210' },
-        { label: 'Email', value: 'billing@tripskyway.com' },
-        { label: 'GST No', value: '07ABCDE1234F1Z5' }
+        { label: 'Company Name', value: BRANDING.company.legalName || BRANDING.company.name },
+        { label: 'Address', value: BRANDING.address.full || `${BRANDING.address.street || ''}\n${BRANDING.address.city || ''} - ${BRANDING.address.postalCode || ''}` },
+        { label: 'Phone', value: BRANDING.contact.phone },
+        { label: 'Email', value: BRANDING.contact.email },
+        { label: 'GST No', value: BRANDING.legal.gstNumber || 'N/A' }
       ];
 
       const customerName = invoice.customer?.name || lead?.name || 'Guest';
@@ -1527,12 +1517,13 @@ export function generateInvoicePDF(invoice, lead) {
       // Bank Box
       doc.font('Helvetica-Bold').fontSize(12).fillColor(colors.headerBlue).text('Bank Details', leftX, footerY);
 
+      const pd = getPaymentDetails();
       const bankData = [
-        ['Account Name', 'Trip Sky Way Travel Solutions'],
-        ['Bank Name', 'HDFC BANK'],
-        ['Account Number', '50200086889269'],
-        ['IFSC Code', 'HDFC0001234'],
-        ['Branch', 'Dwarka, New Delhi']
+        ['Account Name', pd.accountName],
+        ['Bank Name', pd.bankName],
+        ['Account Number', pd.accountNumber],
+        ['IFSC Code', pd.ifscCode],
+        ['Branch', pd.branch]
       ];
 
       let by = footerY + 20;
@@ -1556,7 +1547,7 @@ export function generateInvoicePDF(invoice, lead) {
       doc.fontSize(10).fillColor(colors.textBlack).font('Helvetica-Bold')
         .text('Authorised Signatory', signX, signY + 5, { width: 130, align: 'center' });
       doc.fontSize(8).font('Helvetica').fillColor(colors.textGray)
-        .text('Trip Sky Way', signX, signY + 18, { width: 130, align: 'center' });
+        .text(BRANDING.company.name, signX, signY + 18, { width: 130, align: 'center' });
 
       doc.end();
 
@@ -1609,7 +1600,7 @@ export function generateReceiptPDF(receipt, invoice, lead) {
       if (logoBuffer) {
         doc.image(logoBuffer, 40, 30, { width: 180 }); // Large Logo
       } else {
-        doc.fontSize(24).font('Helvetica-Bold').fillColor(colors.textBlack).text('TRIP SKY WAY', 40, 40);
+        doc.fontSize(24).font('Helvetica-Bold').fillColor(colors.textBlack).text(BRANDING.company.name.toUpperCase(), 40, 40);
       }
 
       // Receipt Info (Top Right - Aligned with Logo horizontally)
@@ -1665,10 +1656,10 @@ export function generateReceiptPDF(receipt, invoice, lead) {
       ];
 
       const toData = [
-        { label: 'Company', value: 'Trip Sky Way Travel Solutions' },
-        { label: 'Address', value: 'New Delhi - 110075' },
-        { label: 'Email', value: 'accounts@tripskyway.com' },
-        { label: 'Phone', value: '+91 98765 43210' }
+        { label: 'Company', value: BRANDING.company.legalName || BRANDING.company.name },
+        { label: 'Address', value: `${BRANDING.address.city || ''} - ${BRANDING.address.postalCode || ''}` },
+        { label: 'Email', value: BRANDING.contact.email },
+        { label: 'Phone', value: BRANDING.contact.phone }
       ];
 
       const rowH = 22;
@@ -1768,7 +1759,7 @@ export function generateReceiptPDF(receipt, invoice, lead) {
       const sigY = 700; // Fixed position near bottom
       doc.lineWidth(1).moveTo(40, sigY).lineTo(200, sigY).stroke(colors.border);
       doc.fillColor(colors.textGray).fontSize(10).text('Authorized Signatory', 40, sigY + 10);
-      doc.text('Trip Sky Way Travel Solutions', 40, sigY + 25);
+      doc.text(BRANDING.company.legalName || BRANDING.company.name, 40, sigY + 25);
 
       doc.fillColor(colors.headerBlue).fontSize(12).font('Helvetica-Bold')
         .text('Thank you for your payment!', 300, sigY + 10, { align: 'right', width: 255 });

@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Save, Calculator, Eye, ToggleLeft, ToggleRight, Downlo
 import toast from 'react-hot-toast';
 import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI, uploadAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
+import { getThankYouMessage } from '../../../config/branding';
 
 const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -532,7 +533,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       `Hello ${lead.name || 'there'},\n\n` +
       `Your quotation ${quotationNumber} is ready. ` +
       `Please contact us for the detailed quotation document.\n\n` +
-      `Thank you for choosing Trip Sky Way!`
+      getThankYouMessage()
     );
 
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;

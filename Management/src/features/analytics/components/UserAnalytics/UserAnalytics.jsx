@@ -7,7 +7,7 @@ import {
   BarChartComponent,
   PieChartComponent,
 } from "../Common";
-import { Users, UserCheck, TrendingUp, DollarSign, Download } from "lucide-react";
+import { Users, UserCheck, TrendingUp, Shield, Download, Activity, Award } from "lucide-react";
 import { exportUserAnalyticsPDF } from "../../utils/exportAnalytics";
 import toast from "react-hot-toast";
 import AnalyticsService from "../../../../services/analytics.service";
@@ -16,14 +16,12 @@ import {
   getAggregatedUserStats,
   getSalesRepStats,
   salesRepPerformanceData,
-  revenueByRepData,
   userTypeDistributionData,
 } from "../../utils/userAnalyticsData";
 
 /**
- * UserAnalytics Component
- * Displays user and sales representative statistics with time range filtering
- * Fetches real data from backend API
+ * UserAnalytics Component - Redesigned
+ * Modern layout with unique component structure
  */
 const UserAnalytics = () => {
   const [timeRange, setTimeRange] = useState("monthly");
@@ -32,29 +30,24 @@ const UserAnalytics = () => {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch analytics data from backend
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
         setError(null);
-        
         const data = await AnalyticsService.getUserAnalyticsOverview(timeRange);
         setAnalyticsData(data);
       } catch (err) {
         console.error('Error fetching user analytics:', err);
         setError(err.message || 'Failed to fetch analytics data');
-        // Fallback to mock data
         setAnalyticsData(null);
       } finally {
         setLoading(false);
       }
     };
-
     fetchAnalytics();
   }, [timeRange]);
 
-  // Compute data based on selected time range
   const currentUserGrowthData = useMemo(() => {
     if (analyticsData?.trendData) {
       return analyticsData.trendData.map(item => ({
@@ -63,8 +56,8 @@ const UserAnalytics = () => {
         week: item.label,
         year: item.label,
         newUsers: item.totalNewUsers,
-        purchased: item.activeUsers, // Using activeUsers as proxy for "purchased"
-        salesReps: item.adminUsers, // Using adminUsers for sales rep count
+        purchased: item.activeUsers,
+        salesReps: item.adminUsers,
       }));
     }
     return getUserGrowthByTimeRange(timeRange);
@@ -76,7 +69,6 @@ const UserAnalytics = () => {
       const totalNewUsers = analyticsData.trendData
         ? analyticsData.trendData.reduce((sum, item) => sum + item.totalNewUsers, 0)
         : stats.totalUsers;
-      
       return {
         totalNewUsers,
         totalPurchased: stats.usersWithBookings || 0,
@@ -84,23 +76,15 @@ const UserAnalytics = () => {
         conversionRate: parseFloat(stats.conversionRate) || 0,
         usersTrend: 0,
         purchasedTrend: 0,
-        lastPeriodNewUsers: 0,
-        lastPeriodPurchased: 0,
       };
     }
     return getAggregatedUserStats(timeRange);
   }, [analyticsData, timeRange]);
 
-  const salesStats = useMemo(() => {
-    return getSalesRepStats(timeRange);
-  }, [timeRange]);
-
-  // Handle PDF export
   const handleExportPDF = async () => {
     try {
       setExporting(true);
       const toastId = toast.loading("Preparing user analytics PDF...");
-
       const summaryMetrics = [
         { label: "Total Users", value: analyticsData?.stats?.totalUsers || 0 },
         { label: "Active Users", value: analyticsData?.stats?.activeUsers || 0 },
@@ -108,12 +92,7 @@ const UserAnalytics = () => {
         { label: "Conversion Rate", value: `${analyticsData?.stats?.conversionRate || 0}%` },
         { label: "Time Range", value: timeRange.toUpperCase() },
       ];
-
-      await exportUserAnalyticsPDF({
-        timeRange,
-        summaryMetrics,
-      });
-
+      await exportUserAnalyticsPDF({ timeRange, summaryMetrics });
       toast.dismiss(toastId);
       toast.success("User analytics PDF downloaded successfully!");
     } catch (error) {
@@ -124,220 +103,204 @@ const UserAnalytics = () => {
     }
   };
 
-  // Get x-axis key based on time range
   const getXAxisKey = () => {
     switch (timeRange) {
-      case "weekly":
-        return "week";
-      case "yearly":
-        return "year";
-      case "monthly":
-      default:
-        return "month";
+      case "weekly": return "week";
+      case "yearly": return "year";
+      default: return "month";
     }
   };
 
-  // Get time range label for display
   const getTimeRangeLabel = () => {
     switch (timeRange) {
-      case "weekly":
-        return "Last 12 weeks";
-      case "yearly":
-        return "Last 5 years";
-      case "monthly":
-      default:
-        return "Last 6 months";
+      case "weekly": return "Last 12 weeks";
+      case "yearly": return "Last 5 years";
+      default: return "Last 6 months";
     }
   };
 
-  // Line chart configuration
   const userGrowthLines = [
-    { dataKey: "newUsers", stroke: "#3b82f6", name: "New Users" },
-    { dataKey: "purchased", stroke: "#10b981", name: "Users Purchased" },
-    { dataKey: "salesReps", stroke: "#f59e0b", name: "Sales Reps Active" },
+    { dataKey: "newUsers", stroke: "#6366f1", name: "New Users" },
+    { dataKey: "purchased", stroke: "#10b981", name: "Active Users" },
+    { dataKey: "salesReps", stroke: "#f59e0b", name: "Admin Users" },
   ];
 
-  // Bar chart configuration
   const salesRepBars = [
-    { dataKey: "sales", fill: "#3b82f6", name: "Sales" },
+    { dataKey: "sales", fill: "#6366f1", name: "Sales" },
     { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
   ];
 
-  // Render loading state
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">User Management Analytics</h2>
-            <p className="text-gray-600 mt-1">User growth and sales performance metrics</p>
-          </div>
-          <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Loading analytics data...</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render error state
-  if (error) {
-    console.warn('Analytics API error, falling back to mock data:', error);
-  }
+  const stats = analyticsData?.stats || {};
 
   return (
-    <div className="space-y-6">
-      {/* Header with Time Range Filter */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">User Management Analytics</h2>
-          <p className="text-gray-600 mt-1">User growth and sales performance metrics</p>
+          <h2 className="text-xl font-bold text-slate-800">User Management</h2>
+          <p className="text-sm text-slate-500 mt-1">User growth and platform activity metrics</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
           <button
             onClick={handleExportPDF}
             disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-violet-500/25"
           >
-            <Download size={18} />
-            {exporting ? "Exporting..." : "Export PDF"}
+            <Download size={16} />
+            {exporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon={Users}
-          label="Total Users"
-          value={analyticsData?.stats?.totalUsers?.toString() || "0"}
-          trend={`${userStats.usersTrend > 0 ? "+" : ""}${userStats.usersTrend}%`}
-          trendDirection={userStats.usersTrend >= 0 ? "up" : "down"}
-          color="blue"
-          subtitle={`${analyticsData?.stats?.activeUsers || 0} Active`}
-        />
-        <StatCard
-          icon={UserCheck}
-          label="Users with Bookings"
-          value={analyticsData?.stats?.usersWithBookings?.toString() || "0"}
-          trend={`${userStats.purchasedTrend > 0 ? "+" : ""}${userStats.purchasedTrend}%`}
-          trendDirection={userStats.purchasedTrend >= 0 ? "up" : "down"}
-          color="green"
-          subtitle={`${analyticsData?.stats?.conversionRate || 0}% conversion`}
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Verified Users"
-          value={analyticsData?.stats?.verifiedUsers?.toString() || "0"}
-          trend={`+${analyticsData?.stats?.verifiedUsers || 0}`}
-          trendDirection="up"
-          color="purple"
-          subtitle="Email Verified"
-        />
-        <StatCard
-          icon={DollarSign}
-          label="User Roles"
-          value={analyticsData?.roleDistribution?.length?.toString() || "4"}
-          trend={`Total: ${analyticsData?.stats?.totalUsers || 0}`}
-          trendDirection="up"
-          unit="Roles"
-          color="orange"
-          subtitle="Active Roles"
-        />
+      {/* User Summary - Modern Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Total Users</span>
+          </div>
+          <p className="text-3xl font-bold">{stats.totalUsers || 0}</p>
+          <p className="text-xs mt-2 opacity-70">{stats.activeUsers || 0} currently active</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Active</span>
+          </div>
+          <p className="text-3xl font-bold">{stats.activeUsers || 0}</p>
+          <p className="text-xs mt-2 opacity-70">With activity this period</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <UserCheck className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Verified</span>
+          </div>
+          <p className="text-3xl font-bold">{stats.verifiedUsers || 0}</p>
+          <p className="text-xs mt-2 opacity-70">Email confirmed</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Award className="w-5 h-5 opacity-80" />
+            <span className="text-sm opacity-80">Conversion</span>
+          </div>
+          <p className="text-3xl font-bold">{stats.conversionRate || 0}%</p>
+          <p className="text-xs mt-2 opacity-70">{stats.usersWithBookings || 0} with bookings</p>
+        </div>
       </div>
 
-      {/* User Growth Trend Chart */}
+      {/* User Growth Chart - Full Width */}
       <ChartContainer
         title="User Growth Trend"
-        description={`New users and activity metrics - ${getTimeRangeLabel()}`}
+        description={`User activity metrics - ${getTimeRangeLabel()}`}
       >
-        <LineChartComponent
-          data={currentUserGrowthData}
-          lines={userGrowthLines}
-          xAxisKey={getXAxisKey()}
-          height={350}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <div className="animate-spin w-8 h-8 border-4 border-violet-200 border-t-violet-600 rounded-full" />
+          </div>
+        ) : (
+          <LineChartComponent
+            data={currentUserGrowthData}
+            lines={userGrowthLines}
+            xAxisKey={getXAxisKey()}
+            height={300}
+          />
+        )}
       </ChartContainer>
 
-      {/* Additional breakdown charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Distribution Charts - 2 Columns */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ChartContainer
           title="Sales Rep Performance"
-          description="Sales count and conversion rates by representative"
+          description="Sales and conversion by representative"
         >
           <BarChartComponent
             data={salesRepPerformanceData}
             bars={salesRepBars}
             xAxisKey="rep"
-            height={320}
-            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
+            height={280}
           />
         </ChartContainer>
 
         <ChartContainer
-          title="User Distribution by Role"
-          description="Breakdown of users by role"
+          title="Role Distribution"
+          description="Users by role"
         >
-          <BarChartComponent
-            data={analyticsData?.roleDistribution || []}
-            bars={[{ dataKey: "count", fill: "#8b5cf6", name: "Count" }]}
-            xAxisKey="role"
-            height={320}
-            margin={{ top: 5, right: 30, left: 0, bottom: 80 }}
-          />
+          {analyticsData?.roleDistribution?.length > 0 ? (
+            <BarChartComponent
+              data={analyticsData.roleDistribution}
+              bars={[{ dataKey: "count", fill: "#8b5cf6", name: "Users" }]}
+              xAxisKey="role"
+              height={280}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No role data available
+            </div>
+          )}
         </ChartContainer>
       </div>
 
-      {/* User Status Distribution Pie Chart */}
+      {/* User Status Distribution */}
       <ChartContainer
         title="User Status Distribution"
-        description="Website users, registered users, and converted users"
+        description="Status breakdown of platform users"
       >
         <PieChartComponent
           data={analyticsData?.userStatusDistribution || userTypeDistributionData}
           dataKey="value"
           nameKey="name"
-          height={300}
-          colors={["#3b82f6", "#10b981", "#f59e0b"]}
+          height={280}
+          colors={["#6366f1", "#10b981", "#f59e0b", "#ef4444"]}
         />
       </ChartContainer>
 
-      {/* Summary Stats Section */}
-      <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">User Statistics Summary ({getTimeRangeLabel()})</h3>
+      {/* Stats Summary Grid */}
+      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+        <h3 className="font-semibold text-slate-800 mb-4">Statistics Summary</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded border border-gray-200">
-            <p className="text-sm text-gray-600">Total Users</p>
-            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.totalUsers || 0}</p>
+          <div className="bg-white p-4 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-400 uppercase tracking-wider">Total</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{stats.totalUsers || 0}</p>
           </div>
-          <div className="bg-white p-4 rounded border border-gray-200">
-            <p className="text-sm text-gray-600">Active Users</p>
-            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.activeUsers || 0}</p>
+          <div className="bg-white p-4 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-400 uppercase tracking-wider">Active</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{stats.activeUsers || 0}</p>
           </div>
-          <div className="bg-white p-4 rounded border border-gray-200">
-            <p className="text-sm text-gray-600">Conversion Rate</p>
-            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.conversionRate || 0}%</p>
+          <div className="bg-white p-4 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-400 uppercase tracking-wider">Conversion</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{stats.conversionRate || 0}%</p>
           </div>
-          <div className="bg-white p-4 rounded border border-gray-200">
-            <p className="text-sm text-gray-600">Verified Users</p>
-            <p className="text-2xl font-bold text-gray-900">{analyticsData?.stats?.verifiedUsers || 0}</p>
+          <div className="bg-white p-4 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-400 uppercase tracking-wider">Verified</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{stats.verifiedUsers || 0}</p>
           </div>
         </div>
       </div>
 
-      {/* Role Details Section */}
-      {analyticsData?.topRoles && analyticsData.topRoles.length > 0 && (
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Top User Roles</h3>
+      {/* Role Details */}
+      {analyticsData?.topRoles?.length > 0 && (
+        <div className="bg-white rounded-2xl p-6 border border-slate-200">
+          <h3 className="font-semibold text-slate-800 mb-4">Top User Roles</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {analyticsData.topRoles.map((role, index) => (
-              <div key={index} className="p-4 bg-gray-50 rounded border border-gray-200">
-                <p className="text-sm text-gray-600 capitalize">{role.role}</p>
-                <p className="text-2xl font-bold text-gray-900">{role.count}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {((role.count / analyticsData.stats.totalUsers) * 100).toFixed(1)}% of total
+              <div key={index} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-4 h-4 text-violet-500" />
+                  <span className="text-sm text-slate-600 capitalize">{role.role}</span>
+                </div>
+                <p className="text-2xl font-bold text-slate-800">{role.count}</p>
+                <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full"
+                    style={{ width: `${(role.count / stats.totalUsers) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  {((role.count / stats.totalUsers) * 100).toFixed(1)}% of total
                 </p>
               </div>
             ))}

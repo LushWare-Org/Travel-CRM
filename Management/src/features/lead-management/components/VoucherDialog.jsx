@@ -3,6 +3,7 @@ import { X, Save, Eye, Send, MessageCircle, Download, Plus, Trash2, Calendar } f
 import toast from 'react-hot-toast';
 import { voucherAPI, packageAPI, customizedPackageAPI, itineraryAPI, quotationAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
+import { getThankYouMessage } from '../../../config/branding';
 
 const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -625,7 +626,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
     const whatsappNumber = lead.whatsapp || lead.phone;
     const message = encodeURIComponent(
-      `Hello ${lead.name},\n\nYour travel voucher has been prepared. Please check your email for details.\n\nVoucher Number: ${formData.voucherNumber || 'Pending'}\n\nThank you for choosing Trip Sky Way!`
+      `Hello ${lead.name},\n\nYour travel voucher has been prepared. Please check your email for details.\n\nVoucher Number: ${formData.voucherNumber || 'Pending'}\n\n${getThankYouMessage()}`
     );
     window.open(`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
   };

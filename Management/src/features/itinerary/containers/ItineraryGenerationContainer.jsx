@@ -1,22 +1,24 @@
 /**
- * ItineraryGeneration Container Component
- * Main container that manages state and orchestrates all sub-components
+ * ItineraryGeneration Container Component - Redesigned
+ * Modern layout with left sidebar navigation and unique component structure
  */
 
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Swal from 'sweetalert2';
+import {
+  Package, Plus, Sparkles, Search, ChevronRight, MapPin,
+  Calendar, Star, Users, Eye, Edit, Download, Copy, Trash2,
+  Image as ImageIcon, Filter, Grid, List, LayoutGrid, BookOpen
+} from 'lucide-react';
 
 // Hooks
 import { usePackageState, useItineraryForm, useImageUpload } from '../hooks';
 import { useAuth } from '../../../contexts/AuthContext';
+import { usePermission } from '../../../contexts/PermissionContext';
 
 // Components
 import {
-  PageHeader,
-  SearchBar,
-  PackageStats,
-  PackagesGrid,
   PackageDetailsModal,
   PackageFormModal,
   NewEditPackageForm,
@@ -33,8 +35,7 @@ import ApiService from '../services/apiService';
 // Utils
 import {
   filterPackages,
-  parseDurationToDays,
-  validateItinerary,
+  formatPriceINR,
 } from '../utils/helpers';
 import { VALIDATION_MESSAGES, CATEGORY_COLORS, STATUS_COLORS } from '../utils/constants';
 import { createDefaultPackage } from '../types';
@@ -45,14 +46,15 @@ import { SAMPLE_PACKAGES } from './sampleData';
 const ItineraryGenerationContainer = () => {
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { hasPermission } = usePermission();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState(null); // null = all, 'draft', 'published', 'archived'
+  const [statusFilter, setStatusFilter] = useState(null);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [showNewPackageDialog, setShowNewPackageDialog] = useState(false);
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
   const [editPackageData, setEditPackageData] = useState(null);
   const [showAIPackageDialog, setShowAIPackageDialog] = useState(false);
-  const [isUploadingImages, setIsUploadingImages] = useState(false); // Track upload state
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [pdfPreviewData, setPdfPreviewData] = useState({
     isOpen: false,
     blob: null,
@@ -60,13 +62,14 @@ const ItineraryGenerationContainer = () => {
     packageData: null,
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState(null);
-  const [itemsPerPage] = useState(12); // 12 items per page for better grid layout (3 columns x 4 rows)
+  const [itemsPerPage] = useState(12);
 
-  // Stats state - fetch from API instead of calculating from local packages
+  // Stats state
   const [stats, setStats] = useState({
     total: 0,
     published: 0,
@@ -76,27 +79,28 @@ const ItineraryGenerationContainer = () => {
     avgRating: 0,
   });
 
-  // Check if user is a salesRep (read-only access)
   const isSalesRep = user?.role === 'salesRep';
+  const canEditPackages = user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_packages'));
 
   // Use custom hooks
-  const { packages, setPackages, updatePackage, deletePackage } = usePackageState(
-    SAMPLE_PACKAGES
-  );
-  const {
-    formData: newFormData,
-    setFormData: setNewFormData,
-  } = useItineraryForm(createDefaultPackage());
+  const { packages, setPackages, updatePackage, deletePackage } = usePackageState(SAMPLE_PACKAGES);
+  const { formData: newFormData, setFormData: setNewFormData } = useItineraryForm(createDefaultPackage());
+  const { images, setImages, handleUpload: handleImageUploadHook, removeImage } = useImageUpload();
 
-  const {
-    images,
-    setImages,
-    handleUpload: handleImageUploadHook,
-    removeImage,
-  } = useImageUpload();
-
-  // Filter packages by search term only (status filtering is done server-side)
+  // Filter packages
   let filteredPackages = filterPackages(packages, searchTerm);
+
+  // Status filter tabs
+  const statusTabs = [
+    { id: null, label: 'All Packages', count: stats.total, gradient: 'from-slate-500 to-slate-600', color: 'slate' },
+    { id: 'published', label: 'Published', count: stats.published, gradient: 'from-emerald-500 to-teal-600', color: 'emerald' },
+    { id: 'draft', label: 'Drafts', count: stats.draft, gradient: 'from-amber-500 to-orange-600', color: 'amber' },
+  ];
+
+  // Filter tabs for sales reps
+  const visibleTabs = isSalesRep
+    ? statusTabs.filter(t => t.id === 'published' || t.id === null)
+    : statusTabs;
 
   /**
    * Load package stats from API
@@ -107,129 +111,94 @@ const ItineraryGenerationContainer = () => {
         const response = await ApiService.getPackageStats();
         if (response.success && response.data) {
           setStats(response.data);
-          console.log('[Stats] Loaded from API:', response.data);
         }
       } catch (error) {
         console.error('Error loading package stats:', error);
       }
     };
-
     loadStats();
-  }, [packages]); // Reload stats when packages change (after create/update/delete)
+  }, [packages]);
 
   /**
-   * Load packages from API on component mount
+   * Load packages from API
    */
   useEffect(() => {
     const loadPackages = async (page = 1) => {
       try {
-        // Build query params with pagination and status filter
-        const params = {
-          page,
-          limit: itemsPerPage
-        };
+        const params = { page, limit: itemsPerPage };
+        if (statusFilter) params.status = statusFilter;
 
-        // Add status filter if selected
-        if (statusFilter) {
-          params.status = statusFilter;
-        }
-
-        // For salesReps, use the protected endpoint which will automatically filter published packages
-        // For other roles, use the standard endpoint
         const response = isSalesRep
           ? await ApiService.getPackagesProtected(params)
           : await ApiService.getPackages(params);
 
         if (response.success && Array.isArray(response.data)) {
           setPackages(response.data);
-
-          // Store pagination metadata
           if (response.pagination) {
             setPagination(response.pagination);
-            console.log('[Pagination] Loaded page', response.pagination.page, 'of', response.pagination.pages);
-            console.log('[Pagination] Total packages:', response.pagination.total);
           }
         }
       } catch (error) {
         console.error('Error loading packages:', error);
-        // Keep using sample data if API fails
       }
     };
-
     loadPackages(currentPage);
-  }, [isSalesRep, currentPage, itemsPerPage, statusFilter]); // Added statusFilter to dependencies
+  }, [isSalesRep, currentPage, itemsPerPage, statusFilter]);
 
   // Handlers
   const handleNewPackageDialogOpen = () => {
-    // Prevent salesReps from creating new packages
     if (isSalesRep) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
       return;
     }
-
     setNewFormData(createDefaultPackage());
     setImages([]);
     setShowNewPackageDialog(true);
   };
 
   const handleAIPackageDialogOpen = () => {
-    // Prevent salesReps from creating new packages
     if (isSalesRep) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
       return;
     }
-
     setShowAIPackageDialog(true);
   };
 
   const handleAIPackageGenerated = (generatedPackageData) => {
-    // Populate the form with AI-generated data
     setNewFormData({
       ...createDefaultPackage(),
       ...generatedPackageData,
-      status: 'draft', // Ensure it's saved as draft
-      price: 0, // Leave price empty for manual entry
-      images: [], // Leave images empty for manual upload
+      status: 'draft',
+      price: 0,
+      images: [],
     });
-
-    // Close AI dialog and open the package form for editing
     setShowAIPackageDialog(false);
     setShowNewPackageDialog(true);
   };
 
   const handleViewPackage = async (pkg) => {
     try {
-      // Fetch full package details to ensure we have complete data including itinerary
       const packageId = pkg._id || pkg.id;
       const response = await ApiService.getPackage(packageId);
-
       if (response.success && response.data) {
         setSelectedPackage(response.data);
       } else {
-        // Fallback to the partial data if fetch fails
-        console.warn('Failed to fetch full package details, using partial data');
         setSelectedPackage(pkg);
       }
     } catch (error) {
       console.error('Error fetching package details:', error);
-      // Fallback to the partial data if fetch fails
       setSelectedPackage(pkg);
     }
   };
 
   const handleEditPackage = async (pkg) => {
-    // Prevent salesReps from editing packages
     if (isSalesRep) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to edit packages.', 'info');
       return;
     }
 
     try {
-      // CRITICAL FIX: Fetch full package details to ensure we have complete data including itinerary
-      // The list view API excludes itinerary data for performance, but we need it for editing
       const packageId = pkg._id || pkg.id;
-      console.log('[DEBUG] Edit package clicked. Fetching full details for ID:', packageId);
-
       const response = await ApiService.getPackage(packageId);
 
       if (!response.success || !response.data) {
@@ -237,223 +206,103 @@ const ItineraryGenerationContainer = () => {
       }
 
       const fullPackage = response.data;
-      console.log('[DEBUG] Full package data fetched:', fullPackage);
-      console.log('[DEBUG] Package images:', fullPackage.images);
-
-      // Extract days from itinerary if present
       const days = fullPackage.days || fullPackage.itinerary?.days || [];
-      console.log('[DEBUG] Extracted days count:', days.length);
 
-      // Ensure images are properly formatted - no blob URLs for existing images
       const formattedImages = (fullPackage.images || []).map(img => {
-        // If it's already an image object with url and public_id, keep it
-        if (typeof img === 'object' && img.url) {
-          return img;
-        }
-        // If it's a string URL, convert to object format
+        if (typeof img === 'object' && img.url) return img;
         if (typeof img === 'string') {
-          return {
-            url: img,
-            public_id: img.split('/').pop()?.split('.')[0] || 'unknown',
-          };
+          return { url: img, public_id: img.split('/').pop()?.split('.')[0] || 'unknown' };
         }
         return img;
       });
 
-      const editData = {
-        ...fullPackage,
-        days: [...days],
-        images: [...formattedImages],
-      };
-
-      console.log('[DEBUG] Edit data prepared with', days.length, 'days');
-      console.log('[DEBUG] Formatted images:', formattedImages.length);
-
+      const editData = { ...fullPackage, days: [...days], images: [...formattedImages] };
       setEditPackageData(editData);
       setShowEditPackageDialog(true);
-      setImages(formattedImages); // Use formatted images, not raw pkg.images
+      setImages(formattedImages);
     } catch (error) {
-      console.error('[ERROR] Failed to fetch package for editing:', error);
+      console.error('Failed to fetch package for editing:', error);
       Swal.fire('Error', 'Failed to load package details for editing. Please try again.', 'error');
     }
   };
 
   const handleSaveNewPackage = async (formData) => {
     try {
-      // Debug: Log incoming status
-      console.log('[Container] handleSaveNewPackage called');
-      console.log('[Container] formData.status:', formData.status);
-
-      // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
         return;
       }
 
-      // Filter out any temporary images (safety check)
       const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
-
-      console.log('[DEBUG] handleSaveNewPackage - All images:', images);
-      console.log('[DEBUG] handleSaveNewPackage - Valid images:', validImages);
-
-      // Validate field lengths only (no required fields)
       const validationErrors = [];
 
-      if (formData.name && formData.name.trim().length > 100) {
-        validationErrors.push('Package Name must not exceed 100 characters');
-      }
-
-      if (formData.destination && formData.destination.trim().length > 100) {
-        validationErrors.push('Destination must not exceed 100 characters');
-      }
-
-      if (formData.description && formData.description.trim().length > 2000) {
-        validationErrors.push('Description must not exceed 2000 characters');
-      }
-
-      if (formData.price && parseFloat(formData.price) < 0) {
-        validationErrors.push('Price must be a non-negative number');
-      }
-
-      if (formData.duration && parseInt(formData.duration, 10) < 0) {
-        validationErrors.push('Duration must be a non-negative number');
-      }
+      if (formData.name && formData.name.trim().length > 100) validationErrors.push('Package Name must not exceed 100 characters');
+      if (formData.destination && formData.destination.trim().length > 100) validationErrors.push('Destination must not exceed 100 characters');
+      if (formData.description && formData.description.trim().length > 2000) validationErrors.push('Description must not exceed 2000 characters');
+      if (formData.price && parseFloat(formData.price) < 0) validationErrors.push('Price must be a non-negative number');
+      if (formData.duration && parseInt(formData.duration, 10) < 0) validationErrors.push('Duration must be a non-negative number');
 
       if (validationErrors.length > 0) {
-        const message = `Please fix the following errors:\n${validationErrors.map(f => `• ${f}`).join('\n')}`;
-        Swal.fire('Validation Errors', message, 'error');
+        Swal.fire('Validation Errors', `Please fix the following errors:\n${validationErrors.map(f => `• ${f}`).join('\n')}`, 'error');
         return;
       }
 
-      // Clean up days data - remove invalid enum values and incomplete days
-      console.log('[Container] ========== DAYS PROCESSING DEBUG ==========');
-      console.log('[Container] formData.days BEFORE cleaning:', formData.days);
-      console.log('[Container] formData.days length BEFORE:', formData.days?.length);
+      const cleanDays = (formData.days || []).filter(day => day && (day.title || day.dayNumber)).map(day => {
+        const cleanDay = { ...day };
+        if (!cleanDay.dayNumber && cleanDay.title) {
+          const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
+          cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
+        }
+        if (!cleanDay.title && cleanDay.dayNumber) cleanDay.title = `Day ${cleanDay.dayNumber}`;
+        if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
+        if (!cleanDay.transport || cleanDay.transport === '') delete cleanDay.transport;
+        if (cleanDay.accommodation) {
+          if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
+          const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
+          if (!hasValidData) delete cleanDay.accommodation;
+        }
+        return cleanDay;
+      });
 
-      const cleanDays = (formData.days || [])
-        .filter(day => day && (day.title || day.dayNumber)) // Include days with title or dayNumber
-        .map(day => {
-          const cleanDay = { ...day };
-
-          // Ensure dayNumber exists
-          if (!cleanDay.dayNumber && cleanDay.title) {
-            // Try to extract day number from title, or use index
-            const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
-            cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
-          }
-
-          // Ensure title exists
-          if (!cleanDay.title && cleanDay.dayNumber) {
-            cleanDay.title = `Day ${cleanDay.dayNumber}`;
-          }
-
-          // Ensure description exists (can be empty string)
-          if (cleanDay.description === undefined || cleanDay.description === null) {
-            cleanDay.description = '';
-          }
-
-          // Remove empty transport enum
-          if (!cleanDay.transport || cleanDay.transport === '') {
-            delete cleanDay.transport;
-          }
-
-          // Remove or fix accommodation with empty type
-          if (cleanDay.accommodation) {
-            if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
-              delete cleanDay.accommodation.type;
-            }
-            // If accommodation object is now empty or only has empty values, remove it
-            const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
-            if (!hasValidData) {
-              delete cleanDay.accommodation;
-            }
-          }
-
-          return cleanDay;
-        });
-
-      console.log('[Container] cleanDays AFTER cleaning:', cleanDays);
-      console.log('[Container] cleanDays length AFTER:', cleanDays?.length);
-      console.log('[Container] ================================================');
-
-      // Map category to valid backend enum values
       const categoryMap = {
-        'adventure': 'family',
-        'budget': 'family',
-        'luxury': 'family',
-        'religious': 'family',
-        'wildlife': 'wild safari',
-        'beach': 'family',
-        'heritage': 'family',
-        'other': 'family',
-        'honeymoon': 'honeymoon',
-        'couple': 'couple',
-        'family': 'family',
-        'group': 'group',
-        'wild safari': 'wild safari',
+        'adventure': 'family', 'budget': 'family', 'luxury': 'family', 'religious': 'family',
+        'wildlife': 'wild safari', 'beach': 'family', 'heritage': 'family', 'other': 'family',
+        'honeymoon': 'honeymoon', 'couple': 'couple', 'family': 'family', 'group': 'group', 'wild safari': 'wild safari',
       };
       const validCategory = categoryMap[formData.category?.toLowerCase()] || 'family';
 
-      // Ensure numeric fields are numbers and remove _id for new packages
       const sanitizedData = {
         ...formData,
-        category: validCategory, // Use mapped category
+        category: validCategory,
         price: parseFloat(formData.price) || 0,
         duration: parseInt(formData.duration, 10) || 1,
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
-        days: cleanDays, // Use cleaned days
-        images: validImages, // Use only valid images (no temp blobs)
-        status: formData.status || 'draft', // Explicitly preserve status
+        days: cleanDays,
+        images: validImages,
+        status: formData.status || 'draft',
       };
 
-      // Remove _id field for new packages (should not be included in POST request)
       delete sanitizedData._id;
       delete sanitizedData.id;
       delete sanitizedData._v;
       delete sanitizedData.__v;
 
-      console.log('[DEBUG] ==> SAVING PACKAGE <==');
-      console.log('[DEBUG] Status:', sanitizedData.status);
-      console.log('[DEBUG] Valid images to save:', validImages);
-      console.log('[DEBUG] Images count:', validImages?.length);
-      console.log('[DEBUG] First image:', validImages?.[0]);
-      console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
-      console.log('[DEBUG] Days to save:', cleanDays);
-      console.log('[DEBUG] Days count:', cleanDays?.length);
-
-      // Call API to save package
       const response = await ApiService.createPackage(sanitizedData);
 
       if (response.success) {
-        // Add newly created package to the top of the list
         setPackages((prev) => [response.data, ...prev]);
         setShowNewPackageDialog(false);
         setNewFormData(createDefaultPackage());
         setImages([]);
-        setCurrentPage(1); // Reset to first page to see the new package
+        setCurrentPage(1);
         Swal.fire('Success', VALIDATION_MESSAGES.PACKAGE_CREATED, 'success');
       } else {
         Swal.fire('Error', response.message || 'Failed to create package', 'error');
       }
     } catch (error) {
       console.error('Error creating package:', error);
-
-      // Show detailed validation errors if available
       if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
-        const errorList = error.errors
-          .map((err) => `• ${err.param || err.field}: ${err.msg}`)
-          .join('\n');
-
-        console.log('%c=== VALIDATION ERRORS ===', 'color: red; font-weight: bold; font-size: 14px;');
-        error.errors.forEach((err, idx) => {
-          console.log(`%c❌ Error ${idx + 1}:`, 'color: red; font-weight: bold;');
-          console.log('   Field:', err.param || err.field || 'unknown');
-          console.log('   Message:', err.msg || err.message || 'No message');
-          console.log('   Value received:', err.value);
-          console.log('   Type:', typeof err.value);
-          console.log('   Location:', err.location || 'body');
-        });
-
+        const errorList = error.errors.map((err) => `• ${err.param || err.field}: ${err.msg}`).join('\n');
         Swal.fire('Validation Error', `Please fix the following:\n\n${errorList}`, 'error');
       } else {
         Swal.fire('Error', error.message || 'Failed to save package to database', 'error');
@@ -463,155 +312,77 @@ const ItineraryGenerationContainer = () => {
 
   const handleSaveEditPackage = async (formData) => {
     try {
-      // Debug: Log incoming status
-      console.log('[Container] handleSaveEditPackage called');
-      console.log('[Container] formData.status:', formData.status);
-
-      // Prevent saving while images are uploading
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
         return;
       }
 
-      // Filter out any temporary images (safety check)
       const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
-
-      console.log('[DEBUG] handleSaveEditPackage - All images:', images);
-      console.log('[DEBUG] handleSaveEditPackage - Valid images:', validImages);
-
-      console.log('[DEBUG] handleSaveEditPackage called');
-      console.log('[DEBUG] formData received:', formData);
-      console.log('[DEBUG] formData._id:', formData._id, 'formData.id:', formData.id);
-
-      // Validate field lengths only (no required fields)
       const validationErrors = [];
 
-      if (formData.name && formData.name.trim().length > 100) {
-        validationErrors.push('Package Name must not exceed 100 characters');
-      }
-
-      if (formData.destination && formData.destination.trim().length > 100) {
-        validationErrors.push('Destination must not exceed 100 characters');
-      }
-
-      if (formData.description && formData.description.trim().length > 2000) {
-        validationErrors.push('Description must not exceed 2000 characters');
-      }
-
-      if (formData.price && parseFloat(formData.price) < 0) {
-        validationErrors.push('Price must be a non-negative number');
-      }
-
-      if (formData.duration && parseInt(formData.duration, 10) < 0) {
-        validationErrors.push('Duration must be a non-negative number');
-      }
+      if (formData.name && formData.name.trim().length > 100) validationErrors.push('Package Name must not exceed 100 characters');
+      if (formData.destination && formData.destination.trim().length > 100) validationErrors.push('Destination must not exceed 100 characters');
+      if (formData.description && formData.description.trim().length > 2000) validationErrors.push('Description must not exceed 2000 characters');
+      if (formData.price && parseFloat(formData.price) < 0) validationErrors.push('Price must be a non-negative number');
+      if (formData.duration && parseInt(formData.duration, 10) < 0) validationErrors.push('Duration must be a non-negative number');
 
       if (validationErrors.length > 0) {
-        const message = `Please fix the following errors:\n${validationErrors.map(f => `• ${f}`).join('\n')}`;
-        Swal.fire('Validation Errors', message, 'error');
+        Swal.fire('Validation Errors', `Please fix the following errors:\n${validationErrors.map(f => `• ${f}`).join('\n')}`, 'error');
         return;
       }
 
       if (!formData._id && !formData.id) {
-        console.error('[DEBUG] No ID found in formData!');
         Swal.fire('Error', 'Package ID is missing', 'error');
         return;
       }
 
       const packageId = formData._id || formData.id;
-      console.log('[DEBUG] Using packageId:', packageId);
 
-      // Clean up days data - remove invalid enum values and incomplete days
-      const cleanDays = (formData.days || [])
-        .filter(day => day && (day.title || day.dayNumber)) // Include days with title or dayNumber
-        .map(day => {
-          const cleanDay = { ...day };
+      const cleanDays = (formData.days || []).filter(day => day && (day.title || day.dayNumber)).map(day => {
+        const cleanDay = { ...day };
+        if (!cleanDay.dayNumber && cleanDay.title) {
+          const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
+          cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
+        }
+        if (!cleanDay.title && cleanDay.dayNumber) cleanDay.title = `Day ${cleanDay.dayNumber}`;
+        if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
+        if (!cleanDay.transport || cleanDay.transport === '') delete cleanDay.transport;
+        if (cleanDay.accommodation) {
+          if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
+          const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
+          if (!hasValidData) delete cleanDay.accommodation;
+        }
+        return cleanDay;
+      });
 
-          // Ensure dayNumber exists
-          if (!cleanDay.dayNumber && cleanDay.title) {
-            // Try to extract day number from title, or use index
-            const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
-            cleanDay.dayNumber = dayMatch ? parseInt(dayMatch[1], 10) : 1;
-          }
-
-          // Ensure title exists
-          if (!cleanDay.title && cleanDay.dayNumber) {
-            cleanDay.title = `Day ${cleanDay.dayNumber}`;
-          }
-
-          // Ensure description exists (can be empty string)
-          if (cleanDay.description === undefined || cleanDay.description === null) {
-            cleanDay.description = '';
-          }
-
-          // Remove empty transport enum
-          if (!cleanDay.transport || cleanDay.transport === '') {
-            delete cleanDay.transport;
-          }
-
-          // Remove or fix accommodation with empty type
-          if (cleanDay.accommodation) {
-            if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
-              delete cleanDay.accommodation.type;
-            }
-            // If accommodation object is now empty or only has empty values, remove it
-            const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
-            if (!hasValidData) {
-              delete cleanDay.accommodation;
-            }
-          }
-
-          return cleanDay;
-        });
-
-      // Map category to valid backend enum values
       const categoryMap = {
-        'adventure': 'family',
-        'budget': 'family',
-        'luxury': 'family',
-        'religious': 'family',
-        'wildlife': 'wild safari',
-        'beach': 'family',
-        'heritage': 'family',
-        'other': 'family',
-        'honeymoon': 'honeymoon',
-        'couple': 'couple',
-        'family': 'family',
-        'group': 'group',
-        'wild safari': 'wild safari',
+        'adventure': 'family', 'budget': 'family', 'luxury': 'family', 'religious': 'family',
+        'wildlife': 'wild safari', 'beach': 'family', 'heritage': 'family', 'other': 'family',
+        'honeymoon': 'honeymoon', 'couple': 'couple', 'family': 'family', 'group': 'group', 'wild safari': 'wild safari',
       };
       const validCategory = categoryMap[formData.category?.toLowerCase()] || 'family';
 
-      // Sanitize data - ensure numeric fields are numbers
       const sanitizedData = {
         ...formData,
-        category: validCategory, // Use mapped category
+        category: validCategory,
         price: parseFloat(formData.price) || 0,
         duration: parseInt(formData.duration, 10) || 1,
         maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1,
-        days: cleanDays, // Use cleaned days
-        images: validImages, // Use only valid images (no temp blobs)
-        status: formData.status || 'draft', // Explicitly preserve status
+        days: cleanDays,
+        images: validImages,
+        status: formData.status || 'draft',
       };
 
-      // Remove internal fields that should not be updated
       delete sanitizedData._id;
       delete sanitizedData._v;
       delete sanitizedData.__v;
       delete sanitizedData.createdAt;
       delete sanitizedData.createdBy;
-      delete sanitizedData.slug; // Let backend regenerate if needed
-
-      console.log('[DEBUG] ==> UPDATING PACKAGE <==');
-      console.log('[DEBUG] Status:', sanitizedData.status);
-      console.log('[DEBUG] Valid images to save:', validImages);
-      console.log('[DEBUG] Images count:', validImages?.length);
-      console.log('[DEBUG] Sanitized data images:', sanitizedData.images);
+      delete sanitizedData.slug;
 
       const response = await ApiService.updatePackage(packageId, sanitizedData);
 
       if (response.success) {
-        // Update local state
         updatePackage(packageId, response.data);
         setShowEditPackageDialog(false);
         setEditPackageData(null);
@@ -620,39 +391,21 @@ const ItineraryGenerationContainer = () => {
         Swal.fire('Error', response.message || 'Failed to update package', 'error');
       }
     } catch (error) {
-      console.error('[Container] Error updating package:', error);
+      console.error('Error updating package:', error);
       Swal.fire('Error', error.message || 'Failed to update package', 'error');
     }
   };
 
   const handleDownloadPackage = async (pkg) => {
     try {
-      setPdfPreviewData({
-        isOpen: true,
-        blob: null,
-        fileName: '',
-        packageData: pkg,
-      });
+      setPdfPreviewData({ isOpen: true, blob: null, fileName: '', packageData: pkg });
       setIsGeneratingPdf(true);
 
-      const { blob, fileName, packageData } = await createPackagePdfBlob(pkg, {
-        fetchLatest: true,
-      });
-
-      setPdfPreviewData({
-        isOpen: true,
-        blob,
-        fileName,
-        packageData,
-      });
+      const { blob, fileName, packageData } = await createPackagePdfBlob(pkg, { fetchLatest: true });
+      setPdfPreviewData({ isOpen: true, blob, fileName, packageData });
     } catch (error) {
       console.error('Error generating package PDF:', error);
-      setPdfPreviewData({
-        isOpen: false,
-        blob: null,
-        fileName: '',
-        packageData: null,
-      });
+      setPdfPreviewData({ isOpen: false, blob: null, fileName: '', packageData: null });
       Swal.fire('Error', 'Failed to generate PDF preview. Please try again.', 'error');
     } finally {
       setIsGeneratingPdf(false);
@@ -695,7 +448,6 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleDuplicatePackage = (pkg) => {
-    // Prevent salesReps from duplicating packages
     if (isSalesRep) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to duplicate packages.', 'info');
       return;
@@ -712,24 +464,14 @@ const ItineraryGenerationContainer = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          // Remove MongoDB _id if present to create a new document
-          const duplicateData = {
-            ...pkg,
-            name: `${pkg.name} (Copy)`,
-            status: 'draft',
-            bookings: 0,
-            rating: 0,
-            reviews: 0,
-          };
-
-          // Remove _id to let backend create a new one
+          const duplicateData = { ...pkg, name: `${pkg.name} (Copy)`, status: 'draft', bookings: 0, rating: 0, reviews: 0 };
           delete duplicateData._id;
 
           const response = await ApiService.createPackage(duplicateData);
 
           if (response.success) {
             setPackages((prev) => [response.data, ...prev]);
-            setCurrentPage(1); // Reset to first page to see the duplicated package
+            setCurrentPage(1);
             Swal.fire('Success', `${pkg.name} has been duplicated successfully.`, 'success');
           } else {
             Swal.fire('Error', response.message || 'Failed to duplicate package', 'error');
@@ -744,13 +486,9 @@ const ItineraryGenerationContainer = () => {
 
   const handleImageUpload = async (files) => {
     if (!files || files.length === 0) return;
-
     const fileArray = Array.from(files);
-
-    // Set uploading state to prevent saving during upload
     setIsUploadingImages(true);
 
-    // Create temporary image objects for immediate feedback
     const tempImages = fileArray.map(file => ({
       url: URL.createObjectURL(file),
       public_id: 'temp-' + Date.now() + '-' + Math.random(),
@@ -759,53 +497,30 @@ const ItineraryGenerationContainer = () => {
     setImages((prev) => [...prev, ...tempImages]);
 
     try {
-      console.log('[DEBUG] Starting upload for', fileArray.length, 'files');
-
-      // Upload all images to Cloudinary - now returns full image objects
       const uploadedImages = await uploadPackageImages(files, (progress) => {
         console.log(`Upload progress: ${progress.current}/${progress.total}`);
       });
 
-      console.log('[DEBUG] Uploaded images from Cloudinary:', uploadedImages);
-
-      // Replace temporary image objects with actual Cloudinary image objects
       setImages((prev) => {
-        // Filter out ALL temp images first
         const withoutTemp = prev.filter(img => !img.isTemp);
-        // Add all uploaded images
-        const finalImages = [...withoutTemp, ...uploadedImages];
-        console.log('[DEBUG] Final images state after upload:', finalImages);
-        return finalImages;
+        return [...withoutTemp, ...uploadedImages];
       });
 
-      // Clean up temporary URLs
       tempImages.forEach(img => URL.revokeObjectURL(img.url));
-
       Swal.fire('Success', `${uploadedImages.length} image(s) uploaded successfully!`, 'success');
     } catch (error) {
-      console.error('[DEBUG] Upload error:', error);
-      console.error('[DEBUG] Error message:', error.message);
-      console.error('[DEBUG] Error stack:', error.stack);
-
-      // Remove temporary images on error
+      console.error('Upload error:', error);
       setImages((prev) => prev.filter(img => !img.isTemp));
       tempImages.forEach(img => URL.revokeObjectURL(img.url));
 
-      // Show more specific error message
       let errorMessage = 'Failed to upload images';
       if (error.message.includes('500')) {
-        errorMessage = 'Server error occurred. Please check if the server is running and Cloudinary credentials are configured.';
+        errorMessage = 'Server error occurred. Please check if the server is running.';
       } else if (error.message) {
         errorMessage = error.message;
       }
-
-      Swal.fire(
-        'Error',
-        errorMessage,
-        'error'
-      );
+      Swal.fire('Error', errorMessage, 'error');
     } finally {
-      // Always reset uploading state
       setIsUploadingImages(false);
     }
   };
@@ -814,144 +529,383 @@ const ItineraryGenerationContainer = () => {
     removeImage(index);
   };
 
-  const handleItineraryChange = (e, section, dayKey) => {
-    // No longer needed with new structure
-  };
-
-  const handleTitleChange = (e, section, dayKey) => {
-    // No longer needed with new structure
-  };
-
-  // Handle page change
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top when changing pages
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle status filter change - reset to page 1 when filter changes
   const handleStatusFilterChange = (status) => {
     setStatusFilter(status);
-    setCurrentPage(1); // Reset to first page when changing filter
+    setCurrentPage(1);
   };
 
-  // Handle search change - reset to page 1 when searching
   const handleSearchChange = (value) => {
     setSearchTerm(value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
+  };
+
+  // Package Card Component
+  const PackageCard = ({ pkg }) => {
+    if (!pkg || typeof pkg !== 'object') return null;
+    const formattedPrice = formatPriceINR(pkg.price);
+    const status = pkg.status || 'draft';
+    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all group">
+        {/* Image */}
+        <div
+          className="h-44 relative overflow-hidden flex items-center justify-center"
+          style={
+            pkg.images && pkg.images.length > 0
+              ? {
+                backgroundImage: `url(${typeof pkg.images[0] === 'string' ? pkg.images[0] : pkg.images[0].url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }
+              : { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }
+          }
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          {!(pkg.images && pkg.images.length > 0) && (
+            <ImageIcon className="w-12 h-12 text-white/50" />
+          )}
+
+          {/* Status Badge */}
+          <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${status === 'published' ? 'bg-emerald-500/90 text-white' :
+              status === 'draft' ? 'bg-amber-500/90 text-white' :
+                'bg-slate-500/90 text-white'
+            }`}>
+            {statusLabel}
+          </span>
+
+          {/* Price */}
+          <div className="absolute bottom-3 left-3">
+            <p className="text-2xl font-bold text-white drop-shadow-lg">{formattedPrice || 'Contact us'}</p>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-5">
+          <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-1">{pkg.name}</h3>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CATEGORY_COLORS[pkg.category] || 'bg-slate-100 text-slate-700'}`}>
+              {pkg.category}
+            </span>
+            {pkg.region && (
+              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                {pkg.region}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-2 text-sm text-slate-600 mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <span>{pkg.duration || 'N/A'} days</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-slate-400" />
+              <span className="line-clamp-1">{Array.isArray(pkg.destinations) ? pkg.destinations.join(', ') : pkg.region || 'N/A'}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              <span className="font-semibold text-slate-800">{pkg.rating || 0}</span>
+              <span className="text-xs text-slate-400">({pkg.reviews || 0})</span>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-slate-500">
+              <Users className="w-4 h-4" />
+              <span>{pkg.bookings || 0}</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
+            <button
+              onClick={() => handleViewPackage(pkg)}
+              className="flex-1 px-3 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
+            >
+              <Eye className="w-4 h-4" />
+              View
+            </button>
+            {canEditPackages && (
+              <button
+                onClick={() => handleEditPackage(pkg)}
+                className="flex-1 px-3 py-2.5 bg-slate-500 text-white rounded-xl hover:bg-slate-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
+              >
+                <Edit className="w-4 h-4" />
+                Edit
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => handleDownloadPackage(pkg)}
+              className="flex-1 px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              PDF
+            </button>
+            {canEditPackages && (
+              <>
+                <button
+                  onClick={() => handleDuplicatePackage(pkg)}
+                  className="flex-1 px-3 py-2.5 bg-violet-500 text-white rounded-xl hover:bg-violet-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy
+                </button>
+                <button
+                  onClick={() => handleDeletePackage(pkg._id || pkg.id)}
+                  className="px-3 py-2.5 bg-rose-500 text-white rounded-xl hover:bg-rose-600 transition-colors font-medium flex items-center justify-center shadow-sm"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <PageHeader
-        onNewPackage={handleNewPackageDialogOpen}
-        onAIPackage={handleAIPackageDialogOpen}
-      />
-
-      {/* Stats */}
-      <div className="bg-white border-b border-gray-200 px-8 py-4">
-        <PackageStats
-          stats={stats}
-          onFilterChange={handleStatusFilterChange}
-          activeFilter={statusFilter}
-        />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50">
+      {/* Decorative Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-200/30 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 right-1/3 w-80 h-80 bg-blue-200/20 rounded-full blur-3xl" />
       </div>
 
-      {/* Content */}
-      <div className="p-8">
-        {/* Search */}
-        <SearchBar value={searchTerm} onChange={handleSearchChange} />
+      <div className="relative flex">
+        {/* Left Sidebar */}
+        <aside className="w-72 min-h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 sticky top-0 flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-6 border-b border-slate-200/60">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-slate-800">Packages</h1>
+                <p className="text-xs text-slate-500">Travel Itineraries</p>
+              </div>
+            </div>
 
-        {/* Packages Grid */}
-        <PackagesGrid
-          packages={filteredPackages}
-          onView={handleViewPackage}
-          onEdit={handleEditPackage}
-          onDownload={handleDownloadPackage}
-          onDelete={handleDeletePackage}
-          onDuplicate={handleDuplicatePackage}
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                <p className="text-lg font-bold text-emerald-600">{stats.published}</p>
+                <p className="text-[10px] text-emerald-600/70 uppercase tracking-wider">Published</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                <p className="text-lg font-bold text-amber-600">{stats.draft}</p>
+                <p className="text-[10px] text-amber-600/70 uppercase tracking-wider">Drafts</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          {!isSalesRep && (
+            <div className="p-4 space-y-2 border-b border-slate-200/60">
+              <button
+                onClick={handleNewPackageDialogOpen}
+                className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:shadow-xl transition-all"
+              >
+                <Plus className="w-5 h-5" />
+                New Package
+              </button>
+              <button
+                onClick={handleAIPackageDialogOpen}
+                className="w-full px-4 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all"
+              >
+                <Sparkles className="w-5 h-5" />
+                AI Generate
+              </button>
+            </div>
+          )}
+
+          {/* Filter Navigation */}
+          <nav className="flex-1 p-4 space-y-2">
+            <p className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Filter by Status</p>
+
+            {visibleTabs.map((tab) => {
+              const isActive = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id || 'all'}
+                  onClick={() => handleStatusFilterChange(tab.id)}
+                  className={`w-full group rounded-xl transition-all duration-300 ${isActive ? 'shadow-lg' : 'hover:bg-slate-50'}`}
+                >
+                  <div className={`flex items-center gap-3 p-3 rounded-xl ${isActive ? `bg-gradient-to-r ${tab.gradient} text-white` : 'text-slate-600'}`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isActive ? 'bg-white/20' : `bg-${tab.color}-50`}`}>
+                      <BookOpen className={`w-5 h-5 ${isActive ? 'text-white' : `text-${tab.color}-600`}`} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className={`font-medium text-sm ${isActive ? 'text-white' : 'text-slate-700'}`}>{tab.label}</p>
+                      <p className={`text-xs ${isActive ? 'text-white/70' : 'text-slate-400'}`}>{tab.count} packages</p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 transition-transform ${isActive ? 'text-white/80' : 'text-slate-300 group-hover:translate-x-1'}`} />
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Sidebar Footer */}
+          <div className="p-4 border-t border-slate-200/60">
+            <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-violet-500" />
+                <span className="text-xs font-semibold text-violet-600">Pro Tip</span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Use AI Generate to quickly create packages with destinations and itineraries.
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1">
+          {/* Content Header */}
+          <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/60 px-8 py-6 sticky top-0 z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Package className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800">
+                    {statusFilter ? `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Packages` : 'All Packages'}
+                  </h2>
+                  <p className="text-sm text-slate-500">{filteredPackages.length} packages found</p>
+                </div>
+              </div>
+
+              {/* View Toggle */}
+              <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <LayoutGrid className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <List className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search packages by name or region..."
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full py-3 pl-12 pr-4 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Content Body */}
+          <div className="p-8">
+            {filteredPackages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                <Package className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-lg font-medium text-slate-600">No packages found</p>
+                <p className="text-sm">Create your first package to get started</p>
+              </div>
+            ) : (
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6' : 'space-y-4'}>
+                {filteredPackages.map((pkg) => (
+                  <PackageCard key={pkg._id || pkg.id} pkg={pkg} />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {pagination && pagination.pages > 1 && (
+              <div className="mt-8">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={pagination.pages}
+                  onPageChange={handlePageChange}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={pagination.total}
+                />
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* Modals */}
+      <PackageDetailsModal pkg={selectedPackage} onClose={() => setSelectedPackage(null)} />
+
+      <PackageFormModal
+        isOpen={showNewPackageDialog}
+        title="Create New Travel Package"
+        subtitle="Build a new itinerary with destinations, activities, and pricing"
+        onClose={() => setShowNewPackageDialog(false)}
+      >
+        <NewEditPackageForm
+          formData={newFormData}
+          setFormData={setNewFormData}
+          onSave={(updatedData) => handleSaveNewPackage(updatedData || newFormData)}
+          onCancel={() => setShowNewPackageDialog(false)}
+          onImageUpload={handleImageUpload}
+          onImageRemove={handleImageRemove}
+          images={images}
+          isUploadingImages={isUploadingImages}
         />
+      </PackageFormModal>
 
-        {/* Pagination */}
-        {pagination && pagination.pages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={pagination.pages}
-            onPageChange={handlePageChange}
-            itemsPerPage={itemsPerPage}
-            totalItems={pagination.total}
-          />
-        )}
-
-        {/* Package Details Modal */}
-        <PackageDetailsModal
-          pkg={selectedPackage}
-          onClose={() => setSelectedPackage(null)}
-        />
-
-        {/* New Package Dialog */}
-        <PackageFormModal
-          isOpen={showNewPackageDialog}
-          title="Create New Travel Package"
-          subtitle="Build a new itinerary with destinations, activities, and pricing"
-          onClose={() => setShowNewPackageDialog(false)}
-        >
+      <PackageFormModal
+        isOpen={showEditPackageDialog}
+        title="Edit Travel Package"
+        subtitle="Update package details and itinerary"
+        onClose={() => setShowEditPackageDialog(false)}
+      >
+        {editPackageData && (
           <NewEditPackageForm
-            formData={newFormData}
-            setFormData={setNewFormData}
-            onSave={(updatedData) => handleSaveNewPackage(updatedData || newFormData)}
-            onCancel={() => setShowNewPackageDialog(false)}
+            formData={editPackageData}
+            setFormData={setEditPackageData}
+            onSave={(updatedData) => handleSaveEditPackage(updatedData || editPackageData)}
+            onCancel={() => setShowEditPackageDialog(false)}
             onImageUpload={handleImageUpload}
             onImageRemove={handleImageRemove}
             images={images}
             isUploadingImages={isUploadingImages}
           />
-        </PackageFormModal>
+        )}
+      </PackageFormModal>
 
-        {/* Edit Package Dialog */}
-        <PackageFormModal
-          isOpen={showEditPackageDialog}
-          title="Edit Travel Package"
-          subtitle="Update package details and itinerary"
-          onClose={() => setShowEditPackageDialog(false)}
-        >
-          {editPackageData && (
-            <NewEditPackageForm
-              formData={editPackageData}
-              setFormData={setEditPackageData}
-              onSave={(updatedData) => handleSaveEditPackage(updatedData || editPackageData)}
-              onCancel={() => setShowEditPackageDialog(false)}
-              onImageUpload={handleImageUpload}
-              onImageRemove={handleImageRemove}
-              images={images}
-              isUploadingImages={isUploadingImages}
-            />
-          )}
-        </PackageFormModal>
+      <AIPackageDialog
+        isOpen={showAIPackageDialog}
+        onClose={() => setShowAIPackageDialog(false)}
+        onPackageGenerated={handleAIPackageGenerated}
+      />
 
-        {/* AI Package Generation Dialog */}
-        <AIPackageDialog
-          isOpen={showAIPackageDialog}
-          onClose={() => setShowAIPackageDialog(false)}
-          onPackageGenerated={handleAIPackageGenerated}
-        />
-
-        <PackagePDFPreviewDialog
-          isOpen={pdfPreviewData.isOpen}
-          onClose={() =>
-            setPdfPreviewData({
-              isOpen: false,
-              blob: null,
-              fileName: '',
-              packageData: null,
-            })
-          }
-          pdfBlob={pdfPreviewData.blob}
-          fileName={pdfPreviewData.fileName}
-          packageData={pdfPreviewData.packageData}
-          isGenerating={!pdfPreviewData.blob && isGeneratingPdf}
-        />
-      </div>
+      <PackagePDFPreviewDialog
+        isOpen={pdfPreviewData.isOpen}
+        onClose={() => setPdfPreviewData({ isOpen: false, blob: null, fileName: '', packageData: null })}
+        pdfBlob={pdfPreviewData.blob}
+        fileName={pdfPreviewData.fileName}
+        packageData={pdfPreviewData.packageData}
+        isGenerating={!pdfPreviewData.blob && isGeneratingPdf}
+      />
     </div>
   );
 };
