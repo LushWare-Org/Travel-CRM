@@ -1,125 +1,271 @@
-import { useState } from 'react';
-import { X, Users } from 'lucide-react';
-import ActiveSalesRepsDialog from './ActiveSalesRepsDialog';
+import { useState, useEffect } from 'react';
+import { X, Settings, RotateCcw, BarChart3, Check, Users, Eye } from 'lucide-react';
+import { adminAPI } from '../../../services/api';
+import toast from 'react-hot-toast';
 
-const SettingsDialog = ({ isOpen, onClose, settings, settingsForm, onSettingsFormChange, onSave }) => {
-  const [showActiveRepsDialog, setShowActiveRepsDialog] = useState(false);
-  
-  if (!isOpen || !settings) return null;
+const SettingsDialog = ({
+  isOpen,
+  onClose,
+  assignmentSettings,
+  setAssignmentSettings,
+  salesReps,
+  onViewActiveSalesReps,
+}) => {
+  const [localSettings, setLocalSettings] = useState({
+    mode: 'manual',
+    strategy: 'round-robin',
+    requireActiveLogin: false,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [activeSalesReps, setActiveSalesReps] = useState([]);
+  const [loadingReps, setLoadingReps] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Map backend field names to frontend field names
+      setLocalSettings({
+        mode: assignmentSettings.mode || 'manual',
+        strategy: assignmentSettings.strategy || 'round-robin',
+        requireActiveLogin: assignmentSettings.requireActiveLogin || false,
+      });
+      fetchActiveSalesReps();
+    }
+  }, [assignmentSettings, isOpen]);
+
+  const fetchActiveSalesReps = async () => {
+    try {
+      setLoadingReps(true);
+      const res = await adminAPI.getSalesReps();
+      if (res.status === 'success' && res.data?.users) {
+        setActiveSalesReps(res.data.users);
+      }
+    } catch (error) {
+      console.error('Error fetching sales reps:', error);
+    } finally {
+      setLoadingReps(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Map frontend field names to backend field names
+      const backendPayload = {
+        assignmentMode: localSettings.mode,
+        autoStrategy: localSettings.strategy === 'round-robin' ? 'round_robin' : 'load_based',
+        requireActiveLogin48h: localSettings.requireActiveLogin,
+      };
+
+      const response = await adminAPI.updateSettings(backendPayload);
+      if (response.success) {
+        setAssignmentSettings(localSettings);
+        toast.success('Settings saved successfully');
+        onClose();
+      } else {
+        toast.error(response.message || 'Failed to save settings');
+      }
+    } catch (err) {
+      console.error('Error saving settings:', err);
+      toast.error(err.message || 'Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  // Count active sales reps (logged in within 1 hour if requireActiveLogin is enabled)
+  const getActiveRepsCount = () => {
+    if (!localSettings.requireActiveLogin) {
+      return activeSalesReps.length;
+    }
+    const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
+    return activeSalesReps.filter(rep => {
+      if (!rep.lastLogin) return false;
+      return new Date(rep.lastLogin) >= oneHourAgo;
+    }).length;
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Assignment Settings</h2>
-            <p className="text-sm text-gray-600 mt-1">Toggle between manual and auto assignment</p>
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl w-full max-w-md shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Settings className="w-5 h-5 text-gray-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Assignment Settings</h3>
+              <p className="text-sm text-gray-500">Configure lead assignment</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-red-50 rounded-lg transition-all duration-200 group">
-            <X className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors duration-200" />
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
+        {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Active Sales Reps Summary */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Active Sales Reps</p>
+                  <p className="text-xs text-gray-500">
+                    {loadingReps ? 'Loading...' : `${getActiveRepsCount()} available for assignment`}
+                  </p>
+                </div>
+              </div>
+              {onViewActiveSalesReps && (
+                <button
+                  onClick={onViewActiveSalesReps}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  View
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Mode Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Assignment Mode</label>
+            <label className="text-sm font-medium text-gray-700 mb-3 block">
+              Assignment Mode
+            </label>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => onSettingsFormChange({ ...settingsForm, assignmentMode: 'manual' })}
-                className={`px-4 py-2 rounded-lg border font-medium ${settingsForm.assignmentMode === 'manual' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                onClick={() => setLocalSettings({ ...localSettings, mode: 'manual' })}
+                className={`p-4 rounded-lg border-2 text-left transition-all ${localSettings.mode === 'manual'
+                  ? 'border-gray-900 bg-gray-50'
+                  : 'border-gray-200 hover:border-gray-300'
+                  }`}
               >
-                Manual
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-900">Manual</span>
+                  {localSettings.mode === 'manual' && (
+                    <Check className="w-4 h-4 text-gray-900" />
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Assign leads manually to sales reps
+                </p>
               </button>
               <button
-                onClick={() => onSettingsFormChange({ ...settingsForm, assignmentMode: 'auto' })}
-                className={`px-4 py-2 rounded-lg border font-medium ${settingsForm.assignmentMode === 'auto' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                onClick={() => setLocalSettings({ ...localSettings, mode: 'auto' })}
+                className={`p-4 rounded-lg border-2 text-left transition-all ${localSettings.mode === 'auto'
+                  ? 'border-gray-900 bg-gray-50'
+                  : 'border-gray-200 hover:border-gray-300'
+                  }`}
               >
-                Auto
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-900">Automatic</span>
+                  {localSettings.mode === 'auto' && (
+                    <Check className="w-4 h-4 text-gray-900" />
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Auto-assign leads using a strategy
+                </p>
               </button>
             </div>
           </div>
 
-          {settingsForm.assignmentMode === 'auto' && (
-            <>
+          {/* Strategy (only for auto mode) */}
+          {localSettings.mode === 'auto' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Auto Strategy</label>
-              <select
-                value={settingsForm.autoStrategy}
-                onChange={(e) => onSettingsFormChange({ ...settingsForm, autoStrategy: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="round_robin">Round Robin</option>
-                <option value="load_based">Load Based</option>
-              </select>
-            </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Require Active Login (1 hour)
-                    </label>
-                    <p className="text-xs text-gray-500">
-                      Only assign leads to sales reps who logged in within the last 1 hour
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onSettingsFormChange({ 
-                      ...settingsForm, 
-                      requireActiveLogin48h: !settingsForm.requireActiveLogin48h 
-                    })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                      settingsForm.requireActiveLogin48h ? 'bg-blue-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        settingsForm.requireActiveLogin48h ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* View Active Sales Reps Button */}
+              <label className="text-sm font-medium text-gray-700 mb-3 block">
+                Distribution Strategy
+              </label>
+              <div className="space-y-2">
                 <button
-                  type="button"
-                  onClick={() => setShowActiveRepsDialog(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors font-medium"
+                  onClick={() => setLocalSettings({ ...localSettings, strategy: 'round-robin' })}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${localSettings.strategy === 'round-robin'
+                    ? 'border-gray-900 bg-gray-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                    }`}
                 >
-                  <Users className="w-4 h-4" />
-                  View Active Sales Reps
+                  <RotateCcw className="w-4 h-4 text-gray-500" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-900">Round Robin</p>
+                    <p className="text-xs text-gray-500">Distribute evenly in order</p>
+                  </div>
+                  {localSettings.strategy === 'round-robin' && (
+                    <Check className="w-4 h-4 text-gray-900 ml-auto" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setLocalSettings({ ...localSettings, strategy: 'load-based' })}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${localSettings.strategy === 'load-based'
+                    ? 'border-gray-900 bg-gray-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                >
+                  <BarChart3 className="w-4 h-4 text-gray-500" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-900">Load Based</p>
+                    <p className="text-xs text-gray-500">Assign to rep with fewest leads</p>
+                  </div>
+                  {localSettings.strategy === 'load-based' && (
+                    <Check className="w-4 h-4 text-gray-900 ml-auto" />
+                  )}
                 </button>
               </div>
-            </>
+            </div>
           )}
 
-          <div className="flex gap-3 pt-2">
+          {/* Require Active Login Option */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Require Active Login</p>
+              <p className="text-xs text-gray-500">Only assign to recently logged-in reps</p>
+            </div>
             <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors font-medium"
+              onClick={() => setLocalSettings({ ...localSettings, requireActiveLogin: !localSettings.requireActiveLogin })}
+              className={`relative w-11 h-6 rounded-full transition-colors ${localSettings.requireActiveLogin ? 'bg-gray-900' : 'bg-gray-300'
+                }`}
             >
-              Close
-            </button>
-            <button
-              onClick={onSave}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
-            >
-              Save Settings
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${localSettings.requireActiveLogin ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+              />
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Active Sales Reps Dialog */}
-      <ActiveSalesRepsDialog
-        isOpen={showActiveRepsDialog}
-        onClose={() => setShowActiveRepsDialog(false)}
-        requireActiveLogin48h={settingsForm.requireActiveLogin48h}
-      />
+        {/* Footer */}
+        <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {isSaving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
 export default SettingsDialog;
-

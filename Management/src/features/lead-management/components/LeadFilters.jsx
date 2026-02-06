@@ -1,74 +1,92 @@
-import { Search, Filter } from 'lucide-react';
+import { Search, X, Filter } from "lucide-react";
 
-const LeadFilters = ({ 
-  searchTerm, 
-  onSearchChange, 
-  onFilterClick,
+const LeadFilters = ({
+  searchTerm,
+  setSearchTerm,
   filterStatus,
-  onFilterStatusChange,
+  setFilterStatus,
   statusCounts,
-  loading,
-  statusColors,
-  statusLabels
+  onAdvancedFilterClick,
 }) => {
-  // Default status colors if not provided
-  const safeStatusColors = statusColors || {};
-  
-  const statusButtons = [
-    { key: "all", label: "All Leads", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: "bg-white", textColor: "text-gray-700" },
-    { key: "new", label: "New", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: safeStatusColors.new?.tab || "bg-blue-100 text-blue-800", textColor: "text-blue-800" },
-    { key: "contacted", label: "Contacted", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: safeStatusColors.contacted?.tab || "bg-yellow-100 text-yellow-800", textColor: "text-yellow-800" },
-    { key: "interested", label: "Interested", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: safeStatusColors.interested?.tab || "bg-purple-100 text-purple-800", textColor: "text-purple-800" },
-    { key: "quoted", label: "Quoted", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: safeStatusColors.quoted?.tab || "bg-cyan-100 text-cyan-800", textColor: "text-cyan-800" },
-    { key: "converted", label: "Converted", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: safeStatusColors.converted?.tab || "bg-green-100 text-green-800", textColor: "text-green-800" },
-    { key: "lost", label: "Loss", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: safeStatusColors.lost?.tab || "bg-red-100 text-red-800", textColor: "text-red-800" },
-    { key: "not-interested", label: "Not Interested", activeBg: "bg-gradient-to-r from-blue-600 to-purple-600", inactiveBg: safeStatusColors["not-interested"]?.tab || "bg-gray-100 text-gray-800", textColor: "text-gray-800" },
+  // Status configuration with colors matching the lead cards
+  const statuses = [
+    { key: "all", label: "All", color: "bg-gray-500", lightBg: "bg-gray-100", textColor: "text-gray-600" },
+    { key: "new", label: "New", color: "bg-blue-500", lightBg: "bg-blue-100", textColor: "text-blue-600" },
+    { key: "contacted", label: "Contacted", color: "bg-cyan-500", lightBg: "bg-cyan-100", textColor: "text-cyan-600" },
+    { key: "interested", label: "Interested", color: "bg-purple-500", lightBg: "bg-purple-100", textColor: "text-purple-600" },
+    { key: "quoted", label: "Quoted", color: "bg-amber-500", lightBg: "bg-amber-100", textColor: "text-amber-600" },
+    { key: "converted", label: "Converted", color: "bg-emerald-500", lightBg: "bg-emerald-100", textColor: "text-emerald-600" },
+    { key: "lost", label: "Lost", color: "bg-red-500", lightBg: "bg-red-100", textColor: "text-red-600" },
+    { key: "not_interested", label: "Not Interested", color: "bg-gray-400", lightBg: "bg-gray-100", textColor: "text-gray-500" },
   ];
 
   return (
-    <>
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, email, contact, city, destination, or sales rep..."
+            placeholder="Search by name, email, phone, destination..."
             value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <X className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          )}
         </div>
+
+        {/* Status Tabs with Colors */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+          {statuses.map((status) => {
+            const isActive = filterStatus === status.key;
+            const count = statusCounts[status.key] || 0;
+
+            return (
+              <button
+                key={status.key}
+                onClick={() => setFilterStatus(status.key)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${isActive
+                    ? `${status.color} text-white shadow-md`
+                    : `${status.lightBg} ${status.textColor} hover:opacity-80`
+                  }`}
+              >
+                {/* Color dot indicator */}
+                {!isActive && status.key !== "all" && (
+                  <span className={`w-2 h-2 rounded-full ${status.color}`} />
+                )}
+                <span>{status.label}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded text-xs font-semibold ${isActive
+                      ? "bg-white/25 text-white"
+                      : "bg-white text-gray-600"
+                    }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Advanced Filters */}
         <button
-          onClick={onFilterClick}
-          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+          onClick={onAdvancedFilterClick}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
         >
           <Filter className="w-4 h-4" />
           Filters
         </button>
       </div>
-
-      {/* Status Tabs */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {statusButtons.map(({ key, label, activeBg, inactiveBg, textColor }) => (
-          <button
-            key={key}
-            onClick={() => onFilterStatusChange(key)}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors shadow-sm ${
-              filterStatus === key
-                ? `${activeBg} text-white`
-                : `${inactiveBg} border border-gray-300 ${textColor} hover:bg-slate-200`
-            }`}
-          >
-            {label}
-            <span className="ml-2 text-xs bg-opacity-20 bg-gray-200 px-2 py-1 rounded-full">
-              {loading ? 0 : (statusCounts[key] || 0)}
-            </span>
-          </button>
-        ))}
-      </div>
-    </>
+    </div>
   );
 };
 
 export default LeadFilters;
-

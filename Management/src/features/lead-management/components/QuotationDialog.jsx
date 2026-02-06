@@ -1177,323 +1177,257 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-3" onClick={handleBackdropClick}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-green-600 to-green-700">
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {isEditing ? 'Edit Quotation' : 'Create Quotation'}
-            </h2>
-            <p className="text-green-100 text-sm mt-1">
-              {lead?.name && `For: ${lead.name}`}
-            </p>
-          </div>
+        <div className="px-5 py-3 flex items-center justify-between bg-slate-900 shrink-0">
           <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
-            >
-              <X className="w-6 h-6" />
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-lg flex items-center justify-center">
+              <Calculator className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">
+                {isEditing ? 'Edit Quotation' : 'New Quotation'}
+              </h2>
+              <p className="text-slate-400 text-xs">{lead?.name || 'Customer'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-5">
+            <div className="text-right">
+              <p className="text-slate-500 text-[10px] uppercase tracking-wide">Total</p>
+              <p className="text-xl font-bold text-white">₹{formatCurrency(totals.totalAmount)}</p>
+            </div>
+            <div className="h-8 w-px bg-slate-700" />
+            <div className="flex items-center gap-3 text-xs">
+              <span className={`px-2 py-1 rounded text-[10px] font-medium ${isDetailedMode ? 'bg-teal-500/20 text-teal-300' : 'bg-slate-700 text-slate-400'}`}>
+                {isDetailedMode ? 'Detailed' : 'Summary'}
+              </span>
+              <span className="text-slate-500">{formData.items.filter(i => i.description).length} items</span>
+            </div>
+            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors">
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            {(loadingExisting || existingQuotations.length > 0) && (
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Existing Quotations
-                  </label>
-                  <select
-                    value={selectedQuotationId || 'new'}
-                    onChange={(e) => setSelectedQuotationId(e.target.value === 'new' ? 'new' : e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                    disabled={loadingExisting}
-                  >
-                    <option value="new">Create New Quotation</option>
-                    {existingQuotations.map((quotation) => {
-                      const quotationId = quotation._id || quotation.id;
-                      return (
-                        <option key={quotationId} value={quotationId}>
-                          {`${quotation.quotationNumber || quotationId} • ${getModeLabel(quotation.mode)} • INR ${formatCurrency(quotation.totalAmount || 0)} • ${formatDateLabel(quotation.createdAt)}`}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  {loadingExisting && (
-                    <p className="text-xs text-gray-500 mt-1">Loading quotations...</p>
+        <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
+          <div className="space-y-4">
+            {/* TOP ROW: Delivery + Plan Selection + Configuration - Improved Layout */}
+            <div className="flex gap-3">
+              {/* Delivery Section - Narrower, stacked layout */}
+              <div className="w-72 shrink-0 bg-white rounded-lg border border-slate-200 p-3">
+                <h3 className="text-xs font-semibold text-slate-600 mb-2">Quotation & Delivery</h3>
+                <div className="space-y-2">
+                  {/* Row 1: Quotation Selection */}
+                  {(loadingExisting || existingQuotations.length > 0) && (
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-1">Quotation</label>
+                      <select
+                        value={selectedQuotationId || 'new'}
+                        onChange={(e) => setSelectedQuotationId(e.target.value === 'new' ? 'new' : e.target.value)}
+                        className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                        disabled={loadingExisting}
+                      >
+                        <option value="new">+ Create New</option>
+                        {existingQuotations.map((q) => (
+                          <option key={q._id || q.id} value={q._id || q.id}>
+                            {q.quotationNumber || (q._id || q.id).slice(-6)} • ₹{formatCurrency(q.totalAmount || 0)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   )}
-                </div>
-                <div className="flex items-end justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadExistingQuotation(selectedQuotationId)}
-                    disabled={selectedQuotationId === 'new'}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    title="Download selected quotation PDF"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download PDF
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Recipient Email
-                </label>
-                <input
-                  type="email"
-                  value={sendEmailAddress}
-                  onChange={(e) => setSendEmailAddress(e.target.value)}
-                  placeholder="customer@example.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  We will send the quotation PDF to this address using the configured mail server.
-                </p>
-              </div>
-              <div className="flex items-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleSendEmail}
-                  disabled={sendingEmail || !sendEmailAddress.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded hover:from-green-700 hover:to-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-4 h-4" />
-                  {sendingEmail ? 'Sending…' : 'Send Email'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSendWhatsApp(currentQuotationId || currentQuotation?._id)}
-                  disabled={!currentQuotationId || currentQuotationId === 'new' || !lead?.whatsapp}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Send via WhatsApp"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp
-                </button>
-              </div>
-            </div>
-
-            {/* NEW: Plan Selection Toggle - Show when multiple plans are available */}
-            {availablePlans.length > 1 && (
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
+                  {/* Row 2: Email Input */}
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                      <span className="text-blue-600">🎯</span>
-                      Select Plan to Quote
-                    </h3>
-                    <p className="text-xs text-gray-600 mt-1">
-                      This lead has multiple travel plans. Choose which one to include in this quotation.
-                    </p>
+                    <label className="block text-[10px] text-slate-500 mb-1">Recipient Email</label>
+                    <input
+                      type="email"
+                      value={sendEmailAddress}
+                      onChange={(e) => setSendEmailAddress(e.target.value)}
+                      placeholder="email@example.com"
+                      className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                  {/* Row 3: Action Buttons */}
+                  <div className="flex gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSendEmail}
+                      disabled={sendingEmail || !sendEmailAddress.trim()}
+                      className="flex-1 px-2 py-1.5 bg-teal-600 text-white rounded text-[10px] font-medium hover:bg-teal-700 disabled:opacity-40 flex items-center justify-center gap-1"
+                    >
+                      <Send className="w-3 h-3" />
+                      {sendingEmail ? '...' : 'Email'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSendWhatsApp(currentQuotationId || currentQuotation?._id)}
+                      disabled={!currentQuotationId || currentQuotationId === 'new' || !lead?.whatsapp}
+                      className="flex-1 px-2 py-1.5 bg-emerald-600 text-white rounded text-[10px] font-medium hover:bg-emerald-700 disabled:opacity-40 flex items-center justify-center gap-1"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      WhatsApp
+                    </button>
+                    {selectedQuotationId !== 'new' && (
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadExistingQuotation(selectedQuotationId)}
+                        className="px-2 py-1.5 bg-slate-100 border border-slate-300 text-slate-700 rounded text-[10px] font-medium hover:bg-slate-200 flex items-center gap-1"
+                      >
+                        <Download className="w-3 h-3" />
+                        PDF
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {availablePlans.includes('customized') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        console.log('🔄 [Quotation] Switching to Customized Package');
-
-                        // Clear existing items (except package item) before loading new plan
-                        setFormData(prev => {
-                          const packageItem = prev.items.find(item => item.category === 'package');
-                          return {
-                            ...prev,
-                            items: packageItem ? [packageItem] : []
-                          };
-                        });
-
-                        setSelectedPlanType('customized');
-                        setDetectedPackageType('customized');
-
-                        // Increase timeout to ensure state updates complete
-                        setTimeout(() => {
-                          console.log('⏰ [Quotation] Loading customized package items');
-                          // Pass explicit type to avoid stale closure issues
-                          loadDetailedItems('customized');
-                        }, 200);
-
-                        toast.success('Switched to Customized Package plan');
-                      }}
-                      className={`px-4 py-3 rounded-lg border-2 transition-all duration-200 ${selectedPlanType === 'customized'
-                        ? 'bg-purple-600 border-purple-600 text-white shadow-lg scale-105'
-                        : 'bg-white border-purple-300 text-purple-700 hover:border-purple-500 hover:bg-purple-50'
-                        }`}
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-2xl">✨</span>
-                        <span className="font-semibold text-sm">Customized Package</span>
-                        <span className="text-xs opacity-80">Personalized for Lead</span>
-                      </div>
-                    </button>
-                  )}
-
-                  {availablePlans.includes('manual') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        console.log('🔄 [Quotation] Switching to Manual Itinerary');
-
-                        // Clear existing items (except package item) before loading new plan
-                        setFormData(prev => {
-                          const packageItem = prev.items.find(item => item.category === 'package');
-                          return {
-                            ...prev,
-                            items: packageItem ? [packageItem] : []
-                          };
-                        });
-
-                        setSelectedPlanType('manual');
-                        setDetectedPackageType('manual');
-
-                        // Increase timeout to ensure state updates complete
-                        setTimeout(() => {
-                          console.log('⏰ [Quotation] Loading manual itinerary items');
-                          if (isDetailedMode) {
-                            // Pass explicit type to avoid stale closure issues
-                            loadDetailedItems('manual');
-                          } else {
-                            loadManualItinerarySimple();
-                          }
-                        }, 200);
-
-                        toast.success('Switched to Manual Itinerary plan');
-                      }}
-                      className={`px-4 py-3 rounded-lg border-2 transition-all duration-200 ${selectedPlanType === 'manual'
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105'
-                        : 'bg-white border-blue-300 text-blue-700 hover:border-blue-500 hover:bg-blue-50'
-                        }`}
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-2xl">📋</span>
-                        <span className="font-semibold text-sm">Manual Itinerary</span>
-                        <span className="text-xs opacity-80">
-                          {lead.manualItinerary?.title || 'Custom Day-by-Day Plan'}
-                        </span>
-                      </div>
-                    </button>
-                  )}
-
-                  {availablePlans.includes('package') && !availablePlans.includes('customized') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedPlanType('package');
-                        setDetectedPackageType('package');
-                        setTimeout(() => {
-                          loadDetailedItems('package');
-                        }, 100);
-                        toast.success('Switched to Regular Package plan');
-                      }}
-                      className={`px-4 py-3 rounded-lg border-2 transition-all duration-200 ${selectedPlanType === 'package'
-                        ? 'bg-green-600 border-green-600 text-white shadow-lg scale-105'
-                        : 'bg-white border-green-300 text-green-700 hover:border-green-500 hover:bg-green-50'
-                        }`}
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-2xl">📦</span>
-                        <span className="font-semibold text-sm">Regular Package</span>
-                        <span className="text-xs opacity-80">
-                          {lead.package?.name || lead.packageName || 'Standard Plan'}
-                        </span>
-                      </div>
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-3 flex items-center gap-2 text-xs text-gray-600 bg-white rounded px-3 py-2">
-                  <span className="font-semibold text-blue-600">💡 Tip:</span>
-                  <span>You can create separate quotations for each plan and send both to the customer for comparison.</span>
-                </div>
               </div>
-            )}
 
-            {/* Package Detection & Detailed Mode Toggle */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Detected Package
-                </label>
-                <div className="px-3 py-2 border border-gray-300 rounded bg-gray-50">
-                  {detectedPackageType === 'customized' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-purple-700">
-                        ✨ Customized Package: {detectedPackage?.name || 'N/A'}
-                      </span>
-                    </div>
-                  )}
-                  {detectedPackageType === 'package' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700">
-                        📦 Package: {detectedPackage?.name || 'N/A'}
-                      </span>
-                    </div>
-                  )}
-                  {detectedPackageType === 'manual' && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-blue-700">
-                        📋 Manual Itinerary
-                      </span>
-                    </div>
-                  )}
-                  {!detectedPackageType && (
-                    <span className="text-sm text-gray-500">No package detected</span>
-                  )}
+              {/* Plan Selection - Wider with better UX */}
+              {availablePlans.length > 1 ? (
+                <div className="flex-1 bg-white rounded-lg border border-slate-200 p-3">
+                  <h3 className="text-xs font-semibold text-slate-600 mb-2">Plan Type</h3>
+                  <div className="flex gap-2">
+                    {availablePlans.includes('customized') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => {
+                            const packageItem = prev.items.find(item => item.category === 'package');
+                            return { ...prev, items: packageItem ? [packageItem] : [] };
+                          });
+                          setSelectedPlanType('customized');
+                          setDetectedPackageType('customized');
+                          setTimeout(() => loadDetailedItems('customized'), 200);
+                          toast.success('Customized Package selected');
+                        }}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${selectedPlanType === 'customized'
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:bg-violet-50'}`}
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>✨</span>
+                          <span>Customized</span>
+                        </div>
+                        <div className="text-[9px] opacity-75 mt-0.5">Modified package</div>
+                      </button>
+                    )}
+                    {availablePlans.includes('manual') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => {
+                            const packageItem = prev.items.find(item => item.category === 'package');
+                            return { ...prev, items: packageItem ? [packageItem] : [] };
+                          });
+                          setSelectedPlanType('manual');
+                          setDetectedPackageType('manual');
+                          setTimeout(() => isDetailedMode ? loadDetailedItems('manual') : loadManualItinerarySimple(), 200);
+                          toast.success('Manual Itinerary selected');
+                        }}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${selectedPlanType === 'manual'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:bg-blue-50'}`}
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>📋</span>
+                          <span>Manual</span>
+                        </div>
+                        <div className="text-[9px] opacity-75 mt-0.5">Custom itinerary</div>
+                      </button>
+                    )}
+                    {availablePlans.includes('package') && !availablePlans.includes('customized') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlanType('package');
+                          setDetectedPackageType('package');
+                          setTimeout(() => loadDetailedItems('package'), 100);
+                          toast.success('Standard Package selected');
+                        }}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all border ${selectedPlanType === 'package'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50'}`}
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>📦</span>
+                          <span>Package</span>
+                        </div>
+                        <div className="text-[9px] opacity-75 mt-0.5">Standard template</div>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Detailed Quotation
-                </label>
-                <button
-                  type="button"
-                  onClick={handleToggleDetailedMode}
-                  disabled={loadingItinerary || !detectedPackageType}
-                  className={`w-full px-3 py-2 border rounded flex items-center justify-center gap-2 transition-colors ${isDetailedMode
-                    ? 'bg-green-100 border-green-500 text-green-700'
-                    : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
-                    } ${loadingItinerary || !detectedPackageType ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {isDetailedMode ? (
-                    <>
-                      <ToggleRight className="w-5 h-5" />
-                      <span>Detailed Mode ON</span>
-                    </>
-                  ) : (
-                    <>
-                      <ToggleLeft className="w-5 h-5" />
-                      <span>Detailed Mode OFF</span>
-                    </>
-                  )}
-                </button>
-                {loadingItinerary && (
-                  <p className="text-xs text-gray-500 mt-1">Loading itinerary...</p>
-                )}
-                <p className="text-xs text-gray-500 mt-2">
-                  Current mode: <span className="font-semibold text-gray-700">{getModeLabel(formData.mode)}</span>
-                  {currentQuotation && ' (loaded from selected quotation)'}
-                </p>
+              ) : (
+                <div className="flex-1" />
+              )}
+
+              {/* Configuration - Improved */}
+              <div className="w-64 shrink-0 bg-white rounded-lg border border-slate-200 p-3">
+                <h3 className="text-xs font-semibold text-slate-600 mb-2">Mode & Status</h3>
+                <div className="space-y-2">
+                  {/* Current Plan Indicator */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Active:</span>
+                    {detectedPackageType === 'customized' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-medium">✨ {detectedPackage?.name?.slice(0, 20) || 'Customized'}</span>
+                    )}
+                    {detectedPackageType === 'package' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-medium">📦 {detectedPackage?.name?.slice(0, 20) || 'Package'}</span>
+                    )}
+                    {detectedPackageType === 'manual' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">📋 Manual Itinerary</span>
+                    )}
+                    {!detectedPackageType && (
+                      <span className="text-[10px] text-slate-400 italic">No plan selected</span>
+                    )}
+                  </div>
+                  {/* Mode Toggle */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">View:</span>
+                    <div className="flex-1 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => !isDetailedMode ? null : handleToggleDetailedMode()}
+                        disabled={loadingItinerary || !detectedPackageType}
+                        className={`flex-1 px-2 py-1.5 rounded text-[10px] font-medium transition-all ${!isDetailedMode ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'} ${loadingItinerary || !detectedPackageType ? 'opacity-40' : ''}`}
+                      >
+                        Summary
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => isDetailedMode ? null : handleToggleDetailedMode()}
+                        disabled={loadingItinerary || !detectedPackageType}
+                        className={`flex-1 px-2 py-1.5 rounded text-[10px] font-medium transition-all ${isDetailedMode ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'} ${loadingItinerary || !detectedPackageType ? 'opacity-40' : ''}`}
+                      >
+                        Day-by-Day
+                      </button>
+                    </div>
+                  </div>
+                  {/* Valid Until */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-100 mt-2">
+                    <span className="text-[10px] text-slate-400">Valid:</span>
+                    <input
+                      type="date"
+                      value={formData.validUntil}
+                      onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
+                      className="flex-1 px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* MANUAL ASSETS SECTION - Only for Pure Manual Itineraries (No Package Linked) */}
             {((detectedPackageType === 'manual' || selectedPlanType === 'manual') && !formData.package && !lead?.package && !lead?.customizedPackage) && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="text-blue-600">🖼️</span>
-                  Quotation Assets (Manual Plan)
-                </h3>
-                <div className="space-y-4">
+              <div className="bg-white rounded-lg border border-slate-200 overflow-hidden mb-4 shadow-sm">
+                <div className="px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
+                  <h3 className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                    <span>🖼️</span>
+                    Quotation Assets (Manual Plan)
+                  </h3>
+                </div>
+                <div className="p-4 space-y-4">
                   {/* Multiple Images Upload */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1631,29 +1565,29 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   <div className="grid grid-cols-2 gap-4">
                     {/* Inclusions */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
                         Inclusions
                       </label>
                       <textarea
                         value={formData.includedServices?.join('\n') || ''}
                         onChange={(e) => setFormData({ ...formData, includedServices: e.target.value.split('\n') })}
-                        placeholder="Enter inclusions (one per line)"
+                        placeholder="Enter inclusions (one per line)..."
                         rows={4}
-                        className="w-full px-3 py-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
                     {/* Exclusions */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
                         Exclusions
                       </label>
                       <textarea
                         value={formData.excludedServices?.join('\n') || ''}
                         onChange={(e) => setFormData({ ...formData, excludedServices: e.target.value.split('\n') })}
-                        placeholder="Enter exclusions (one per line)"
+                        placeholder="Enter exclusions (one per line)..."
                         rows={4}
-                        className="w-full px-3 py-2 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                   </div>
@@ -1661,406 +1595,438 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               </div>
             )}
 
-            {/* Valid Until */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Valid Until
-                </label>
-                <input
-                  type="date"
-                  value={formData.validUntil}
-                  onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
+
 
             {/* Items Table */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Items {isDetailedMode ? '(Detailed Mode - Individual Pricing)' : '(Summary Mode - Package Price Only)'}
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-teal-50 to-cyan-50 border-b border-teal-200">
+                <h3 className="text-sm font-semibold text-teal-800 flex items-center gap-2">
+                  <span>📋</span>
+                  Items {isDetailedMode ? '(Detailed - Day by Day)' : '(Summary)'}
                 </h3>
-                {/* Show Add Item/Field button */}
                 <button
                   type="button"
                   onClick={addItem}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-md text-xs font-medium hover:bg-teal-700 transition-colors shadow-sm"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                   {isDetailedMode ? 'Add Item' : 'Add Field'}
                 </button>
               </div>
+              <div className="p-4">
+                {!isDetailedMode ? (
+                  /* Summary Mode: Package price input + All activities as read-only text */
+                  <div className="space-y-4">
+                    {/* Package Price Input (Editable) */}
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Package Total Price
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">INR</span>
+                        <input
+                          type="number"
+                          value={(() => {
+                            const packageItem = formData.items.find(item => item.category === 'package');
+                            return packageItem ? (packageItem.totalPrice || packageItem.unitPrice || 0) : 0;
+                          })()}
+                          onChange={(e) => {
+                            const price = parseFloat(e.target.value) || 0;
+                            setFormData(prev => {
+                              const packageItemIndex = prev.items.findIndex(item => item.category === 'package');
+                              if (packageItemIndex >= 0) {
+                                const newItems = [...prev.items];
+                                newItems[packageItemIndex] = {
+                                  ...newItems[packageItemIndex],
+                                  totalPrice: price,
+                                  unitPrice: price,
+                                  quantity: 1,
+                                };
+                                return { ...prev, items: newItems };
+                              } else {
+                                // If no package item exists, create one
+                                return {
+                                  ...prev,
+                                  items: [
+                                    {
+                                      description: 'Package Total',
+                                      category: 'package',
+                                      quantity: 1,
+                                      unitPrice: price,
+                                      totalPrice: price,
+                                      notes: '',
+                                    },
+                                    ...prev.items.filter(item => item.category !== 'package'),
+                                  ],
+                                };
+                              }
+                            });
+                          }}
+                          min="0"
+                          step="0.01"
+                          className="flex-1 px-3 py-2 border border-green-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500"
+                          placeholder="Enter package total price"
+                        />
+                      </div>
+                    </div>
 
-              {!isDetailedMode ? (
-                /* Summary Mode: Package price input + All activities as read-only text */
-                <div className="space-y-4">
-                  {/* Package Price Input (Editable) */}
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Package Total Price
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">INR</span>
+                    {/* Extra Fields Only - No included activities shown */}
+                    {formData.items.filter(item => item.category !== 'package' && item.isManual === true).length > 0 && (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          Extra Fields
+                        </label>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {formData.items
+                            .map((item, originalIndex) => {
+                              // Skip package items and non-manual items (activities from itinerary)
+                              if (item.category === 'package' || item.isManual !== true) return null;
+
+                              // Only show manually added extra fields
+                              return (
+                                <div
+                                  key={originalIndex}
+                                  className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded"
+                                >
+                                  <input
+                                    type="text"
+                                    value={item.description || ''}
+                                    onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                    placeholder="Field description"
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                  <input
+                                    type="number"
+                                    value={item.totalPrice || item.unitPrice || 0}
+                                    onChange={(e) => {
+                                      const price = parseFloat(e.target.value) || 0;
+                                      // Update both totalPrice and unitPrice in a single state update
+                                      const newItems = [...formData.items];
+                                      newItems[originalIndex] = {
+                                        ...newItems[originalIndex],
+                                        totalPrice: price,
+                                        unitPrice: price,
+                                        quantity: 1,
+                                      };
+                                      setFormData({ ...formData, items: newItems });
+                                    }}
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="Price"
+                                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                                  />
+                                  <button
+                                    onClick={() => removeItem(originalIndex)}
+                                    className="text-red-600 hover:text-red-800"
+                                    type="button"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            })
+                            .filter(item => item !== null)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Detailed Mode: All items with editable price inputs (Grouped by Day) */
+                  <div className="overflow-x-auto">
+                    {/* helper to group items */}
+                    {(() => {
+                      const items = formData.items.filter(i => i.category !== 'package');
+                      if (items.length === 0) {
+                        return (
+                          <div className="text-center py-8 text-gray-500 text-sm border-t">
+                            No items added yet. Click "Reset from Itinerary" or "Add Item" to populate.
+                          </div>
+                        );
+                      }
+
+                      // Group by Day
+                      const grouped = {};
+                      const others = [];
+
+                      items.forEach((item, index) => {
+                        const originalIndex = formData.items.indexOf(item);
+                        const match = item.description?.match(/^Day\s*(\d+)/i);
+                        if (match) {
+                          const dayNum = parseInt(match[1]);
+                          if (!grouped[dayNum]) grouped[dayNum] = [];
+                          grouped[dayNum].push({ ...item, originalIndex });
+                        } else {
+                          others.push({ ...item, originalIndex });
+                        }
+                      });
+
+                      const dayKeys = Object.keys(grouped).sort((a, b) => a - b);
+
+                      return (
+                        <div className="space-y-4">
+                          {/* Render days in 2-column grid */}
+                          <div className="grid grid-cols-2 gap-4">
+                            {dayKeys.map(day => (
+                              <div key={day} className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
+                                <div className="bg-gradient-to-r from-slate-100 to-slate-200 px-3 py-2 border-b border-slate-300 flex justify-between items-center shrink-0">
+                                  <h4 className="font-semibold text-slate-700 text-xs flex items-center gap-1.5">
+                                    <span className="w-5 h-5 flex items-center justify-center bg-white rounded-full text-[10px] text-slate-600 shadow-sm border border-slate-200 font-bold">{day}</span>
+                                    Day {day}
+                                  </h4>
+                                  <span className="text-[9px] font-medium text-slate-500 bg-white/50 px-1.5 py-0.5 rounded border border-slate-200">{grouped[day].length} items</span>
+                                </div>
+                                <div className="divide-y divide-slate-100 overflow-y-auto max-h-60 bg-white custom-scrollbar">
+                                  {grouped[day].map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
+                                    <div key={originalIndex} className="group relative px-3 py-2.5 hover:bg-slate-50 transition-colors">
+                                      <div className="flex gap-2 items-start">
+                                        <div className="flex-1 min-w-0">
+                                          <textarea
+                                            value={description || ''}
+                                            onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                            rows={1}
+                                            onInput={(e) => {
+                                              e.target.style.height = 'auto';
+                                              e.target.style.height = e.target.scrollHeight + 'px';
+                                            }}
+                                            className="w-full text-xs text-slate-700 bg-transparent border-0 p-0 focus:ring-0 resize-none font-medium leading-relaxed placeholder-slate-300"
+                                            placeholder="Item description..."
+                                          />
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0 ml-1">
+                                          <div className="relative group/price">
+                                            <div className="absolute inset-y-0 left-0 pl-1.5 flex items-center pointer-events-none">
+                                              <span className="text-[10px] text-slate-400">₹</span>
+                                            </div>
+                                            <input
+                                              type="number"
+                                              value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
+                                              onChange={(e) => {
+                                                const val = parseFloat(e.target.value) || 0;
+                                                const newItems = [...formData.items];
+                                                newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
+                                                setFormData({ ...formData, items: newItems });
+                                              }}
+                                              className="w-20 pl-4 pr-1 py-1 text-right text-xs bg-slate-50 border border-slate-200 rounded text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all font-semibold"
+                                              placeholder="0.00"
+                                            />
+                                          </div>
+                                          <button
+                                            onClick={() => removeItem(originalIndex)}
+                                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Remove Item"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {grouped[day].length === 0 && (
+                                    <div className="px-4 py-8 text-center text-[10px] text-slate-400 italic bg-slate-50/50">
+                                      No items for this day
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+
+                          {others.length > 0 && (
+                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm mt-4">
+                              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                                <h4 className="font-semibold text-slate-700 text-xs flex items-center gap-2">
+                                  <span>📦</span> General Items
+                                </h4>
+                              </div>
+                              <div className="divide-y divide-slate-100">
+                                {others.map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
+                                  <div key={originalIndex} className="group relative px-4 py-3 hover:bg-slate-50 transition-colors">
+                                    <div className="flex gap-3 items-start">
+                                      <div className="flex-1 min-w-0">
+                                        <textarea
+                                          value={description || ''}
+                                          onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                          rows={1}
+                                          onInput={(e) => {
+                                            e.target.style.height = 'auto';
+                                            e.target.style.height = e.target.scrollHeight + 'px';
+                                          }}
+                                          className="w-full text-xs text-slate-700 bg-transparent border-0 p-0 focus:ring-0 resize-none font-medium leading-relaxed placeholder-slate-300"
+                                          placeholder="Item description..."
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                                        <div className="relative group/price">
+                                          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                            <span className="text-[10px] text-slate-400">₹</span>
+                                          </div>
+                                          <input
+                                            type="number"
+                                            value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
+                                            onChange={(e) => {
+                                              const val = parseFloat(e.target.value) || 0;
+                                              const newItems = [...formData.items];
+                                              newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
+                                              setFormData({ ...formData, items: newItems });
+                                            }}
+                                            className="w-24 pl-5 pr-2 py-1.5 text-right text-xs bg-slate-50 border border-slate-200 rounded text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all font-semibold"
+                                            placeholder="0.00"
+                                          />
+                                        </div>
+                                        <button
+                                          onClick={() => removeItem(originalIndex)}
+                                          className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                          title="Remove Item"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+
+                          {/* Resync Button */}
+                          <div className="flex justify-end pt-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm('This will reload items from the itinerary, effectively resetting your manual edits for this section. Continue?')) {
+                                  loadDetailedItems();
+                                }
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                            >
+                              ↻ Reset/Reload Items from Itinerary
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )
+                }
+              </div>
+            </div>
+
+            {/* Calculations & Summary */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Tax & Discount Card */}
+              <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200">
+                  <h4 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                    <span>💰</span> Tax & Discount
+                  </h4>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-slate-500 mb-1">Tax Rate (%)</label>
                       <input
                         type="number"
-                        value={(() => {
-                          const packageItem = formData.items.find(item => item.category === 'package');
-                          return packageItem ? (packageItem.totalPrice || packageItem.unitPrice || 0) : 0;
-                        })()}
-                        onChange={(e) => {
-                          const price = parseFloat(e.target.value) || 0;
-                          setFormData(prev => {
-                            const packageItemIndex = prev.items.findIndex(item => item.category === 'package');
-                            if (packageItemIndex >= 0) {
-                              const newItems = [...prev.items];
-                              newItems[packageItemIndex] = {
-                                ...newItems[packageItemIndex],
-                                totalPrice: price,
-                                unitPrice: price,
-                                quantity: 1,
-                              };
-                              return { ...prev, items: newItems };
-                            } else {
-                              // If no package item exists, create one
-                              return {
-                                ...prev,
-                                items: [
-                                  {
-                                    description: 'Package Total',
-                                    category: 'package',
-                                    quantity: 1,
-                                    unitPrice: price,
-                                    totalPrice: price,
-                                    notes: '',
-                                  },
-                                  ...prev.items.filter(item => item.category !== 'package'),
-                                ],
-                              };
-                            }
-                          });
-                        }}
+                        value={formData.taxRate}
+                        onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
                         min="0"
+                        max="100"
                         step="0.01"
-                        className="flex-1 px-3 py-2 border border-green-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500"
-                        placeholder="Enter package total price"
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
                       />
                     </div>
+                    <div className="flex-1">
+                      <label className="block text-[10px] text-slate-500 mb-1">Discount Type</label>
+                      <select
+                        value={formData.discountType}
+                        onChange={(e) => setFormData({ ...formData, discountType: e.target.value, discountValue: 0 })}
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                      >
+                        <option value="none">None</option>
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed Amount</option>
+                      </select>
+                    </div>
                   </div>
-
-                  {/* Extra Fields Only - No included activities shown */}
-                  {formData.items.filter(item => item.category !== 'package' && item.isManual === true).length > 0 && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <label className="block text-sm font-semibold text-gray-700 mb-3">
-                        Extra Fields
+                  {formData.discountType !== 'none' && (
+                    <div>
+                      <label className="block text-[10px] text-slate-500 mb-1">
+                        Discount Value {formData.discountType === 'percentage' ? '(%)' : '(₹)'}
                       </label>
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {formData.items
-                          .map((item, originalIndex) => {
-                            // Skip package items and non-manual items (activities from itinerary)
-                            if (item.category === 'package' || item.isManual !== true) return null;
-
-                            // Only show manually added extra fields
-                            return (
-                              <div
-                                key={originalIndex}
-                                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded"
-                              >
-                                <input
-                                  type="text"
-                                  value={item.description || ''}
-                                  onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                  placeholder="Field description"
-                                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                />
-                                <input
-                                  type="number"
-                                  value={item.totalPrice || item.unitPrice || 0}
-                                  onChange={(e) => {
-                                    const price = parseFloat(e.target.value) || 0;
-                                    // Update both totalPrice and unitPrice in a single state update
-                                    const newItems = [...formData.items];
-                                    newItems[originalIndex] = {
-                                      ...newItems[originalIndex],
-                                      totalPrice: price,
-                                      unitPrice: price,
-                                      quantity: 1,
-                                    };
-                                    setFormData({ ...formData, items: newItems });
-                                  }}
-                                  min="0"
-                                  step="0.01"
-                                  placeholder="Price"
-                                  className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                                />
-                                <button
-                                  onClick={() => removeItem(originalIndex)}
-                                  className="text-red-600 hover:text-red-800"
-                                  type="button"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            );
-                          })
-                          .filter(item => item !== null)}
-                      </div>
+                      <input
+                        type="number"
+                        value={formData.discountValue}
+                        onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
+                        min="0"
+                        step="0.01"
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                      />
                     </div>
                   )}
                 </div>
-              ) : (
-                /* Detailed Mode: All items with editable price inputs (Grouped by Day) */
-                <div className="overflow-x-auto">
-                  {/* helper to group items */}
-                  {(() => {
-                    const items = formData.items.filter(i => i.category !== 'package');
-                    if (items.length === 0) {
-                      return (
-                        <div className="text-center py-8 text-gray-500 text-sm border-t">
-                          No items added yet. Click "Reset from Itinerary" or "Add Item" to populate.
-                        </div>
-                      );
-                    }
-
-                    // Group by Day
-                    const grouped = {};
-                    const others = [];
-
-                    items.forEach((item, index) => {
-                      const originalIndex = formData.items.indexOf(item);
-                      const match = item.description?.match(/^Day\s*(\d+)/i);
-                      if (match) {
-                        const dayNum = parseInt(match[1]);
-                        if (!grouped[dayNum]) grouped[dayNum] = [];
-                        grouped[dayNum].push({ ...item, originalIndex });
-                      } else {
-                        others.push({ ...item, originalIndex });
-                      }
-                    });
-
-                    const dayKeys = Object.keys(grouped).sort((a, b) => a - b);
-
-                    return (
-                      <div className="space-y-6">
-                        {dayKeys.map(day => (
-                          <div key={day} className="border rounded-lg overflow-hidden bg-white shadow-sm">
-                            <div className="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-                              <h4 className="font-bold text-gray-700">Day {day}</h4>
-                              <span className="text-xs text-gray-500">{grouped[day].length} items</span>
-                            </div>
-                            <table className="w-full border-collapse">
-                              <tbody className="divide-y divide-gray-100">
-                                {grouped[day].map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
-                                  <tr key={originalIndex} className="hover:bg-gray-50">
-                                    <td className="px-4 py-2 w-full">
-                                      <input
-                                        type="text"
-                                        value={description || ''}
-                                        onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                        className="w-full px-2 py-1 border-0 bg-transparent focus:ring-0 text-sm text-gray-700"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-2 whitespace-nowrap">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">INR</span>
-                                        <input
-                                          type="number"
-                                          value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            const newItems = [...formData.items];
-                                            newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
-                                            setFormData({ ...formData, items: newItems });
-                                          }}
-                                          className="w-24 px-2 py-1 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-green-500"
-                                        />
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-2 w-10 text-center">
-                                      <button
-                                        onClick={() => removeItem(originalIndex)}
-                                        className="text-gray-400 hover:text-red-500 transition-colors"
-                                        title="Remove item"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ))}
-
-                        {others.length > 0 && (
-                          <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-                            <div className="bg-gray-50 px-4 py-2 border-b">
-                              <h4 className="font-bold text-gray-700">General Items</h4>
-                            </div>
-                            <table className="w-full border-collapse">
-                              <tbody className="divide-y divide-gray-100">
-                                {others.map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
-                                  <tr key={originalIndex} className="hover:bg-gray-50">
-                                    <td className="px-4 py-2 w-full">
-                                      <input
-                                        type="text"
-                                        value={description || ''}
-                                        onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                        className="w-full px-2 py-1 border-0 bg-transparent focus:ring-0 text-sm text-gray-700"
-                                        placeholder="Item description"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-2 whitespace-nowrap">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">INR</span>
-                                        <input
-                                          type="number"
-                                          value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            const newItems = [...formData.items];
-                                            newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
-                                            setFormData({ ...formData, items: newItems });
-                                          }}
-                                          className="w-24 px-2 py-1 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-green-500"
-                                        />
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-2 w-10 text-center">
-                                      <button
-                                        onClick={() => removeItem(originalIndex)}
-                                        className="text-gray-400 hover:text-red-500 transition-colors"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-
-                        {/* Resync Button */}
-                        <div className="flex justify-end pt-4">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm('This will reload items from the itinerary, effectively resetting your manual edits for this section. Continue?')) {
-                                loadDetailedItems();
-                              }
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
-                          >
-                            ↻ Reset/Reload Items from Itinerary
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-
-            {/* Calculations */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tax Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.taxRate}
-                    onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Discount Type
-                  </label>
-                  <select
-                    value={formData.discountType}
-                    onChange={(e) => setFormData({ ...formData, discountType: e.target.value, discountValue: 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="none">None</option>
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed Amount</option>
-                  </select>
-                </div>
-                {formData.discountType !== 'none' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Discount Value
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.discountValue}
-                      onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                )}
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <Calculator className="w-5 h-5" />
-                  Summary
-                </h4>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{totals.subtotal.toFixed(2)}</span>
+
+              {/* Summary Card */}
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg overflow-hidden text-white">
+                <div className="px-4 py-2.5 border-b border-slate-700">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Calculator className="w-4 h-4 text-teal-400" />
+                    <span>Summary</span>
+                  </h4>
                 </div>
-                {totals.discountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Discount:</span>
-                    <span>-{totals.discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                {totals.taxAmount > 0 && (
+                <div className="p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax:</span>
-                    <span className="font-medium">{totals.taxAmount.toFixed(2)}</span>
+                    <span className="text-slate-400">Subtotal:</span>
+                    <span className="font-medium">₹{formatCurrency(totals.subtotal)}</span>
                   </div>
-                )}
-                <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
-                  <span>Total:</span>
-                  <span className="text-green-600">{totals.totalAmount.toFixed(2)}</span>
+                  {totals.discountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-emerald-400">
+                      <span>Discount:</span>
+                      <span>-₹{formatCurrency(totals.discountAmount)}</span>
+                    </div>
+                  )}
+                  {totals.taxAmount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Tax ({formData.taxRate}%):</span>
+                      <span className="font-medium">₹{formatCurrency(totals.taxAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold border-t border-slate-700 pt-3 mt-3">
+                    <span>Total:</span>
+                    <span className="text-teal-400">₹{formatCurrency(totals.totalAmount)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Notes & Terms */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes
-                </label>
+              <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <span>📝</span> Notes
+                  </label>
+                </div>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="Additional notes..."
+                  className="w-full px-4 py-3 border-0 text-sm focus:outline-none focus:ring-0 resize-none"
+                  placeholder="Additional notes or special instructions..."
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Terms
-                </label>
+              <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-200">
+                  <label className="text-sm font-semibold text-indigo-700 flex items-center gap-2">
+                    <span>💳</span> Payment Terms
+                  </label>
+                </div>
                 <textarea
                   value={formData.paymentTerms}
                   onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
                   rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-3 border-0 text-sm focus:outline-none focus:ring-0 resize-none"
                   placeholder="Payment terms and conditions..."
                 />
               </div>
@@ -2069,33 +2035,32 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-          <div>
+        <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center gap-2">
             {currentQuotationId && (
               <button
                 onClick={() => handlePreviewPDF(currentQuotationId)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors font-medium"
-                title="Preview/Download Quotation PDF"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
               >
                 <Eye className="w-4 h-4" />
-                View PDF
+                Preview PDF
               </button>
             )}
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors"
+              className="px-5 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium"
             >
               Cancel
             </button>
             <button
               onClick={() => handleSubmit('save')}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 text-sm font-semibold shadow-sm"
             >
               <Save className="w-4 h-4" />
-              Save Quotation
+              {loading ? 'Saving...' : 'Save Quotation'}
             </button>
           </div>
         </div>
@@ -2130,7 +2095,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           />
         )}
       </div>
-    </div>
+    </div >
   );
 };
 

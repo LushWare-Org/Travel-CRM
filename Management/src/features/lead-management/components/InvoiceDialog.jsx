@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Calculator, Eye, Download, Send, MessageCircle } from 'lucide-react';
+import { X, Plus, Trash2, Save, Calculator, Eye, Download, Send, MessageCircle, FileText, Calendar, Package, Receipt, CreditCard, Percent, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { invoiceAPI, quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
@@ -16,1299 +16,414 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [currentInvoice, setCurrentInvoice] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [detectedPackage, setDetectedPackage] = useState(null);
-  const [detectedPackageType, setDetectedPackageType] = useState(null); // 'package', 'customized', 'manual'
+  const [detectedPackageType, setDetectedPackageType] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({ items: true, discount: false, communication: false });
 
   const [formData, setFormData] = useState({
-    lead: lead?._id || lead?.id,
-    quotation: '',
-    package: '',
-    type: 'invoice',
-    items: [
-      {
-        description: '',
-        category: 'other',
-        quantity: 1,
-        unitPrice: 0,
-        totalPrice: 0,
-        taxRate: 0,
-        notes: '',
-      },
-    ],
-    taxRate: 0,
-    discountType: 'none',
-    discountValue: 0,
+    lead: lead?._id || lead?.id, quotation: '', package: '', type: 'invoice',
+    items: [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }],
+    taxRate: 0, discountType: 'none', discountValue: 0,
     issueDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    notes: '',
-    terms: '',
-    paymentTerms: '',
-    paymentInstructions: '',
+    notes: '', terms: '', paymentTerms: '', paymentInstructions: '',
   });
   const [quotationMode, setQuotationMode] = useState('summary');
   const isDetailedMode = quotationMode === 'detailed';
   const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined) {
-      return '0.00';
-    }
-    const value = Number(amount) || 0;
-    return value.toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
+  const formatCurrency = (amount) => (Number(amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatDateLabel = (dateValue) => { if (!dateValue) return 'N/A'; try { return new Date(dateValue).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return 'N/A'; } };
+  const getModeLabel = (mode) => mode === 'detailed' ? 'Detailed' : 'Summary';
 
-  const formatDateLabel = (dateValue) => {
-    if (!dateValue) return 'N/A';
-    try {
-      return new Date(dateValue).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch (error) {
-      return 'N/A';
-    }
-  };
+  const toggleSection = (section) => setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
 
-  const getModeLabel = (mode) => (mode === 'detailed' ? 'Detailed' : 'Non Detailed');
-
-  const handleDownloadQuotationPDF = async (quotationId) => {
-    if (!quotationId) return;
-    try {
-      await quotationAPI.downloadPDF(quotationId);
-      toast.success('Quotation PDF downloaded');
-    } catch (error) {
-      console.error('Error downloading quotation PDF:', error);
-      toast.error('Failed to download quotation PDF');
-    }
-  };
+  const handleDownloadQuotationPDF = async (quotationId) => { if (!quotationId) return; try { await quotationAPI.downloadPDF(quotationId); toast.success('Quotation PDF downloaded'); } catch (error) { toast.error('Failed to download quotation PDF'); } };
 
   useEffect(() => {
     if (isOpen && lead) {
-      setQuotationMode('summary');
-      // Auto-detect package type from lead
-      detectPackageType();
-
-      // Reset form with lead data
-      setFormData(prev => ({
-        ...prev,
-        lead: lead._id || lead.id,
-        package: lead.package?._id || lead.package || '',
-      }));
-
+      setQuotationMode('summary'); detectPackageType();
+      setFormData(prev => ({ ...prev, lead: lead._id || lead.id, package: lead.package?._id || lead.package || '' }));
       setSendEmailAddress(lead?.email || lead?.customer?.email || '');
-
-      // Fetch quotations
-      fetchQuotations();
-      // Fetch existing invoices for this lead
-      fetchExistingInvoices();
-
-      // For manual itineraries, load simplified day items even in non-detailed mode
-      if (lead.manualItinerary?._id || lead.manualItinerary) {
-        loadManualItinerarySimple();
-      }
+      fetchQuotations(); fetchExistingInvoices();
+      if (lead.manualItinerary?._id || lead.manualItinerary) loadManualItinerarySimple();
     }
   }, [isOpen, lead]);
 
-  // Load manual itinerary with simplified day descriptions (for non-detailed mode)
   const loadManualItinerarySimple = async () => {
     if (!lead) return;
-
     try {
       const manualResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
       if (manualResponse.success || manualResponse.status === 'success') {
         const manualItinerary = manualResponse.data || manualResponse;
         if (manualItinerary?.days && Array.isArray(manualItinerary.days)) {
-          // Create simplified items for each day
-          const simplifiedItems = manualItinerary.days.map((day, index) => ({
-            description: `Day ${day.dayNumber || index + 1}`,
-            category: 'other',
-            quantity: 1,
-            unitPrice: 0,
-            totalPrice: 0,
-            taxRate: 0,
-            notes: '',
-          }));
-
-          // Keep package item if exists, then add simplified day items
-          setFormData(prev => {
-            const existingPackageItem = prev.items.find(item => item.category === 'package');
-            const newItems = existingPackageItem ? [existingPackageItem, ...simplifiedItems] : simplifiedItems;
-            return { ...prev, items: newItems };
-          });
+          const simplifiedItems = manualItinerary.days.map((day, index) => ({ description: `Day ${day.dayNumber || index + 1}`, category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }));
+          setFormData(prev => { const existingPackageItem = prev.items.find(item => item.category === 'package'); return { ...prev, items: existingPackageItem ? [existingPackageItem, ...simplifiedItems] : simplifiedItems }; });
         }
       }
-    } catch (error) {
-      console.error('Error loading manual itinerary:', error);
-    }
+    } catch (error) { console.error('Error loading manual itinerary:', error); }
   };
 
-  // Auto-detect package type from lead
   const detectPackageType = async () => {
     if (!lead) return;
-
-    // Check for customized package first
     if (lead.customizedPackage?._id || lead.customizedPackage) {
-      const packageId = lead.customizedPackage._id || lead.customizedPackage;
-      setDetectedPackageType('customized');
-      try {
-        const response = await customizedPackageAPI.getById(packageId);
-        if (response.success || response.status === 'success') {
-          setDetectedPackage(response.data || response);
-          // Auto-populate package price
-          if (response.data?.price || response.price) {
-            const pkg = response.data || response;
-            addPackageItem(pkg.name, pkg.price, 'customized');
-          }
-        }
-      } catch (error) {
-        console.error('Error loading customized package:', error);
-      }
+      const packageId = lead.customizedPackage._id || lead.customizedPackage; setDetectedPackageType('customized');
+      try { const response = await customizedPackageAPI.getById(packageId); if (response.success || response.status === 'success') { setDetectedPackage(response.data || response); if (response.data?.price || response.price) { const pkg = response.data || response; addPackageItem(pkg.name, pkg.price, 'customized'); } } } catch (error) { console.error('Error loading customized package:', error); }
       return;
     }
-
-    // Check for regular package
     if (lead.package?._id || lead.package || lead.packageName) {
-      const packageId = lead.package?._id || lead.package;
-      setDetectedPackageType('package');
-      if (packageId) {
-        try {
-          const response = await packageAPI.getById(packageId);
-          if (response.success || response.status === 'success') {
-            const pkg = response.data || response;
-            setDetectedPackage(pkg);
-            // Auto-populate package price
-            if (pkg.price) {
-              addPackageItem(pkg.name, pkg.price, 'package');
-            }
-          }
-        } catch (error) {
-          console.error('Error loading package:', error);
-        }
-      }
+      const packageId = lead.package?._id || lead.package; setDetectedPackageType('package');
+      if (packageId) { try { const response = await packageAPI.getById(packageId); if (response.success || response.status === 'success') { const pkg = response.data || response; setDetectedPackage(pkg); if (pkg.price) addPackageItem(pkg.name, pkg.price, 'package'); } } catch (error) { console.error('Error loading package:', error); } }
       return;
     }
-
-    // Check for manual itinerary
-    if (lead.manualItinerary?._id || lead.manualItinerary) {
-      setDetectedPackageType('manual');
-      setDetectedPackage({ type: 'manual', name: 'Manual Itinerary' });
-    }
+    if (lead.manualItinerary?._id || lead.manualItinerary) { setDetectedPackageType('manual'); setDetectedPackage({ type: 'manual', name: 'Manual Itinerary' }); }
   };
 
-  // Add package item to invoice
   const addPackageItem = (packageName, price, type = 'package') => {
-    const packageItem = {
-      description: `${packageName} ${type === 'customized' ? '(Customized)' : ''} Package`,
-      category: 'package',
-      quantity: 1,
-      unitPrice: price,
-      totalPrice: price,
-      taxRate: 0,
-      notes: type === 'customized' ? 'Customized package' : '',
-    };
-
+    const packageItem = { description: `${packageName} ${type === 'customized' ? '(Customized)' : ''} Package`, category: 'package', quantity: 1, unitPrice: price, totalPrice: price, taxRate: 0, notes: type === 'customized' ? 'Customized package' : '' };
     setFormData(prev => {
-      // Check if package item already exists
-      const existingIndex = prev.items.findIndex(item =>
-        item.category === 'package' ||
-        item.description?.toLowerCase().includes('package')
-      );
-
-      if (existingIndex >= 0) {
-        // Update existing package item
-        const updatedItems = [...prev.items];
-        updatedItems[existingIndex] = packageItem;
-        return { ...prev, items: updatedItems };
-      } else {
-        // Add new package item at the beginning, or as first item if no items exist
-        const currentItems = prev.items && prev.items.length > 0 ? prev.items : [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }];
-        return { ...prev, items: [packageItem, ...currentItems.filter(item => item.category !== 'package')] };
-      }
+      const existingIndex = prev.items.findIndex(item => item.category === 'package' || item.description?.toLowerCase().includes('package'));
+      if (existingIndex >= 0) { const updatedItems = [...prev.items]; updatedItems[existingIndex] = packageItem; return { ...prev, items: updatedItems }; }
+      else { const currentItems = prev.items?.length > 0 ? prev.items : [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }]; return { ...prev, items: [packageItem, ...currentItems.filter(item => item.category !== 'package')] }; }
     });
   };
 
   const fetchQuotations = async () => {
     if (!lead?._id && !lead?.id) return;
-    try {
-      setLoadingQuotations(true);
-      const response = await quotationAPI.getByLead(lead._id || lead.id);
-      if (response.success || response.status === 'success') {
-        const quotesData = response.data?.quotations || response.data || [];
-        const filteredQuotes = quotesData.filter(q => q.status !== 'converted');
-        setQuotations(filteredQuotes);
-
-        // If form has a quotation selected, reload the latest quotation data
-        if (formData.quotation) {
-          const selectedQuote = filteredQuotes.find(q =>
-            (q._id || q.id) === formData.quotation
-          );
-          if (selectedQuote) {
-            // Reload quotation data to get latest updates
-            loadQuotationData(formData.quotation);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching quotations:', error);
-    } finally {
-      setLoadingQuotations(false);
-    }
+    try { setLoadingQuotations(true); const response = await quotationAPI.getByLead(lead._id || lead.id); if (response.success || response.status === 'success') { const quotesData = response.data?.quotations || response.data || []; setQuotations(quotesData.filter(q => q.status !== 'converted')); if (formData.quotation) { const selectedQuote = quotesData.find(q => (q._id || q.id) === formData.quotation); if (selectedQuote) loadQuotationData(formData.quotation); } } } catch (error) { console.error('Error fetching quotations:', error); } finally { setLoadingQuotations(false); }
   };
 
   const fetchExistingInvoices = async () => {
     if (!lead?._id && !lead?.id) return;
     try {
-      setLoadingExisting(true);
-      const response = await invoiceAPI.getByLead(lead._id || lead.id);
+      setLoadingExisting(true); const response = await invoiceAPI.getByLead(lead._id || lead.id);
       if (response.success || response.status === 'success') {
         const invoicesData = response.data?.invoices || response.data?.data || response.data || [];
         const invoicesArray = Array.isArray(invoicesData) ? invoicesData : [];
         setExistingInvoices(invoicesArray);
-
-        // Load the most recent invoice into form for editing
         if (invoicesArray.length > 0) {
-          const latestInvoice = invoicesArray[0]; // Most recent first
-          setCurrentInvoice(latestInvoice);
-          setIsEditing(true);
-
-          // DEDUPLICATION: Remove duplicate items when loading from database
-          const deduplicateItems = (items) => {
-            if (!items || items.length === 0) return [{
-              description: '',
-              category: 'other',
-              quantity: 1,
-              unitPrice: 0,
-              totalPrice: 0,
-              taxRate: 0,
-              notes: '',
-            }];
-
-            const uniqueMap = new Map();
-            const uniqueItems = [];
-
-            items.forEach(item => {
-              const normalizedDesc = (item.description || '').trim().toLowerCase();
-              if (!normalizedDesc) return;
-
-              if (!uniqueMap.has(normalizedDesc)) {
-                uniqueMap.set(normalizedDesc, true);
-                uniqueItems.push({
-                  description: item.description || '',
-                  category: item.category || 'other',
-                  quantity: item.quantity || 1,
-                  unitPrice: item.unitPrice || 0,
-                  totalPrice: item.totalPrice || 0,
-                  taxRate: item.taxRate || 0,
-                  notes: item.notes || '',
-                });
-              }
-            });
-
-            return uniqueItems.length > 0 ? uniqueItems : [{
-              description: '',
-              category: 'other',
-              quantity: 1,
-              unitPrice: 0,
-              totalPrice: 0,
-              taxRate: 0,
-              notes: '',
-            }];
-          };
-
-          // Populate form with existing invoice data (deduplicated)
-          setFormData({
-            lead: lead._id || lead.id,
-            quotation: latestInvoice.quotation?._id || latestInvoice.quotation || '',
-            package: latestInvoice.package?._id || latestInvoice.package || '',
-            type: latestInvoice.type || 'invoice',
-            items: deduplicateItems(latestInvoice.items),
-            taxRate: latestInvoice.taxRate || 0,
-            discountType: latestInvoice.discountType || 'none',
-            discountValue: latestInvoice.discountValue || 0,
-            issueDate: latestInvoice.issueDate ? new Date(latestInvoice.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            dueDate: latestInvoice.dueDate ? new Date(latestInvoice.dueDate).toISOString().split('T')[0] : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            notes: latestInvoice.notes || '',
-            terms: latestInvoice.terms || '',
-            paymentTerms: latestInvoice.paymentTerms || '',
-            paymentInstructions: latestInvoice.paymentInstructions || '',
-          });
-          setQuotationMode((latestInvoice.quotation && latestInvoice.quotation.mode) ? latestInvoice.quotation.mode : 'summary');
-
-          setSendEmailAddress(
-            latestInvoice.customer?.email ||
-            latestInvoice.lead?.email ||
-            lead?.email ||
-            '',
-          );
-
+          const latestInvoice = invoicesArray[0]; setCurrentInvoice(latestInvoice); setIsEditing(true);
+          const deduplicateItems = (items) => { if (!items?.length) return [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }]; const uniqueMap = new Map(); const uniqueItems = []; items.forEach(item => { const normalizedDesc = (item.description || '').trim().toLowerCase(); if (!normalizedDesc) return; if (!uniqueMap.has(normalizedDesc)) { uniqueMap.set(normalizedDesc, true); uniqueItems.push({ description: item.description || '', category: item.category || 'other', quantity: item.quantity || 1, unitPrice: item.unitPrice || 0, totalPrice: item.totalPrice || 0, taxRate: item.taxRate || 0, notes: item.notes || '' }); } }); return uniqueItems.length > 0 ? uniqueItems : [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }]; };
+          setFormData({ lead: lead._id || lead.id, quotation: latestInvoice.quotation?._id || latestInvoice.quotation || '', package: latestInvoice.package?._id || latestInvoice.package || '', type: latestInvoice.type || 'invoice', items: deduplicateItems(latestInvoice.items), taxRate: latestInvoice.taxRate || 0, discountType: latestInvoice.discountType || 'none', discountValue: latestInvoice.discountValue || 0, issueDate: latestInvoice.issueDate ? new Date(latestInvoice.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0], dueDate: latestInvoice.dueDate ? new Date(latestInvoice.dueDate).toISOString().split('T')[0] : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: latestInvoice.notes || '', terms: latestInvoice.terms || '', paymentTerms: latestInvoice.paymentTerms || '', paymentInstructions: latestInvoice.paymentInstructions || '' });
+          setQuotationMode((latestInvoice.quotation?.mode) || 'summary');
+          setSendEmailAddress(latestInvoice.customer?.email || latestInvoice.lead?.email || lead?.email || '');
           setCurrentInvoiceId(latestInvoice._id || latestInvoice.id);
-
-          // If invoice has a quotation, load the latest quotation data
-          if (latestInvoice.quotation) {
-            const quotationId = latestInvoice.quotation._id || latestInvoice.quotation;
-            loadQuotationData(quotationId);
-          }
-        } else {
-          setIsEditing(false);
-          setCurrentInvoice(null);
-          setQuotationMode('summary');
-        }
+          if (latestInvoice.quotation) loadQuotationData(latestInvoice.quotation._id || latestInvoice.quotation);
+        } else { setIsEditing(false); setCurrentInvoice(null); setQuotationMode('summary'); }
       }
-    } catch (error) {
-      console.error('Error fetching existing invoices:', error);
-    } finally {
-      setLoadingExisting(false);
-    }
+    } catch (error) { console.error('Error fetching existing invoices:', error); } finally { setLoadingExisting(false); }
   };
 
-  const handleSendWhatsApp = (invoiceId) => {
-    if (!lead?.whatsapp) {
-      toast.error('WhatsApp number not available for this lead');
-      return;
-    }
-
-    const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
-    if (!whatsappNumber) {
-      toast.error('Invalid WhatsApp number');
-      return;
-    }
-
-    const invoiceNumber = currentInvoice?.invoiceNumber || `#${invoiceId?.slice(-6)}` || 'Invoice';
-    const totalAmount = currentInvoice?.totalAmount || formData.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0;
-    const message = encodeURIComponent(
-      `Hello ${lead.name || 'there'},\n\n` +
-      `Your invoice ${invoiceNumber} for ${totalAmount.toFixed(2)} is ready. ` +
-      `Please contact us for the detailed invoice document.\n\n` +
-      getThankYouMessage()
-    );
-
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
-  };
-
-  const handleSendInvoiceEmail = async () => {
-    const targetId =
-      currentInvoiceId || currentInvoice?._id || currentInvoice?.id || null;
-
-    if (!targetId) {
-      toast.error('Please save the invoice before sending the email');
-      return;
-    }
-
-    const trimmedEmail = sendEmailAddress.trim();
-    if (!trimmedEmail) {
-      toast.error('Please provide a recipient email address');
-      return;
-    }
-
-    try {
-      setSendingEmail(true);
-      await invoiceAPI.send(targetId, { email: trimmedEmail });
-      toast.success('Invoice emailed successfully');
-      await fetchExistingInvoices();
-    } catch (error) {
-      toast.error(error.message || 'Failed to send invoice email');
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
-  const handlePreviewPDF = (invoiceId) => {
-    setCurrentInvoiceId(invoiceId);
-    setShowPDFPreview(true);
-  };
+  const handleSendWhatsApp = (invoiceId) => { if (!lead?.whatsapp) { toast.error('WhatsApp number not available'); return; } const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, ''); if (!whatsappNumber) { toast.error('Invalid WhatsApp number'); return; } const invoiceNumber = currentInvoice?.invoiceNumber || `#${invoiceId?.slice(-6)}` || 'Invoice'; const totalAmount = currentInvoice?.totalAmount || formData.items?.reduce((sum, item) => sum + (item.totalPrice || 0), 0) || 0; const message = encodeURIComponent(`Hello ${lead.name || 'there'},\n\nYour invoice ${invoiceNumber} for ${totalAmount.toFixed(2)} is ready.\n\n${getThankYouMessage()}`); window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank'); };
+  const handleSendInvoiceEmail = async () => { const targetId = currentInvoiceId || currentInvoice?._id || currentInvoice?.id; if (!targetId) { toast.error('Please save the invoice first'); return; } const trimmedEmail = sendEmailAddress.trim(); if (!trimmedEmail) { toast.error('Please provide a recipient email'); return; } try { setSendingEmail(true); await invoiceAPI.send(targetId, { email: trimmedEmail }); toast.success('Invoice emailed successfully'); await fetchExistingInvoices(); } catch (error) { toast.error(error.message || 'Failed to send invoice email'); } finally { setSendingEmail(false); } };
+  const handlePreviewPDF = (invoiceId) => { setCurrentInvoiceId(invoiceId); setShowPDFPreview(true); };
 
   const loadQuotationData = async (quotationId) => {
     if (!quotationId) return;
-
     try {
-      // Always fetch fresh quotation data from API to get latest updates
       const response = await quotationAPI.getById(quotationId);
-
       if (response.success || response.status === 'success' || response.data) {
-        const quote = response.data || response;
-
-        const quoteMode = quote.mode || 'summary';
-        setQuotationMode(quoteMode);
-
-        // DEDUPLICATION: Remove duplicate items based on normalized description
-        const deduplicateItems = (items) => {
-          if (!items || items.length === 0) return [];
-
-          const uniqueMap = new Map();
-          const uniqueItems = [];
-
-          items.forEach(item => {
-            // Normalize description for comparison (trim and lowercase)
-            const normalizedDesc = (item.description || '').trim().toLowerCase();
-
-            // Skip empty descriptions
-            if (!normalizedDesc) return;
-
-            // If we haven't seen this description before, add it
-            if (!uniqueMap.has(normalizedDesc)) {
-              uniqueMap.set(normalizedDesc, true);
-              uniqueItems.push({
-                description: item.description || '',
-                category: item.category || 'other',
-                quantity: item.quantity || 1,
-                unitPrice: item.unitPrice || 0,
-                totalPrice: item.totalPrice || 0,
-                taxRate: item.taxRate || 0,
-                notes: item.notes || '',
-                isManual: item.isManual !== undefined ? item.isManual :
-                  (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package'),
-              });
-            }
-          });
-
-          return uniqueItems;
-        };
-
-        // Update form with deduplicated quotation data
-        setFormData(prev => ({
-          ...prev,
-          quotation: quotationId,
-          items: deduplicateItems(quote.items),
-          taxRate: quote.taxRate !== undefined ? quote.taxRate : prev.taxRate,
-          discountType: quote.discountType || prev.discountType,
-          discountValue: quote.discountValue !== undefined ? quote.discountValue : prev.discountValue,
-          notes: quote.notes !== undefined ? quote.notes : prev.notes,
-          terms: quote.terms !== undefined ? quote.terms : prev.terms,
-          paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms,
-        }));
-
-        toast.success('Quotation data loaded (duplicates removed)');
+        const quote = response.data || response; const quoteMode = quote.mode || 'summary'; setQuotationMode(quoteMode);
+        const deduplicateItems = (items) => { if (!items?.length) return []; const uniqueMap = new Map(); const uniqueItems = []; items.forEach(item => { const normalizedDesc = (item.description || '').trim().toLowerCase(); if (!normalizedDesc) return; if (!uniqueMap.has(normalizedDesc)) { uniqueMap.set(normalizedDesc, true); uniqueItems.push({ description: item.description || '', category: item.category || 'other', quantity: item.quantity || 1, unitPrice: item.unitPrice || 0, totalPrice: item.totalPrice || 0, taxRate: item.taxRate || 0, notes: item.notes || '', isManual: item.isManual !== undefined ? item.isManual : (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package') }); } }); return uniqueItems; };
+        setFormData(prev => ({ ...prev, quotation: quotationId, items: deduplicateItems(quote.items), taxRate: quote.taxRate !== undefined ? quote.taxRate : prev.taxRate, discountType: quote.discountType || prev.discountType, discountValue: quote.discountValue !== undefined ? quote.discountValue : prev.discountValue, notes: quote.notes !== undefined ? quote.notes : prev.notes, terms: quote.terms !== undefined ? quote.terms : prev.terms, paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms }));
+        toast.success('Quotation data loaded');
       }
-    } catch (error) {
-      console.error('Error loading quotation:', error);
-      toast.error('Failed to load quotation data');
-    }
+    } catch (error) { toast.error('Failed to load quotation data'); }
   };
 
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-
-    // Recalculate totalPrice for this item
-    if (field === 'quantity' || field === 'unitPrice') {
-      const qty = field === 'quantity' ? parseFloat(value) || 0 : newItems[index].quantity || 0;
-      const price = field === 'unitPrice' ? parseFloat(value) || 0 : newItems[index].unitPrice || 0;
-      newItems[index].totalPrice = qty * price;
-    } else if (field === 'totalPrice') {
-      // When totalPrice is changed directly, update unitPrice and quantity to match
-      const totalPrice = parseFloat(value) || 0;
-      newItems[index].totalPrice = totalPrice;
-      newItems[index].unitPrice = totalPrice;
-      newItems[index].quantity = 1;
-    }
-
-    setFormData({ ...formData, items: newItems });
-  };
-
-  const addItem = () => {
-    setFormData({
-      ...formData,
-      items: [
-        ...formData.items,
-        {
-          description: '',
-          category: 'other',
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
-          taxRate: 0,
-          notes: '',
-          isManual: true, // Mark as manually added for summary mode
-        },
-      ],
-    });
-  };
-
-  const removeItem = (index) => {
-    if (formData.items.length > 1) {
-      const newItems = formData.items.filter((_, i) => i !== index);
-      setFormData({ ...formData, items: newItems });
-    } else {
-      toast.error('At least one item is required');
-    }
-  };
+  const handleItemChange = (index, field, value) => { const newItems = [...formData.items]; newItems[index] = { ...newItems[index], [field]: value }; if (field === 'quantity' || field === 'unitPrice') { const qty = field === 'quantity' ? parseFloat(value) || 0 : newItems[index].quantity || 0; const price = field === 'unitPrice' ? parseFloat(value) || 0 : newItems[index].unitPrice || 0; newItems[index].totalPrice = qty * price; } else if (field === 'totalPrice') { const totalPrice = parseFloat(value) || 0; newItems[index].totalPrice = totalPrice; newItems[index].unitPrice = totalPrice; newItems[index].quantity = 1; } setFormData({ ...formData, items: newItems }); };
+  const addItem = () => { setFormData({ ...formData, items: [...formData.items, { description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '', isManual: true }] }); };
+  const removeItem = (index) => { if (formData.items.length > 1) setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) }); else toast.error('At least one item is required'); };
 
   const calculateTotals = () => {
-    // When in detailed mode, exclude package items from calculation
-    // When in summary mode, include package item + all extra fields (manually added items)
-    const itemsToCalculate = isDetailedMode
-      ? formData.items.filter(item => item.category !== 'package')
-      : formData.items.filter(item => {
-        // In summary mode, include package item and all manually added extra fields
-        // Exclude read-only activities from itinerary
-        return item.category === 'package' || item.isManual === true;
-      });
-
-    // Calculate subtotal - use totalPrice if available, otherwise calculate from quantity * unitPrice
-    const subtotal = itemsToCalculate.reduce((sum, item) => {
-      const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null
-        ? item.totalPrice
-        : (item.quantity || 0) * (item.unitPrice || 0);
-      return sum + itemTotal;
-    }, 0);
-
-    let discountAmount = 0;
-    if (formData.discountType === 'percentage') {
-      discountAmount = (subtotal * (formData.discountValue || 0)) / 100;
-    } else if (formData.discountType === 'fixed') {
-      discountAmount = formData.discountValue || 0;
-    }
-
-    const taxableAmount = subtotal - discountAmount;
-    const taxAmount = (taxableAmount * (formData.taxRate || 0)) / 100;
-    const totalAmount = taxableAmount + taxAmount;
-
-    return { subtotal, discountAmount, taxAmount, totalAmount };
+    const itemsToCalculate = isDetailedMode ? formData.items.filter(item => item.category !== 'package') : formData.items.filter(item => item.category === 'package' || item.isManual === true);
+    const subtotal = itemsToCalculate.reduce((sum, item) => { const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null ? item.totalPrice : (item.quantity || 0) * (item.unitPrice || 0); return sum + itemTotal; }, 0);
+    let discountAmount = 0; if (formData.discountType === 'percentage') discountAmount = (subtotal * (formData.discountValue || 0)) / 100; else if (formData.discountType === 'fixed') discountAmount = formData.discountValue || 0;
+    const taxableAmount = subtotal - discountAmount; const taxAmount = (taxableAmount * (formData.taxRate || 0)) / 100; return { subtotal, discountAmount, taxAmount, totalAmount: taxableAmount + taxAmount };
   };
 
   const handleSubmit = async (status = 'draft') => {
-    // When in detailed mode, exclude package items from submission
-    const itemsToSubmit = isDetailedMode
-      ? formData.items.filter(item => item.category !== 'package')
-      : formData.items;
-
-    if (!itemsToSubmit.some(item => item.description.trim())) {
-      toast.error('Please add at least one item with description');
-      return;
-    }
-
+    const itemsToSubmit = isDetailedMode ? formData.items.filter(item => item.category !== 'package') : formData.items;
+    if (!itemsToSubmit.some(item => item.description.trim())) { toast.error('Please add at least one item'); return; }
     const totals = calculateTotals();
-
-    // Prepare payload and filter out empty strings
-    const payload = {
-      ...formData,
-      items: itemsToSubmit, // Use filtered items (without package items in detailed mode)
-      ...totals,
-      paidAmount: 0,
-      outstandingAmount: totals.totalAmount,
-      issueDate: new Date(formData.issueDate).toISOString(),
-      dueDate: new Date(formData.dueDate).toISOString(),
-      status: status === 'send' ? 'sent' : 'draft',
-      paymentStatus: 'unpaid',
-    };
-
-    // Remove empty strings from ObjectId fields (Mongoose can't cast empty strings)
-    if (payload.package === '' || !payload.package) {
-      delete payload.package;
-    }
-    if (payload.quotation === '' || !payload.quotation) {
-      delete payload.quotation;
-    }
-    if (payload.lead === '' || !payload.lead) {
-      delete payload.lead;
-    }
-
+    const payload = { ...formData, items: itemsToSubmit, ...totals, paidAmount: 0, outstandingAmount: totals.totalAmount, issueDate: new Date(formData.issueDate).toISOString(), dueDate: new Date(formData.dueDate).toISOString(), status: status === 'send' ? 'sent' : 'draft', paymentStatus: 'unpaid' };
+    if (!payload.package) delete payload.package; if (!payload.quotation) delete payload.quotation; if (!payload.lead) delete payload.lead;
     try {
-      setLoading(true);
-      let response;
-
-      // Update existing invoice if editing, otherwise create new
-      if (isEditing && currentInvoice) {
-        const invoiceId = currentInvoice._id || currentInvoice.id;
-        response = await invoiceAPI.update(invoiceId, payload);
-        setCurrentInvoiceId(invoiceId);
-      } else {
-        response = await invoiceAPI.create(payload);
-        if (response.success || response.status === 'success') {
-          const invoiceId = response.data?._id || response.data?.id;
-          setCurrentInvoiceId(invoiceId);
-        }
-      }
-
-      if (response.success || response.status === 'success') {
-        toast.success(`Invoice ${isEditing ? 'updated' : 'created'} successfully!`);
-
-        // Show PDF preview after successful save
-        if (currentInvoiceId || (response.data?._id || response.data?.id)) {
-          const idToPreview = currentInvoiceId || (response.data?._id || response.data?.id);
-          setCurrentInvoiceId(idToPreview);
-          setShowPDFPreview(true);
-        } else {
-          onSuccess?.();
-          onClose();
-        }
-      } else {
-        toast.error(response.message || `Failed to ${isEditing ? 'update' : 'create'} invoice`);
-      }
-    } catch (error) {
-      toast.error(error.message || `Failed to ${isEditing ? 'update' : 'create'} invoice`);
-    } finally {
-      setLoading(false);
-    }
+      setLoading(true); let response;
+      if (isEditing && currentInvoice) { response = await invoiceAPI.update(currentInvoice._id || currentInvoice.id, payload); setCurrentInvoiceId(currentInvoice._id || currentInvoice.id); }
+      else { response = await invoiceAPI.create(payload); if (response.success || response.status === 'success') setCurrentInvoiceId(response.data?._id || response.data?.id); }
+      if (response.success || response.status === 'success') { toast.success(`Invoice ${isEditing ? 'updated' : 'created'}!`); if (currentInvoiceId || (response.data?._id || response.data?.id)) { setCurrentInvoiceId(currentInvoiceId || (response.data?._id || response.data?.id)); setShowPDFPreview(true); } else { onSuccess?.(); onClose(); } }
+      else toast.error(response.message || 'Failed to save invoice');
+    } catch (error) { toast.error(error.message || 'Failed to save invoice'); } finally { setLoading(false); }
   };
 
   const totals = calculateTotals();
-
   if (!isOpen) return null;
+  const handleBackdropClick = (e) => { if (e.target === e.currentTarget) onClose(); };
 
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+  const invoiceTypes = [
+    { value: 'invoice', label: 'Standard', icon: '📄' },
+    { value: 'proforma', label: 'Proforma', icon: '📋' },
+    { value: 'tax-invoice', label: 'Tax Invoice', icon: '🧾' },
+  ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-purple-600 to-purple-700">
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {isEditing ? 'Edit Invoice' : 'Create Invoice'}
-            </h2>
-            <p className="text-purple-100 text-sm mt-1">
-              {lead?.name && `For: ${lead.name}`}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
+    <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/70 via-purple-900/60 to-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
+      <div className="bg-gradient-to-b from-white to-slate-50 rounded-3xl shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden flex flex-col">
+        {/* Header with Gradient */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700" />
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDYwIEwgNjAgMCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIwLjUiIG9wYWNpdHk9IjAuMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30" />
+          <div className="relative px-8 py-6 flex items-center justify-between">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
+                <Receipt className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">{isEditing ? 'Edit Invoice' : 'New Invoice'}</h2>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-indigo-200 text-sm">{lead?.name || 'Customer'}</span>
+                  {detectedPackageType && (
+                    <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs text-white">{detectedPackageType === 'customized' ? '✨ Custom' : detectedPackageType === 'manual' ? '📋 Manual' : '📦 Package'}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-3 hover:bg-white/10 rounded-xl transition-colors"><X className="w-6 h-6 text-white" /></button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
-            {/* Package & Mode Information */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Detected Package
-              </label>
-              <div className="px-3 py-2 border border-gray-300 rounded bg-gray-50">
-                {detectedPackageType === 'customized' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-purple-700">
-                      ✨ Customized Package: {detectedPackage?.name || 'N/A'}
-                    </span>
-                  </div>
-                )}
-                {detectedPackageType === 'package' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      📦 Package: {detectedPackage?.name || 'N/A'}
-                    </span>
-                  </div>
-                )}
-                {detectedPackageType === 'manual' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-blue-700">
-                      📋 Manual Itinerary
-                    </span>
-                  </div>
-                )}
-                {!detectedPackageType && (
-                  <span className="text-sm text-gray-500">No package detected</span>
-                )}
+        {/* Main Content with Floating Summary */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left: Form Area */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            {/* Quick Stats Row */}
+            <div className="grid grid-cols-4 gap-3">
+              
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Issue Date</p>
+                <input type="date" value={formData.issueDate} onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })} className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none" />
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Quotation mode: <span className="font-semibold text-gray-700">{getModeLabel(quotationMode)}</span>
-                {!formData.quotation && ' (no quotation selected)'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Recipient Email
-                </label>
-                <input
-                  type="email"
-                  value={sendEmailAddress}
-                  onChange={(e) => setSendEmailAddress(e.target.value)}
-                  placeholder="customer@example.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  We will email the invoice PDF to this address using the configured mail server.
-                </p>
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Due Date</p>
+                <input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none" />
               </div>
-              <div className="flex items-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleSendInvoiceEmail}
-                  disabled={sendingEmail || !sendEmailAddress.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white rounded hover:from-purple-700 hover:to-fuchsia-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-4 h-4" />
-                  {sendingEmail ? 'Sending…' : 'Send Email'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSendWhatsApp(currentInvoiceId || currentInvoice?._id)}
-                  disabled={!currentInvoiceId || !lead?.whatsapp}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Send via WhatsApp"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp
-                </button>
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Mode</p>
+                <p className="text-sm font-semibold text-indigo-600">{getModeLabel(quotationMode)}</p>
               </div>
             </div>
 
-            {/* Quotation Selection */}
+            {/* Quotation Selector */}
             {quotations.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Convert from Quotation (Optional)
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={formData.quotation}
-                    onChange={(e) => {
-                      setFormData({ ...formData, quotation: e.target.value });
-                      if (e.target.value) {
-                        setQuotationMode('summary');
-                        loadQuotationData(e.target.value);
-                      } else {
-                        // Reset items if no quotation selected
-                        setFormData(prev => ({
-                          ...prev,
-                          quotation: '',
-                          items: [{
-                            description: '',
-                            category: 'other',
-                            quantity: 1,
-                            unitPrice: 0,
-                            totalPrice: 0,
-                            taxRate: 0,
-                            notes: '',
-                          }],
-                        }));
-                        setQuotationMode('summary');
-                      }
-                    }}
-                    disabled={loadingQuotations}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">{loadingQuotations ? 'Loading...' : 'No Quotation'}</option>
-                    {quotations.map((quote) => (
-                      <option key={quote._id || quote.id} value={quote._id || quote.id}>
-                        {`${quote.quotationNumber || (quote._id || '')} • ${getModeLabel(quote.mode)} • INR ${formatCurrency(quote.totalAmount || 0)} • ${formatDateLabel(quote.issueDate || quote.createdAt)}`}
-                      </option>
-                    ))}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <label className="text-sm font-semibold text-gray-700 mb-3 block">Import from Quotation</label>
+                <div className="flex gap-3">
+                  <select value={formData.quotation} onChange={(e) => { setFormData({ ...formData, quotation: e.target.value }); if (e.target.value) loadQuotationData(e.target.value); else setQuotationMode('summary'); }} className="flex-1 px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" disabled={loadingQuotations}>
+                    <option value="">{loadingQuotations ? 'Loading...' : '— Select Quotation —'}</option>
+                    {quotations.map(q => (<option key={q._id || q.id} value={q._id || q.id}>{q.quotationNumber || q._id} • ₹{formatCurrency(q.totalAmount || 0)}</option>))}
                   </select>
-                  {formData.quotation && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Refresh quotation data to get latest updates
-                        loadQuotationData(formData.quotation);
-                      }}
-                      className="px-3 py-2 bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
-                      title="Refresh Quotation Data"
-                    >
-                      🔄
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadQuotationPDF(formData.quotation)}
-                    disabled={!formData.quotation}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    title="Download selected quotation PDF"
-                  >
-                    <Download className="w-4 h-4" />
-                    PDF
-                  </button>
+                  {formData.quotation && (<button type="button" onClick={() => handleDownloadQuotationPDF(formData.quotation)} className="px-4 py-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"><Download className="w-4 h-4 text-gray-600" /></button>)}
                 </div>
               </div>
             )}
 
-            {/* Invoice Type and Dates */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Invoice Type
-                </label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="invoice">Invoice</option>
-                  <option value="proforma">Proforma Invoice</option>
-                  <option value="tax-invoice">Tax Invoice</option>
-                  <option value="commercial-invoice">Commercial Invoice</option>
-                </select>
+            {/* Items Section - Collapsible */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <button type="button" onClick={() => toggleSection('items')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center"><FileText className="w-5 h-5 text-indigo-600" /></div>
+                  <div className="text-left">
+                    <p className="font-semibold text-gray-900">Invoice Items</p>
+                    <p className="text-xs text-gray-500">{formData.items.length} items</p>
+                  </div>
+                </div>
+                {expandedSections.items ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+              {expandedSections.items && (
+                <div className="px-5 pb-5 border-t border-gray-100">
+                  {!isDetailedMode ? (
+                    <div className="mt-4 space-y-4">
+                      {/* Package Price - Large Input */}
+                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-100">
+                        <label className="text-sm font-semibold text-gray-700 mb-3 block">Package Total Amount</label>
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">₹</span>
+                          <input type="number" value={(() => { const pkg = formData.items.find(i => i.category === 'package'); return pkg ? (pkg.totalPrice || pkg.unitPrice || 0) : 0; })()} onChange={(e) => { const price = parseFloat(e.target.value) || 0; setFormData(prev => { const pkgIdx = prev.items.findIndex(i => i.category === 'package'); if (pkgIdx >= 0) { const items = [...prev.items]; items[pkgIdx] = { ...items[pkgIdx], totalPrice: price, unitPrice: price, quantity: 1 }; return { ...prev, items }; } else { return { ...prev, items: [{ description: 'Package Total', category: 'package', quantity: 1, unitPrice: price, totalPrice: price, notes: '' }, ...prev.items] }; } }); }} className="flex-1 text-3xl font-bold text-gray-900 bg-transparent border-0 focus:outline-none" placeholder="0.00" />
+                        </div>
+                      </div>
+                      {/* Extra Items */}
+                      {formData.items.filter(i => i.category !== 'package' && i.isManual).length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-gray-600">Additional Items</p>
+                          {formData.items.map((item, originalIndex) => {
+                            if (item.category === 'package' || !item.isManual) return null;
+                            return (
+                              <div key={originalIndex} className="flex gap-3 items-center">
+                                <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} placeholder="Description" className="flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 border-0" />
+                                <div className="flex items-center bg-gray-50 rounded-xl px-3"><span className="text-gray-400 text-sm">₹</span><input type="number" value={item.totalPrice || 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-24 py-3 bg-transparent text-right text-sm font-medium focus:outline-none" /></div>
+                                <button type="button" onClick={() => removeItem(originalIndex)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <button type="button" onClick={addItem} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm"><Plus className="w-4 h-4" />Add Item</button>
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {formData.items.filter(i => i.category !== 'package').map((item, idx) => {
+                        const originalIndex = formData.items.indexOf(item);
+                        return (
+                          <div key={originalIndex} className="flex gap-3 items-center bg-gray-50 rounded-xl p-3">
+                            <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} className="flex-1 px-3 py-2 bg-white rounded-lg text-sm border border-gray-200 focus:ring-2 focus:ring-indigo-500" placeholder="Item description" />
+                            <div className="flex items-center bg-white rounded-lg px-3 border border-gray-200"><span className="text-gray-400 text-xs">₹</span><input type="number" value={item.totalPrice ?? 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-20 py-2 bg-transparent text-right text-sm focus:outline-none" /></div>
+                            <button type="button" onClick={() => removeItem(originalIndex)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        );
+                      })}
+                      <button type="button" onClick={addItem} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm"><Plus className="w-4 h-4" />Add Item</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Discount & Tax Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <button type="button" onClick={() => toggleSection('discount')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center"><Percent className="w-5 h-5 text-green-600" /></div>
+                  <div className="text-left"><p className="font-semibold text-gray-900">Discount & Tax</p><p className="text-xs text-gray-500">{formData.taxRate > 0 ? `${formData.taxRate}% tax` : 'No tax'}{formData.discountType !== 'none' ? `, ${formData.discountValue}${formData.discountType === 'percentage' ? '%' : ' flat'} discount` : ''}</p></div>
+                </div>
+                {expandedSections.discount ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
+              {expandedSections.discount && (
+                <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-2 block">Tax Rate (%)</label>
+                    <input type="number" value={formData.taxRate} onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-2 block">Discount Type</label>
+                    <select value={formData.discountType} onChange={(e) => setFormData({ ...formData, discountType: e.target.value, discountValue: 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0">
+                      <option value="none">None</option>
+                      <option value="percentage">Percentage</option>
+                      <option value="fixed">Fixed Amount</option>
+                    </select>
+                  </div>
+                  {formData.discountType !== 'none' && (
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 mb-2 block">Discount Value</label>
+                      <input type="number" value={formData.discountValue} onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0" placeholder="0" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <label className="text-sm font-semibold text-gray-700 mb-3 block">Payment Terms</label>
+                <textarea value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} rows="3" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Payment terms..." />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Issue Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.issueDate}
-                  onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <label className="text-sm font-semibold text-gray-700 mb-3 block">Notes</label>
+                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows="3" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Additional notes..." />
               </div>
             </div>
 
-            {/* Items - Show summary mode for non-detailed, detailed table for detailed mode */}
-            {!isDetailedMode ? (
-              /* Summary Mode: Package price input + All activities as read-only text + Editable extra fields */
-              <div className="space-y-4">
-                {/* Package Price Input (Editable) */}
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Package Total Price
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">INR</span>
-                    <input
-                      type="number"
-                      value={(() => {
-                        const packageItem = formData.items.find(item => item.category === 'package');
-                        return packageItem ? (packageItem.totalPrice || packageItem.unitPrice || 0) : 0;
-                      })()}
-                      onChange={(e) => {
-                        const price = parseFloat(e.target.value) || 0;
-                        setFormData(prev => {
-                          const packageItemIndex = prev.items.findIndex(item => item.category === 'package');
-                          if (packageItemIndex >= 0) {
-                            const newItems = [...prev.items];
-                            newItems[packageItemIndex] = {
-                              ...newItems[packageItemIndex],
-                              totalPrice: price,
-                              unitPrice: price,
-                              quantity: 1,
-                            };
-                            return { ...prev, items: newItems };
-                          } else {
-                            return {
-                              ...prev,
-                              items: [
-                                {
-                                  description: 'Package Total',
-                                  category: 'package',
-                                  quantity: 1,
-                                  unitPrice: price,
-                                  totalPrice: price,
-                                  notes: '',
-                                },
-                                ...prev.items.filter(item => item.category !== 'package'),
-                              ],
-                            };
-                          }
-                        });
-                      }}
-                      min="0"
-                      step="0.01"
-                      className="flex-1 px-3 py-2 border border-purple-300 rounded text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="Enter package total price"
-                    />
-                  </div>
-                </div>
-
-                {/* Extra Fields Only - No included activities shown in summary mode */}
-                {formData.items.filter(item => item.category !== 'package' && item.isManual === true).length > 0 && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      Extra Fields
-                    </label>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {formData.items
-                        .map((item, originalIndex) => {
-                          // Skip package items and non-manual items (activities from itinerary)
-                          if (item.category === 'package' || item.isManual !== true) return null;
-
-                          // Only show manually added extra fields
-                          return (
-                            <div
-                              key={originalIndex}
-                              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded"
-                            >
-                              <input
-                                type="text"
-                                value={item.description || ''}
-                                onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                placeholder="Field description"
-                                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                              <input
-                                type="number"
-                                value={item.totalPrice || item.unitPrice || 0}
-                                onChange={(e) => {
-                                  const price = parseFloat(e.target.value) || 0;
-                                  // Update both totalPrice and unitPrice in a single state update
-                                  const newItems = [...formData.items];
-                                  newItems[originalIndex] = {
-                                    ...newItems[originalIndex],
-                                    totalPrice: price,
-                                    unitPrice: price,
-                                    quantity: 1,
-                                  };
-                                  setFormData({ ...formData, items: newItems });
-                                }}
-                                min="0"
-                                step="0.01"
-                                placeholder="Price"
-                                className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                              <button
-                                onClick={() => removeItem(originalIndex)}
-                                className="text-red-600 hover:text-red-800"
-                                type="button"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          );
-                        })
-                        .filter(item => item !== null)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Detailed Mode: All items with editable price inputs (Grouped by Day) */
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">Items (Detailed Mode - Grouped by Day)</h3>
-                  <button
-                    onClick={addItem}
-                    className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Item
-                  </button>
-                </div>
-
-                <div className="overflow-x-auto">
-                  {(() => {
-                    const items = formData.items.filter(i => i.category !== 'package');
-                    if (items.length === 0) {
-                      return (
-                        <div className="text-center py-8 text-gray-500 text-sm border-t">
-                          No items added yet. Click "Add Item" to populate.
-                        </div>
-                      );
-                    }
-
-                    // Group by Day
-                    const grouped = {};
-                    const others = [];
-
-                    items.forEach((item) => {
-                      const originalIndex = formData.items.indexOf(item);
-                      const match = item.description?.match(/^Day\s*(\d+)/i);
-                      if (match) {
-                        const dayNum = parseInt(match[1]);
-                        if (!grouped[dayNum]) grouped[dayNum] = [];
-                        grouped[dayNum].push({ ...item, originalIndex });
-                      } else {
-                        others.push({ ...item, originalIndex });
-                      }
-                    });
-
-                    const dayKeys = Object.keys(grouped).sort((a, b) => a - b);
-
-                    return (
-                      <div className="space-y-6">
-                        {dayKeys.map(day => (
-                          <div key={day} className="border rounded-lg overflow-hidden bg-white shadow-sm">
-                            <div className="bg-purple-50 px-4 py-2 border-b flex justify-between items-center">
-                              <h4 className="font-bold text-gray-700">Day {day}</h4>
-                              <span className="text-xs text-gray-500">{grouped[day].length} items</span>
-                            </div>
-                            <table className="w-full border-collapse">
-                              <tbody className="divide-y divide-gray-100">
-                                {grouped[day].map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
-                                  <tr key={originalIndex} className="hover:bg-gray-50">
-                                    <td className="px-4 py-2 w-full">
-                                      <input
-                                        type="text"
-                                        value={description || ''}
-                                        onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                        className="w-full px-2 py-1 border-0 bg-transparent focus:ring-0 text-sm text-gray-700"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-2 whitespace-nowrap">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">INR</span>
-                                        <input
-                                          type="number"
-                                          value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            const newItems = [...formData.items];
-                                            newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
-                                            setFormData({ ...formData, items: newItems });
-                                          }}
-                                          className="w-24 px-2 py-1 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-purple-500"
-                                        />
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-2 w-10 text-center">
-                                      <button
-                                        onClick={() => removeItem(originalIndex)}
-                                        className="text-gray-400 hover:text-red-500 transition-colors"
-                                        title="Remove item"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ))}
-
-                        {others.length > 0 && (
-                          <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-                            <div className="bg-gray-50 px-4 py-2 border-b">
-                              <h4 className="font-bold text-gray-700">General Items</h4>
-                            </div>
-                            <table className="w-full border-collapse">
-                              <tbody className="divide-y divide-gray-100">
-                                {others.map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
-                                  <tr key={originalIndex} className="hover:bg-gray-50">
-                                    <td className="px-4 py-2 w-full">
-                                      <input
-                                        type="text"
-                                        value={description || ''}
-                                        onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                        className="w-full px-2 py-1 border-0 bg-transparent focus:ring-0 text-sm text-gray-700"
-                                        placeholder="Item description"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-2 whitespace-nowrap">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-400">INR</span>
-                                        <input
-                                          type="number"
-                                          value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
-                                          onChange={(e) => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            const newItems = [...formData.items];
-                                            newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
-                                            setFormData({ ...formData, items: newItems });
-                                          }}
-                                          className="w-24 px-2 py-1 border border-gray-200 rounded text-sm text-right focus:outline-none focus:border-purple-500"
-                                        />
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-2 w-10 text-center">
-                                      <button
-                                        onClick={() => removeItem(originalIndex)}
-                                        className="text-gray-400 hover:text-red-500 transition-colors"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+            {/* Communication */}
+            {currentInvoiceId && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Send Invoice</p>
+                <div className="flex gap-3">
+                  <input type="email" value={sendEmailAddress} onChange={(e) => setSendEmailAddress(e.target.value)} placeholder="customer@example.com" className="flex-1 px-4 py-3 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 border-0" />
+                  <button type="button" onClick={handleSendInvoiceEmail} disabled={sendingEmail} className="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-sm flex items-center gap-2"><Send className="w-4 h-4" />{sendingEmail ? '...' : 'Email'}</button>
+                  <button type="button" onClick={() => handleSendWhatsApp(currentInvoiceId)} disabled={!lead?.whatsapp} className="px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium text-sm flex items-center gap-2 disabled:opacity-50"><MessageCircle className="w-4 h-4" />WhatsApp</button>
                 </div>
               </div>
             )}
+          </div>
 
-            {/* Calculations */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tax Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.taxRate}
-                    onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Discount Type
-                  </label>
-                  <select
-                    value={formData.discountType}
-                    onChange={(e) => setFormData({ ...formData, discountType: e.target.value, discountValue: 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="none">None</option>
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed Amount</option>
-                  </select>
-                </div>
-                {formData.discountType !== 'none' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Discount Value
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.discountValue}
-                      onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                )}
+          {/* Right: Floating Summary Panel */}
+          <div className="w-80 bg-gradient-to-b from-gray-900 to-slate-900 text-white p-6 flex flex-col shrink-0">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center"><Calculator className="w-5 h-5" /></div>
+              <div>
+                <p className="font-semibold">Invoice Summary</p>
+                <p className="text-xs text-gray-400">{getModeLabel(quotationMode)} Mode</p>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <Calculator className="w-5 h-5" />
-                  Summary
-                </h4>
+            </div>
+
+            <div className="flex-1 space-y-4">
+              <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{totals.subtotal.toFixed(2)}</span>
+                  <span className="text-gray-400">Subtotal</span>
+                  <span className="font-medium">₹{formatCurrency(totals.subtotal)}</span>
                 </div>
                 {totals.discountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Discount:</span>
-                    <span>-{totals.discountAmount.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-green-400">Discount</span>
+                    <span className="text-green-400">-₹{formatCurrency(totals.discountAmount)}</span>
                   </div>
                 )}
                 {totals.taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax:</span>
-                    <span className="font-medium">{totals.taxAmount.toFixed(2)}</span>
+                    <span className="text-gray-400">Tax ({formData.taxRate}%)</span>
+                    <span>₹{formatCurrency(totals.taxAmount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
-                  <span>Total:</span>
-                  <span className="text-purple-600">{totals.totalAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-500 pt-2 border-t">
-                  <span>Outstanding:</span>
-                  <span className="font-medium">{totals.totalAmount.toFixed(2)}</span>
+              </div>
+
+              <div className="border-t border-white/10 pt-4">
+                <div className="flex justify-between items-end">
+                  <span className="text-gray-400">Total Amount</span>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold">₹{formatCurrency(totals.totalAmount)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Due: {formatDateLabel(formData.dueDate)}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Existing Invoices */}
+              {existingInvoices.length > 0 && (
+                <div className="border-t border-white/10 pt-4">
+                  <p className="text-xs text-gray-400 mb-2">Previous Invoices</p>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {existingInvoices.slice(0, 5).map((inv, idx) => (
+                      <div key={inv._id || inv.id} className={`p-2 rounded-lg text-xs cursor-pointer transition-colors ${currentInvoice?._id === inv._id ? 'bg-indigo-600' : 'bg-white/5 hover:bg-white/10'}`} onClick={() => { setCurrentInvoice(inv); setCurrentInvoiceId(inv._id || inv.id); setIsEditing(true); }}>
+                        <p className="font-medium">{inv.invoiceNumber || `Invoice #${idx + 1}`}</p>
+                        <p className="text-gray-500">₹{formatCurrency(inv.totalAmount || 0)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Notes & Terms */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Terms
-                </label>
-                <textarea
-                  value={formData.paymentTerms}
-                  onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
-                  rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="Payment terms..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Instructions
-                </label>
-                <textarea
-                  value={formData.paymentInstructions}
-                  onChange={(e) => setFormData({ ...formData, paymentInstructions: e.target.value })}
-                  rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="Bank details, payment methods..."
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-          <div>
-            {currentInvoiceId && (
-              <button
-                onClick={() => handlePreviewPDF(currentInvoiceId)}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors font-medium"
-                title="Preview/Download Invoice PDF"
-              >
-                <Eye className="w-4 h-4" />
-                View PDF
+            {/* Actions */}
+            <div className="space-y-3 mt-6 pt-4 border-t border-white/10">
+              {currentInvoiceId && (
+                <button onClick={() => handlePreviewPDF(currentInvoiceId)} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-medium text-sm transition-colors">
+                  <Eye className="w-4 h-4" />Preview PDF
+                </button>
+              )}
+              <button onClick={() => handleSubmit()} disabled={loading} className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-xl font-bold transition-all disabled:opacity-50 shadow-lg">
+                {loading ? 'Saving...' : isEditing ? 'Update Invoice' : 'Create Invoice'}
               </button>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleSubmit()}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {isEditing ? 'Update Invoice' : 'Save Invoice'}
-            </button>
+              <button type="button" onClick={onClose} className="w-full px-4 py-3 text-gray-400 hover:text-white transition-colors text-sm">Cancel</button>
+            </div>
           </div>
         </div>
-
-        {/* PDF Preview Dialog */}
-        {showPDFPreview && currentInvoiceId && (
-          <PDFPreviewDialog
-            isOpen={showPDFPreview}
-            onClose={() => {
-              setShowPDFPreview(false);
-              setCurrentInvoiceId(null);
-              onSuccess?.();
-              onClose();
-            }}
-            onBack={() => {
-              setShowPDFPreview(false);
-              // Keep the form dialog open, just close PDF preview
-            }}
-            pdfUrl={`/billing/invoices/${currentInvoiceId}/pdf`}
-            documentName="Invoice"
-            onDownload={true}
-            documents={existingInvoices}
-            currentIndex={existingInvoices.findIndex(inv =>
-              (inv._id || inv.id) === currentInvoiceId
-            )}
-            onNavigate={(index) => {
-              if (existingInvoices[index]) {
-                const invoiceId = existingInvoices[index]._id || existingInvoices[index].id;
-                setCurrentInvoiceId(invoiceId);
-              }
-            }}
-          />
-        )}
       </div>
+
+      {showPDFPreview && currentInvoiceId && (
+        <PDFPreviewDialog isOpen={showPDFPreview} onClose={() => { setShowPDFPreview(false); setCurrentInvoiceId(null); onSuccess?.(); onClose(); }} onBack={() => setShowPDFPreview(false)} pdfUrl={`/billing/invoices/${currentInvoiceId}/pdf`} documentName="Invoice" onDownload={true} documents={existingInvoices} currentIndex={existingInvoices.findIndex(inv => (inv._id || inv.id) === currentInvoiceId)} onNavigate={(index) => { if (existingInvoices[index]) setCurrentInvoiceId(existingInvoices[index]._id || existingInvoices[index].id); }} />
+      )}
     </div>
   );
 };
 
 export default InvoiceDialog;
-

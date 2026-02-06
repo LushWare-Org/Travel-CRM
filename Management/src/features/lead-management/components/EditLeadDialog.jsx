@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, XCircle, Copy } from 'lucide-react';
+import {
+  X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, XCircle, Copy,
+  User, MapPin, Plane, Users, Globe, Package, ChevronDown, ChevronUp, Sparkles,
+  Trash2, Check
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import { leadAPI, packageAPI, manualItineraryAPI, customizedPackageAPI } from '../../../services/api';
@@ -20,9 +24,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const { user } = useAuth();
   const { hasPermission } = usePermission();
 
-  // Determine if user can edit leads
-  // Sales Reps can view/edit their own assigned leads
-  // Admins/SuperAdmins with manage_leads permission can edit any lead
   const isSalesRep = user?.role === 'salesRep';
   const canManageLeads = user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_leads'));
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,6 +44,13 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const [editRemarkText, setEditRemarkText] = useState('');
   const [newRemarkText, setNewRemarkText] = useState('');
   const [showAddRemark, setShowAddRemark] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    personal: true,
+    travel: true,
+    package: true,
+    remarks: false,
+    itinerary: false,
+  });
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -66,7 +74,13 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     return sequence > 1 ? `${cleanBase} (Customized-${sequence})` : `${cleanBase} (Customized)`;
   };
 
-  // Fetch packages when dialog opens
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchPackages();
@@ -80,7 +94,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
-        // Filter to only show active and published packages
         packagesList = packagesList.filter((pkg) =>
           pkg.isActive !== false && pkg.status === 'published'
         );
@@ -127,7 +140,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     }
   };
 
-  // Initialize form when lead changes
   useEffect(() => {
     if (lead) {
       const primaryPackageId = lead.package?._id || lead.package || '';
@@ -174,10 +186,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         status: lead.status || 'new',
       });
 
-      // Initialize remarks
       setRemarks(lead.remarks || []);
-
-      // Load manual itinerary if exists
       loadManualItinerary();
     }
   }, [lead, salesReps]);
@@ -193,6 +202,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       if (response.success && response.data) {
         setItineraryDays(response.data.days || []);
         setShowManualItinerary(response.data.days && response.data.days.length > 0);
+        if (response.data.days && response.data.days.length > 0) {
+          setExpandedSections(prev => ({ ...prev, itinerary: true }));
+        }
       } else {
         setItineraryDays([]);
         setShowManualItinerary(false);
@@ -211,8 +223,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
     try {
       setIsSubmitting(true);
-      // Only Sales Reps cannot change the assigned sales rep
-      // Admins/SuperAdmins with manage_leads permission can change it freely
       const leadId = lead._id || lead.id;
       if (formData.assignedTo === '') {
         try {
@@ -244,7 +254,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       }
       await leadAPI.updateLead(leadId, updateData);
 
-      // Save manual itinerary if days exist
       if (showManualItinerary && itineraryDays.length > 0) {
         try {
           await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
@@ -253,7 +262,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           toast.error('Lead updated but itinerary save failed');
         }
       } else if (showManualItinerary && itineraryDays.length === 0) {
-        // If itinerary was shown but is now empty, delete it
         try {
           const itineraryResponse = await manualItineraryAPI.getByLead(leadId);
           if (itineraryResponse.success && itineraryResponse.data?._id) {
@@ -325,7 +333,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       onSuccess?.();
       onClose();
     } catch (error) {
-      alert(`Failed to update lead: ${error.message}`);
+      toast.error(`Failed to update lead: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -338,15 +346,8 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     }
 
     const selectedPackageId = formData.package;
-    console.log('🎯 handleEditPackage called');
-    console.log('🎯 formData.package:', formData.package);
-    console.log('🎯 customPackageId state:', customPackageId);
-    console.log('🎯 selectedPackageId:', selectedPackageId);
-
     const isCustomizedSelected =
       !!customPackageId && selectedPackageId === customPackageId;
-
-    console.log('🎯 isCustomizedSelected:', isCustomizedSelected);
 
     const confirmationHtml = isCustomizedSelected
       ? `
@@ -370,7 +371,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         </div>
       `;
 
-    // Show confirmation dialog (Phase 6: UI/UX refinement)
     const result = await Swal.fire({
       title: 'Customize Package?',
       html: confirmationHtml,
@@ -388,37 +388,21 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     }
 
     try {
-      console.log('🔍 Loading package for editing. Selected ID:', selectedPackageId);
-      console.log('🔍 Is customized package?', isCustomizedSelected);
-
       const response = isCustomizedSelected
         ? await customizedPackageAPI.getById(selectedPackageId)
         : await packageAPI.getById(selectedPackageId);
 
-      console.log('📦 API Response:', response);
-
       const pkg = response?.data?.data || response?.data || response;
-
-      console.log('📦 Extracted package:', pkg);
-      console.log('📦 Package itinerary:', pkg?.itinerary);
-      console.log('📦 Package days:', pkg?.days);
 
       if (response?.success && pkg) {
         let days = [];
 
         if (pkg.itinerary?.days) {
           days = pkg.itinerary.days;
-          console.log('✅ Loaded days from pkg.itinerary.days:', days.length, 'days');
         } else if (Array.isArray(pkg.days)) {
           days = pkg.days;
-          console.log('✅ Loaded days from pkg.days:', days.length, 'days');
-        } else {
-          console.warn('⚠️ No days found in package!');
         }
 
-        console.log('📋 Final days array:', days);
-
-        // Format images
         const formattedImages = (pkg.images || []).map(img => {
           if (typeof img === 'object' && img.url) {
             return img;
@@ -432,8 +416,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           return img;
         });
 
-        // Prepare package data for editing (remove _id so it creates a new one)
-        // Store original package ID for tracking
         const originalPackageId =
           (pkg.originalPackage && (pkg.originalPackage._id || pkg.originalPackage.id || pkg.originalPackage)) ||
           pkg.originalPackageId ||
@@ -458,29 +440,25 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
         const editData = {
           ...pkg,
-          _id: undefined, // Remove ID so it creates a new package unless we explicitly update
+          _id: undefined,
           id: undefined,
           name: displayName,
           days: [...days],
           images: [...formattedImages],
-          originalPackageId: originalPackageId, // Store for later use in save
+          originalPackageId: originalPackageId,
           existingPackageId: selectedPackageId,
           baseName,
           customizationSequence: sequence,
         };
 
-        console.log('📝 Setting editData with', editData.days?.length || 0, 'days');
-        console.log('📝 Edit data:', editData);
-
         setEditPackageData(editData);
         setImages(formattedImages);
         setShowEditPackageDialog(true);
       } else {
-        console.error('❌ Failed to load package. Response:', response);
         toast.error('Failed to load package data');
       }
     } catch (error) {
-      console.error('❌ Error loading package:', error);
+      console.error('Error loading package:', error);
       toast.error('Failed to load package for editing');
     }
   };
@@ -492,7 +470,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     try {
       const uploadedImages = await uploadPackageImages(files);
 
-      // Format as expected by the form
       const formattedImages = uploadedImages.map(img => ({
         url: img.url,
         public_id: img.public_id,
@@ -513,10 +490,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   };
 
   const handleSaveEditedPackage = async (updatedPackageData) => {
-    console.log('🎁 handleSaveEditedPackage received data:', updatedPackageData);
-    console.log('🎁 updatedPackageData.days:', updatedPackageData.days);
-    console.log('🎁 updatedPackageData.days length:', updatedPackageData.days?.length || 0);
-
     try {
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -539,26 +512,18 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         return;
       }
 
-      console.log('📦 updatedPackageData.days before cleaning:', updatedPackageData.days);
-
-      // Don't filter out days - save all days to preserve customizations
-      // Users might add locations/activities without filling title/description
       const cleanDays = (updatedPackageData.days || []).map((day, index) => {
         const cleanDay = { ...day };
-        // Ensure dayNumber exists for backend validation
         if (!cleanDay.dayNumber) cleanDay.dayNumber = index + 1;
 
-        // Clean up transport if empty
         if (!cleanDay.transport || cleanDay.transport === '') {
           delete cleanDay.transport;
         }
 
-        // Clean up activities
         if (cleanDay.activities && Array.isArray(cleanDay.activities)) {
           cleanDay.activities = cleanDay.activities.filter(a => a && typeof a === 'string' && a.trim() !== '');
         }
 
-        // Clean up accommodation if no valid data
         if (cleanDay.accommodation) {
           if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') {
             delete cleanDay.accommodation.type;
@@ -571,9 +536,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
         return cleanDay;
       });
-
-      console.log('📦 Saving customized package with days:', cleanDays.length);
-      console.log('📦 cleanDays:', cleanDays);
 
       const validImages = images.filter((img) => !img.isTemp && img.url && img.public_id);
 
@@ -604,7 +566,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
       const sanitizePackageType = (pt) => {
         if (!pt) return 'Standard';
-        // Ensure Title Case: 'standard' -> 'Standard'
         const lower = pt.toLowerCase();
         return lower.charAt(0).toUpperCase() + lower.slice(1);
       };
@@ -623,7 +584,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         baseName: sanitizedBaseName,
         category: sanitizeCategory(updatedPackageData.category),
         packageType: sanitizePackageType(updatedPackageData.packageType),
-        name: sanitizedBaseName, // Ensure name is set
+        name: sanitizedBaseName,
       };
 
       const customizedForLead = lead._id || lead.id;
@@ -633,11 +594,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           formData.package === customPackageId);
 
       if (isUpdatingExistingCustom) {
-        // UPDATE EXISTING CUSTOMIZED PACKAGE
         const updatePayload = {
           ...basePayload,
           customizedForLead,
-          days: cleanDays, // ✅ Explicitly include days for update
+          days: cleanDays,
         };
         updatePayload.customizationSequence =
           editPackageData?.customizationSequence || lead.customizedPackage?.customizationSequence || 1;
@@ -650,15 +610,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           updatePayload.customizationNotes = `Customized for lead "${lead.name || customizedForLead}"`;
         }
 
-        console.log('🔄 Updating customized package:', customPackageId, 'with', cleanDays.length, 'days');
-
         const response = await customizedPackageAPI.update(customPackageId, updatePayload);
 
         if (response?.success && response.data) {
           const updatedPackage = response.data.data || response.data;
           const updatedPackageId = updatedPackage._id || updatedPackage.id;
-
-          console.log('✅ Customized package updated successfully:', updatedPackageId);
 
           await leadAPI.updateLead(lead._id || lead.id, {
             customizedPackage: updatedPackageId,
@@ -681,31 +637,25 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           await fetchPackages();
           onSuccess?.();
         } else {
-          console.error('❌ Update failed:', response);
           Swal.fire('Error', response?.message || 'Failed to update customized package', 'error');
         }
       } else {
-        // CREATE NEW CUSTOMIZED PACKAGE
         const creationPayload = {
           ...basePayload,
           customizedForLead,
           originalPackage: originalPackageRef,
           customizedBy: undefined,
-          days: cleanDays, // ✅ Explicitly include days for creation
+          days: cleanDays,
           customizationNotes:
             basePayload.customizationNotes ||
             `Customized from package "${updatedPackageData.name?.replace(' (Customized)', '') || 'Original'}" for lead "${lead.name || customizedForLead}"`,
         };
-
-        console.log('➕ Creating new customized package with', cleanDays.length, 'days');
 
         const response = await packageAPI.create(creationPayload);
 
         if (response.success && response.data) {
           const newPackage = response.data;
           const newPackageId = newPackage._id || newPackage.id;
-
-          console.log('✅ New customized package created:', newPackageId);
 
           await leadAPI.updateLead(lead._id || lead.id, {
             customizedPackage: newPackageId,
@@ -728,12 +678,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           await fetchPackages();
           onSuccess?.();
         } else {
-          console.error('❌ Creation failed:', response);
           Swal.fire('Error', response.message || 'Failed to create customized package', 'error');
         }
       }
     } catch (error) {
-      console.error('❌ Error saving customized package:', error);
+      console.error('Error saving customized package:', error);
       Swal.fire('Error', error.message || 'Failed to save customized package', 'error');
     }
   };
@@ -763,246 +712,301 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     </div>
   );
 
+  // Section Header Component
+  const SectionHeader = ({ icon: Icon, title, subtitle, section, gradient, count }) => (
+    <button
+      type="button"
+      onClick={() => toggleSection(section)}
+      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expandedSections[section]
+          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
+          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+        }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-xl ${expandedSections[section] ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
+          <Icon className={`w-5 h-5 ${expandedSections[section] ? 'text-white' : 'text-gray-600'}`} />
+        </div>
+        <div className="text-left">
+          <h3 className="font-semibold flex items-center gap-2">
+            {title}
+            {count !== undefined && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${expandedSections[section] ? 'bg-white/20' : 'bg-gray-200'
+                }`}>
+                {count}
+              </span>
+            )}
+          </h3>
+          <p className={`text-xs ${expandedSections[section] ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
+        </div>
+      </div>
+      {expandedSections[section] ? (
+        <ChevronUp className="w-5 h-5" />
+      ) : (
+        <ChevronDown className="w-5 h-5" />
+      )}
+    </button>
+  );
+
+  // Input Field Component
+  const InputField = ({ label, required, icon: Icon, children }) => (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 flex justify-between items-center rounded-t-xl shadow-lg z-10">
-          <div>
-            <h2 className="text-2xl font-bold">Edit Lead - {formData.name || 'Lead'}</h2>
-            <p className="text-sm text-blue-100 mt-1">Update lead information and details</p>
+      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="relative bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white p-6 shrink-0">
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg transition-all duration-200 group">
-            <X className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-200" />
-          </button>
+
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-white/15 backdrop-blur-sm rounded-2xl">
+                <Edit className="w-7 h-7" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">Edit Lead</h2>
+                <p className="text-emerald-100 text-sm mt-0.5">{formData.name || 'Lead Details'}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2.5 hover:bg-white/15 rounded-xl transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Personal Information Section */}
           <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Personal Information</h3>
-              <p className="text-xs text-gray-500 mt-1">Basic contact details of the lead</p>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="Enter full name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="email@example.com"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Contact Number <span className="text-red-500">*</span>
-                </label>
-                <PhoneInput
-                  international
-                  defaultCountry="LK"
-                  value={formData.phone}
-                  onChange={(value) => setFormData({ ...formData, phone: value || "" })}
-                  className="phone-input-wrapper"
-                  placeholder="Enter phone number"
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    WhatsApp Number
-                  </label>
-                  {formData.phone && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
-                      className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                      title="Copy contact number to WhatsApp"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      Copy from Contact
-                    </button>
-                  )}
+            <SectionHeader
+              icon={User}
+              title="Personal Information"
+              subtitle="Contact details of the lead"
+              section="personal"
+              gradient="from-blue-500 to-blue-600"
+            />
+
+            {expandedSections.personal && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                <InputField label="Full Name" required icon={User}>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    placeholder="Enter full name"
+                  />
+                </InputField>
+
+                <InputField label="Email Address" icon={Mail}>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    placeholder="email@example.com"
+                  />
+                </InputField>
+
+                <InputField label="Contact Number" required icon={Phone}>
+                  <PhoneInput
+                    international
+                    defaultCountry="LK"
+                    value={formData.phone}
+                    onChange={(value) => setFormData({ ...formData, phone: value || "" })}
+                    className="phone-input-wrapper"
+                    placeholder="Enter phone number"
+                  />
+                </InputField>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      WhatsApp Number
+                    </label>
+                    {formData.phone && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                  <PhoneInput
+                    international
+                    defaultCountry="LK"
+                    value={formData.whatsapp}
+                    onChange={(value) => setFormData({ ...formData, whatsapp: value || "" })}
+                    className="phone-input-wrapper"
+                    placeholder="Enter WhatsApp number"
+                  />
                 </div>
-                <PhoneInput
-                  international
-                  defaultCountry="LK"
-                  value={formData.whatsapp}
-                  onChange={(value) => setFormData({ ...formData, whatsapp: value || "" })}
-                  className="phone-input-wrapper"
-                  placeholder="Enter WhatsApp number"
-                />
               </div>
-            </div>
+            )}
           </div>
 
           {/* Travel Details Section */}
           <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Travel Details</h3>
-              <p className="text-xs text-gray-500 mt-1">Information about the travel requirements</p>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Departure City
-                </label>
-                <LocationAutocomplete
-                  value={formData.city}
-                  onChange={(value) => setFormData({ ...formData, city: value })}
-                  placeholder="e.g., Colombo, Sri Lanka"
-                  destination={formData.destination}
-                />
+            <SectionHeader
+              icon={Plane}
+              title="Travel Details"
+              subtitle="Trip information and dates"
+              section="travel"
+              gradient="from-purple-500 to-purple-600"
+            />
+
+            {expandedSections.travel && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+                <InputField label="Departure City" icon={MapPin}>
+                  <LocationAutocomplete
+                    value={formData.city}
+                    onChange={(value) => setFormData({ ...formData, city: value })}
+                    placeholder="e.g., Colombo, Sri Lanka"
+                    destination={formData.destination}
+                  />
+                </InputField>
+
+                <InputField label="Destination" icon={MapPin}>
+                  <DestinationSelector
+                    value={formData.destination}
+                    onChange={(event) =>
+                      setFormData({ ...formData, destination: event.target.value })
+                    }
+                  />
+                </InputField>
+
+                <InputField label="Travel Date (Start)" icon={Calendar}>
+                  <input
+                    type="date"
+                    value={formData.travelDate}
+                    onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                  />
+                </InputField>
+
+                <InputField label="End Date" icon={Calendar}>
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    min={formData.travelDate || undefined}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                  />
+                </InputField>
+
+                <InputField label="Number of Travelers" icon={Users}>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.numberOfTravelers}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({
+                        ...formData,
+                        numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
+                      });
+                    }}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                    placeholder="e.g., 2"
+                  />
+                </InputField>
+
+                <InputField label="Platform / Source" icon={Globe}>
+                  <select
+                    value={formData.platform}
+                    onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                  >
+                    <option value="">Select Platform</option>
+                    <option value="Website Form">🌐 Website Form</option>
+                    <option value="Social Media">📱 Social Media</option>
+                    <option value="Phone Call">📞 Phone Call</option>
+                    <option value="Referral">🤝 Referral</option>
+                    <option value="Email">📧 Email</option>
+                    <option value="Walk-in">🚶 Walk-in</option>
+                  </select>
+                </InputField>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Destination
-                </label>
-                <DestinationSelector
-                  value={formData.destination}
-                  onChange={(event) =>
-                    setFormData({ ...formData, destination: event.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Travel Date (Start)
-                </label>
-                <input
-                  type="date"
-                  value={formData.travelDate}
-                  onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  min={formData.travelDate || undefined}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Number of Travelers
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={formData.numberOfTravelers}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFormData({
-                      ...formData,
-                      numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
-                    });
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="e.g., 2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Platform/Source
-                </label>
-                <select
-                  value={formData.platform}
-                  onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
-                >
-                  <option value="">Select Platform</option>
-                  <option value="Website Form">Website Form</option>
-                  <option value="Social Media">Social Media</option>
-                  <option value="Phone Call">Phone Call</option>
-                  <option value="Referral">Referral</option>
-                  <option value="Walk-in">Walk-in</option>
-                </select>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Package & Assignment Section */}
           <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Package & Assignment</h3>
-              <p className="text-xs text-gray-500 mt-1">Select package and assign sales representative</p>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Package
-                </label>
-                <div className="space-y-2">
-                  <select
-                    value={formData.package || ''}
-                    onChange={(e) => {
-                      const packageId = e.target.value;
-                      const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-                      setFormData({
-                        ...formData,
-                        package: packageId,
-                        packageName: selectedPackage?.name || '',
-                        destination: selectedPackage?.destination || formData.destination
-                      });
-                    }}
-                    disabled={loadingPackages}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
-                    {packages.map((pkg) => {
-                      const optionId = pkg._id || pkg.id;
-                      const baseName =
-                        pkg.baseName ||
-                        `${pkg.name || 'Unnamed Package'}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
-                      const sequence = pkg.customizationSequence || pkg.sequence || 0;
-                      let label = baseName || 'Unnamed Package';
-                      if (pkg.customizedForLead || pkg.isCustomizedPackage) {
-                        label = sequence > 1 ? `${label} (Customized-${sequence})` : `${label} (Customized)`;
-                      }
-                      return (
-                        <option key={optionId} value={optionId}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
+            <SectionHeader
+              icon={Package}
+              title="Package & Assignment"
+              subtitle="Select package and sales representative"
+              section="package"
+              gradient="from-emerald-500 to-teal-600"
+            />
+
+            {expandedSections.package && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                <div className="space-y-3">
+                  <InputField label="Package" icon={Package}>
+                    <select
+                      value={formData.package || ''}
+                      onChange={(e) => {
+                        const packageId = e.target.value;
+                        const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
+                        setFormData({
+                          ...formData,
+                          package: packageId,
+                          packageName: selectedPackage?.name || '',
+                          destination: selectedPackage?.destination || formData.destination
+                        });
+                      }}
+                      disabled={loadingPackages}
+                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
+                      {packages.map((pkg) => {
+                        const optionId = pkg._id || pkg.id;
+                        const baseName =
+                          pkg.baseName ||
+                          `${pkg.name || 'Unnamed Package'}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+                        const sequence = pkg.customizationSequence || pkg.sequence || 0;
+                        let label = baseName || 'Unnamed Package';
+                        if (pkg.customizedForLead || pkg.isCustomizedPackage) {
+                          label = sequence > 1 ? `${label} (Customized-${sequence})` : `${label} (Customized)`;
+                        }
+                        return (
+                          <option key={optionId} value={optionId}>
+                            {label}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </InputField>
                   {formData.package && (
                     <button
                       onClick={handleEditPackage}
-                      className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all font-medium flex items-center justify-center gap-2 shadow-sm"
+                      className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25"
                       type="button"
                     >
                       <Edit className="w-4 h-4" />
@@ -1010,329 +1014,320 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     </button>
                   )}
                 </div>
-                {packages.length === 0 && !loadingPackages && (
-                  <p className="text-xs text-gray-500 mt-1">No packages available</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Sales Representative
-                </label>
-                <select
-                  value={formData.assignedTo || ''}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    if (id === '__name_only') {
-                      setFormData(prev => ({ ...prev, assignedTo: '__name_only' }));
-                      return;
-                    }
 
-                    if (id === '') {
-                      setFormData(prev => ({ ...prev, assignedTo: '', salesRep: '' }));
-                      return;
-                    }
-
-                    const rep = salesReps.find(r => r.id === id || r._id === id);
-                    setFormData(prev => ({ ...prev, assignedTo: id, salesRep: rep ? rep.name : '' }));
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
-                >
-                  <option value="">Select Sales Rep</option>
-                  {formData.salesRep && (!formData.assignedTo || formData.assignedTo === '__name_only') && (
-                    <option value="__name_only">{formData.salesRep}</option>
-                  )}
-                  {salesReps.map((rep) => (
-                    <option key={rep.id || rep._id} value={rep.id || rep._id}>{rep.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-
-          {/* Remarks Section */}
-          <div className="space-y-4 border-t border-gray-200 pt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  Remarks ({remarks.length})
-                </h3>
-                <p className="text-xs text-gray-500 mt-1">Add notes and comments about this lead</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddRemark(!showAddRemark);
-                  if (!showAddRemark) {
-                    setNewRemarkText('');
-                  }
-                }}
-                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all font-medium flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                {showAddRemark ? 'Cancel' : 'Add Remark'}
-              </button>
-            </div>
-
-            {/* Add New Remark */}
-            {showAddRemark && (
-              <div className="mb-4 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 shadow-sm">
-                <label className="block text-sm font-semibold text-gray-700 mb-3">New Remark</label>
-                <textarea
-                  value={newRemarkText}
-                  onChange={(e) => setNewRemarkText(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none mb-4 transition-all"
-                  rows={4}
-                  placeholder="Enter your remark here..."
-                />
-                <div className="flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddRemark(false);
-                      setNewRemarkText('');
-                    }}
-                    className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center gap-2"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newRemarkText.trim()) {
-                        toast.error('Remark text cannot be empty');
+                <InputField label="Sales Representative" icon={User}>
+                  <select
+                    value={formData.assignedTo || ''}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (id === '__name_only') {
+                        setFormData(prev => ({ ...prev, assignedTo: '__name_only' }));
                         return;
                       }
-                      const newRemark = {
-                        text: newRemarkText.trim(),
-                        date: new Date(),
-                        addedAt: new Date(),
-                      };
-                      setRemarks([...remarks, newRemark]);
-                      setNewRemarkText('');
-                      setShowAddRemark(false);
-                      toast.success('Remark added successfully');
+
+                      if (id === '') {
+                        setFormData(prev => ({ ...prev, assignedTo: '', salesRep: '' }));
+                        return;
+                      }
+
+                      const rep = salesReps.find(r => r.id === id || r._id === id);
+                      setFormData(prev => ({ ...prev, assignedTo: id, salesRep: rep ? rep.name : '' }));
                     }}
-                    className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-sm"
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                   >
-                    <Save className="w-4 h-4" />
-                    Add Remark
+                    <option value="">Select Sales Rep</option>
+                    {formData.salesRep && (!formData.assignedTo || formData.assignedTo === '__name_only') && (
+                      <option value="__name_only">{formData.salesRep}</option>
+                    )}
+                    {salesReps.map((rep) => (
+                      <option key={rep.id || rep._id} value={rep.id || rep._id}>{rep.name}</option>
+                    ))}
+                  </select>
+                </InputField>
+              </div>
+            )}
+          </div>
+
+          {/* Remarks Section */}
+          <div className="space-y-4">
+            <SectionHeader
+              icon={MessageSquare}
+              title="Remarks & Notes"
+              subtitle="Add comments about this lead"
+              section="remarks"
+              gradient="from-amber-500 to-orange-500"
+              count={remarks.length}
+            />
+
+            {expandedSections.remarks && (
+              <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-4">
+                {/* Add New Remark Button */}
+                {!showAddRemark && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRemark(true)}
+                    className="w-full px-4 py-3 border-2 border-dashed border-amber-300 text-amber-700 rounded-xl hover:bg-amber-100 hover:border-amber-400 transition-colors flex items-center justify-center gap-2 font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add New Remark
                   </button>
+                )}
+
+                {/* Add Remark Form */}
+                {showAddRemark && (
+                  <div className="p-4 bg-white rounded-xl border-2 border-amber-200 shadow-sm">
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">New Remark</label>
+                    <textarea
+                      value={newRemarkText}
+                      onChange={(e) => setNewRemarkText(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 resize-none mb-3 transition-all"
+                      rows={3}
+                      placeholder="Enter your remark here..."
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddRemark(false);
+                          setNewRemarkText('');
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!newRemarkText.trim()) {
+                            toast.error('Remark text cannot be empty');
+                            return;
+                          }
+                          const newRemark = {
+                            text: newRemarkText.trim(),
+                            date: new Date(),
+                            addedAt: new Date(),
+                          };
+                          setRemarks([...remarks, newRemark]);
+                          setNewRemarkText('');
+                          setShowAddRemark(false);
+                          toast.success('Remark added');
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all flex items-center gap-2"
+                      >
+                        <Check className="w-4 h-4" />
+                        Add Remark
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Remarks List */}
+                <div className="space-y-3">
+                  {remarks.length > 0 ? (
+                    remarks.map((remark, index) => (
+                      <div key={index} className="p-4 bg-white rounded-xl border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all group">
+                        {editingRemarkIndex === index ? (
+                          <div className="space-y-3">
+                            <textarea
+                              value={editRemarkText}
+                              onChange={(e) => setEditRemarkText(e.target.value)}
+                              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 resize-none transition-all"
+                              rows={3}
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingRemarkIndex(null);
+                                  setEditRemarkText('');
+                                }}
+                                className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!editRemarkText.trim()) {
+                                    toast.error('Remark text cannot be empty');
+                                    return;
+                                  }
+                                  const updatedRemarks = [...remarks];
+                                  updatedRemarks[index] = {
+                                    ...updatedRemarks[index],
+                                    text: editRemarkText.trim(),
+                                    date: updatedRemarks[index].date || new Date(),
+                                    addedAt: updatedRemarks[index].addedAt || updatedRemarks[index].date || new Date(),
+                                    addedBy: updatedRemarks[index].addedBy || updatedRemarks[index].addedBy?._id || updatedRemarks[index].addedBy?.id,
+                                    ...(updatedRemarks[index]._id && { _id: updatedRemarks[index]._id }),
+                                  };
+                                  setRemarks(updatedRemarks);
+                                  setEditingRemarkIndex(null);
+                                  setEditRemarkText('');
+                                  toast.success('Remark updated');
+                                }}
+                                className="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all flex items-center gap-1.5"
+                              >
+                                <Save className="w-4 h-4" />
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm text-gray-800 flex-1">{remark.text}</p>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingRemarkIndex(index);
+                                    setEditRemarkText(remark.text || '');
+                                  }}
+                                  className="p-1.5 hover:bg-amber-100 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit className="w-4 h-4 text-amber-600" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedRemarks = remarks.filter((_, i) => i !== index);
+                                    setRemarks(updatedRemarks);
+                                    toast.success('Remark deleted');
+                                  }}
+                                  className="p-1.5 hover:bg-red-100 rounded-lg transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
+                              <span>
+                                {remark.date ? new Date(remark.date).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                }) : 'No date'}
+                              </span>
+                              <span className="font-medium">#{index + 1}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                      <MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm font-medium">No remarks yet</p>
+                      <p className="text-xs mt-1 text-gray-400">Add your first note</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-
-            {/* Remarks List */}
-            <div className="space-y-4">
-              {remarks.length > 0 ? (
-                remarks.map((remark, index) => (
-                  <div key={index} className="p-5 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 hover:shadow-md transition-all">
-                    {editingRemarkIndex === index ? (
-                      // Edit mode
-                      <div className="space-y-3">
-                        <textarea
-                          value={editRemarkText}
-                          onChange={(e) => setEditRemarkText(e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
-                          rows={4}
-                          placeholder="Enter remark text..."
-                        />
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">
-                            {remark.date ? new Date(remark.date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'No date'}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingRemarkIndex(null);
-                                setEditRemarkText('');
-                              }}
-                              className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center gap-2"
-                            >
-                              <XCircle className="w-4 h-4" />
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!editRemarkText.trim()) {
-                                  toast.error('Remark text cannot be empty');
-                                  return;
-                                }
-                                const updatedRemarks = [...remarks];
-                                updatedRemarks[index] = {
-                                  ...updatedRemarks[index],
-                                  text: editRemarkText.trim(),
-                                  date: updatedRemarks[index].date || new Date(),
-                                  addedAt: updatedRemarks[index].addedAt || updatedRemarks[index].date || new Date(),
-                                  addedBy: updatedRemarks[index].addedBy || updatedRemarks[index].addedBy?._id || updatedRemarks[index].addedBy?.id,
-                                  ...(updatedRemarks[index]._id && { _id: updatedRemarks[index]._id }),
-                                };
-                                setRemarks(updatedRemarks);
-                                setEditingRemarkIndex(null);
-                                setEditRemarkText('');
-                                toast.success('Remark updated successfully');
-                              }}
-                              className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all flex items-center gap-2 shadow-sm"
-                            >
-                              <Save className="w-4 h-4" />
-                              Save Changes
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      // View mode
-                      <>
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <p className="text-sm text-gray-900 flex-1">{remark.text}</p>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updatedRemarks = remarks.filter((_, i) => i !== index);
-                                setRemarks(updatedRemarks);
-                                toast.success('Remark deleted');
-                              }}
-                              className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group"
-                              title="Delete remark"
-                            >
-                              <XCircle className="w-4 h-4 text-gray-500 group-hover:text-red-600 transition-colors" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingRemarkIndex(index);
-                                setEditRemarkText(remark.text || '');
-                              }}
-                              className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors group"
-                              title="Edit remark"
-                            >
-                              <Edit className="w-4 h-4 text-gray-500 group-hover:text-blue-600 transition-colors" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
-                          <span className="text-xs text-gray-500">
-                            {remark.date ? new Date(remark.date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'No date'}
-                          </span>
-                          <span className="text-xs font-medium text-gray-600">
-                            Remark #{index + 1}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-12 text-gray-500 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                  <p className="text-sm font-medium">No remarks yet</p>
-                  <p className="text-xs mt-1 text-gray-400">Click "Add Remark" to add your first note</p>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Manual Itinerary Section */}
-          <div className="border-t pt-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Manual Itinerary</h3>
-              {loadingItinerary ? (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">Loading...</span>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowManualItinerary(!showManualItinerary);
-                    if (!showManualItinerary && itineraryDays.length === 0) {
-                      setItineraryDays([createDefaultDay(1)]);
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
-                >
-                  <Calendar className="w-4 h-4" />
-                  {showManualItinerary ? 'Hide Itinerary' : (itineraryDays.length > 0 ? 'Show Manual Itinerary' : 'Add Manual Itinerary')}
-                </button>
-              )}
-            </div>
+          <div className="space-y-4">
+            <SectionHeader
+              icon={Calendar}
+              title="Manual Itinerary"
+              subtitle={itineraryDays.length > 0 ? `${itineraryDays.length} day${itineraryDays.length > 1 ? 's' : ''} planned` : 'Custom day-by-day plan'}
+              section="itinerary"
+              gradient="from-indigo-500 to-violet-600"
+              count={itineraryDays.length > 0 ? itineraryDays.length : undefined}
+            />
 
-            {showManualItinerary && (
-              <div className="mt-4">
-                <ItineraryEditor
-                  days={itineraryDays}
-                  onDayChange={(dayNumber, dayData) => {
-                    setItineraryDays(prev =>
-                      prev.map(day =>
-                        day.dayNumber === dayNumber ? { ...day, ...dayData } : day
-                      )
-                    );
-                  }}
-                  onAddDay={() => {
-                    const newDayNumber = itineraryDays.length + 1;
-                    setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
-                  }}
-                  onRemoveDay={(dayNumber) => {
-                    const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                    const renumberedDays = filteredDays.map((day, index) => ({
-                      ...day,
-                      dayNumber: index + 1,
-                    }));
-                    setItineraryDays(renumberedDays);
-                  }}
-                  destination={formData.destination}
-                  hideTitleAndDescription={true}
-                />
+            {expandedSections.itinerary && (
+              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-sm text-gray-600">
+                    Create a custom day-by-day itinerary for this lead
+                  </p>
+                  {loadingItinerary ? (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">Loading...</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowManualItinerary(!showManualItinerary);
+                        if (!showManualItinerary && itineraryDays.length === 0) {
+                          setItineraryDays([createDefaultDay(1)]);
+                        }
+                      }}
+                      className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl hover:from-indigo-600 hover:to-violet-700 transition-all font-medium flex items-center gap-2 shadow-lg shadow-indigo-500/25"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      {showManualItinerary ? 'Hide Editor' : (itineraryDays.length > 0 ? 'Show Itinerary' : 'Create Itinerary')}
+                    </button>
+                  )}
+                </div>
+
+                {showManualItinerary && (
+                  <div className="p-4 bg-white rounded-xl border border-indigo-200">
+                    <ItineraryEditor
+                      days={itineraryDays}
+                      onDayChange={(dayNumber, dayData) => {
+                        setItineraryDays(prev =>
+                          prev.map(day =>
+                            day.dayNumber === dayNumber ? { ...day, ...dayData } : day
+                          )
+                        );
+                      }}
+                      onAddDay={() => {
+                        const newDayNumber = itineraryDays.length + 1;
+                        setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
+                      }}
+                      onRemoveDay={(dayNumber) => {
+                        const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
+                        const renumberedDays = filteredDays.map((day, index) => ({
+                          ...day,
+                          dayNumber: index + 1,
+                        }));
+                        setItineraryDays(renumberedDays);
+                      }}
+                      destination={formData.destination}
+                      hideTitleAndDescription={true}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-4 pt-6 border-t border-gray-200">
-            <button
-              onClick={onClose}
-              className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all font-semibold"
-              type="button"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSubmitting}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
-              type="button"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Saving Changes...
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5" />
-                  Save Changes
-                </>
-              )}
-            </button>
-          </div>
+        {/* Footer Actions */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold"
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
+            type="button"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                Save Changes
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -1371,4 +1366,3 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 };
 
 export default EditLeadDialog;
-

@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Loader2, Calendar, Copy } from 'lucide-react';
+import {
+  X, Plus, Loader2, Calendar, Copy, User, Mail, Phone,
+  MapPin, Plane, Users, Globe, Package, MessageSquare,
+  ChevronDown, ChevronUp, Sparkles, Save
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
@@ -18,6 +22,13 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [showManualItinerary, setShowManualItinerary] = useState(false);
   const [itineraryDays, setItineraryDays] = useState([]);
+  const [expandedSections, setExpandedSections] = useState({
+    personal: true,
+    travel: true,
+    package: true,
+    remarks: false,
+    itinerary: false,
+  });
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -40,7 +51,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       fetchPackages();
-      // Auto-assign to current user if they are a sales rep
       if (isSalesRep && user?._id) {
         setFormData(prev => ({
           ...prev,
@@ -54,29 +64,20 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const fetchPackages = async () => {
     try {
       setLoadingPackages(true);
-      
-      // Fetch all packages (without isActive filter since it needs to be boolean, we'll filter client-side)
-      // Validator only allows limit up to 100, so we'll fetch up to 100 and filter client-side
       const response = await packageAPI.getAll();
-      
+
       if (response && response.success === true && response.data) {
-        // response.data is already the packages array from the controller
         let packagesList = Array.isArray(response.data) ? response.data : [];
-        
-        // Filter to only show active and published packages
-        packagesList = packagesList.filter(pkg => 
+        packagesList = packagesList.filter(pkg =>
           pkg.isActive !== false && pkg.status === 'published'
         );
-        
         setPackages(packagesList);
       } else {
-        console.error('Unexpected response format:', response);
         setPackages([]);
       }
     } catch (error) {
       console.error('Error fetching packages:', error);
       setPackages([]);
-      // Only show error if it's not an auth issue (401/403)
       if (error.message && !error.message.includes('401') && !error.message.includes('403')) {
         toast.error('Failed to load packages');
       }
@@ -109,13 +110,19 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     });
   };
 
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
-      // If sales rep, always assign to themselves
       const assignedTo = isSalesRep && user?._id ? user._id : (formData.assignedTo || undefined);
       const salesRepName = isSalesRep && user?.name ? user.name : (formData.salesRep || undefined);
-      
+
       const leadData = {
         name: formData.name?.trim() || undefined,
         email: formData.email?.trim() || undefined,
@@ -142,20 +149,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       const response = await leadAPI.createLead(leadData);
       const leadId = response.data?._id || response.data?.id;
 
-      // Save manual itinerary if days exist
       if (showManualItinerary && itineraryDays.length > 0) {
         try {
           await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
         } catch (itineraryError) {
           console.error('Error saving manual itinerary:', itineraryError);
-          // Don't fail the entire operation if itinerary save fails
           toast.error('Lead created but itinerary save failed');
         }
       }
 
       toast.success('Lead created successfully');
-      
-      // Reset form
+
       setFormData({
         name: "",
         email: "",
@@ -179,7 +183,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       onSuccess?.();
       onClose();
     } catch (error) {
-      alert(`Failed to create lead: ${error.message}`);
+      toast.error(`Failed to create lead: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -187,293 +191,338 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
   if (!isOpen) return null;
 
+  // Section Header Component
+  const SectionHeader = ({ icon: Icon, title, subtitle, section, gradient }) => (
+    <button
+      type="button"
+      onClick={() => toggleSection(section)}
+      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expandedSections[section]
+          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
+          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+        }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-xl ${expandedSections[section] ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
+          <Icon className={`w-5 h-5 ${expandedSections[section] ? 'text-white' : 'text-gray-600'}`} />
+        </div>
+        <div className="text-left">
+          <h3 className="font-semibold">{title}</h3>
+          <p className={`text-xs ${expandedSections[section] ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
+        </div>
+      </div>
+      {expandedSections[section] ? (
+        <ChevronUp className="w-5 h-5" />
+      ) : (
+        <ChevronDown className="w-5 h-5" />
+      )}
+    </button>
+  );
+
+  // Input Field Component
+  const InputField = ({ label, required, icon: Icon, children }) => (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 flex justify-between items-center rounded-t-xl shadow-lg z-10">
-          <div>
-            <h2 className="text-2xl font-bold">Add New Lead</h2>
-            <p className="text-sm text-blue-100 mt-1">Fill in all lead information to create a new lead</p>
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white p-6 shrink-0">
+          {/* Decorative Elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-lg transition-all duration-200 group"
-          >
-            <X className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-200" />
-          </button>
+
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-white/15 backdrop-blur-sm rounded-2xl">
+                <Sparkles className="w-7 h-7" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">Create New Lead</h2>
+                <p className="text-blue-100 text-sm mt-0.5">Fill in the details to add a new lead</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2.5 hover:bg-white/15 rounded-xl transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Personal Information Section */}
           <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Personal Information</h3>
-              <p className="text-xs text-gray-500 mt-1">Basic contact details of the lead</p>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="Enter full name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="email@example.com"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Contact Number <span className="text-red-500">*</span>
-                </label>
-                <PhoneInput
-                  international
-                  defaultCountry="LK"
-                  value={formData.phone}
-                  onChange={(value) => setFormData({ ...formData, phone: value || "" })}
-                  className="phone-input-wrapper"
-                  placeholder="Enter phone number"
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    WhatsApp Number
-                  </label>
-                  {formData.phone && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
-                      className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                      title="Copy contact number to WhatsApp"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      Copy from Contact
-                    </button>
-                  )}
+            <SectionHeader
+              icon={User}
+              title="Personal Information"
+              subtitle="Contact details of the lead"
+              section="personal"
+              gradient="from-blue-500 to-blue-600"
+            />
+
+            {expandedSections.personal && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                <InputField label="Full Name" required icon={User}>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    placeholder="Enter full name"
+                  />
+                </InputField>
+
+                <InputField label="Email Address" icon={Mail}>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                    placeholder="email@example.com"
+                  />
+                </InputField>
+
+                <InputField label="Contact Number" required icon={Phone}>
+                  <PhoneInput
+                    international
+                    defaultCountry="LK"
+                    value={formData.phone}
+                    onChange={(value) => setFormData({ ...formData, phone: value || "" })}
+                    className="phone-input-wrapper"
+                    placeholder="Enter phone number"
+                  />
+                </InputField>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      WhatsApp Number
+                    </label>
+                    {formData.phone && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
+                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                  <PhoneInput
+                    international
+                    defaultCountry="LK"
+                    value={formData.whatsapp}
+                    onChange={(value) => setFormData({ ...formData, whatsapp: value || "" })}
+                    className="phone-input-wrapper"
+                    placeholder="Enter WhatsApp number"
+                  />
                 </div>
-                <PhoneInput
-                  international
-                  defaultCountry="LK"
-                  value={formData.whatsapp}
-                  onChange={(value) => setFormData({ ...formData, whatsapp: value || "" })}
-                  className="phone-input-wrapper"
-                  placeholder="Enter WhatsApp number"
-                />
               </div>
-            </div>
+            )}
           </div>
 
           {/* Travel Details Section */}
           <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Travel Details</h3>
-              <p className="text-xs text-gray-500 mt-1">Information about the travel requirements</p>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Departure City
-                </label>
-                <LocationAutocomplete
-                  value={formData.city}
-                  onChange={(value) => setFormData({ ...formData, city: value })}
-                  placeholder="e.g., Colombo, Sri Lanka"
-                />
+            <SectionHeader
+              icon={Plane}
+              title="Travel Details"
+              subtitle="Trip information and dates"
+              section="travel"
+              gradient="from-purple-500 to-purple-600"
+            />
+
+            {expandedSections.travel && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+                <InputField label="Departure City" icon={MapPin}>
+                  <LocationAutocomplete
+                    value={formData.city}
+                    onChange={(value) => setFormData({ ...formData, city: value })}
+                    placeholder="e.g., Colombo, Sri Lanka"
+                  />
+                </InputField>
+
+                <InputField label="Destination" icon={MapPin}>
+                  <DestinationSelector
+                    value={formData.destination}
+                    onChange={(event) =>
+                      setFormData({ ...formData, destination: event.target.value })
+                    }
+                  />
+                </InputField>
+
+                <InputField label="Travel Date (Start)" icon={Calendar}>
+                  <input
+                    type="date"
+                    value={formData.travelDate}
+                    onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                  />
+                </InputField>
+
+                <InputField label="End Date" icon={Calendar}>
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    min={formData.travelDate || undefined}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                  />
+                </InputField>
+
+                <InputField label="Number of Travelers" icon={Users}>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.numberOfTravelers}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData({
+                        ...formData,
+                        numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
+                      });
+                    }}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                    placeholder="e.g., 2"
+                  />
+                </InputField>
+
+                <InputField label="Platform / Source" icon={Globe}>
+                  <select
+                    value={formData.platform}
+                    onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                  >
+                    <option value="">Select Platform</option>
+                    <option value="Website Form">🌐 Website Form</option>
+                    <option value="Social Media">📱 Social Media</option>
+                    <option value="Phone Call">📞 Phone Call</option>
+                    <option value="Referral">🤝 Referral</option>
+                    <option value="Email">📧 Email</option>
+                    <option value="Walk-in">🚶 Walk-in</option>
+                  </select>
+                </InputField>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Destination
-                </label>
-                <DestinationSelector
-                  value={formData.destination}
-                  onChange={(event) =>
-                    setFormData({ ...formData, destination: event.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Travel Date (Start)
-                </label>
-                <input
-                  type="date"
-                  value={formData.travelDate}
-                  onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  min={formData.travelDate || undefined}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Number of Travelers
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={formData.numberOfTravelers}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setFormData({
-                      ...formData,
-                      numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
-                    });
-                  }}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                  placeholder="e.g., 2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Platform/Source
-                </label>
-                <select
-                  value={formData.platform}
-                  onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
-                >
-                  <option value="">Select Platform</option>
-                  <option value="Website Form">Website Form</option>
-                  <option value="Social Media">Social Media</option>
-                  <option value="Phone Call">Phone Call</option>
-                  <option value="Referral">Referral</option>
-                  <option value="Email">Email</option>
-                  <option value="Walk-in">Walk-in</option>
-                </select>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Package & Assignment Section */}
           <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Package & Assignment</h3>
-              <p className="text-xs text-gray-500 mt-1">Select package and assign sales representative</p>
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Package
-                </label>
-                <select
-                  value={formData.package || ''}
-                  onChange={(e) => {
-                    const packageId = e.target.value;
-                    const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-                    setFormData({ 
-                      ...formData, 
-                      package: packageId,
-                      packageName: selectedPackage?.name || '',
-                      destination: selectedPackage?.destination || formData.destination
-                    });
-                  }}
-                  disabled={loadingPackages}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
-                  {packages && packages.length > 0 ? (
-                    packages.map((pkg) => (
-                      <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
-                        {pkg.name || 'Unnamed Package'}
-                      </option>
-                    ))
-                  ) : (
-                    !loadingPackages && <option value="" disabled>No packages found</option>
-                  )}
-                </select>
-                {packages.length === 0 && !loadingPackages && (
-                  <p className="text-xs text-gray-500 mt-1">No packages available</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Sales Representative
-                </label>
-                {!isSalesRep ? (
+            <SectionHeader
+              icon={Package}
+              title="Package & Assignment"
+              subtitle="Select package and sales representative"
+              section="package"
+              gradient="from-emerald-500 to-teal-600"
+            />
+
+            {expandedSections.package && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                <InputField label="Package" icon={Package}>
                   <select
-                    value={formData.assignedTo || ''}
+                    value={formData.package || ''}
                     onChange={(e) => {
-                      const id = e.target.value;
-                      const rep = salesReps.find(r => r.id === id);
-                      setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
+                      const packageId = e.target.value;
+                      const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
+                      setFormData({
+                        ...formData,
+                        package: packageId,
+                        packageName: selectedPackage?.name || '',
+                        destination: selectedPackage?.destination || formData.destination
+                      });
                     }}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                    disabled={loadingPackages}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
-                    <option value="">Select Sales Rep</option>
-                    {salesReps.map((rep) => (
-                      <option key={rep.id} value={rep.id}>{rep.name}</option>
-                    ))}
+                    <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
+                    {packages && packages.length > 0 ? (
+                      packages.map((pkg) => (
+                        <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
+                          {pkg.name || 'Unnamed Package'}
+                        </option>
+                      ))
+                    ) : (
+                      !loadingPackages && <option value="" disabled>No packages found</option>
+                    )}
                   </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={user?.name || ''}
-                    disabled
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                  />
-                )}
+                </InputField>
+
+                <InputField label="Sales Representative" icon={User}>
+                  {!isSalesRep ? (
+                    <select
+                      value={formData.assignedTo || ''}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        const rep = salesReps.find(r => r.id === id);
+                        setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
+                      }}
+                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                    >
+                      <option value="">Select Sales Rep</option>
+                      {salesReps.map((rep) => (
+                        <option key={rep.id} value={rep.id}>{rep.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={user?.name || ''}
+                      disabled
+                      className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl text-gray-600 cursor-not-allowed"
+                    />
+                  )}
+                </InputField>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Additional Information Section */}
+          {/* Remarks Section */}
           <div className="space-y-4">
-            <div className="border-b border-gray-200 pb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Additional Information</h3>
-              <p className="text-xs text-gray-500 mt-1">Optional remarks and notes</p>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Remarks</label>
-              <div className="space-y-3">
+            <SectionHeader
+              icon={MessageSquare}
+              title="Remarks & Notes"
+              subtitle="Add optional comments about this lead"
+              section="remarks"
+              gradient="from-amber-500 to-orange-500"
+            />
+
+            {expandedSections.remarks && (
+              <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-3">
                 {formData.remarks.map((remark, index) => (
                   <div key={index} className="flex gap-3 items-center">
                     <input
                       type="text"
                       value={remark.text}
                       onChange={(e) => updateRemark(index, "text", e.target.value)}
-                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      className="flex-1 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
                       placeholder={`Remark ${index + 1}`}
                     />
                     <input
                       type="date"
                       value={remark.date}
                       onChange={(e) => updateRemark(index, "date", e.target.value)}
-                      className="w-40 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      className="w-44 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
                     />
                     {formData.remarks.length > 1 && (
                       <button
                         onClick={() => removeRemark(index)}
-                        className="px-3 py-2.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                        className="p-3 text-red-500 hover:bg-red-100 rounded-xl transition-colors"
                         type="button"
                       >
                         <X className="w-4 h-4" />
@@ -483,96 +532,107 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 ))}
                 <button
                   onClick={addRemarkField}
-                  className="w-full px-4 py-2.5 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2 font-medium"
+                  className="w-full px-4 py-3 border-2 border-dashed border-amber-300 text-amber-700 rounded-xl hover:bg-amber-100 hover:border-amber-400 transition-colors flex items-center justify-center gap-2 font-medium"
                   type="button"
                 >
                   <Plus className="w-4 h-4" />
                   Add Another Remark
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* Manual Itinerary Section */}
-          <div className="space-y-4 border-t border-gray-200 pt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Manual Itinerary</h3>
-                <p className="text-xs text-gray-500 mt-1">Optional: Create a custom itinerary for this lead</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowManualItinerary(!showManualItinerary);
-                  if (!showManualItinerary && itineraryDays.length === 0) {
-                    setItineraryDays([createDefaultDay(1)]);
-                  }
-                }}
-                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all font-medium flex items-center gap-2 shadow-sm"
-              >
-                <Calendar className="w-4 h-4" />
-                {showManualItinerary ? 'Hide Itinerary' : 'Add Manual Itinerary'}
-              </button>
-            </div>
-
-            {showManualItinerary && (
-              <div className="mt-4">
-                <ItineraryEditor
-                  days={itineraryDays}
-                  onDayChange={(dayNumber, dayData) => {
-                    setItineraryDays(prev =>
-                      prev.map(day =>
-                        day.dayNumber === dayNumber ? { ...day, ...dayData } : day
-                      )
-                    );
-                  }}
-                  onAddDay={() => {
-                    const newDayNumber = itineraryDays.length + 1;
-                    setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
-                  }}
-                  onRemoveDay={(dayNumber) => {
-                    const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                    const renumberedDays = filteredDays.map((day, index) => ({
-                      ...day,
-                      dayNumber: index + 1,
-                    }));
-                    setItineraryDays(renumberedDays);
-                  }}
-                  destination={formData.destination}
-                  hideTitleAndDescription={true}
-                />
-              </div>
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-4 pt-6 border-t border-gray-200">
-            <button
-              onClick={onClose}
-              className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all font-semibold"
-              type="button"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
-              type="button"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Creating Lead...
-                </>
-              ) : (
-                <>
-                  <Plus className="w-5 h-5" />
-                  Create Lead
-                </>
-              )}
-            </button>
+          {/* Manual Itinerary Section */}
+          <div className="space-y-4">
+            <SectionHeader
+              icon={Calendar}
+              title="Manual Itinerary"
+              subtitle="Optional: Create a custom itinerary"
+              section="itinerary"
+              gradient="from-indigo-500 to-violet-600"
+            />
+
+            {expandedSections.itinerary && (
+              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-sm text-gray-600">
+                    Create a custom day-by-day itinerary for this lead
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowManualItinerary(!showManualItinerary);
+                      if (!showManualItinerary && itineraryDays.length === 0) {
+                        setItineraryDays([createDefaultDay(1)]);
+                      }
+                    }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl hover:from-indigo-600 hover:to-violet-700 transition-all font-medium flex items-center gap-2 shadow-lg shadow-indigo-500/25"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    {showManualItinerary ? 'Hide Editor' : 'Open Editor'}
+                  </button>
+                </div>
+
+                {showManualItinerary && (
+                  <div className="mt-4 p-4 bg-white rounded-xl border border-indigo-200">
+                    <ItineraryEditor
+                      days={itineraryDays}
+                      onDayChange={(dayNumber, dayData) => {
+                        setItineraryDays(prev =>
+                          prev.map(day =>
+                            day.dayNumber === dayNumber ? { ...day, ...dayData } : day
+                          )
+                        );
+                      }}
+                      onAddDay={() => {
+                        const newDayNumber = itineraryDays.length + 1;
+                        setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
+                      }}
+                      onRemoveDay={(dayNumber) => {
+                        const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
+                        const renumberedDays = filteredDays.map((day, index) => ({
+                          ...day,
+                          dayNumber: index + 1,
+                        }));
+                        setItineraryDays(renumberedDays);
+                      }}
+                      destination={formData.destination}
+                      hideTitleAndDescription={true}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold"
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+            type="button"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                Create Lead
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -580,4 +640,3 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 };
 
 export default NewLeadDialog;
-
