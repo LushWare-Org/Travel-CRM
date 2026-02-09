@@ -79,15 +79,34 @@ Note: Rooms and flights are subject to availability. If there is any change and 
 
 Kindly share your feedback @ ${BRANDING.urls.website.replace('https://', '').replace('http://', '').toUpperCase()} and ${BRANDING.contact.email} feel free at any time to contact us.`;
 
+// Modern Professional Color Palette - Sleek Travel Agency Design
 const PALETTE = {
-  orange: '#F5A623',
-  lightOrange: '#FEF3C7',
-  darkGray: '#1F2937',
-  gray: '#4B5563',
-  lightGray: '#E5E7EB',
+  // Primary Colors
+  primary: '#0F766E',        // Deep Teal - Main brand color
+  primaryLight: '#14B8A6',   // Lighter teal for accents
+  primaryDark: '#134E4A',    // Dark teal for headers
+
+  // Accent Colors
+  accent: '#F59E0B',         // Amber/Gold - Highlights, CTAs
+  accentLight: '#FEF3C7',    // Light amber for backgrounds
+  accentDark: '#D97706',     // Darker amber for text on light bg
+
+  // Neutral Colors
+  slate: '#1E293B',          // Dark slate for headers/footers
+  slateLight: '#334155',     // Medium slate
+  gray: '#64748B',           // Text gray
+  grayLight: '#94A3B8',      // Light text
+  border: '#E2E8F0',         // Borders
+  background: '#F8FAFC',     // Light backgrounds
   white: '#FFFFFF',
-  black: '#000000',
-  blue: '#3B82F6'
+  black: '#0F172A',          // Near black for text
+
+  // Legacy mappings for backward compatibility
+  orange: '#F59E0B',
+  lightOrange: '#FEF3C7',
+  darkGray: '#1E293B',
+  lightGray: '#E2E8F0',
+  blue: '#0EA5E9'
 };
 
 const loadLogo = () => {
@@ -139,39 +158,78 @@ const calculateDuration = (start, end) => {
   return `${diffDays} Nights ${diffDays + 1} Days`;
 };
 
-// Draw Wave Header
-const drawWaveHeader = (doc, title) => {
-  const headerHeight = 100;
-  doc.rect(0, 0, 595, headerHeight).fill('#000000');
-  doc.moveTo(0, headerHeight - 30)
-    .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
-    .lineTo(595, 0).lineTo(0, 0).fill('#000000');
-  doc.moveTo(400, 0)
-    .bezierCurveTo(450, 40, 520, 60, 595, 50)
-    .lineTo(595, 0).fill('#F5A623');
+// Draw Modern Geometric Header
+const drawModernHeader = (doc, title) => {
+  const headerHeight = 90;
+
+  // Main dark slate header background
+  doc.rect(0, 0, 595, headerHeight).fill(PALETTE.slate);
+
+  // Diagonal accent stripe (teal)
+  doc.save();
+  doc.moveTo(450, 0)
+    .lineTo(595, 0)
+    .lineTo(595, headerHeight)
+    .lineTo(380, headerHeight)
+    .closePath()
+    .fill(PALETTE.primary);
+  doc.restore();
+
+  // Small accent triangle
+  doc.save();
+  doc.moveTo(360, headerHeight)
+    .lineTo(400, headerHeight)
+    .lineTo(380, headerHeight - 20)
+    .closePath()
+    .fill(PALETTE.primaryLight);
+  doc.restore();
+
+  // Logo
   const logo = loadLogo();
   if (logo) {
     try {
-      doc.image(logo, 50, 25, { width: 80 });
+      doc.image(logo, 40, 18, { height: 55 });
     } catch (e) { console.warn('Logo error:', e.message); }
   }
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(16).text(BRANDING.company.name, 140, 35);
-  doc.font('Helvetica').fontSize(9).text(BRANDING.company.tagline || 'Curating inspired journeys', 140, 55);
-  const badgeX = 490;
-  const badgeY = 40;
-  doc.circle(badgeX, badgeY, 28).fill('#FFFFFF');
-  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold')
-    .text(title, badgeX - 20, badgeY - 3, { width: 40, align: 'center' });
+
+  // Company name and tagline
+  doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(18)
+    .text(BRANDING.company.name, 110, 28);
+  doc.font('Helvetica').fontSize(9).fillColor(PALETTE.grayLight)
+    .text(BRANDING.company.tagline || 'Premium Travel Experiences', 110, 50);
+
+  // Document type badge (right side)
+  if (title) {
+    doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(11)
+      .text(title.toUpperCase(), 460, 35, { width: 100, align: 'center' });
+  }
 };
 
-// Draw Footer Wave
-const drawFooterWave = (doc) => {
+// Draw Modern Footer
+const drawModernFooter = (doc, pageNum, totalPages) => {
   const pageHeight = 842;
-  const waveY = pageHeight - 80;
-  doc.moveTo(0, waveY)
-    .bezierCurveTo(150, waveY + 20, 350, waveY - 10, 595, waveY + 10)
-    .lineTo(595, pageHeight).lineTo(0, pageHeight).fill('#F5A623');
+  const footerHeight = 50;
+  const footerY = pageHeight - footerHeight;
+
+  // Footer background with gradient effect (dark to teal)
+  doc.rect(0, footerY, 400, footerHeight).fill(PALETTE.slate);
+  doc.rect(400, footerY, 195, footerHeight).fill(PALETTE.primary);
+
+  // Company info in footer
+  doc.fillColor(PALETTE.grayLight).font('Helvetica').fontSize(8)
+    .text(`${BRANDING.contact.email} | ${BRANDING.contact.phone}`, 30, footerY + 18);
+  doc.text(BRANDING.urls.website.replace('https://', '').replace('http://', ''), 30, footerY + 30);
+
+  // Page number on the right (teal section)
+  if (pageNum && totalPages) {
+    doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(10)
+      .text(`${pageNum} / ${totalPages}`, 450, footerY + 20, { width: 80, align: 'center' });
+  }
 };
+
+// Legacy aliases for backward compatibility
+const drawWaveHeader = drawModernHeader;
+const drawFooterWave = () => { }; // Deprecated, use drawModernFooter instead
 
 export async function generateQuotationPDF(quotation, lead) {
   return new Promise(async (resolve, reject) => {
@@ -293,30 +351,55 @@ export async function generateQuotationPDF(quotation, lead) {
         coverImageBuffer = await fetchImage(coverImageUrl);
       }
 
-      // Cover Image
+      // Cover Image with gradient overlay
       if (coverImageBuffer) {
         try {
-          doc.image(coverImageBuffer, 0, 0, { width: 595, height: 400, cover: [595, 400] });
+          doc.image(coverImageBuffer, 0, 0, { width: 595, height: 380, cover: [595, 380] });
         } catch (e) {
           console.warn('[PDF] Cover image error:', e.message);
-          doc.rect(0, 0, 595, 400).fill(PALETTE.lightGray);
+          // Fallback: gradient background
+          doc.rect(0, 0, 595, 380).fill(PALETTE.slate);
         }
       } else {
-        doc.rect(0, 0, 595, 400).fill(PALETTE.lightGray);
+        // Sleek gradient fallback
+        doc.rect(0, 0, 595, 380).fill(PALETTE.slate);
       }
 
-      // Dark overlay for text readability
+      // Modern gradient overlay (teal to transparent)
       doc.save();
-      doc.rect(0, 300, 595, 100).fillOpacity(0.75).fill(PALETTE.black);
+      doc.rect(0, 280, 595, 100).fill(PALETTE.primaryDark);
+      doc.fillOpacity(0.9);
       doc.restore();
 
-      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(26)
-        .text(packageName.toUpperCase(), 30, 330, { width: 535, align: 'center' });
+      // Package name with accent bar
+      const nameY = 300;
+      doc.rect(40, nameY - 5, 5, 45).fill(PALETTE.accent); // Accent bar
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(24)
+        .text(packageName.toUpperCase(), 55, nameY, { width: 500 });
 
-      // Tour Details Section - Optimized spacing
-      let yPos = 450;
-      doc.font('Helvetica-Bold').fontSize(16).fillColor(PALETTE.orange).text('TOUR DETAILS:', 50, yPos);
-      yPos += 25;
+      // Quotation badge
+      doc.roundedRect(480, 10, 100, 30, 5).fill(PALETTE.accent);
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(10)
+        .text('QUOTATION', 485, 18, { width: 90, align: 'center' });
+
+      // Tour Details Card
+      let yPos = 410;
+      const cardX = 40;
+      const cardWidth = 515;
+      const cardHeight = 120;
+
+      // Card background with subtle border
+      doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 8).fill(PALETTE.white);
+      doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 8).stroke(PALETTE.border);
+
+      // Card header bar
+      doc.roundedRect(cardX, yPos, cardWidth, 35, 8).fill(PALETTE.primary);
+      doc.rect(cardX, yPos + 27, cardWidth, 8).fill(PALETTE.primary); // Cover bottom corners
+
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(13)
+        .text('TOUR DETAILS', cardX + 20, yPos + 10);
+
+      yPos += 50;
 
       let startDate = lead?.travelDate;
       let endDate = lead?.endDate;
@@ -347,52 +430,69 @@ export async function generateQuotationPDF(quotation, lead) {
         durationStr = `${Math.max(0, durationDays - 1)} Nights ${durationDays} Days`;
       }
 
-      const details = [
-        { label: 'Travel Date:', value: startDate ? `${formatDate(startDate)} to ${endDate ? formatDate(endDate) : 'TBA'}` : 'TBA' },
-        { label: 'No. of Pax:', value: `${pax} Person(s)` },
-        { label: 'Duration:', value: durationStr },
-        // { label: 'Hotel:', value: hotelName }
-      ];
+      // Details in two columns for modern look
+      const col1X = cardX + 20;
+      const col2X = cardX + 270;
 
-      doc.font('Helvetica').fontSize(11).fillColor(PALETTE.darkGray);
-      details.forEach(item => {
-        doc.font('Helvetica-Bold').text(item.label, 50, yPos, { continued: true });
-        doc.font('Helvetica').text(`  ${item.value}`, { continued: false });
-        yPos += 20;
-      });
+      // Row 1
+      doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text('Travel Dates', col1X, yPos);
+      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(11)
+        .text(startDate ? `${formatDate(startDate)} - ${endDate ? formatDate(endDate) : 'TBA'}` : 'TBA', col1X, yPos + 12);
+
+      doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text('Duration', col2X, yPos);
+      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(11)
+        .text(durationStr, col2X, yPos + 12);
+
+      // Row 2
+      yPos += 38;
+      doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text('Travelers', col1X, yPos);
+      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(11)
+        .text(`${pax} Person(s)`, col1X, yPos + 12);
+
+      // Total amount preview (if desired)
+      if (quotation.totalAmount) {
+        doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text('Estimated Total', col2X, yPos);
+        doc.fillColor(PALETTE.primary).font('Helvetica-Bold').fontSize(14)
+          .text(formatCurrency(quotation.totalAmount), col2X, yPos + 10);
+      }
+
+      yPos += 60;
 
       // --- PAGE 2: HIGHLIGHTS & ITINERARY ---
       doc.addPage();
-      const logo = loadLogo();
-      if (logo) {
-        try {
-          doc.image(logo, 50, 40, { width: 80 });
-        } catch (e) { console.warn('Logo error:', e.message); }
-      }
 
-      yPos = 100;
+      // Modern page header
+      drawModernHeader(doc, 'Itinerary');
+
+      yPos = 110;
 
       // Package Highlights Section (from database)
       if (packageHighlights && packageHighlights.length > 0) {
-        doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16).text('PACKAGE HIGHLIGHTS', 50, yPos);
-        doc.moveTo(50, yPos + 22).lineTo(545, yPos + 22).strokeColor(PALETTE.orange).lineWidth(2).stroke();
+        // Section header with accent bar
+        doc.rect(40, yPos, 4, 20).fill(PALETTE.accent);
+        doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(14).text('PACKAGE HIGHLIGHTS', 50, yPos + 2);
         yPos += 35;
 
+        // Highlights in a subtle card
+        doc.roundedRect(40, yPos - 5, 515, Math.min(packageHighlights.length * 20 + 15, 150), 6)
+          .fill(PALETTE.accentLight);
+
         packageHighlights.slice(0, 6).forEach(highlight => {
-          doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(10)
-            .text(`✓ ${highlight}`, 60, yPos, { width: 485 });
+          doc.fillColor(PALETTE.black).font('Helvetica').fontSize(10)
+            .text(`✓  ${highlight}`, 55, yPos, { width: 485 });
           yPos += 18;
         });
 
-        yPos += 20;
+        yPos += 25;
       }
 
       // Itinerary Section
-      if (yPos > 650) { doc.addPage(); yPos = 50; }
+      if (yPos > 650) { doc.addPage(); drawModernHeader(doc, 'Itinerary'); yPos = 110; }
 
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16).text('TRAVEL ITINERARY', 50, yPos);
-      doc.moveTo(50, yPos + 22).lineTo(545, yPos + 22).strokeColor(PALETTE.orange).lineWidth(2).stroke();
-      yPos += 35;
+      // Section header with accent bar
+      doc.rect(40, yPos, 4, 20).fill(PALETTE.primary);
+      doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(14).text('TRAVEL ITINERARY', 50, yPos + 2);
+      yPos += 40;
 
       // Use actual itinerary days from database instead of parsing quotation items
       console.log('[PDF] Rendering itinerary with', itineraryDays.length, 'days');
@@ -409,30 +509,32 @@ export async function generateQuotationPDF(quotation, lead) {
           // Check for page break (giving generous space for day block)
           if (yPos > 650) {
             doc.addPage();
-            yPos = 50;
+            drawModernHeader(doc, 'Itinerary');
+            yPos = 110;
             // Re-draw header if new page
             if (i > 0) {
-              doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16).text('TRAVEL ITINERARY (Cont.)', 50, yPos);
-              doc.moveTo(50, yPos + 22).lineTo(545, yPos + 22).strokeColor(PALETTE.orange).lineWidth(2).stroke();
+              doc.rect(40, yPos, 4, 20).fill(PALETTE.primary);
+              doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(14).text('TRAVEL ITINERARY (Continued)', 50, yPos + 2);
               yPos += 45;
             }
           }
 
           const dayBlockY = yPos;
 
-          // 1. Day Circle & Line
-          const timelineX = 70;
-          doc.circle(timelineX, dayBlockY + 12, 12).fill(PALETTE.orange);
-          doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(10)
-            .text(`${day.dayNumber || i + 1}`, timelineX - 5, dayBlockY + 8, { width: 10, align: 'center' });
+          // 1. Day Circle & Line - Modern teal design
+          const timelineX = 60;
+          doc.circle(timelineX, dayBlockY + 12, 14).fill(PALETTE.primary);
+          doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(11)
+            .text(`${day.dayNumber || i + 1}`, timelineX - 6, dayBlockY + 7, { width: 12, align: 'center' });
 
           // 2. Day Content Box (Right of timeline)
-          const contentX = 100;
-          const contentW = 450;
+          const contentX = 90;
+          const contentW = 465;
 
-          // Day Title
-          doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(12)
-            .text(`Day ${day.dayNumber || i + 1}: ${day.title || 'Day ' + (i + 1)}`, contentX, dayBlockY + 5);
+          // Day Title with subtle background
+          doc.roundedRect(contentX - 5, dayBlockY - 2, contentW, 22, 3).fill(PALETTE.background);
+          doc.fillColor(PALETTE.primaryDark).font('Helvetica-Bold').fontSize(12)
+            .text(`Day ${day.dayNumber || i + 1}: ${day.title || 'Day ' + (i + 1)}`, contentX, dayBlockY + 3);
 
           let contentY = dayBlockY + 25;
 
@@ -536,21 +638,20 @@ export async function generateQuotationPDF(quotation, lead) {
           }
 
           if (metaText.length > 0) {
-            doc.fillColor(PALETTE.darkGray).font('Helvetica-Bold').fontSize(9);
+            doc.fillColor(PALETTE.slateLight).font('Helvetica-Bold').fontSize(9);
             metaText.forEach(txt => {
-              doc.text(`• ${txt}`, contentX, contentY);
+              doc.text(`- ${txt}`, contentX, contentY);
               contentY += 12;
             });
             contentY += 5;
           }
 
-          // Draw Connecting Line (except for last item)
+          // Draw Connecting Line (except for last item) - Modern dashed style
           if (i < itineraryDays.length - 1) {
-            // Calculate how far down the line should go
             const endY = contentY + 10;
-            doc.moveTo(timelineX, dayBlockY + 24)
+            doc.moveTo(timelineX, dayBlockY + 28)
               .lineTo(timelineX, endY)
-              .strokeColor('#eee')
+              .strokeColor(PALETTE.border)
               .lineWidth(2)
               .stroke();
           }
@@ -570,7 +671,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
       // --- INCLUSIONS & EXCLUSIONS ---
       yPos += 15;
-      if (yPos > 600) { doc.addPage(); yPos = 50; }
+      if (yPos > 550) { doc.addPage(); drawModernHeader(doc, 'Details'); yPos = 110; }
 
       const inclusions = (packageInclusions && packageInclusions.length > 0)
         ? packageInclusions
@@ -580,34 +681,59 @@ export async function generateQuotationPDF(quotation, lead) {
         ? packageExclusions
         : (quotation.excludedServices || []);
 
-      const startInclY = yPos;
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(14).text('INCLUSIONS', 50, yPos);
-      let iy = yPos + 20;
-      doc.font('Helvetica').fontSize(9.5).fillColor(PALETTE.darkGray);
+      // Calculate card heights
+      const incHeight = Math.max(inclusions.length * 16 + 50, 120);
+      const excHeight = Math.max(exclusions.length * 16 + 50, 120);
+      const incExcCardHeight = Math.max(incHeight, excHeight);
+
+      // Two-column card layout
+      const incExcColWidth = 250;
+      const incColX = 40;
+      const excColX = 305;
+
+      // INCLUSIONS Card
+      doc.roundedRect(incColX, yPos, incExcColWidth, incExcCardHeight, 8).fill(PALETTE.white);
+      doc.roundedRect(incColX, yPos, incExcColWidth, incExcCardHeight, 8).stroke(PALETTE.border);
+
+      // Card header
+      doc.roundedRect(incColX, yPos, incExcColWidth, 32, 8).fill(PALETTE.primary);
+      doc.rect(incColX, yPos + 24, incExcColWidth, 8).fill(PALETTE.primary);
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(11)
+        .text('✓  INCLUSIONS', incColX + 15, yPos + 10);
+
+      let iy = yPos + 45;
+      doc.font('Helvetica').fontSize(9).fillColor(PALETTE.black);
       if (inclusions.length === 0) {
-        doc.text('• As per package details', 50, iy);
-        iy += 15;
+        doc.text('• As per package details', incColX + 15, iy);
       } else {
         inclusions.forEach(inc => {
-          doc.text(`• ${inc}`, 50, iy, { width: 220 });
-          iy += doc.heightOfString(`• ${inc}`, { width: 220 }) + 4;
+          doc.text(`• ${inc}`, incColX + 15, iy, { width: incExcColWidth - 30 });
+          iy += doc.heightOfString(`• ${inc}`, { width: incExcColWidth - 30 }) + 3;
         });
       }
 
-      let rightY = startInclY;
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(14).text('EXCLUSIONS', 310, rightY);
-      let ey = rightY + 20;
-      doc.font('Helvetica').fontSize(9.5).fillColor(PALETTE.darkGray);
+      // EXCLUSIONS Card
+      doc.roundedRect(excColX, yPos, incExcColWidth, incExcCardHeight, 8).fill(PALETTE.white);
+      doc.roundedRect(excColX, yPos, incExcColWidth, incExcCardHeight, 8).stroke(PALETTE.border);
+
+      // Card header (gray for exclusions)
+      doc.roundedRect(excColX, yPos, incExcColWidth, 32, 8).fill(PALETTE.slateLight);
+      doc.rect(excColX, yPos + 24, incExcColWidth, 8).fill(PALETTE.slateLight);
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(11)
+        .text('✗  EXCLUSIONS', excColX + 15, yPos + 10);
+
+      let ey = yPos + 45;
+      doc.font('Helvetica').fontSize(9).fillColor(PALETTE.black);
       if (exclusions.length === 0) {
-        doc.text('• As per package details', 310, ey);
-        ey += 15;
+        doc.text('• As per package details', excColX + 15, ey);
       } else {
         exclusions.forEach(exc => {
-          doc.text(`• ${exc}`, 310, ey, { width: 220 });
-          ey += doc.heightOfString(`• ${exc}`, { width: 220 }) + 4;
+          doc.text(`• ${exc}`, excColX + 15, ey, { width: incExcColWidth - 30 });
+          ey += doc.heightOfString(`• ${exc}`, { width: incExcColWidth - 30 }) + 3;
         });
       }
-      yPos = Math.max(iy, ey) + 25;
+
+      yPos += incExcCardHeight + 25;
 
       /* 
       // --- PAGE 3+: REVIEWS (Dynamic Google Style Cards) - COMMENTED OUT AS PER USER REQUEST ---
@@ -694,47 +820,55 @@ export async function generateQuotationPDF(quotation, lead) {
       */
 
       // --- PRICING & PAYMENT ---
-      // Force new page if close to bottom to prevent "data outside page"
-      if (yPos > 500) { doc.addPage(); yPos = 50; }
-      else yPos += 30; // Spacing
-
-      // Header for Section
-      // doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16).text('PAYMENT & PRICING', 50, yPos);
-      yPos += 30;
-
-      // Pricing Box
-      // doc.fillColor(PALETTE.black).fontSize(14).font('Helvetica-Bold').text('Total Package Cost:', 50, yPos + 10);
-      // doc.fillColor(PALETTE.orange).fontSize(18).text(formatCurrency(quotation.totalAmount), 200, yPos + 8);
-      // yPos += 40;
-
-      // Payment Box (Orange Bg)
-      // --- PRICING & PAYMENT ---
-      // Ensure we have space for the header and pricing summary
-      if (yPos > 600) { doc.addPage(); yPos = 50; }
-      else yPos += 25;
-
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16).text('PAYMENT & PRICING', 50, yPos);
-      yPos += 25;
-
-      // Pricing Display
-      doc.fillColor(PALETTE.black).fontSize(13).font('Helvetica-Bold').text('Total Package Cost:', 50, yPos);
-      doc.fillColor(PALETTE.orange).fontSize(17).text(formatCurrency(quotation.totalAmount), 200, yPos - 2);
-      yPos += 35;
-
-      // Payment Box Logic
-      const payBoxH = 210;
-      // If payment box + logos (approx 300px total) won't fit, new page
-      if (yPos + 300 > 750) {
+      // Force new page if close to bottom
+      if (yPos > 450) {
         doc.addPage();
-        yPos = 50;
+        drawModernHeader(doc, 'Payment');
+        yPos = 110;
+      } else {
+        yPos += 30;
+      }
+
+      // Section header
+      doc.rect(40, yPos, 4, 20).fill(PALETTE.accent);
+      doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(14).text('PAYMENT & PRICING', 50, yPos + 2);
+      yPos += 40;
+
+      // Total Amount Card (prominent display)
+      const totalCardY = yPos;
+      doc.roundedRect(40, totalCardY, 515, 70, 10).fill(PALETTE.primaryDark);
+      doc.fillColor(PALETTE.grayLight).font('Helvetica').fontSize(11).text('TOTAL PACKAGE COST', 60, totalCardY + 15);
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(28).text(formatCurrency(quotation.totalAmount), 60, totalCardY + 32);
+
+      // Valid until badge
+      if (quotation.validUntil) {
+        doc.roundedRect(400, totalCardY + 15, 140, 40, 6).fill(PALETTE.accent);
+        doc.fillColor(PALETTE.white).font('Helvetica').fontSize(9).text('Valid Until', 420, totalCardY + 22);
+        doc.font('Helvetica-Bold').fontSize(12).text(formatDate(quotation.validUntil), 420, totalCardY + 35);
+      }
+
+      yPos = totalCardY + 90;
+
+      // Payment Details Card
+      const payBoxH = 190;
+      if (yPos + payBoxH + 50 > 750) {
+        doc.addPage();
+        drawModernHeader(doc, 'Payment');
+        yPos = 110;
       }
 
       const payBoxY = yPos;
 
-      doc.roundedRect(50, payBoxY, 495, payBoxH, 8).fill(PALETTE.lightOrange).stroke(PALETTE.orange);
-      doc.fillColor(PALETTE.black).fontSize(12).font('Helvetica-Bold').text('Bank Transfers:', 70, payBoxY + 18);
+      // Payment card with two sections
+      doc.roundedRect(40, payBoxY, 515, payBoxH, 10).fill(PALETTE.white);
+      doc.roundedRect(40, payBoxY, 515, payBoxH, 10).stroke(PALETTE.border);
 
-      let by = payBoxY + 40;
+      // Left side - Bank Details
+      doc.roundedRect(40, payBoxY, 280, 35, 10).fill(PALETTE.primary);
+      doc.rect(40, payBoxY + 25, 280, 10).fill(PALETTE.primary);
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(11).text('BANK TRANSFER', 60, payBoxY + 11);
+
+      let by = payBoxY + 50;
       const pd = getPaymentDetails();
       const bankInfo = [
         ['Bank:', pd.bankName],
@@ -744,37 +878,35 @@ export async function generateQuotationPDF(quotation, lead) {
         ['Branch:', pd.branch]
       ];
       bankInfo.forEach(([l, v]) => {
-        doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9.5).text(l, 70, by);
-        doc.fillColor(PALETTE.black).font('Helvetica-Bold').text(v, 175, by);
+        doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text(l, 55, by);
+        doc.fillColor(PALETTE.black).font('Helvetica-Bold').text(v, 145, by);
         by += 18;
       });
 
-      const qrY = payBoxY + 18;
-      const qrX = 355;
-      doc.fillColor(PALETTE.blue).fontSize(13).font('Helvetica-Bold').text('Scan to pay via', qrX, qrY);
-      doc.fillColor('#4caf50').fontSize(15).text('UPI', qrX + 105, qrY);
+      // Right side - QR Code
+      const qrX = 340;
+      doc.roundedRect(320, payBoxY, 235, 35, 10).fill(PALETTE.slateLight);
+      doc.rect(320, payBoxY + 25, 235, 10).fill(PALETTE.slateLight);
+      doc.fillColor(PALETTE.white).font('Helvetica-Bold').fontSize(11).text('SCAN TO PAY (UPI)', qrX, payBoxY + 11);
 
       // Add actual QR code image
       try {
         const qrCodePath = path.join(dirname, '../assets/payment-qr.jpeg');
         if (fs.existsSync(qrCodePath)) {
-          doc.image(qrCodePath, qrX + 8, qrY + 28, { width: 95, height: 95 });
+          doc.image(qrCodePath, qrX + 30, payBoxY + 50, { width: 90, height: 90 });
         } else {
-          // Fallback: draw rectangle if image not found
-          doc.rect(qrX + 8, qrY + 28, 95, 95).stroke(PALETTE.black);
-          doc.fillColor(PALETTE.black).fontSize(8).text('QR Code', qrX + 32, qrY + 70);
+          doc.roundedRect(qrX + 30, payBoxY + 50, 90, 90, 8).stroke(PALETTE.border);
+          doc.fillColor(PALETTE.gray).fontSize(9).text('QR Code', qrX + 55, payBoxY + 90);
         }
       } catch (error) {
         console.warn('[PDF] QR code image error:', error.message);
-        // Fallback: draw rectangle
-        doc.rect(qrX + 8, qrY + 28, 95, 95).stroke(PALETTE.black);
-        doc.fillColor(PALETTE.black).fontSize(8).text('QR Code', qrX + 32, qrY + 70);
+        doc.roundedRect(qrX + 30, payBoxY + 50, 90, 90, 8).stroke(PALETTE.border);
       }
 
-      doc.fillColor(PALETTE.black).fontSize(9).text(`UPI: ${pd.upiId}`, qrX, qrY + 135);
-      doc.text(`Mobile: ${pd.phone}`, qrX, qrY + 150);
+      doc.fillColor(PALETTE.gray).fontSize(8).text(`UPI: ${pd.upiId}`, qrX + 20, payBoxY + 150);
+      doc.text(`Mobile: ${pd.phone}`, qrX + 20, payBoxY + 162);
 
-      yPos += payBoxH + 25;
+      yPos = payBoxY + payBoxH + 20;
 
       // Logos
       // Payment Method Badges - Using text badges instead of images to avoid 404 errors
@@ -854,15 +986,11 @@ export async function generateQuotationPDF(quotation, lead) {
 
       // --- LAST PAGE: TERMS, CANCELLATION, CONTACT ---
       doc.addPage();
-      if (logo) {
-        try {
-          doc.image(logo, 50, 40, { width: 80 });
-        } catch (e) { console.warn('Logo error:', e.message); }
-      }
-      yPos = 100;
+      drawModernHeader(doc, 'Terms & Info');
+      yPos = 110;
 
       // Terms - Parse and render with bold subtopics
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(14).text('TERMS & CONDITIONS', 50, yPos);
+      doc.fillColor(PALETTE.primaryDark).font('Helvetica-Bold').fontSize(14).text('TERMS & CONDITIONS', 50, yPos);
       yPos += 25;
 
       // Split terms into lines and render with formatting
@@ -908,7 +1036,7 @@ export async function generateQuotationPDF(quotation, lead) {
       // Cancellation Policy - Parse and render with bold subtopics
       if (yPos > 720) { doc.addPage(); yPos = 50; }
 
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(14).text('CANCELLATION POLICY', 50, yPos);
+      doc.fillColor(PALETTE.primaryDark).font('Helvetica-Bold').fontSize(14).text('CANCELLATION POLICY', 50, yPos);
       yPos += 25;
 
       const cancellationLines = getCancellationPolicy().split('\n');
@@ -927,11 +1055,11 @@ export async function generateQuotationPDF(quotation, lead) {
             doc.addPage();
             yPos = 50;
           }
-          doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(10);
+          doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(10);
           doc.text(trimmedLine, 50, yPos, { width: 495, align: 'left' });
           yPos += doc.heightOfString(trimmedLine, { width: 495 }) + 5;
         } else {
-          doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(9);
+          doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9);
           const textHeight = doc.heightOfString(trimmedLine, { width: 495, lineGap: 2 });
 
           // Check if text will fit on current page
@@ -969,7 +1097,7 @@ export async function generateQuotationPDF(quotation, lead) {
       const contentWidth = 495;
 
       // Reviews Header - Mimic Google Style
-      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(22).text('Google Reviews', margin, yPos);
+      doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(22).text('Google Reviews', margin, yPos);
 
       // "Excellent" Badge
       yPos += 30;
@@ -989,7 +1117,7 @@ export async function generateQuotationPDF(quotation, lead) {
       yPos += 50;
 
       // --- SECTION 1: COMPANY REVIEWS ---
-      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(14).text(BRANDING.company.name, margin, yPos);
+      doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(14).text(BRANDING.company.name, margin, yPos);
       doc.fillColor('#6B7280').fontSize(10).font('Helvetica').text(`Travel Agency in ${BRANDING.address.city || 'Your City'}`, margin + 100, yPos + 2);
       yPos += 25;
 
@@ -1045,7 +1173,7 @@ export async function generateQuotationPDF(quotation, lead) {
         if (yPos > 650) { doc.addPage(); yPos = 50; }
 
         yPos += 10;
-        doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(14).text(`${mainPackage.name} Reviews`, margin, yPos);
+        doc.fillColor(PALETTE.slate).font('Helvetica-Bold').fontSize(14).text(`${mainPackage.name} Reviews`, margin, yPos);
         yPos += 25;
 
         // Package Summary Card
@@ -1116,25 +1244,25 @@ export async function generateQuotationPDF(quotation, lead) {
       yPos = 300; // Start lower on the page for centered appearance
 
       // Contact Us content
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(20).text('CONTACT US', 0, yPos, { align: 'center' });
+      doc.fillColor(PALETTE.primaryDark).font('Helvetica-Bold').fontSize(20).text('CONTACT US', 0, yPos, { align: 'center' });
       yPos += 35;
-      doc.fillColor(PALETTE.darkGray).font('Helvetica').fontSize(11)
+      doc.fillColor(PALETTE.slateLight).font('Helvetica').fontSize(11)
         .text('Our team is always there to serve you and suggest you what can suit your travel', 0, yPos, { align: 'center' });
       yPos += 18;
       doc.text('needs the best. In case of any doubt regarding the shared trip or any other', 0, yPos, { align: 'center' });
       yPos += 18;
       doc.text('services offered by us, you can contact our team at:', 0, yPos, { align: 'center' });
       yPos += 35;
-      doc.fillColor(PALETTE.orange).font('Helvetica-Bold').fontSize(16)
+      doc.fillColor(PALETTE.accent).font('Helvetica-Bold').fontSize(16)
         .text(BRANDING.contact.phone, 0, yPos, { align: 'center' });
       yPos += 30;
-      doc.fillColor(PALETTE.darkGray).fontSize(12).font('Helvetica')
+      doc.fillColor(PALETTE.slateLight).fontSize(12).font('Helvetica')
         .text(`${BRANDING.contact.email}  |  ${BRANDING.urls.website.replace('https://', '').replace('http://', '').toUpperCase()}`, 0, yPos, { align: 'center' });
 
       // Add Contact Us page footer (black bar at bottom)
       const contactPageIndex = doc.bufferedPageRange().count - 1;
       doc.switchToPage(contactPageIndex);
-      doc.rect(0, 750, 595, 92).fill(PALETTE.black);
+      doc.rect(0, 750, 595, 92).fill(PALETTE.slate);
 
       // Update all page numbers now that we know the total (ONLY ONCE)
       const totalPages = doc.bufferedPageRange().count;
@@ -1226,11 +1354,9 @@ const numberToWords = (n) => {
 export function generateInvoicePDF(invoice, lead) {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({
-        margin: 40,
-        size: 'A4',
-      });
+      const doc = new PDFDocument({ margin: 0, size: 'A4' });
 
+      // Setup Stream
       const fileName = `invoice-${invoice.invoiceNumber || invoice._id}-${Date.now()}.pdf`;
       const uploadsDir = path.join(dirname, '../../uploads/billing');
 
@@ -1242,312 +1368,259 @@ export function generateInvoicePDF(invoice, lead) {
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
 
-      // --- COLORS ---
+      // --- COLORS (Modern Teal/Slate Theme) ---
       const colors = {
-        headerBlue: '#1a365d',
-        textBlack: '#1f2937', // Softer black
-        textGray: '#4b5563',
-        border: '#e5e7eb',
-        bgLight: '#f9fafb',
-        white: '#FFFFFF'
+        primary: PALETTE.primary,        // Deep Teal
+        primaryDark: PALETTE.primaryDark, // Dark Teal Header
+        primaryLight: PALETTE.primaryLight, // Light Teal accents
+        accent: PALETTE.accent,          // Amber Gold
+        slate: PALETTE.slate,            // Dark Slate
+        gray: PALETTE.gray,              // Text Gray
+        bgLight: '#F3F4F6',              // Light gray background
+        white: PALETTE.white,
+        black: PALETTE.black,
+        border: PALETTE.border
       };
 
-      // --- HELPERS ---
+      // --- HEADER DESIGN (Unique Split Layout) ---
+      const headerHeight = 180;
+      const rightPanelX = 360;
 
-      // Draw a filled cell with text
-      const drawField = (x, y, w, h, bg, text, isBold = false, align = 'left', textColor = colors.textBlack) => {
-        // Draw Background
-        doc.rect(x, y, w, h).fill(bg);
-        // Draw Border
-        doc.rect(x, y, w, h).stroke(colors.border);
-        // Draw Text
-        doc.fillColor(textColor)
-          .font(isBold ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(9)
-          .text(text || '-', x + 6, y + 6, { width: w - 12, align: align, lineGap: 2 });
-      };
+      // Right Panel Background
+      doc.rect(rightPanelX, 0, 595 - rightPanelX, headerHeight).fill(colors.primaryDark);
 
-      // --- HEADER ---
-      let y = 40;
-
+      // 1. Logo (Top Left)
       const logoBuffer = loadLogo();
       if (logoBuffer) {
-        doc.image(logoBuffer, 40, 30, { width: 120 });
+        doc.image(logoBuffer, 40, 40, { height: 50 });
       } else {
-        doc.fontSize(22).font('Helvetica-Bold').fillColor(colors.textBlack).text(BRANDING.company.name.toUpperCase(), 40, 40);
+        doc.fontSize(20).font('Helvetica-Bold').fillColor(colors.primary).text(BRANDING.company.name.toUpperCase(), 40, 40);
       }
 
-      // Invoice Title (Center)
-      const title = invoice.type === 'proforma' ? 'PROFORMA INVOICE' : 'INVOICE';
-      doc.font('Helvetica-Bold').fontSize(22).fillColor(colors.headerBlue).text(title, 0, 40, { align: 'center' });
+      // 2. Bill From (Left, below Logo)
+      let y = 110;
+      doc.fillColor(colors.gray).fontSize(8).font('Helvetica-Bold').text('BILLED BY', 40, y);
+      y += 12;
+      doc.fillColor(colors.black).fontSize(12).font('Helvetica-Bold').text(BRANDING.company.legalName || BRANDING.company.name, 40, y);
+      y += 18;
+      doc.fillColor(colors.gray).fontSize(9).font('Helvetica')
+        .text(BRANDING.address.full || `${BRANDING.address.street || ''}, ${BRANDING.address.city || ''}`, 40, y, { width: 300 })
+        .text(`Phone: ${BRANDING.contact.phone}`, 40, y + 24)
+        .text(`Email: ${BRANDING.contact.email}`, 40, y + 36);
+      if (BRANDING.legal.gstNumber) {
+        doc.text(`GST No: ${BRANDING.legal.gstNumber}`, 40, y + 48);
+      }
 
-      // Right Side Info (Invoice No, Date, Due Date, Booking Id)
-      const rightStart = 400;
-      const rightLabelW = 70;
-      const rightValW = 100;
-      let ry = 35;
+      // 3. Invoice Title & Details (Right Panel, Dark Background)
+      const title = invoice.type === 'proforma' ? 'PROFORMA' : 'INVOICE';
+      const rightPanelW = 595 - rightPanelX;
 
-      const headerInfo = [
-        { label: 'Invoice No', value: invoice.invoiceNumber || 'PROFORMA' },
-        { label: 'Invoice Date', value: invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB') },
-        { label: 'Due Date', value: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB') : '-' },
-        { label: 'Booking Id', value: invoice.booking?.bookingId || invoice.booking?._id || 'N/A' }
-      ];
+      // Title Centered
+      doc.fillColor(colors.white).fontSize(28).font('Helvetica-Bold')
+        .text(title, rightPanelX, 35, { width: rightPanelW, align: 'center' });
 
-      doc.fontSize(9);
-      headerInfo.forEach(info => {
-        doc.font('Helvetica-Bold').fillColor(colors.textBlack).text(info.label, rightStart, ry, { width: rightLabelW, align: 'right' });
-        doc.font('Helvetica').fillColor(colors.textBlack).text(info.value, rightStart + rightLabelW + 5, ry, { width: rightValW, align: 'right' });
-        ry += 12;
-      });
+      // Accent line Centered
+      const lineWidth = 40;
+      doc.rect(rightPanelX + (rightPanelW - lineWidth) / 2, 68, lineWidth, 3).fill(colors.accent);
 
-      y = 100; // Move down for address section
+      let dy = 75;
 
-      // --- ADDRESS SECTIONS (Bill From / Bill To) ---
-      y += 20;
-
-      const sectionW = 250;
-      const leftX = 40;
-      const rightX = 305;
-      const headerH = 24;
-
-      // Headers
-      doc.rect(leftX, y, sectionW, headerH).fill(colors.headerBlue);
-      doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(11).text('Bill From:', leftX + 8, y + 7);
-
-      doc.rect(rightX, y, sectionW, headerH).fill(colors.headerBlue);
-      doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(11).text('Bill To:', rightX + 8, y + 7);
-
-      y += headerH;
-
-      // Data Prep
-      const billFromData = [
-        { label: 'Company Name', value: BRANDING.company.legalName || BRANDING.company.name },
-        { label: 'Address', value: BRANDING.address.full || `${BRANDING.address.street || ''}\n${BRANDING.address.city || ''} - ${BRANDING.address.postalCode || ''}` },
-        { label: 'Phone', value: BRANDING.contact.phone },
-        { label: 'Email', value: BRANDING.contact.email },
-        { label: 'GST No', value: BRANDING.legal.gstNumber || 'N/A' }
-      ];
-
-      const customerName = invoice.customer?.name || lead?.name || 'Guest';
-      const customerPhone = invoice.customer?.phone || lead?.phone || 'N/A';
-      const customerEmail = invoice.customer?.email || lead?.email || 'N/A';
-      const customerAddr = invoice.customer?.address || lead?.city || '-';
-
-      const billToData = [
-        { label: 'Name', value: customerName },
-        { label: 'Address', value: customerAddr },
-        { label: 'Phone', value: customerPhone },
-        { label: 'Email', value: customerEmail },
-        { label: 'Place of Supply', value: invoice.placeOfSupply || lead?.destination || '-' }
-      ];
-
-      // Draw Address Details side-by-side
-      const startY = y;
-      const labelW = 90;
-      const valueW = 160;
-      const rowMinH = 20;
-
-      // Ensure exact alignment by iterating max rows
-      const maxRows = Math.max(billFromData.length, billToData.length);
-
-      // Helper to calculate height needed for a row (based on left and right content)
-      const getRowHeight = (idx) => {
-        const leftTxt = billFromData[idx]?.value || '';
-        const rightTxt = billToData[idx]?.value || '';
-        const lh = doc.heightOfString(leftTxt, { width: valueW - 12, fontSize: 9 });
-        const rh = doc.heightOfString(rightTxt, { width: valueW - 12, fontSize: 9 });
-        return Math.max(lh + 12, rh + 12, rowMinH); // +12 for padding
+      const drawHeaderDetail = (label, value) => {
+        doc.fillColor(colors.primaryLight).fontSize(8).font('Helvetica')
+          .text(label, rightPanelX, dy, { width: rightPanelW, align: 'center' });
+        doc.fillColor(colors.white).fontSize(11).font('Helvetica-Bold')
+          .text(value, rightPanelX, dy + 12, { width: rightPanelW, align: 'center' });
+        dy += 35;
       };
 
-      for (let i = 0; i < maxRows; i++) {
-        const h = getRowHeight(i);
+      drawHeaderDetail('INVOICE NO', invoice.invoiceNumber || 'PROFORMA');
+      drawHeaderDetail('DATE', invoice.issueDate ? formatDate(invoice.issueDate) : formatDate(new Date()));
+      drawHeaderDetail('DUE DATE', invoice.dueDate ? formatDate(invoice.dueDate) : '-');
 
-        // Left (From)
-        if (billFromData[i]) {
-          drawField(leftX, y, labelW, h, colors.bgLight, billFromData[i].label, false, 'left', colors.textGray);
-          drawField(leftX + labelW, y, valueW, h, colors.white, billFromData[i].value, true, 'left', colors.textBlack);
-        } else {
-          // Empty filler if needed (UI polish)
-          drawField(leftX, y, labelW + valueW, h, colors.white, '');
-        }
+      // --- BILL TO SECTION (Distinct Card) ---
+      y = 210;
 
-        // Right (To)
-        if (billToData[i]) {
-          drawField(rightX, y, labelW, h, colors.bgLight, billToData[i].label, false, 'left', colors.textGray);
-          drawField(rightX + labelW, y, valueW, h, colors.white, billToData[i].value, true, 'left', colors.textBlack);
-        } else {
-          drawField(rightX, y, labelW + valueW, h, colors.white, '');
-        }
+      // Card Background
+      doc.rect(40, y, 515, 85).fill(colors.white).stroke(colors.border);
+      // Left colored accent border
+      doc.rect(40, y, 4, 85).fill(colors.accent);
 
-        y += h;
+      const customerName = invoice.customer?.name || lead?.name || 'Guest';
+
+      // "Bill To" Label
+      doc.fillColor(colors.primary).fontSize(9).font('Helvetica-Bold').text('BILL TO', 60, y + 15);
+
+      // Customer Name
+      doc.fillColor(colors.black).fontSize(14).font('Helvetica-Bold').text(customerName, 60, y + 32);
+
+      // Customer Address
+      doc.fillColor(colors.gray).fontSize(10).font('Helvetica')
+        .text(invoice.customer?.address || lead?.city || 'Address Not Provided', 60, y + 50, { width: 220 });
+
+      // Contact Info (Right side of card)
+      doc.fillColor(colors.gray).fontSize(9).font('Helvetica-Bold').text('CONTACT INFO', 320, y + 15);
+      doc.fillColor(colors.black).fontSize(10).font('Helvetica')
+        .text(invoice.customer?.phone || lead?.phone || '-', 320, y + 32)
+        .text(invoice.customer?.email || lead?.email || '-', 320, y + 46);
+
+      // Place of Supply
+      if (invoice.placeOfSupply || lead?.destination) {
+        doc.fillColor(colors.gray).fontSize(9).font('Helvetica-Bold').text('PLACE OF SUPPLY', 420, y + 15);
+        doc.fillColor(colors.black).fontSize(10).font('Helvetica')
+          .text(invoice.placeOfSupply || lead?.destination, 420, y + 32);
       }
 
-      y += 20; // Gap
+      y += 110;
 
-      // --- MAIN ITEMS TABLE ---
+      // --- ITEMS TABLE ---
+      // Header Row (Teal Background)
       const tableHeaders = [
         { label: 'S.No', w: 40, align: 'center' },
         { label: 'Service Description', w: 325, align: 'left' },
         { label: 'Amount (INR)', w: 150, align: 'right' }
       ];
 
-      // Table Header Row
-      const tableW = 515;
-      const tableHeaderH = 25;
+      doc.rect(40, y, 515, 30).fill(colors.primaryDark);
 
-      doc.rect(leftX, y, tableW, tableHeaderH).fill(colors.headerBlue);
-      let tx = leftX;
+      let tx = 40;
       tableHeaders.forEach(h => {
         doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(10)
-          .text(h.label, tx + 5, y + 8, { width: h.w - 10, align: h.align });
+          .text(h.label, tx + 5, y + 10, { width: h.w - 10, align: h.align });
         tx += h.w;
       });
 
-      y += tableHeaderH;
+      y += 30;
 
-      // Table Content (Items)
-      // Requirement: "package name with minimum details"
-
+      // Prepare Description Logic (Reused from existing)
       const paxCount = (lead?.adults || 0) + (lead?.children || 0);
       const paxStr = paxCount > 0 ? `(${lead.adults} Adults${lead.children ? `, ${lead.children} Children` : ''})` : '';
-
       const packageItem = invoice.items?.find(i => i.category === 'package') || invoice.items?.[0];
 
-      // Get Package Name and Type directly
-      // Get Package Name and Type directly
       let packageName = 'Travel Services';
       let packageTypeLabel = '';
 
-      // STRATEGY: Prefer the Base Package Name (lead.package.name) as it's the most "marketing friendly" name.
-      // Customized package names might be auto-generated (e.g. "Day 1...") which are bad for descriptions.
-
-      // 1. Try Base Package from Lead (Highest Priority for Name)
       if (lead?.package?.name) {
         packageName = lead.package.name;
-        // Determine label based on if customization exists
         if (lead.customizedPackage || invoice.type === 'customized' || lead.manualItinerary) {
           packageTypeLabel = '(Customized Package)';
         } else {
           packageTypeLabel = '(Standard Package)';
         }
-      }
-      // 2. Try Invoice Package (if Lead package missing)
-      else if (invoice.package?.name) {
+      } else if (invoice.package?.name) {
         packageName = invoice.package.name;
         packageTypeLabel = '(Standard Package)';
-      }
-      // 3. Fallback to Customized Package Name (only if clean)
-      else if (lead?.customizedPackage?.name) {
-        // Only use if it doesn't look like a day entry
+      } else if (lead?.customizedPackage?.name) {
         if (!lead.customizedPackage.name.trim().startsWith('Day')) {
           packageName = lead.customizedPackage.name;
         }
         packageTypeLabel = '(Customized Package)';
       }
 
-      // 4. Check Item Description (Lowest Priority Override, with filters)
       if (packageItem?.description && packageItem.description !== 'Package Total') {
-        // Only use description if it looks like a Name (short) and NOT a Day description
         const desc = packageItem.description.trim();
-        // Strict check to avoid "Day 1: Hotel..." strings becoming the title
         if (desc.length < 60 && !desc.startsWith('Day') && !desc.toLowerCase().startsWith('day 1')) {
           packageName = desc;
         }
       }
 
-      // Ensure Label is correct if overridden via other means
-      if (invoice.type === 'customized' || packageName.toLowerCase().includes('customized')) {
-        packageTypeLabel = '(Customized Package)';
-      }
-
-      // Final Composite Description
       const fullDescription = `${packageName} ${packageTypeLabel}\nDestination: ${lead?.destination || 'N/A'} ${paxStr}`;
-
       const amountStr = formatCurrency(invoice.totalAmount);
 
-      // Calc height
-      const descH = doc.heightOfString(fullDescription, { width: tableHeaders[1].w - 20 }) + 20;
-      const rowItemH = Math.max(descH, 40);
+      // content height
+      const descH = doc.heightOfString(fullDescription, { width: 305 }) + 20;
+      const rowH = Math.max(descH, 40);
 
-      // Draw Row
-      tx = leftX;
+      // Item Row
+      // Background (White) - add bottom border
+      doc.rect(40, y, 515, rowH).fill(colors.white).stroke(colors.border);
+
       // S.No
-      drawField(tx, y, tableHeaders[0].w, rowItemH, colors.white, '1', false, 'center', colors.textBlack); tx += tableHeaders[0].w;
-      // Description
-      drawField(tx, y, tableHeaders[1].w, rowItemH, colors.white, fullDescription, false, 'left', colors.textBlack); tx += tableHeaders[1].w;
-      // Amount
-      drawField(tx, y, tableHeaders[2].w, rowItemH, colors.white, amountStr, true, 'right', colors.textBlack);
+      doc.fillColor(colors.black).font('Helvetica').fontSize(10)
+        .text('1', 40, y + 12, { width: 40, align: 'center' });
 
-      y += rowItemH;
+      // Description
+      doc.fillColor(colors.black).font('Helvetica').fontSize(10)
+        .text(fullDescription, 85, y + 12, { width: 305, align: 'left' });
+
+      // Amount
+      doc.fillColor(colors.black).font('Helvetica-Bold').fontSize(10)
+        .text(amountStr, 410, y + 12, { width: 140, align: 'right' });
+
+      y += rowH + 20;
+
 
       // --- TOTALS SECTION ---
-      // Align to right
-      const totalLabelW = 120;
-      const totalValW = 150;
-      const totalX = 40 + tableW - totalLabelW - totalValW + tableHeaders[0].w; // Adjusting to flush right
-      const startTotalX = (40 + tableW) - (totalLabelW + totalValW);
+      // Right Aligned Box
+      const totalBoxW = 250;
+      const totalBoxX = 555 - totalBoxW;
 
-      const drawTotalRow = (label, val, isBold = false, bg = colors.white) => {
-        drawField(startTotalX, y, totalLabelW, 25, bg, label, false, 'right', colors.textGray);
-        drawField(startTotalX + totalLabelW, y, totalValW, 25, bg, val, true, 'right', isBold ? colors.textBlack : colors.textGray);
-        y += 25;
+      const drawTotalRow = (label, value, isTotal = false) => {
+        // Label
+        doc.fillColor(colors.gray).font('Helvetica').fontSize(10)
+          .text(label, totalBoxX, y, { width: 100, align: 'right' });
+
+        // Value
+        doc.fillColor(isTotal ? colors.primaryDark : colors.black)
+          .font(isTotal ? 'Helvetica-Bold' : 'Helvetica-Bold')
+          .fontSize(isTotal ? 14 : 10)
+          .text(value, totalBoxX + 110, y - (isTotal ? 2 : 0), { width: 130, align: 'right' });
+
+        y += isTotal ? 25 : 20;
       };
 
-      drawTotalRow('Sub Total', formatCurrency(invoice.totalAmount));
-      // if tax/discount existed, looped here
-      drawTotalRow('Total Amount', formatCurrency(invoice.totalAmount), true, '#eff6ff'); // Light blue bg for total
-
-      // Total in Words
+      drawTotalRow('Sub Total', amountStr);
+      // Tax styling if needed... 
+      // Divider line
+      doc.moveTo(totalBoxX, y).lineTo(555, y).stroke(colors.border);
       y += 10;
-      const words = numberToWords(Math.round(invoice.totalAmount || 0));
-      doc.font('Helvetica-Bold').fontSize(10).fillColor(colors.textBlack)
-        .text('Total Amount in Words:', leftX, y);
-      doc.font('Helvetica-Oblique').fontSize(10).fillColor(colors.textGray)
-        .text(`${words}`, leftX + 120, y);
+      drawTotalRow('Total Amount', amountStr, true);
 
-      y += 40;
+      // Amount in words
+      y += 10; // Extra spacing
+      const words = numberToWords(Math.round(invoice.totalAmount || 0));
+      doc.rect(40, y, 300, 25).fill(colors.bgLight);
+      doc.fillColor(colors.gray).font('Helvetica-Bold').fontSize(9)
+        .text(`${words} Only`, 45, y + 8, { width: 290 });
+
+
+      y += 50;
 
       // --- BANK DETAILS & FOOTER ---
-      // Check space
       if (y > 650) { doc.addPage(); y = 50; }
 
       const footerY = y;
 
       // Bank Box
-      doc.font('Helvetica-Bold').fontSize(12).fillColor(colors.headerBlue).text('Bank Details', leftX, footerY);
+      doc.fillColor(colors.primaryDark).font('Helvetica-Bold').fontSize(12).text('BANK DETAILS', 40, footerY);
+      doc.rect(40, footerY + 15, 40, 3).fill(colors.accent);
 
       const pd = getPaymentDetails();
-      const bankData = [
-        ['Account Name', pd.accountName],
-        ['Bank Name', pd.bankName],
-        ['Account Number', pd.accountNumber],
-        ['IFSC Code', pd.ifscCode],
-        ['Branch', pd.branch]
-      ];
+      let by = footerY + 30;
 
-      let by = footerY + 20;
-      const blw = 110;
-      const bvw = 200;
+      const drawBankDetail = (label, value) => {
+        doc.fillColor(colors.gray).font('Helvetica').fontSize(9).text(label, 40, by);
+        doc.fillColor(colors.black).font('Helvetica-Bold').fontSize(9).text(value, 120, by);
+        by += 15;
+      };
 
-      bankData.forEach(([l, v]) => {
-        drawField(leftX, by, blw, 20, colors.bgLight, l, false, 'left', colors.textGray);
-        drawField(leftX + blw, by, bvw, 20, colors.white, v, true, 'left', colors.textBlack);
-        by += 20;
-      });
+      drawBankDetail('Account Name', pd.accountName);
+      drawBankDetail('Bank Name', pd.bankName);
+      drawBankDetail('Account No', pd.accountNumber);
+      drawBankDetail('IFSC Code', pd.ifscCode);
+      drawBankDetail('Branch', pd.branch);
 
-      // Terms / Signatory
+      // Terms / Signature Area
       const signX = 400;
-      const signY = footerY + 80;
+      const signY = footerY + 40;
 
-      doc.fontSize(8).fillColor(colors.textGray)
-        .text('This is a computer generated invoice and does not require a physical signature.', leftX, by + 20);
+      doc.fontSize(8).fillColor(colors.gray)
+        .text('This is a computer generated invoice and does not require a physical signature.', 40, by + 30, { width: 300 });
 
-      doc.moveTo(signX, signY).lineTo(signX + 130, signY).stroke(colors.border);
-      doc.fontSize(10).fillColor(colors.textBlack).font('Helvetica-Bold')
-        .text('Authorised Signatory', signX, signY + 5, { width: 130, align: 'center' });
-      doc.fontSize(8).font('Helvetica').fillColor(colors.textGray)
-        .text(BRANDING.company.name, signX, signY + 18, { width: 130, align: 'center' });
+      doc.moveTo(signX, signY + 40).lineTo(signX + 130, signY + 40).stroke(colors.border);
+      doc.fontSize(10).fillColor(colors.black).font('Helvetica-Bold')
+        .text('Authorised Signatory', signX, signY + 45, { width: 130, align: 'center' });
+      doc.fontSize(8).font('Helvetica').fillColor(colors.gray)
+        .text(BRANDING.company.name, signX, signY + 60, { width: 130, align: 'center' });
 
       doc.end();
 
@@ -1560,7 +1633,7 @@ export function generateInvoicePDF(invoice, lead) {
   });
 }
 
-// RECEIPT GENERATOR (Preserved)
+// RECEIPT GENERATOR - Modern Design
 export function generateReceiptPDF(receipt, invoice, lead) {
   return new Promise((resolve, reject) => {
     try {
@@ -1572,132 +1645,118 @@ export function generateReceiptPDF(receipt, invoice, lead) {
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
 
-      // --- COLORS & STYLES ---
+      // --- COLORS (Modern Teal/Slate Theme) ---
       const colors = {
-        headerBlue: '#1a365d', // Navy
-        headerOrange: '#d97706', // Amber/Orange
-        textBlack: '#1f2937',
-        textGray: '#4b5563',
-        border: '#e5e7eb',
-        bgLight: '#f9fafb',
-        white: '#FFFFFF',
-        successGreen: '#059669'
+        primary: PALETTE.primary,
+        primaryDark: PALETTE.primaryDark,
+        primaryLight: PALETTE.primaryLight,
+        accent: PALETTE.accent,
+        slate: PALETTE.slate,
+        gray: PALETTE.gray,
+        bgLight: '#F3F4F6',
+        white: PALETTE.white,
+        black: PALETTE.black,
+        border: PALETTE.border,
+        success: '#10B981'
       };
 
-      // --- HELPERS ---
-      const drawField = (x, y, w, h, bg, text, isBold = false, align = 'left', textColor = colors.textBlack) => {
-        doc.rect(x, y, w, h).fill(bg);
-        doc.rect(x, y, w, h).stroke(colors.border);
-        doc.fillColor(textColor)
-          .font(isBold ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(9)
-          .text(text || '-', x + 6, y + 8, { width: w - 12, align: align });
-      };
+      // --- HEADER DESIGN ---
+      const headerHeight = 180;
+      const rightPanelX = 360;
+      const rightPanelW = 595 - rightPanelX;
 
-      // --- HEADER LAYOUT ---
-      // Logo (Top Left)
+      // Right Panel Background
+      doc.rect(rightPanelX, 0, rightPanelW, headerHeight).fill(colors.primaryDark);
+
+      // 1. Logo (Top Left)
       const logoBuffer = loadLogo();
       if (logoBuffer) {
-        doc.image(logoBuffer, 40, 30, { width: 180 }); // Large Logo
+        doc.image(logoBuffer, 40, 40, { height: 50 });
       } else {
-        doc.fontSize(24).font('Helvetica-Bold').fillColor(colors.textBlack).text(BRANDING.company.name.toUpperCase(), 40, 40);
+        doc.fontSize(20).font('Helvetica-Bold').fillColor(colors.primary).text(BRANDING.company.name.toUpperCase(), 40, 40);
       }
 
-      // Receipt Info (Top Right - Aligned with Logo horizontally)
-      // Moving "Receipt Info" to top right allows the Title to sit centered BELOW them without collision
-      const rightStart = 355; // Starts at 355, Ends at 555 (Margin)
-      let ry = 35; // Start at top
-      doc.fontSize(10);
+      // 2. Received By (Left)
+      let y = 110;
+      doc.fillColor(colors.gray).fontSize(8).font('Helvetica-Bold').text('RECEIVED BY', 40, y);
+      y += 12;
+      doc.fillColor(colors.black).fontSize(12).font('Helvetica-Bold').text(BRANDING.company.legalName || BRANDING.company.name, 40, y);
+      y += 18;
+      doc.fillColor(colors.gray).fontSize(9).font('Helvetica')
+        .text(BRANDING.address.full || `${BRANDING.address.street || ''}, ${BRANDING.address.city || ''}`, 40, y, { width: 300 })
+        .text(`Phone: ${BRANDING.contact.phone}`, 40, y + 24)
+        .text(`Email: ${BRANDING.contact.email}`, 40, y + 36);
 
-      const receiptInfo = [
-        { label: 'Receipt No:', value: receipt.receiptNumber || 'N/A' },
-        { label: 'Date:', value: formatDate(receipt.paymentDate) },
-        { label: 'Payment Mode:', value: (receipt.paymentMethod || 'Cash').toUpperCase() }
-      ];
+      // 3. Receipt Title & Details (Right Panel)
+      // Title Centered
+      doc.fillColor(colors.white).fontSize(28).font('Helvetica-Bold')
+        .text('RECEIPT', rightPanelX, 35, { width: rightPanelW, align: 'center' });
 
-      receiptInfo.forEach(info => {
-        doc.font('Helvetica-Bold').fillColor(colors.textGray).text(info.label, rightStart, ry, { width: 90, align: 'right' });
-        doc.font('Helvetica-Bold').fillColor(colors.textBlack).text(info.value, rightStart + 95, ry, { width: 105, align: 'right' });
-        ry += 15;
-      });
+      // Accent line Centered
+      const lineWidth = 40;
+      doc.rect(rightPanelX + (rightPanelW - lineWidth) / 2, 68, lineWidth, 3).fill(colors.accent);
 
-      // Title (Centered, Below Logo/Info)
-      doc.font('Helvetica-Bold').fontSize(26).fillColor(colors.headerBlue)
-        .text('PAYMENT RECEIPT', 0, 90, { align: 'center' }); // Lowered to y=90
+      let dy = 75;
+      const drawHeaderDetail = (label, value) => {
+        doc.fillColor(colors.primaryLight).fontSize(8).font('Helvetica')
+          .text(label, rightPanelX, dy, { width: rightPanelW, align: 'center' });
+        doc.fillColor(colors.white).fontSize(11).font('Helvetica-Bold')
+          .text(value, rightPanelX, dy + 12, { width: rightPanelW, align: 'center' });
+        dy += 35;
+      };
 
-      let y = 130; // Start content below title
+      drawHeaderDetail('RECEIPT NO', receipt.receiptNumber || 'N/A');
+      drawHeaderDetail('DATE', receipt.paymentDate ? formatDate(receipt.paymentDate) : formatDate(new Date()));
+      drawHeaderDetail('PAYMENT MODE', (receipt.paymentMethod || 'Cash').toUpperCase());
 
-      // --- ADDRESS SECTION ---
-      // Bill From (Company) & Bill To (Customer)
-      const sectionW = 250;
-      const leftX = 40;
-      const rightX = 305;
-      const headerH = 24;
+      // --- RECEIVED FROM SECTION (Card) ---
+      y = 210;
 
-      // Section Headers
-      doc.rect(leftX, y, sectionW, headerH).fill(colors.headerBlue);
-      doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(11).text('Received From (Customer):', leftX + 8, y + 7);
+      // Card Background
+      doc.rect(40, y, 515, 85).fill(colors.white).stroke(colors.border);
+      // Left colored accent border
+      doc.rect(40, y, 4, 85).fill(colors.accent);
 
-      doc.rect(rightX, y, sectionW, headerH).fill(colors.headerBlue);
-      doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(11).text('Payment To (Company):', rightX + 8, y + 7);
-
-      y += headerH;
-
-      // Data
       const customerName = invoice?.customer?.name || lead?.name || 'Guest';
-      const customerEmail = invoice?.customer?.email || lead?.email || '-';
-      const customerPhone = invoice?.customer?.phone || lead?.phone || '-';
 
-      const fromData = [
-        { label: 'Name', value: customerName },
-        { label: 'Email', value: customerEmail },
-        { label: 'Phone', value: customerPhone },
-        { label: 'Booking Ref', value: invoice?.booking?.bookingId || '-' }
+      // Label
+      doc.fillColor(colors.primary).fontSize(9).font('Helvetica-Bold').text('RECEIVED FROM', 60, y + 15);
+
+      // Customer Name
+      doc.fillColor(colors.black).fontSize(14).font('Helvetica-Bold').text(customerName, 60, y + 32);
+
+      // Details
+      doc.fillColor(colors.gray).fontSize(10).font('Helvetica')
+        .text(invoice?.customer?.address || lead?.city || 'Address Not Provided', 60, y + 50, { width: 220 });
+
+      // Contact Info
+      doc.fillColor(colors.gray).fontSize(9).font('Helvetica-Bold').text('CONTACT INFO', 320, y + 15);
+      doc.fillColor(colors.black).fontSize(10).font('Helvetica')
+        .text(invoice?.customer?.phone || lead?.phone || '-', 320, y + 32)
+        .text(invoice?.customer?.email || lead?.email || '-', 320, y + 46);
+
+      y += 110;
+
+      // --- PAYMENT DETAILS TABLE ---
+      // Header
+      const tableHeaders = [
+        { label: 'Description', w: 235, align: 'left' },
+        { label: 'Reference / Transaction ID', w: 160, align: 'left' },
+        { label: 'Amount Received', w: 120, align: 'right' }
       ];
 
-      const toData = [
-        { label: 'Company', value: BRANDING.company.legalName || BRANDING.company.name },
-        { label: 'Address', value: `${BRANDING.address.city || ''} - ${BRANDING.address.postalCode || ''}` },
-        { label: 'Email', value: BRANDING.contact.email },
-        { label: 'Phone', value: BRANDING.contact.phone }
-      ];
+      doc.rect(40, y, 515, 30).fill(colors.primaryDark);
 
-      const rowH = 22;
-      for (let i = 0; i < 4; i++) {
-        // Left (Customer)
-        drawField(leftX, y, 90, rowH, colors.bgLight, fromData[i].label, false, 'left', colors.textGray);
-        drawField(leftX + 90, y, 160, rowH, colors.white, fromData[i].value, true, 'left', colors.textBlack);
-
-        // Right (Company)
-        drawField(rightX, y, 90, rowH, colors.bgLight, toData[i].label, false, 'left', colors.textGray);
-        drawField(rightX + 90, y, 160, rowH, colors.white, toData[i].value, true, 'left', colors.textBlack);
-        y += rowH;
-      }
+      let tx = 40;
+      tableHeaders.forEach(h => {
+        doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(10)
+          .text(h.label, tx + 10, y + 10, { width: h.w - 20, align: h.align });
+        tx += h.w;
+      });
 
       y += 30;
 
-      // --- PAYMENT DETAILS BOX ---
-      doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.headerBlue).text('Payment Details', 40, y);
-      y += 20;
-
-      // UPDATED COLUMN WIDTHS to fit 515px width and avoid clipping (Total: 515)
-      const detailHeaders = [
-        { label: 'Description', w: 170 },           // Reduced from 180
-        { label: 'Transaction / Ref ID', w: 140 },  // Reduced from 180
-        { label: 'Payment Date', w: 85, align: 'center' }, // Reduced from 100
-        { label: 'Amount Received', w: 120, align: 'right' } // Increased from 95 to fix clipping
-      ];
-
-      // Header Row
-      let tx = 40;
-      doc.rect(tx, y, 515, 25).fill(colors.headerOrange);
-      detailHeaders.forEach(h => {
-        doc.fillColor(colors.white).fontSize(10).text(h.label, tx + 5, y + 8, { width: h.w - 10, align: h.align });
-        tx += h.w;
-      });
-      y += 25;
-
-      // Details Row
+      // Data Row
       const methodMeta = receipt.paymentDetails || {};
       let refId = receipt.transactionId || '-';
       if (receipt.paymentMethod === 'card') refId = `Card ending ${methodMeta.cardLastFour || 'xxxx'}`;
@@ -1705,64 +1764,76 @@ export function generateReceiptPDF(receipt, invoice, lead) {
       if (receipt.paymentMethod === 'upi') refId = `UPI: ${methodMeta.upiTransactionId || methodMeta.upiId || '-'}`;
 
       const desc = `Payment towards Invoice #${invoice?.invoiceNumber || invoice?._id || 'N/A'}`;
+      const amountStr = formatCurrency(receipt.amount);
 
-      tx = 40;
-      // Draw cells using new widths
-      drawField(tx, y, 170, 35, colors.white, desc); tx += 170;
-      drawField(tx, y, 140, 35, colors.white, refId); tx += 140;
-      drawField(tx, y, 85, 35, colors.white, formatDate(receipt.paymentDate), false, 'center'); tx += 85;
+      // Row styling
+      const rowH = 40;
+      doc.rect(40, y, 515, rowH).fill(colors.white).stroke(colors.border);
 
-      // Amount Cell (Green Highlight)
-      doc.rect(tx, y, 120, 35).fill('#ecfdf5'); // Light green bg
-      doc.rect(tx, y, 120, 35).stroke(colors.successGreen);
-      doc.fillColor(colors.successGreen).font('Helvetica-Bold').fontSize(11)
-        .text(formatCurrency(receipt.amount), tx + 5, y + 12, { width: 110, align: 'right' }); // Width adjusted
+      // Description
+      doc.fillColor(colors.black).font('Helvetica-Bold').fontSize(10)
+        .text(desc, 50, y + 14, { width: 215 });
 
-      y += 50;
+      // Reference
+      doc.fillColor(colors.black).font('Helvetica').fontSize(10)
+        .text(refId, 285, y + 14, { width: 140 });
 
-      // --- ACCOUNT SUMMARY (Invoice Context) ---
-      // Show totals to give context (Total Invoice, Paid, Balance)
+      // Amount (Green Highlight)
+      doc.rect(435, y, 120, rowH).fill('#ecfdf5').stroke(colors.success); // Highlight cell
+      doc.fillColor(colors.success).font('Helvetica-Bold').fontSize(11)
+        .text(amountStr, 435, y + 14, { width: 110, align: 'right' });
+
+      y += rowH + 30;
+
+      // --- ACCOUNT SUMMARY ---
       if (invoice) {
-        const summaryW = 250;
-        const summaryX = 305; // Right aligned
-
-        doc.font('Helvetica-Bold').fontSize(11).fillColor(colors.headerBlue).text('Account Summary', summaryX, y);
-        y += 15;
-
         const totalAmt = invoice.totalAmount || 0;
-        const paidAmt = invoice.paidAmount || 0; // This usually includes the current receipt if updated
-        // For display clarity, let's assume invoice.paidAmount is up to date
+        const paidAmt = invoice.paidAmount || 0;
+        // Logic check: does paidAmt include this receipt? Usually yes in DB.
         const balance = Math.max(0, totalAmt - paidAmt);
 
-        const summaryRows = [
-          { label: 'Total Invoice Amount', val: formatCurrency(totalAmt) },
-          { label: 'Total Paid (Including this)', val: formatCurrency(paidAmt) },
-          { label: 'Balance Due', val: formatCurrency(balance), isBold: true, color: balance > 0 ? '#dc2626' : colors.successGreen }
-        ];
+        const summaryX = 355;
+        const summaryW = 200;
 
-        summaryRows.forEach(row => {
-          doc.rect(summaryX, y, 130, 20).fill(colors.bgLight);
-          doc.rect(summaryX, y, 130, 20).stroke(colors.border);
-          doc.fillColor(colors.textGray).font('Helvetica').fontSize(9).text(row.label, summaryX + 5, y + 5);
+        doc.fillColor(colors.gray).fontSize(10).font('Helvetica-Bold').text('ACCOUNT SUMMARY', summaryX, y);
+        y += 15;
 
-          doc.rect(summaryX + 130, y, 120, 20).fill(colors.white);
-          doc.rect(summaryX + 130, y, 120, 20).stroke(colors.border);
-          doc.fillColor(row.color || colors.textBlack).font(row.isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9)
-            .text(row.val, summaryX + 135, y + 5, { width: 110, align: 'right' });
+        const drawSummaryRow = (label, val, isBold = false) => {
+          doc.fillColor(colors.gray).font('Helvetica').text(label, summaryX, y);
+          doc.fillColor(isBold ? (balance > 0 ? '#dc2626' : colors.success) : colors.black)
+            .font('Helvetica-Bold').text(val, summaryX + 110, y, { width: 90, align: 'right' });
           y += 20;
-        });
+        };
+
+        drawSummaryRow('Invoice Total', formatCurrency(totalAmt));
+        drawSummaryRow('Total Paid', formatCurrency(paidAmt));
+        doc.moveTo(summaryX, y - 5).lineTo(summaryX + 200, y - 5).stroke(colors.border);
+        drawSummaryRow('Balance Due', formatCurrency(balance), true);
       }
 
-      y += 40;
+      y += 20;
 
-      // --- FOOTER / SIGNATURE ---
-      const sigY = 700; // Fixed position near bottom
-      doc.lineWidth(1).moveTo(40, sigY).lineTo(200, sigY).stroke(colors.border);
-      doc.fillColor(colors.textGray).fontSize(10).text('Authorized Signatory', 40, sigY + 10);
-      doc.text(BRANDING.company.legalName || BRANDING.company.name, 40, sigY + 25);
+      // Amount in words
+      const words = numberToWords(Math.round(receipt.amount || 0));
+      doc.rect(40, y, 300, 25).fill(colors.bgLight);
+      doc.fillColor(colors.gray).font('Helvetica-Bold').fontSize(9)
+        .text(`${words} Only`, 45, y + 8, { width: 290 });
 
-      doc.fillColor(colors.headerBlue).fontSize(12).font('Helvetica-Bold')
-        .text('Thank you for your payment!', 300, sigY + 10, { align: 'right', width: 255 });
+      y += 60;
+
+      // --- FOOTER ---
+      if (y > 700) { doc.addPage(); y = 50; }
+
+      const sigY = y;
+
+      doc.fontSize(8).fillColor(colors.gray)
+        .text('This is a computer generated receipt.', 40, sigY + 30);
+
+      doc.moveTo(400, sigY).lineTo(530, sigY).stroke(colors.border);
+      doc.fontSize(10).fillColor(colors.black).font('Helvetica-Bold')
+        .text('Authorized Signatory', 400, sigY + 10, { width: 130, align: 'center' });
+      doc.fontSize(8).font('Helvetica').fillColor(colors.gray)
+        .text(BRANDING.company.name, 400, sigY + 25, { width: 130, align: 'center' });
 
       doc.end();
       stream.on('finish', () => resolve(filePath));

@@ -245,6 +245,22 @@ class EmailService {
     const website = BRANDING.urls.website;
     const phone = BRANDING.contact.phone;
 
+    // Modern Teal/Slate Color Scheme
+    const colors = {
+      primary: '#0F766E',        // Deep Teal
+      primaryLight: '#14B8A6',   // Light teal
+      primaryDark: '#134E4A',    // Dark teal
+      accent: '#F59E0B',         // Amber gold
+      accentLight: '#FEF3C7',    // Light amber
+      slate: '#1E293B',          // Dark slate
+      slateLight: '#334155',     // Medium slate
+      gray: '#64748B',           // Gray text
+      grayLight: '#94A3B8',      // Light text
+      background: '#F8FAFC',     // Light background
+      white: '#FFFFFF',
+      black: '#0F172A',
+    };
+
     return `
       <!DOCTYPE html>
       <html>
@@ -252,22 +268,34 @@ class EmailService {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
-      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px 0;">
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: ${colors.background};">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: ${colors.background}; padding: 20px 0;">
           <tr>
             <td align="center">
-              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                <!-- Header -->
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: ${colors.white}; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                <!-- Header with Two-Tone Design -->
                 <tr>
-                  <td style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 50px 32px; text-align: center; position: relative; border-bottom: 4px solid #FF9800;">
-                    <div style="position: relative; z-index: 1;">
-                      <div style="margin-bottom: 16px;">
-                        <span style="color: #FF9800; font-size: 36px; font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 20px rgba(255, 152, 0, 0.8);">${companyName}</span>
-                      </div>
-                      <div style="height: 2px; width: 120px; background: linear-gradient(90deg, transparent, #FF9800, transparent); margin: 12px auto; border-radius: 2px;"></div>
-                      <div style="color: #FF9800; font-size: 12px; margin-top: 12px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600;">✈ ${tagline} ✈</div>
-                    </div>
+                  <td style="background: linear-gradient(135deg, ${colors.slate} 0%, ${colors.slateLight} 100%); padding: 40px 32px; position: relative;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width: 70%;">
+                          <div style="margin-bottom: 8px;">
+                            <span style="color: ${colors.white}; font-size: 28px; font-weight: 800; letter-spacing: 1px;">${companyName}</span>
+                          </div>
+                          <div style="color: ${colors.primaryLight}; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 500;">✈ ${tagline}</div>
+                        </td>
+                        <td style="width: 30%; text-align: right; vertical-align: middle;">
+                          <div style="background: ${colors.primary}; padding: 12px 20px; border-radius: 8px; display: inline-block;">
+                            <span style="color: ${colors.white}; font-size: 11px; font-weight: 600; letter-spacing: 1px;">TRAVEL EXPERTS</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
+                </tr>
+                <!-- Accent Bar -->
+                <tr>
+                  <td style="height: 4px; background: linear-gradient(90deg, ${colors.primary}, ${colors.primaryLight}, ${colors.accent});"></td>
                 </tr>
                 <!-- Content -->
                 <tr>
@@ -277,17 +305,17 @@ class EmailService {
                 </tr>
                 <!-- Footer -->
                 <tr>
-                  <td style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 32px; text-align: center; color: #ffffff;">
-                    <h3 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 8px;">${companyName}</h3>
-                    <p style="color: #999999; font-size: 14px; margin-bottom: 16px; font-style: italic;">${tagline}</p>
+                  <td style="background: linear-gradient(135deg, ${colors.slate} 0%, ${colors.slateLight} 100%); padding: 32px; text-align: center; color: ${colors.white};">
+                    <h3 style="color: ${colors.primaryLight}; font-size: 20px; margin-top: 0; margin-bottom: 8px;">${companyName}</h3>
+                    <p style="color: ${colors.grayLight}; font-size: 14px; margin-bottom: 16px; font-style: italic;">${tagline}</p>
                     <div style="margin-bottom: 16px;">
-                      <a href="${website}" style="color: #FF9800; text-decoration: none; font-size: 14px;">${website.replace('https://', '').replace('http://', '')}</a>
+                      <a href="${website}" style="color: ${colors.primaryLight}; text-decoration: none; font-size: 14px;">${website.replace('https://', '').replace('http://', '')}</a>
                     </div>
                     <div style="margin-bottom: 16px;">
-                      <a href="tel:${phone.replace(/[^+\d]/g, '')}" style="color: #999999; text-decoration: none; font-size: 14px;">📞 ${phone}</a>
+                      <a href="tel:${phone.replace(/[^+\d]/g, '')}" style="color: ${colors.grayLight}; text-decoration: none; font-size: 14px;">📞 ${phone}</a>
                     </div>
                     <div style="height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 20px auto; max-width: 200px;"></div>
-                    <p style="color: #666666; font-size: 12px; margin-bottom: 0;">${getCopyrightText()}</p>
+                    <p style="color: ${colors.gray}; font-size: 12px; margin-bottom: 0;">${getCopyrightText()}</p>
                   </td>
                 </tr>
               </table>
@@ -300,7 +328,8 @@ class EmailService {
   }
 
   getButton(text, url) {
-    return `<a href="${url}" style="display: inline-block; background-color: #FF9800; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 500; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);">${text}</a>`;
+    // Modern teal button with subtle shadow
+    return `<a href="${url}" style="display: inline-block; background: linear-gradient(135deg, #0F766E 0%, #14B8A6 100%); color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 500; box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);">${text}</a>`;
   }
 
   async sendQuotationEmail({ quotation, recipientEmail, pdfPath }) {
@@ -319,32 +348,32 @@ class EmailService {
     `;
 
     const content = `
-      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Quotation 📋</h1>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for considering ${BRANDING.company.name}. We're excited to help you plan your journey! Please find your quotation details below.</p>
+      <h1 style="color: #0F172A; font-size: 28px; margin: 0 0 8px 0;">Your Quotation 📋</h1>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">Thank you for considering ${BRANDING.company.name}. We're excited to help you plan your journey! Please find your quotation details below.</p>
 
-      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
-        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Quotation Summary</h2>
+      <div style="background: linear-gradient(135deg, #1E293B 0%, #334155 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #0F766E;">
+        <h2 style="color: #14B8A6; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Quotation Summary</h2>
         
         <div style="margin-bottom: 16px;">
-          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Total Amount</div>
+          <div style="color: #14B8A6; font-size: 14px; margin-bottom: 4px;">Total Amount</div>
           <div style="color: #ffffff; font-size: 32px; font-weight: 600;">${this.formatCurrency(quotation.totalAmount)}</div>
         </div>
 
-        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+        <div style="height: 1px; background-color: rgba(20, 184, 166, 0.2); margin: 20px 0;"></div>
 
         <div style="margin-bottom: 12px;">
-          <span style="color: #FF9800; font-size: 14px;">Valid Until: </span>
+          <span style="color: #14B8A6; font-size: 14px;">Valid Until: </span>
           <span style="color: #ffffff; font-size: 16px;">${this.formatDate(quotation.validUntil)}</span>
         </div>
 
         <div>
-          <span style="color: #FF9800; font-size: 14px;">Status: </span>
-          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${quotation.status?.toUpperCase() || 'DRAFT'}</span>
+          <span style="color: #14B8A6; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(16, 185, 129, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${quotation.status?.toUpperCase() || 'DRAFT'}</span>
         </div>
       </div>
 
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions or would like to proceed with the booking, simply reply to this email. Our team is here to help you every step of the way.</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions or would like to proceed with the booking, simply reply to this email. Our team is here to help you every step of the way.</p>
     `;
     const html = this.getEmailTemplate(content);
 
@@ -376,44 +405,44 @@ class EmailService {
       : `${BRANDING.company.name} Invoice`;
 
     const content = `
-      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Invoice 💼</h1>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for choosing ${BRANDING.company.name}. Please find your invoice attached.</p>
+      <h1 style="color: #0F172A; font-size: 28px; margin: 0 0 8px 0;">Your Invoice 💼</h1>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">Thank you for choosing ${BRANDING.company.name}. Please find your invoice attached.</p>
 
-      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
-        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Invoice Summary</h2>
+      <div style="background: linear-gradient(135deg, #1E293B 0%, #334155 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #0F766E;">
+        <h2 style="color: #14B8A6; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Invoice Summary</h2>
         
         <div style="margin-bottom: 16px;">
-          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Invoice Number</div>
+          <div style="color: #14B8A6; font-size: 14px; margin-bottom: 4px;">Invoice Number</div>
           <div style="color: #ffffff; font-size: 18px; font-weight: 600;">${invoiceNumber}</div>
         </div>
 
-        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+        <div style="height: 1px; background-color: rgba(20, 184, 166, 0.2); margin: 20px 0;"></div>
 
         <div style="margin-bottom: 12px;">
-          <span style="color: #FF9800; font-size: 14px;">Issue Date: </span>
+          <span style="color: #14B8A6; font-size: 14px;">Issue Date: </span>
           <span style="color: #ffffff; font-size: 16px;">${this.formatDate(invoice.issueDate || invoice.createdAt)}</span>
         </div>
 
         <div style="margin-bottom: 12px;">
-          <span style="color: #FF9800; font-size: 14px;">Due Date: </span>
+          <span style="color: #14B8A6; font-size: 14px;">Due Date: </span>
           <span style="color: #ffffff; font-size: 16px;">${this.formatDate(invoice.dueDate)}</span>
         </div>
 
         <div style="margin-bottom: 12px;">
-          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Total Amount</div>
+          <div style="color: #14B8A6; font-size: 14px; margin-bottom: 4px;">Total Amount</div>
           <div style="color: #ffffff; font-size: 32px; font-weight: 600;">${this.formatCurrency(invoice.totalAmount)}</div>
         </div>
 
-        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+        <div style="height: 1px; background-color: rgba(20, 184, 166, 0.2); margin: 20px 0;"></div>
 
         <div>
-          <span style="color: #FF9800; font-size: 14px;">Status: </span>
-          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${invoice.status?.toUpperCase() || 'DRAFT'}</span>
+          <span style="color: #14B8A6; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(16, 185, 129, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${invoice.status?.toUpperCase() || 'DRAFT'}</span>
         </div>
       </div>
 
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Please review the attached invoice and let us know if you have any questions.</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">Please review the attached invoice and let us know if you have any questions.</p>
     `;
     const html = this.getEmailTemplate(content);
 
@@ -445,44 +474,44 @@ class EmailService {
       : `${BRANDING.company.name} Payment Receipt`;
 
     const content = `
-      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Payment Receipt ✅</h1>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Thank you for your payment. Please find your receipt attached for your records.</p>
+      <h1 style="color: #0F172A; font-size: 28px; margin: 0 0 8px 0;">Payment Receipt ✅</h1>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">Thank you for your payment. Please find your receipt attached for your records.</p>
 
-      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
-        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Receipt Summary</h2>
+      <div style="background: linear-gradient(135deg, #1E293B 0%, #334155 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #0F766E;">
+        <h2 style="color: #14B8A6; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Receipt Summary</h2>
         
         <div style="margin-bottom: 16px;">
-          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Amount</div>
+          <div style="color: #14B8A6; font-size: 14px; margin-bottom: 4px;">Amount</div>
           <div style="color: #ffffff; font-size: 32px; font-weight: 600;">${this.formatCurrency(receipt.amount)}</div>
         </div>
 
-        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+        <div style="height: 1px; background-color: rgba(20, 184, 166, 0.2); margin: 20px 0;"></div>
 
         <div style="margin-bottom: 12px;">
-          <span style="color: #FF9800; font-size: 14px;">Receipt Number: </span>
+          <span style="color: #14B8A6; font-size: 14px;">Receipt Number: </span>
           <span style="color: #ffffff; font-size: 16px;">${receiptNumber}</span>
         </div>
 
         <div style="margin-bottom: 12px;">
-          <span style="color: #FF9800; font-size: 14px;">Payment Date: </span>
+          <span style="color: #14B8A6; font-size: 14px;">Payment Date: </span>
           <span style="color: #ffffff; font-size: 16px;">${this.formatDate(receipt.paymentDate)}</span>
         </div>
 
         ${invoice ? `<div style="margin-bottom: 12px;">
-          <span style="color: #FF9800; font-size: 14px;">Invoice: </span>
+          <span style="color: #14B8A6; font-size: 14px;">Invoice: </span>
           <span style="color: #ffffff; font-size: 16px;">${invoice.invoiceNumber}</span>
         </div>` : ''}
 
-        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+        <div style="height: 1px; background-color: rgba(20, 184, 166, 0.2); margin: 20px 0;"></div>
 
         <div>
-          <span style="color: #FF9800; font-size: 14px;">Status: </span>
-          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.2); padding: 4px 12px; border-radius: 6px; display: inline-block;">${receipt.receiptStatus?.replace(/-/g, ' ').toUpperCase() || 'PAID'}</span>
+          <span style="color: #14B8A6; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 6px; display: inline-block;">${receipt.receiptStatus?.replace(/-/g, ' ').toUpperCase() || 'PAID'}</span>
         </div>
       </div>
 
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions, please reach out to us.</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions, please reach out to us.</p>
     `;
     const html = this.getEmailTemplate(content);
 
@@ -514,39 +543,39 @@ class EmailService {
       : `${BRANDING.company.name} Travel Voucher`;
 
     const content = `
-      <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 8px 0;">Your Travel Voucher 🎫</h1>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 15px 0;">Thank you for choosing ${BRANDING.company.name}! We're excited to be part of your travel journey. ✈️🌍</p>
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Please find your travel voucher attached. This voucher contains all the important details about your trip.</p>
+      <h1 style="color: #0F172A; font-size: 28px; margin: 0 0 8px 0;">Your Travel Voucher 🎫</h1>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 15px 0;">Thank you for choosing ${BRANDING.company.name}! We're excited to be part of your travel journey. ✈️🌍</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">Please find your travel voucher attached. This voucher contains all the important details about your trip.</p>
 
-      <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #FF9800;">
-        <h2 style="color: #FF9800; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Voucher Summary</h2>
+      <div style="background: linear-gradient(135deg, #1E293B 0%, #334155 100%); border-radius: 12px; padding: 32px; margin-bottom: 32px; border: 2px solid #0F766E;">
+        <h2 style="color: #14B8A6; font-size: 20px; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.5px;">Voucher Summary</h2>
         
         <div style="margin-bottom: 16px;">
-          <div style="color: #FF9800; font-size: 14px; margin-bottom: 4px;">Voucher Number</div>
+          <div style="color: #14B8A6; font-size: 14px; margin-bottom: 4px;">Voucher Number</div>
           <div style="color: #ffffff; font-size: 18px; font-weight: 600;">${voucherNumber}</div>
         </div>
 
-        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+        <div style="height: 1px; background-color: rgba(20, 184, 166, 0.2); margin: 20px 0;"></div>
 
         <div style="margin-bottom: 12px;">
-          <span style="color: #FF9800; font-size: 14px;">Package: </span>
+          <span style="color: #14B8A6; font-size: 14px;">Package: </span>
           <span style="color: #ffffff; font-size: 16px;">${packageName}</span>
         </div>
 
-        <div style="height: 1px; background-color: rgba(255, 152, 0, 0.2); margin: 20px 0;"></div>
+        <div style="height: 1px; background-color: rgba(20, 184, 166, 0.2); margin: 20px 0;"></div>
 
         <div>
-          <span style="color: #FF9800; font-size: 14px;">Status: </span>
-          <span style="color: #ffffff; font-size: 16px; background-color: rgba(76, 175, 80, 0.3); padding: 4px 12px; border-radius: 6px; display: inline-block; font-weight: 600;">CONFIRMED</span>
+          <span style="color: #14B8A6; font-size: 14px;">Status: </span>
+          <span style="color: #ffffff; font-size: 16px; background-color: rgba(16, 185, 129, 0.3); padding: 4px 12px; border-radius: 6px; display: inline-block; font-weight: 600;">CONFIRMED</span>
         </div>
       </div>
 
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">Please review the attached voucher carefully. It contains your travel dates, accommodation details, meal plans, and itinerary.</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">Please review the attached voucher carefully. It contains your travel dates, accommodation details, meal plans, and itinerary.</p>
 
-      <p style="color: #666666; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions or need assistance, please don't hesitate to contact us.</p>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 32px 0;">If you have any questions or need assistance, please don't hesitate to contact us.</p>
 
-      <p style="color: #FF9800; font-size: 18px; font-weight: bold; margin: 20px 0; text-align: center;">We wish you a wonderful and memorable journey! 🎉</p>
+      <p style="color: #0F766E; font-size: 18px; font-weight: bold; margin: 20px 0; text-align: center;">We wish you a wonderful and memorable journey! 🎉</p>
     `;
     const html = this.getEmailTemplate(content);
 

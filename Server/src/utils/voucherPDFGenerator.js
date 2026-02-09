@@ -84,17 +84,20 @@ const fetchImage = async (url) => {
   }
 };
 
-// Color Scheme
+// Modern Color Scheme - Teal/Slate Theme
 const COLORS = {
-  primary: '#EA580C', // Orange
-  primaryDark: '#C2410C',
-  secondary: '#1F2937', // Dark Gray
-  text: '#374151',
-  textLight: '#6B7280',
-  background: '#F9FAFB',
+  primary: '#0F766E',        // Deep Teal
+  primaryLight: '#14B8A6',   // Light teal
+  primaryDark: '#134E4A',    // Dark teal
+  secondary: '#1E293B',      // Dark slate
+  accent: '#F59E0B',         // Amber gold
+  accentLight: '#FEF3C7',    // Light amber
+  text: '#0F172A',           // Near black
+  textLight: '#64748B',      // Gray text
+  background: '#F8FAFC',     // Light background
   white: '#FFFFFF',
-  border: '#E5E7EB',
-  accentBg: '#FFF7ED', // Light orange bg
+  border: '#E2E8F0',
+  accentBg: '#F0FDFA',       // Light teal bg
 };
 
 const formatDate = (date) => {
@@ -170,32 +173,46 @@ export async function generateVoucherPDF(voucher, lead) {
         const contentWidth = 595 - (margin * 2);
         let y = 0;
 
-        // --- 1. HEADER SECTION ---
-        // Logo and Company Name Background
-        doc.rect(0, 0, 595, 80).fill(COLORS.white);
+        // --- 1. MODERN HEADER SECTION ---
+        // Two-tone header background
+        doc.rect(0, 0, 595, 90).fill(COLORS.secondary);
+        doc.rect(420, 0, 175, 90).fill(COLORS.primary);
 
         if (logoBuffer) {
-          doc.image(logoBuffer, margin, 20, { height: 40 });
+          doc.image(logoBuffer, margin, 18, { height: 55 });
+
+          // Company Name & Motto
+          doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(18)
+            .text(BRANDING.company.name, margin + 70, 28);
+
+          doc.font('Helvetica').fontSize(9).fillColor('#94A3B8') // Light gray for motto
+            .text(BRANDING.company.tagline || 'Premium Travel Experiences', margin + 70, 50);
         } else {
-          doc.fillColor(COLORS.primary).fontSize(20).font('Helvetica-Bold').text(BRANDING.company.name, margin, 30);
+          doc.fillColor(COLORS.white).fontSize(20).font('Helvetica-Bold')
+            .text(BRANDING.company.name, margin, 25);
+          doc.font('Helvetica').fontSize(10).fillColor('#94A3B8')
+            .text(BRANDING.company.tagline || 'Premium Travel Experiences', margin, 50);
         }
 
-        // Voucher Title & Number (Right Aligned)
-        doc.fontSize(24).font('Helvetica-Bold').fillColor(COLORS.secondary)
-          .text('TRAVEL VOUCHER', 0, 25, { align: 'right', width: 595 - margin });
+        // Voucher Title (Right side in teal section)
+        doc.fontSize(14).font('Helvetica-Bold').fillColor(COLORS.white)
+          .text('TRAVEL', 435, 25, { width: 145, align: 'center' })
+          .text('VOUCHER', 435, 42, { width: 145, align: 'center' });
 
-        doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-          .text(`#${voucher.voucherNumber || 'DRAFT'}`, 0, 55, { align: 'right', width: 595 - margin });
+        // Voucher number badge
+        doc.roundedRect(445, 65, 125, 18, 4).fill(COLORS.accent);
+        doc.fillColor(COLORS.white).fontSize(8).font('Helvetica-Bold')
+          .text(`#${voucher.voucherNumber || 'DRAFT'}`, 450, 69, { width: 115, align: 'center' });
 
-        y = 80;
+        y = 100;
 
-        // --- 2. PACKAGE INFO BANNER (Consistent for all vouchers) ---
-        doc.rect(0, y, 595, 100).fill(COLORS.secondary);
-        doc.fillColor(COLORS.white).fontSize(22).font('Helvetica-Bold')
-          .text(packageDetails.name || 'Your Trip', margin, y + 35);
-        doc.fontSize(12).font('Helvetica')
-          .text(`${packageDetails.destination || ''}  |  ${packageDetails.duration || 0} Days`, margin, y + 65);
-        y += 120;
+        // --- 2. PACKAGE INFO BANNER ---
+        doc.rect(0, y, 595, 80).fill(COLORS.primaryDark);
+        doc.fillColor(COLORS.white).fontSize(20).font('Helvetica-Bold')
+          .text(packageDetails.name || 'Your Trip', margin, y + 25);
+        doc.fontSize(11).font('Helvetica').fillColor(COLORS.accentLight)
+          .text(`${packageDetails.destination || ''}  |  ${packageDetails.duration || 0} Days`, margin, y + 52);
+        y += 95;
 
         // --- 3. TRIP INFO GRID ---
         // Grid configuration
@@ -344,8 +361,8 @@ export async function generateVoucherPDF(voucher, lead) {
 
             // Day card with subtle background
             // --- RENDER ---
-            // Background
-            doc.roundedRect(margin, y, contentWidth, cardHeight, 3).fillAndStroke('#FFF7ED', '#FED7AA');
+            // Background (Light teal with teal border)
+            doc.roundedRect(margin, y, contentWidth, cardHeight, 5).fillAndStroke(COLORS.accentBg, COLORS.primaryLight);
 
             // Badge
             doc.circle(margin + 15, y + 20, 12).fill(COLORS.primary);
@@ -414,7 +431,7 @@ export async function generateVoucherPDF(voucher, lead) {
 
             // Hotel
             if (hotelHeight > 0) {
-              doc.font('Helvetica-Bold').fillColor('#C2410C').fontSize(9)
+              doc.font('Helvetica-Bold').fillColor(COLORS.primaryDark).fontSize(9)
                 .text('Hotel: ', margin + 35, currentTextY, { continued: true })
                 .font('Helvetica').text(day.accommodation.name, { width: textWidth });
               currentTextY += hotelHeight;

@@ -24,21 +24,23 @@ const loadLogo = () => {
   }
 };
 
-// Color Scheme matching billingPDFGenerator.js
+// Modern Color Scheme - Teal/Slate Theme (matching billingPDFGenerator.js)
 const PALETTE = {
-  background: [249, 250, 251],      // Light gray
-  secondaryBackground: [209, 213, 219], // Medium gray
-  primaryText: [31, 41, 55],        // Very dark gray/black
-  secondaryText: [75, 85, 99],      // Medium gray
-  mutedText: [107, 114, 128],       // Light gray
-  accent: [234, 88, 12],            // Orange-red (primary accent)
-  accentDark: [234, 179, 8],        // Yellow
-  badgeBg: [234, 88, 12],           // Orange-red
+  background: [248, 250, 252],      // Light background
+  secondaryBackground: [226, 232, 240], // Border color
+  primaryText: [15, 23, 42],        // Near black
+  secondaryText: [100, 116, 139],   // Gray text
+  mutedText: [148, 163, 184],       // Light gray
+  accent: [15, 118, 110],           // Deep teal (primary)
+  accentLight: [20, 184, 166],      // Light teal
+  accentDark: [19, 78, 74],         // Dark teal
+  gold: [245, 158, 11],             // Amber gold
+  badgeBg: [245, 158, 11],          // Amber gold for badges
   badgeText: [255, 255, 255],       // White
-  cardBg: [245, 245, 245],          // Very light gray
-  cardBorder: [156, 163, 175],      // Gray border
-  pillBg: [209, 213, 219],          // Light gray
-  timeline: [0, 0, 0],              // Black
+  cardBg: [240, 253, 250],          // Light teal bg
+  cardBorder: [20, 184, 166],       // Teal border
+  pillBg: [226, 232, 240],          // Light gray
+  headerBg: [30, 41, 59],           // Dark slate
 };
 
 // Convert RGB array to hex for PDFKit
@@ -51,19 +53,21 @@ const rgbToHex = (rgb) => {
 };
 
 const COLORS = {
-  primary: rgbToHex(PALETTE.accent),      // Orange-red
-  primaryDark: rgbToHex([180, 60, 8]),    // Darker orange
-  primaryLight: rgbToHex([251, 146, 60]), // Lighter orange
-  accent: rgbToHex(PALETTE.accentDark),   // Yellow
+  primary: '#0F766E',               // Deep teal
+  primaryDark: '#134E4A',           // Dark teal
+  primaryLight: '#14B8A6',          // Light teal
+  accent: '#F59E0B',                // Amber gold
+  accentLight: '#FEF3C7',           // Light amber
+  slate: '#1E293B',                 // Dark slate
   white: '#FFFFFF',
-  gray100: '#F9FAFB',
-  gray200: '#E5E7EB',
-  gray600: '#4B5563',
-  gray700: '#374151',
-  gray800: '#1F2937',
-  gray900: '#111827',
+  gray100: '#F8FAFC',
+  gray200: '#E2E8F0',
+  gray600: '#64748B',
+  gray700: '#334155',
+  gray800: '#1E293B',
+  gray900: '#0F172A',
   success: '#10B981',
-  warning: rgbToHex(PALETTE.accentDark),
+  warning: '#F59E0B',
   error: '#EF4444',
 };
 
@@ -94,41 +98,32 @@ export function generatePaymentHistoryPDF(paymentHistory) {
       const stream = fs.createWriteStream(filePath);
       doc.pipe(stream);
 
-      // ===== HEADER WITH WAVE DESIGN =====
-      const headerHeight = 100;
+      // ===== MODERN HEADER (Two-tone design) =====
+      const headerHeight = 90;
       const headerY = 0;
       const headerWidth = 595;
 
-      // Draw black wave background
-      doc.rect(0, headerY, headerWidth, headerHeight).fillAndStroke('#000000', '#000000');
+      // Draw dark slate background
+      doc.rect(0, headerY, headerWidth, headerHeight).fill(COLORS.slate);
 
-      // Draw bottom wave curve using bezier curves
-      doc.moveTo(0, headerHeight - 30)
-        .bezierCurveTo(150, headerHeight - 10, 350, headerHeight - 50, 595, headerHeight - 30)
+      // Diagonal teal accent on right
+      doc.save();
+      doc.moveTo(420, 0)
         .lineTo(595, 0)
-        .lineTo(0, 0)
-        .fill('#000000');
+        .lineTo(595, headerHeight)
+        .lineTo(350, headerHeight)
+        .closePath()
+        .fill(COLORS.primary);
+      doc.restore();
 
-      // Draw orange accent curve in top right
-      doc.moveTo(400, 0)
-        .bezierCurveTo(450, 40, 520, 60, 595, 50)
-        .lineTo(595, 0)
-        .fill('#F5A623');
-
-      let cursorX = 50;
+      let cursorX = 40;
       const logoBuffer = loadLogo();
 
       // Add logo if available
       if (logoBuffer) {
         try {
-          const logoHeight = 20;
-          const logoWidth = 80;
-          doc.image(logoBuffer, cursorX, headerY + 25, {
-            width: logoWidth,
-            height: logoHeight,
-            fit: [logoWidth, logoHeight],
-          });
-          cursorX += logoWidth + 12;
+          doc.image(logoBuffer, cursorX, headerY + 18, { height: 55 });
+          cursorX += 80;
         } catch (error) {
           console.warn('[Payment History PDF] Failed to add logo:', error);
         }
@@ -138,22 +133,19 @@ export function generatePaymentHistoryPDF(paymentHistory) {
         .fillColor(COLORS.white)
         .fontSize(16)
         .font('Helvetica-Bold')
-        .text(BRANDING.company.name, cursorX, headerY + 25)
+        .text(BRANDING.company.name, cursorX, headerY + 28)
         .fontSize(9)
         .font('Helvetica')
-        .text(BRANDING.company.tagline, cursorX, headerY + 47);
+        .fillColor(COLORS.gray600)
+        .text(BRANDING.company.tagline || 'Premium Travel Experiences', cursorX, headerY + 48);
 
-      // Add PAYMENT HISTORY badge
-      const badgeX = 490;
-      const badgeY = headerY + 40;
-      doc.circle(badgeX, badgeY, 28).fillAndStroke(COLORS.white, COLORS.white);
-
+      // Add PAYMENT HISTORY text on right (in teal section)
       doc
-        .fillColor('#000000')
-        .fontSize(6)
+        .fillColor(COLORS.white)
+        .fontSize(14)
         .font('Helvetica-Bold')
-        .text('PAYMENT', badgeX - 22, badgeY - 6, { width: 44, align: 'center' })
-        .text('HISTORY', badgeX - 22, badgeY + 1, { width: 44, align: 'center' });
+        .text('PAYMENT', 460, headerY + 25, { width: 100, align: 'center' })
+        .text('HISTORY', 460, headerY + 42, { width: 100, align: 'center' });
 
       // ===== INFO CARDS =====
       let yPos = 140;
