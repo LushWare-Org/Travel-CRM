@@ -9,9 +9,8 @@ export default {
       'http://127.0.0.1:5173',
       'http://127.0.0.1:5174',
       'http://127.0.0.1:3000',
-      'https://harshkumar.space',
-      'https://www.harshkumar.space',
-      'https://crm.harshkumar.space'
+      'https://lushtravelcloud.com',
+      'https://www.lushtravelcloud.com',
     ];
 
     // Allow requests with no origin (mobile apps, Postman, etc.)
