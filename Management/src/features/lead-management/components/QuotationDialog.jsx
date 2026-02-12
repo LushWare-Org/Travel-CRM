@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI, uploadAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
-import { formatCurrency, getCurrencySymbol, CURRENCY_CODE, LOCALE } from '../../../../utils/currency';
+import { formatCurrency, getCurrencySymbol, CURRENCY_CODE, LOCALE } from '../../../utils/currency.js';
 
 const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);

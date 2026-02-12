@@ -1,5 +1,5 @@
 import { TrendingUp, Target, Award } from 'lucide-react';
-import { getCurrencySymbol } from '../../../utils/currency';
+import { getCurrencySymbol } from '../../../utils/currency.js';
 
 /**
  * Sales Rep Personal Performance Card

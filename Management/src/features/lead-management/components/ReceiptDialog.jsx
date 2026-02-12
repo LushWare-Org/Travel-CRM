@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
-import { formatCurrency, getCurrencySymbol, CURRENCY_CODE } from '../../../../utils/currency';
+import { formatCurrency, getCurrencySymbol, CURRENCY_CODE } from '../../../utils/currency.js';
 
 const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);

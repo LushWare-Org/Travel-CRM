@@ -5,7 +5,7 @@
  */
 
 import { Moon, DollarSign, Users, Briefcase, Info } from 'lucide-react';
-import { getCurrencySymbol, CURRENCY_CODE } from '../../../../utils/currency';
+import { getCurrencySymbol, CURRENCY_CODE } from '../../../../utils/currency.js';
 
 const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange }) => {
   const handleChange = (e) => {

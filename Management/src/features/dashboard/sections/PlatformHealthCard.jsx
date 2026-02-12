@@ -1,6 +1,6 @@
 import { Users, TrendingUp, DollarSign, Activity, Briefcase, Eye } from 'lucide-react';
 import StatCard from '../../analytics/components/Common/StatCard';
-import { formatCompact } from '../../../utils/currency';
+import { formatCompact } from '../../../utils/currency.js';
 
 /**
  * Platform Health Card - Redesigned

@@ -9,7 +9,7 @@ import { jsPDF } from 'jspdf';
 import Swal from 'sweetalert2';
 import { PDF_CONFIG } from '../utils/constants';
 import ApiService from './apiService';
-import { formatCurrency, CURRENCY_CODE } from '../../../utils/currency';
+import { formatCurrency, CURRENCY_CODE } from '../../../utils/currency.js';
 
 /**
  * Load image and convert to base64

@@ -3,7 +3,7 @@ import { Search, Download, Eye, Send, Receipt, FileText, FileCheck, ExternalLink
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { invoiceAPI, receiptAPI, quotationAPI, voucherAPI, paymentHistoryAPI } from "../services/api.js";
-import { formatCurrency } from "../utils/currency";
+import { formatCurrency } from "../utils/currency.js";
 
 /**
  * BillingInvoicing - Redesigned

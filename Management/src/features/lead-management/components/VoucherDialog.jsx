@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { voucherAPI, packageAPI, customizedPackageAPI, itineraryAPI, quotationAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
-import { LOCALE } from '../../../../utils/currency';
+import { LOCALE } from '../../../utils/currency.js';
 
 const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);

@@ -1,6 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ChartContainer from '../../analytics/components/Common/ChartContainer';
-import { formatCompact } from '../../../utils/currency';
+import { formatCompact } from '../../../utils/currency.js';
 
 /**
  * Revenue Performance Section

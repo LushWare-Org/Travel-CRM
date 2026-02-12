@@ -14,7 +14,7 @@ import {
   RadialBarChart, RadialBar, Legend
 } from 'recharts';
 
-import { formatCompact } from '../../utils/currency';
+import { formatCompact } from '../../utils/currency.js';
 
 // ============================================
 // UNIQUE LOADING STATE

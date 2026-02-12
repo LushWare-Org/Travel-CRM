@@ -18,7 +18,7 @@ import ItineraryDisplay from '../ItineraryDisplay';
 import { validateItinerary } from '../../utils/helpers';
 import { VALIDATION_MESSAGES } from '../../utils/constants';
 import { createDefaultDay } from '../../types/index.js';
-import { formatCurrency } from '../../../../utils/currency';
+import { formatCurrency } from '../../../../utils/currency.js';
 
 const NewEditPackageForm = ({
   formData,

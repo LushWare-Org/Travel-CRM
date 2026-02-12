@@ -10,9 +10,8 @@ import {
 import { DollarSign, Wallet, TrendingUp, AlertCircle, Download, CreditCard, Receipt } from "lucide-react";
 import { analyticsAPI } from "../../../../services/api";
 import { exportBillingAnalyticsPDF } from "../../utils/exportAnalytics";
-import { exportBillingAnalyticsPDF } from "../../utils/exportAnalytics";
 import toast from "react-hot-toast";
-import { formatCompact, formatCurrency, getCurrencySymbol } from "../../../../utils/currency";
+import { formatCompact, formatCurrency, getCurrencySymbol } from "../../../../utils/currency.js";
 
 /**
  * BillingAnalytics Component - Redesigned
