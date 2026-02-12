@@ -51,7 +51,6 @@ const MONTHS = [
 export default function Home() {
   const navigate = useNavigate();
   const [destinations, setDestinations] = useState([]);
-  const [localDestinations, setLocalDestinations] = useState([]);
   const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,8 +150,7 @@ export default function Home() {
             if (!mounted) return;
             const sorted = dest.slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
             setPackages(pkg);
-            setDestinations(sorted.filter((d) => d.type !== 'domestic'));
-            setLocalDestinations(sorted.filter((d) => d.type === 'domestic'));
+            setDestinations(sorted);
           })
           .catch((err) => {
             if (!mounted) return;
@@ -171,8 +169,7 @@ export default function Home() {
             if (!mounted) return;
             const sorted = dest.slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
             setPackages(pkg);
-            setDestinations(sorted.filter((d) => d.type !== 'domestic'));
-            setLocalDestinations(sorted.filter((d) => d.type === 'domestic'));
+            setDestinations(sorted);
           })
           .catch((err) => {
             if (!mounted) return;
@@ -234,16 +231,16 @@ export default function Home() {
     if (!bookings || bookings.length === 0) {
       return [];
     }
-    
+
     return bookings.map((booking, i) => {
       try {
         const pkg = booking.package;
         if (!pkg) return null;
-        
-        const timeDiffSeconds = booking.createdAt 
-          ? Math.floor((new Date() - new Date(booking.createdAt)) / 1000) 
+
+        const timeDiffSeconds = booking.createdAt
+          ? Math.floor((new Date() - new Date(booking.createdAt)) / 1000)
           : 0;
-        
+
         let bookedAgoText = 'Just now';
         if (timeDiffSeconds < 1) {
           bookedAgoText = 'Just now';
@@ -265,7 +262,7 @@ export default function Home() {
           const years = Math.floor(timeDiffSeconds / 31536000);
           bookedAgoText = years === 1 ? '1 year' : `${years} years`;
         }
-        
+
         return {
           id: pkg._id,
           packageName: pkg.name,
@@ -274,9 +271,9 @@ export default function Home() {
           price: pkg.price,
           pax: booking.numberOfTravelers,
           bookedAgo: bookedAgoText,
-          traveler: { 
-            name: booking.user?.name || `Traveler ${i + 1}`, 
-            from: pkg.destination 
+          traveler: {
+            name: booking.user?.name || `Traveler ${i + 1}`,
+            from: pkg.destination
           },
           slug: pkg.slug,
         };
@@ -335,8 +332,8 @@ export default function Home() {
             }
           `}</style>
           {/* <div className="flex animate-scroll-continuous whitespace-nowrap py-5"> */}
-            {/* Tags */}
-            {/* <div className="flex items-center">
+          {/* Tags */}
+          {/* <div className="flex items-center">
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
                 <Globe className="w-5 h-5 text-orange-400 flex-shrink-0" /> Explore 100+ Destinations
               </span>
@@ -389,45 +386,44 @@ export default function Home() {
               </span>
             </div> */}
           {/* </div> */}
-        </div>       
-         {/* Video Slides */}
-       {[0, 1, 2, 3].map((i) => {
-  const isActive = i === currentSlide;
+        </div>
+        {/* Video Slides */}
+        {[0, 1, 2, 3].map((i) => {
+          const isActive = i === currentSlide;
 
-  return (
-    <div
-      key={`video-${i}`}
-      className={`absolute inset-0 transition-opacity duration-1000 ${
-        isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
-      }`}
-    >
-      <img
-        src={`/v${i + 1}-poster.webp`}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover"
-        loading={i === 0 ? 'eager' : 'lazy'}
-        decoding={i === 0 ? 'auto' : 'async'}
-      />
+          return (
+            <div
+              key={`video-${i}`}
+              className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                }`}
+            >
+              <img
+                src={`/v${i + 1}-poster.webp`}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                loading={i === 0 ? 'eager' : 'lazy'}
+                decoding={i === 0 ? 'auto' : 'async'}
+              />
 
-      {/* Video loads */}
-      {isActive && (
-        <video
-          className="absolute inset-0 w-full h-full object-cover"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="none"
-        >
-          <source src={`/v${i + 1}.mp4`} type="video/mp4" />
-        </video>
-      )}
+              {/* Video loads */}
+              {isActive && (
+                <video
+                  className="absolute inset-0 w-full h-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="none"
+                >
+                  <source src={`/v${i + 1}.mp4`} type="video/mp4" />
+                </video>
+              )}
 
-      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
-      <div className="absolute inset-0 bg-black/20" />
-    </div>
-  );
-})}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
+              <div className="absolute inset-0 bg-black/20" />
+            </div>
+          );
+        })}
 
         {/* Image Slides */}
         {/* <div className="absolute inset-0">
@@ -456,8 +452,8 @@ export default function Home() {
         </button>
 
         {/* Hero Content */}
-      <div className="relative z-30 h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">          
-        <div className="max-w-7xl text-center mx-auto">
+        <div className="relative z-30 h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">
+          <div className="max-w-7xl text-center mx-auto">
             <div className="max-w-4xl">
               <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-poppins">
                 {(() => {
@@ -472,7 +468,7 @@ export default function Home() {
                   );
                 })()}
               </h1>
-              <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{heroSlides[currentSlide % 4].subtitle}</p>             
+              <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{heroSlides[currentSlide % 4].subtitle}</p>
 
               {/* Search bar */}
               <div className="relative mt-16 md:mt-15 lg:mt-15">
@@ -491,15 +487,8 @@ export default function Home() {
                             className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium text-sm sm:text-base appearance-none cursor-pointer transition-all focus:border-orange-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
                           >
                             <option value="" disabled hidden>{destinationPlaceholder || 'Select Destination'}</option>
-                            <optgroup label="🌏 International Destinations">
+                            <optgroup label="🌏 Destinations">
                               {destinations.slice(0, 30).map((d) => (
-                                <option key={d.id} value={d.name.toLowerCase()}>
-                                  {d.name} {d.packagesCount ? `(${d.packagesCount} packages)` : ''}
-                                </option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="🏠 Domestic Destinations">
-                              {localDestinations.slice(0, 20).map((d) => (
                                 <option key={d.id} value={d.name.toLowerCase()}>
                                   {d.name} {d.packagesCount ? `(${d.packagesCount} packages)` : ''}
                                 </option>
@@ -537,8 +526,8 @@ export default function Home() {
                           {/* Month */}
                           {monthDropdownOpen && (
                             <>
-                              <div 
-                                className="fixed inset-0 z-[9998]" 
+                              <div
+                                className="fixed inset-0 z-[9998]"
                                 onClick={() => setMonthDropdownOpen(false)}
                               />
                               {/* Dropdown */}
@@ -551,11 +540,10 @@ export default function Home() {
                                         setSearchFilters(p => ({ ...p, when: month.value }));
                                         setMonthDropdownOpen(false);
                                       }}
-                                      className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${
-                                        searchFilters.when === month.value
+                                      className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${searchFilters.when === month.value
                                           ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg'
                                           : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
-                                      }`}
+                                        }`}
                                     >
                                       {month.label}
                                     </button>
@@ -589,7 +577,7 @@ export default function Home() {
         </div>
       </div>
 
-      <Stats/>
+      <Stats />
       <AboutSection />
 
       {/* Deals of the Month */}
@@ -604,7 +592,7 @@ export default function Home() {
       </section> */}
 
       <RecentlyBookedSlider items={recentItems} />
-      <DestinationsSection destinations={destinations} localDestinations={localDestinations} />
+      <DestinationsSection destinations={destinations} />
       <WhyChooseUs />
       <FeaturedPackages packages={packages} />
       <TestimonialsSection />

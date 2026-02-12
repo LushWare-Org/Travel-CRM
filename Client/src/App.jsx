@@ -7,7 +7,6 @@ import Home from './pages/Landing/Home';
 import { AuthProvider } from './context/AuthContext';
 
 const DestinationsInternational = lazy(() => import('./pages/DestinationsInternational'));
-const DestinationsDomestic = lazy(() => import('./pages/DestinationsDomestic'));
 const PackageDetails = lazy(() => import('./pages/PackageDetails'));
 const CustomizePackage = lazy(() => import('./pages/CustomizePackage'));
 const Packages = lazy(() => import('./pages/Packages'));
@@ -36,7 +35,7 @@ function AppContent() {
         else navigate(url);
       } else {
         const qKey = path.includes('destinations')
-          ? path.includes('domestic') ? 'state' : 'region'
+          ? 'region'
           : /^\d+$/.test(String(filter)) ? 'id' : 'country';
         const url = `${path}?${qKey}=${filter}`;
         if (force) navigate(url, { state: { __force: Date.now() } });
@@ -57,7 +56,6 @@ function AppContent() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/destinations-international" element={<DestinationsInternational />} />
-            <Route path="/destinations-domestic" element={<DestinationsDomestic />} />
             <Route path="/packages" element={<Packages />} />
             <Route path="/planner" element={<PlanYourTrip />} />
             <Route path="/about" element={<AboutUs />} />

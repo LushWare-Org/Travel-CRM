@@ -13,7 +13,6 @@ export default function Header({ currentPage, onNavigate }) {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
   const [internationalMenu, setInternationalMenu] = useState([]);
-  const [domesticMenu, setDomesticMenu] = useState([]);
   const location = useLocation();
   const pathname = location.pathname;
   const searchParams = new URLSearchParams(location.search);
@@ -36,7 +35,7 @@ export default function Header({ currentPage, onNavigate }) {
         rafId = null;
       });
     };
-    
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
@@ -103,13 +102,6 @@ export default function Header({ currentPage, onNavigate }) {
         const sorted = (destinations || []).slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
         setInternationalMenu(
           sorted
-            .filter((dest) => dest.type !== 'domestic')
-            .slice(0, MAX_NAV_ITEMS)
-            .map((dest) => ({ id: dest.id, name: dest.name, slug: dest.slug }))
-        );
-        setDomesticMenu(
-          sorted
-            .filter((dest) => dest.type === 'domestic')
             .slice(0, MAX_NAV_ITEMS)
             .map((dest) => ({ id: dest.id, name: dest.name, slug: dest.slug }))
         );
@@ -117,7 +109,6 @@ export default function Header({ currentPage, onNavigate }) {
       })
       .catch(() => {
         setInternationalMenu([]);
-        setDomesticMenu([]);
         setDestinationsLoaded(true);
       })
       .finally(() => {
@@ -130,19 +121,17 @@ export default function Header({ currentPage, onNavigate }) {
 
   const navItems = useMemo(() => [
     { name: 'Home', page: 'home' },
-    { name: 'International Destinations', page: 'destinations-international', dropdown: internationalMenu },
-    { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: domesticMenu },
+    { name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu },
     { name: 'About Us', page: 'about' },
     { name: 'Contact', page: 'contact' },
     { name: 'Career', page: 'career' },
     user && { name: 'My Account', page: 'my-account' },
     !user && { name: 'Login', page: 'login' },
-  ].filter(Boolean), [user, internationalMenu, domesticMenu]);
+  ].filter(Boolean), [user, internationalMenu]);
 
   const leftNavItems = useMemo(() => [
-    { name: 'International Destinations', page: 'destinations-international', dropdown: internationalMenu },
-    { name: 'Domestic Destinations', page: 'destinations-domestic', dropdown: domesticMenu },
-  ], [internationalMenu, domesticMenu]);
+    { name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu },
+  ], [internationalMenu]);
 
   const sideMenuItems = useMemo(() => [
     { name: 'Home', page: 'home' },
@@ -161,16 +150,15 @@ export default function Header({ currentPage, onNavigate }) {
       const destination = searchParams.get('destination');
       if (!destination) return false;
       if (item.page === 'destinations-international' && internationalMenu.some(d => d.slug === destination)) return true;
-      if (item.page === 'destinations-domestic' && domesticMenu.some(d => d.slug === destination)) return true;
     }
     return false;
-  }, [pathname, searchParams, internationalMenu, domesticMenu]);
+  }, [pathname, searchParams, internationalMenu]);
 
   return (
     <header className="relative z-50 overflow-visible transition-all duration-300 bg-black shadow-lg font-opensans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
-        <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
+          <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
             <img src="/logo.png" alt="TripSkyWay Logo" className="h-10 w-auto" />
           </a>
           <div className="flex-1" />
@@ -200,8 +188,8 @@ export default function Header({ currentPage, onNavigate }) {
                       setActiveDropdown(null);
                     }}
                     className={`relative px-5 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap text-sm font-medium
-                      ${isActive 
-                        ? 'text-orange-400 font-semibold bg-orange-900/20' 
+                      ${isActive
+                        ? 'text-orange-400 font-semibold bg-orange-900/20'
                         : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
                       }
                       ${item.page === 'login' ? 'border border-orange-500/50 hover:border-orange-400' : ''}
@@ -256,7 +244,7 @@ export default function Header({ currentPage, onNavigate }) {
               );
             })}
 
-          {/* Right Side */}
+            {/* Right Side */}
             <a
               href="/planner"
               className="group relative overflow-hidden bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2 ml-4 flex-shrink-0"
@@ -356,8 +344,8 @@ export default function Header({ currentPage, onNavigate }) {
                         }
                       }}
                       className={`flex-1 text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
-                        ${isActive 
-                          ? 'text-orange-400 bg-orange-900/20' 
+                        ${isActive
+                          ? 'text-orange-400 bg-orange-900/20'
                           : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
                         }
                       `}
@@ -373,7 +361,7 @@ export default function Header({ currentPage, onNavigate }) {
                       </button>
                     )}
                   </div>
-                  
+
                   {/* Mobile Dropdown List */}
                   {item.dropdown && isMobileDropdownOpen && (
                     <div className="bg-gray-900/50 rounded-lg mt-1 mb-2 grid grid-cols-2 gap-2 p-3">
@@ -456,8 +444,8 @@ export default function Header({ currentPage, onNavigate }) {
                     setSideMenuOpen(false);
                   }}
                   className={`w-full text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
-                    ${isActive 
-                      ? 'text-orange-400 bg-orange-900/20' 
+                    ${isActive
+                      ? 'text-orange-400 bg-orange-900/20'
                       : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
                     }
                   `}

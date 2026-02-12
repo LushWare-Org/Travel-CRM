@@ -5,12 +5,10 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Search, MapPin, Globe, Home, ChevronDown } from 'lucide-react';
+import { Search, MapPin, Globe, ChevronDown } from 'lucide-react';
 import {
   POPULAR_INTERNATIONAL,
-  POPULAR_DOMESTIC,
   OTHER_INTERNATIONAL,
-  OTHER_DOMESTIC,
 } from '../utils/destinations';
 
 const DestinationSelector = ({ value, onChange, placeholder = 'Select Destination' }) => {
@@ -68,7 +66,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
 
   const renderDestinationGrid = (destinations, emptyMessage) => {
     const filtered = getFilteredDestinations(destinations);
-    
+
     if (filtered.length === 0) {
       return (
         <div className="text-center py-8 text-gray-500 text-sm">
@@ -84,11 +82,10 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
             key={dest.value}
             type="button"
             onClick={() => handleSelect(dest)}
-            className={`px-3 py-2 text-sm text-left rounded-xl transition-all ${
-              value?.value === dest.value || value?.label === dest.label
+            className={`px-3 py-2 text-sm text-left rounded-xl transition-all ${value?.value === dest.value || value?.label === dest.label
                 ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-semibold shadow-md'
                 : 'bg-gray-50 hover:bg-orange-50 text-gray-700 hover:text-orange-700 border border-gray-200 hover:border-orange-300'
-            }`}
+              }`}
           >
             {dest.label}
           </button>
@@ -111,9 +108,8 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
           </span>
         </div>
         <ChevronDown
-          className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${
-            isOpen ? 'transform rotate-180' : ''
-          }`}
+          className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'transform rotate-180' : ''
+            }`}
         />
       </div>
 
@@ -141,38 +137,24 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
             <button
               type="button"
               onClick={() => setActiveTab('popular-international')}
-              className={`flex-1 px-4 py-3 text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'popular-international'
+              className={`flex-1 px-4 py-3 text-xs font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'popular-international'
                   ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
                   : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <Globe size={14} />
-              Popular International
+              Popular Destinations
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('popular-domestic')}
-              className={`flex-1 px-4 py-3 text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'popular-domestic'
+              onClick={() => setActiveTab('other-international')}
+              className={`flex-1 px-4 py-3 text-xs font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'other-international'
                   ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
                   : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
-              }`}
-            >
-              <Home size={14} />
-              Popular Domestic
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('other')}
-              className={`flex-1 px-4 py-3 text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'other'
-                  ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
-                  : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <MapPin size={14} />
-              More
+              More Destinations
             </button>
           </div>
 
@@ -186,49 +168,21 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
                 </div>
                 {renderDestinationGrid(
                   POPULAR_INTERNATIONAL,
-                  'No international destinations found'
+                  'No destinations found'
                 )}
               </div>
             )}
 
-            {activeTab === 'popular-domestic' && (
+            {activeTab === 'other-international' && (
               <div>
-                <div className="px-2 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 mb-2">
-                  <Home size={12} className="text-orange-600" />
-                  Popular Domestic Destinations (India)
+                <div className="px-2 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 bg-white rounded-lg mb-2">
+                  <Globe size={12} className="text-orange-600" />
+                  More International Destinations
                 </div>
                 {renderDestinationGrid(
-                  POPULAR_DOMESTIC,
-                  'No domestic destinations found'
+                  OTHER_INTERNATIONAL,
+                  'No destinations found'
                 )}
-              </div>
-            )}
-
-            {activeTab === 'other' && (
-              <div className="space-y-4">
-                {/* Other International */}
-                <div>
-                  <div className="px-2 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 bg-white rounded-lg mb-2">
-                    <Globe size={12} className="text-orange-600" />
-                    Other International
-                  </div>
-                  {renderDestinationGrid(
-                    OTHER_INTERNATIONAL,
-                    'No international destinations found'
-                  )}
-                </div>
-
-                {/* Other Domestic */}
-                <div>
-                  <div className="px-2 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 bg-white rounded-lg mb-2 mt-4">
-                    <Home size={12} className="text-orange-600" />
-                    Other Domestic (India)
-                  </div>
-                  {renderDestinationGrid(
-                    OTHER_DOMESTIC,
-                    'No domestic destinations found'
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -275,4 +229,3 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
 };
 
 export default DestinationSelector;
-

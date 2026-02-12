@@ -204,7 +204,7 @@ export default function PackagesPage() {
 
   const destinationLabel = selectedDestination?.name || 'All Destinations';
   const destinationTypeLabel = selectedDestination
-    ? selectedDestination.type === 'domestic' ? 'Domestic' : 'International'
+    ? 'International'
     : 'Curated';
   const categoryLabel = categoryQuery
     ? categoryQuery.charAt(0).toUpperCase() + categoryQuery.slice(1)

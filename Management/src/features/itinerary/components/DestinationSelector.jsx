@@ -4,12 +4,10 @@
  */
 
 import { useState } from 'react';
-import { Search, MapPin, Globe, Home } from 'lucide-react';
+import { Search, MapPin, Globe } from 'lucide-react';
 import {
   POPULAR_INTERNATIONAL,
-  POPULAR_DOMESTIC,
   OTHER_INTERNATIONAL,
-  OTHER_DOMESTIC,
   ALL_DESTINATIONS,
 } from '../utils/countries';
 
@@ -34,7 +32,7 @@ const DestinationSelector = ({ value, onChange, name = 'destination' }) => {
 
   const renderDestinationGrid = (destinations, emptyMessage) => {
     const filtered = getFilteredDestinations(destinations);
-    
+
     if (filtered.length === 0) {
       return (
         <div className="text-center py-8 text-gray-500 text-sm">
@@ -50,11 +48,10 @@ const DestinationSelector = ({ value, onChange, name = 'destination' }) => {
             key={dest.value}
             type="button"
             onClick={() => handleSelect(dest)}
-            className={`px-3 py-2 text-sm text-left rounded-md transition-all ${
-              value === dest.label
+            className={`px-3 py-2 text-sm text-left rounded-md transition-all ${value === dest.label
                 ? 'bg-blue-500 text-white font-medium shadow-md'
                 : 'bg-gray-50 hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200'
-            }`}
+              }`}
           >
             {dest.label}
           </button>
@@ -77,9 +74,8 @@ const DestinationSelector = ({ value, onChange, name = 'destination' }) => {
           </span>
         </div>
         <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${
-            isOpen ? 'transform rotate-180' : ''
-          }`}
+          className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'transform rotate-180' : ''
+            }`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -111,38 +107,24 @@ const DestinationSelector = ({ value, onChange, name = 'destination' }) => {
             <button
               type="button"
               onClick={() => setActiveTab('popular-international')}
-              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
-                activeTab === 'popular-international'
+              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${activeTab === 'popular-international'
                   ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
                   : 'text-gray-600 hover:text-blue-600'
-              }`}
+                }`}
             >
               <Globe size={14} />
-              Popular International
+              Popular Destinations
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('popular-domestic')}
-              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
-                activeTab === 'popular-domestic'
+              onClick={() => setActiveTab('other-international')}
+              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${activeTab === 'other-international'
                   ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
                   : 'text-gray-600 hover:text-blue-600'
-              }`}
-            >
-              <Home size={14} />
-              Popular Domestic
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('other')}
-              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
-                activeTab === 'other'
-                  ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
-                  : 'text-gray-600 hover:text-blue-600'
-              }`}
+                }`}
             >
               <MapPin size={14} />
-              More
+              More Destinations
             </button>
           </div>
 
@@ -156,49 +138,21 @@ const DestinationSelector = ({ value, onChange, name = 'destination' }) => {
                 </div>
                 {renderDestinationGrid(
                   POPULAR_INTERNATIONAL,
-                  'No international destinations found'
+                  'No destinations found'
                 )}
               </div>
             )}
 
-            {activeTab === 'popular-domestic' && (
+            {activeTab === 'other-international' && (
               <div>
-                <div className="px-2 py-1 text-xs font-semibold text-gray-600 flex items-center gap-1">
-                  <Home size={12} />
-                  Popular Domestic Destinations (India)
+                <div className="px-2 py-1 text-xs font-semibold text-gray-600 flex items-center gap-1 bg-gray-100 rounded">
+                  <Globe size={12} />
+                  More International Destinations
                 </div>
                 {renderDestinationGrid(
-                  POPULAR_DOMESTIC,
-                  'No domestic destinations found'
+                  OTHER_INTERNATIONAL,
+                  'No destinations found'
                 )}
-              </div>
-            )}
-
-            {activeTab === 'other' && (
-              <div className="space-y-3">
-                {/* Other International */}
-                <div>
-                  <div className="px-2 py-1 text-xs font-semibold text-gray-600 flex items-center gap-1 bg-gray-100 rounded">
-                    <Globe size={12} />
-                    Other International
-                  </div>
-                  {renderDestinationGrid(
-                    OTHER_INTERNATIONAL,
-                    'No international destinations found'
-                  )}
-                </div>
-
-                {/* Other Domestic */}
-                <div>
-                  <div className="px-2 py-1 text-xs font-semibold text-gray-600 flex items-center gap-1 bg-gray-100 rounded mt-2">
-                    <Home size={12} />
-                    Other Domestic (India)
-                  </div>
-                  {renderDestinationGrid(
-                    OTHER_DOMESTIC,
-                    'No domestic destinations found'
-                  )}
-                </div>
               </div>
             )}
           </div>

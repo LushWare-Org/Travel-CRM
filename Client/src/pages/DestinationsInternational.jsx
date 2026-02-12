@@ -16,7 +16,7 @@ import {
   Grid,
   List,
   ArrowRight,
-  Sun, 
+  Sun,
 } from 'lucide-react';
 import { fetchPackages } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
@@ -73,8 +73,7 @@ export default function DestinationsInternational() {
     fetchPackages({ limit: 100 })
       .then(({ destinations: dest }) => {
         if (!isMounted) return;
-        const international = dest.filter(d => d.type !== 'domestic');
-        setDestinations(international);
+        setDestinations(dest);
       })
       .catch(err => {
         if (!isMounted) return;
@@ -200,9 +199,8 @@ export default function DestinationsInternational() {
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1
-            className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${
-              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+              }`}
             style={{ lineHeight: '1.15' }}
           >
             Discover Your Next{' '}
@@ -227,17 +225,15 @@ export default function DestinationsInternational() {
             </span>
           </h1>
           <p
-            className={`text-lg md:text-xl text-white/80 max-w-3xl mx-auto mb-8 transition-all duration-700 delay-200 ${
-              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className={`text-lg md:text-xl text-white/80 max-w-3xl mx-auto mb-8 transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+              }`}
           >
             Explore {destinations.length} incredible international destinations crafted for comfort, class & unforgettable moments
           </p>
           {/* Social Proof */}
           <div
-            className={`mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-8 transition-all duration-700 delay-500 ${
-              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className={`mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-8 transition-all duration-700 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+              }`}
           >
             <div className="flex items-center gap-3">
               <div className="flex -space-x-3">
@@ -276,11 +272,10 @@ export default function DestinationsInternational() {
             <div className="flex items-center space-x-2 md:space-x-4 w-full md:w-auto">
               <button
                 onClick={() => setShowFilters((prev) => !prev)}
-                className={`flex items-center space-x-2 px-3 md:px-4 py-2 rounded-lg transition-all duration-300 text-sm md:text-base ${
-                  showFilters
+                className={`flex items-center space-x-2 px-3 md:px-4 py-2 rounded-lg transition-all duration-300 text-sm md:text-base ${showFilters
                     ? 'bg-gray-100 hover:bg-gray-200 text-black shadow-md hover:shadow-lg'
                     : 'bg-gray-100 hover:bg-gray-200 text-black border border-gray-200 hover:border-orange-300'
-                }`}
+                  }`}
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 <span className="font-semibold">{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
@@ -311,21 +306,19 @@ export default function DestinationsInternational() {
               <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1 w-full md:w-auto">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
-                    viewMode === 'grid' 
-                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200' 
+                  className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'grid'
+                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
                       : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
-                  }`}
+                    }`}
                 >
                   <Grid className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
-                    viewMode === 'list' 
-                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200' 
+                  className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'list'
+                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
                       : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
-                  }`}
+                    }`}
                 >
                   <List className="w-5 h-5" />
                 </button>
@@ -344,7 +337,7 @@ export default function DestinationsInternational() {
               <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-screen md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-32 2xl:rounded-2xl 2xl:h-auto overflow-y-auto">
                 <div className="flex items-center justify-between mb-6 2xl:mb-6">
                   <h3 className="text-xl font-bold flex items-center gap-2">
-                    <Filter className="w-5 h-5 text-orange-600" /> 
+                    <Filter className="w-5 h-5 text-orange-600" />
                   </h3>
                   <button
                     onClick={() => setShowFilters(false)}
@@ -371,7 +364,7 @@ export default function DestinationsInternational() {
                 {/* Region */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-gray-600" /> 
+                    <Globe className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-900">Region</span>
                   </h4>
                   <div className="space-y-1">
@@ -379,19 +372,17 @@ export default function DestinationsInternational() {
                       <div key={region}>
                         <button
                           onClick={() => toggleRegion(region)}
-                          className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center justify-between group cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${
-                            selectedRegions.includes(region)
+                          className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center justify-between group cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${selectedRegions.includes(region)
                               ? 'bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100 text-orange-800 border-orange-300 shadow-sm'
                               : 'bg-white hover:bg-gray-50 text-gray-700'
-                          }`}
+                            }`}
                         >
                           <span className="font-medium">{region}</span>
                           <ChevronRight
-                            className={`w-4 h-4 transition-transform ${
-                              selectedRegions.includes(region) 
-                                ? 'text-orange-600' 
+                            className={`w-4 h-4 transition-transform ${selectedRegions.includes(region)
+                                ? 'text-orange-600'
                                 : 'text-gray-400 group-hover:text-orange-500'
-                            }`}
+                              }`}
                           />
                         </button>
                         {region !== 'All' && selectedRegions.includes(region) && countriesByRegion[region] && (
@@ -417,7 +408,7 @@ export default function DestinationsInternational() {
                 {/* Price Range */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <IndianRupee className="w-4 h-4 text-gray-600" /> 
+                    <IndianRupee className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-900">Budget</span>
                   </h4>
                   <div className="space-y-2">
@@ -440,7 +431,7 @@ export default function DestinationsInternational() {
 
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Star className="w-4 h-4 text-gray-600" /> 
+                    <Star className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-900">Hotel Rating</span>
                   </h4>
                   <div className="space-y-2">
@@ -458,8 +449,8 @@ export default function DestinationsInternational() {
                         <div className="flex items-center gap-2">
                           <div className="flex gap-0.5">
                             {[...Array(5)].map((_, i) => (
-                              <Star 
-                                key={i} 
+                              <Star
+                                key={i}
                                 className={`w-4 h-4 ${i < starCount ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
                               />
                             ))}
@@ -504,7 +495,7 @@ export default function DestinationsInternational() {
                         />
                       </picture>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
@@ -565,7 +556,7 @@ export default function DestinationsInternational() {
                           alt={dest.name}
                           loading="lazy"
                           decoding="async"
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
                       </div>
@@ -596,7 +587,7 @@ export default function DestinationsInternational() {
                           <Link
                             to={`/packages?destination=${dest.slug}`}
                             onClick={(e) => e.stopPropagation()}
-                        className="px-8 py-3 bg-black hover:bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
+                            className="px-8 py-3 bg-black hover:bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
                           >
                             <span>View Packages</span>
                             <ArrowRight className="w-5 h-5" />
@@ -622,11 +613,10 @@ export default function DestinationsInternational() {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${
-                        currentPage === page
+                      className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${currentPage === page
                           ? 'bg-orange-600 text-white shadow-lg'
                           : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                      }`}
+                        }`}
                     >
                       {page}
                     </button>

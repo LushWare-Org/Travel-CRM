@@ -1,6 +1,6 @@
 /**
  * Destinations for travel packages
- * Organized by popular, international, and domestic (India) destinations
+ * Organized by popular and other international destinations
  */
 
 // Popular International Destinations
@@ -18,47 +18,6 @@ export const POPULAR_INTERNATIONAL = [
   { value: 'Sri Lanka', label: 'Sri Lanka' },
   { value: 'Thailand', label: 'Thailand' },
   { value: 'Vietnam', label: 'Vietnam' },
-];
-
-// Popular Domestic Destinations (India)
-export const POPULAR_DOMESTIC = [
-  { value: 'Andaman', label: 'Andaman & Nicobar Islands' },
-  { value: 'Goa', label: 'Goa' },
-  { value: 'Himachal', label: 'Himachal Pradesh' },
-  { value: 'Kashmir', label: 'Kashmir' },
-  { value: 'Kerala', label: 'Kerala' },
-  { value: 'Rajasthan', label: 'Rajasthan' },
-  { value: 'Northeast', label: 'Northeast India' },
-];
-
-// Additional Domestic Destinations (India)
-export const OTHER_DOMESTIC = [
-  { value: 'Agra', label: 'Agra (Taj Mahal)' },
-  { value: 'Amritsar', label: 'Amritsar' },
-  { value: 'Assam', label: 'Assam' },
-  { value: 'Bengaluru', label: 'Bengaluru' },
-  { value: 'Chennai', label: 'Chennai' },
-  { value: 'Darjeeling', label: 'Darjeeling' },
-  { value: 'Delhi', label: 'Delhi' },
-  { value: 'Gujarat', label: 'Gujarat' },
-  { value: 'Hampi', label: 'Hampi' },
-  { value: 'Jaipur', label: 'Jaipur' },
-  { value: 'Kolkata', label: 'Kolkata' },
-  { value: 'Ladakh', label: 'Ladakh' },
-  { value: 'Leh', label: 'Leh' },
-  { value: 'Lakshadweep', label: 'Lakshadweep' },
-  { value: 'Manali', label: 'Manali' },
-  { value: 'Mumbai', label: 'Mumbai' },
-  { value: 'Mysore', label: 'Mysore' },
-  { value: 'Ooty', label: 'Ooty' },
-  { value: 'Pondicherry', label: 'Pondicherry' },
-  { value: 'Punjab', label: 'Punjab' },
-  { value: 'Rishikesh', label: 'Rishikesh' },
-  { value: 'Shimla', label: 'Shimla' },
-  { value: 'Sikkim', label: 'Sikkim' },
-  { value: 'Udaipur', label: 'Udaipur' },
-  { value: 'Uttarakhand', label: 'Uttarakhand' },
-  { value: 'Varanasi', label: 'Varanasi' },
 ];
 
 // Additional International Destinations
@@ -112,8 +71,5 @@ export const OTHER_INTERNATIONAL = [
 // Combined list for search functionality
 export const ALL_DESTINATIONS = [
   ...POPULAR_INTERNATIONAL,
-  ...POPULAR_DOMESTIC,
-  ...OTHER_DOMESTIC,
   ...OTHER_INTERNATIONAL,
 ].sort((a, b) => a.label.localeCompare(b.label));
-

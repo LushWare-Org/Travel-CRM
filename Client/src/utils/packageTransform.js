@@ -7,40 +7,7 @@ const slugify = (value = '') => value
   .replace(/-{2,}/g, '-')
   .replace(/^-|-$/g, '');
 
-const DOMESTIC_KEYWORDS = [
-  'india',
-  'andaman',
-  'andaman & nicobar',
-  'goa',
-  'kerala',
-  'kashmir',
-  'himachal',
-  'himachal pradesh',
-  'rajasthan',
-  'northeast',
-  'northeast india',
-  'delhi',
-  'mumbai',
-  'jaipur',
-  'udaipur',
-  'varanasi',
-  'sikkim',
-  'uttarakhand',
-  'ladakh',
-  'leh',
-  'shimla',
-  'manali',
-  'pondicherry',
-  'lakshadweep',
-  'agra',
-  'darjeeling',
-  'coorg',
-  'amritsar',
-  'gujarat',
-  'bhopal',
-  'kolkata',
-  'bangalore',
-];
+
 
 const COUNTRY_REGION_MAP = {
   'indonesia': 'Asia',
@@ -121,10 +88,7 @@ const ACTIVITY_RULES = [
   { label: 'Family', pattern: /(family|kids|children|child|friendly)/i },
 ];
 
-const isDomesticDestination = (value = '') => {
-  const normalized = value.toLowerCase();
-  return DOMESTIC_KEYWORDS.some((keyword) => normalized.includes(keyword));
-};
+
 
 const inferRegion = (countryOrLocation = '') => {
   const normalized = countryOrLocation.toLowerCase();
@@ -150,16 +114,12 @@ export const normalizeDestination = (destinationValue = '') => {
   const parts = raw.split(',').map((part) => part.trim()).filter(Boolean);
   const name = parts[0] || raw;
   const lastSegment = parts.length > 1 ? parts[parts.length - 1] : '';
-  const type = isDomesticDestination(raw) ? 'domestic' : 'international';
-  const country = type === 'domestic'
-    ? 'India'
-    : (lastSegment || raw);
-  const region = type === 'domestic' ? 'India' : inferRegion(country);
+  const type = 'international';
+  const country = lastSegment || raw;
+  const region = inferRegion(country);
   const nameSlug = slugify(name);
   const countrySlug = slugify(country);
-  const slug = type === 'domestic'
-    ? nameSlug
-    : (countrySlug || nameSlug);
+  const slug = countrySlug || nameSlug;
   const key = slug || slugify(raw);
 
   return {

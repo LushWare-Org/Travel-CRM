@@ -155,149 +155,32 @@ export const LOCATIONS_BY_DESTINATION = {
     'Sapa',
     'Phong Nha Cave',
   ],
-
-  // Popular Domestic (India)
-  'Andaman & Nicobar Islands': [
-    'Port Blair',
-    'Cellular Jail',
-    'Radhanagar Beach',
-    'Havelock Island',
-    'Neil Island',
-    'Ross Island',
-    'Baratang Island',
-    'Coral Reefs',
-    'Limestone Caves',
-  ],
-  'Goa': [
-    'Baga Beach',
-    'Calangute Beach',
-    'Anjuna Beach',
-    'Fort Aguada',
-    'Basilica of Bom Jesus',
-    'Dudhsagar Falls',
-    'Chapora Fort',
-    'Palolem Beach',
-    'Saturday Night Market',
-    'Spice Plantation',
-  ],
-  'Himachal Pradesh': [
-    'Shimla',
-    'Manali',
-    'Kullu',
-    'Dharamshala',
-    'McLeod Ganj',
-    'Dalhousie',
-    'Kasol',
-    'Rohtang Pass',
-    'Solang Valley',
-    'Hidimba Temple',
-    'Mall Road',
-  ],
-  'Kashmir': [
-    'Dal Lake',
-    'Srinagar',
-    'Gulmarg',
-    'Pahalgam',
-    'Sonamarg',
-    'Nishat Bagh',
-    'Shalimar Bagh',
-    'Shankaracharya Temple',
-    'Betaab Valley',
-    'Aru Valley',
-  ],
-  'Kerala': [
-    'Munnar',
-    'Alleppey Backwaters',
-    'Kovalam Beach',
-    'Thekkady',
-    'Wayanad',
-    'Kochi',
-    'Fort Kochi',
-    'Athirapally Falls',
-    'Varkala Beach',
-    'Tea Gardens',
-    'Houseboat',
-  ],
-  'Rajasthan': [
-    'Jaipur',
-    'Amber Fort',
-    'Hawa Mahal',
-    'City Palace Jaipur',
-    'Udaipur',
-    'Lake Pichola',
-    'City Palace Udaipur',
-    'Jaisalmer Fort',
-    'Sand Dunes',
-    'Jodhpur',
-    'Mehrangarh Fort',
-    'Pushkar',
-    'Ranthambore National Park',
-  ],
-  'Northeast India': [
-    'Kaziranga National Park',
-    'Shillong',
-    'Cherrapunji',
-    'Tawang Monastery',
-    'Gangtok',
-    'Tsomgo Lake',
-    'Nathula Pass',
-    'Mawlynnong Village',
-    'Living Root Bridges',
-    'Majuli Island',
-  ],
-
-  // Common domestic locations
-  'Delhi': [
-    'Red Fort',
-    'Qutub Minar',
-    'India Gate',
-    'Lotus Temple',
-    'Humayun\'s Tomb',
-    'Akshardham Temple',
-    'Chandni Chowk',
-    'Connaught Place',
-    'Jama Masjid',
-  ],
-  'Agra': [
-    'Taj Mahal',
-    'Agra Fort',
-    'Fatehpur Sikri',
-    'Mehtab Bagh',
-    'Itmad-ud-Daulah',
-  ],
-  'Jaipur': [
-    'Amber Fort',
-    'Hawa Mahal',
-    'City Palace',
-    'Jantar Mantar',
-    'Jal Mahal',
-    'Nahargarh Fort',
-  ],
 };
+
 
 // Get locations for a specific destination
 export const getLocationsForDestination = (destination) => {
   if (!destination) return [];
-  
+
   // Handle object format (from DestinationSelector)
   const destinationName = typeof destination === 'object' ? destination.label || destination.value : destination;
   if (!destinationName) return [];
-  
+
   // Try exact match first
   if (LOCATIONS_BY_DESTINATION[destinationName]) {
     return LOCATIONS_BY_DESTINATION[destinationName];
   }
-  
+
   // Try partial match
-  const partialMatch = Object.keys(LOCATIONS_BY_DESTINATION).find(key => 
-    key.toLowerCase().includes(destinationName.toLowerCase()) || 
+  const partialMatch = Object.keys(LOCATIONS_BY_DESTINATION).find(key =>
+    key.toLowerCase().includes(destinationName.toLowerCase()) ||
     destinationName.toLowerCase().includes(key.toLowerCase())
   );
-  
+
   if (partialMatch) {
     return LOCATIONS_BY_DESTINATION[partialMatch];
   }
-  
+
   return [];
 };
 
