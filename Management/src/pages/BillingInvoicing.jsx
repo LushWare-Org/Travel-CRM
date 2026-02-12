@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Search, Download, Eye, Send, Receipt, FileText, FileCheck, ExternalLink, Ticket, History, Calendar, X, ChevronRight, Sparkles, Filter, DollarSign, CreditCard, TrendingUp } from "lucide-react";
+import { Search, Download, Eye, Send, Receipt, FileText, FileCheck, ExternalLink, Ticket, History, Calendar, X, ChevronRight, Sparkles, Filter, DollarSign, CreditCard, TrendingUp, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { invoiceAPI, receiptAPI, quotationAPI, voucherAPI, paymentHistoryAPI } from "../services/api.js";
+import { formatCurrency } from "../utils/currency";
 
 /**
  * BillingInvoicing - Redesigned
@@ -11,6 +12,7 @@ import { invoiceAPI, receiptAPI, quotationAPI, voucherAPI, paymentHistoryAPI } f
 const BillingInvoicing = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState("grid");
   const [activeTab, setActiveTab] = useState("quotations");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
@@ -205,10 +207,8 @@ const BillingInvoicing = () => {
     return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   };
 
-  const formatCurrency = (amount) => {
-    if (!amount && amount !== 0) return "N/A";
-    return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  };
+
+
 
   // Handler functions (preserved from original)
   const handleDownloadQuotationPDF = async (quotationId) => {
@@ -454,7 +454,7 @@ const BillingInvoicing = () => {
 
       <div className="relative flex">
         {/* Left Sidebar */}
-        <aside className="w-72 min-h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 sticky top-0 flex flex-col">
+        <aside className="w-72 h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 sticky top-0 flex flex-col overflow-y-auto pb-4">
           {/* Sidebar Header */}
           <div className="p-6 border-b border-slate-200/60">
             <div className="flex items-center gap-3 mb-4">
@@ -572,6 +572,23 @@ const BillingInvoicing = () => {
                 <Filter className="w-5 h-5" />
                 {(startDate || endDate) && <span className="w-2 h-2 rounded-full bg-blue-500" />}
               </button>
+
+              <div className="flex bg-white border border-slate-200 rounded-xl p-1 gap-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-slate-100 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-slate-100 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Table View"
+                >
+                  <TableIcon className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Date Filter Panel */}
@@ -606,89 +623,313 @@ const BillingInvoicing = () => {
             {activeTab === "quotations" && (
               loadingQuotations ? <LoadingSpinner /> :
                 filteredQuotations.length === 0 ? <EmptyState message="No quotations found" /> :
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredQuotations.map((quotation) => (
-                      <DataCard
-                        key={quotation._id || quotation.id}
-                        item={quotation}
-                        type="Quotation"
-                        onView={() => setSelectedQuotation(quotation)}
-                        onDownload={() => handleDownloadQuotationPDF(quotation._id || quotation.id)}
-                        onSend={() => handleSendQuotation(quotation._id || quotation.id)}
-                      />
-                    ))}
-                  </div>
+                  viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredQuotations.map((quotation) => (
+                        <DataCard
+                          key={quotation._id || quotation.id}
+                          item={quotation}
+                          type="Quotation"
+                          onView={() => setSelectedQuotation(quotation)}
+                          onDownload={() => handleDownloadQuotationPDF(quotation._id || quotation.id)}
+                          onSend={() => handleSendQuotation(quotation._id || quotation.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-medium text-slate-500">
+                          <tr>
+                            <th className="px-4 py-3">Number</th>
+                            <th className="px-4 py-3">Customer</th>
+                            <th className="px-4 py-3">Issue Date</th>
+                            <th className="px-4 py-3">Valid Until</th>
+                            <th className="px-4 py-3">Amount</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredQuotations.map((quotation) => (
+                            <tr key={quotation._id || quotation.id} onClick={() => { const lId = quotation.lead?._id || quotation.lead?.id || quotation.lead; if (lId) handleNavigateToLead(lId); }} className="hover:bg-slate-50 transition-colors group cursor-pointer">
+                              <td className="px-4 py-3 font-medium text-slate-900">
+                                {quotation.quotationNumber || 'N/A'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="font-medium text-slate-900">{quotation.customer?.name || quotation.lead?.name || 'N/A'}</p>
+                                  <p className="text-xs text-slate-400">{quotation.customer?.email || quotation.lead?.email || ''}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(quotation.issueDate || quotation.createdAt)}</td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(quotation.validUntil)}</td>
+                              <td className="px-4 py-3 font-medium text-slate-900">{formatCurrency(quotation.totalAmount)}</td>
+                              <td className="px-4 py-3"><StatusBadge status={quotation.status} /></td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setSelectedQuotation(quotation)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="View"><Eye className="w-4 h-4" /></button>
+                                  <button onClick={() => handleDownloadQuotationPDF(quotation._id || quotation.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Download"><Download className="w-4 h-4" /></button>
+                                  <button onClick={() => handleSendQuotation(quotation._id || quotation.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Send"><Send className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
             )}
 
             {/* Invoices Grid */}
             {activeTab === "invoices" && (
               loadingInvoices ? <LoadingSpinner /> :
                 filteredInvoices.length === 0 ? <EmptyState message="No invoices found" /> :
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredInvoices.map((invoice) => (
-                      <DataCard
-                        key={invoice._id || invoice.id}
-                        item={invoice}
-                        type="Invoice"
-                        onView={() => setSelectedInvoice(invoice)}
-                        onDownload={() => handleDownloadInvoicePDF(invoice._id || invoice.id)}
-                        onSend={() => handleSendInvoice(invoice._id || invoice.id)}
-                      />
-                    ))}
-                  </div>
+                  viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredInvoices.map((invoice) => (
+                        <DataCard
+                          key={invoice._id || invoice.id}
+                          item={invoice}
+                          type="Invoice"
+                          onView={() => setSelectedInvoice(invoice)}
+                          onDownload={() => handleDownloadInvoicePDF(invoice._id || invoice.id)}
+                          onSend={() => handleSendInvoice(invoice._id || invoice.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-medium text-slate-500">
+                          <tr>
+                            <th className="px-4 py-3">Number</th>
+                            <th className="px-4 py-3">Customer</th>
+                            <th className="px-4 py-3">Issue Date</th>
+                            <th className="px-4 py-3">Due Date</th>
+                            <th className="px-4 py-3 text-right">Total</th>
+                            <th className="px-4 py-3 text-right">Paid</th>
+                            <th className="px-4 py-3 text-right">Due</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredInvoices.map((invoice) => (
+                            <tr key={invoice._id || invoice.id} onClick={() => { const lId = invoice.lead?._id || invoice.lead?.id || invoice.lead; if (lId) handleNavigateToLead(lId); }} className="hover:bg-slate-50 transition-colors group cursor-pointer">
+                              <td className="px-4 py-3 font-medium text-slate-900">{invoice.invoiceNumber || 'N/A'}</td>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="font-medium text-slate-900">{invoice.customer?.name || invoice.lead?.name || 'N/A'}</p>
+                                  <p className="text-xs text-slate-400">{invoice.customer?.email || invoice.lead?.email || ''}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(invoice.createdAt)}</td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(invoice.dueDate)}</td>
+                              <td className="px-4 py-3 text-right font-medium text-slate-900">{formatCurrency(invoice.totalAmount)}</td>
+                              <td className="px-4 py-3 text-right text-emerald-600">{formatCurrency(invoice.paidAmount)}</td>
+                              <td className="px-4 py-3 text-right text-amber-600">{formatCurrency(invoice.outstandingAmount)}</td>
+                              <td className="px-4 py-3"><StatusBadge status={invoice.status} /></td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setSelectedInvoice(invoice)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="View"><Eye className="w-4 h-4" /></button>
+                                  <button onClick={() => handleDownloadInvoicePDF(invoice._id || invoice.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Download"><Download className="w-4 h-4" /></button>
+                                  <button onClick={() => handleSendInvoice(invoice._id || invoice.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Send"><Send className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
             )}
 
             {/* Receipts Grid */}
             {activeTab === "receipts" && (
               loadingReceipts ? <LoadingSpinner /> :
                 filteredReceipts.length === 0 ? <EmptyState message="No receipts found" /> :
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredReceipts.map((receipt) => (
-                      <DataCard
-                        key={receipt._id || receipt.id}
-                        item={receipt}
-                        type="Receipt"
-                        onView={() => setSelectedReceipt(receipt)}
-                        onDownload={() => handleDownloadReceiptPDF(receipt._id || receipt.id)}
-                        onSend={() => handleSendReceipt(receipt._id || receipt.id)}
-                      />
-                    ))}
-                  </div>
+                  viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredReceipts.map((receipt) => (
+                        <DataCard
+                          key={receipt._id || receipt.id}
+                          item={receipt}
+                          type="Receipt"
+                          onView={() => setSelectedReceipt(receipt)}
+                          onDownload={() => handleDownloadReceiptPDF(receipt._id || receipt.id)}
+                          onSend={() => handleSendReceipt(receipt._id || receipt.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-medium text-slate-500">
+                          <tr>
+                            <th className="px-4 py-3">Number</th>
+                            <th className="px-4 py-3">Customer</th>
+                            <th className="px-4 py-3">Date</th>
+                            <th className="px-4 py-3">Method</th>
+                            <th className="px-4 py-3">Amount</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredReceipts.map((receipt) => (
+                            <tr key={receipt._id || receipt.id} onClick={() => { const lId = receipt.lead?._id || receipt.lead?.id || receipt.lead; if (lId) handleNavigateToLead(lId); }} className="hover:bg-slate-50 transition-colors group cursor-pointer">
+                              <td className="px-4 py-3 font-medium text-slate-900">{receipt.receiptNumber || 'N/A'}</td>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="font-medium text-slate-900">{receipt.customer?.name || receipt.lead?.name || 'N/A'}</p>
+                                  <p className="text-xs text-slate-400">{receipt.customer?.email || receipt.lead?.email || ''}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(receipt.paymentDate)}</td>
+                              <td className="px-4 py-3 text-slate-600 capitalize">{receipt.paymentMethod || 'N/A'}</td>
+                              <td className="px-4 py-3 font-medium text-slate-900">{formatCurrency(receipt.amount)}</td>
+                              <td className="px-4 py-3"><StatusBadge status={receipt.receiptStatus} /></td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setSelectedReceipt(receipt)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="View"><Eye className="w-4 h-4" /></button>
+                                  <button onClick={() => handleDownloadReceiptPDF(receipt._id || receipt.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Download"><Download className="w-4 h-4" /></button>
+                                  <button onClick={() => handleSendReceipt(receipt._id || receipt.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Send"><Send className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
             )}
 
             {/* Vouchers Grid */}
             {activeTab === "vouchers" && (
               loadingVouchers ? <LoadingSpinner /> :
                 filteredVouchers.length === 0 ? <EmptyState message="No vouchers found" /> :
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredVouchers.map((voucher) => (
-                      <DataCard
-                        key={voucher._id || voucher.id}
-                        item={voucher}
-                        type="Voucher"
-                        onView={() => setSelectedVoucher(voucher)}
-                        onDownload={() => handleDownloadVoucherPDF(voucher._id || voucher.id)}
-                        onSend={() => handleSendVoucher(voucher._id || voucher.id)}
-                      />
-                    ))}
-                  </div>
+                  viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredVouchers.map((voucher) => (
+                        <DataCard
+                          key={voucher._id || voucher.id}
+                          item={voucher}
+                          type="Voucher"
+                          onView={() => setSelectedVoucher(voucher)}
+                          onDownload={() => handleDownloadVoucherPDF(voucher._id || voucher.id)}
+                          onSend={() => handleSendVoucher(voucher._id || voucher.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-medium text-slate-500">
+                          <tr>
+                            <th className="px-4 py-3">Number</th>
+                            <th className="px-4 py-3">Customer</th>
+                            <th className="px-4 py-3">Package</th>
+                            <th className="px-4 py-3">Travel Date</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredVouchers.map((voucher) => (
+                            <tr key={voucher._id || voucher.id} onClick={() => { const lId = voucher.lead?._id || voucher.lead?.id || voucher.lead; if (lId) handleNavigateToLead(lId); }} className="hover:bg-slate-50 transition-colors group cursor-pointer">
+                              <td className="px-4 py-3 font-medium text-slate-900">{voucher.voucherNumber || 'N/A'}</td>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="font-medium text-slate-900">{voucher.customer?.name || voucher.lead?.name || 'N/A'}</p>
+                                  <p className="text-xs text-slate-400">{voucher.customer?.email || voucher.lead?.email || ''}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {voucher.package?.name || voucher.customizedPackage?.name || voucher.packageDetails?.name || 'N/A'}
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {formatDate(voucher.travelStartDate)} - {formatDate(voucher.travelEndDate)}
+                              </td>
+                              <td className="px-4 py-3"><StatusBadge status={voucher.status} /></td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setSelectedVoucher(voucher)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="View"><Eye className="w-4 h-4" /></button>
+                                  <button onClick={() => handleDownloadVoucherPDF(voucher._id || voucher.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Download"><Download className="w-4 h-4" /></button>
+                                  <button onClick={() => handleSendVoucher(voucher._id || voucher.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Send"><Send className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
             )}
 
             {/* Payment History Grid */}
             {activeTab === "payment-history" && (
               loadingPaymentHistory ? <LoadingSpinner /> :
                 filteredPaymentHistory.length === 0 ? <EmptyState message="No payment history found" /> :
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {filteredPaymentHistory.map((ph) => (
-                      <DataCard
-                        key={ph._id || ph.id}
-                        item={ph}
-                        type="Payment"
-                        onView={() => setSelectedPaymentHistory(ph)}
-                        onDownload={() => handleDownloadPaymentHistoryPDF(ph._id || ph.id)}
-                      />
-                    ))}
-                  </div>
+                  viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredPaymentHistory.map((ph) => (
+                        <DataCard
+                          key={ph._id || ph.id}
+                          item={ph}
+                          type="Payment"
+                          onView={() => setSelectedPaymentHistory(ph)}
+                          onDownload={() => handleDownloadPaymentHistoryPDF(ph._id || ph.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-medium text-slate-500">
+                          <tr>
+                            <th className="px-4 py-3">Number</th>
+                            <th className="px-4 py-3">Customer</th>
+                            <th className="px-4 py-3">Receipt / Invoice</th>
+                            <th className="px-4 py-3">Method</th>
+                            <th className="px-4 py-3">Date</th>
+                            <th className="px-4 py-3 text-right">Amount</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredPaymentHistory.map((ph) => (
+                            <tr key={ph._id || ph.id} onClick={() => { const lId = ph.lead?._id || ph.lead?.id || ph.lead; if (lId) handleNavigateToLead(lId); }} className="hover:bg-slate-50 transition-colors group cursor-pointer">
+                              <td className="px-4 py-3 font-medium text-slate-900">{ph.paymentHistoryNumber || 'N/A'}</td>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="font-medium text-slate-900">{ph.customer?.name || ph.lead?.name || 'N/A'}</p>
+                                  <p className="text-xs text-slate-400">{ph.customer?.email || ph.lead?.email || ''}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                <div className="flex flex-col text-xs">
+                                  <span>R: {ph.receipt?.receiptNumber || '-'}</span>
+                                  <span>I: {ph.invoice?.invoiceNumber || '-'}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600 capitalize">{ph.paymentMethod || 'N/A'}</td>
+                              <td className="px-4 py-3 text-slate-600">{formatDate(ph.paymentDate)}</td>
+                              <td className="px-4 py-3 text-right font-medium text-emerald-600">{formatCurrency(ph.amount)}</td>
+                              <td className="px-4 py-3"><StatusBadge status={ph.status} /></td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setSelectedPaymentHistory(ph)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="View"><Eye className="w-4 h-4" /></button>
+                                  <button onClick={() => handleDownloadPaymentHistoryPDF(ph._id || ph.id)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-700" title="Download"><Download className="w-4 h-4" /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
             )}
           </div>
         </main>

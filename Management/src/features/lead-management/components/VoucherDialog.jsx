@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { voucherAPI, packageAPI, customizedPackageAPI, itineraryAPI, quotationAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
+import { LOCALE } from '../../../../utils/currency';
 
 const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -344,7 +345,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         </div>
                         <div>
                           <p className="text-gray-500 text-sm">Departure</p>
-                          <p className="font-bold text-lg text-gray-900">{formData.travelStartDate ? new Date(formData.travelStartDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not Set'}</p>
+                          <p className="font-bold text-lg text-gray-900">{formData.travelStartDate ? new Date(formData.travelStartDate).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not Set'}</p>
                         </div>
                       </div>
                       <input type="date" value={formData.travelStartDate} onChange={(e) => setFormData(prev => ({ ...prev, travelStartDate: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
@@ -356,7 +357,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         </div>
                         <div>
                           <p className="text-gray-500 text-sm">Return</p>
-                          <p className="font-bold text-lg text-gray-900">{formData.travelEndDate ? new Date(formData.travelEndDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not Set'}</p>
+                          <p className="font-bold text-lg text-gray-900">{formData.travelEndDate ? new Date(formData.travelEndDate).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not Set'}</p>
                         </div>
                       </div>
                       <input type="date" value={formData.travelEndDate} onChange={(e) => setFormData(prev => ({ ...prev, travelEndDate: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />

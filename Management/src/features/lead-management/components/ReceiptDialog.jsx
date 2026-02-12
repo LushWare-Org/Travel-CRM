@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
+import { formatCurrency, getCurrencySymbol, CURRENCY_CODE } from '../../../../utils/currency';
 
 const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -23,7 +24,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     lead: lead?._id || lead?.id,
     invoice: '',
     amount: 0,
-    currency: 'INR',
+    currency: CURRENCY_CODE,
     paymentMethod: 'cash',
     paymentDate: new Date().toISOString().split('T')[0],
     paymentType: 'installment',
@@ -51,7 +52,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         lead: lead._id || lead.id,
         invoice: '',
         amount: 0,
-        currency: 'INR',
+        currency: CURRENCY_CODE,
         paymentMethod: 'cash',
         paymentDate: new Date().toISOString().split('T')[0],
         paymentType: 'installment',
@@ -362,10 +363,10 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <option value="">{loadingInvoices ? 'Loading invoices...' : 'Choose an invoice'}</option>
                 {invoices.map((invoice) => (
                   <option key={invoice._id || invoice.id} value={invoice._id || invoice.id}>
-                    {invoice.invoiceNumber || invoice._id} - Outstanding: ₹{(
+                    {invoice.invoiceNumber || invoice._id} - Outstanding: {formatCurrency(
                       invoice.outstandingAmount ||
-                      (invoice.totalAmount - (invoice.paidAmount || 0))
-                    ).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      (invoice.totalAmount - (invoice.paidAmount || 0)), { minimumFractionDigits: 2 }
+                    )}
                   </option>
                 ))}
               </select>
@@ -388,15 +389,15 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center">
                     <p className="text-xs text-gray-500 mb-1">Total Amount</p>
-                    <p className="font-semibold text-gray-900">₹{selectedInvoice.totalAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}</p>
+                    <p className="font-semibold text-gray-900">{formatCurrency(selectedInvoice.totalAmount, { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center">
                     <p className="text-xs text-gray-500 mb-1">Paid</p>
-                    <p className="font-semibold text-emerald-600">₹{(selectedInvoice.paidAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                    <p className="font-semibold text-emerald-600">{formatCurrency(selectedInvoice.paidAmount || 0, { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center border-2 border-amber-200">
                     <p className="text-xs text-gray-500 mb-1">Outstanding</p>
-                    <p className="font-bold text-amber-600">₹{outstandingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                    <p className="font-bold text-amber-600">{formatCurrency(outstandingBalance, { minimumFractionDigits: 2 })}</p>
                   </div>
                 </div>
               </div>
@@ -409,7 +410,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   Payment Amount <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">{getCurrencySymbol()}</span>
                   <input
                     type="number"
                     value={formData.amount}
@@ -422,7 +423,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   />
                 </div>
                 {selectedInvoice && (
-                  <p className="text-xs text-gray-500 mt-2">Maximum: ₹{outstandingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-gray-500 mt-2">Maximum: {formatCurrency(outstandingBalance, { minimumFractionDigits: 2 })}</p>
                 )}
               </div>
               <div>
@@ -451,8 +452,8 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     type="button"
                     onClick={() => handlePaymentMethodChange(method.value)}
                     className={`flex flex-col items-center gap-1 px-3 py-3 rounded-lg border-2 transition-all ${formData.paymentMethod === method.value
-                        ? 'border-amber-500 bg-amber-50 text-amber-700'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      ? 'border-amber-500 bg-amber-50 text-amber-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                   >
                     <span className="text-xl">{method.icon}</span>
@@ -695,16 +696,16 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center py-2 border-b border-amber-200">
                     <span className="text-gray-600">Current Outstanding</span>
-                    <span className="font-medium">₹{outstandingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-medium">{formatCurrency(outstandingBalance, { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-amber-200">
                     <span className="text-gray-600">This Payment</span>
-                    <span className="font-medium text-emerald-600">- ₹{formData.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-medium text-emerald-600">- {formatCurrency(formData.amount, { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between items-center py-3">
                     <span className="font-semibold text-gray-900">New Balance</span>
                     <span className="text-xl font-bold text-amber-600">
-                      ₹{Math.max(0, outstandingBalance - formData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {formatCurrency(Math.max(0, outstandingBalance - formData.amount), { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>

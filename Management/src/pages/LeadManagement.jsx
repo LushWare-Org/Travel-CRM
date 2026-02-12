@@ -11,6 +11,8 @@ import {
   UserX,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { leadAPI, adminAPI } from "../services/api";
@@ -87,6 +89,7 @@ const LeadManagement = () => {
   const hasJumpedToLead = useRef(false);
   const [sectionLead, setSectionLead] = useState(null);
   const [showSectionView, setShowSectionView] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
 
   const leadsPerPage = 12;
 
@@ -265,6 +268,22 @@ const LeadManagement = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                  title="Table View"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+              </div>
               <button
                 onClick={fetchLeads}
                 disabled={loading}
@@ -315,6 +334,7 @@ const LeadManagement = () => {
         {/* Lead Cards Grid */}
         {!loading && !error && filteredLeads.length > 0 && (
           <LeadTable
+            viewMode={viewMode}
             leads={paginatedLeads}
             loading={loading}
             error={error}

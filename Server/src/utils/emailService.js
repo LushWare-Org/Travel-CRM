@@ -222,9 +222,11 @@ class EmailService {
 
   formatCurrency(amount) {
     if (amount === null || amount === undefined) return '0.00';
-    return Number(amount).toLocaleString('en-IN', {
+    const currencyCode = process.env.CURRENCY_CODE || 'INR';
+    const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+    return Number(amount).toLocaleString(locale, {
       style: 'currency',
-      currency: 'INR',
+      currency: currencyCode,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
@@ -232,7 +234,9 @@ class EmailService {
 
   formatDate(date) {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-IN', {
+    const currencyCode = process.env.CURRENCY_CODE || 'INR';
+    const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+    return new Date(date).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -787,7 +791,7 @@ class EmailService {
       <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="color: #FF9800; font-size: 18px; margin: 0 0 15px 0;">Login Details</h3>
         <table style="width: 100%; color: #ffffff; font-size: 15px;">
-          <tr><td style="padding: 10px 0; border-bottom: 1px solid #333;"><strong style="color: #FF9800;">Timestamp:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #333;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td></tr>
+          <tr><td style="padding: 10px 0; border-bottom: 1px solid #333;"><strong style="color: #FF9800;">Timestamp:</strong></td><td style="padding: 10px 0; border-bottom: 1px solid #333;">${new Date().toLocaleString(process.env.CURRENCY_CODE === 'INR' ? 'en-IN' : 'en-US')}</td></tr>
           <tr><td style="padding: 10px 0;"><strong style="color: #FF9800;">Account:</strong></td><td style="padding: 10px 0;">${user.email}</td></tr>
         </table>
       </div>

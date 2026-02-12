@@ -1,4 +1,5 @@
 import { TrendingUp, Target, Award } from 'lucide-react';
+import { getCurrencySymbol } from '../../../utils/currency';
 
 /**
  * Sales Rep Personal Performance Card
@@ -8,7 +9,7 @@ import { TrendingUp, Target, Award } from 'lucide-react';
 const SalesRepPerformanceCard = ({ data }) => {
   // Default values if data is loading or not available
   const stats = data?.stats || {};
-  
+
   const assignedLeads = stats.totalAssignedLeads || 0;
   const convertedLeads = stats.totalConvertedLeads || 0;
   const conversionRate = stats.conversionRate || 0;
@@ -60,7 +61,7 @@ const SalesRepPerformanceCard = ({ data }) => {
         <div className="bg-white bg-opacity-10 rounded-lg p-4 border border-white border-opacity-20 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-2">
             <p className="text-blue-100 text-sm font-medium">Est. Earnings</p>
-            <span className="text-yellow-200 text-sm font-bold">₹</span>
+            <span className="text-yellow-200 text-sm font-bold">{getCurrencySymbol()}</span>
           </div>
           <p className="text-3xl font-bold text-white">
             {(estimatedEarnings / 1000).toFixed(0)}K

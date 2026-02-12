@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ChartContainer from '../../analytics/components/Common/ChartContainer';
+import { formatCompact } from '../../../utils/currency';
 
 /**
  * Revenue Performance Section
@@ -9,6 +10,7 @@ import ChartContainer from '../../analytics/components/Common/ChartContainer';
 const RevenuePerformanceSection = ({ data }) => {
   // Extract revenue trend from analytics response
   const revenueTrend = data?.revenueTrend || [];
+
 
   // If no data, show placeholder
   if (!revenueTrend || revenueTrend.length === 0) {
@@ -38,7 +40,7 @@ const RevenuePerformanceSection = ({ data }) => {
               border: '1px solid #e5e7eb',
               borderRadius: '0.5rem'
             }}
-            formatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+            formatter={(value) => formatCompact(value)}
           />
           <Legend />
           <Bar dataKey="revenue" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Actual Revenue" />
@@ -53,7 +55,7 @@ const RevenuePerformanceSection = ({ data }) => {
           <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
             <p className="text-sm text-orange-700">Total Outstanding Amount</p>
             <p className="text-2xl font-bold text-orange-900 mt-1">
-              ₹{(data.stats.totalOutstanding / 100000).toFixed(1)}L
+              {formatCompact(data.stats.totalOutstanding)}
             </p>
             <p className="text-xs text-orange-600 mt-1">{data.stats.pendingInvoices} pending invoices</p>
           </div>
@@ -62,7 +64,7 @@ const RevenuePerformanceSection = ({ data }) => {
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-sm text-green-700">Potential Revenue</p>
             <p className="text-2xl font-bold text-green-900 mt-1">
-              ₹{(data.stats.totalPotentialRevenue / 100000).toFixed(1)}L
+              {formatCompact(data.stats.totalPotentialRevenue)}
             </p>
             <p className="text-xs text-green-600 mt-1">Could be collected</p>
           </div>

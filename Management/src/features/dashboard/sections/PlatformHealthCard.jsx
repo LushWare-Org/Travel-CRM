@@ -1,5 +1,6 @@
 import { Users, TrendingUp, DollarSign, Activity, Briefcase, Eye } from 'lucide-react';
 import StatCard from '../../analytics/components/Common/StatCard';
+import { formatCompact } from '../../../utils/currency';
 
 /**
  * Platform Health Card - Redesigned
@@ -48,7 +49,7 @@ const PlatformHealthCard = ({ leadData, billingData, userData, packageData, isSa
   if (billingData) {
     stats.push({
       title: 'Monthly Revenue',
-      value: `₹${(billingStats.totalRevenue / 100000).toFixed(1)}L`,
+      value: formatCompact(billingStats.totalRevenue),
       icon: DollarSign,
       color: 'purple',
       trend: '+23%', // Placeholder
@@ -57,7 +58,7 @@ const PlatformHealthCard = ({ leadData, billingData, userData, packageData, isSa
 
     stats.push({
       title: 'Outstanding',
-      value: `₹${(billingStats.totalOutstanding / 100000).toFixed(1)}L`,
+      value: formatCompact(billingStats.totalOutstanding),
       icon: Eye,
       color: 'orange',
       trend: '-15%', // Placeholder

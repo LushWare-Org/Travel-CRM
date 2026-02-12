@@ -10,7 +10,9 @@ import {
 import { DollarSign, Wallet, TrendingUp, AlertCircle, Download, CreditCard, Receipt } from "lucide-react";
 import { analyticsAPI } from "../../../../services/api";
 import { exportBillingAnalyticsPDF } from "../../utils/exportAnalytics";
+import { exportBillingAnalyticsPDF } from "../../utils/exportAnalytics";
 import toast from "react-hot-toast";
+import { formatCompact, formatCurrency, getCurrencySymbol } from "../../../../utils/currency";
 
 /**
  * BillingAnalytics Component - Redesigned
@@ -32,22 +34,8 @@ const BillingAnalytics = () => {
   const [paymentStatusData, setPaymentStatusData] = useState([]);
   const [invoiceBreakdownData, setInvoiceBreakdownData] = useState([]);
 
-  const currencyFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      }),
-    []
-  );
-
-  const formatCurrency = (value) => currencyFormatter.format(value || 0);
   const formatShort = (value) => {
-    if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
-    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
-    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
-    return `₹${value}`;
+    return `${getCurrencySymbol()}${formatCompact(value)}`;
   };
 
   const calculateTrend = (current, previous) => {
@@ -164,7 +152,7 @@ const BillingAnalytics = () => {
             {calculateTrend(revenueTrend.current, revenueTrend.previous)}% from last period
           </p>
         </div>
-        
+
         <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white">
           <div className="flex items-center gap-2 mb-3">
             <Wallet className="w-5 h-5 opacity-80" />
@@ -173,7 +161,7 @@ const BillingAnalytics = () => {
           <p className="text-3xl font-bold">{formatShort(stats.totalOutstanding)}</p>
           <p className="text-xs mt-2 opacity-70">{stats.pendingInvoices} pending invoices</p>
         </div>
-        
+
         <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-5 text-white">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-5 h-5 opacity-80" />
@@ -182,7 +170,7 @@ const BillingAnalytics = () => {
           <p className="text-3xl font-bold">{formatShort(stats.totalPotentialRevenue)}</p>
           <p className="text-xs mt-2 opacity-70">Available to collect</p>
         </div>
-        
+
         <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-5 text-white">
           <div className="flex items-center gap-2 mb-3">
             <Receipt className="w-5 h-5 opacity-80" />

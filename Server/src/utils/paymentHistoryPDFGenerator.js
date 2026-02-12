@@ -73,7 +73,8 @@ const COLORS = {
 
 // Helper function to format currency
 function formatCurrency(amount, currency = 'LKR') {
-  return `${currency} ${parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const locale = (process.env.CURRENCY_CODE === 'INR') ? 'en-IN' : 'en-US';
+  return `${currency} ${parseFloat(amount || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /**

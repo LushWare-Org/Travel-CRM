@@ -102,7 +102,8 @@ const COLORS = {
 
 const formatDate = (date) => {
   if (!date) return 'TBD';
-  return new Date(date).toLocaleDateString('en-IN', {
+  const locale = (process.env.CURRENCY_CODE === 'INR') ? 'en-IN' : 'en-US';
+  return new Date(date).toLocaleDateString(locale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',

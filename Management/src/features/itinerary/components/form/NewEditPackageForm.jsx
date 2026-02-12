@@ -18,6 +18,7 @@ import ItineraryDisplay from '../ItineraryDisplay';
 import { validateItinerary } from '../../utils/helpers';
 import { VALIDATION_MESSAGES } from '../../utils/constants';
 import { createDefaultDay } from '../../types/index.js';
+import { formatCurrency } from '../../../../utils/currency';
 
 const NewEditPackageForm = ({
   formData,
@@ -311,7 +312,7 @@ const NewEditPackageForm = ({
             </div>
             <div className="bg-white rounded-xl p-4 border border-slate-200">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Price</p>
-              <p className="font-medium text-slate-800">₹ {localFormData.price?.toFixed(2) || '0.00'}</p>
+              <p className="font-medium text-slate-800">{formatCurrency(localFormData.price, { minimumFractionDigits: 2 })}</p>
             </div>
             {localFormData.highlights && localFormData.highlights.length > 0 && (
               <div className="bg-white rounded-xl p-4 border border-slate-200 md:col-span-2">

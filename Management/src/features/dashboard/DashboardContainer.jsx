@@ -14,6 +14,8 @@ import {
   RadialBarChart, RadialBar, Legend
 } from 'recharts';
 
+import { formatCompact } from '../../utils/currency';
+
 // ============================================
 // UNIQUE LOADING STATE
 // ============================================
@@ -135,8 +137,8 @@ const TimeSelector = ({ selected, onChange }) => {
           key={opt.id}
           onClick={() => onChange(opt.id)}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selected === opt.id
-              ? 'bg-white text-slate-800 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
+            ? 'bg-white text-slate-800 shadow-sm'
+            : 'text-slate-500 hover:text-slate-700'
             }`}
         >
           {opt.label}
@@ -261,9 +263,9 @@ const RevenueBarChart = ({ data }) => {
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
         <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
+        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => formatCompact(v)} />
         <Tooltip
-          formatter={(value) => `₹${(value / 100000).toFixed(2)}L`}
+          formatter={(value) => formatCompact(value)}
           contentStyle={{
             backgroundColor: '#fff',
             border: '1px solid #e2e8f0',
@@ -287,12 +289,12 @@ const RevenueSummaryCards = ({ data }) => {
     <div className="grid grid-cols-2 gap-4 mt-4">
       <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white">
         <p className="text-xs opacity-80">Outstanding</p>
-        <p className="text-2xl font-bold mt-1">₹{(data.stats.totalOutstanding / 100000).toFixed(1)}L</p>
+        <p className="text-2xl font-bold mt-1">{formatCompact(data.stats.totalOutstanding)}</p>
         <p className="text-xs opacity-70 mt-1">{data.stats.pendingInvoices} invoices pending</p>
       </div>
       <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
         <p className="text-xs opacity-80">Potential Revenue</p>
-        <p className="text-2xl font-bold mt-1">₹{(data.stats.totalPotentialRevenue / 100000).toFixed(1)}L</p>
+        <p className="text-2xl font-bold mt-1">{formatCompact(data.stats.totalPotentialRevenue)}</p>
         <p className="text-xs opacity-70 mt-1">Available to collect</p>
       </div>
     </div>
@@ -456,8 +458,8 @@ const DashboardContainer = () => {
 
   if (billingData) {
     metrics.push(
-      { title: 'Monthly Revenue', value: `₹${(billingStats.totalRevenue / 100000).toFixed(1)}L`, trend: '+23%', description: 'Paid invoices', icon: DollarSign, colorScheme: 'violet' },
-      { title: 'Outstanding', value: `₹${(billingStats.totalOutstanding / 100000).toFixed(1)}L`, trend: '-15%', description: 'Pending payments', icon: Eye, colorScheme: 'amber' },
+      { title: 'Monthly Revenue', value: formatCompact(billingStats.totalRevenue), trend: '+23%', description: 'Paid invoices', icon: DollarSign, colorScheme: 'violet' },
+      { title: 'Outstanding', value: formatCompact(billingStats.totalOutstanding), trend: '-15%', description: 'Pending payments', icon: Eye, colorScheme: 'amber' },
     );
   }
 

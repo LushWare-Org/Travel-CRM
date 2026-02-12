@@ -1,18 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Star, Clock, IndianRupee, Filter, X, SlidersHorizontal, Grid, List, ArrowRight, Compass, Sun, Users } from 'lucide-react';
+import { Star, Clock, Banknote, Filter, X, SlidersHorizontal, Grid, List, ArrowRight, Compass, Sun, Users } from 'lucide-react';
 import { fetchPackages } from '../utils/packageApi';
 import { createSlug } from '../utils/packageTransform';
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency, getCurrencySymbol } from '../utils/currency';
+
+const CURRENCY_SYMBOL = getCurrencySymbol();
 
 const filterOptions = {
   priceRanges: [
-    { label: 'Below ₹ 50 k', min: 0, max: 50000 },
-    { label: '₹ 50k - ₹ 75k', min: 50000, max: 75000 },
-    { label: '₹ 75k - ₹ 1 L', min: 75000, max: 100000 },
-    { label: '₹ 1 L - ₹ 1.5L', min: 100000, max: 150000 },
-    { label: '₹ 1.5L - ₹ 2 L', min: 150000, max: 200000 },
-    { label: 'Above ₹ 2L', min: 200000, max: Infinity }
+    { label: `Below ${CURRENCY_SYMBOL} 50 k`, min: 0, max: 50000 },
+    { label: `${CURRENCY_SYMBOL} 50k - ${CURRENCY_SYMBOL} 75k`, min: 50000, max: 75000 },
+    { label: `${CURRENCY_SYMBOL} 75k - ${CURRENCY_SYMBOL} 1 L`, min: 75000, max: 100000 },
+    { label: `${CURRENCY_SYMBOL} 1 L - ${CURRENCY_SYMBOL} 1.5L`, min: 100000, max: 150000 },
+    { label: `${CURRENCY_SYMBOL} 1.5L - ${CURRENCY_SYMBOL} 2 L`, min: 150000, max: 200000 },
+    { label: `Above ${CURRENCY_SYMBOL} 2L`, min: 200000, max: Infinity }
   ],
   durations: [
     { label: 'Short (1-4 days)', min: 1, max: 4 },
@@ -237,9 +239,8 @@ export default function PackagesPage() {
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1
-            className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${
-              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+              }`}
             style={{ lineHeight: '1.15' }}
           >
             {categoryLabel || destinationLabel}{' '}
@@ -264,17 +265,15 @@ export default function PackagesPage() {
             </span>
           </h1>
           <p
-            className={`text-lg md:text-xl text-white/80 max-w-3xl mx-auto mb-8 transition-all duration-700 delay-200 ${
-              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className={`text-lg md:text-xl text-white/80 max-w-3xl mx-auto mb-8 transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+              }`}
           >
             {categoryLabel ? categoryLabel + ' Packages' : destinationTypeLabel} • {filteredPackages.length} packages available
           </p>
           {/* Social Proof */}
           <div
-            className={`mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-8 transition-all duration-700 delay-500 ${
-              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            }`}
+            className={`mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-8 transition-all duration-700 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+              }`}
           >
             <div className="flex items-center gap-3">
               <div className="flex -space-x-3">
@@ -313,11 +312,10 @@ export default function PackagesPage() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setShowFilters((prev) => !prev)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${
-                  showFilters
-                    ? 'bg-gray-100 hover:bg-gray-200 text-black shadow-md hover:shadow-lg'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 hover:border-orange-300'
-                }`}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${showFilters
+                  ? 'bg-gray-100 hover:bg-gray-200 text-black shadow-md hover:shadow-lg'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 hover:border-orange-300'
+                  }`}
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 <span className="font-semibold">{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
@@ -348,21 +346,19 @@ export default function PackagesPage() {
               <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1 w-full md:w-auto">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
-                    viewMode === 'grid'
-                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
-                      : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
-                  }`}
+                  className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'grid'
+                    ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
+                    : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
+                    }`}
                 >
                   <Grid className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
-                    viewMode === 'list'
-                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
-                      : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
-                  }`}
+                  className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'list'
+                    ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
+                    : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
+                    }`}
                 >
                   <List className="w-5 h-5" />
                 </button>
@@ -378,7 +374,7 @@ export default function PackagesPage() {
           {/* Filters */}
           {showFilters && (
             <div className="w-72 fixed top-0 left-0 max-h-screen z-50 md:w-96 md:flex-shrink-0 md:fixed md:top-0 md:left-0 md:bottom-0 md:right-auto md:h-screen md:rounded-none 2xl:static 2xl:w-72 2xl:h-auto 2xl:inset-auto 2xl:rounded-2xl">
-              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-screen md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-32 2xl:rounded-2xl 2xl:h-auto overflow-y-auto">
+              <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-screen md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-24 2xl:rounded-2xl 2xl:h-[calc(100vh-8rem)] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6 2xl:mb-6">
                   <h3 className="text-xl font-bold flex items-center gap-2">
                     <Filter className="w-5 h-5 text-orange-600" />
@@ -394,7 +390,7 @@ export default function PackagesPage() {
                 {/* Price Range */}
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <IndianRupee className="w-4 h-4 text-gray-600" />
+                    <Banknote className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-900">Budget</span>
                   </h4>
                   <div className="space-y-2">
@@ -460,8 +456,8 @@ export default function PackagesPage() {
                         <div className="flex items-center gap-2">
                           <div className="flex gap-0.5">
                             {[...Array(5)].map((_, i) => (
-                              <Star 
-                                key={i} 
+                              <Star
+                                key={i}
                                 className={`w-4 h-4 ${i < starCount ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
                               />
                             ))}
@@ -567,11 +563,10 @@ export default function PackagesPage() {
                             setCurrentPage(page);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
-                          className={`px-3 py-2 rounded-lg font-semibold transition-all duration-300 ${
-                            currentPage === page
-                              ? 'bg-orange-600 text-white shadow-md'
-                              : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
-                          }`}
+                          className={`px-3 py-2 rounded-lg font-semibold transition-all duration-300 ${currentPage === page
+                            ? 'bg-orange-600 text-white shadow-md'
+                            : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                            }`}
                         >
                           {page}
                         </button>
@@ -604,7 +599,7 @@ export default function PackagesPage() {
                     >
                       <div className="flex flex-col lg:flex-row">
                         <div className="relative lg:w-80 h-64 lg:h-80 overflow-hidden flex-shrink-0">
-                        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+                          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
                           <picture>
                             <source
                               srcSet={(pkg.images && pkg.images[0])?.replace(/\.(jpg|jpeg|png)$/i, '.webp') || (pkg.image_url?.replace(/\.(jpg|jpeg|png)$/i, '.webp') || '')}
@@ -674,11 +669,10 @@ export default function PackagesPage() {
                             setCurrentPage(page);
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
-                          className={`px-3 py-2 rounded-lg font-semibold transition-all duration-300 ${
-                            currentPage === page
-                              ? 'bg-orange-600 text-white shadow-md'
-                              : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
-                          }`}
+                          className={`px-3 py-2 rounded-lg font-semibold transition-all duration-300 ${currentPage === page
+                            ? 'bg-orange-600 text-white shadow-md'
+                            : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                            }`}
                         >
                           {page}
                         </button>

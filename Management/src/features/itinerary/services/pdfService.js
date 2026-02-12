@@ -9,6 +9,7 @@ import { jsPDF } from 'jspdf';
 import Swal from 'sweetalert2';
 import { PDF_CONFIG } from '../utils/constants';
 import ApiService from './apiService';
+import { formatCurrency, CURRENCY_CODE } from '../../../utils/currency';
 
 /**
  * Load image and convert to base64
@@ -371,7 +372,7 @@ function legacyBuildPDFDocument(pkg, images) {
       return y + (currentRow + 1) * 8 + 4;
     };
 
-    const formatINR = (value) => {
+    const formatPrice = (value) => {
       if (value === null || value === undefined || value === '') {
         return 'On request';
       }
@@ -379,11 +380,7 @@ function legacyBuildPDFDocument(pkg, images) {
       if (!Number.isFinite(numeric)) {
         return 'On request';
       }
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0,
-      }).format(numeric);
+      return formatCurrency(numeric, { maximumFractionDigits: 0 });
     };
 
     // ========== START PDF GENERATION ==========
@@ -589,7 +586,7 @@ function legacyBuildPDFDocument(pkg, images) {
     doc.setTextColor(94, 74, 52);
     doc.text('PRICE', rightX + 6, rightY + 12);
     doc.setFontSize(20);
-    doc.text(formatINR(pkg.price), rightX + 6, rightY + 28);
+    doc.text(formatPrice(pkg.price), rightX + 6, rightY + 28);
 
     doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
@@ -1065,7 +1062,7 @@ function buildPDFDocument(pkg, images) {
       return false;
     };
 
-    const formatINR = (value) => {
+    const formatPrice = (value) => {
       if (value === null || value === undefined || value === '') {
         return 'On request';
       }
@@ -1073,11 +1070,7 @@ function buildPDFDocument(pkg, images) {
       if (!Number.isFinite(numeric)) {
         return String(value);
       }
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0,
-      }).format(numeric);
+      return formatCurrency(numeric, { maximumFractionDigits: 0 });
     };
 
     const formatDateDisplay = (value) => {
@@ -1795,7 +1788,7 @@ function buildPDFDocument(pkg, images) {
     doc.setTextColor(...palette.primaryText);
     const priceText = formatINR(pkg.price);
     const sanitizedPrice = priceText.replace(/[^\d.,]/g, '');
-    doc.text(`INR ${sanitizedPrice}`, priceLeftX, yPos + 36);
+    doc.text(`${CURRENCY_CODE} ${sanitizedPrice}`, priceLeftX, yPos + 36);
 
     if (pkg.priceNotes) {
       doc.setFont(undefined, 'normal');

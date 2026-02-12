@@ -5,6 +5,7 @@
  */
 
 import { Moon, DollarSign, Users, Briefcase, Info } from 'lucide-react';
+import { getCurrencySymbol, CURRENCY_CODE } from '../../../../utils/currency';
 
 const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange }) => {
   const handleChange = (e) => {
@@ -83,9 +84,9 @@ const PackageDetails = ({ formData, nightsInput, onFormChange, onNightsChange })
         </InputCard>
 
         {/* Price */}
-        <InputCard label="Price" required icon={DollarSign} hint="Enter price in INR">
+        <InputCard label="Price" required icon={DollarSign} hint={`Enter price in ${CURRENCY_CODE}`}>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-semibold text-lg">₹</span>
+            <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-semibold text-lg">{getCurrencySymbol()}</span>
             <input
               type="number"
               name="price"

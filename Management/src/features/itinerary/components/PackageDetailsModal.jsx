@@ -6,7 +6,7 @@
 
 import {
   X, Star, MapPin, Calendar, Users, Briefcase,
-  Tag, DollarSign, Check, XCircle, Sparkles,
+  Tag, Banknote, Check, XCircle, Sparkles,
   Image as ImageIcon, CalendarDays, BookOpen, TrendingUp
 } from 'lucide-react';
 import ItineraryDisplay from './ItineraryDisplay';
@@ -132,7 +132,7 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
               <InfoCard
                 label="Price"
                 value={formattedPrice}
-                icon={DollarSign}
+                icon={Banknote}
                 gradient="from-violet-500 to-purple-600"
               />
               <InfoCard

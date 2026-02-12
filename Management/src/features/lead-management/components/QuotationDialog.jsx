@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI, uploadAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
+import { formatCurrency, getCurrencySymbol, CURRENCY_CODE, LOCALE } from '../../../../utils/currency';
 
 const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -49,21 +50,12 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [formData, setFormData] = useState(buildDefaultFormData(lead));
   const [selectedQuotationId, setSelectedQuotationId] = useState(null);
 
-  const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined) {
-      return '0.00';
-    }
-    const value = Number(amount) || 0;
-    return value.toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
+  // formatCurrency is now imported from utils/currency
 
   const formatDateLabel = (dateValue) => {
     if (!dateValue) return 'N/A';
     try {
-      return new Date(dateValue).toLocaleDateString('en-IN', {
+      return new Date(dateValue).toLocaleDateString(LOCALE, {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -1195,7 +1187,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           <div className="flex items-center gap-5">
             <div className="text-right">
               <p className="text-slate-500 text-[10px] uppercase tracking-wide">Total</p>
-              <p className="text-xl font-bold text-white">₹{formatCurrency(totals.totalAmount)}</p>
+              <p className="text-xl font-bold text-white">{formatCurrency(totals.totalAmount, { minimumFractionDigits: 2 })}</p>
             </div>
             <div className="h-8 w-px bg-slate-700" />
             <div className="flex items-center gap-3 text-xs">
@@ -1232,7 +1224,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         <option value="new">+ Create New</option>
                         {existingQuotations.map((q) => (
                           <option key={q._id || q.id} value={q._id || q.id}>
-                            {q.quotationNumber || (q._id || q.id).slice(-6)} • ₹{formatCurrency(q.totalAmount || 0)}
+                            {q.quotationNumber || (q._id || q.id).slice(-6)} • {formatCurrency(q.totalAmount || 0, { minimumFractionDigits: 2 })}
                           </option>
                         ))}
                       </select>
@@ -1623,7 +1615,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         Package Total Price
                       </label>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">INR</span>
+                        <span className="text-sm text-gray-600">{CURRENCY_CODE}</span>
                         <input
                           type="number"
                           value={(() => {
@@ -1795,7 +1787,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                                         <div className="flex items-center gap-2 shrink-0 ml-1">
                                           <div className="relative group/price">
                                             <div className="absolute inset-y-0 left-0 pl-1.5 flex items-center pointer-events-none">
-                                              <span className="text-[10px] text-slate-400">₹</span>
+                                              <span className="text-[10px] text-slate-400">{getCurrencySymbol()}</span>
                                             </div>
                                             <input
                                               type="number"
@@ -1832,66 +1824,68 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                           </div>
 
 
-                          {others.length > 0 && (
-                            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm mt-4">
-                              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-                                <h4 className="font-semibold text-slate-700 text-xs flex items-center gap-2">
-                                  <span>📦</span> General Items
-                                </h4>
-                              </div>
-                              <div className="divide-y divide-slate-100">
-                                {others.map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
-                                  <div key={originalIndex} className="group relative px-4 py-3 hover:bg-slate-50 transition-colors">
-                                    <div className="flex gap-3 items-start">
-                                      <div className="flex-1 min-w-0">
-                                        <textarea
-                                          value={description || ''}
-                                          onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
-                                          rows={1}
-                                          onInput={(e) => {
-                                            e.target.style.height = 'auto';
-                                            e.target.style.height = e.target.scrollHeight + 'px';
-                                          }}
-                                          className="w-full text-xs text-slate-700 bg-transparent border-0 p-0 focus:ring-0 resize-none font-medium leading-relaxed placeholder-slate-300"
-                                          placeholder="Item description..."
-                                        />
-                                      </div>
-                                      <div className="flex items-center gap-2 shrink-0 ml-2">
-                                        <div className="relative group/price">
-                                          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                                            <span className="text-[10px] text-slate-400">₹</span>
-                                          </div>
-                                          <input
-                                            type="number"
-                                            value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
-                                            onChange={(e) => {
-                                              const val = parseFloat(e.target.value) || 0;
-                                              const newItems = [...formData.items];
-                                              newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
-                                              setFormData({ ...formData, items: newItems });
+                          {
+                            others.length > 0 && (
+                              <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm mt-4">
+                                <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                                  <h4 className="font-semibold text-slate-700 text-xs flex items-center gap-2">
+                                    <span>📦</span> General Items
+                                  </h4>
+                                </div>
+                                <div className="divide-y divide-slate-100">
+                                  {others.map(({ originalIndex, description, totalPrice, unitPrice, quantity }) => (
+                                    <div key={originalIndex} className="group relative px-4 py-3 hover:bg-slate-50 transition-colors">
+                                      <div className="flex gap-3 items-start">
+                                        <div className="flex-1 min-w-0">
+                                          <textarea
+                                            value={description || ''}
+                                            onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)}
+                                            rows={1}
+                                            onInput={(e) => {
+                                              e.target.style.height = 'auto';
+                                              e.target.style.height = e.target.scrollHeight + 'px';
                                             }}
-                                            className="w-24 pl-5 pr-2 py-1.5 text-right text-xs bg-slate-50 border border-slate-200 rounded text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all font-semibold"
-                                            placeholder="0.00"
+                                            className="w-full text-xs text-slate-700 bg-transparent border-0 p-0 focus:ring-0 resize-none font-medium leading-relaxed placeholder-slate-300"
+                                            placeholder="Item description..."
                                           />
                                         </div>
-                                        <button
-                                          onClick={() => removeItem(originalIndex)}
-                                          className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                          title="Remove Item"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                                          <div className="relative group/price">
+                                            <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                              <span className="text-[10px] text-slate-400">{getCurrencySymbol()}</span>
+                                            </div>
+                                            <input
+                                              type="number"
+                                              value={totalPrice !== undefined ? totalPrice : (unitPrice || 0) * (quantity || 1)}
+                                              onChange={(e) => {
+                                                const val = parseFloat(e.target.value) || 0;
+                                                const newItems = [...formData.items];
+                                                newItems[originalIndex] = { ...newItems[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 };
+                                                setFormData({ ...formData, items: newItems });
+                                              }}
+                                              className="w-24 pl-5 pr-2 py-1.5 text-right text-xs bg-slate-50 border border-slate-200 rounded text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all font-semibold"
+                                              placeholder="0.00"
+                                            />
+                                          </div>
+                                          <button
+                                            onClick={() => removeItem(originalIndex)}
+                                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Remove Item"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )
+                          }
 
 
                           {/* Resync Button */}
-                          <div className="flex justify-end pt-4">
+                          < div className="flex justify-end pt-4" >
                             <button
                               type="button"
                               onClick={() => {
@@ -1952,7 +1946,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   {formData.discountType !== 'none' && (
                     <div>
                       <label className="block text-[10px] text-slate-500 mb-1">
-                        Discount Value {formData.discountType === 'percentage' ? '(%)' : '(₹)'}
+                        Discount Value {formData.discountType === 'percentage' ? '(%)' : `(${getCurrencySymbol()})`}
                       </label>
                       <input
                         type="number"
@@ -1978,23 +1972,23 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <div className="p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Subtotal:</span>
-                    <span className="font-medium">₹{formatCurrency(totals.subtotal)}</span>
+                    <span className="font-medium">{formatCurrency(totals.subtotal, { minimumFractionDigits: 2 })}</span>
                   </div>
                   {totals.discountAmount > 0 && (
                     <div className="flex justify-between text-sm text-emerald-400">
                       <span>Discount:</span>
-                      <span>-₹{formatCurrency(totals.discountAmount)}</span>
+                      <span>-{formatCurrency(totals.discountAmount, { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   {totals.taxAmount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-400">Tax ({formData.taxRate}%):</span>
-                      <span className="font-medium">₹{formatCurrency(totals.taxAmount)}</span>
+                      <span className="font-medium">{formatCurrency(totals.taxAmount, { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold border-t border-slate-700 pt-3 mt-3">
                     <span>Total:</span>
-                    <span className="text-teal-400">₹{formatCurrency(totals.totalAmount)}</span>
+                    <span className="text-teal-400">{formatCurrency(totals.totalAmount, { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </div>

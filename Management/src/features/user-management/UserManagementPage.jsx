@@ -122,7 +122,7 @@ const UserManagementPage = () => {
 
       <div className="relative flex">
         {/* Left Sidebar Navigation */}
-        <aside className="w-72 min-h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 sticky top-0 flex flex-col">
+        <aside className="w-72 h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 sticky top-0 flex flex-col overflow-y-auto pb-4">
           {/* Sidebar Header */}
           <div className="p-6 border-b border-slate-200/60">
             <div className="flex items-center gap-3 mb-4">
@@ -164,17 +164,17 @@ const UserManagementPage = () => {
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
                     className={`w-full group rounded-xl transition-all duration-300 ${isActive
-                        ? 'shadow-lg'
-                        : 'hover:bg-slate-50'
+                      ? 'shadow-lg'
+                      : 'hover:bg-slate-50'
                       }`}
                   >
                     <div className={`flex items-center gap-3 p-3 rounded-xl ${isActive
-                        ? `bg-gradient-to-r ${tab.gradient} text-white`
-                        : 'text-slate-600'
+                      ? `bg-gradient-to-r ${tab.gradient} text-white`
+                      : 'text-slate-600'
                       }`}>
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isActive
-                          ? 'bg-white/20'
-                          : tab.lightBg
+                        ? 'bg-white/20'
+                        : tab.lightBg
                         }`}>
                         <TabIcon className={`w-5 h-5 ${isActive ? 'text-white' : `text-${tab.color}-600`}`} />
                       </div>

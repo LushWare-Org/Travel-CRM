@@ -4,6 +4,7 @@
  */
 
 import { createDefaultDay } from '../types/index.js';
+import { formatCurrency } from '../../../utils/currency.js';
 
 /**
  * Generate days array based on duration
@@ -13,7 +14,7 @@ import { createDefaultDay } from '../types/index.js';
  */
 export const generateDaysArray = (days, currentDays = []) => {
   const daysCount = parseInt(days, 10) || 0;
-  
+
   if (daysCount <= 0) return [];
 
   let newDays = [...currentDays];
@@ -85,7 +86,7 @@ export const validateItinerary = (days) => {
  */
 export const filterPackages = (packages, searchTerm) => {
   if (!searchTerm.trim()) return packages;
-  
+
   const term = searchTerm.toLowerCase();
   return packages.filter(
     (pkg) =>
@@ -136,12 +137,10 @@ export const formatPriceINR = (value) => {
     return typeof value === 'string' ? value : '';
   }
 
+  // Determine decimal places based on value
   const hasDecimals = !Number.isInteger(numericValue);
 
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
+  return formatCurrency(numericValue, {
     minimumFractionDigits: hasDecimals ? 2 : 0,
-    maximumFractionDigits: hasDecimals ? 2 : 0,
-  }).format(numericValue);
+  });
 };

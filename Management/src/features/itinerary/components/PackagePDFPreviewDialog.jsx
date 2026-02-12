@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, FileText, MapPin, Calendar, IndianRupee, Users, X } from 'lucide-react';
+import { Download, FileText, MapPin, Calendar, Banknote, Users, X } from 'lucide-react';
 import { formatPriceINR } from '../utils/helpers';
 
 const FALLBACK_FILE_NAME = 'travel-itinerary.pdf';
@@ -32,7 +32,7 @@ const PackagePDFPreviewDialog = ({
       {
         label: 'Package Price',
         value: formatPriceINR(packageData.price) || 'On request',
-        icon: IndianRupee,
+        icon: Banknote,
       },
       {
         label: 'Group Size',

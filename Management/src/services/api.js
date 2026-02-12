@@ -1,6 +1,6 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "https://api.harshkumar.space/api/v1";
-  // import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+// import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
 
 class ApiService {
   constructor() {
@@ -247,6 +247,12 @@ export const leadAPI = {
   updateLead: async (id, leadData) => {
     const api = new ApiService();
     return api.put(`/leads/${id}`, leadData);
+  },
+
+  // Update lead status
+  updateLeadStatus: async (id, status) => {
+    const api = new ApiService();
+    return api.put(`/leads/${id}`, { status });
   },
 
   // Delete lead

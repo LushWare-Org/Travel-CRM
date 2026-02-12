@@ -143,12 +143,15 @@ const Sidebar = () => {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                navigate(item.path);
+                setSidebarOpen(false);
+              }}
               onMouseEnter={() => setHoveredItem(index)}
               onMouseLeave={() => setHoveredItem(null)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left group relative overflow-hidden ${active
-                  ? 'text-white shadow-lg'
-                  : 'text-sky-700 hover:bg-white/60'
+                ? 'text-white shadow-lg'
+                : 'text-sky-700 hover:bg-white/60'
                 }`}
               style={active ? {
                 background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
@@ -209,10 +212,10 @@ const Sidebar = () => {
             <div className="mt-3 flex items-center gap-2">
               <span
                 className={`text-xs px-2.5 py-1 rounded-full font-medium ${user.role === 'superAdmin'
-                    ? 'bg-amber-100 text-amber-700'
-                    : user.role === 'admin'
-                      ? 'bg-sky-100 text-sky-700'
-                      : 'bg-emerald-100 text-emerald-700'
+                  ? 'bg-amber-100 text-amber-700'
+                  : user.role === 'admin'
+                    ? 'bg-sky-100 text-sky-700'
+                    : 'bg-emerald-100 text-emerald-700'
                   }`}
               >
                 {user.role === 'superAdmin' ? '⭐ Super Admin' : user.role === 'admin' ? 'Admin' : 'Sales Rep'}
@@ -228,8 +231,8 @@ const Sidebar = () => {
           onClick={handleLogout}
           disabled={isLoggingOut}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${isLoggingOut
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-red-50 text-red-600 hover:bg-red-100 hover:shadow-md'
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-red-50 text-red-600 hover:bg-red-100 hover:shadow-md'
             }`}
           style={{
             border: '1px solid rgba(239, 68, 68, 0.2)',

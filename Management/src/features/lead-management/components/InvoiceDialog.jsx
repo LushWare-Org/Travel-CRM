@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { invoiceAPI, quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
+import { formatCurrency, getCurrencySymbol, CURRENCY_CODE, LOCALE } from '../../../../utils/currency';
 
 const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -32,8 +33,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  const formatCurrency = (amount) => (Number(amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const formatDateLabel = (dateValue) => { if (!dateValue) return 'N/A'; try { return new Date(dateValue).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return 'N/A'; } };
+  // formatCurrency is now imported from utils/currency
+  const formatDateLabel = (dateValue) => { if (!dateValue) return 'N/A'; try { return new Date(dateValue).toLocaleDateString(LOCALE, { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return 'N/A'; } };
   const getModeLabel = (mode) => mode === 'detailed' ? 'Detailed' : 'Summary';
 
   const toggleSection = (section) => setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -199,7 +200,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Quick Stats Row */}
             <div className="grid grid-cols-4 gap-3">
-              
+
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Issue Date</p>
                 <input type="date" value={formData.issueDate} onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })} className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none" />
@@ -221,7 +222,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <div className="flex gap-3">
                   <select value={formData.quotation} onChange={(e) => { setFormData({ ...formData, quotation: e.target.value }); if (e.target.value) loadQuotationData(e.target.value); else setQuotationMode('summary'); }} className="flex-1 px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" disabled={loadingQuotations}>
                     <option value="">{loadingQuotations ? 'Loading...' : '— Select Quotation —'}</option>
-                    {quotations.map(q => (<option key={q._id || q.id} value={q._id || q.id}>{q.quotationNumber || q._id} • ₹{formatCurrency(q.totalAmount || 0)}</option>))}
+                    {quotations.map(q => (<option key={q._id || q.id} value={q._id || q.id}>{q.quotationNumber || q._id} • {formatCurrency(q.totalAmount || 0, { minimumFractionDigits: 2 })}</option>))}
                   </select>
                   {formData.quotation && (<button type="button" onClick={() => handleDownloadQuotationPDF(formData.quotation)} className="px-4 py-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"><Download className="w-4 h-4 text-gray-600" /></button>)}
                 </div>
@@ -248,7 +249,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-100">
                         <label className="text-sm font-semibold text-gray-700 mb-3 block">Package Total Amount</label>
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">₹</span>
+                          <span className="text-2xl">{getCurrencySymbol()}</span>
                           <input type="number" value={(() => { const pkg = formData.items.find(i => i.category === 'package'); return pkg ? (pkg.totalPrice || pkg.unitPrice || 0) : 0; })()} onChange={(e) => { const price = parseFloat(e.target.value) || 0; setFormData(prev => { const pkgIdx = prev.items.findIndex(i => i.category === 'package'); if (pkgIdx >= 0) { const items = [...prev.items]; items[pkgIdx] = { ...items[pkgIdx], totalPrice: price, unitPrice: price, quantity: 1 }; return { ...prev, items }; } else { return { ...prev, items: [{ description: 'Package Total', category: 'package', quantity: 1, unitPrice: price, totalPrice: price, notes: '' }, ...prev.items] }; } }); }} className="flex-1 text-3xl font-bold text-gray-900 bg-transparent border-0 focus:outline-none" placeholder="0.00" />
                         </div>
                       </div>
@@ -261,7 +262,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             return (
                               <div key={originalIndex} className="flex gap-3 items-center">
                                 <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} placeholder="Description" className="flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 border-0" />
-                                <div className="flex items-center bg-gray-50 rounded-xl px-3"><span className="text-gray-400 text-sm">₹</span><input type="number" value={item.totalPrice || 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-24 py-3 bg-transparent text-right text-sm font-medium focus:outline-none" /></div>
+                                <div className="flex items-center bg-gray-50 rounded-xl px-3"><span className="text-gray-400 text-sm">{getCurrencySymbol()}</span><input type="number" value={item.totalPrice || 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-24 py-3 bg-transparent text-right text-sm font-medium focus:outline-none" /></div>
                                 <button type="button" onClick={() => removeItem(originalIndex)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-4 h-4" /></button>
                               </div>
                             );
@@ -277,7 +278,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         return (
                           <div key={originalIndex} className="flex gap-3 items-center bg-gray-50 rounded-xl p-3">
                             <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} className="flex-1 px-3 py-2 bg-white rounded-lg text-sm border border-gray-200 focus:ring-2 focus:ring-indigo-500" placeholder="Item description" />
-                            <div className="flex items-center bg-white rounded-lg px-3 border border-gray-200"><span className="text-gray-400 text-xs">₹</span><input type="number" value={item.totalPrice ?? 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-20 py-2 bg-transparent text-right text-sm focus:outline-none" /></div>
+                            <div className="flex items-center bg-white rounded-lg px-3 border border-gray-200"><span className="text-gray-400 text-xs">{getCurrencySymbol()}</span><input type="number" value={item.totalPrice ?? 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-20 py-2 bg-transparent text-right text-sm focus:outline-none" /></div>
                             <button type="button" onClick={() => removeItem(originalIndex)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         );
@@ -361,18 +362,18 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Subtotal</span>
-                  <span className="font-medium">₹{formatCurrency(totals.subtotal)}</span>
+                  <span className="font-medium">{formatCurrency(totals.subtotal, { minimumFractionDigits: 2 })}</span>
                 </div>
                 {totals.discountAmount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-green-400">Discount</span>
-                    <span className="text-green-400">-₹{formatCurrency(totals.discountAmount)}</span>
+                    <span className="text-green-400">-{formatCurrency(totals.discountAmount, { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 {totals.taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Tax ({formData.taxRate}%)</span>
-                    <span>₹{formatCurrency(totals.taxAmount)}</span>
+                    <span>{formatCurrency(totals.taxAmount, { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
@@ -381,7 +382,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <div className="flex justify-between items-end">
                   <span className="text-gray-400">Total Amount</span>
                   <div className="text-right">
-                    <p className="text-3xl font-bold">₹{formatCurrency(totals.totalAmount)}</p>
+                    <p className="text-3xl font-bold">{formatCurrency(totals.totalAmount, { minimumFractionDigits: 2 })}</p>
                     <p className="text-xs text-gray-500 mt-1">Due: {formatDateLabel(formData.dueDate)}</p>
                   </div>
                 </div>
@@ -395,7 +396,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     {existingInvoices.slice(0, 5).map((inv, idx) => (
                       <div key={inv._id || inv.id} className={`p-2 rounded-lg text-xs cursor-pointer transition-colors ${currentInvoice?._id === inv._id ? 'bg-indigo-600' : 'bg-white/5 hover:bg-white/10'}`} onClick={() => { setCurrentInvoice(inv); setCurrentInvoiceId(inv._id || inv.id); setIsEditing(true); }}>
                         <p className="font-medium">{inv.invoiceNumber || `Invoice #${idx + 1}`}</p>
-                        <p className="text-gray-500">₹{formatCurrency(inv.totalAmount || 0)}</p>
+                        <p className="text-gray-500">{formatCurrency(inv.totalAmount || 0, { minimumFractionDigits: 2 })}</p>
                       </div>
                     ))}
                   </div>

@@ -146,7 +146,16 @@ const formatDate = (date) => {
 };
 
 function formatCurrency(amount) {
-  return `INR ${parseFloat(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const symbol = process.env.CURRENCY_SYMBOL;
+  const code = process.env.CURRENCY_CODE || 'INR';
+  const locale = code === 'INR' ? 'en-IN' : 'en-US';
+  const numeric = parseFloat(amount || 0);
+
+  if (symbol) {
+    return `${symbol} ${numeric.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  return `${code} ${numeric.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const calculateDuration = (start, end) => {
@@ -1477,7 +1486,7 @@ export function generateInvoicePDF(invoice, lead) {
       const tableHeaders = [
         { label: 'S.No', w: 40, align: 'center' },
         { label: 'Service Description', w: 325, align: 'left' },
-        { label: 'Amount (INR)', w: 150, align: 'right' }
+        { label: `Amount (${process.env.CURRENCY_CODE || 'INR'})`, w: 150, align: 'right' }
       ];
 
       doc.rect(40, y, 515, 30).fill(colors.primaryDark);

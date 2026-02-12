@@ -143,7 +143,9 @@ class PackageAIPDFGenerator {
           doc.text(`Duration: ${pkg.duration} days`);
         }
         if (pkg.price) {
-          doc.text(`Price: ₹${pkg.price.toLocaleString('en-IN')}`);
+          const currencySymbol = process.env.CURRENCY_SYMBOL || process.env.CURRENCY_CODE || 'INR';
+          const locale = (process.env.CURRENCY_CODE === 'INR') ? 'en-IN' : 'en-US';
+          doc.text(`Price: ${currencySymbol}${pkg.price.toLocaleString(locale)}`);
         }
         if (pkg.maxGroupSize) {
           doc.text(`Max Group Size: ${pkg.maxGroupSize} people`);

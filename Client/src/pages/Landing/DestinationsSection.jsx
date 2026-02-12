@@ -9,8 +9,8 @@ import {
 import { fetchPackages } from "../../utils/packageApi"
 
 const videoHeights = [
-  "h-96", 
-  "h-80", 
+  "h-96",
+  "h-80",
   "h-88",
   "h-72",
   "h-96",
@@ -19,7 +19,7 @@ const videoHeights = [
   "h-76",
   "h-84",
   "h-96",
-  "h-80", 
+  "h-80",
   "h-88",
   "h-72",
 ]
@@ -131,36 +131,34 @@ function ReviewsVideoSlider() {
             )
           })}
         </div>
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-6">
-              <button
-                onClick={goToPrevious}
-                disabled={currentPage === 0}
-                className={`p-3 rounded-full transition-all ${
-                  currentPage === 0
-                    ? "bg-white/20 text-white/40 cursor-not-allowed"
-                    : "bg-white/90 hover:bg-white text-gray-800 shadow-lg"
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-6">
+            <button
+              onClick={goToPrevious}
+              disabled={currentPage === 0}
+              className={`p-3 rounded-full transition-all ${currentPage === 0
+                  ? "bg-white/20 text-white/40 cursor-not-allowed"
+                  : "bg-white/90 hover:bg-white text-gray-800 shadow-lg"
                 }`}
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <span className="text-white font-medium text-lg">
-                {currentPage + 1} / {totalPages}
-              </span>
-              <button
-                onClick={goToNext}
-                disabled={currentPage === totalPages - 1}
-                className={`p-3 rounded-full transition-all ${
-                  currentPage === totalPages - 1
-                    ? "bg-white/20 text-white/40 cursor-not-allowed"
-                    : "bg-white/90 hover:bg-white text-gray-800 shadow-lg"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            <span className="text-white font-medium text-lg">
+              {currentPage + 1} / {totalPages}
+            </span>
+            <button
+              onClick={goToNext}
+              disabled={currentPage === totalPages - 1}
+              className={`p-3 rounded-full transition-all ${currentPage === totalPages - 1
+                  ? "bg-white/20 text-white/40 cursor-not-allowed"
+                  : "bg-white/90 hover:bg-white text-gray-800 shadow-lg"
                 }`}
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </div>
-          )}
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -183,6 +181,7 @@ function InternationalGrid({ destinations, loading }) {
   const handleDestinationClick = (dest) => {
     navigate(`/packages?destination=${dest.slug}`)
   }
+  const symbol = import.meta.env.VITE_CURRENCY_SYMBOL || '₹';
   return (
     <>
       <style>{`
@@ -201,30 +200,30 @@ function InternationalGrid({ destinations, loading }) {
         }
       `}</style>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-      {internationalDests.map((dest) => (
-        <button
-          key={dest.id}
-          onClick={() => handleDestinationClick(dest)}
-          className="group relative overflow-hidden rounded-2xl aspect-[5/7] hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
-        >
-          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
-          <img
-            src={dest.image_url || "/placeholder.svg"}
-            alt={dest.name}
-            className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
-            placeholderClassName="w-full h-full"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
-          <div className="absolute inset-0 flex flex-col justify-end p-3 md:p-6">
-            <h3 className="text-xl font-bold text-white">{dest.name}</h3>
-            <div className="text-white/90 text-sm mt-2">
-              <span>Starting from</span>
-              <p className="text-lg font-bold">₹{Math.round(dest.price)?.toLocaleString()}</p>
+        {internationalDests.map((dest) => (
+          <button
+            key={dest.id}
+            onClick={() => handleDestinationClick(dest)}
+            className="group relative overflow-hidden rounded-2xl aspect-[5/7] hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+          >
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+            <img
+              src={dest.image_url || "/placeholder.svg"}
+              alt={dest.name}
+              className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+              placeholderClassName="w-full h-full"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+            <div className="absolute inset-0 flex flex-col justify-end p-3 md:p-6">
+              <h3 className="text-xl font-bold text-white">{dest.name}</h3>
+              <div className="text-white/90 text-sm mt-2">
+                <span>Starting from</span>
+                <p className="text-lg font-bold">{symbol}{Math.round(dest.price)?.toLocaleString()}</p>
+              </div>
             </div>
-          </div>
-        </button>
-      ))}
-    </div>
+          </button>
+        ))}
+      </div>
     </>
   )
 }
@@ -265,6 +264,7 @@ function LocalSlider({ destinations, loading }) {
   if (localDests.length === 0) return <div className="text-center py-12 text-gray-500">No local destinations available</div>
 
   const handleDestinationClick = (dest) => navigate(`/packages?destination=${dest.slug}`)
+  const symbol = import.meta.env.VITE_CURRENCY_SYMBOL || '₹';
 
   return (
     <div className="relative px-0 md:px-16">
@@ -306,16 +306,16 @@ function LocalSlider({ destinations, loading }) {
           <div key={dest.id} className="w-full">
             <button onClick={() => handleDestinationClick(dest)} className="w-full group relative overflow-hidden rounded-2xl aspect-[5/7] hover:shadow-2xl transition-all duration-300 cursor-pointer">
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
-              <img 
-                src={dest.image_url || "/placeholder.svg"} 
-                alt={dest.name} 
+              <img
+                src={dest.image_url || "/placeholder.svg"}
+                alt={dest.name}
                 className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
                 placeholderClassName="w-full h-full"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
               <div className="absolute top-4 left-4 right-4"><h3 className="text-xl font-bold text-white drop-shadow-lg text-left">{dest.name}</h3></div>
               <div className="absolute bottom-4 left-4 right-4">
-                <div className="text-white/90 text-left"><p className="text-sm mb-1">Starting from</p><p className="text-xl font-bold">₹{Math.round(dest.price)?.toLocaleString()}</p></div>
+                <div className="text-white/90 text-left"><p className="text-sm mb-1">Starting from</p><p className="text-xl font-bold">{symbol}{Math.round(dest.price)?.toLocaleString()}</p></div>
               </div>
             </button>
           </div>
