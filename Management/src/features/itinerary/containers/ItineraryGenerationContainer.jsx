@@ -3,13 +3,13 @@
  * Modern layout with left sidebar navigation and unique component structure
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import Swal from 'sweetalert2';
 import {
   Package, Plus, Sparkles, Search, ChevronRight, MapPin,
   Calendar, Star, Users, Eye, Edit, Download, Copy, Trash2,
-  Image as ImageIcon, Filter, Grid, List, LayoutGrid, BookOpen
+  Image as ImageIcon, Filter, Grid, List, LayoutGrid, BookOpen, Menu, X
 } from 'lucide-react';
 
 // Hooks
@@ -63,6 +63,18 @@ const ItineraryGenerationContainer = () => {
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const toggleSidebar = useCallback(() => setSidebarOpen(prev => !prev), []);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -684,8 +696,17 @@ const ItineraryGenerationContainer = () => {
       </div>
 
       <div className="relative flex">
+        {/* Sidebar Backdrop (mobile) */}
+        {sidebarOpen && (
+          <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
+        )}
+
         {/* Left Sidebar */}
-        <aside className="w-72 min-h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 sticky top-0 flex flex-col">
+        <aside className={`
+          w-72 min-h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 flex flex-col
+          md:sticky md:top-0
+          ${isMobile ? 'fixed inset-y-0 left-0 z-30 transition-transform duration-300 ' + (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'sticky top-0'}
+        `}>
           {/* Sidebar Header */}
           <div className="p-6 border-b border-slate-200/60">
             <div className="flex items-center gap-3 mb-4">
@@ -740,7 +761,7 @@ const ItineraryGenerationContainer = () => {
               return (
                 <button
                   key={tab.id || 'all'}
-                  onClick={() => handleStatusFilterChange(tab.id)}
+                  onClick={() => { handleStatusFilterChange(tab.id); if (isMobile) setSidebarOpen(false); }}
                   className={`w-full group rounded-xl transition-all duration-300 ${isActive ? 'shadow-lg' : 'hover:bg-slate-50'}`}
                 >
                   <div className={`flex items-center gap-3 p-3 rounded-xl ${isActive ? `bg-gradient-to-r ${tab.gradient} text-white` : 'text-slate-600'}`}>
@@ -775,11 +796,19 @@ const ItineraryGenerationContainer = () => {
         {/* Main Content */}
         <main className="flex-1">
           {/* Content Header */}
-          <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/60 px-8 py-6 sticky top-0 z-10">
+          <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/60 px-4 sm:px-8 py-4 sm:py-6 sticky top-0 z-10">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <Package className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-3 sm:gap-4 pl-10 md:pl-0">
+                {/* Packages sidebar toggle - mobile only */}
+                <button
+                  onClick={toggleSidebar}
+                  className="md:hidden p-2 bg-violet-100 hover:bg-violet-200 rounded-lg transition-colors"
+                  title="Toggle packages sidebar"
+                >
+                  {sidebarOpen ? <X className="w-4 h-4 text-violet-700" /> : <Menu className="w-4 h-4 text-violet-700" />}
+                </button>
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-slate-800">
@@ -790,7 +819,7 @@ const ItineraryGenerationContainer = () => {
               </div>
 
               {/* View Toggle */}
-              <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+              <div className="hidden sm:flex items-center gap-2 bg-slate-100 rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
@@ -806,6 +835,26 @@ const ItineraryGenerationContainer = () => {
               </div>
             </div>
 
+            {/* Mobile Action Buttons */}
+            {!isSalesRep && (
+              <div className="flex md:hidden gap-2 mb-4">
+                <button
+                  onClick={handleNewPackageDialogOpen}
+                  className="flex-1 px-3 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Package
+                </button>
+                <button
+                  onClick={handleAIPackageDialogOpen}
+                  className="flex-1 px-3 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm shadow-sm"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  AI Generate
+                </button>
+              </div>
+            )}
+
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -820,7 +869,7 @@ const ItineraryGenerationContainer = () => {
           </div>
 
           {/* Content Body */}
-          <div className="p-8">
+          <div className="p-4 sm:p-8">
             {filteredPackages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                 <Package className="w-16 h-16 mb-4 opacity-50" />

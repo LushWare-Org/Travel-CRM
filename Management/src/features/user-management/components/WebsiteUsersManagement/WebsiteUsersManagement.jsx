@@ -199,7 +199,7 @@ const WebsiteUsersManagement = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatsCard label="Total Users" value={stats.total} icon={Users} color="cyan" />
         <StatsCard label="Active Users" value={stats.active} icon={UserCheck} color="green" />
         <StatsCard label="Inactive" value={stats.inactive} icon={UserX} color="red" />
@@ -220,7 +220,7 @@ const WebsiteUsersManagement = () => {
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex gap-4">
-        <div className="w-64">
+        <div className="w-full sm:w-64">
           <label className="block text-sm font-medium text-gray-700 mb-2">User Status</label>
           <select
             value={filterStatus}
@@ -288,7 +288,7 @@ const WebsiteUsersManagement = () => {
       >
         <div className="space-y-4">
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
@@ -309,7 +309,7 @@ const WebsiteUsersManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Phone" required>
               <div className="flex gap-2">
                 <select

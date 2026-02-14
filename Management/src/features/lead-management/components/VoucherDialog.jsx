@@ -224,10 +224,10 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/70 to-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-3" onClick={handleBackdropClick}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl h-[92vh] overflow-hidden flex">
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/70 to-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-0 sm:p-3" onClick={handleBackdropClick}>
+      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl w-full max-w-6xl h-full sm:h-[92vh] overflow-hidden flex flex-col md:flex-row">
         {/* Left Sidebar */}
-        <div className="w-64 bg-gradient-to-b from-emerald-600 via-emerald-700 to-teal-800 text-white flex flex-col shrink-0">
+        <div className="hidden md:flex w-64 bg-gradient-to-b from-emerald-600 via-emerald-700 to-teal-800 text-white flex-col shrink-0">
           {/* Logo Area */}
           <div className="p-6 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -301,14 +301,27 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mobile Section Nav */}
+          <div className="flex md:hidden overflow-x-auto border-b border-gray-200 bg-emerald-600 shrink-0">
+            {sections.map((section) => (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                className={`flex items-center gap-1.5 px-4 py-3 whitespace-nowrap text-sm font-medium transition-colors ${activeSection === section.id ? 'bg-white text-emerald-700 border-b-2 border-white' : 'text-white/80 hover:text-white'}`}
+              >
+                <section.icon className="w-4 h-4" />
+                {section.label}
+              </button>
+            ))}
+          </div>
           {/* Top Bar */}
-          <div className="h-16 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
-            <div>
-              <h3 className="font-bold text-gray-900">{formData.packageDetails.name || 'Travel Package'}</h3>
+          <div className="h-14 sm:h-16 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-3 sm:px-6 shrink-0">
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate">{formData.packageDetails.name || 'Travel Package'}</h3>
               <p className="text-xs text-gray-500 flex items-center gap-1"><Globe className="w-3 h-3" /> {formData.packageDetails.destination || 'Destination not set'}</p>
             </div>
-            <div className="flex items-center gap-2">
-              {loadingPackage && <span className="text-xs text-gray-400">Loading...</span>}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {loadingPackage && <span className="text-xs text-gray-400 hidden sm:inline">Loading...</span>}
               <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
@@ -316,7 +329,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-gray-50">
             <form onSubmit={handleSubmit}>
               {/* OVERVIEW Section */}
               {activeSection === 'overview' && (
@@ -327,7 +340,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     <div className="relative z-10">
                       <p className="text-emerald-100 text-sm mb-1">Package</p>
                       <h2 className="text-2xl font-bold mb-4">{formData.packageDetails.name || 'Untitled Package'}</h2>
-                      <div className="grid grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div><p className="text-emerald-100 text-xs">Destination</p><p className="font-semibold">{formData.packageDetails.destination || '—'}</p></div>
                         <div><p className="text-emerald-100 text-xs">Duration</p><p className="font-semibold">{formData.packageDetails.duration || 0} Days</p></div>
                         <div><p className="text-emerald-100 text-xs">Category</p><p className="font-semibold">{formData.packageDetails.category || '—'}</p></div>
@@ -337,7 +350,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   </div>
 
                   {/* Travel Dates - Big Cards */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                       <div className="flex items-center gap-3 mb-4">
                         <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -366,7 +379,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
                   {/* Inclusions/Exclusions Tags */}
                   {(formData.packageDetails.inclusions?.length > 0 || formData.packageDetails.exclusions?.length > 0) && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {formData.packageDetails.inclusions?.length > 0 && (
                         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                           <h4 className="font-semibold text-gray-900 mb-3 text-sm flex items-center gap-2">✅ Inclusions</h4>
@@ -413,7 +426,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             </div>
                             <button type="button" onClick={() => removeLocationDate(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                           </div>
-                          <div className="p-5 grid grid-cols-4 gap-4">
+                          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                               <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">City/Location</label>
                               <input type="text" value={loc.location} onChange={(e) => handleLocationDateChange(index, 'location', e.target.value)} placeholder="e.g. Paris" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
@@ -449,7 +462,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       <p className="text-gray-400 text-sm mt-1">Meal plans are loaded from the itinerary</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {formData.mealPlans.map((plan, index) => (
                         <div key={index} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                           <div className="flex items-center justify-between mb-3">
@@ -511,8 +524,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   {currentVoucherId && (
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
                       <h4 className="font-bold text-gray-900 mb-4">📤 Send Voucher</h4>
-                      <div className="flex gap-3">
-                        <input type="email" value={sendEmailAddress} onChange={(e) => setSendEmailAddress(e.target.value)} placeholder="customer@example.com" className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                      <div className="flex flex-col sm:flex-row gap-3">
                         <button type="button" onClick={handleSendEmail} disabled={sendingEmail} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"><Send className="w-4 h-4" />{sendingEmail ? 'Sending...' : 'Email'}</button>
                         <button type="button" onClick={handleSendWhatsApp} className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium flex items-center gap-2"><MessageCircle className="w-4 h-4" />WhatsApp</button>
                       </div>
@@ -524,7 +536,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
           </div>
 
           {/* Bottom Action Bar */}
-          <div className="h-20 bg-white border-t border-gray-200 flex items-center justify-between px-6 shrink-0">
+          <div className="h-auto sm:h-20 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-3 sm:px-6 py-3 sm:py-0 gap-2 sm:gap-0 shrink-0">
             <div className="flex items-center gap-3">
               {currentVoucherId && (
                 <>

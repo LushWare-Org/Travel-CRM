@@ -109,23 +109,23 @@ const PDFPreviewDialog = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4" onClick={handleBackdropClick}>
+      <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-6xl h-full sm:h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700">
-          <div className="flex items-center gap-4">
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             {onBack && (
               <button
                 onClick={handleBack}
-                className="flex items-center gap-2 px-3 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded transition-colors font-medium"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded transition-colors font-medium text-sm"
                 title="Back to Form"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back
+                <span className="hidden sm:inline">Back</span>
               </button>
             )}
-            <div>
-              <h2 className="text-2xl font-bold text-white">PDF Preview</h2>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-2xl font-bold text-white">PDF Preview</h2>
               <p className="text-blue-100 text-sm mt-1">
                 {documentName || 'Document'}
                 {canNavigate && (
@@ -136,10 +136,10 @@ const PDFPreviewDialog = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
             {/* Navigation Buttons */}
             {canNavigate && (
-              <div className="flex items-center gap-2 mr-2">
+              <div className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">
                 <button
                   onClick={handlePrevious}
                   disabled={!canGoPrevious}
@@ -161,10 +161,10 @@ const PDFPreviewDialog = ({
             {onDownload && pdfBlobUrl && !loading && (
               <button
                 onClick={handleDownload}
-                className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors font-medium"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors font-medium text-sm"
               >
                 <Download className="w-4 h-4" />
-                Download
+                <span className="hidden sm:inline">Download</span>
               </button>
             )}
             <button

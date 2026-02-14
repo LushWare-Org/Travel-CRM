@@ -152,36 +152,36 @@ export default function ResetPassword() {
         {/* Back Button */}
         <button
           onClick={() => navigate('/login')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8 transition"
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 sm:mb-8 transition"
         >
           <ArrowLeft size={20} />
           <span>Back to Login</span>
         </button>
 
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-4 sm:mb-8">
           <div className="flex justify-center mb-4">
-            <div className="bg-purple-100 p-4 rounded-full">
-              <Lock className="text-purple-600" size={32} />
+            <div className="bg-purple-100 p-3 sm:p-4 rounded-full">
+              <Lock className="text-purple-600" size={28} />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Password</h1>
-          <p className="text-gray-600">Set your new permanent password</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Reset Password</h1>
+          <p className="text-gray-600 text-sm sm:text-base">Set your new permanent password</p>
         </div>
 
         {/* Info Banner */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
           <AlertCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
           <div>
             <p className="text-sm text-blue-900 font-medium">First Time Setup</p>
-            <p className="text-sm text-blue-800 mt-1">
+            <p className="text-xs sm:text-sm text-blue-800 mt-1">
               You received a temporary password via email. Use it here along with your new permanent password.
             </p>
           </div>
         </div>
 
         {/* Reset Form */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div>

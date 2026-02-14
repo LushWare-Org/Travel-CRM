@@ -112,7 +112,7 @@ const LeadStats = ({ leads, salesReps, onAssignSuccess }) => {
             <div
               key={stat.key}
               onClick={() => isClickable && handleStatClick(stat.key)}
-              className={`bg-white rounded-xl border ${stat.border} p-5 ${isClickable ? "cursor-pointer hover:shadow-md transition-shadow" : ""
+              className={`bg-white rounded-xl border ${stat.border} p-3 sm:p-5 ${isClickable ? "cursor-pointer hover:shadow-md transition-shadow" : ""
                 }`}
             >
               <div className="flex items-center justify-between">
@@ -124,7 +124,7 @@ const LeadStats = ({ leads, salesReps, onAssignSuccess }) => {
                 )}
               </div>
               <div className="mt-4">
-                <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+                <p className="text-xl sm:text-2xl font-semibold text-gray-900">{stat.value}</p>
                 <p className="text-sm text-gray-500 mt-0.5">{stat.label}</p>
               </div>
             </div>
@@ -187,7 +187,7 @@ const LeadStats = ({ leads, salesReps, onAssignSuccess }) => {
 
                     return (
                       <div key={leadId} className="px-6 py-4 hover:bg-gray-50">
-                        <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-gray-900 truncate">{lead.name}</p>
                             <p className="text-sm text-gray-500 truncate">

@@ -63,7 +63,8 @@ function AppContent() {
           isAuthenticated ? (
             <div className="flex h-screen bg-gray-50">
               <Sidebar />
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto min-w-0">
+                <div className="md:hidden h-0" /> {/* Spacer for mobile hamburger */}
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/analytics" element={<Analytics />} />

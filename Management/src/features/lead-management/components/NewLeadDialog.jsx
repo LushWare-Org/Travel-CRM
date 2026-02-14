@@ -237,7 +237,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     >
       <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white p-6 shrink-0">
+        <div className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white p-4 sm:p-6 shrink-0">
           {/* Decorative Elements */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
@@ -250,7 +250,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 <Sparkles className="w-7 h-7" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold">Create New Lead</h2>
+                <h2 className="text-xl sm:text-2xl font-bold">Create New Lead</h2>
                 <p className="text-blue-100 text-sm mt-0.5">Fill in the details to add a new lead</p>
               </div>
             </div>
@@ -517,7 +517,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                       type="date"
                       value={remark.date}
                       onChange={(e) => updateRemark(index, "date", e.target.value)}
-                      className="w-44 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
+                      className="w-full sm:w-44 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
                     />
                     {formData.remarks.length > 1 && (
                       <button
@@ -607,7 +607,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
+        <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
           <button
             onClick={onClose}
             className="flex-1 px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold"

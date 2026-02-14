@@ -156,10 +156,10 @@ const VacanciesContainer = () => {
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-4 shadow-sm sticky top-0 z-10">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-8 py-4 shadow-sm sticky top-0 z-10">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Vacancies Management</h1>
+          <div className="pl-10 md:pl-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Vacancies Management</h1>
             <p className="text-sm text-gray-500 mt-1">Create and manage job openings</p>
           </div>
           <button
@@ -167,17 +167,18 @@ const VacanciesContainer = () => {
               resetForm();
               setShowForm(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base"
           >
-            <Plus className="w-5 h-5" />
-            Add Vacancy
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Add Vacancy</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* Filter */}
-        <div className="mb-6 flex gap-4">
+        <div className="mb-6 flex flex-wrap gap-2 sm:gap-4">
           {['all', 'active', 'draft', 'closed'].map(status => (
             <button
               key={status}
@@ -207,7 +208,7 @@ const VacanciesContainer = () => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4 mb-4 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 text-sm">
                   <div>
                     <p className="text-gray-600">Type</p>
                     <p className="font-medium">{vacancy.type}</p>
@@ -261,9 +262,9 @@ const VacanciesContainer = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
               {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
                   <input
@@ -327,7 +328,7 @@ const VacanciesContainer = () => {
               </div>
 
               {/* Status */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select

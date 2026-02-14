@@ -54,7 +54,7 @@ const MetricTile = ({ title, value, trend, description, icon: Icon, colorScheme,
   const isPositive = trend?.startsWith('+');
 
   return (
-    <div className={`group relative bg-white rounded-2xl border ${colors.border} p-5 hover:shadow-xl transition-all duration-300 overflow-hidden ${isLarge ? 'col-span-2' : ''}`}>
+    <div className={`group relative bg-white rounded-2xl border ${colors.border} p-4 sm:p-5 hover:shadow-xl transition-all duration-300 overflow-hidden ${isLarge ? 'col-span-1 sm:col-span-2' : ''}`}>
       {/* Background Pattern */}
       <div className="absolute top-0 right-0 w-32 h-32 opacity-5">
         <Icon className="w-full h-full" />
@@ -85,7 +85,7 @@ const MetricTile = ({ title, value, trend, description, icon: Icon, colorScheme,
           {/* Value Row */}
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-3xl font-bold text-slate-800 tracking-tight">{value}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">{value}</p>
               <p className="text-xs text-slate-400 mt-1">{description}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-1 transition-all" />
@@ -101,19 +101,19 @@ const MetricTile = ({ title, value, trend, description, icon: Icon, colorScheme,
 // ============================================
 const ChartPanel = ({ title, subtitle, icon: Icon, children, actions, height = 320 }) => (
   <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow">
-    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-          <Icon className="w-5 h-5 text-slate-600" />
+    <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center flex-shrink-0">
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />
         </div>
-        <div>
-          <h3 className="font-semibold text-slate-800">{title}</h3>
-          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        <div className="min-w-0">
+          <h3 className="font-semibold text-slate-800 text-sm sm:text-base truncate">{title}</h3>
+          {subtitle && <p className="text-xs text-slate-400 hidden sm:block">{subtitle}</p>}
         </div>
       </div>
-      {actions && <div>{actions}</div>}
+      {actions && <div className="flex-shrink-0">{actions}</div>}
     </div>
-    <div className="p-6" style={{ height }}>
+    <div className="p-3 sm:p-6" style={{ height: Math.min(height, typeof window !== 'undefined' && window.innerWidth < 640 ? 240 : height) }}>
       {children}
     </div>
   </div>
@@ -136,7 +136,7 @@ const TimeSelector = ({ selected, onChange }) => {
         <button
           key={opt.id}
           onClick={() => onChange(opt.id)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selected === opt.id
+          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${selected === opt.id
             ? 'bg-white text-slate-800 shadow-sm'
             : 'text-slate-500 hover:text-slate-700'
             }`}
@@ -286,16 +286,16 @@ const RevenueSummaryCards = ({ data }) => {
   if (!data?.stats) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-4 mt-4">
-      <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-4">
+      <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white">
         <p className="text-xs opacity-80">Outstanding</p>
-        <p className="text-2xl font-bold mt-1">{formatCompact(data.stats.totalOutstanding)}</p>
-        <p className="text-xs opacity-70 mt-1">{data.stats.pendingInvoices} invoices pending</p>
+        <p className="text-lg sm:text-2xl font-bold mt-1">{formatCompact(data.stats.totalOutstanding)}</p>
+        <p className="text-[10px] sm:text-xs opacity-70 mt-1">{data.stats.pendingInvoices} invoices pending</p>
       </div>
-      <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
+      <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
         <p className="text-xs opacity-80">Potential Revenue</p>
-        <p className="text-2xl font-bold mt-1">{formatCompact(data.stats.totalPotentialRevenue)}</p>
-        <p className="text-xs opacity-70 mt-1">Available to collect</p>
+        <p className="text-lg sm:text-2xl font-bold mt-1">{formatCompact(data.stats.totalPotentialRevenue)}</p>
+        <p className="text-[10px] sm:text-xs opacity-70 mt-1">Available to collect</p>
       </div>
     </div>
   );
@@ -310,18 +310,18 @@ const UserAnalyticsPanel = ({ data }) => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="text-center p-4 bg-slate-50 rounded-xl">
-          <p className="text-3xl font-bold text-slate-800">{userStats.totalUsers || 0}</p>
-          <p className="text-xs text-slate-500 mt-1">Total Users</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <div className="text-center p-3 sm:p-4 bg-slate-50 rounded-xl">
+          <p className="text-xl sm:text-3xl font-bold text-slate-800">{userStats.totalUsers || 0}</p>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1">Total Users</p>
         </div>
-        <div className="text-center p-4 bg-emerald-50 rounded-xl">
-          <p className="text-3xl font-bold text-emerald-600">{userStats.activeUsers || 0}</p>
-          <p className="text-xs text-slate-500 mt-1">Active</p>
+        <div className="text-center p-3 sm:p-4 bg-emerald-50 rounded-xl">
+          <p className="text-xl sm:text-3xl font-bold text-emerald-600">{userStats.activeUsers || 0}</p>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1">Active</p>
         </div>
-        <div className="text-center p-4 bg-rose-50 rounded-xl">
-          <p className="text-3xl font-bold text-rose-600">{userStats.inactiveUsers || 0}</p>
-          <p className="text-xs text-slate-500 mt-1">Inactive</p>
+        <div className="text-center p-3 sm:p-4 bg-rose-50 rounded-xl">
+          <p className="text-xl sm:text-3xl font-bold text-rose-600">{userStats.inactiveUsers || 0}</p>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1">Inactive</p>
         </div>
       </div>
 
@@ -361,18 +361,18 @@ const SalesRepDashboard = ({ data }) => {
   const performance = data?.performance || {};
 
   return (
-    <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 border border-amber-200">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-          <Zap className="w-6 h-6 text-white" />
+    <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 border border-amber-200">
+      <div className="flex items-center gap-3 mb-4 sm:mb-6">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+          <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
         </div>
         <div>
-          <h3 className="font-bold text-slate-800 text-lg">Your Performance</h3>
+          <h3 className="font-bold text-slate-800 text-base sm:text-lg">Your Performance</h3>
           <p className="text-xs text-amber-600">Personal metrics for this period</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: 'Leads Assigned', value: performance.leadsAssigned || 0, color: 'from-blue-400 to-blue-600' },
           { label: 'Converted', value: performance.converted || 0, color: 'from-emerald-400 to-emerald-600' },
@@ -474,25 +474,25 @@ const DashboardContainer = () => {
     <div className="h-full overflow-auto bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-lg border-b border-slate-200/50">
-        <div className="px-8 py-5 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-            <p className="text-sm text-slate-500">Welcome back, <span className="font-semibold text-slate-700">{user?.name || 'User'}</span></p>
+        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="pl-10 md:pl-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Dashboard</h1>
+            <p className="text-xs sm:text-sm text-slate-500">Welcome back, <span className="font-semibold text-slate-700">{user?.name || 'User'}</span></p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
             <button
               onClick={() => { setRefreshing(true); fetchData(); }}
               disabled={refreshing}
-              className={`p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all ${refreshing ? 'animate-spin' : ''}`}
+              className={`p-2 sm:p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all ${refreshing ? 'animate-spin' : ''}`}
             >
-              <RefreshCw className="w-5 h-5" />
+              <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <TimeSelector selected={timeRange} onChange={setTimeRange} />
           </div>
         </div>
       </div>
 
-      <div className="p-6 lg:p-8 space-y-8">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
         {error && (
           <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm">
             {error} <button onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
@@ -502,22 +502,22 @@ const DashboardContainer = () => {
         {/* Sales Rep Dashboard */}
         {isSalesRep && <SalesRepDashboard data={salesRepData} />}
 
-        {/* Metrics Grid - 3 columns layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {/* Metrics Grid - responsive columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5">
           {metrics.map((metric, idx) => (
             <MetricTile key={idx} {...metric} />
           ))}
         </div>
 
         {/* Charts Row 1 - Lead Funnel (wide) + Package Distribution */}
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 sm:gap-6">
           <div className="xl:col-span-3">
-            <ChartPanel title="Lead Pipeline Trends" subtitle="New leads vs conversions over time" icon={TrendingUp} height={300}>
+            <ChartPanel title="Lead Pipeline Trends" subtitle="New leads vs conversions over time" icon={TrendingUp} height={260}>
               <LeadFunnelChart data={leadData} />
             </ChartPanel>
           </div>
           <div className="xl:col-span-2">
-            <ChartPanel title="Destination Popularity" subtitle="Top destinations by inquiries" icon={PieChartIcon} height={300}>
+            <ChartPanel title="Destination Popularity" subtitle="Top destinations by inquiries" icon={PieChartIcon} height={260}>
               <PackageRadialChart data={packageData} />
             </ChartPanel>
           </div>
@@ -525,9 +525,9 @@ const DashboardContainer = () => {
 
         {/* Charts Row 2 - Revenue Performance (for billing admins) */}
         {canViewBilling && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
             <div className="xl:col-span-2">
-              <ChartPanel title="Revenue Performance" subtitle="Monthly revenue vs targets" icon={DollarSign} height={280}>
+              <ChartPanel title="Revenue Performance" subtitle="Monthly revenue vs targets" icon={DollarSign} height={260}>
                 <RevenueBarChart data={billingData} />
               </ChartPanel>
             </div>
@@ -539,7 +539,7 @@ const DashboardContainer = () => {
 
         {/* Charts Row 3 - User Analytics (for admins) */}
         {canViewUsers && (
-          <ChartPanel title="User Analytics" subtitle="Platform user metrics and distribution" icon={Users} height={280}>
+          <ChartPanel title="User Analytics" subtitle="Platform user metrics and distribution" icon={Users} height={320}>
             <UserAnalyticsPanel data={userData} />
           </ChartPanel>
         )}

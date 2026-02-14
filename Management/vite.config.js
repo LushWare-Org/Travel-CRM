@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     open: true,
     proxy: {
-      "/api": "https://lushtravelcloud.com/api",
+      "/api": "https://api.lushtravelcloud.com/api",
     },
     hmr: {
       overlay: false,

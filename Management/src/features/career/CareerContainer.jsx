@@ -203,33 +203,33 @@ const CareerContainer = () => {
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 shadow-sm sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-gray-900">Career Management</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage job applications and candidates</p>
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-8 py-4 shadow-sm sticky top-0 z-10">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 pl-10 md:pl-0">Career Management</h1>
+        <p className="text-sm text-gray-500 mt-1 pl-10 md:pl-0">Manage job applications and candidates</p>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-            <p className="text-gray-600 text-sm">Total Applications</p>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalApplications || 0}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow p-3 sm:p-4 border-l-4 border-blue-500">
+            <p className="text-gray-600 text-xs sm:text-sm">Total Applications</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.totalApplications || 0}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500">
-            <p className="text-gray-600 text-sm">Pending</p>
-            <p className="text-3xl font-bold text-yellow-600">{stats.pendingCount || 0}</p>
+          <div className="bg-white rounded-lg shadow p-3 sm:p-4 border-l-4 border-yellow-500">
+            <p className="text-gray-600 text-xs sm:text-sm">Pending</p>
+            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{stats.pendingCount || 0}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-            <p className="text-gray-600 text-sm">Shortlisted</p>
-            <p className="text-3xl font-bold text-green-600">{stats.shortlistedCount || 0}</p>
+          <div className="bg-white rounded-lg shadow p-3 sm:p-4 border-l-4 border-green-500">
+            <p className="text-gray-600 text-xs sm:text-sm">Shortlisted</p>
+            <p className="text-2xl sm:text-3xl font-bold text-green-600">{stats.shortlistedCount || 0}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
-            <p className="text-gray-600 text-sm">Rejected</p>
-            <p className="text-3xl font-bold text-red-600">{stats.rejectedCount || 0}</p>
+          <div className="bg-white rounded-lg shadow p-3 sm:p-4 border-l-4 border-red-500">
+            <p className="text-gray-600 text-xs sm:text-sm">Rejected</p>
+            <p className="text-2xl sm:text-3xl font-bold text-red-600">{stats.rejectedCount || 0}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
-            <p className="text-gray-600 text-sm">Hired</p>
-            <p className="text-3xl font-bold text-purple-600">{stats.hiredCount || 0}</p>
+          <div className="bg-white rounded-lg shadow p-3 sm:p-4 border-l-4 border-purple-500 col-span-2 sm:col-span-1">
+            <p className="text-gray-600 text-xs sm:text-sm">Hired</p>
+            <p className="text-2xl sm:text-3xl font-bold text-purple-600">{stats.hiredCount || 0}</p>
           </div>
         </div>
 
@@ -294,7 +294,8 @@ const CareerContainer = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
@@ -380,9 +381,10 @@ const CareerContainer = () => {
             </tbody>
           </table>
 
+          </div>
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
               <p className="text-sm text-gray-600">
                 Showing {startIdx + 1} to {Math.min(startIdx + itemsPerPage, filteredApplications.length)} of {filteredApplications.length}
               </p>
@@ -427,14 +429,14 @@ const CareerContainer = () => {
             <div className="p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Application Details</h2>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Full Name</p>
                     <p className="text-gray-900 font-medium">{selectedApp.fullName}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Email</p>
-                    <p className="text-gray-900 font-medium">{selectedApp.email}</p>
+                    <p className="text-gray-900 font-medium break-all">{selectedApp.email}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Phone</p>

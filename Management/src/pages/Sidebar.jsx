@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Menu, X, Home, Users, MapPin, DollarSign, User, LogOut,
@@ -15,9 +15,28 @@ const Sidebar = () => {
   const { logout, user } = useAuth();
   const permission = usePermission();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    if (isMobile) setMobileOpen(false);
+  }, [location.pathname, isMobile]);
 
   // Update time every minute
   useEffect(() => {
@@ -94,9 +113,12 @@ const Sidebar = () => {
     return "Good Evening";
   };
 
-  return (
+  // Toggle for mobile
+  const toggleMobile = useCallback(() => setMobileOpen(prev => !prev), []);
+
+  const sidebarContent = (isExpanded) => (
     <div
-      className={`${sidebarOpen ? "w-72" : "w-20"} h-full transition-all duration-300 flex flex-col relative overflow-hidden`}
+      className={`${isExpanded ? "w-72" : "w-20"} h-full transition-all duration-300 flex flex-col relative overflow-hidden`}
       style={{
         background: 'linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%)',
       }}
@@ -109,29 +131,35 @@ const Sidebar = () => {
       <div className="p-5 border-b border-sky-200/60 backdrop-blur-sm relative z-10">
         <div className="flex items-center gap-3">
           <div
-            className={`${sidebarOpen ? 'w-12 h-12' : 'w-10 h-10'} rounded-2xl flex items-center justify-center font-bold text-white shadow-lg transition-all duration-300`}
+            className={`${isExpanded ? 'w-12 h-12' : 'w-10 h-10'} rounded-2xl flex items-center justify-center font-bold text-white shadow-lg transition-all duration-300 flex-shrink-0`}
             style={{
               background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%)',
               boxShadow: '0 8px 24px -4px rgba(14, 165, 233, 0.4)',
             }}
           >
-            <span className={`${sidebarOpen ? 'text-lg' : 'text-sm'} font-extrabold tracking-tight`}>
+            <span className={`${isExpanded ? 'text-lg' : 'text-sm'} font-extrabold tracking-tight`}>
               {getSidebarInfo().shortName.substring(0, 2)}
             </span>
           </div>
-          {sidebarOpen && (
+          {isExpanded && (
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-bold text-sky-900 truncate">{getSidebarInfo().name}</h1>
               <p className="text-xs text-sky-600 font-medium truncate">{getSidebarInfo().tagline}</p>
             </div>
+          )}
+          {/* Close button on mobile */}
+          {isMobile && isExpanded && (
+            <button onClick={() => setMobileOpen(false)} className="p-2 rounded-xl hover:bg-sky-100 text-sky-600 ml-auto">
+              <X className="w-5 h-5" />
+            </button>
           )}
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto relative z-10">
-        <div className={`${sidebarOpen ? 'px-3' : 'px-1'} mb-4`}>
-          {sidebarOpen && (
+        <div className={`${isExpanded ? 'px-3' : 'px-1'} mb-4`}>
+          {isExpanded && (
             <p className="text-[10px] uppercase tracking-wider text-sky-500 font-semibold">Main Menu</p>
           )}
         </div>
@@ -145,7 +173,8 @@ const Sidebar = () => {
               key={item.path}
               onClick={() => {
                 navigate(item.path);
-                setSidebarOpen(false);
+                if (isMobile) setMobileOpen(false);
+                else setSidebarOpen(false);
               }}
               onMouseEnter={() => setHoveredItem(index)}
               onMouseLeave={() => setHoveredItem(null)}
@@ -168,7 +197,7 @@ const Sidebar = () => {
               <item.icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${hovered && !active ? 'scale-110' : ''
                 } ${active ? 'text-white' : 'text-sky-500'}`} />
 
-              {sidebarOpen && (
+              {isExpanded && (
                 <>
                   <span className={`text-sm font-medium flex-1 ${active ? 'text-white' : ''}`}>
                     {item.label}
@@ -183,7 +212,7 @@ const Sidebar = () => {
       </nav>
 
       {/* User Profile Section */}
-      {sidebarOpen && user && (
+      {isExpanded && user && (
         <div className="p-4 border-t border-sky-200/60 relative z-10">
           <div
             className="rounded-2xl p-4 backdrop-blur-sm"
@@ -194,7 +223,7 @@ const Sidebar = () => {
           >
             <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold shadow-md"
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold shadow-md flex-shrink-0"
                 style={{
                   background: user.role === 'superAdmin'
                     ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
@@ -239,27 +268,67 @@ const Sidebar = () => {
           }}
         >
           <LogOut className="w-5 h-5" />
-          {sidebarOpen && (
+          {isExpanded && (
             <span className="text-sm">{isLoggingOut ? "Signing out..." : "Sign Out"}</span>
           )}
         </button>
 
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="w-full flex items-center justify-center gap-2 bg-white/70 backdrop-blur-sm px-4 py-2.5 rounded-xl hover:bg-white transition-all duration-200 text-sky-600 hover:text-sky-700 border border-sky-100"
-        >
-          {sidebarOpen ? (
-            <>
-              <X className="w-4 h-4" />
-              <span className="text-xs font-medium">Collapse</span>
-            </>
-          ) : (
-            <Menu className="w-5 h-5" />
-          )}
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-full flex items-center justify-center gap-2 bg-white/70 backdrop-blur-sm px-4 py-2.5 rounded-xl hover:bg-white transition-all duration-200 text-sky-600 hover:text-sky-700 border border-sky-100"
+          >
+            {sidebarOpen ? (
+              <>
+                <X className="w-4 h-4" />
+                <span className="text-xs font-medium">Collapse</span>
+              </>
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
+
+  // Mobile: render hamburger button + overlay drawer
+  if (isMobile) {
+    return (
+      <>
+        {/* Mobile Hamburger Button - Fixed top-left */}
+        {!mobileOpen && (
+          <button
+            onClick={toggleMobile}
+            className="fixed top-3 left-3 z-50 p-2.5 rounded-xl bg-white shadow-lg border border-sky-100 text-sky-600 hover:bg-sky-50 transition-all"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Overlay */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
+        {/* Sidebar Drawer */}
+        <div
+          className={`fixed top-0 left-0 h-full z-50 transform transition-transform duration-300 ease-in-out ${
+            mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          {sidebarContent(true)}
+        </div>
+      </>
+    );
+  }
+
+  // Desktop: render inline sidebar
+  return sidebarContent(sidebarOpen);
 };
 
 export default Sidebar;

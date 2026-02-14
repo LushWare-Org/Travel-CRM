@@ -4,7 +4,7 @@
  * Follows best practices for API integration
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.harshkumar.space/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
 
 /**
  * Enhanced request wrapper with error handling and logging

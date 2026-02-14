@@ -12,8 +12,9 @@ import {
 } from "lucide-react";
 
 /**
- * Analytics Main Page - Completely Redesigned
- * Vertical sidebar navigation with main content area
+ * Analytics Main Page - Responsive Design
+ * Desktop: Vertical sidebar navigation with main content area
+ * Mobile: Horizontal scrollable tabs with full-width content
  */
 const Analytics = () => {
   const [activeTab, setActiveTab] = useState("leads");
@@ -22,6 +23,7 @@ const Analytics = () => {
     {
       id: "leads",
       label: "Lead Analytics",
+      shortLabel: "Leads",
       icon: TrendingUp,
       component: LeadAnalytics,
       color: "#3b82f6",
@@ -31,6 +33,7 @@ const Analytics = () => {
     {
       id: "billing",
       label: "Billing Analytics",
+      shortLabel: "Billing",
       icon: DollarSign,
       component: BillingAnalytics,
       color: "#10b981",
@@ -40,6 +43,7 @@ const Analytics = () => {
     {
       id: "users",
       label: "User Analytics",
+      shortLabel: "Users",
       icon: Users,
       component: UserAnalytics,
       color: "#8b5cf6",
@@ -49,6 +53,7 @@ const Analytics = () => {
     {
       id: "itineraries",
       label: "Package Analytics",
+      shortLabel: "Packages",
       icon: Briefcase,
       component: PackageAnalytics,
       color: "#f59e0b",
@@ -58,6 +63,7 @@ const Analytics = () => {
     {
       id: "website",
       label: "Website Analytics",
+      shortLabel: "Website",
       icon: Globe,
       component: WebsiteAnalytics,
       color: "#06b6d4",
@@ -70,9 +76,43 @@ const Analytics = () => {
   const ActiveComponent = activeTabData?.component;
 
   return (
-    <div className="h-full flex bg-slate-50">
-      {/* Left Sidebar Navigation */}
-      <div className="w-64 bg-white border-r border-slate-200 flex-shrink-0 flex flex-col">
+    <div className="h-full flex flex-col md:flex-row bg-slate-50">
+      {/* Mobile Header + Horizontal Tabs */}
+      <div className="md:hidden bg-white border-b border-slate-200 sticky top-0 z-10">
+        {/* Mobile Header */}
+        <div className="px-4 pt-3 pb-2 flex items-center gap-3 pl-14">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
+            <BarChart3 className="w-4 h-4 text-white" />
+          </div>
+          <h1 className="font-bold text-slate-800 text-lg">Analytics</h1>
+        </div>
+        
+        {/* Horizontal scrollable tabs */}
+        <div className="flex overflow-x-auto px-3 pb-3 gap-2 scrollbar-hide">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                  isActive
+                    ? 'text-white shadow-md'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+                style={isActive ? { backgroundColor: tab.color } : {}}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                {tab.shortLabel}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Desktop Left Sidebar Navigation */}
+      <div className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-shrink-0 flex-col">
         {/* Header */}
         <div className="p-6 border-b border-slate-100">
           <div className="flex items-center gap-3">
@@ -135,9 +175,9 @@ const Analytics = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Bar with Active Tab Info */}
-        <div className="bg-white border-b border-slate-200 px-8 py-5 flex-shrink-0">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Desktop Top Bar with Active Tab Info */}
+        <div className="hidden md:block bg-white border-b border-slate-200 px-8 py-5 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {activeTabData && (
@@ -155,27 +195,14 @@ const Analytics = () => {
                 </>
               )}
             </div>
-
-            {/* Optional: Quick navigation dropdown for mobile */}
-            <div className="lg:hidden">
-              <select
-                value={activeTab}
-                onChange={(e) => setActiveTab(e.target.value)}
-                className="px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm font-medium text-slate-700"
-              >
-                {tabs.map(tab => (
-                  <option key={tab.id} value={tab.id}>{tab.label}</option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-8">
+          <div className="p-4 sm:p-6 lg:p-8">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-              <div className="p-6 lg:p-8">
+              <div className="p-4 sm:p-6 lg:p-8">
                 {ActiveComponent && <ActiveComponent />}
               </div>
             </div>

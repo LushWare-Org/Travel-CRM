@@ -19,6 +19,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [detectedPackage, setDetectedPackage] = useState(null);
   const [detectedPackageType, setDetectedPackageType] = useState(null);
   const [expandedSections, setExpandedSections] = useState({ items: true, discount: false, communication: false });
+  const [showMobileSummary, setShowMobileSummary] = useState(false);
 
   const [formData, setFormData] = useState({
     lead: lead?._id || lead?.id, quotation: '', package: '', type: 'invoice',
@@ -169,19 +170,19 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/70 via-purple-900/60 to-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
-      <div className="bg-gradient-to-b from-white to-slate-50 rounded-3xl shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-gradient-to-br from-indigo-900/70 via-purple-900/60 to-slate-900/80 backdrop-blur-md flex items-center justify-center z-50 p-0 sm:p-4" onClick={handleBackdropClick}>
+      <div className="bg-gradient-to-b from-white to-slate-50 rounded-none sm:rounded-3xl shadow-2xl w-full max-w-6xl h-full sm:h-[90vh] overflow-hidden flex flex-col">
         {/* Header with Gradient */}
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700" />
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDYwIEwgNjAgMCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIwLjUiIG9wYWNpdHk9IjAuMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30" />
-          <div className="relative px-8 py-6 flex items-center justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-                <Receipt className="w-7 h-7 text-white" />
+          <div className="relative px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between">
+            <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shrink-0">
+                <Receipt className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white">{isEditing ? 'Edit Invoice' : 'New Invoice'}</h2>
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-2xl font-bold text-white">{isEditing ? 'Edit Invoice' : 'New Invoice'}</h2>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-indigo-200 text-sm">{lead?.name || 'Customer'}</span>
                   {detectedPackageType && (
@@ -195,11 +196,11 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         </div>
 
         {/* Main Content with Floating Summary */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Left: Form Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-5">
             {/* Quick Stats Row */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Issue Date</p>
@@ -300,7 +301,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 {expandedSections.discount ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
               </button>
               {expandedSections.discount && (
-                <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-3 gap-4">
+                <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs font-medium text-gray-500 mb-2 block">Tax Rate (%)</label>
                     <input type="number" value={formData.taxRate} onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0" placeholder="0" />
@@ -324,7 +325,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             </div>
 
             {/* Notes */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <label className="text-sm font-semibold text-gray-700 mb-3 block">Payment Terms</label>
                 <textarea value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} rows="3" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Payment terms..." />
@@ -339,7 +340,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             {currentInvoiceId && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Send Invoice</p>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <input type="email" value={sendEmailAddress} onChange={(e) => setSendEmailAddress(e.target.value)} placeholder="customer@example.com" className="flex-1 px-4 py-3 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 border-0" />
                   <button type="button" onClick={handleSendInvoiceEmail} disabled={sendingEmail} className="px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-sm flex items-center gap-2"><Send className="w-4 h-4" />{sendingEmail ? '...' : 'Email'}</button>
                   <button type="button" onClick={() => handleSendWhatsApp(currentInvoiceId)} disabled={!lead?.whatsapp} className="px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium text-sm flex items-center gap-2 disabled:opacity-50"><MessageCircle className="w-4 h-4" />WhatsApp</button>
@@ -348,8 +349,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             )}
           </div>
 
-          {/* Right: Floating Summary Panel */}
-          <div className="w-80 bg-gradient-to-b from-gray-900 to-slate-900 text-white p-6 flex flex-col shrink-0">
+          {/* Right: Desktop Summary Panel - hidden on mobile */}
+          <div className="hidden md:flex md:flex-col md:w-80 bg-gradient-to-b from-gray-900 to-slate-900 text-white p-6 shrink-0">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center"><Calculator className="w-5 h-5" /></div>
               <div>
@@ -382,7 +383,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <div className="flex justify-between items-end">
                   <span className="text-gray-400">Total Amount</span>
                   <div className="text-right">
-                    <p className="text-3xl font-bold">{formatCurrency(totals.totalAmount, { minimumFractionDigits: 2 })}</p>
+                    <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(totals.totalAmount, { minimumFractionDigits: 2 })}</p>
                     <p className="text-xs text-gray-500 mt-1">Due: {formatDateLabel(formData.dueDate)}</p>
                   </div>
                 </div>
@@ -416,6 +417,79 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               </button>
               <button type="button" onClick={onClose} className="w-full px-4 py-3 text-gray-400 hover:text-white transition-colors text-sm">Cancel</button>
             </div>
+          </div>
+        </div>
+
+        {/* Mobile Bottom Summary Bar */}
+        <div className="md:hidden bg-gradient-to-b from-gray-900 to-slate-900 text-white">
+          {/* Expandable Summary Drawer */}
+          {showMobileSummary && (
+            <div className="px-4 pt-4 pb-2 space-y-3 max-h-[40vh] overflow-y-auto border-t border-white/10">
+              {/* Breakdown */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Subtotal</span>
+                  <span className="font-medium">{formatCurrency(totals.subtotal, { minimumFractionDigits: 2 })}</span>
+                </div>
+                {totals.discountAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-green-400">Discount</span>
+                    <span className="text-green-400">-{formatCurrency(totals.discountAmount, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {totals.taxAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Tax ({formData.taxRate}%)</span>
+                    <span>{formatCurrency(totals.taxAmount, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Due date & Mode */}
+              <div className="flex justify-between text-xs text-gray-500 pt-2 border-t border-white/10">
+                <span>Due: {formatDateLabel(formData.dueDate)}</span>
+                <span className="text-indigo-400 font-medium">{getModeLabel(quotationMode)} Mode</span>
+              </div>
+
+              {/* Existing Invoices */}
+              {existingInvoices.length > 0 && (
+                <div className="pt-2 border-t border-white/10">
+                  <p className="text-xs text-gray-400 mb-2">Previous Invoices</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                    {existingInvoices.slice(0, 5).map((inv, idx) => (
+                      <button key={inv._id || inv.id} className={`shrink-0 px-3 py-2 rounded-lg text-xs transition-colors ${currentInvoice?._id === inv._id ? 'bg-indigo-600' : 'bg-white/5 active:bg-white/10'}`} onClick={() => { setCurrentInvoice(inv); setCurrentInvoiceId(inv._id || inv.id); setIsEditing(true); setShowMobileSummary(false); }}>
+                        <p className="font-medium">{inv.invoiceNumber || `#${idx + 1}`}</p>
+                        <p className="text-gray-500">{formatCurrency(inv.totalAmount || 0, { minimumFractionDigits: 2 })}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview PDF */}
+              {currentInvoiceId && (
+                <button onClick={() => handlePreviewPDF(currentInvoiceId)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 active:bg-white/20 rounded-xl font-medium text-sm transition-colors">
+                  <Eye className="w-4 h-4" />Preview PDF
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Compact Bottom Bar */}
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-white/20 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+            <button type="button" onClick={() => setShowMobileSummary(!showMobileSummary)} className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                {showMobileSummary ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider">Total</p>
+                <p className="text-lg font-bold truncate">{formatCurrency(totals.totalAmount, { minimumFractionDigits: 2 })}</p>
+              </div>
+            </button>
+            <button onClick={() => handleSubmit()} disabled={loading} className="shrink-0 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 active:from-indigo-600 active:to-purple-700 rounded-xl font-bold text-sm transition-all disabled:opacity-50 shadow-lg">
+              <Save className="w-4 h-4" />
+              {loading ? '...' : isEditing ? 'Update' : 'Create'}
+            </button>
           </div>
         </div>
       </div>

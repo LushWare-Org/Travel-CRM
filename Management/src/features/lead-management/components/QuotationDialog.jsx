@@ -1206,9 +1206,9 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
           <div className="space-y-4">
             {/* TOP ROW: Delivery + Plan Selection + Configuration - Improved Layout */}
-            <div className="flex gap-3">
+            <div className="flex flex-col lg:flex-row gap-3">
               {/* Delivery Section - Narrower, stacked layout */}
-              <div className="w-72 shrink-0 bg-white rounded-lg border border-slate-200 p-3">
+              <div className="w-full lg:w-72 lg:shrink-0 bg-white rounded-lg border border-slate-200 p-3">
                 <h3 className="text-xs font-semibold text-slate-600 mb-2">Quotation & Delivery</h3>
                 <div className="space-y-2">
                   {/* Row 1: Quotation Selection */}
@@ -1355,7 +1355,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               )}
 
               {/* Configuration - Improved */}
-              <div className="w-64 shrink-0 bg-white rounded-lg border border-slate-200 p-3">
+              <div className="w-full lg:w-64 lg:shrink-0 bg-white rounded-lg border border-slate-200 p-3">
                 <h3 className="text-xs font-semibold text-slate-600 mb-2">Mode & Status</h3>
                 <div className="space-y-2">
                   {/* Current Plan Indicator */}
@@ -1481,7 +1481,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
                     {/* Image Gallery */}
                     {formData.images && formData.images.length > 0 && (
-                      <div className="mt-3 grid grid-cols-3 gap-3">
+                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {formData.images.map((img, index) => (
                           <div key={index} className="relative group">
                             <div className={`relative h-32 bg-gray-100 rounded-md overflow-hidden border-2 ${img.isCover ? 'border-orange-500' : 'border-gray-200'}`}>
@@ -1554,7 +1554,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Inclusions */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -1757,7 +1757,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       return (
                         <div className="space-y-4">
                           {/* Render days in 2-column grid */}
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {dayKeys.map(day => (
                               <div key={day} className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col">
                                 <div className="bg-gradient-to-r from-slate-100 to-slate-200 px-3 py-2 border-b border-slate-300 flex justify-between items-center shrink-0">
@@ -1908,7 +1908,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             </div>
 
             {/* Calculations & Summary */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Tax & Discount Card */}
               <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                 <div className="px-4 py-2.5 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200">
@@ -1917,7 +1917,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   </h4>
                 </div>
                 <div className="p-4 space-y-3">
-                  <div className="flex gap-3">
+                  <div className="flex flex-col lg:flex-row gap-3">
                     <div className="flex-1">
                       <label className="block text-[10px] text-slate-500 mb-1">Tax Rate (%)</label>
                       <input
@@ -1995,7 +1995,7 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             </div>
 
             {/* Notes & Terms */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                 <div className="px-4 py-2 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">

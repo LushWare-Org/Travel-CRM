@@ -306,7 +306,7 @@ const LeadTable = ({
                 {/* Document Actions Section */}
                 <div className="px-5 py-4 bg-gray-50 rounded-b-xl border-t border-gray-100">
                   <p className="text-xs font-medium text-gray-500 mb-3">Documents</p>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {/* Quotation */}
                     <button
                       onClick={(e) => {
@@ -390,7 +390,7 @@ const LeadTable = ({
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-xl border border-gray-200 px-4 sm:px-5 py-4">
             <p className="text-sm text-gray-600">
               Showing <span className="font-medium">{paginationStart}</span> to{" "}
               <span className="font-medium">{paginationEnd}</span> of{" "}
@@ -679,7 +679,7 @@ const LeadTable = ({
 
       {/* Pagination Controls */}
       {totalLeads > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 mt-4 bg-white border border-gray-200 rounded-lg">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 mt-4 bg-white border border-gray-200 rounded-lg">
           <div className="text-sm text-gray-700">
             Showing {paginationStart} to {paginationEnd} of {totalLeads} leads
           </div>

@@ -89,29 +89,29 @@ const PackagePDFPreviewDialog = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
-      <div className="flex h-full w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/60 px-0 py-0 sm:px-4 sm:py-6 backdrop-blur-sm">
+      <div className="flex h-full w-full max-w-7xl flex-col overflow-hidden rounded-none sm:rounded-2xl bg-white shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-sky-700 via-sky-600 to-indigo-600 px-6 py-4">
-          <div className="flex items-center gap-3 text-white">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur">
-              <FileText className="h-6 w-6" />
+        <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-sky-700 via-sky-600 to-indigo-600 px-3 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-3 text-white min-w-0">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur shrink-0">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h2 className="text-2xl font-semibold tracking-wide">Itinerary Preview</h2>
-              <p className="text-sm text-white/80">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-2xl font-semibold tracking-wide">Itinerary Preview</h2>
+              <p className="text-xs sm:text-sm text-white/80 truncate">
                 {packageData?.name || 'Travel package'} · {fileName}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={handleDownload}
               disabled={!pdfBlob || isGenerating}
-              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 font-semibold text-sky-600 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white px-2 sm:px-4 py-2 font-semibold text-sky-600 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 text-sm"
             >
               <Download className="h-4 w-4" />
-              Download PDF
+              <span className="hidden sm:inline">Download PDF</span>
             </button>
             <button
               onClick={onClose}

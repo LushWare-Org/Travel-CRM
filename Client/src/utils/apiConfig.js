@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = 'https://api.harshkumar.space/api/v1';
+const DEFAULT_BASE_URL = 'https://api.lushtravelcloud.com/api/v1';
 
 export const API_BASE_URL = (
   import.meta?.env?.VITE_API_URL?.trim() || DEFAULT_BASE_URL

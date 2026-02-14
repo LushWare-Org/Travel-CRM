@@ -12,21 +12,21 @@ const CareerManagement = () => {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-8 shadow-sm">
-        <div className="flex gap-8">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-8 shadow-sm">
+        <div className="flex gap-4 sm:gap-8 pl-10 md:pl-0">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-4 flex items-center gap-2 font-medium transition border-b-2 ${
+                className={`py-3 sm:py-4 px-2 sm:px-4 flex items-center gap-2 font-medium transition border-b-2 text-sm sm:text-base ${
                   activeTab === tab.id
                     ? 'text-blue-600 border-blue-600'
                     : 'text-gray-600 border-transparent hover:text-gray-900'
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                 {tab.label}
               </button>
             );

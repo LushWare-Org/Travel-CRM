@@ -519,7 +519,7 @@ const VendorManagement = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex gap-4">
+      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <label className="block text-sm font-medium text-gray-700 mb-2">Active Status</label>
           <select
@@ -641,7 +641,7 @@ const VendorManagement = () => {
             </ol>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Name" required error={validationErrors.name}>
               <input
                 type="text"
@@ -713,7 +713,7 @@ const VendorManagement = () => {
             />
           </FormGroup>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Service Type" required error={validationErrors.serviceType}>
               <select
                 value={formData.serviceType}
@@ -771,7 +771,7 @@ const VendorManagement = () => {
                 placeholder="Street address"
               />
             </FormGroup>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="City">
                 <input
                   type="text"
@@ -791,7 +791,7 @@ const VendorManagement = () => {
                 />
               </FormGroup>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="ZIP Code">
                 <input
                   type="text"
@@ -816,7 +816,7 @@ const VendorManagement = () => {
           {/* Bank Details Section */}
           <div className="border-t pt-4">
             <p className="font-semibold text-gray-700 mb-3">Bank Details</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="Account Name">
                 <input
                   type="text"
@@ -836,7 +836,7 @@ const VendorManagement = () => {
                 />
               </FormGroup>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="Bank Name">
                 <input
                   type="text"
@@ -856,7 +856,7 @@ const VendorManagement = () => {
                 />
               </FormGroup>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="IFSC Code">
                 <input
                   type="text"
@@ -931,7 +931,7 @@ const VendorManagement = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Name" required>
               <input
                 type="text"
@@ -1003,7 +1003,7 @@ const VendorManagement = () => {
             />
           </FormGroup>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Service Type" required>
               <select
                 value={formData.serviceType}
@@ -1061,7 +1061,7 @@ const VendorManagement = () => {
                 placeholder="Street address"
               />
             </FormGroup>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="City">
                 <input
                   type="text"
@@ -1081,7 +1081,7 @@ const VendorManagement = () => {
                 />
               </FormGroup>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="ZIP Code">
                 <input
                   type="text"
@@ -1106,7 +1106,7 @@ const VendorManagement = () => {
           {/* Bank Details Section */}
           <div className="border-t pt-4">
             <p className="font-semibold text-gray-700 mb-3">Bank Details</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="Account Name">
                 <input
                   type="text"
@@ -1126,7 +1126,7 @@ const VendorManagement = () => {
                 />
               </FormGroup>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="Bank Name">
                 <input
                   type="text"
@@ -1146,7 +1146,7 @@ const VendorManagement = () => {
                 />
               </FormGroup>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormGroup label="IFSC Code">
                 <input
                   type="text"
@@ -1239,7 +1239,7 @@ const VendorManagement = () => {
                   <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
                   Contact Information
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Name</p>
                     <p className="text-sm font-medium text-gray-900">{selectedVendor.name}</p>
@@ -1267,7 +1267,7 @@ const VendorManagement = () => {
                   <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
                   Business Information
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Business Name</p>
                     <p className="text-sm font-medium text-gray-900">{selectedVendor.businessName}</p>
@@ -1313,7 +1313,7 @@ const VendorManagement = () => {
                     <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
                     Primary Contact
                   </h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">Name</p>
                       <p className="text-sm font-medium text-gray-900">{selectedVendor.contactPerson.name}</p>
@@ -1341,7 +1341,7 @@ const VendorManagement = () => {
                     <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
                     Bank Details
                   </h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-600">Account Name</p>
                       <p className="text-sm font-medium text-gray-900">{selectedVendor.bankDetails.accountName}</p>
@@ -1376,7 +1376,7 @@ const VendorManagement = () => {
                   <span className="w-1 h-1 bg-indigo-600 rounded-full"></span>
                   Performance
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Rating</p>
                     <p className="text-sm font-medium text-gray-900 flex items-center gap-1">

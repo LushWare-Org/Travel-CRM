@@ -525,7 +525,7 @@ const SalesRepManagement = () => {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             <StatsCard label="Total Reps" value={stats.total} icon={User} color="blue" />
             <StatsCard label="Active Reps" value={onlineCount} icon={User} color="green" />
             <StatsCard label="Total Leads" value={stats.totalLeads} icon={TrendingUp} color="purple" />
@@ -604,7 +604,7 @@ const SalesRepManagement = () => {
             </ol>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
@@ -627,7 +627,7 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Country Code" required>
               <select
                 value={formData.phoneCountry}
@@ -655,7 +655,7 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Commission Rate (%)" required>
               <input
                 type="number"
@@ -699,7 +699,7 @@ const SalesRepManagement = () => {
         error={error}
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
@@ -720,7 +720,7 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Country Code" required>
               <select
                 value={formData.phoneCountry}
@@ -748,7 +748,7 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormGroup label="Commission Rate (%)" required>
               <input
                 type="number"

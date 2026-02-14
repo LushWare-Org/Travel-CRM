@@ -198,13 +198,13 @@ export default function SalesRepLoginOTP() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">{getLoginBranding().title}</h1>
-          <p className="text-gray-600">Verify Your Identity</p>
+        <div className="text-center mb-4 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">{getLoginBranding().title}</h1>
+          <p className="text-gray-600 text-sm sm:text-base">Verify Your Identity</p>
         </div>
 
         {/* OTP Card */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Enter OTP</h2>
             <p className="text-gray-600 text-sm">
@@ -229,7 +229,7 @@ export default function SalesRepLoginOTP() {
                   setError('');
                 }}
                 placeholder="000000"
-                className="w-full px-4 py-3 text-center text-3xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none tracking-widest font-mono"
+                className="w-full px-4 py-3 text-center text-2xl sm:text-3xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none tracking-wider sm:tracking-widest font-mono"
                 disabled={isSubmitting || timer === 0}
               />
             </div>
