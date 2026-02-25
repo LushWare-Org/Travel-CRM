@@ -10,6 +10,7 @@ import packageService from '../services/package.service.js';
 import { assignSalesRepIfNeeded } from '../services/assignment.service.js';
 import emailService from '../utils/emailService.js';
 import logger from '../config/logger.js';
+import aiTriggerService from '../services/ai/aiTrigger.service.js';
 
 const normalizePhone = (phone) => {
   if (!phone) return undefined;
@@ -164,6 +165,10 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
 
       await packageService.incrementBookings(pkg._id);
       await session.commitTransaction();
+
+      aiTriggerService.publishLeadCreated(newLead, 'website-booking').catch((error) => {
+        logger.error(`AI trigger failed for booking lead ${newLead._id}: ${error.message}`);
+      });
 
       // Send assignment email notification if a sales rep was assigned
       if (newLead.assignedTo && assignmentResult?.assigned) {

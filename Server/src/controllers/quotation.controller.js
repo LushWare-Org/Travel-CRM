@@ -6,6 +6,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { APIFeatures } from '../utils/apiFeatures.js';
 import emailService from '../utils/emailService.js';
+import aiTriggerService from '../services/ai/aiTrigger.service.js';
 
 const formatQuotationForResponse = (quotationDoc) => {
   if (!quotationDoc) {
@@ -170,6 +171,8 @@ export const createQuotation = asyncHandler(async (req, res) => {
   const quotationDoc = await BillingService.createQuotation(req.body, req.user.id);
   const quotation = formatQuotationForResponse(quotationDoc);
 
+  aiTriggerService.publishLeadUpdated({ _id: quotationDoc.lead }).catch(() => null);
+
   res.status(201).json({
     success: true,
     message: 'Quotation created successfully',
@@ -291,6 +294,8 @@ export const sendQuotation = asyncHandler(async (req, res, next) => {
   quotationDoc.status = 'sent';
   quotationDoc.sentAt = new Date();
   await quotationDoc.save();
+
+  aiTriggerService.publishQuotationSent(quotationDoc).catch(() => null);
 
   const updatedQuotation = formatQuotationForResponse(quotationDoc);
 

@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import { generateItineraryPDF, generateLeadItineraryPDF } from '../utils/pdfGenerator.js';
 import emailService from '../utils/emailService.js';
 import logger from '../config/logger.js';
+import aiTriggerService from '../services/ai/aiTrigger.service.js';
 
 // @desc    Create a new lead
 // @route   POST /api/v1/leads
@@ -107,6 +108,10 @@ export const createLead = asyncHandler(async (req, res, next) => {
   }
 
   const lead = await Lead.create(req.body);
+
+  aiTriggerService.publishLeadCreated(lead).catch((error) => {
+    logger.error(`AI trigger failed for lead created ${lead._id}: ${error.message}`);
+  });
 
   // Send assignment email notification if a sales rep was assigned
   if (lead.assignedTo) {
@@ -432,6 +437,15 @@ export const updateLead = asyncHandler(async (req, res, next) => {
     } else if (newAssignedTo === previousAssignedTo) {
       logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
     }
+  }
+
+  aiTriggerService.publishLeadUpdated(lead).catch((error) => {
+    logger.error(`AI trigger failed for lead updated ${lead._id}: ${error.message}`);
+  });
+  if (previousStatus !== lead.status) {
+    aiTriggerService.publishLeadStatusChanged(lead, previousStatus).catch((error) => {
+      logger.error(`AI trigger failed for lead status changed ${lead._id}: ${error.message}`);
+    });
   }
 
   res.status(200).json({
@@ -907,6 +921,10 @@ export const createWebsiteContactLead = asyncHandler(async (req, res, next) => {
   // Create lead
   const lead = await Lead.create(leadPayload);
 
+  aiTriggerService.publishLeadCreated(lead, 'website-contact').catch((error) => {
+    logger.error(`AI trigger failed for website lead created ${lead._id}: ${error.message}`);
+  });
+
   res.status(201).json({
     success: true,
     message: 'Contact form submitted successfully',
@@ -985,3 +1003,4 @@ export default {
   downloadLeadItineraryPDF,
   createWebsiteContactLead,
 };
+  const previousStatus = lead.status;

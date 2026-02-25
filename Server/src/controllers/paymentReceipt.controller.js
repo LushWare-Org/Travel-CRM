@@ -5,6 +5,7 @@ import BillingService from '../services/billing.service.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import emailService from '../utils/emailService.js';
+import aiEventBusService from '../services/ai/aiEventBus.service.js';
 import { APIFeatures } from '../utils/apiFeatures.js';
 
 /**
@@ -179,6 +180,16 @@ export const createPaymentReceipt = asyncHandler(async (req, res) => {
     message: 'Payment recorded successfully',
     data: receipt,
   });
+
+  aiEventBusService.publish({
+    type: 'receipt.created',
+    source: 'payment-receipt.controller',
+    payload: {
+      leadId: String(receipt.lead),
+      receiptId: String(receipt._id),
+      invoiceId: String(receipt.invoice),
+    },
+  }).catch(() => null);
 });
 
 /**

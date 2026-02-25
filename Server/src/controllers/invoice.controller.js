@@ -6,6 +6,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { APIFeatures } from '../utils/apiFeatures.js';
 import emailService from '../utils/emailService.js';
+import aiTriggerService from '../services/ai/aiTrigger.service.js';
 
 const formatInvoiceForResponse = (invoiceDoc) => {
   if (!invoiceDoc) {
@@ -198,6 +199,8 @@ export const createInvoice = asyncHandler(async (req, res, next) => {
   const invoiceDoc = await Invoice.create(req.body);
   const invoice = formatInvoiceForResponse(invoiceDoc);
 
+  aiTriggerService.publishLeadUpdated({ _id: invoiceDoc.lead }).catch(() => null);
+
   res.status(201).json({
     success: true,
     message: 'Invoice created successfully',
@@ -359,6 +362,8 @@ export const sendInvoice = asyncHandler(async (req, res, next) => {
   invoiceDoc.status = 'sent';
   invoiceDoc.sentAt = new Date();
   await invoiceDoc.save();
+
+  aiTriggerService.publishInvoiceSent(invoiceDoc).catch(() => null);
 
   const updatedInvoice = formatInvoiceForResponse(invoiceDoc);
 

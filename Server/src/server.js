@@ -47,6 +47,7 @@ import uploadRoutes from './routes/upload.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import careerRoutes from './routes/career.routes.js';
 import vacancyRoutes from './routes/vacancy.routes.js';
+import aiRoutes from './routes/ai.routes.js';
 
 // Billing Module Routes
 import quotationRoutes from './routes/quotation.routes.js';
@@ -57,6 +58,8 @@ import voucherRoutes from './routes/voucher.routes.js';
 import paymentHistoryRoutes from './routes/paymentHistory.routes.js';
 import hotelSuggestionRoutes from './routes/hotelSuggestion.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
+import aiOrchestratorService from './services/ai/aiOrchestrator.service.js';
+import aiSchedulerService from './services/ai/aiScheduler.service.js';
 
 // Import middleware
 import errorHandler from './middleware/errorHandler.js';
@@ -142,6 +145,7 @@ app.use(`/api/${API_VERSION}/hotels`, hotelSuggestionRoutes);
 
 // Webhook routes (public endpoints for external services)
 app.use(`/api/${API_VERSION}/webhooks`, webhookRoutes);
+app.use(`/api/${API_VERSION}/ai`, aiRoutes);
 
 // Error handling
 app.use(notFound);
@@ -173,6 +177,8 @@ const startServer = async () => {
 
     // Verify email service after server starts
     await emailService.verifyConnection();
+    aiOrchestratorService.start();
+    aiSchedulerService.start();
   });
   server.setTimeout(45000);
 };
