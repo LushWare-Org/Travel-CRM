@@ -19,15 +19,15 @@ const LOGO_PATH = path.join(dirname, '../../../Management/public/website-logo-1.
 
 // Color Scheme - Black and Orange Theme
 const COLORS = {
-  headerBg: '#0C0C0C',           // Black
-  headerText: '#FFFFFF',         // White
-  accent: '#EA580C',             // Orange
-  accentLight: '#F97316',        // Light Orange
-  primaryText: '#1F2937',        // Dark Gray
-  secondaryText: '#6B7280',      // Medium Gray
-  border: '#E5E7EB',             // Light Gray
-  background: '#FFFFFF',         // White
-  statBg: '#F9FAFB',             // Off-white
+  headerBg: '#0C0C0C', // Black
+  headerText: '#FFFFFF', // White
+  accent: '#EA580C', // Orange
+  accentLight: '#F97316', // Light Orange
+  primaryText: '#1F2937', // Dark Gray
+  secondaryText: '#6B7280', // Medium Gray
+  border: '#E5E7EB', // Light Gray
+  background: '#FFFFFF', // White
+  statBg: '#F9FAFB', // Off-white
 };
 
 // Helper to load logo
@@ -87,7 +87,7 @@ async function generateAnalyticsPDF(options) {
     logger.info(`[PDF Generator] Setting HTML content (${htmlContent.length} bytes)`);
     await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' }); // Changed from networkidle0
 
-    logger.info(`[PDF Generator] Rendering PDF...`);
+    logger.info('[PDF Generator] Rendering PDF...');
     // Generate PDF
     const pdfBuffer = await page.pdf({
       format: 'A4',
@@ -115,7 +115,9 @@ async function generateAnalyticsPDF(options) {
 /**
  * Generate HTML Template for PDF
  */
-function generateHTMLTemplate({ title, timeRange, stats, charts, summary }) {
+function generateHTMLTemplate({
+  title, timeRange, stats, charts, summary,
+}) {
   const logoBase64 = loadLogo();
   const logoTag = logoBase64
     ? `<img src="data:image/png;base64,${logoBase64}" alt="${BRANDING.company.name}" style="height: 24px; margin-right: 8px;">`
@@ -123,13 +125,12 @@ function generateHTMLTemplate({ title, timeRange, stats, charts, summary }) {
 
   const statsHTML = stats
     .map(
-      (stat, idx) =>
-        `
+      (stat, idx) => `
     <div style="flex: 1; min-width: 150px; padding: 16px; background: ${COLORS.statBg}; border-radius: 8px; border-left: 4px solid ${COLORS.accent}; margin-right: ${idx < stats.length - 1 ? '12px' : '0'};">
       <div style="font-size: 12px; color: ${COLORS.secondaryText}; margin-bottom: 4px;">${stat.label}</div>
       <div style="font-size: 20px; font-weight: bold; color: ${COLORS.primaryText};">${stat.value}</div>
     </div>
-  `
+  `,
     )
     .join('');
 

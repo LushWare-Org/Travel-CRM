@@ -61,7 +61,7 @@ export const handleLeadWebhook = asyncHandler(async (req, res) => {
   }
 
   // Handle webhook event
-  const entry = req.body.entry;
+  const { entry } = req.body;
   if (!entry || !Array.isArray(entry)) {
     logger.warn('Invalid webhook payload - no entry array');
     return res.status(200).json({ received: true });
@@ -69,7 +69,7 @@ export const handleLeadWebhook = asyncHandler(async (req, res) => {
 
   // Process each entry
   for (const entryItem of entry) {
-    const changes = entryItem.changes;
+    const { changes } = entryItem;
     if (!changes || !Array.isArray(changes)) {
       continue;
     }
@@ -78,7 +78,7 @@ export const handleLeadWebhook = asyncHandler(async (req, res) => {
       // Check if this is a leadgen event
       if (change.value && change.value.leadgen_id) {
         const leadgenId = change.value.leadgen_id;
-        
+
         try {
           await processFacebookLead(leadgenId);
           logger.info(`Successfully processed Facebook lead: ${leadgenId}`);
@@ -101,7 +101,7 @@ export const handleLeadWebhook = asyncHandler(async (req, res) => {
  */
 const processFacebookLead = async (leadgenId) => {
   const accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
-  
+
   if (!accessToken) {
     throw new Error('Facebook Page Access Token not configured');
   }
@@ -136,12 +136,12 @@ const processFacebookLead = async (leadgenId) => {
     leadData.email,
     leadData.phone,
     leadData.leadDateTime,
-    Lead
+    Lead,
   );
 
   if (existingLead) {
     logger.info(`Duplicate lead detected: ${leadData.email || leadData.phone} - skipping creation`);
-    
+
     // Add remark to existing lead about new Facebook submission
     if (!existingLead.remarks) {
       existingLead.remarks = [];
@@ -152,7 +152,7 @@ const processFacebookLead = async (leadgenId) => {
       addedBy: systemUser?._id || null,
     });
     await existingLead.save();
-    
+
     return existingLead;
   }
 
@@ -177,5 +177,3 @@ const processFacebookLead = async (leadgenId) => {
 
   return lead;
 };
-
-

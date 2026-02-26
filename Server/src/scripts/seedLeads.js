@@ -436,7 +436,9 @@ export const seedLeads = async () => {
         acc.bySalesRep[lead.salesRep] = (acc.bySalesRep[lead.salesRep] || 0) + 1;
         return acc;
       },
-      { total: 0, bySource: {}, byStatus: {}, bySalesRep: {} }
+      {
+        total: 0, bySource: {}, byStatus: {}, bySalesRep: {},
+      },
     );
 
     console.log(`Total Leads: ${summary.total}`);

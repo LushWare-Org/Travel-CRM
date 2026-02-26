@@ -13,7 +13,7 @@ import { APIFeatures } from '../utils/apiFeatures.js';
 export const getAllPaymentHistory = asyncHandler(async (req, res) => {
   // Build base query - filter by lead assignedTo for sales reps
   let baseQuery = PaymentHistory.find();
-  
+
   // If user is a sales rep, only show payment history for leads assigned to them
   if (req.user.role === 'salesRep') {
     const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
@@ -51,7 +51,7 @@ export const getAllPaymentHistory = asyncHandler(async (req, res) => {
   }
 
   const paymentHistory = await features.query;
-  
+
   // Get total count with same filter
   let countQuery = PaymentHistory.find();
   if (req.user.role === 'salesRep') {
@@ -59,7 +59,7 @@ export const getAllPaymentHistory = asyncHandler(async (req, res) => {
     const leadIds = assignedLeadIds.map((lead) => lead._id);
     countQuery = countQuery.where('lead').in(leadIds);
   }
-  
+
   // Apply date range filter to count query
   if (req.query.startDate || req.query.endDate) {
     const dateFilter = {};
@@ -75,7 +75,7 @@ export const getAllPaymentHistory = asyncHandler(async (req, res) => {
       countQuery = countQuery.find({ paymentDate: dateFilter });
     }
   }
-  
+
   const total = await countQuery.countDocuments();
 
   res.status(200).json({
@@ -167,7 +167,7 @@ export const downloadPaymentHistoryPDF = asyncHandler(async (req, res, next) => 
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="payment-history-${paymentHistory.paymentHistoryNumber || paymentHistory._id}.pdf"`);
-    
+
     const fileStream = fs.createReadStream(pdfPath);
     fileStream.pipe(res);
 
@@ -175,9 +175,7 @@ export const downloadPaymentHistoryPDF = asyncHandler(async (req, res, next) => 
       // Optionally delete the file after sending
     });
 
-    fileStream.on('error', (error) => {
-      return next(new AppError('Error reading PDF file', 500));
-    });
+    fileStream.on('error', (error) => next(new AppError('Error reading PDF file', 500)));
   } catch (error) {
     return next(new AppError(`Error generating PDF: ${error.message}`, 500));
   }
@@ -191,7 +189,7 @@ export const downloadPaymentHistoryPDF = asyncHandler(async (req, res, next) => 
 export const downloadPaymentHistoryListPDF = asyncHandler(async (req, res, next) => {
   // Build base query - filter by lead assignedTo for sales reps
   let baseQuery = PaymentHistory.find();
-  
+
   // If user is a sales rep, only show payment history for leads assigned to them
   if (req.user.role === 'salesRep') {
     const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
@@ -238,7 +236,7 @@ export const downloadPaymentHistoryListPDF = asyncHandler(async (req, res, next)
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="payment-history-list-${Date.now()}.pdf"`);
-    
+
     const fileStream = fs.createReadStream(pdfPath);
     fileStream.pipe(res);
 
@@ -247,11 +245,8 @@ export const downloadPaymentHistoryListPDF = asyncHandler(async (req, res, next)
       fs.unlink(pdfPath, () => {});
     });
 
-    fileStream.on('error', (error) => {
-      return next(new AppError('Error reading PDF file', 500));
-    });
+    fileStream.on('error', (error) => next(new AppError('Error reading PDF file', 500)));
   } catch (error) {
     return next(new AppError(`Error generating PDF: ${error.message}`, 500));
   }
 });
-

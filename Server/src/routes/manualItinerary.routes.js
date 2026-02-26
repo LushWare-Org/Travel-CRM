@@ -28,4 +28,3 @@ router.get('/lead/:leadId', authorize('admin', 'salesRep'), getManualItineraryBy
 router.delete('/:id', authorize('admin', 'salesRep'), deleteManualItinerary);
 
 export default router;
-

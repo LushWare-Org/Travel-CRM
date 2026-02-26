@@ -185,7 +185,7 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 // Index for role-based queries
 userSchema.index({ role: 1, isActive: 1 });

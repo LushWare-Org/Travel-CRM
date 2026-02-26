@@ -4,18 +4,18 @@ import Lead from '../models/lead.model.js';
 
 async function getEligibleSalesReps(config) {
   const baseQuery = { role: 'salesRep', isActive: true };
-  
+
   // Filter by enabled sales reps if specified
   if (config.enabledSalesReps && config.enabledSalesReps.length > 0) {
     baseQuery._id = { $in: config.enabledSalesReps };
   }
-  
+
   // Filter by 1-hour login activity if setting is enabled
   if (config.requireActiveLogin48h === true) {
     const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
     baseQuery.lastLogin = { $gte: oneHourAgo };
   }
-  
+
   return User.find(baseQuery).select('name email lastLogin');
 }
 
@@ -74,5 +74,3 @@ export async function assignSalesRepIfNeeded(leadDraft) {
 }
 
 export default { assignSalesRepIfNeeded };
-
-

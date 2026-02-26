@@ -18,7 +18,7 @@ class HotelSuggestionService {
     try {
       // Prioritize locations if available, otherwise use destination
       const searchLocation = location || destination;
-      
+
       const prompt = `You are a travel expert. Based on the following information, suggest ${count} best matching hotels:
 
 Destination: ${destination || 'Not specified'}
@@ -64,7 +64,7 @@ Return ONLY the JSON array, nothing else.`;
         maxTokens: 4000, // Increased for complete hotel suggestions
         temperature: 0.7,
       });
-      
+
       if (!responseText || typeof responseText !== 'string') {
         throw new Error('No response from AI service');
       }
@@ -80,14 +80,14 @@ Return ONLY the JSON array, nothing else.`;
       try {
         // Try to extract JSON from the response
         const text = responseText.trim();
-        
+
         // Remove markdown code blocks if present
-        let jsonText = text
+        const jsonText = text
           .replace(/```json\n?/g, '')
           .replace(/```\n?/g, '')
           .replace(/```javascript\n?/g, '')
           .trim();
-        
+
         // Try direct parse first
         try {
           hotels = JSON.parse(jsonText);
@@ -116,20 +116,20 @@ Return ONLY the JSON array, nothing else.`;
       } catch (parseError) {
         console.error('Failed to parse JSON. Response text:', responseText.substring(0, 1000));
         console.error('Parse error:', parseError);
-        
+
         // Try a more aggressive extraction - look for any array-like structure
         try {
           // Try multiple patterns to extract JSON
           // Pattern 1: Simple array pattern
           let arrayPattern = /\[[\s\S]*?\]/;
           let match = responseText.match(arrayPattern);
-          
+
           if (!match) {
             // Pattern 2: More flexible - find anything between [ and ]
             arrayPattern = /\[[^\]]*(?:\{[^}]*\}[^\]]*)*\]/;
             match = responseText.match(arrayPattern);
           }
-          
+
           if (!match) {
             // Pattern 3: Find nested structures
             const lines = responseText.split('\n');
@@ -150,17 +150,17 @@ Return ONLY the JSON array, nothing else.`;
               match = [jsonLines.join('\n')];
             }
           }
-          
+
           if (match && match[0]) {
             try {
               hotels = JSON.parse(match[0]);
             } catch (e) {
               // Try cleaning up the match
-              let cleaned = match[0]
+              const cleaned = match[0]
                 .replace(/```json/gi, '')
                 .replace(/```/g, '')
                 .trim();
-              
+
               // If JSON is incomplete/truncated, try to fix it
               try {
                 hotels = JSON.parse(cleaned);
@@ -170,20 +170,20 @@ Return ONLY the JSON array, nothing else.`;
                 const closeBrackets = (cleaned.match(/\]/g) || []).length;
                 const openBraces = (cleaned.match(/\{/g) || []).length;
                 const closeBraces = (cleaned.match(/\}/g) || []).length;
-                
+
                 // If incomplete, try to close it properly
                 if (openBrackets > closeBrackets || openBraces > closeBraces) {
                   // Find the last complete object
-                  let lastCompleteIndex = cleaned.lastIndexOf('}');
+                  const lastCompleteIndex = cleaned.lastIndexOf('}');
                   if (lastCompleteIndex !== -1) {
                     // Extract up to the last complete object
                     let partialJson = cleaned.substring(0, lastCompleteIndex + 1);
-                    
+
                     // Close any open brackets
                     if (openBrackets > closeBrackets) {
                       partialJson += ']';
                     }
-                    
+
                     try {
                       hotels = JSON.parse(partialJson);
                       console.warn(`[Hotel Suggestions] Using partial JSON (${hotels.length} hotels)`);
@@ -191,7 +191,7 @@ Return ONLY the JSON array, nothing else.`;
                       // Try to extract individual hotel objects
                       const hotelMatches = cleaned.match(/\{[^}]*"name"[^}]*\}/g);
                       if (hotelMatches && hotelMatches.length > 0) {
-                        hotels = hotelMatches.map(match => {
+                        hotels = hotelMatches.map((match) => {
                           try {
                             return JSON.parse(match);
                           } catch (e) {
@@ -200,7 +200,7 @@ Return ONLY the JSON array, nothing else.`;
                             const addressMatch = match.match(/"address"\s*:\s*"([^"]*)"/);
                             const contactMatch = match.match(/"contactNumber"\s*:\s*"([^"]*)"/);
                             const ratingMatch = match.match(/"rating"\s*:\s*([0-9.]+)/);
-                            
+
                             return {
                               name: nameMatch ? nameMatch[1] : 'Unknown Hotel',
                               address: addressMatch ? addressMatch[1] : '',
@@ -208,7 +208,7 @@ Return ONLY the JSON array, nothing else.`;
                               rating: ratingMatch ? parseFloat(ratingMatch[1]) : 0,
                             };
                           }
-                        }).filter(h => h && h.name);
+                        }).filter((h) => h && h.name);
                         console.warn(`[Hotel Suggestions] Extracted ${hotels.length} hotels from incomplete JSON`);
                       } else {
                         throw e;
@@ -227,7 +227,7 @@ Return ONLY the JSON array, nothing else.`;
             const hotelPattern = /\{[^}]*"name"[^}]*\}/g;
             const hotelMatches = responseText.match(hotelPattern);
             if (hotelMatches && hotelMatches.length > 0) {
-              hotels = hotelMatches.map(match => {
+              hotels = hotelMatches.map((match) => {
                 try {
                   return JSON.parse(match);
                 } catch (e) {
@@ -236,7 +236,7 @@ Return ONLY the JSON array, nothing else.`;
                   const addressMatch = match.match(/"address"\s*:\s*"([^"]*)"/);
                   const contactMatch = match.match(/"contactNumber"\s*:\s*"([^"]*)"/);
                   const ratingMatch = match.match(/"rating"\s*:\s*([0-9.]+)/);
-                  
+
                   return {
                     name: nameMatch ? nameMatch[1] : 'Unknown Hotel',
                     address: addressMatch ? addressMatch[1] : '',
@@ -244,7 +244,7 @@ Return ONLY the JSON array, nothing else.`;
                     rating: ratingMatch ? parseFloat(ratingMatch[1]) : 0,
                   };
                 }
-              }).filter(h => h && h.name);
+              }).filter((h) => h && h.name);
               console.warn(`[Hotel Suggestions] Extracted ${hotels.length} hotels using pattern matching`);
             } else {
               throw new Error('Could not extract JSON array from response');
@@ -269,11 +269,11 @@ Return ONLY the JSON array, nothing else.`;
           name: hotel.name || `Hotel ${index + 1}`,
           address: hotel.address || 'Address not available',
           contactNumber: hotel.contactNumber || hotel.phone || hotel.contact || '',
-          rating: hotel.rating !== undefined && hotel.rating !== null 
-            ? parseFloat(hotel.rating) 
+          rating: hotel.rating !== undefined && hotel.rating !== null
+            ? parseFloat(hotel.rating)
             : (hotel.rating === undefined ? null : parseFloat(hotel.rating)),
         }))
-        .filter(hotel => hotel.name && hotel.address); // Filter out invalid entries
+        .filter((hotel) => hotel.name && hotel.address); // Filter out invalid entries
 
       if (formattedHotels.length === 0) {
         throw new Error('No valid hotel suggestions found');
@@ -288,4 +288,3 @@ Return ONLY the JSON array, nothing else.`;
 }
 
 export default new HotelSuggestionService();
-

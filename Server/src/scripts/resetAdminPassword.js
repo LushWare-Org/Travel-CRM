@@ -13,12 +13,12 @@ dotenv.config({ path: join(__dirname, '../../.env') });
 
 /**
  * Emergency Script to Reset Admin Password
- * 
+ *
  * Use this when you:
  * - Accidentally forced password reset on your admin account
  * - Can't remember the temporary password
  * - Need to restore access to admin panel
- * 
+ *
  * Run: node src/scripts/resetAdminPassword.js
  */
 

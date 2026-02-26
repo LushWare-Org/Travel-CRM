@@ -15,7 +15,7 @@ const router = express.Router();
 router.get(
   '/ai-status',
   protect,
-  packageAIController.checkAIStatus
+  packageAIController.checkAIStatus,
 );
 
 // Generate AI content from title only (no package ID needed) - must be before /:id routes
@@ -24,7 +24,7 @@ router.post(
   '/generate-from-title',
   protect,
   aiLimiter,
-  packageAIController.generateFromTitle
+  packageAIController.generateFromTitle,
 );
 
 // Generate AI content for a package
@@ -33,7 +33,7 @@ router.post(
   protect,
   authorize('admin', 'salesRep'),
   aiLimiter,
-  packageAIController.generateAIContent
+  packageAIController.generateAIContent,
 );
 
 // Preview AI content without saving
@@ -42,7 +42,7 @@ router.get(
   protect,
   authorize('admin', 'salesRep'),
   apiLimiter,
-  packageAIController.previewAIContent
+  packageAIController.previewAIContent,
 );
 
 // Generate and download AI PDF
@@ -51,8 +51,7 @@ router.get(
   protect,
   authorize('admin', 'salesRep'),
   apiLimiter,
-  packageAIController.generateAIPDF
+  packageAIController.generateAIPDF,
 );
 
 export default router;
-

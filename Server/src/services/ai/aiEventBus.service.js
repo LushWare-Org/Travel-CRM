@@ -16,7 +16,9 @@ class AIEventBusService extends EventEmitter {
     this.handler = handler;
   }
 
-  async publish({ type, source, payload = {}, correlationId }) {
+  async publish({
+    type, source, payload = {}, correlationId,
+  }) {
     const event = await AIEvent.create({
       type,
       source,

@@ -150,7 +150,7 @@ const quotationSchema = new mongoose.Schema(
     coverImage: String, // Legacy field - kept for backward compatibility
     images: [{
       url: String,
-      isCover: { type: Boolean, default: false }
+      isCover: { type: Boolean, default: false },
     }], // Multiple images for manual/custom quotations
     pdfUrl: String,
     sentAt: Date,

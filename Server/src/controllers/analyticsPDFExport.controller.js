@@ -23,12 +23,12 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
  */
 export const exportLeadAnalyticsPDF = asyncHandler(async (req, res) => {
   const { timeRange = 'monthly', chartsSvg = [], summaryData = {} } = req.body;
-  
+
   logger.info(`[Lead PDF Export] Starting export with ${chartsSvg.length} charts, time range: ${timeRange}`);
-  logger.info(`[Lead PDF Export] First chart sample:`, chartsSvg[0] ? { 
-    title: chartsSvg[0].title, 
+  logger.info('[Lead PDF Export] First chart sample:', chartsSvg[0] ? {
+    title: chartsSvg[0].title,
     hasImageData: !!chartsSvg[0].imageData,
-    imageDataLength: chartsSvg[0].imageData?.length 
+    imageDataLength: chartsSvg[0].imageData?.length,
   } : 'No charts');
 
   try {
@@ -90,7 +90,7 @@ export const exportLeadAnalyticsPDF = asyncHandler(async (req, res) => {
     logger.info(`[Lead PDF Export] Sending PDF response (${pdfBuffer.length} bytes)...`);
     res.end(pdfBuffer, 'binary');
   } catch (error) {
-    logger.error(`[Lead PDF Export] ❌ Error:`, error.message);
+    logger.error('[Lead PDF Export] ❌ Error:', error.message);
     throw error;
   }
 });
@@ -110,11 +110,11 @@ export const exportBillingAnalyticsPDF = asyncHandler(async (req, res) => {
   try {
     // Fetch billing statistics
     const invoices = await Invoice.find();
-    
+
     const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
     const paidAmount = invoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
     const outstandingAmount = totalRevenue - paidAmount;
-    
+
     const paymentStatuses = invoices.reduce((acc, inv) => {
       acc[inv.status] = (acc[inv.status] || 0) + 1;
       return acc;
@@ -153,18 +153,18 @@ export const exportBillingAnalyticsPDF = asyncHandler(async (req, res) => {
     }
 
     logger.info(`[Billing PDF Export] ✅ Generated PDF buffer: ${pdfBuffer.length} bytes`);
-    
+
     // Set headers before sending
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="billing-analytics-${Date.now()}.pdf"`);
     res.setHeader('Content-Length', pdfBuffer.length);
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    
+
     // Use res.end() for binary data instead of res.send()
     logger.info(`[Billing PDF Export] Sending PDF response (${pdfBuffer.length} bytes)...`);
     res.end(pdfBuffer, 'binary');
   } catch (error) {
-    logger.error(`[Billing PDF Export] ❌ Error:`, error.message);
+    logger.error('[Billing PDF Export] ❌ Error:', error.message);
     throw error;
   }
 });
@@ -282,7 +282,7 @@ export const exportWebsiteAnalyticsPDF = asyncHandler(async (req, res) => {
   // Fetch website statistics
   const leads = await Lead.find();
   const bookings = await Booking.find();
-  
+
   const totalLeads = leads.length;
   const totalBookings = bookings.length;
   const conversionRate = totalLeads > 0 ? ((totalBookings / totalLeads) * 100).toFixed(1) : '0';

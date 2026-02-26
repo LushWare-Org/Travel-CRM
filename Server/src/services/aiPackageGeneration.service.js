@@ -16,7 +16,7 @@ class AIPackageGenerationService {
   async generatePackage(destination, description, packageType, category, nights) {
     try {
       const days = nights + 1; // Convert nights to days
-      
+
       const descriptionLine = description ? `Description (user requirements): ${description}\n` : '';
       const prompt = `You are an expert travel package designer. Create a complete travel package based on the following requirements:
 
@@ -115,7 +115,7 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
         maxTokens: 8000, // Increased for complete package generation
         temperature: 0.7,
       });
-      
+
       if (!responseText || typeof responseText !== 'string') {
         throw new Error('No response from AI service');
       }
@@ -130,29 +130,29 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
       let packageData = null;
       try {
         const text = responseText.trim();
-        
+
         // Log full response for debugging (first 5000 chars)
         console.log('[AI Package] Full response preview:', text.substring(0, 5000));
         console.log('[AI Package] Response starts with:', text.substring(0, 200));
-        
+
         // Remove markdown code blocks if present
-        let jsonText = text
+        const jsonText = text
           .replace(/```json\n?/gi, '')
           .replace(/```\n?/g, '')
           .replace(/```javascript\n?/gi, '')
           .replace(/```typescript\n?/gi, '')
           .trim();
-        
+
         // Try direct parse first
         try {
           packageData = JSON.parse(jsonText);
           console.log('[AI Package] Successfully parsed JSON directly');
         } catch (e) {
           console.log('[AI Package] Direct parse failed, trying extraction methods...');
-          
+
           // Try multiple extraction strategies
           let extractedJson = null;
-          
+
           // Strategy 1: Find JSON object with balanced braces
           const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
@@ -179,7 +179,7 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
               }
             }
           }
-          
+
           if (extractedJson) {
             try {
               packageData = JSON.parse(extractedJson);
@@ -189,13 +189,13 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
               console.log('[AI Package] Parse error:', parseErr.message);
               // If JSON is incomplete/truncated, try to fix it
               let fixedJson = extractedJson;
-              
+
               // Count braces to see if JSON is incomplete
               const openBraces = (fixedJson.match(/\{/g) || []).length;
               const closeBraces = (fixedJson.match(/\}/g) || []).length;
               const openBrackets = (fixedJson.match(/\[/g) || []).length;
               const closeBrackets = (fixedJson.match(/\]/g) || []).length;
-              
+
               // If incomplete, try to close it properly
               if (openBraces > closeBraces || openBrackets > closeBrackets) {
                 // Try to find where it was cut off and close it
@@ -203,23 +203,23 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
                 if (openBrackets > closeBrackets) {
                   fixedJson += ']'.repeat(openBrackets - closeBrackets);
                 }
-                
+
                 // Then close any open objects
                 if (openBraces > closeBraces) {
                   fixedJson += '}'.repeat(openBraces - closeBraces);
                 }
-                
+
                 try {
                   packageData = JSON.parse(fixedJson);
                 } catch (fixErr) {
                   // If still fails, try a more aggressive approach
                   // Extract what we can and build a partial structure
                   console.warn('JSON is incomplete, attempting partial extraction');
-                  
+
                   // Try to extract at least the basic fields
                   const nameMatch = jsonText.match(/"name"\s*:\s*"([^"]*)"/);
                   const descMatch = jsonText.match(/"description"\s*:\s*"([^"]*)"/);
-                  
+
                   if (nameMatch) {
                     // Build a minimal valid structure
                     packageData = {
@@ -230,7 +230,7 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
                       exclusions: [],
                       days: [],
                     };
-                    
+
                     // Try to extract days if possible
                     const daysMatch = jsonText.match(/"days"\s*:\s*\[([\s\S]*?)\]/);
                     if (daysMatch) {
@@ -246,7 +246,9 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
                             description: '',
                             locations: [],
                             activities: [],
-                            accommodation: { name: '', address: '', contactNumber: '', rating: 0, type: 'hotel' },
+                            accommodation: {
+                              name: '', address: '', contactNumber: '', rating: 0, type: 'hotel',
+                            },
                             meals: { breakfast: true, lunch: false, dinner: true },
                             transport: '',
                             images: [],
@@ -263,7 +265,9 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
                           description: '',
                           locations: [],
                           activities: [],
-                          accommodation: { name: '', address: '', contactNumber: '', rating: 0, type: 'hotel' },
+                          accommodation: {
+                            name: '', address: '', contactNumber: '', rating: 0, type: 'hotel',
+                          },
                           meals: { breakfast: true, lunch: false, dinner: true },
                           transport: '',
                           images: [],
@@ -271,7 +275,7 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
                         });
                       }
                     }
-                    
+
                     console.warn('Using partial package data due to incomplete JSON');
                   } else {
                     // Last resort: log the actual response and throw
@@ -301,7 +305,9 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
                       description: '',
                       locations: [],
                       activities: [],
-                      accommodation: { name: '', address: '', contactNumber: '', rating: 0, type: 'hotel' },
+                      accommodation: {
+                        name: '', address: '', contactNumber: '', rating: 0, type: 'hotel',
+                      },
                       meals: { breakfast: true, lunch: false, dinner: true },
                       transport: '',
                       images: [],
@@ -318,7 +324,7 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
             // No JSON object found at all - try to extract any structured data
             console.error('[AI Package] No JSON object pattern found in response');
             console.error('[AI Package] Response preview:', responseText.substring(0, 1000));
-            
+
             // Try to find if there's any JSON-like structure
             const nameMatch = responseText.match(/"name"\s*:\s*"([^"]*)"/);
             if (nameMatch) {
@@ -339,7 +345,9 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
                   description: '',
                   locations: [],
                   activities: [],
-                  accommodation: { name: '', address: '', contactNumber: '', rating: 0, type: 'hotel' },
+                  accommodation: {
+                    name: '', address: '', contactNumber: '', rating: 0, type: 'hotel',
+                  },
                   meals: { breakfast: true, lunch: false, dinner: true },
                   transport: '',
                   images: [],
@@ -379,7 +387,9 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
             description: '',
             locations: [],
             activities: [],
-            accommodation: { name: '', address: '', contactNumber: '', rating: 0, type: 'hotel' },
+            accommodation: {
+              name: '', address: '', contactNumber: '', rating: 0, type: 'hotel',
+            },
             meals: { breakfast: true, lunch: false, dinner: true },
             transport: '',
             images: [],
@@ -397,7 +407,9 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
             description: '',
             locations: [],
             activities: [],
-            accommodation: { name: '', address: '', contactNumber: '', rating: 0, type: 'hotel' },
+            accommodation: {
+              name: '', address: '', contactNumber: '', rating: 0, type: 'hotel',
+            },
             meals: { breakfast: true, lunch: false, dinner: true },
             transport: '',
             images: [],
@@ -408,21 +420,21 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
 
       // Map category to valid backend enum values
       const categoryMap = {
-        'adventure': 'family', // Map adventure to family
-        'budget': 'family',
-        'luxury': 'family',
-        'religious': 'family',
-        'wildlife': 'wild safari', // Map wildlife to wild safari
-        'beach': 'family',
-        'heritage': 'family',
-        'other': 'family',
-        'honeymoon': 'honeymoon',
-        'couple': 'couple',
-        'family': 'family',
-        'group': 'group',
+        adventure: 'family', // Map adventure to family
+        budget: 'family',
+        luxury: 'family',
+        religious: 'family',
+        wildlife: 'wild safari', // Map wildlife to wild safari
+        beach: 'family',
+        heritage: 'family',
+        other: 'family',
+        honeymoon: 'honeymoon',
+        couple: 'couple',
+        family: 'family',
+        group: 'group',
         'wild safari': 'wild safari',
       };
-      
+
       const categoryStr = category ? String(category).toLowerCase() : 'family';
       const validCategory = categoryMap[categoryStr];
 
@@ -430,7 +442,7 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
       const formattedPackage = {
         name: packageData.name,
         description: packageData.description || '',
-        destination: destination,
+        destination,
         duration: days,
         category: validCategory,
         packageType: packageType || 'Standard',
@@ -475,4 +487,3 @@ Return ONLY the JSON object, nothing else. Ensure all ${days} days are included.
 }
 
 export default new AIPackageGenerationService();
-

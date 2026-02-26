@@ -9,5 +9,3 @@ export const updateSettingsSchema = Joi.object({
   skipInactive: Joi.boolean(),
   requireActiveLogin48h: Joi.boolean(), // Only assign to sales reps who logged in within 1 hour
 });
-
-

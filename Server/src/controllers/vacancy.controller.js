@@ -47,7 +47,9 @@ export const createVacancy = asyncHandler(async (req, res, next) => {
 });
 
 export const getVacancies = asyncHandler(async (req, res, next) => {
-  const { status = 'active', sortBy = '-createdAt', page = 1, limit = 10 } = req.query;
+  const {
+    status = 'active', sortBy = '-createdAt', page = 1, limit = 10,
+  } = req.query;
 
   const filter = {};
   if (status) filter.status = status;
@@ -77,7 +79,6 @@ export const getVacancies = asyncHandler(async (req, res, next) => {
   });
 });
 
-
 export const getVacancyById = asyncHandler(async (req, res, next) => {
   const vacancy = await Vacancy.findById(req.params.id);
 
@@ -90,7 +91,6 @@ export const getVacancyById = asyncHandler(async (req, res, next) => {
     data: { vacancy },
   });
 });
-
 
 export const updateVacancy = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
@@ -113,7 +113,7 @@ export const updateVacancy = asyncHandler(async (req, res, next) => {
   ];
 
   const filteredUpdates = {};
-  allowedFields.forEach(field => {
+  allowedFields.forEach((field) => {
     if (updates.hasOwnProperty(field)) {
       filteredUpdates[field] = updates[field];
     }
@@ -134,7 +134,6 @@ export const updateVacancy = asyncHandler(async (req, res, next) => {
     data: { vacancy },
   });
 });
-
 
 export const deleteVacancy = asyncHandler(async (req, res, next) => {
   const vacancy = await Vacancy.findByIdAndDelete(req.params.id);
@@ -164,13 +163,13 @@ export const getAdminVacancies = asyncHandler(async (req, res, next) => {
   vacancies = await Promise.all(
     vacancies.map(async (vacancy) => {
       const applicationCount = await Career.countDocuments({
-        position: vacancy.position
+        position: vacancy.position,
       });
       return {
         ...vacancy,
-        applicationsCount: applicationCount
+        applicationsCount: applicationCount,
       };
-    })
+    }),
   );
 
   const total = await Vacancy.countDocuments({});

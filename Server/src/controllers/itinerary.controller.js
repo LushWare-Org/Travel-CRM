@@ -4,12 +4,12 @@
  * Fully functional with best practices
  */
 
+import { validationResult } from 'express-validator';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import Itinerary from '../models/itinerary.model.js';
 import Package from '../models/package.model.js';
 import ItineraryService from '../services/itinerary.service.js';
-import { validationResult } from 'express-validator';
 import logger from '../config/logger.js';
 
 /**

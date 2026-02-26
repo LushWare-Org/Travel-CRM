@@ -87,7 +87,9 @@ class FollowUpAgentService extends BaseAgent {
       scopeId: lead._id,
       memoryType: 'follow-up',
       summary: `Lead score ${leadScore}, dropoff ${dropOffProbability}`,
-      content: { leadScore, dropOffProbability, followUpDate, message },
+      content: {
+        leadScore, dropOffProbability, followUpDate, message,
+      },
       lastAgent: this.name,
       confidence: 0.72,
       tags: ['follow-up'],
@@ -104,7 +106,9 @@ class FollowUpAgentService extends BaseAgent {
       correlationId: event.correlationId,
     });
 
-    return { leadScore, dropOffProbability, followUpDate, message };
+    return {
+      leadScore, dropOffProbability, followUpDate, message,
+    };
   }
 
   async recordFeedback(leadId, outcome) {

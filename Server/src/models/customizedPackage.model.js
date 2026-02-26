@@ -179,4 +179,3 @@ customizedPackageSchema.index({ createdAt: -1 });
 customizedPackageSchema.index({ isActive: 1 });
 
 export default mongoose.model('CustomizedPackage', customizedPackageSchema);
-

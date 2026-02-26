@@ -75,9 +75,7 @@ export const validateRequest = (schema, location = 'body') => {
  * @param {Object|Array} schema - Joi validation schema or express-validator array
  * @returns {Function} Express middleware function
  */
-export const validate = (schema) => {
-  return validateRequest(schema, 'body');
-};
+export const validate = (schema) => validateRequest(schema, 'body');
 
 /**
  * Validation middleware for express-validator (backward compatibility)

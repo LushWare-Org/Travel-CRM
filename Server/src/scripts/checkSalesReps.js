@@ -18,10 +18,10 @@ const checkSalesReps = async () => {
       console.log('\nTo create a sales rep, you can:');
       console.log('1. Use the Admin UI to create a sales rep');
       console.log('2. Create one manually with this script\n');
-      
+
       // Ask if user wants to create a sample sales rep
       console.log('Creating a sample sales rep...\n');
-      
+
       const sampleSalesRep = await User.create({
         name: 'John Sales Rep',
         email: 'salesrep@example.com',
@@ -31,20 +31,20 @@ const checkSalesReps = async () => {
         isActive: true,
         isEmailVerified: true,
         isTempPassword: true,
-        mustChangePassword: true
+        mustChangePassword: true,
       });
-      
+
       console.log('✅ Sample sales rep created:');
       console.log(`   Name: ${sampleSalesRep.name}`);
       console.log(`   Email: ${sampleSalesRep.email}`);
-      console.log(`   Password: TempPass123!`);
-      console.log(`   Status: Active\n`);
+      console.log('   Password: TempPass123!');
+      console.log('   Status: Active\n');
     } else {
       // Show all sales reps
       const salesReps = await User.find({ role: 'salesRep' })
         .select('name email phone isActive createdAt')
         .sort({ createdAt: -1 });
-      
+
       console.log('📋 Sales Representatives:\n');
       salesReps.forEach((rep, index) => {
         console.log(`${index + 1}. ${rep.name}`);

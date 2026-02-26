@@ -1,9 +1,9 @@
 /**
  * Centralized Branding Configuration
- * 
+ *
  * This file contains all company-specific branding information.
  * All values are read from environment variables with sensible defaults.
- * 
+ *
  * To customize for a new customer, update the corresponding environment variables.
  */
 
@@ -152,8 +152,6 @@ export const getSocialLinks = () => {
 /**
  * Get copyright text
  */
-export const getCopyrightText = (year = new Date().getFullYear()) => {
-  return `© ${year} ${BRANDING.company.name}. All rights reserved.`;
-};
+export const getCopyrightText = (year = new Date().getFullYear()) => `© ${year} ${BRANDING.company.name}. All rights reserved.`;
 
 export default BRANDING;

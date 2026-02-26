@@ -18,7 +18,7 @@ class PackageAIService {
    */
   async generatePackageContent(packageId) {
     const pkg = await Package.findById(packageId);
-    
+
     if (!pkg) {
       throw new AppError('Package not found', 404);
     }
@@ -41,21 +41,21 @@ class PackageAIService {
         logger.info('Attempting to generate content using REST API...');
         aiContent = await geminiRestService.generatePackageContent(
           pkg.name,
-          additionalInfo
+          additionalInfo,
         );
         logger.info('Successfully generated content using REST API');
       } catch (restError) {
         logger.warn('REST API approach failed, trying SDK approach:', restError.message);
         aiContent = await geminiService.generatePackageContent(
           pkg.name,
-          additionalInfo
+          additionalInfo,
         );
       }
 
       // Update package with AI-generated content
       pkg.description = aiContent.description || pkg.description;
       pkg.highlights = aiContent.highlights || pkg.highlights;
-      
+
       // Save updated package
       await pkg.save();
 
@@ -70,7 +70,7 @@ class PackageAIService {
       logger.error('Error generating AI content:', error);
       throw new AppError(
         `Failed to generate AI content: ${error.message}`,
-        500
+        500,
       );
     }
   }
@@ -82,7 +82,7 @@ class PackageAIService {
    */
   async previewAIContent(packageId) {
     const pkg = await Package.findById(packageId);
-    
+
     if (!pkg) {
       throw new AppError('Package not found', 404);
     }
@@ -104,14 +104,14 @@ class PackageAIService {
         logger.info('Attempting to preview content using REST API...');
         aiContent = await geminiRestService.generatePackageContent(
           pkg.name,
-          additionalInfo
+          additionalInfo,
         );
         logger.info('Successfully previewed content using REST API');
       } catch (restError) {
         logger.warn('REST API approach failed, trying SDK approach:', restError.message);
         aiContent = await geminiService.generatePackageContent(
           pkg.name,
-          additionalInfo
+          additionalInfo,
         );
       }
 
@@ -123,11 +123,10 @@ class PackageAIService {
       logger.error('Error previewing AI content:', error);
       throw new AppError(
         `Failed to preview AI content: ${error.message}`,
-        500
+        500,
       );
     }
   }
 }
 
 export default new PackageAIService();
-

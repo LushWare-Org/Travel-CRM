@@ -63,7 +63,7 @@ const commissionRate = Joi.number()
 // Create sales rep schema
 export const createSalesRepSchema = Joi.object().keys({
   name,
-  email: email,
+  email,
   phone,
   phoneCountry,
   commissionRate,
@@ -74,28 +74,33 @@ export const createSalesRepSchema = Joi.object().keys({
 
 // Update sales rep schema
 export const updateSalesRepSchema = Joi.object().keys({
-  name: Joi.string().min(2).max(50).trim().optional().messages({
-    'string.min': 'Name must be at least 2 characters',
-    'string.max': 'Name cannot exceed 50 characters',
-  }),
-  email: Joi.string().email().lowercase().optional().messages({
-    'string.email': 'Please provide a valid email address',
-  }),
+  name: Joi.string().min(2).max(50).trim()
+    .optional()
+    .messages({
+      'string.min': 'Name must be at least 2 characters',
+      'string.max': 'Name cannot exceed 50 characters',
+    }),
+  email: Joi.string().email().lowercase().optional()
+    .messages({
+      'string.email': 'Please provide a valid email address',
+    }),
   phone: Joi.string().regex(/^\+?[1-9]\d{1,14}$/).optional().messages({
     'string.pattern.base': 'Phone number must be in E.164 format (e.g., +94768952480)',
   }),
-  phoneCountry: Joi.string().length(2).uppercase().optional().messages({
-    'string.length': 'Country code must be 2 characters',
-  }),
-  commissionRate: Joi.number().min(0).max(100).optional().messages({
-    'number.min': 'Commission rate cannot be less than 0%',
-    'number.max': 'Commission rate cannot exceed 100%',
-  }),
+  phoneCountry: Joi.string().length(2).uppercase().optional()
+    .messages({
+      'string.length': 'Country code must be 2 characters',
+    }),
+  commissionRate: Joi.number().min(0).max(100).optional()
+    .messages({
+      'number.min': 'Commission rate cannot be less than 0%',
+      'number.max': 'Commission rate cannot exceed 100%',
+    }),
 });
 
 // Update commission schema
 export const updateCommissionSchema = Joi.object().keys({
-  commissionRate: commissionRate,
+  commissionRate,
 });
 
 // Toggle status schema

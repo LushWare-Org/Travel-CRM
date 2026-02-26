@@ -8,7 +8,9 @@ import hotelSuggestionService from '../services/hotelSuggestion.service.js';
  * @access  Private
  */
 export const suggestHotels = asyncHandler(async (req, res) => {
-  const { destination, packageType, category, location, count } = req.body;
+  const {
+    destination, packageType, category, location, count,
+  } = req.body;
 
   // Validate required fields - either destination or location must be provided
   if (!destination && !location) {
@@ -21,7 +23,7 @@ export const suggestHotels = asyncHandler(async (req, res) => {
       packageType,
       category,
       location,
-      count || 5
+      count || 5,
     );
 
     res.status(200).json({
@@ -33,8 +35,7 @@ export const suggestHotels = asyncHandler(async (req, res) => {
     console.error('Error in suggestHotels controller:', error);
     throw new AppError(
       error.message || 'Failed to generate hotel suggestions',
-      500
+      500,
     );
   }
 });
-

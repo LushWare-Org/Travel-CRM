@@ -22,17 +22,23 @@ const getPaymentDetails = () => {
     accountType: bank.accountType || 'Current Account',
     branch: bank.branch || 'Main Branch',
     upiId: bank.upiId || '',
-    phone: bank.phone || BRANDING.contact.phone
+    phone: bank.phone || BRANDING.contact.phone,
   };
 };
 
 // Customer Reviews - These should be customized per deployment or made configurable
 const DESTINATION_REVIEWS = {
-  'Generic': [
-    { name: 'Happy Customer', rating: 5, text: 'Amazing experience! The itinerary was perfectly planned and executed. Highly recommended!', time: '1 month ago' },
-    { name: 'Satisfied Traveler', rating: 5, text: 'Very professional team. They took care of every small detail. Will definitely book again.', time: '2 months ago' },
-    { name: 'Travel Enthusiast', rating: 4, text: 'Good service and support throughout the trip. Had a memorable vacation.', time: '3 months ago' }
-  ]
+  Generic: [
+    {
+      name: 'Happy Customer', rating: 5, text: 'Amazing experience! The itinerary was perfectly planned and executed. Highly recommended!', time: '1 month ago',
+    },
+    {
+      name: 'Satisfied Traveler', rating: 5, text: 'Very professional team. They took care of every small detail. Will definitely book again.', time: '2 months ago',
+    },
+    {
+      name: 'Travel Enthusiast', rating: 4, text: 'Good service and support throughout the trip. Had a memorable vacation.', time: '3 months ago',
+    },
+  ],
 };
 
 // Terms text - uses BRANDING for company name
@@ -82,31 +88,31 @@ Kindly share your feedback @ ${BRANDING.urls.website.replace('https://', '').rep
 // Modern Professional Color Palette - Sleek Travel Agency Design
 const PALETTE = {
   // Primary Colors
-  primary: '#0F766E',        // Deep Teal - Main brand color
-  primaryLight: '#14B8A6',   // Lighter teal for accents
-  primaryDark: '#134E4A',    // Dark teal for headers
+  primary: '#0F766E', // Deep Teal - Main brand color
+  primaryLight: '#14B8A6', // Lighter teal for accents
+  primaryDark: '#134E4A', // Dark teal for headers
 
   // Accent Colors
-  accent: '#F59E0B',         // Amber/Gold - Highlights, CTAs
-  accentLight: '#FEF3C7',    // Light amber for backgrounds
-  accentDark: '#D97706',     // Darker amber for text on light bg
+  accent: '#F59E0B', // Amber/Gold - Highlights, CTAs
+  accentLight: '#FEF3C7', // Light amber for backgrounds
+  accentDark: '#D97706', // Darker amber for text on light bg
 
   // Neutral Colors
-  slate: '#1E293B',          // Dark slate for headers/footers
-  slateLight: '#334155',     // Medium slate
-  gray: '#64748B',           // Text gray
-  grayLight: '#94A3B8',      // Light text
-  border: '#E2E8F0',         // Borders
-  background: '#F8FAFC',     // Light backgrounds
+  slate: '#1E293B', // Dark slate for headers/footers
+  slateLight: '#334155', // Medium slate
+  gray: '#64748B', // Text gray
+  grayLight: '#94A3B8', // Light text
+  border: '#E2E8F0', // Borders
+  background: '#F8FAFC', // Light backgrounds
   white: '#FFFFFF',
-  black: '#0F172A',          // Near black for text
+  black: '#0F172A', // Near black for text
 
   // Legacy mappings for backward compatibility
   orange: '#F59E0B',
   lightOrange: '#FEF3C7',
   darkGray: '#1E293B',
   lightGray: '#E2E8F0',
-  blue: '#0EA5E9'
+  blue: '#0EA5E9',
 };
 
 const loadLogo = () => {
@@ -128,10 +134,10 @@ const fetchImage = async (url) => {
       responseType: 'arraybuffer',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': 'https://google.com',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+        Referer: 'https://google.com',
+        Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
       },
-      timeout: 5000
+      timeout: 5000,
     });
     return response.data;
   } catch (error) {
@@ -296,7 +302,6 @@ export async function generateQuotationPDF(quotation, lead) {
         console.log('[PDF] Using regular package:', mainPackage.name);
       }
 
-
       let packageName = mainPackage.name || lead?.packageName || 'Custom Tour Package';
       // Append "(Manual Itinerary)" if using manual itinerary with a base package
       if (quotation.type === 'custom' && mainPackage.name) {
@@ -320,7 +325,7 @@ export async function generateQuotationPDF(quotation, lead) {
       if (quotation.images && quotation.images.length > 0) {
         // Sort so cover image is first
         const sortedImages = [...quotation.images].sort((a, b) => (b.isCover ? 1 : 0) - (a.isCover ? 1 : 0));
-        sortedImages.forEach(img => availableImages.push(img.url));
+        sortedImages.forEach((img) => availableImages.push(img.url));
         console.log('[PDF] Using', quotation.images.length, 'images from quotation');
       }
       // Priority 2: Legacy coverImage field
@@ -330,17 +335,17 @@ export async function generateQuotationPDF(quotation, lead) {
       }
       // Priority 3: Package images
       else if (mainPackage.images && mainPackage.images.length > 0) {
-        mainPackage.images.forEach(img => availableImages.push(img.url));
+        mainPackage.images.forEach((img) => availableImages.push(img.url));
         console.log('[PDF] Using', mainPackage.images.length, 'images from package');
       }
       // Priority 4: Original package images
       else if (mainPackage.originalPackage && mainPackage.originalPackage.images) {
-        mainPackage.originalPackage.images.forEach(img => availableImages.push(img.url));
+        mainPackage.originalPackage.images.forEach((img) => availableImages.push(img.url));
         console.log('[PDF] Using images from original package');
       }
       // Priority 5: Lead package images
       else if (lead && lead.package && lead.package.images) {
-        lead.package.images.forEach(img => availableImages.push(img.url));
+        lead.package.images.forEach((img) => availableImages.push(img.url));
         console.log('[PDF] Using images from lead package');
       }
 
@@ -352,7 +357,6 @@ export async function generateQuotationPDF(quotation, lead) {
       console.log('[PDF] Package highlights:', packageHighlights.length);
       console.log('[PDF] Package inclusions:', packageInclusions.length);
       console.log('[PDF] Package exclusions:', packageExclusions.length);
-
 
       // --- PAGE 1: COVER & TOUR DETAILS ---
       let coverImageBuffer = null;
@@ -410,7 +414,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
       yPos += 50;
 
-      let startDate = lead?.travelDate;
+      const startDate = lead?.travelDate;
       let endDate = lead?.endDate;
       let durationDays = 0;
 
@@ -486,7 +490,7 @@ export async function generateQuotationPDF(quotation, lead) {
         doc.roundedRect(40, yPos - 5, 515, Math.min(packageHighlights.length * 20 + 15, 150), 6)
           .fill(PALETTE.accentLight);
 
-        packageHighlights.slice(0, 6).forEach(highlight => {
+        packageHighlights.slice(0, 6).forEach((highlight) => {
           doc.fillColor(PALETTE.black).font('Helvetica').fontSize(10)
             .text(`✓  ${highlight}`, 55, yPos, { width: 485 });
           yPos += 18;
@@ -543,7 +547,7 @@ export async function generateQuotationPDF(quotation, lead) {
           // Day Title with subtle background
           doc.roundedRect(contentX - 5, dayBlockY - 2, contentW, 22, 3).fill(PALETTE.background);
           doc.fillColor(PALETTE.primaryDark).font('Helvetica-Bold').fontSize(12)
-            .text(`Day ${day.dayNumber || i + 1}: ${day.title || 'Day ' + (i + 1)}`, contentX, dayBlockY + 3);
+            .text(`Day ${day.dayNumber || i + 1}: ${day.title || `Day ${i + 1}`}`, contentX, dayBlockY + 3);
 
           let contentY = dayBlockY + 25;
 
@@ -592,8 +596,10 @@ export async function generateQuotationPDF(quotation, lead) {
           if (dayImageBuffer) {
             try {
               // Place image
-              doc.image(dayImageBuffer, contentX, contentY, { width: 150, height: 100, fit: [150, 100], align: 'center' });
-              // Wrap text around it? No, simpler to put text next to it or below. 
+              doc.image(dayImageBuffer, contentX, contentY, {
+                width: 150, height: 100, fit: [150, 100], align: 'center',
+              });
+              // Wrap text around it? No, simpler to put text next to it or below.
               // Let's put text to the right of image if description is short, or below if long.
               // For consistency, let's put image on flow.
               // Actually, a nice layout is Image Left, Text Right
@@ -633,7 +639,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
           // Highlights / Details (Locations, Meals)
           const metaY = contentY;
-          let metaText = [];
+          const metaText = [];
 
           if (day.locations && day.locations.length > 0) metaText.push(`Locations: ${day.locations.join(', ')}`);
           if (day.accommodation && day.accommodation.name) metaText.push(`Stay: ${day.accommodation.name}`);
@@ -648,7 +654,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
           if (metaText.length > 0) {
             doc.fillColor(PALETTE.slateLight).font('Helvetica-Bold').fontSize(9);
-            metaText.forEach(txt => {
+            metaText.forEach((txt) => {
               doc.text(`- ${txt}`, contentX, contentY);
               contentY += 12;
             });
@@ -667,7 +673,6 @@ export async function generateQuotationPDF(quotation, lead) {
 
           yPos = contentY + 20; // Bottom spacing
         } // end loop
-
       } else {
         // Fallback: No itinerary days, show message
         doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(10)
@@ -715,7 +720,7 @@ export async function generateQuotationPDF(quotation, lead) {
       if (inclusions.length === 0) {
         doc.text('• As per package details', incColX + 15, iy);
       } else {
-        inclusions.forEach(inc => {
+        inclusions.forEach((inc) => {
           doc.text(`• ${inc}`, incColX + 15, iy, { width: incExcColWidth - 30 });
           iy += doc.heightOfString(`• ${inc}`, { width: incExcColWidth - 30 }) + 3;
         });
@@ -736,7 +741,7 @@ export async function generateQuotationPDF(quotation, lead) {
       if (exclusions.length === 0) {
         doc.text('• As per package details', excColX + 15, ey);
       } else {
-        exclusions.forEach(exc => {
+        exclusions.forEach((exc) => {
           doc.text(`• ${exc}`, excColX + 15, ey, { width: incExcColWidth - 30 });
           ey += doc.heightOfString(`• ${exc}`, { width: incExcColWidth - 30 }) + 3;
         });
@@ -744,10 +749,10 @@ export async function generateQuotationPDF(quotation, lead) {
 
       yPos += incExcCardHeight + 25;
 
-      /* 
+      /*
       // --- PAGE 3+: REVIEWS (Dynamic Google Style Cards) - COMMENTED OUT AS PER USER REQUEST ---
       // Replaced by the new Google Reviews section at the end of the document
-      
+
       doc.addPage();
       if (logo) {
         try {
@@ -884,7 +889,7 @@ export async function generateQuotationPDF(quotation, lead) {
         ['Account Name:', pd.accountName],
         ['Account No:', pd.accountNumber],
         ['IFSC Code:', pd.ifscCode],
-        ['Branch:', pd.branch]
+        ['Branch:', pd.branch],
       ];
       bankInfo.forEach(([l, v]) => {
         doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text(l, 55, by);
@@ -928,38 +933,38 @@ export async function generateQuotationPDF(quotation, lead) {
           name: 'Razorpay',
           url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Razorpay_logo.svg/1200px-Razorpay_logo.svg.png',
           width: 70,
-          fallbackColor: '#3395FF'
+          fallbackColor: '#3395FF',
         },
         {
           name: 'Mastercard',
           url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/MasterCard_Logo.svg/1200px-MasterCard_Logo.svg.png',
           width: 40,
-          fallbackColor: '#EB001B'
+          fallbackColor: '#EB001B',
         },
         {
           name: 'Visa',
           url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/1200px-Visa_Inc._logo.svg.png',
           width: 50,
-          fallbackColor: '#1a1f71'
+          fallbackColor: '#1a1f71',
         },
         {
           name: 'Paytm',
           url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Paytm_Logo_%28standalone%29.svg/1200px-Paytm_Logo_%28standalone%29.svg.png',
           width: 50,
-          fallbackColor: '#00BAF2'
+          fallbackColor: '#00BAF2',
         },
         {
           name: 'GPay',
           url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Google_Pay_Logo_%282020%29.svg/1200px-Google_Pay_Logo_%282020%29.svg.png',
           width: 50,
-          fallbackColor: '#4285F4'
+          fallbackColor: '#4285F4',
         },
         {
           name: 'PhonePe',
           url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/PhonePe_Logo.svg/1200px-PhonePe_Logo.svg.png',
           width: 70,
-          fallbackColor: '#5F259F'
-        }
+          fallbackColor: '#5F259F',
+        },
       ];
 
       let lx = 50;
@@ -974,7 +979,9 @@ export async function generateQuotationPDF(quotation, lead) {
               // Calculate aspects to center vertically in a 28px height box
               const aspect = 28 / 28; // height constrained
               // PDFKit scales by width automatically if height not provided, but we want to fit
-              doc.image(imgBuffer, lx, logoY, { width: logo.width, height: 28, fit: [logo.width, 28], align: 'center', valign: 'center' });
+              doc.image(imgBuffer, lx, logoY, {
+                width: logo.width, height: 28, fit: [logo.width, 28], align: 'center', valign: 'center',
+              });
               loaded = true;
             }
           }
@@ -1018,8 +1025,8 @@ export async function generateQuotationPDF(quotation, lead) {
         }
 
         // Check if line is a subtopic (ends with colon or is all caps)
-        const isSubtopic = trimmedLine.endsWith(':') ||
-          (trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && !trimmedLine.startsWith('•'));
+        const isSubtopic = trimmedLine.endsWith(':')
+          || (trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && !trimmedLine.startsWith('•'));
 
         if (isSubtopic) {
           doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(10);
@@ -1056,8 +1063,8 @@ export async function generateQuotationPDF(quotation, lead) {
           continue;
         }
 
-        const isSubtopic = trimmedLine.endsWith(':') ||
-          (trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && !trimmedLine.startsWith('•'));
+        const isSubtopic = trimmedLine.endsWith(':')
+          || (trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 5 && !trimmedLine.startsWith('•'));
 
         if (isSubtopic) {
           if (yPos > 720) {
@@ -1115,7 +1122,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
       // Star Rating Summary
       // Draw 5 stars
-      let sx = margin + 105;
+      const sx = margin + 105;
       const sy = yPos + 5;
       for (let i = 0; i < 5; i++) {
         drawStar(doc, sx + (i * 18), sy, 0.7); // 0.7 scale ~16px
@@ -1131,9 +1138,15 @@ export async function generateQuotationPDF(quotation, lead) {
       yPos += 25;
 
       const companyReviews = [
-        { initial: 'P', color: '#EF4444', name: 'Priya Sharma', date: '2 weeks ago', text: `Excellent service! ${BRANDING.company.name} made our honeymoon absolutely perfect. The team was responsive, professional, and handled every detail with care. Highly recommend!` },
-        { initial: 'R', color: '#3B82F6', name: 'Rajesh Kumar', date: '1 month ago', text: 'Best travel agency! They customized our trip exactly as we wanted. The itinerary was perfect and the support throughout was exceptional. Will definitely book again!' },
-        { initial: 'A', color: '#10B981', name: 'Anita Desai', date: '3 weeks ago', text: 'Amazing experience from start to finish. The itinerary was well-planned, hotels were fantastic, and the support team was available 24/7. Exceeded all expectations!' }
+        {
+          initial: 'P', color: '#EF4444', name: 'Priya Sharma', date: '2 weeks ago', text: `Excellent service! ${BRANDING.company.name} made our honeymoon absolutely perfect. The team was responsive, professional, and handled every detail with care. Highly recommend!`,
+        },
+        {
+          initial: 'R', color: '#3B82F6', name: 'Rajesh Kumar', date: '1 month ago', text: 'Best travel agency! They customized our trip exactly as we wanted. The itinerary was perfect and the support throughout was exceptional. Will definitely book again!',
+        },
+        {
+          initial: 'A', color: '#10B981', name: 'Anita Desai', date: '3 weeks ago', text: 'Amazing experience from start to finish. The itinerary was well-planned, hotels were fantastic, and the support team was available 24/7. Exceeded all expectations!',
+        },
       ];
 
       companyReviews.forEach((review) => {
@@ -1150,7 +1163,7 @@ export async function generateQuotationPDF(quotation, lead) {
 
         // Google Logo & Stars
         // Simple Google Logo Text (G Blue, o Red, o Yellow, g Blue, l Green, e Red)
-        let gX = 500;
+        const gX = 500;
         doc.font('Helvetica-Bold').fontSize(10);
         doc.fillColor('#4285F4').text('G', gX, yPos + 5);
         doc.fillColor('#EA4335').text('o', gX + 8, yPos + 5);
@@ -1160,8 +1173,8 @@ export async function generateQuotationPDF(quotation, lead) {
         doc.fillColor('#EA4335').text('e', gX + 29, yPos + 5);
 
         // Stars below name using vector path
-        let rsx = margin + 50;
-        let rsy = yPos + 30;
+        const rsx = margin + 50;
+        const rsy = yPos + 30;
         for (let i = 0; i < 5; i++) {
           drawStar(doc, rsx + (i * 12), rsy, 0.45); // Smaller stars
         }
@@ -1190,8 +1203,8 @@ export async function generateQuotationPDF(quotation, lead) {
         doc.fillColor('#111827').fontSize(20).font('Helvetica-Bold').text('4.8', margin + 20, yPos + 15);
 
         // Stars for package summary
-        let psx = margin + 60;
-        let psy = yPos + 10;
+        const psx = margin + 60;
+        const psy = yPos + 10;
         for (let i = 0; i < 5; i++) {
           drawStar(doc, psx + (i * 15), psy, 0.6);
         }
@@ -1200,8 +1213,12 @@ export async function generateQuotationPDF(quotation, lead) {
         yPos += 70;
 
         const packageReviews = [
-          { initial: 'A', color: '#F97316', name: 'Arjun Kapoor', date: '1 week ago', text: 'This package exceeded all our expectations! Every detail was perfectly planned and executed. The hotels were luxurious, activities were thrilling, and the entire experience was unforgettable. Highly recommend!' },
-          { initial: 'M', color: '#EC4899', name: 'Meera Nair', date: '2 weeks ago', text: 'Wonderful experience! The hotels were amazing, locations were breathtaking, and the itinerary was well-balanced between relaxation and adventure. Great value for money. Will book again!' }
+          {
+            initial: 'A', color: '#F97316', name: 'Arjun Kapoor', date: '1 week ago', text: 'This package exceeded all our expectations! Every detail was perfectly planned and executed. The hotels were luxurious, activities were thrilling, and the entire experience was unforgettable. Highly recommend!',
+          },
+          {
+            initial: 'M', color: '#EC4899', name: 'Meera Nair', date: '2 weeks ago', text: 'Wonderful experience! The hotels were amazing, locations were breathtaking, and the itinerary was well-balanced between relaxation and adventure. Great value for money. Will book again!',
+          },
         ];
 
         packageReviews.forEach((review) => {
@@ -1216,7 +1233,7 @@ export async function generateQuotationPDF(quotation, lead) {
           doc.fillColor('#9CA3AF').fontSize(9).font('Helvetica').text(review.date, margin + 50, yPos + 18);
 
           // Google Logo & Stars
-          let gX = 500;
+          const gX = 500;
           doc.font('Helvetica-Bold').fontSize(10);
           doc.fillColor('#4285F4').text('G', gX, yPos + 5);
           doc.fillColor('#EA4335').text('o', gX + 8, yPos + 5);
@@ -1226,8 +1243,8 @@ export async function generateQuotationPDF(quotation, lead) {
           doc.fillColor('#EA4335').text('e', gX + 29, yPos + 5);
 
           // Stars using path
-          let rsx = margin + 50;
-          let rsy = yPos + 30;
+          const rsx = margin + 50;
+          const rsy = yPos + 30;
           for (let i = 0; i < 5; i++) {
             drawStar(doc, rsx + (i * 12), rsy, 0.45);
           }
@@ -1299,7 +1316,7 @@ const numberToWords = (n) => {
 
   if (n === 0) return 'Zero';
 
-  let words = [];
+  const words = [];
 
   // Function to convert 2 digit numbers
   const convertTwoDigits = (num) => {
@@ -1307,7 +1324,7 @@ const numberToWords = (n) => {
     if (num < 20) return double[num - 10];
     const ten = Math.floor(num / 10);
     const rem = num % 10;
-    return tens[ten] + (rem ? ' ' + single[rem] : '');
+    return tens[ten] + (rem ? ` ${single[rem]}` : '');
   };
 
   // Split integer and decimal
@@ -1331,16 +1348,16 @@ const numberToWords = (n) => {
     integerPart %= 100;
 
     if (crore > 0) {
-      words.push(convertTwoDigits(crore) + ' Crore');
+      words.push(`${convertTwoDigits(crore)} Crore`);
     }
     if (lakh > 0) {
-      words.push(convertTwoDigits(lakh) + ' Lakh');
+      words.push(`${convertTwoDigits(lakh)} Lakh`);
     }
     if (thousand > 0) {
-      words.push(convertTwoDigits(thousand) + ' Thousand');
+      words.push(`${convertTwoDigits(thousand)} Thousand`);
     }
     if (hundred > 0) {
-      words.push(convertTwoDigits(hundred) + ' Hundred');
+      words.push(`${convertTwoDigits(hundred)} Hundred`);
     }
     if (integerPart > 0) {
       words.push(convertTwoDigits(integerPart));
@@ -1350,7 +1367,7 @@ const numberToWords = (n) => {
   let result = words.join(' ');
   // Add decimal part
   if (decimalPart > 0) {
-    result += ' and ' + convertTwoDigits(decimalPart) + ' Paise';
+    result += ` and ${convertTwoDigits(decimalPart)} Paise`;
   } else {
     result += ' Only';
   }
@@ -1379,16 +1396,16 @@ export function generateInvoicePDF(invoice, lead) {
 
       // --- COLORS (Modern Teal/Slate Theme) ---
       const colors = {
-        primary: PALETTE.primary,        // Deep Teal
+        primary: PALETTE.primary, // Deep Teal
         primaryDark: PALETTE.primaryDark, // Dark Teal Header
         primaryLight: PALETTE.primaryLight, // Light Teal accents
-        accent: PALETTE.accent,          // Amber Gold
-        slate: PALETTE.slate,            // Dark Slate
-        gray: PALETTE.gray,              // Text Gray
-        bgLight: '#F3F4F6',              // Light gray background
+        accent: PALETTE.accent, // Amber Gold
+        slate: PALETTE.slate, // Dark Slate
+        gray: PALETTE.gray, // Text Gray
+        bgLight: '#F3F4F6', // Light gray background
         white: PALETTE.white,
         black: PALETTE.black,
-        border: PALETTE.border
+        border: PALETTE.border,
       };
 
       // --- HEADER DESIGN (Unique Split Layout) ---
@@ -1486,13 +1503,13 @@ export function generateInvoicePDF(invoice, lead) {
       const tableHeaders = [
         { label: 'S.No', w: 40, align: 'center' },
         { label: 'Service Description', w: 325, align: 'left' },
-        { label: `Amount (${process.env.CURRENCY_CODE || 'INR'})`, w: 150, align: 'right' }
+        { label: `Amount (${process.env.CURRENCY_CODE || 'INR'})`, w: 150, align: 'right' },
       ];
 
       doc.rect(40, y, 515, 30).fill(colors.primaryDark);
 
       let tx = 40;
-      tableHeaders.forEach(h => {
+      tableHeaders.forEach((h) => {
         doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(10)
           .text(h.label, tx + 5, y + 10, { width: h.w - 10, align: h.align });
         tx += h.w;
@@ -1503,7 +1520,7 @@ export function generateInvoicePDF(invoice, lead) {
       // Prepare Description Logic (Reused from existing)
       const paxCount = (lead?.adults || 0) + (lead?.children || 0);
       const paxStr = paxCount > 0 ? `(${lead.adults} Adults${lead.children ? `, ${lead.children} Children` : ''})` : '';
-      const packageItem = invoice.items?.find(i => i.category === 'package') || invoice.items?.[0];
+      const packageItem = invoice.items?.find((i) => i.category === 'package') || invoice.items?.[0];
 
       let packageName = 'Travel Services';
       let packageTypeLabel = '';
@@ -1557,7 +1574,6 @@ export function generateInvoicePDF(invoice, lead) {
 
       y += rowH + 20;
 
-
       // --- TOTALS SECTION ---
       // Right Aligned Box
       const totalBoxW = 250;
@@ -1578,7 +1594,7 @@ export function generateInvoicePDF(invoice, lead) {
       };
 
       drawTotalRow('Sub Total', amountStr);
-      // Tax styling if needed... 
+      // Tax styling if needed...
       // Divider line
       doc.moveTo(totalBoxX, y).lineTo(555, y).stroke(colors.border);
       y += 10;
@@ -1590,7 +1606,6 @@ export function generateInvoicePDF(invoice, lead) {
       doc.rect(40, y, 300, 25).fill(colors.bgLight);
       doc.fillColor(colors.gray).font('Helvetica-Bold').fontSize(9)
         .text(`${words} Only`, 45, y + 8, { width: 290 });
-
 
       y += 50;
 
@@ -1666,7 +1681,7 @@ export function generateReceiptPDF(receipt, invoice, lead) {
         white: PALETTE.white,
         black: PALETTE.black,
         border: PALETTE.border,
-        success: '#10B981'
+        success: '#10B981',
       };
 
       // --- HEADER DESIGN ---
@@ -1751,13 +1766,13 @@ export function generateReceiptPDF(receipt, invoice, lead) {
       const tableHeaders = [
         { label: 'Description', w: 235, align: 'left' },
         { label: 'Reference / Transaction ID', w: 160, align: 'left' },
-        { label: 'Amount Received', w: 120, align: 'right' }
+        { label: 'Amount Received', w: 120, align: 'right' },
       ];
 
       doc.rect(40, y, 515, 30).fill(colors.primaryDark);
 
       let tx = 40;
-      tableHeaders.forEach(h => {
+      tableHeaders.forEach((h) => {
         doc.fillColor(colors.white).font('Helvetica-Bold').fontSize(10)
           .text(h.label, tx + 10, y + 10, { width: h.w - 20, align: h.align });
         tx += h.w;

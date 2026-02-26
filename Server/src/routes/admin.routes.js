@@ -18,9 +18,9 @@ import {
 } from '../controllers/admin.controller.js';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validator.js';
-import { 
-  createStaffSchema, 
-  updateUserStatusSchema, 
+import {
+  createStaffSchema,
+  updateUserStatusSchema,
   updateProfileSchema,
   updatePermissionsSchema,
   promoteSuperAdminSchema,

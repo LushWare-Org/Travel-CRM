@@ -3,8 +3,7 @@ import rateLimit from 'express-rate-limit';
 // Rate limiting is DISABLED by default
 // To enable rate limiting, set RATE_LIMIT_ENABLED=true in your .env file
 // By default, all limiters will be no-op (no rate limiting applied)
-const isRateLimitingDisabled =
-  process.env.RATE_LIMIT_ENABLED !== 'true';
+const isRateLimitingDisabled = process.env.RATE_LIMIT_ENABLED !== 'true';
 
 const noopMiddleware = (req, res, next) => next();
 
@@ -26,7 +25,7 @@ export const limiter = createLimiter({
       success: false,
       message: `Too many requests from this IP. Limit: ${maxRequests} requests per ${Math.round(windowMs / 60000)} minutes. Please try again later.`,
       error: 'Rate limit exceeded',
-      retryAfter: retryAfter, // seconds until retry is allowed
+      retryAfter, // seconds until retry is allowed
       limit: maxRequests,
       window: Math.round(windowMs / 60000), // window in minutes
     });
@@ -51,7 +50,7 @@ export const authLimiter = createLimiter({
       success: false,
       message: `Too many authentication attempts. Limit: ${maxAttempts} attempts per ${windowMinutes} minutes. Please try again after ${windowMinutes} minutes.`,
       error: 'Rate limit exceeded',
-      retryAfter: retryAfter, // seconds until retry is allowed
+      retryAfter, // seconds until retry is allowed
       limit: maxAttempts,
       window: windowMinutes, // window in minutes
     });
@@ -72,7 +71,7 @@ export const apiLimiter = createLimiter({
       success: false,
       message: 'Too many API requests. Limit: 60 requests per minute. Please slow down and try again in a minute.',
       error: 'Rate limit exceeded',
-      retryAfter: retryAfter, // seconds until retry is allowed
+      retryAfter, // seconds until retry is allowed
       limit: 60,
       window: 1, // window in minutes
     });

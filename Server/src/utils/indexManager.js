@@ -3,7 +3,7 @@ import logger from '../config/logger.js';
 
 export const dropReviewsIndexes = async () => {
   try {
-    const db = mongoose.connection.db;
+    const { db } = mongoose.connection;
     if (!db) {
       logger.warn('Database connection not ready');
       return;
@@ -18,7 +18,7 @@ export const dropReviewsIndexes = async () => {
         return;
       }
     }
-    
+
     logger.info('No problematic indexes found to drop');
   } catch (error) {
     logger.error('Error managing indexes:', error.message);

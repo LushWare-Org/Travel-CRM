@@ -201,7 +201,6 @@ const packages = [
   },
 ];
 
-
 const seedDatabase = async () => {
   try {
     // Connect to database
@@ -301,4 +300,3 @@ export const resetAdminPassword = async () => {
 };
 
 seedDatabase();
-

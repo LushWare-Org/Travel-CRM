@@ -20,7 +20,7 @@ const testLeadAssignmentEmail = async () => {
 
     // Find a sales rep
     const salesRep = await User.findOne({ role: 'salesRep' }).select('name email');
-    
+
     if (!salesRep) {
       console.error('❌ No sales rep found in database!');
       process.exit(1);
@@ -35,7 +35,7 @@ const testLeadAssignmentEmail = async () => {
 
     // Find a lead
     const lead = await Lead.findOne().lean();
-    
+
     if (!lead) {
       console.error('❌ No lead found in database!');
       process.exit(1);
@@ -45,14 +45,14 @@ const testLeadAssignmentEmail = async () => {
 
     // Test email sending
     console.log('📧 Sending test lead assignment email...');
-    
+
     try {
       await emailService.sendLeadAssignmentEmail({
         salesRep: {
           name: salesRep.name,
           email: salesRep.email,
         },
-        lead: lead,
+        lead,
         assignedBy: {
           name: 'Admin User',
         },
@@ -78,4 +78,3 @@ const testLeadAssignmentEmail = async () => {
 };
 
 testLeadAssignmentEmail();
-

@@ -4,13 +4,6 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Get current directory for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Load environment variables FIRST before any other imports
-dotenv.config({ path: join(__dirname, '../.env') });
-
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -65,6 +58,13 @@ import aiSchedulerService from './services/ai/aiScheduler.service.js';
 import errorHandler from './middleware/errorHandler.js';
 import notFound from './middleware/notFound.js';
 import emailService from './utils/emailService.js';
+
+// Get current directory for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables FIRST before any other imports
+dotenv.config({ path: join(__dirname, '../.env') });
 
 const app = express();
 

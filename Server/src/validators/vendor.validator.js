@@ -111,7 +111,8 @@ const contactPerson = Joi.object({
         }
       }
     }),
-  email: Joi.string().email().lowercase().allow('').optional(),
+  email: Joi.string().email().lowercase().allow('')
+    .optional(),
   designation: Joi.string().trim().allow('').optional(),
 }).optional();
 
@@ -140,13 +141,16 @@ export const createVendorSchema = Joi.object().keys({
 
 // Update vendor schema
 export const updateVendorSchema = Joi.object().keys({
-  name: Joi.string().min(2).max(50).trim().optional().messages({
-    'string.min': 'Name must be at least 2 characters',
-    'string.max': 'Name cannot exceed 50 characters',
-  }),
-  email: Joi.string().email().lowercase().optional().messages({
-    'string.email': 'Please provide a valid email address',
-  }),
+  name: Joi.string().min(2).max(50).trim()
+    .optional()
+    .messages({
+      'string.min': 'Name must be at least 2 characters',
+      'string.max': 'Name cannot exceed 50 characters',
+    }),
+  email: Joi.string().email().lowercase().optional()
+    .messages({
+      'string.email': 'Please provide a valid email address',
+    }),
   phone: Joi.string()
     .trim()
     .optional()
@@ -161,10 +165,12 @@ export const updateVendorSchema = Joi.object().keys({
         }
       }
     }),
-  businessName: Joi.string().min(2).max(100).trim().optional().messages({
-    'string.min': 'Business name must be at least 2 characters',
-    'string.max': 'Business name cannot exceed 100 characters',
-  }),
+  businessName: Joi.string().min(2).max(100).trim()
+    .optional()
+    .messages({
+      'string.min': 'Business name must be at least 2 characters',
+      'string.max': 'Business name cannot exceed 100 characters',
+    }),
   serviceType: Joi.string()
     .valid('hotel', 'transport', 'activity', 'restaurant', 'guide', 'other')
     .optional()
@@ -197,7 +203,8 @@ export const updateVendorSchema = Joi.object().keys({
           }
         }
       }),
-    email: Joi.string().email().lowercase().allow('').optional(),
+    email: Joi.string().email().lowercase().allow('')
+      .optional(),
     designation: Joi.string().trim().allow('').optional(),
   }).optional(),
   bankDetails: Joi.object({

@@ -9,7 +9,7 @@ class GeminiRestService {
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY;
     this.baseURL = 'https://generativelanguage.googleapis.com/v1beta';
-    
+
     if (!this.apiKey || this.apiKey.trim() === '') {
       logger.warn('GEMINI_API_KEY not found. AI features will be disabled.');
       this.apiKey = null;
@@ -27,7 +27,7 @@ class GeminiRestService {
   async generateContent(prompt, options = {}) {
     if (!this.apiKey) {
       throw new Error(
-        'GEMINI_API_KEY is not set. Get a key from https://makersuite.google.com/app/apikey'
+        'GEMINI_API_KEY is not set. Get a key from https://makersuite.google.com/app/apikey',
       );
     }
 
@@ -36,13 +36,13 @@ class GeminiRestService {
     // Prioritize v1 API and working models
     const apiVersions = ['v1', 'v1beta'];
     const modelsToTry = [
-      'gemini-2.0-flash',      // Known working model
-      'gemini-2.5-flash',      // Latest stable flash model
-      'gemini-2.5-pro',        // Latest stable pro model
-      'gemini-2.0-flash-001',  // Stable version
-      'gemini-1.5-flash',      // Fallback to older models
-      'gemini-1.5-pro',        // Fallback to older models
-      'gemini-pro',            // Legacy fallback
+      'gemini-2.0-flash', // Known working model
+      'gemini-2.5-flash', // Latest stable flash model
+      'gemini-2.5-pro', // Latest stable pro model
+      'gemini-2.0-flash-001', // Stable version
+      'gemini-1.5-flash', // Fallback to older models
+      'gemini-1.5-pro', // Fallback to older models
+      'gemini-pro', // Legacy fallback
     ];
 
     const errors = []; // Collect errors for better diagnostics
@@ -52,7 +52,7 @@ class GeminiRestService {
         try {
           const cleanModel = model.replace(/^models\//, '');
           const url = `https://generativelanguage.googleapis.com/${version}/models/${cleanModel}:generateContent?key=${this.apiKey}`;
-          
+
           logger.info(`Trying ${version}/${cleanModel}...`);
 
           const response = await fetch(url, {
@@ -63,15 +63,15 @@ class GeminiRestService {
             body: JSON.stringify({
               contents: [{
                 parts: [{
-                  text: prompt
-                }]
+                  text: prompt,
+                }],
               }],
               generationConfig: {
                 temperature: options.temperature || 0.7,
                 topP: options.topP || 0.8,
                 topK: 40,
                 maxOutputTokens: options.maxTokens || 2000,
-              }
+              },
             }),
           });
 
@@ -80,37 +80,37 @@ class GeminiRestService {
             const errorInfo = `${version}/${cleanModel}: ${response.status} - ${errorText.substring(0, 200)}`;
             logger.warn(`Failed: ${errorInfo}`);
             errors.push(errorInfo);
-            
+
             // If it's a 401/403, the key is invalid - don't try other models
             if (response.status === 401 || response.status === 403) {
               throw new Error(
-                `Invalid API key. Status: ${response.status}. ` +
-                `Get a new key from https://makersuite.google.com/app/apikey`
+                `Invalid API key. Status: ${response.status}. `
+                + 'Get a new key from https://makersuite.google.com/app/apikey',
               );
             }
-            
+
             // If it's 404, try next model/version
             if (response.status === 404) {
               continue;
             }
-            
+
             // If it's 429 (quota exceeded), this is a critical error - don't try other models
             if (response.status === 429) {
               try {
                 const errorData = JSON.parse(errorText);
                 if (errorData.error && errorData.error.message && errorData.error.message.includes('quota')) {
                   throw new Error(
-                    `API quota exceeded. You have exceeded your current quota. ` +
-                    `Please check your plan and billing details at https://ai.google.dev/gemini-api/pricing ` +
-                    `or wait for your quota to reset.`
+                    'API quota exceeded. You have exceeded your current quota. '
+                    + 'Please check your plan and billing details at https://ai.google.dev/gemini-api/pricing '
+                    + 'or wait for your quota to reset.',
                   );
                 }
               } catch (e) {
                 // If parsing fails, still throw quota error
                 if (errorText.includes('quota') || errorText.includes('Quota')) {
                   throw new Error(
-                    `API quota exceeded. You have exceeded your current quota. ` +
-                    `Please check your plan and billing details or wait for your quota to reset.`
+                    'API quota exceeded. You have exceeded your current quota. '
+                    + 'Please check your plan and billing details or wait for your quota to reset.',
                   );
                 }
               }
@@ -118,24 +118,24 @@ class GeminiRestService {
               logger.warn(`Rate limit hit for ${version}/${cleanModel}, trying next model...`);
               continue;
             }
-            
+
             if (response.status === 503) {
               logger.warn(`Service unavailable for ${version}/${cleanModel}, trying next model...`);
               continue;
             }
-            
+
             // Other errors - try next model
             continue;
           }
 
           const data = await response.json();
-          
+
           if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-            const content = data.candidates[0].content;
-            
+            const { content } = data.candidates[0];
+
             // Handle different response formats
             let text = null;
-            
+
             // Format 1: content.parts[0].text (standard format)
             if (content.parts && Array.isArray(content.parts) && content.parts[0] && content.parts[0].text) {
               text = content.parts[0].text;
@@ -154,14 +154,13 @@ class GeminiRestService {
                 }
               }
             }
-            
+
             if (text) {
               logger.info(`✅ Successfully generated content using ${version}/${cleanModel}`);
               return text;
-            } else {
-              logger.warn(`Unexpected response format from ${version}/${cleanModel}:`, JSON.stringify(data.candidates[0].content).substring(0, 200));
-              continue;
             }
+            logger.warn(`Unexpected response format from ${version}/${cleanModel}:`, JSON.stringify(data.candidates[0].content).substring(0, 200));
+            continue;
           } else {
             logger.warn(`Unexpected response format from ${version}/${cleanModel}`);
             continue;
@@ -171,13 +170,13 @@ class GeminiRestService {
           if (error.message.includes('Invalid API key') || error.message.includes('401') || error.message.includes('403')) {
             throw error;
           }
-          
+
           // For 404 or other errors, try next model/version
           if (error.message.includes('404') || error.message.includes('not found')) {
             errors.push(`${version}/${model}: ${error.message}`);
             continue;
           }
-          
+
           // Log and continue for other errors
           const errorInfo = `${version}/${model}: ${error.message}`;
           logger.warn(`Error: ${errorInfo}`);
@@ -188,26 +187,26 @@ class GeminiRestService {
     }
 
     // Check if all errors are quota-related
-    const quotaErrors = errors.filter(e => e.includes('429') || e.toLowerCase().includes('quota'));
+    const quotaErrors = errors.filter((e) => e.includes('429') || e.toLowerCase().includes('quota'));
     if (quotaErrors.length > 0 && quotaErrors.length === errors.length) {
       throw new Error(
-        'API quota exceeded. You have exceeded your current quota for all models. ' +
-        'Please check your plan and billing details at https://ai.google.dev/gemini-api/pricing ' +
-        'or wait for your quota to reset. ' +
-        'Free tier quotas typically reset daily or monthly.'
+        'API quota exceeded. You have exceeded your current quota for all models. '
+        + 'Please check your plan and billing details at https://ai.google.dev/gemini-api/pricing '
+        + 'or wait for your quota to reset. '
+        + 'Free tier quotas typically reset daily or monthly.',
       );
     }
-    
+
     // If we get here, all models/versions failed
-    const errorSummary = errors.length > 0 
+    const errorSummary = errors.length > 0
       ? `\n\nErrors encountered:\n${errors.slice(0, 5).map((e, i) => `${i + 1}. ${e}`).join('\n')}${errors.length > 5 ? `\n... and ${errors.length - 5} more errors` : ''}`
       : '';
-    
+
     throw new Error(
-      'Unable to generate content. All models and API versions returned errors. ' +
-      'Please check: 1) API key is valid, 2) Generative AI API is enabled, ' +
-      '3) Get a new key from https://makersuite.google.com/app/apikey' +
-      errorSummary
+      'Unable to generate content. All models and API versions returned errors. '
+      + 'Please check: 1) API key is valid, 2) Generative AI API is enabled, '
+      + `3) Get a new key from https://makersuite.google.com/app/apikey${
+        errorSummary}`,
     );
   }
 
@@ -258,29 +257,29 @@ Make the content engaging, professional, and suitable for a travel agency websit
       } catch (parseError) {
         // If JSON parsing fails, create structured content from text
         logger.warn('Failed to parse JSON response, creating structured content from text');
-        const lines = response.split('\n').filter(line => line.trim());
-        
+        const lines = response.split('\n').filter((line) => line.trim());
+
         content = {
           description: lines.slice(0, 3).join(' ').substring(0, 500) || 'A wonderful travel package experience.',
-          highlights: lines.slice(3, 8).filter(l => l.trim().length > 0).map(l => l.replace(/^[-*•]\s*/, '').trim()) || [
+          highlights: lines.slice(3, 8).filter((l) => l.trim().length > 0).map((l) => l.replace(/^[-*•]\s*/, '').trim()) || [
             'Expertly curated itinerary',
             'Comfortable accommodations',
             'Professional tour guides',
             'Memorable experiences',
-            'Great value for money'
+            'Great value for money',
           ],
           inclusions: [
             'Accommodation',
             'Transportation',
             'Meals as specified',
             'Tour guide services',
-            'Entrance fees'
+            'Entrance fees',
           ],
           exclusions: [
             'International flights',
             'Personal expenses',
             'Travel insurance',
-            'Visa fees'
+            'Visa fees',
           ],
         };
       }
@@ -295,5 +294,3 @@ Make the content engaging, professional, and suitable for a travel agency websit
 
 // Export singleton instance
 export default new GeminiRestService();
-
-

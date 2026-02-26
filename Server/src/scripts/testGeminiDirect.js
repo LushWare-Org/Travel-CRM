@@ -104,7 +104,7 @@ async function testGeminiDirect() {
       console.log('\n');
 
       if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        const text = data.candidates[0].content.parts[0].text;
+        const { text } = data.candidates[0].content.parts[0];
         console.log('Generated Text:');
         console.log(text);
         console.log('\n');
@@ -131,4 +131,3 @@ async function testGeminiDirect() {
 }
 
 testGeminiDirect().catch(console.error);
-

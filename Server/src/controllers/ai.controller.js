@@ -58,7 +58,9 @@ export const getAgentStatus = asyncHandler(async (req, res) => {
 });
 
 export const overrideAgent = asyncHandler(async (req, res, next) => {
-  const { agentName, action, note, eventId } = req.body;
+  const {
+    agentName, action, note, eventId,
+  } = req.body;
   if (!agentName || !action) {
     return next(new AppError('agentName and action are required', 400));
   }

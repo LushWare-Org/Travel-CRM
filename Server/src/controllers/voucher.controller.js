@@ -211,9 +211,9 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
     shouldExtractFromBackend = true; // Always extract for customized packages
   } else {
     // MANUAL ITINERARY: Check if frontend already provided the data
-    const hasFrontendData = req.body.packageDetails?.name &&
-      req.body.mealPlans?.length > 0 &&
-      req.body.itinerarySummary?.length > 0;
+    const hasFrontendData = req.body.packageDetails?.name
+      && req.body.mealPlans?.length > 0
+      && req.body.itinerarySummary?.length > 0;
 
     if (!hasFrontendData) {
       // Frontend didn't provide complete data, try to extract from quotations
@@ -245,10 +245,10 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
             exclusions: quotationData.excludedServices || [],
             highlights: [],
             coverImage: quotationData.coverImage ? { url: quotationData.coverImage } : null,
-            images: (quotationData.images || []).map(img => ({
+            images: (quotationData.images || []).map((img) => ({
               url: img.url,
-              isCover: img.isCover || false
-            }))
+              isCover: img.isCover || false,
+            })),
           };
         }
 
@@ -271,7 +271,7 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
       highlights: packageData.highlights || [],
       // Snapshot images for consistency
       coverImage: packageData.coverImage || null,
-      images: packageData.images || []
+      images: packageData.images || [],
     };
   }
 
@@ -310,8 +310,8 @@ export const createVoucher = asyncHandler(async (req, res, next) => {
     req.body.itinerarySummary = req.body.itinerarySummary.map((day) => ({
       dayNumber: day.dayNumber || 0,
       title: String(day.title || ''),
-      locations: Array.isArray(day.locations) ? day.locations.map(loc => String(loc)) : [],
-      activities: Array.isArray(day.activities) ? day.activities.map(act => String(act)) : [],
+      locations: Array.isArray(day.locations) ? day.locations.map((loc) => String(loc)) : [],
+      activities: Array.isArray(day.activities) ? day.activities.map((act) => String(act)) : [],
       accommodation: day.accommodation && typeof day.accommodation === 'object' && !Array.isArray(day.accommodation)
         ? {
           name: String(day.accommodation.name || ''),
@@ -508,8 +508,8 @@ export const sendVoucherEmail = asyncHandler(async (req, res, next) => {
       to: email,
       voucherNumber: voucher.voucherNumber,
       customerName: voucher.customer?.name || voucher.lead?.name,
-      packageName: packageName,
-      pdfBuffer: pdfBuffer,
+      packageName,
+      pdfBuffer,
       fileName: `voucher-${voucher.voucherNumber || voucher._id}.pdf`,
     });
 
@@ -578,6 +578,3 @@ export const confirmVoucher = asyncHandler(async (req, res, next) => {
     data: voucher,
   });
 });
-
-
-

@@ -77,7 +77,7 @@ export const getAllUsers = asyncHandler(async (req, res, next) => {
       if (requestedFields.includes('password')) {
         return next(new AppError('Cannot select password field', 400));
       }
-      selectFields = requestedFields.join(' ') + ' -password';
+      selectFields = `${requestedFields.join(' ')} -password`;
     }
 
     // Execute query with optimizations
@@ -184,7 +184,9 @@ export const getCurrentUserProfile = asyncHandler(async (req, res, next) => {
  * @rules   Only admins can create users, email must be unique
  */
 export const createUser = asyncHandler(async (req, res, next) => {
-  const { name, email, phone, password, role } = req.body;
+  const {
+    name, email, phone, password, role,
+  } = req.body;
 
   try {
     // Check if user already exists
@@ -338,7 +340,9 @@ export const updateCurrentUserProfile = asyncHandler(async (req, res, next) => {
  */
 export const updateUser = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  const { name, phone, role, isActive } = req.body;
+  const {
+    name, phone, role, isActive,
+  } = req.body;
 
   // Validate ID format
   if (!id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -663,8 +667,6 @@ export const getUsersByRole = asyncHandler(async (req, res, next) => {
     .sort()
     .paginate();
 
-
-
   const users = await apiFeatures.query.lean();
   const totalUsers = await User.countDocuments({ role });
 
@@ -691,7 +693,7 @@ export const assignUserRole = asyncHandler(async (req, res, next) => {
     return next(new AppError(`Invalid role. Valid roles are: ${validRoles.join(', ')}. Use /admin/super/promote for superAdmin.`, 400));
   }
 
-  let user = await User.findById(req.params.id);
+  const user = await User.findById(req.params.id);
 
   if (!user) {
     return next(new AppError('User not found', 404));

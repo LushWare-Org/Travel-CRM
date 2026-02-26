@@ -31,5 +31,3 @@ export const updateSettings = asyncHandler(async (req, res) => {
 });
 
 export default { getSettings, updateSettings };
-
-

@@ -14,9 +14,9 @@ const sendTokenResponse = (user, statusCode, res, message = 'Success') => {
   // Calculate cookie expiration (7 days default)
   const cookieExpiresIn = parseInt(process.env.COOKIE_EXPIRES_IN || process.env.JWT_COOKIE_EXPIRES_IN || '7', 10);
   const maxAge = isNaN(cookieExpiresIn) ? 7 * 24 * 60 * 60 * 1000 : cookieExpiresIn * 24 * 60 * 60 * 1000;
-  
+
   const options = {
-    maxAge: maxAge,
+    maxAge,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -380,7 +380,9 @@ export const resendVerification = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/auth/reset-temp-password
 // @access  Public
 export const resetTempPassword = asyncHandler(async (req, res, next) => {
-  const { email, currentPassword, newPassword, confirmPassword } = req.body;
+  const {
+    email, currentPassword, newPassword, confirmPassword,
+  } = req.body;
 
   // Verify passwords match
   if (newPassword !== confirmPassword) {
@@ -461,22 +463,18 @@ export const updateProfile = asyncHandler(async (req, res, next) => {
  * Generate a random 6-digit OTP code
  * @returns {string} 6-digit OTP code
  */
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 /**
  * Generate temporary token for OTP verification
  * @param {string} userId - User ID
  * @returns {string} Temporary JWT token
  */
-const generateTempToken = (userId) => {
-  return jwt.sign(
-    { userId, tempAuth: true },
-    process.env.JWT_SECRET,
-    { expiresIn: '15m' } // Temp token valid for 15 minutes
-  );
-};
+const generateTempToken = (userId) => jwt.sign(
+  { userId, tempAuth: true },
+  process.env.JWT_SECRET,
+  { expiresIn: '15m' }, // Temp token valid for 15 minutes
+);
 
 /**
  * Verify temporary token
@@ -498,7 +496,7 @@ const verifyTempToken = (token) => {
  */
 const maskEmail = (email) => {
   const [name, domain] = email.split('@');
-  const maskedName = name.substring(0, 2) + '***';
+  const maskedName = `${name.substring(0, 2)}***`;
   return `${maskedName}@${domain}`;
 };
 

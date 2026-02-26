@@ -35,7 +35,7 @@ async function listGeminiModels() {
     try {
       console.log(`📡 Checking ${version} API...`);
       const url = `https://generativelanguage.googleapis.com/${version}/models?key=${trimmedKey}`;
-      
+
       console.log(`URL: ${url.replace(trimmedKey, 'AIzaSy...')}\n`);
 
       const response = await fetch(url, {
@@ -55,18 +55,16 @@ async function listGeminiModels() {
       }
 
       const data = await response.json();
-      
+
       if (data.models && Array.isArray(data.models)) {
         console.log(`✅ Found ${data.models.length} models in ${version}:\n`);
-        
+
         // Filter models that support generateContent
-        const generateContentModels = data.models.filter(model => 
-          model.supportedGenerationMethods && 
-          model.supportedGenerationMethods.includes('generateContent')
-        );
+        const generateContentModels = data.models.filter((model) => model.supportedGenerationMethods
+          && model.supportedGenerationMethods.includes('generateContent'));
 
         console.log(`📝 Models supporting generateContent (${generateContentModels.length}):`);
-        generateContentModels.forEach(model => {
+        generateContentModels.forEach((model) => {
           console.log(`   ✅ ${model.name}`);
           if (model.displayName) {
             console.log(`      Display: ${model.displayName}`);
@@ -75,17 +73,17 @@ async function listGeminiModels() {
             console.log(`      Description: ${model.description.substring(0, 100)}...`);
           }
         });
-        
+
         console.log('\n');
-        
+
         // Test the first available model
         if (generateContentModels.length > 0) {
           const testModel = generateContentModels[0];
-          const modelName = testModel.name.replace(`models/`, '');
+          const modelName = testModel.name.replace('models/', '');
           console.log(`🧪 Testing with model: ${modelName}...`);
-          
+
           const generateUrl = `https://generativelanguage.googleapis.com/${version}/models/${modelName}:generateContent?key=${trimmedKey}`;
-          
+
           const testResponse = await fetch(generateUrl, {
             method: 'POST',
             headers: {
@@ -94,13 +92,13 @@ async function listGeminiModels() {
             body: JSON.stringify({
               contents: [{
                 parts: [{
-                  text: 'Say hello in one sentence'
-                }]
+                  text: 'Say hello in one sentence',
+                }],
               }],
               generationConfig: {
                 temperature: 0.7,
                 maxOutputTokens: 50,
-              }
+              },
             }),
           });
 
@@ -112,15 +110,14 @@ async function listGeminiModels() {
             console.log(`✅ Use this API version: ${version}`);
             console.log('\n');
             return; // Success, exit
-          } else {
-            const errorText = await testResponse.text();
-            console.log(`❌ Test failed: ${errorText.substring(0, 200)}`);
           }
+          const errorText = await testResponse.text();
+          console.log(`❌ Test failed: ${errorText.substring(0, 200)}`);
         }
       } else {
         console.log('⚠️  Unexpected response format:', JSON.stringify(data, null, 2).substring(0, 500));
       }
-      
+
       console.log('\n');
     } catch (error) {
       console.log(`❌ Error checking ${version}: ${error.message}`);

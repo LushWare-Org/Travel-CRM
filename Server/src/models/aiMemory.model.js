@@ -34,6 +34,8 @@ const aiMemorySchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-aiMemorySchema.index({ scopeType: 1, scopeId: 1, memoryType: 1, updatedAt: -1 });
+aiMemorySchema.index({
+  scopeType: 1, scopeId: 1, memoryType: 1, updatedAt: -1,
+});
 
 export default mongoose.model('AIMemory', aiMemorySchema);

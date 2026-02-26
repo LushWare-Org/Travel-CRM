@@ -97,33 +97,33 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
 
   let booking = null;
   const leadPayload = {
-      name: sanitizedName,
-      email: sanitizedEmail,
-      phone: normalizedPhone || '',
-      source: 'booking',
-      platform: 'Website Form',
-      package: pkg._id,
-      packageName: pkg.name,
-      destination: pkg.destination,
-      destinationCountry: pkg.destination,
-      travelDate: parsedTravelDate,
-      endDate: parsedEndDate || undefined,
-      numberOfTravelers: parsedTravelers,
-      budget: pkg.price ? `${pkg.price}` : undefined,
-      message: message?.trim() || undefined,
-      status: 'new',
-      tags: ['website-booking'],
-    };
+    name: sanitizedName,
+    email: sanitizedEmail,
+    phone: normalizedPhone || '',
+    source: 'booking',
+    platform: 'Website Form',
+    package: pkg._id,
+    packageName: pkg.name,
+    destination: pkg.destination,
+    destinationCountry: pkg.destination,
+    travelDate: parsedTravelDate,
+    endDate: parsedEndDate || undefined,
+    numberOfTravelers: parsedTravelers,
+    budget: pkg.price ? `${pkg.price}` : undefined,
+    message: message?.trim() || undefined,
+    status: 'new',
+    tags: ['website-booking'],
+  };
 
-    if (message?.trim()) {
-      leadPayload.remarks = [
-        {
-          text: `Website inquiry: ${message.trim()}`,
-          date: new Date(),
-          addedBy: null,
-        },
-      ];
-    }
+  if (message?.trim()) {
+    leadPayload.remarks = [
+      {
+        text: `Website inquiry: ${message.trim()}`,
+        date: new Date(),
+        addedBy: null,
+      },
+    ];
+  }
 
   let assignedSalesRepId = null;
   let assignmentResult = null;
@@ -189,14 +189,14 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
               })
               .catch((err) => {
                 logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
-                logger.error(`Email error details:`, err);
+                logger.error('Email error details:', err);
               });
           } else {
             logger.warn(`⚠️  Cannot send assignment email: sales rep ${newLead.assignedTo} has no email address`);
           }
         } catch (error) {
           logger.error(`Error preparing lead assignment email: ${error.message}`);
-          logger.error(`Error stack:`, error.stack);
+          logger.error('Error stack:', error.stack);
         }
       }
 

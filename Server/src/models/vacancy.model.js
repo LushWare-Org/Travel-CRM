@@ -8,7 +8,7 @@ const vacancySchema = new mongoose.Schema(
       trim: true,
       maxlength: [100, 'Position cannot be more than 100 characters'],
     },
-    
+
     description: {
       type: String,
       required: [true, 'Job description is required'],
@@ -59,7 +59,7 @@ const vacancySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 vacancySchema.index({ status: 1, createdAt: -1 });

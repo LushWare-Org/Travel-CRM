@@ -72,7 +72,7 @@ const careerSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 careerSchema.index({ email: 1 });
@@ -82,7 +82,7 @@ careerSchema.index({ createdAt: -1 });
 
 careerSchema.pre('save', function (next) {
   if (this.phone && !this.phone.startsWith('+')) {
-    this.phone = '+91' + this.phone.replace(/\D/g, '');
+    this.phone = `+91${this.phone.replace(/\D/g, '')}`;
   }
   next();
 });

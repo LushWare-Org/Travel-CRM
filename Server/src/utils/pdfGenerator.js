@@ -341,7 +341,7 @@ export function generateLeadItineraryPDF(lead, itinerary) {
         .text('Day-by-Day Plan', { underline: true })
         .moveDown(0.5);
 
-      let y = doc.y;
+      let { y } = doc;
       (itinerary.days || []).forEach((day, idx) => {
         if (y > 700) {
           doc.addPage();

@@ -138,16 +138,16 @@ const packageSchema = new mongoose.Schema(
 packageSchema.pre('save', async function createSlug(next) {
   if (this.isModified('name')) {
     let slug = slugify(this.name, { lower: true });
-    
+
     // For new documents, check for slug conflicts
     if (this.isNew) {
-      let existingCount = await this.constructor.countDocuments({ slug });
+      const existingCount = await this.constructor.countDocuments({ slug });
       if (existingCount > 0) {
         // Append timestamp to make slug unique
         slug = `${slug}-${Date.now()}`;
       }
     }
-    
+
     this.slug = slug;
   }
   next();

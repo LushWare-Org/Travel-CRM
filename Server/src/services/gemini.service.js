@@ -9,7 +9,7 @@ import logger from '../config/logger.js';
 class GeminiService {
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey || apiKey.trim() === '') {
       logger.warn('GEMINI_API_KEY not found in environment variables. AI features will be disabled.');
       logger.warn('To enable: Get API key from https://makersuite.google.com/app/apikey and add to Server/.env');
@@ -22,7 +22,7 @@ class GeminiService {
         logger.warn('GEMINI_API_KEY format looks incorrect. Valid keys start with "AIza".');
         logger.warn('Get a new key from: https://makersuite.google.com/app/apikey');
       }
-      
+
       try {
         this.genAI = new GoogleGenerativeAI(trimmedKey);
         // Don't initialize model here - initialize it when needed to handle errors better
@@ -45,21 +45,21 @@ class GeminiService {
    */
   async generateContent(prompt, options = {}) {
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey || apiKey.trim() === '') {
       throw new Error(
-        'GEMINI_API_KEY is not set in .env file. ' +
-        'Get a free API key from: https://makersuite.google.com/app/apikey ' +
-        'Then add to Server/.env: GEMINI_API_KEY=your_key_here'
+        'GEMINI_API_KEY is not set in .env file. '
+        + 'Get a free API key from: https://makersuite.google.com/app/apikey '
+        + 'Then add to Server/.env: GEMINI_API_KEY=your_key_here',
       );
     }
-    
+
     if (!this.genAI) {
       throw new Error(
-        'Gemini AI client not initialized. ' +
-        'Please check: 1) GEMINI_API_KEY is in .env, 2) API key is valid, ' +
-        '3) Restart server after adding the key. ' +
-        'Get a new key from: https://makersuite.google.com/app/apikey'
+        'Gemini AI client not initialized. '
+        + 'Please check: 1) GEMINI_API_KEY is in .env, 2) API key is valid, '
+        + '3) Restart server after adding the key. '
+        + 'Get a new key from: https://makersuite.google.com/app/apikey',
       );
     }
 
@@ -77,19 +77,19 @@ class GeminiService {
       };
 
       // Initialize model lazily - don't cache until we know it works
-      let model = this.model;
+      let { model } = this;
       if (!model && this.genAI) {
         // Try models in order - use current available models (as of 2025)
         const modelsToTry = [
-          'gemini-2.5-flash',      // Latest stable flash model (most common)
-          'gemini-2.5-pro',        // Latest stable pro model
-          'gemini-2.0-flash',      // Alternative flash model
-          'gemini-2.0-flash-001',  // Stable version
-          'gemini-1.5-flash',      // Fallback to older models
-          'gemini-1.5-pro',        // Fallback to older models
-          'gemini-pro',            // Legacy fallback
+          'gemini-2.5-flash', // Latest stable flash model (most common)
+          'gemini-2.5-pro', // Latest stable pro model
+          'gemini-2.0-flash', // Alternative flash model
+          'gemini-2.0-flash-001', // Stable version
+          'gemini-1.5-flash', // Fallback to older models
+          'gemini-1.5-pro', // Fallback to older models
+          'gemini-pro', // Legacy fallback
         ];
-        
+
         for (const modelName of modelsToTry) {
           try {
             // Clean model name (remove 'models/' prefix if present)
@@ -117,7 +117,7 @@ class GeminiService {
           } catch (modelError) {
             // If it's an auth error, the key is invalid - don't try other models
             if (modelError.message.includes('401') || modelError.message.includes('403') || modelError.message.includes('API key') || modelError.message.includes('authentication')) {
-              logger.error(`API key authentication failed:`, modelError.message);
+              logger.error('API key authentication failed:', modelError.message);
               throw modelError;
             }
             logger.warn(`Failed to initialize ${modelName}:`, modelError.message);
@@ -128,20 +128,20 @@ class GeminiService {
       }
 
       if (!model) {
-        const apiKeyPreview = process.env.GEMINI_API_KEY 
-          ? `${process.env.GEMINI_API_KEY.trim().substring(0, 10)}...` 
+        const apiKeyPreview = process.env.GEMINI_API_KEY
+          ? `${process.env.GEMINI_API_KEY.trim().substring(0, 10)}...`
           : 'NOT SET';
-        
+
         throw new Error(
-          `Unable to initialize any Gemini model. All models returned 404 (not found). ` +
-          `API Key: ${apiKeyPreview}. ` +
-          `This usually means: 1) The API key doesn't have access to these models, ` +
-          `2) The API key might be restricted, or 3) You need to enable the Generative AI API. ` +
-          `SOLUTION: 1) Get a NEW API key from https://makersuite.google.com/app/apikey (make sure it's from AI Studio, not Google Cloud), ` +
-          `2) Make sure the key has access to Gemini models, ` +
-          `3) Add to Server/.env as GEMINI_API_KEY=your_key, ` +
-          `4) Restart server. ` +
-          `If using Google Cloud Console, enable API at: https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com`
+          'Unable to initialize any Gemini model. All models returned 404 (not found). '
+          + `API Key: ${apiKeyPreview}. `
+          + 'This usually means: 1) The API key doesn\'t have access to these models, '
+          + '2) The API key might be restricted, or 3) You need to enable the Generative AI API. '
+          + 'SOLUTION: 1) Get a NEW API key from https://makersuite.google.com/app/apikey (make sure it\'s from AI Studio, not Google Cloud), '
+          + '2) Make sure the key has access to Gemini models, '
+          + '3) Add to Server/.env as GEMINI_API_KEY=your_key, '
+          + '4) Restart server. '
+          + 'If using Google Cloud Console, enable API at: https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com',
         );
       }
 
@@ -169,39 +169,39 @@ class GeminiService {
       return text;
     } catch (error) {
       logger.error('Error generating content with Gemini AI:', error);
-      
+
       // Provide helpful error message
       let errorMessage = error.message || 'Unknown error';
-      
+
       if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-        errorMessage = 'Gemini model not found. ' +
-          'SOLUTION: 1) Get a NEW API key from https://makersuite.google.com/app/apikey (AI Studio keys work immediately), ' +
-          '2) Add to Server/.env: GEMINI_API_KEY=your_key, 3) Restart server. ' +
-          'For Google Cloud keys, enable API at https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com';
+        errorMessage = 'Gemini model not found. '
+          + 'SOLUTION: 1) Get a NEW API key from https://makersuite.google.com/app/apikey (AI Studio keys work immediately), '
+          + '2) Add to Server/.env: GEMINI_API_KEY=your_key, 3) Restart server. '
+          + 'For Google Cloud keys, enable API at https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com';
       } else if (errorMessage.includes('API key') || errorMessage.includes('authentication') || errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('Invalid') || errorMessage.includes('expired')) {
-        const apiKeyPreview = process.env.GEMINI_API_KEY 
-          ? `${process.env.GEMINI_API_KEY.trim().substring(0, 10)}...` 
+        const apiKeyPreview = process.env.GEMINI_API_KEY
+          ? `${process.env.GEMINI_API_KEY.trim().substring(0, 10)}...`
           : 'NOT SET';
         const keyLength = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim().length : 0;
-        
-        errorMessage = 'Invalid or expired API key. ' +
-          'SOLUTION: 1) Get a NEW key from https://makersuite.google.com/app/apikey (AI Studio keys work immediately), ' +
-          '2) Copy the COMPLETE key (starts with AIza..., usually 39+ characters), ' +
-          '3) Replace in Server/.env: GEMINI_API_KEY=your_new_complete_key (no spaces/quotes), ' +
-          '4) Restart server completely. ' +
-          `Current key preview: ${apiKeyPreview} (length: ${keyLength} chars). ` +
-          'If key is shorter than 35 chars, it may be incomplete.';
+
+        errorMessage = 'Invalid or expired API key. '
+          + 'SOLUTION: 1) Get a NEW key from https://makersuite.google.com/app/apikey (AI Studio keys work immediately), '
+          + '2) Copy the COMPLETE key (starts with AIza..., usually 39+ characters), '
+          + '3) Replace in Server/.env: GEMINI_API_KEY=your_new_complete_key (no spaces/quotes), '
+          + '4) Restart server completely. '
+          + `Current key preview: ${apiKeyPreview} (length: ${keyLength} chars). `
+          + 'If key is shorter than 35 chars, it may be incomplete.';
       } else if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
         errorMessage = 'API quota exceeded or rate limited. Please check your Gemini API usage limits or wait a few minutes.';
       } else if (errorMessage.includes('400')) {
         errorMessage = 'Bad request to Gemini API. Please check your API key format and try a new key from https://makersuite.google.com/app/apikey';
       }
-      
+
       logger.error('Gemini AI error details:', {
         message: error.message,
         stack: error.stack,
       });
-      
+
       throw new Error(`Failed to generate content: ${errorMessage}`);
     }
   }
@@ -268,11 +268,11 @@ Make the content engaging, informative, and suitable for a travel agency website
     try {
       // Try to extract JSON from the response
       const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      
+
       if (jsonMatch) {
         const jsonStr = jsonMatch[0];
         const parsed = JSON.parse(jsonStr);
-        
+
         // Validate and clean the parsed data
         return {
           description: parsed.description || `Experience the amazing ${packageTitle}. This carefully crafted package offers unforgettable memories and unique experiences.`,
@@ -284,10 +284,9 @@ Make the content engaging, informative, and suitable for a travel agency website
           bestTimeToVisit: parsed.bestTimeToVisit || 'Year-round destination with pleasant weather.',
           whatToExpect: parsed.whatToExpect || 'An amazing travel experience with professional guidance and memorable moments.',
         };
-      } else {
-        // Fallback: parse as plain text
-        return this.parsePlainTextResponse(rawContent, packageTitle);
       }
+      // Fallback: parse as plain text
+      return this.parsePlainTextResponse(rawContent, packageTitle);
     } catch (error) {
       logger.warn('Failed to parse JSON response, using fallback:', error);
       return this.parsePlainTextResponse(rawContent, packageTitle);
@@ -298,11 +297,11 @@ Make the content engaging, informative, and suitable for a travel agency website
    * Fallback parser for plain text responses
    */
   parsePlainTextResponse(rawContent, packageTitle) {
-    const lines = rawContent.split('\n').filter(line => line.trim());
-    
+    const lines = rawContent.split('\n').filter((line) => line.trim());
+
     return {
       description: rawContent.substring(0, 500) || `Experience the amazing ${packageTitle}.`,
-      highlights: lines.slice(0, 5).filter(line => line.length > 10),
+      highlights: lines.slice(0, 5).filter((line) => line.length > 10),
       itineraryOverview: 'A well-planned itinerary covering the best attractions.',
       inclusions: ['Accommodation', 'Transportation', 'Meals', 'Guide Services'],
       exclusions: ['International flights', 'Personal expenses', 'Travel insurance'],
@@ -315,4 +314,3 @@ Make the content engaging, informative, and suitable for a travel agency website
 
 // Export singleton instance
 export default new GeminiService();
-

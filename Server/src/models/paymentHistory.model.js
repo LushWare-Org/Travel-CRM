@@ -124,4 +124,3 @@ paymentHistorySchema.index({ status: 1 });
 const PaymentHistory = mongoose.model('PaymentHistory', paymentHistorySchema);
 
 export default PaymentHistory;
-

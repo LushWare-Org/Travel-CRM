@@ -79,7 +79,7 @@ export const getAllVendors = asyncHandler(async (req, res, next) => {
     // Build select object for field limiting
     let selectFields = '-__v -password'; // Exclude sensitive fields by default
     if (req.query.fields) {
-      const fields = req.query.fields.split(',').map(f => f.trim());
+      const fields = req.query.fields.split(',').map((f) => f.trim());
       selectFields = fields.join(' ');
     }
 
@@ -197,7 +197,7 @@ export const createVendor = asyncHandler(async (req, res, next) => {
     if (businessRegistrationNumber) {
       const existingBusiness = await User.findOne({
         businessRegistrationNumber,
-        role: 'vendor'
+        role: 'vendor',
       });
       if (existingBusiness) {
         return next(new AppError('Business registration number already exists', 400));
@@ -217,7 +217,7 @@ export const createVendor = asyncHandler(async (req, res, next) => {
     const newVendor = await User.create({
       name: name.trim(),
       email: email.toLowerCase(),
-      phone: phone, // Store E.164 format (e.g., +94768952480)
+      phone, // Store E.164 format (e.g., +94768952480)
       phoneCountry: phoneCountry || 'US', // Store country code (e.g., 'LK')
       password: tempPassword,
       role: 'vendor',
@@ -288,7 +288,7 @@ export const createVendor = asyncHandler(async (req, res, next) => {
     // Handle MongoDB validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors)
-        .map(err => err.message)
+        .map((err) => err.message)
         .join(', ');
       return next(new AppError(`Validation error: ${messages}`, 400));
     }
@@ -326,7 +326,7 @@ export const updateVendor = asyncHandler(async (req, res, next) => {
 
   try {
     // Check if vendor exists
-    let vendor = await User.findById(id).where('role').equals('vendor');
+    const vendor = await User.findById(id).where('role').equals('vendor');
 
     if (!vendor) {
       return next(new AppError('Vendor not found', 404));

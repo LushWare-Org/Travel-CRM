@@ -67,8 +67,8 @@ export const getAllSalesReps = asyncHandler(async (req, res, next) => {
     // Build select object for field limiting
     let selectFields;
     if (req.query.fields) {
-      const fields = req.query.fields.split(',').map(f => f.trim());
-      selectFields = fields.join(' ') + ' lastLogin'; // Include lastLogin with custom fields
+      const fields = req.query.fields.split(',').map((f) => f.trim());
+      selectFields = `${fields.join(' ')} lastLogin`; // Include lastLogin with custom fields
     } else {
       // Use inclusion fields instead of exclusion to include lastLogin
       selectFields = 'name email phone phoneCountry role isActive isEmailVerified commissionRate targetLeads createdAt lastLogin';
@@ -182,7 +182,9 @@ export const getSalesRepById = asyncHandler(async (req, res, next) => {
  * @body    { name, email, phone, commissionRate }
  */
 export const createSalesRep = asyncHandler(async (req, res, next) => {
-  const { name, email, phone, commissionRate = 10 } = req.body;
+  const {
+    name, email, phone, commissionRate = 10,
+  } = req.body;
 
   try {
     // Check if user already exists
@@ -204,7 +206,7 @@ export const createSalesRep = asyncHandler(async (req, res, next) => {
     const newSalesRep = await User.create({
       name: name.trim(),
       email: email.toLowerCase(),
-      phone: phone,
+      phone,
       phoneCountry: req.body.phoneCountry || 'US',
       password: tempPassword,
       role: 'salesRep',
@@ -256,7 +258,7 @@ export const createSalesRep = asyncHandler(async (req, res, next) => {
     // Handle MongoDB validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors)
-        .map(err => err.message)
+        .map((err) => err.message)
         .join(', ');
       return next(new AppError(`Validation error: ${messages}`, 400));
     }
@@ -273,7 +275,9 @@ export const createSalesRep = asyncHandler(async (req, res, next) => {
  */
 export const updateSalesRep = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  const { name, email, phone, commissionRate } = req.body;
+  const {
+    name, email, phone, commissionRate,
+  } = req.body;
 
   // Validate ID format
   if (!id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -282,7 +286,7 @@ export const updateSalesRep = asyncHandler(async (req, res, next) => {
 
   try {
     // Check if sales rep exists
-    let salesRep = await User.findById(id).where('role').equals('salesRep');
+    const salesRep = await User.findById(id).where('role').equals('salesRep');
 
     if (!salesRep) {
       return next(new AppError('Sales representative not found', 404));

@@ -37,13 +37,27 @@ const CATEGORY_LABELS = {
 const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS);
 
 const PRICE_BUCKETS = [
-  { key: 'Below ₹50K', label: 'Below ₹50K', min: 0, max: 50000 },
-  { key: '₹50K-₹2L', label: '₹50K-₹2L', min: 50000, max: 200000 },
-  { key: '₹2L-₹5L', label: '₹2L-₹5L', min: 200000, max: 500000 },
-  { key: '₹5L-₹10L', label: '₹5L-₹10L', min: 500000, max: 1000000 },
-  { key: '₹10L-₹25L', label: '₹10L-₹25L', min: 1000000, max: 2500000 },
-  { key: '₹25L+', label: '₹25L+', min: 2500000, max: Number.MAX_SAFE_INTEGER },
-  { key: 'Unspecified', label: 'Unspecified', min: null, max: null },
+  {
+    key: 'Below ₹50K', label: 'Below ₹50K', min: 0, max: 50000,
+  },
+  {
+    key: '₹50K-₹2L', label: '₹50K-₹2L', min: 50000, max: 200000,
+  },
+  {
+    key: '₹2L-₹5L', label: '₹2L-₹5L', min: 200000, max: 500000,
+  },
+  {
+    key: '₹5L-₹10L', label: '₹5L-₹10L', min: 500000, max: 1000000,
+  },
+  {
+    key: '₹10L-₹25L', label: '₹10L-₹25L', min: 1000000, max: 2500000,
+  },
+  {
+    key: '₹25L+', label: '₹25L+', min: 2500000, max: Number.MAX_SAFE_INTEGER,
+  },
+  {
+    key: 'Unspecified', label: 'Unspecified', min: null, max: null,
+  },
 ];
 
 const PAYMENT_STATUS_LABELS = {
@@ -218,7 +232,11 @@ export const getLeadAnalyticsOverview = asyncHandler(async (req, res) => {
         }, {}),
       },
     },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    {
+      $sort: {
+        '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1,
+      },
+    },
   ]);
 
   const trendMap = new Map();
@@ -670,7 +688,11 @@ export const getBillingAnalyticsOverview = asyncHandler(async (req, res) => {
         invoices: { $sum: 1 },
       },
     },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    {
+      $sort: {
+        '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1,
+      },
+    },
   ]);
 
   const revenueMap = new Map();
@@ -761,8 +783,8 @@ export const getBillingAnalyticsOverview = asyncHandler(async (req, res) => {
     .map((entry) => ({
       category: entry.category || 'other',
       name:
-        INVOICE_CATEGORY_LABELS[entry.category] ||
-        entry.category
+        INVOICE_CATEGORY_LABELS[entry.category]
+        || entry.category
           .split(' ')
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
           .join(' '),
@@ -845,7 +867,7 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
 export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
   const User = (await import('../models/user.model.js')).default;
   const Booking = (await import('../models/booking.model.js')).default;
-  
+
   const timeRange = clampTimeRange(req.query.timeRange);
   const buckets = buildTimeBuckets(timeRange);
   const startDate = buckets[0]?.start ? new Date(buckets[0].start) : new Date(0);
@@ -880,7 +902,11 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
           },
         },
       },
-      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+      {
+        $sort: {
+          '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1,
+        },
+      },
     ]);
 
     // Build trend data map
@@ -967,23 +993,23 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
     // Registered Users = Email verified users (actively engaged)
     // Converted Users = Users with bookings (made a purchase/booking)
     const userStatusDistribution = [
-      { 
-        name: 'Website Users', 
+      {
+        name: 'Website Users',
         value: totalUsers,
         description: 'All registered users in the system',
-        color: '#3b82f6'
+        color: '#3b82f6',
       },
-      { 
-        name: 'Registered Users', 
+      {
+        name: 'Registered Users',
         value: verifiedUsers,
         description: 'Users with verified email',
-        color: '#10b981'
+        color: '#10b981',
       },
-      { 
-        name: 'Converted Users', 
+      {
+        name: 'Converted Users',
         value: usersWithBookings,
         description: 'Users with bookings',
-        color: '#f59e0b'
+        color: '#f59e0b',
       },
     ];
 
@@ -1067,7 +1093,11 @@ export const getSalesRepPersonalPerformance = asyncHandler(async (req, res) => {
           },
         },
       },
-      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+      {
+        $sort: {
+          '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1,
+        },
+      },
     ]);
 
     // Map trend data to time buckets
@@ -1128,7 +1158,7 @@ export const getSalesRepPersonalPerformance = asyncHandler(async (req, res) => {
 
     const totalAssignedLeads = statsData.totalAssignedLeads || 0;
     const totalConvertedLeads = statsData.totalConvertedLeads || 0;
-    const conversionRate = totalAssignedLeads > 0 
+    const conversionRate = totalAssignedLeads > 0
       ? parseFloat(((totalConvertedLeads / totalAssignedLeads) * 100).toFixed(2))
       : 0;
 
@@ -1200,7 +1230,11 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
         },
       },
     },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    {
+      $sort: {
+        '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1,
+      },
+    },
   ]);
 
   // Get booking data (actual conversions)
@@ -1212,7 +1246,11 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
         bookings: { $sum: 1 },
       },
     },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1 } },
+    {
+      $sort: {
+        '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.isoWeek': 1,
+      },
+    },
   ]);
 
   // Create trend maps
@@ -1430,9 +1468,9 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
 
   const stats = {
     totalSearches: totalLeads,
-    totalBookings: totalBookings,
+    totalBookings,
     uniqueDestinations: uniqueDestinations.filter((d) => d !== null && d !== undefined).length,
-    uniqueActivities: uniqueActivities,
+    uniqueActivities,
     conversionRate:
       totalLeads > 0
         ? parseFloat(((convertedLeads / totalLeads) * 100).toFixed(2))
@@ -1453,5 +1491,3 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
     },
   });
 });
-
-

@@ -188,7 +188,7 @@ manualItinerarySchema.pre('save', function calculateMetadata(next) {
       if (day.transport === '' || day.transport === null) {
         day.transport = undefined;
       }
-      
+
       totalActivities += day.activities?.length || 0;
       totalLocations += day.locations?.length || 0;
       totalPlaces += day.places?.length || 0;
@@ -241,4 +241,3 @@ manualItinerarySchema.virtual('completionPercentage').get(function getCompletion
 });
 
 export default mongoose.model('ManualItinerary', manualItinerarySchema);
-

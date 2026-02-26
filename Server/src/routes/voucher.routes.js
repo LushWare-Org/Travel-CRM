@@ -35,6 +35,3 @@ router.post('/:id/viewed', voucherController.markVoucherViewed);
 router.post('/:id/confirm', protect, voucherController.confirmVoucher);
 
 export default router;
-
-
-

@@ -26,39 +26,39 @@ const loadLogo = () => {
 
 // Modern Color Scheme - Teal/Slate Theme (matching billingPDFGenerator.js)
 const PALETTE = {
-  background: [248, 250, 252],      // Light background
+  background: [248, 250, 252], // Light background
   secondaryBackground: [226, 232, 240], // Border color
-  primaryText: [15, 23, 42],        // Near black
-  secondaryText: [100, 116, 139],   // Gray text
-  mutedText: [148, 163, 184],       // Light gray
-  accent: [15, 118, 110],           // Deep teal (primary)
-  accentLight: [20, 184, 166],      // Light teal
-  accentDark: [19, 78, 74],         // Dark teal
-  gold: [245, 158, 11],             // Amber gold
-  badgeBg: [245, 158, 11],          // Amber gold for badges
-  badgeText: [255, 255, 255],       // White
-  cardBg: [240, 253, 250],          // Light teal bg
-  cardBorder: [20, 184, 166],       // Teal border
-  pillBg: [226, 232, 240],          // Light gray
-  headerBg: [30, 41, 59],           // Dark slate
+  primaryText: [15, 23, 42], // Near black
+  secondaryText: [100, 116, 139], // Gray text
+  mutedText: [148, 163, 184], // Light gray
+  accent: [15, 118, 110], // Deep teal (primary)
+  accentLight: [20, 184, 166], // Light teal
+  accentDark: [19, 78, 74], // Dark teal
+  gold: [245, 158, 11], // Amber gold
+  badgeBg: [245, 158, 11], // Amber gold for badges
+  badgeText: [255, 255, 255], // White
+  cardBg: [240, 253, 250], // Light teal bg
+  cardBorder: [20, 184, 166], // Teal border
+  pillBg: [226, 232, 240], // Light gray
+  headerBg: [30, 41, 59], // Dark slate
 };
 
 // Convert RGB array to hex for PDFKit
 const rgbToHex = (rgb) => {
   const [r, g, b] = rgb;
-  return `#${[r, g, b].map(x => {
+  return `#${[r, g, b].map((x) => {
     const hex = x.toString(16);
-    return hex.length === 1 ? '0' + hex : hex;
+    return hex.length === 1 ? `0${hex}` : hex;
   }).join('')}`;
 };
 
 const COLORS = {
-  primary: '#0F766E',               // Deep teal
-  primaryDark: '#134E4A',           // Dark teal
-  primaryLight: '#14B8A6',          // Light teal
-  accent: '#F59E0B',                // Amber gold
-  accentLight: '#FEF3C7',           // Light amber
-  slate: '#1E293B',                 // Dark slate
+  primary: '#0F766E', // Deep teal
+  primaryDark: '#134E4A', // Dark teal
+  primaryLight: '#14B8A6', // Light teal
+  accent: '#F59E0B', // Amber gold
+  accentLight: '#FEF3C7', // Light amber
+  slate: '#1E293B', // Dark slate
   white: '#FFFFFF',
   gray100: '#F8FAFC',
   gray200: '#E2E8F0',
@@ -477,7 +477,7 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         .fillColor(COLORS.white)
         .fontSize(8)
         .font('Helvetica-Bold')
-        .text('#', colX, tableTop + 10)
+        .text('#', colX, tableTop + 10);
       colX += colWidths.number;
 
       doc.text('DATE', colX, tableTop + 10);
@@ -496,7 +496,6 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
       colX += colWidths.type;
 
       doc.text('STATUS', colX, tableTop + 10);
-
 
       let rowY = tableTop + 28;
       const pageHeight = 842;
@@ -588,7 +587,7 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
         colX += colWidths.date;
 
         // Truncate customer name if too long
-        const customerText = customerName.length > 18 ? customerName.substring(0, 15) + '...' : customerName;
+        const customerText = customerName.length > 18 ? `${customerName.substring(0, 15)}...` : customerName;
         doc.text(customerText, colX, rowY + 12, { width: colWidths.customer - 5 });
         colX += colWidths.customer;
 
@@ -652,4 +651,3 @@ export function generatePaymentHistoryListPDF(paymentHistoryList, dateRange = {}
     }
   });
 }
-

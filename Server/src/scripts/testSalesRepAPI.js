@@ -21,9 +21,9 @@ const testAPI = async () => {
 
     // Build filter object (same as controller)
     const filter = { role: 'salesRep' };
-    
+
     console.log('📋 Filter being used:', JSON.stringify(filter, null, 2));
-    
+
     // Query database
     const salesReps = await User.find(filter)
       .sort('-createdAt')
@@ -32,7 +32,7 @@ const testAPI = async () => {
       .lean();
 
     console.log(`\n📊 Results: Found ${salesReps.length} sales reps`);
-    
+
     if (salesReps.length > 0) {
       console.log('\n📝 Sales Reps Data:');
       salesReps.forEach((rep, index) => {
@@ -45,15 +45,15 @@ const testAPI = async () => {
       });
     } else {
       console.log('\n⚠️  No sales reps found with the filter!');
-      
+
       // Check if there are ANY users with role salesRep
       const totalSalesReps = await User.countDocuments({ role: 'salesRep' });
       console.log(`\n🔍 Total users with role 'salesRep': ${totalSalesReps}`);
-      
+
       // Check all roles
       const allUsers = await User.find({}).select('name email role').lean();
       console.log(`\n📋 All users in database (${allUsers.length} total):`);
-      allUsers.forEach(user => {
+      allUsers.forEach((user) => {
         console.log(`   - ${user.name} (${user.email}) - Role: ${user.role}`);
       });
     }

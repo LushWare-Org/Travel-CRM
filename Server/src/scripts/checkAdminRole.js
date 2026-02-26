@@ -31,7 +31,7 @@ const checkAdminRole = async () => {
     console.log('═══════════════════════════════════════════\n');
 
     if (admin.role !== 'admin') {
-      console.log('⚠️  WARNING: User role is "' + admin.role + '" but should be "admin"');
+      console.log(`⚠️  WARNING: User role is "${admin.role}" but should be "admin"`);
       console.log('   Fixing role...\n');
       admin.role = 'admin';
       await admin.save();
@@ -46,4 +46,3 @@ const checkAdminRole = async () => {
 };
 
 checkAdminRole();
-

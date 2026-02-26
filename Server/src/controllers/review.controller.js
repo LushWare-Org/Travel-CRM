@@ -4,7 +4,9 @@ import Package from '../models/package.model.js';
 
 export const createReview = asyncHandler(async (req, res) => {
   const { id: packageId } = req.params;
-  const { name, email, rating, comment } = req.body;
+  const {
+    name, email, rating, comment,
+  } = req.body;
 
   // Validate required fields
   if (!name || !rating || !comment) {
@@ -44,9 +46,9 @@ export const createReview = asyncHandler(async (req, res) => {
       rating: parseFloat(avgRating),
       numReviews: allReviews.length,
     },
-    { runValidators: false }
+    { runValidators: false },
   );
-  
+
   await review.populate('author', 'name');
 
   res.status(201).json({
@@ -177,7 +179,7 @@ export const updateReview = asyncHandler(async (req, res) => {
       rating: parseFloat(avgRating),
       numReviews: allReviews.length,
     },
-    { runValidators: false }
+    { runValidators: false },
   );
 
   res.status(200).json({
@@ -215,7 +217,7 @@ export const deleteReview = asyncHandler(async (req, res) => {
       rating: parseFloat(avgRating),
       numReviews: allReviews.length,
     },
-    { runValidators: false }
+    { runValidators: false },
   );
 
   res.status(200).json({

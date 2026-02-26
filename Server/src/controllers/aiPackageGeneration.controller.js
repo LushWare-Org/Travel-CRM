@@ -8,7 +8,9 @@ import aiPackageGenerationService from '../services/aiPackageGeneration.service.
  * @access  Private
  */
 export const generateAIPackage = asyncHandler(async (req, res) => {
-  const { destination, packageType, category, nights, description } = req.body;
+  const {
+    destination, packageType, category, nights, description,
+  } = req.body;
 
   // Validate required fields
   if (!destination) {
@@ -25,7 +27,7 @@ export const generateAIPackage = asyncHandler(async (req, res) => {
       description,
       packageType,
       category,
-      parseInt(nights, 10)
+      parseInt(nights, 10),
     );
 
     res.status(200).json({
@@ -36,8 +38,7 @@ export const generateAIPackage = asyncHandler(async (req, res) => {
     console.error('Error in generateAIPackage controller:', error);
     throw new AppError(
       error.message || 'Failed to generate AI package',
-      500
+      500,
     );
   }
 });
-

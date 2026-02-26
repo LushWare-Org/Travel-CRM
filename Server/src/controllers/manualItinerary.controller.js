@@ -11,21 +11,21 @@ import logger from '../config/logger.js';
 
 const normalizePhone = (phone) => {
   if (!phone) return undefined;
-  
+
   // Trim and check if empty
   const cleaned = phone.trim();
   if (!cleaned) return undefined;
-  
+
   // PhoneInput from react-phone-number-input returns E.164 format (e.g., +94771234567)
   // Keep it as is if it starts with + (international format)
   if (cleaned.startsWith('+')) {
     return cleaned;
   }
-  
+
   // If it's a valid phone number format, return it
   // Extract digits to check length
   const digits = cleaned.replace(/\D/g, '');
-  
+
   // Accept phone numbers with at least 7 digits (minimum valid phone number)
   if (digits.length >= 7) {
     // If it has country code (more than 10 digits), add + prefix
@@ -36,7 +36,7 @@ const normalizePhone = (phone) => {
     // For 7-9 digit numbers, return as is (might be partial or local)
     return cleaned;
   }
-  
+
   // Return the original cleaned value if it has content
   return cleaned.length > 0 ? cleaned : undefined;
 };
@@ -57,21 +57,21 @@ export const createOrUpdateManualItinerary = asyncHandler(async (req, res, next)
 
   // Clean up days data: convert empty strings to undefined for enum fields
   if (days && Array.isArray(days)) {
-    days = days.map(day => {
+    days = days.map((day) => {
       const cleanedDay = { ...day };
-      
+
       // Convert empty strings to undefined for transport
       if (cleanedDay.transport === '' || cleanedDay.transport === null) {
         delete cleanedDay.transport;
       }
-      
+
       // Convert empty strings to undefined for accommodation.type
       if (cleanedDay.accommodation) {
         if (cleanedDay.accommodation.type === '' || cleanedDay.accommodation.type === null) {
           delete cleanedDay.accommodation.type;
         }
         // If accommodation object is empty after cleaning, remove it
-        const accommodationKeys = Object.keys(cleanedDay.accommodation).filter(key => {
+        const accommodationKeys = Object.keys(cleanedDay.accommodation).filter((key) => {
           const value = cleanedDay.accommodation[key];
           return value !== undefined && value !== null && value !== '';
         });
@@ -79,7 +79,7 @@ export const createOrUpdateManualItinerary = asyncHandler(async (req, res, next)
           delete cleanedDay.accommodation;
         }
       }
-      
+
       return cleanedDay;
     });
   }
@@ -334,12 +334,12 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
               places: day.places || [],
               notes: day.notes || '',
             };
-            
+
             // Only include transport if it has a valid non-empty value
             if (day.transport && day.transport.trim() !== '') {
               dayData.transport = day.transport;
             }
-            
+
             return dayData;
           }),
           createdBy: user._id,
@@ -378,7 +378,7 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
           const salesRep = assignmentResult.salesRep || await User.findById(newLead.assignedTo).select('name email').lean();
           if (salesRep && salesRep.email) {
             logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${newLead._id} (from manual itinerary)`);
-            
+
             await emailService.sendLeadAssignmentEmail({
               salesRep,
               lead: newLead.toObject(),
@@ -391,7 +391,7 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
           }
         } catch (error) {
           logger.error(`Error sending lead assignment email: ${error.message}`);
-          logger.error(`Error stack:`, error.stack);
+          logger.error('Error stack:', error.stack);
         }
       });
     }
@@ -404,7 +404,6 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res, next) 
   }
 });
 
-
 export const getUserManualItineraries = asyncHandler(async (req, res, next) => {
   const userEmail = req.user?.email;
   if (!userEmail) {
@@ -412,7 +411,7 @@ export const getUserManualItineraries = asyncHandler(async (req, res, next) => {
   }
   // Find leads with user's email
   const leads = await Lead.find({ email: userEmail.toLowerCase() });
-  const leadIds = leads.map(l => l._id);
+  const leadIds = leads.map((l) => l._id);
   // Find manual itineraries linked to those leads
   const manualItineraries = await ManualItinerary.find({ lead: { $in: leadIds } })
     .populate('lead')

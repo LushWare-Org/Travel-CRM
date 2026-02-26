@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import Lead from '../models/lead.model.js';
@@ -6,8 +7,7 @@ import Settings from '../models/settings.model.js';
 import User from '../models/user.model.js';
 import { assignSalesRepIfNeeded } from '../services/assignment.service.js';
 import Itinerary from '../models/itinerary.model.js';
-import mongoose from 'mongoose';
-import { generateItineraryPDF, generateLeadItineraryPDF } from '../utils/pdfGenerator.js';
+import { generateLeadItineraryPDF } from '../utils/pdfGenerator.js';
 import emailService from '../utils/emailService.js';
 import logger from '../config/logger.js';
 import aiTriggerService from '../services/ai/aiTrigger.service.js';
@@ -134,14 +134,14 @@ export const createLead = asyncHandler(async (req, res, next) => {
           })
           .catch((err) => {
             logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
-            logger.error(`Email error details:`, err);
+            logger.error('Email error details:', err);
           });
       } else {
         logger.warn(`⚠️  Cannot send assignment email: sales rep ${lead.assignedTo} has no email address`);
       }
     } catch (error) {
       logger.error(`Error preparing lead assignment email: ${error.message}`);
-      logger.error(`Error stack:`, error.stack);
+      logger.error('Error stack:', error.stack);
       // Don't block the response if email fails
     }
   }
@@ -235,10 +235,9 @@ export const getLead = asyncHandler(async (req, res, next) => {
 
   // Check permissions - sales rep can only access leads assigned to them
   // Admins/SuperAdmins with manage_leads permission can access any lead
-  const canManageLeads =
-    req.user.role === 'superAdmin' ||
-    req.user.role === 'admin' ||
-    (req.user.permissions && req.user.permissions.includes('manage_leads'));
+  const canManageLeads = req.user.role === 'superAdmin'
+    || req.user.role === 'admin'
+    || (req.user.permissions && req.user.permissions.includes('manage_leads'));
 
   if (!canManageLeads && req.user.role === 'salesRep' && lead.assignedTo?.toString() !== req.user._id.toString()) {
     throw new AppError('Not authorized to access this lead', 403);
@@ -259,6 +258,7 @@ export const updateLead = asyncHandler(async (req, res, next) => {
   if (!lead) {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
   }
+  const previousStatus = lead.status;
 
   // If user is a sales rep, prevent them from changing assignedTo
   if (req.user.role === 'salesRep' && req.body.assignedTo !== undefined) {
@@ -353,10 +353,9 @@ export const updateLead = asyncHandler(async (req, res, next) => {
   // 2. Admin with manage_leads permission
   // 3. Regular admin role
   // 4. Sales rep assigned to the lead
-  const canManageLeads =
-    req.user.role === 'superAdmin' ||
-    req.user.role === 'admin' ||
-    (req.user.permissions && req.user.permissions.includes('manage_leads'));
+  const canManageLeads = req.user.role === 'superAdmin'
+    || req.user.role === 'admin'
+    || (req.user.permissions && req.user.permissions.includes('manage_leads'));
 
   if (!canManageLeads && lead.assignedTo?.toString() !== req.user._id.toString()) {
     throw new AppError('Not authorized to update this lead', 403);
@@ -418,9 +417,9 @@ export const updateLead = asyncHandler(async (req, res, next) => {
           })
           .catch((err) => {
             logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
-            logger.error(`Email error details:`, err);
+            logger.error('Email error details:', err);
             if (err.stack) {
-              logger.error(`Error stack:`, err.stack);
+              logger.error('Error stack:', err.stack);
             }
           });
       } else {
@@ -428,15 +427,13 @@ export const updateLead = asyncHandler(async (req, res, next) => {
       }
     } catch (error) {
       logger.error(`Error preparing lead assignment email: ${error.message}`);
-      logger.error(`Error stack:`, error.stack);
+      logger.error('Error stack:', error.stack);
       // Don't block the response if email fails
     }
-  } else {
-    if (!newAssignedTo) {
-      logger.info(`ℹ️  Email not sent: No assignedTo in update request`);
-    } else if (newAssignedTo === previousAssignedTo) {
-      logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
-    }
+  } else if (!newAssignedTo) {
+    logger.info('ℹ️  Email not sent: No assignedTo in update request');
+  } else if (newAssignedTo === previousAssignedTo) {
+    logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
   }
 
   aiTriggerService.publishLeadUpdated(lead).catch((error) => {
@@ -507,7 +504,7 @@ export const getLeadRemarks = asyncHandler(async (req, res, next) => {
     throw new AppError(`Lead not found with id of ${req.params.id}`, 404);
   }
 
-  let remarks = lead.remarks;
+  let { remarks } = lead;
 
   // Get last 3 remarks if limit is not specified
   if (!req.query.all && remarks.length > 3) {
@@ -574,26 +571,24 @@ export const assignLead = asyncHandler(async (req, res, next) => {
             })
             .catch((err) => {
               logger.error(`❌ Failed to send lead assignment email to ${rep.email}: ${err.message}`);
-              logger.error(`Email error details:`, err);
+              logger.error('Email error details:', err);
               if (err.stack) {
-                logger.error(`Error stack:`, err.stack);
+                logger.error('Error stack:', err.stack);
               }
             });
         } catch (error) {
           logger.error(`Error preparing lead assignment email: ${error.message}`);
-          logger.error(`Error stack:`, error.stack);
+          logger.error('Error stack:', error.stack);
           // Don't block the response if email fails
         }
-      } else {
-        if (!newAssignedTo) {
-          logger.warn(`⚠️  Email not sent: No assignedTo provided in request`);
-        } else if (newAssignedTo === previousAssignedTo) {
-          logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
-        } else if (!rep) {
-          logger.warn(`⚠️  Email not sent: Sales rep ${newAssignedTo} not found`);
-        } else if (!rep.email) {
-          logger.warn(`⚠️  Email not sent: Sales rep ${rep.name} (${newAssignedTo}) has no email address`);
-        }
+      } else if (!newAssignedTo) {
+        logger.warn('⚠️  Email not sent: No assignedTo provided in request');
+      } else if (newAssignedTo === previousAssignedTo) {
+        logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
+      } else if (!rep) {
+        logger.warn(`⚠️  Email not sent: Sales rep ${newAssignedTo} not found`);
+      } else if (!rep.email) {
+        logger.warn(`⚠️  Email not sent: Sales rep ${rep.name} (${newAssignedTo}) has no email address`);
       }
 
       res.status(200).json({
@@ -966,16 +961,6 @@ export const downloadLeadItineraryPDF = asyncHandler(async (req, res) => {
     throw new AppError('Itinerary not found', 404);
   }
 
-  // Minimal package meta for PDF header (since we may not have a package)
-  const packageMeta = {
-    name: lead.destination || 'Custom Itinerary',
-    duration: itinerary.days?.length || 0,
-    destination: (itinerary.days?.[0]?.locations?.[0]) || (lead.city || ''),
-    price: 0,
-    inclusions: [],
-    exclusions: [],
-  };
-
   const filePath = await generateLeadItineraryPDF(lead, itinerary);
   return res.download(filePath, (err) => {
     if (err) {
@@ -1003,4 +988,3 @@ export default {
   downloadLeadItineraryPDF,
   createWebsiteContactLead,
 };
-  const previousStatus = lead.status;

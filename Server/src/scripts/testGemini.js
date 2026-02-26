@@ -15,7 +15,7 @@ dotenv.config({ path: join(__dirname, '../../.env') });
 
 async function testGemini() {
   const apiKey = process.env.GEMINI_API_KEY;
-  
+
   if (!apiKey) {
     console.error('❌ GEMINI_API_KEY not found in .env file');
     process.exit(1);
@@ -26,7 +26,7 @@ async function testGemini() {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    
+
     // First, try to list available models
     console.log('Fetching available models...\n');
     try {
@@ -36,7 +36,7 @@ async function testGemini() {
         const data = await response.json();
         console.log('Available models:');
         if (data.models) {
-          data.models.forEach(model => {
+          data.models.forEach((model) => {
             console.log(`  - ${model.name}`);
           });
         }
@@ -45,7 +45,7 @@ async function testGemini() {
     } catch (listError) {
       console.log('Could not list models, trying direct test...\n');
     }
-    
+
     // Try different models with different API versions
     const modelsToTry = [
       { name: 'gemini-pro', apiVersion: 'v1' },
@@ -53,19 +53,19 @@ async function testGemini() {
       { name: 'gemini-1.5-flash', apiVersion: 'v1' },
       { name: 'models/gemini-1.5-flash', apiVersion: 'v1' },
     ];
-    
+
     for (const { name, apiVersion } of modelsToTry) {
       try {
         console.log(`Testing model: ${name} (${apiVersion})...`);
-        const model = genAI.getGenerativeModel({ 
+        const model = genAI.getGenerativeModel({
           model: name,
           // Try without specifying API version first
         });
-        
+
         const result = await model.generateContent('Say hello in one word');
         const response = await result.response;
         const text = response.text();
-        
+
         console.log(`✅ ${name} works! Response: ${text}\n`);
         console.log(`✅ Use model: ${name} in your service\n`);
         process.exit(0);
@@ -73,7 +73,7 @@ async function testGemini() {
         console.log(`❌ ${name} failed: ${error.message.substring(0, 100)}...\n`);
       }
     }
-    
+
     console.error('❌ All models failed.');
     console.error('\n💡 Possible solutions:');
     console.error('1. Check if your API key is valid');
@@ -89,4 +89,3 @@ async function testGemini() {
 }
 
 testGemini();
-

@@ -16,7 +16,7 @@ import { APIFeatures } from '../utils/apiFeatures.js';
 export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
   // Build base query - filter by lead assignedTo for sales reps
   let baseQuery = PaymentReceipt.find();
-  
+
   // If user is a sales rep, only show receipts for leads assigned to them
   if (req.user.role === 'salesRep') {
     const assignedLeadIds = await Lead.find({ assignedTo: req.user._id }).select('_id').lean();
@@ -54,7 +54,7 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
   }
 
   const receipts = await features.query;
-  
+
   // Get total count with same filter
   let countQuery = PaymentReceipt.find();
   if (req.user.role === 'salesRep') {
@@ -62,7 +62,7 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
     const leadIds = assignedLeadIds.map((lead) => lead._id);
     countQuery = countQuery.where('lead').in(leadIds);
   }
-  
+
   // Apply date range filter to count query
   if (req.query.startDate || req.query.endDate) {
     const dateFilter = {};
@@ -78,7 +78,7 @@ export const getAllPaymentReceipts = asyncHandler(async (req, res) => {
       countQuery = countQuery.find({ paymentDate: dateFilter });
     }
   }
-  
+
   const total = await countQuery.countDocuments();
 
   res.status(200).json({
@@ -214,7 +214,7 @@ export const updatePaymentReceipt = asyncHandler(async (req, res, next) => {
 
   // Prevent updating critical fields that affect payment tracking
   const restrictedFields = ['amount', 'invoice', 'lead', 'customer', 'paymentDate', 'paymentMethod', 'paymentType', 'currency', 'transactionId'];
-  const hasRestrictedFields = restrictedFields.some(field => req.body[field] !== undefined);
+  const hasRestrictedFields = restrictedFields.some((field) => req.body[field] !== undefined);
   if (hasRestrictedFields) {
     return next(new AppError('Cannot update payment amount, invoice, or other critical fields. Create a new receipt for additional payments.', 400));
   }
@@ -448,7 +448,7 @@ export const downloadPaymentReceiptPDF = asyncHandler(async (req, res, next) => 
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="receipt-${receipt.receiptNumber || receipt._id}.pdf"`);
-    
+
     const fileStream = fs.createReadStream(pdfPath);
     fileStream.pipe(res);
 
@@ -457,9 +457,7 @@ export const downloadPaymentReceiptPDF = asyncHandler(async (req, res, next) => 
       // fs.unlinkSync(pdfPath);
     });
 
-    fileStream.on('error', (error) => {
-      return next(new AppError('Error reading PDF file', 500));
-    });
+    fileStream.on('error', (error) => next(new AppError('Error reading PDF file', 500)));
   } catch (error) {
     return next(new AppError(`Error generating PDF: ${error.message}`, 500));
   }

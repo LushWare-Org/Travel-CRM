@@ -87,50 +87,46 @@ const hasPermission = (role, resource, action, userPermissions = []) => {
  * @param {string} resource - The resource being accessed (e.g., 'user', 'profile')
  * @param {string} action - The action being performed (e.g., 'create', 'read', 'update')
  */
-export const checkPermission = (resource, action) => {
-  return asyncHandler(async (req, res, next) => {
-    if (!req.user) {
-      throw new AppError('User not authenticated', 401);
-    }
+export const checkPermission = (resource, action) => asyncHandler(async (req, res, next) => {
+  if (!req.user) {
+    throw new AppError('User not authenticated', 401);
+  }
 
-    const hasAccess = hasPermission(req.user.role, resource, action, req.user.permissions);
+  const hasAccess = hasPermission(req.user.role, resource, action, req.user.permissions);
 
-    if (!hasAccess) {
-      logger.warn(`Unauthorized access attempt: User ${req.user.email} (${req.user.role}) tried to ${action} ${resource}`);
-      throw new AppError(
-        `User role '${req.user.role}' is not authorized to ${action} ${resource}`,
-        403,
-      );
-    }
+  if (!hasAccess) {
+    logger.warn(`Unauthorized access attempt: User ${req.user.email} (${req.user.role}) tried to ${action} ${resource}`);
+    throw new AppError(
+      `User role '${req.user.role}' is not authorized to ${action} ${resource}`,
+      403,
+    );
+  }
 
-    logger.debug(`Permission granted: User ${req.user.email} can ${action} ${resource}`);
-    next();
-  });
-};
+  logger.debug(`Permission granted: User ${req.user.email} can ${action} ${resource}`);
+  next();
+});
 
 /**
  * Restrict to specific roles
  * Usage: restrictToRoles('admin', 'salesRep')
  */
-export const restrictToRoles = (...allowedRoles) => {
-  return asyncHandler(async (req, res, next) => {
-    if (!req.user) {
-      throw new AppError('User not authenticated', 401);
-    }
+export const restrictToRoles = (...allowedRoles) => asyncHandler(async (req, res, next) => {
+  if (!req.user) {
+    throw new AppError('User not authenticated', 401);
+  }
 
-    if (!allowedRoles.includes(req.user.role)) {
-      logger.warn(
-        `Unauthorized role access attempt: User ${req.user.email} (${req.user.role}) attempted restricted route`,
-      );
-      throw new AppError(
-        `This route is only accessible by: ${allowedRoles.join(', ')}`,
-        403,
-      );
-    }
+  if (!allowedRoles.includes(req.user.role)) {
+    logger.warn(
+      `Unauthorized role access attempt: User ${req.user.email} (${req.user.role}) attempted restricted route`,
+    );
+    throw new AppError(
+      `This route is only accessible by: ${allowedRoles.join(', ')}`,
+      403,
+    );
+  }
 
-    next();
-  });
-};
+  next();
+});
 
 /**
  * Restrict to admin only
@@ -187,9 +183,7 @@ export const canAccessProfile = asyncHandler(async (req, res, next) => {
 /**
  * Get all permissions for a specific role
  */
-export const getRolePermissions = (role) => {
-  return RBAC_PERMISSIONS[role] || null;
-};
+export const getRolePermissions = (role) => RBAC_PERMISSIONS[role] || null;
 
 /**
  * Check if user can edit another user

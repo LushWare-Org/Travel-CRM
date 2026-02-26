@@ -3,10 +3,10 @@
  * Handles all image upload operations to Cloudinary
  */
 
-import cloudinary from '../config/cloudinary.js';
-import AppError from '../utils/appError.js';
 import fs from 'fs/promises';
 import path from 'path';
+import cloudinary from '../config/cloudinary.js';
+import AppError from '../utils/appError.js';
 
 /**
  * Upload a single image to Cloudinary
@@ -75,9 +75,7 @@ export const uploadImage = async (filePath, options = {}) => {
  */
 export const uploadMultipleImages = async (filePaths, options = {}) => {
   try {
-    const uploadPromises = filePaths.map((filePath) =>
-      uploadImage(filePath, options)
-    );
+    const uploadPromises = filePaths.map((filePath) => uploadImage(filePath, options));
     return await Promise.all(uploadPromises);
   } catch (error) {
     console.error('Multiple images upload error:', error);
@@ -121,7 +119,7 @@ export const uploadImageFromBuffer = async (buffer, options = {}) => {
               size: result.bytes,
             });
           }
-        }
+        },
       );
 
       uploadStream.end(buffer);
@@ -192,15 +190,13 @@ export const getOptimizedImageUrl = (publicId, options = {}) => {
  * @param {number} size - Thumbnail size (default: 200)
  * @returns {string} Thumbnail URL
  */
-export const getThumbnailUrl = (publicId, size = 200) => {
-  return cloudinary.url(publicId, {
-    width: size,
-    height: size,
-    crop: 'fill',
-    quality: 'auto',
-    fetch_format: 'auto',
-  });
-};
+export const getThumbnailUrl = (publicId, size = 200) => cloudinary.url(publicId, {
+  width: size,
+  height: size,
+  crop: 'fill',
+  quality: 'auto',
+  fetch_format: 'auto',
+});
 
 /**
  * Upload image with preset transformations
@@ -213,25 +209,33 @@ export const uploadWithPreset = async (filePath, preset = 'default') => {
     package: {
       folder: 'trip-sky-way/packages',
       transformation: [
-        { width: 1200, height: 800, crop: 'fill', quality: 'auto' },
+        {
+          width: 1200, height: 800, crop: 'fill', quality: 'auto',
+        },
       ],
     },
     itinerary: {
       folder: 'trip-sky-way/itineraries',
       transformation: [
-        { width: 1000, height: 600, crop: 'fill', quality: 'auto' },
+        {
+          width: 1000, height: 600, crop: 'fill', quality: 'auto',
+        },
       ],
     },
     profile: {
       folder: 'trip-sky-way/profiles',
       transformation: [
-        { width: 400, height: 400, crop: 'fill', quality: 'auto', gravity: 'face' },
+        {
+          width: 400, height: 400, crop: 'fill', quality: 'auto', gravity: 'face',
+        },
       ],
     },
     thumbnail: {
       folder: 'trip-sky-way/thumbnails',
       transformation: [
-        { width: 300, height: 200, crop: 'fill', quality: 'auto' },
+        {
+          width: 300, height: 200, crop: 'fill', quality: 'auto',
+        },
       ],
     },
     default: {

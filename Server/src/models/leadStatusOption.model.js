@@ -47,7 +47,7 @@ const leadStatusOptionSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Index for efficient queries
@@ -55,4 +55,3 @@ leadStatusOptionSchema.index({ order: 1 });
 leadStatusOptionSchema.index({ isActive: 1 });
 
 export default mongoose.model('LeadStatusOption', leadStatusOptionSchema);
-

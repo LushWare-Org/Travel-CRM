@@ -66,15 +66,15 @@ const voucherSchema = new mongoose.Schema(
       // Added for manual vouchers to store images directly
       coverImage: {
         url: String,
-        public_id: String
+        public_id: String,
       },
       images: [
         {
           url: String,
           public_id: String,
-          isCover: Boolean
-        }
-      ]
+          isCover: Boolean,
+        },
+      ],
     },
     // Meal plans from itinerary (day-wise)
     mealPlans: [
@@ -193,6 +193,3 @@ voucherSchema.index({ voucherNumber: 1 });
 const Voucher = mongoose.model('Voucher', voucherSchema);
 
 export default Voucher;
-
-
-

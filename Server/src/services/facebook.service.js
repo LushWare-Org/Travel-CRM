@@ -22,7 +22,7 @@ class FacebookService {
     try {
       // Remove 'sha256=' prefix if present
       const receivedSignature = signature.replace('sha256=', '');
-      
+
       // Calculate expected signature
       const expectedSignature = crypto
         .createHmac('sha256', appSecret)
@@ -32,7 +32,7 @@ class FacebookService {
       // Compare signatures using constant-time comparison
       return crypto.timingSafeEqual(
         Buffer.from(receivedSignature, 'hex'),
-        Buffer.from(expectedSignature, 'hex')
+        Buffer.from(expectedSignature, 'hex'),
       );
     } catch (error) {
       logger.error('Error verifying webhook signature:', error);
@@ -49,7 +49,7 @@ class FacebookService {
   static async getLeadData(leadgenId, accessToken) {
     try {
       const graphApiUrl = `https://graph.facebook.com/v18.0/${leadgenId}`;
-      
+
       const response = await axios.get(graphApiUrl, {
         params: {
           access_token: accessToken,
@@ -65,13 +65,13 @@ class FacebookService {
       return response.data;
     } catch (error) {
       logger.error('Error fetching lead data from Facebook:', error);
-      
+
       if (error.response) {
         throw new Error(
-          `Facebook API Error: ${error.response.data?.error?.message || error.message}`
+          `Facebook API Error: ${error.response.data?.error?.message || error.message}`,
         );
       }
-      
+
       throw new Error(`Failed to fetch lead data: ${error.message}`);
     }
   }
@@ -102,15 +102,13 @@ class FacebookService {
    */
   static formatPhoneNumber(phone) {
     if (!phone) return null;
-    
+
     // Remove all characters except digits, +, and spaces
     const cleaned = phone.replace(/[^\d+\s]/g, '');
-    
+
     // Remove extra spaces
     return cleaned.trim() || null;
   }
 }
 
 export default FacebookService;
-
-

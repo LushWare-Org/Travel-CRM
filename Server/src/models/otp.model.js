@@ -51,7 +51,7 @@ const otpSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Index for quick lookups by userId and type

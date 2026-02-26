@@ -42,26 +42,25 @@ console.log('\n🧪 Testing API connection...');
 try {
   const { GoogleGenerativeAI } = await import('@google/generative-ai');
   const genAI = new GoogleGenerativeAI(apiKey);
-  
+
   // Try the most common model
   const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-  
+
   console.log('✅ Gemini client initialized');
   console.log('✅ Model loaded: gemini-pro');
-  
+
   // Try a simple generation
   console.log('🔄 Testing content generation...');
   const result = await model.generateContent('Say "Hello" in one word');
   const response = await result.response;
   const text = response.text();
-  
+
   console.log(`✅ Generation successful! Response: "${text.trim()}"\n`);
   console.log('🎉 Everything is working! Your Gemini AI is properly configured.\n');
-  
 } catch (error) {
   console.log('❌ API test failed!\n');
   console.log('Error:', error.message);
-  
+
   if (error.message.includes('404') || error.message.includes('not found')) {
     console.log('\n📋 This usually means:');
     console.log('1. The API key doesn\'t have access to Gemini models');
@@ -71,7 +70,7 @@ try {
     console.log('  1. Go to: https://makersuite.google.com/app/apikey');
     console.log('  2. Create a new API key');
     console.log('  3. This key works immediately, no setup needed\n');
-    
+
     console.log('Option B - Enable API for Google Cloud Key:');
     console.log('  1. Go to: https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com');
     console.log('  2. Select your project');
@@ -84,7 +83,6 @@ try {
     console.log('\n📋 Unexpected error');
     console.log('💡 Check the error message above for details\n');
   }
-  
+
   process.exit(1);
 }
-

@@ -5,10 +5,12 @@ import AppError from '../utils/appError.js';
 import emailService from '../utils/emailService.js';
 
 export const applyForPosition = asyncHandler(async (req, res, next) => {
-  const { fullName, email, phone, position, coverLetter, agreeTerms, resumeUrl, resumeFileName } = req.body;
+  const {
+    fullName, email, phone, position, coverLetter, agreeTerms, resumeUrl, resumeFileName,
+  } = req.body;
 
   console.log('📝 [Career] Application received:', {
-    fullName, email, position, hasResume: !!resumeUrl
+    fullName, email, position, hasResume: !!resumeUrl,
   });
 
   // 1. Basic Validation
@@ -26,7 +28,7 @@ export const applyForPosition = asyncHandler(async (req, res, next) => {
   // 2. Vacancy Validation (Case Insensitive)
   const vacancy = await Vacancy.findOne({
     position: { $regex: new RegExp(`^${cleanPosition}$`, 'i') },
-    status: 'active'
+    status: 'active',
   });
 
   if (!vacancy) {
@@ -44,8 +46,8 @@ export const applyForPosition = asyncHandler(async (req, res, next) => {
     return next(
       new AppError(
         `You have already applied for ${cleanPosition}. Please wait for our response.`,
-        400
-      )
+        400,
+      ),
     );
   }
 
@@ -82,7 +84,7 @@ export const applyForPosition = asyncHandler(async (req, res, next) => {
             <p style="margin: 5px 0;"><strong>Position:</strong> ${vacancy.position}</p>
             <p style="margin: 5px 0;"><strong>Email:</strong> ${cleanEmail}</p>
           </div>
-        `)
+        `),
       });
 
       // 2. Send notification to admin(s)
@@ -104,9 +106,8 @@ export const applyForPosition = asyncHandler(async (req, res, next) => {
           <div style="text-align: center; margin: 30px 0;">
             ${emailService.getButton('Review Application', `${managementUrl}/career`)}
           </div>
-        `)
+        `),
       });
-
     } catch (emailErr) {
       console.error('⚠️ [Career] Email notification failed (non-blocking):', emailErr);
     }
@@ -122,16 +123,17 @@ export const applyForPosition = asyncHandler(async (req, res, next) => {
     console.error('❌ [Career] Application saving error:', error);
     // Pass the actual error if it's Mongoose validation related, otherwise generic
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
+      const messages = Object.values(error.errors).map((val) => val.message);
       return next(new AppError(messages.join('. '), 400));
     }
     return next(new AppError('Failed to submit application. Please try again.', 500));
   }
 });
 
-
 export const getCareerApplications = asyncHandler(async (req, res, next) => {
-  const { status, position, sortBy = '-createdAt', page = 1, limit = 10 } = req.query;
+  const {
+    status, position, sortBy = '-createdAt', page = 1, limit = 10,
+  } = req.query;
   const filter = {};
   if (status) filter.status = status;
   if (position) filter.position = position;
@@ -163,7 +165,7 @@ export const getCareerApplications = asyncHandler(async (req, res, next) => {
 export const getApplicationDetails = asyncHandler(async (req, res, next) => {
   const application = await Career.findById(req.params.id).populate(
     'reviewedBy',
-    'name email'
+    'name email',
   );
 
   if (!application) {
@@ -179,7 +181,9 @@ export const getApplicationDetails = asyncHandler(async (req, res, next) => {
 });
 
 export const updateApplicationStatus = asyncHandler(async (req, res, next) => {
-  const { status, adminNotes, rating, feedback } = req.body;
+  const {
+    status, adminNotes, rating, feedback,
+  } = req.body;
 
   const validStatuses = ['pending', 'under-review', 'shortlisted', 'rejected', 'hired'];
 
@@ -235,13 +239,12 @@ export const updateApplicationStatus = asyncHandler(async (req, res, next) => {
                     <p style="margin: 0;">${application.feedback}</p>
                 </div>
                 ` : ''}
-            `)
+            `),
       });
 
       application.emailSent = true;
       application.emailSentAt = new Date();
       await application.save(); // Save the email sent status
-
     } catch (emailErr) {
       console.error('⚠️ [Career] Status update email failed:', emailErr);
     }

@@ -8,9 +8,9 @@ import BRANDING from '../config/branding.js';
 // Helper function to convert RGB array to hex
 const rgbToHex = (rgb) => {
   const [r, g, b] = rgb;
-  return `#${[r, g, b].map(x => {
+  return `#${[r, g, b].map((x) => {
     const hex = x.toString(16);
-    return hex.length === 1 ? '0' + hex : hex;
+    return hex.length === 1 ? `0${hex}` : hex;
   }).join('')}`;
 };
 
@@ -42,15 +42,15 @@ const fetchImage = async (url) => {
   const ALLOWED_DOMAINS = [
     'res.cloudinary.com',
     'cloudinary.com',
-    'localhost'
+    'localhost',
   ];
 
   // Handle relative paths (uploads) or full URLs
-  let imageUrl = url;
+  const imageUrl = url;
   if (!url.startsWith('http')) {
-    // Assuming local server or adjust base URL as needed. 
-    // Ideally, this should be a full URL/cloud storage link. 
-    // For now, if it's a relative path in uploads, we might try to read locally if possible, 
+    // Assuming local server or adjust base URL as needed.
+    // Ideally, this should be a full URL/cloud storage link.
+    // For now, if it's a relative path in uploads, we might try to read locally if possible,
     // otherwise we skip or try to construct a localhost URL if running locally?
     // Let's assume for production/cloud these are full URLs or we try to resolve against the server's public URL if configured.
     // For this environment, let's try to handle local file system if it starts with 'uploads/'
@@ -67,9 +67,7 @@ const fetchImage = async (url) => {
   try {
     // Validate URL domain
     const urlObj = new URL(imageUrl);
-    const isAllowed = ALLOWED_DOMAINS.some(domain =>
-      urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain)
-    );
+    const isAllowed = ALLOWED_DOMAINS.some((domain) => urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`));
 
     if (!isAllowed) {
       console.warn('[Voucher PDF] Blocked request to untrusted domain:', urlObj.hostname);
@@ -86,18 +84,18 @@ const fetchImage = async (url) => {
 
 // Modern Color Scheme - Teal/Slate Theme
 const COLORS = {
-  primary: '#0F766E',        // Deep Teal
-  primaryLight: '#14B8A6',   // Light teal
-  primaryDark: '#134E4A',    // Dark teal
-  secondary: '#1E293B',      // Dark slate
-  accent: '#F59E0B',         // Amber gold
-  accentLight: '#FEF3C7',    // Light amber
-  text: '#0F172A',           // Near black
-  textLight: '#64748B',      // Gray text
-  background: '#F8FAFC',     // Light background
+  primary: '#0F766E', // Deep Teal
+  primaryLight: '#14B8A6', // Light teal
+  primaryDark: '#134E4A', // Dark teal
+  secondary: '#1E293B', // Dark slate
+  accent: '#F59E0B', // Amber gold
+  accentLight: '#FEF3C7', // Light amber
+  text: '#0F172A', // Near black
+  textLight: '#64748B', // Gray text
+  background: '#F8FAFC', // Light background
   white: '#FFFFFF',
   border: '#E2E8F0',
-  accentBg: '#F0FDFA',       // Light teal bg
+  accentBg: '#F0FDFA', // Light teal bg
 };
 
 const formatDate = (date) => {
@@ -119,7 +117,7 @@ export async function generateVoucherPDF(voucher, lead) {
 
     // Get Package Image (Cover)
     let heroImageBuffer = null;
-    let galleryImages = [];
+    const galleryImages = [];
     const pkg = voucher.package || voucher.customizedPackage || {};
     const packageDetails = voucher.packageDetails || {};
 
@@ -277,7 +275,7 @@ export async function generateVoucherPDF(voucher, lead) {
 
           // Table Rows
           doc.font('Helvetica').fontSize(10).fillColor(COLORS.text);
-          voucher.locationDates.forEach(loc => {
+          voucher.locationDates.forEach((loc) => {
             // Check for page break
             if (y > 750) {
               doc.addPage();
@@ -339,7 +337,7 @@ export async function generateVoucherPDF(voucher, lead) {
                 activitiesHeight += Math.max(leftHeight, rightHeight) + 3;
               } else {
                 // Single column for 1-3 activities
-                day.activities.forEach(activity => {
+                day.activities.forEach((activity) => {
                   activitiesHeight += doc.heightOfString(`• ${activity}`, { width: textWidth - 10 }) + 2;
                 });
                 activitiesHeight += 3;
@@ -381,7 +379,8 @@ export async function generateVoucherPDF(voucher, lead) {
             if (locationHeight > 0) {
               doc.font('Helvetica-Bold').fillColor(COLORS.textLight).fontSize(9)
                 .text('Location: ', margin + 35, currentTextY, { continued: true })
-                .font('Helvetica').text(day.locations.join(', '), { width: textWidth });
+                .font('Helvetica')
+                .text(day.locations.join(', '), { width: textWidth });
               currentTextY += locationHeight + 2;
             }
 
@@ -434,7 +433,8 @@ export async function generateVoucherPDF(voucher, lead) {
             if (hotelHeight > 0) {
               doc.font('Helvetica-Bold').fillColor(COLORS.primaryDark).fontSize(9)
                 .text('Hotel: ', margin + 35, currentTextY, { continued: true })
-                .font('Helvetica').text(day.accommodation.name, { width: textWidth });
+                .font('Helvetica')
+                .text(day.accommodation.name, { width: textWidth });
               currentTextY += hotelHeight;
             }
 
@@ -444,7 +444,7 @@ export async function generateVoucherPDF(voucher, lead) {
         }
 
         // --- 6. MEAL PLANS ---
-        if (voucher.mealPlans && voucher.mealPlans.some(m => m.breakfast || m.lunch || m.dinner)) {
+        if (voucher.mealPlans && voucher.mealPlans.some((m) => m.breakfast || m.lunch || m.dinner)) {
           // Check for page break
           if (y > 650) {
             doc.addPage();
@@ -456,7 +456,7 @@ export async function generateVoucherPDF(voucher, lead) {
           y += 40;
 
           doc.font('Helvetica').fontSize(10).fillColor(COLORS.text);
-          voucher.mealPlans.forEach(plan => {
+          voucher.mealPlans.forEach((plan) => {
             const meals = [];
             if (plan.breakfast) meals.push('Breakfast');
             if (plan.lunch) meals.push('Lunch');
@@ -493,7 +493,7 @@ export async function generateVoucherPDF(voucher, lead) {
             doc.fillColor(COLORS.primary).fontSize(11).font('Helvetica-Bold').text('INCLUSIONS', margin, y);
             y += 15;
             doc.font('Helvetica').fontSize(9).fillColor(COLORS.text);
-            packageDetails.inclusions.forEach(item => {
+            packageDetails.inclusions.forEach((item) => {
               if (typeof item === 'string') {
                 doc.text(`•  ${item}`, { width: 240 });
               }
@@ -506,7 +506,7 @@ export async function generateVoucherPDF(voucher, lead) {
             doc.fillColor(COLORS.primary).fontSize(11).font('Helvetica-Bold').text('EXCLUSIONS', 300, rightListY);
             rightListY += 15;
             doc.font('Helvetica').fontSize(9).fillColor(COLORS.text);
-            packageDetails.exclusions.forEach(item => {
+            packageDetails.exclusions.forEach((item) => {
               if (typeof item === 'string') {
                 doc.text(`•  ${item}`, 300, rightListY, { width: 240 });
                 rightListY += doc.heightOfString(`•  ${item}`, { width: 240 });

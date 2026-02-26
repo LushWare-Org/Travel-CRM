@@ -245,22 +245,22 @@ class EmailService {
 
   getEmailTemplate(content) {
     const companyName = BRANDING.company.name;
-    const tagline = BRANDING.company.tagline;
-    const website = BRANDING.urls.website;
-    const phone = BRANDING.contact.phone;
+    const { tagline } = BRANDING.company;
+    const { website } = BRANDING.urls;
+    const { phone } = BRANDING.contact;
 
     // Modern Teal/Slate Color Scheme
     const colors = {
-      primary: '#0F766E',        // Deep Teal
-      primaryLight: '#14B8A6',   // Light teal
-      primaryDark: '#134E4A',    // Dark teal
-      accent: '#F59E0B',         // Amber gold
-      accentLight: '#FEF3C7',    // Light amber
-      slate: '#1E293B',          // Dark slate
-      slateLight: '#334155',     // Medium slate
-      gray: '#64748B',           // Gray text
-      grayLight: '#94A3B8',      // Light text
-      background: '#F8FAFC',     // Light background
+      primary: '#0F766E', // Deep Teal
+      primaryLight: '#14B8A6', // Light teal
+      primaryDark: '#134E4A', // Dark teal
+      accent: '#F59E0B', // Amber gold
+      accentLight: '#FEF3C7', // Light amber
+      slate: '#1E293B', // Dark slate
+      slateLight: '#334155', // Medium slate
+      gray: '#64748B', // Gray text
+      grayLight: '#94A3B8', // Light text
+      background: '#F8FAFC', // Light background
       white: '#FFFFFF',
       black: '#0F172A',
     };
@@ -470,7 +470,9 @@ class EmailService {
     });
   }
 
-  async sendReceiptEmail({ receipt, invoice, recipientEmail, pdfPath }) {
+  async sendReceiptEmail({
+    receipt, invoice, recipientEmail, pdfPath,
+  }) {
     const customerName = receipt.customer?.name || receipt.lead?.name || 'Customer';
     const receiptNumber = receipt.receiptNumber || receipt._id;
     const subject = receiptNumber
@@ -541,7 +543,9 @@ class EmailService {
     });
   }
 
-  async sendVoucherEmail({ to, voucherNumber, customerName, packageName, pdfBuffer, fileName }) {
+  async sendVoucherEmail({
+    to, voucherNumber, customerName, packageName, pdfBuffer, fileName,
+  }) {
     const subject = voucherNumber
       ? `${BRANDING.company.name} Travel Voucher - ${voucherNumber}`
       : `${BRANDING.company.name} Travel Voucher`;
@@ -650,7 +654,9 @@ class EmailService {
     });
   }
 
-  async sendLeadAssignmentEmail({ salesRep, lead, assignedBy, assignmentMode }) {
+  async sendLeadAssignmentEmail({
+    salesRep, lead, assignedBy, assignmentMode,
+  }) {
     // Validate email configuration before attempting to send
     if (!emailConfig.from || !emailConfig.host || !emailConfig.port) {
       const error = new Error('Email configuration is incomplete. Cannot send lead assignment email.');
@@ -703,7 +709,7 @@ class EmailService {
           <div style="margin-top: 15px;">
             <strong>Remarks:</strong>
             <ul style="margin: 8px 0; padding-left: 20px;">
-              ${lead.remarks.slice(-3).map(remark => `<li>${remark.text || remark} - ${this.formatDate(remark.date || new Date())}</li>`).join('')}
+              ${lead.remarks.slice(-3).map((remark) => `<li>${remark.text || remark} - ${this.formatDate(remark.date || new Date())}</li>`).join('')}
             </ul>
           </div>
         ` : ''}

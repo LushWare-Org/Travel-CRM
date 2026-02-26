@@ -13,10 +13,9 @@ const formatInvoiceForResponse = (invoiceDoc) => {
     return invoiceDoc;
   }
 
-  const invoice =
-    typeof invoiceDoc.toObject === 'function'
-      ? invoiceDoc.toObject({ virtuals: true })
-      : { ...invoiceDoc };
+  const invoice = typeof invoiceDoc.toObject === 'function'
+    ? invoiceDoc.toObject({ virtuals: true })
+    : { ...invoiceDoc };
 
   invoice.issueDate = invoice.createdAt || invoice.issueDate;
 
@@ -324,7 +323,7 @@ export const sendInvoice = asyncHandler(async (req, res, next) => {
     .populate({
       path: 'lead',
       select: 'name email phone status destination assignedTo adults children travelers customizedPackage',
-      populate: { path: 'customizedPackage', select: 'name' }
+      populate: { path: 'customizedPackage', select: 'name' },
     })
     .populate('quotation');
 
@@ -513,7 +512,7 @@ export const downloadInvoicePDF = asyncHandler(async (req, res, next) => {
     .populate({
       path: 'lead',
       select: 'name email phone status destination assignedTo adults children travelers customizedPackage',
-      populate: { path: 'customizedPackage', select: 'name' }
+      populate: { path: 'customizedPackage', select: 'name' },
     })
     .populate('quotation')
     .populate('booking')
@@ -538,9 +537,7 @@ export const downloadInvoicePDF = asyncHandler(async (req, res, next) => {
       // fs.unlinkSync(pdfPath);
     });
 
-    fileStream.on('error', (error) => {
-      return next(new AppError('Error reading PDF file', 500));
-    });
+    fileStream.on('error', (error) => next(new AppError('Error reading PDF file', 500)));
   } catch (error) {
     return next(new AppError(`Error generating PDF: ${error.message}`, 500));
   }

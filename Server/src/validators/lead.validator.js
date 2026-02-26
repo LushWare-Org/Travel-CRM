@@ -261,5 +261,3 @@ export const assignLeadSchema = Joi.object({
       'string.pattern.base': 'assignedTo must be a valid ObjectId',
     }),
 });
-
-

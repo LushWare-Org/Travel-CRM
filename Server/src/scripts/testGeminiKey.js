@@ -29,7 +29,7 @@ if (!apiKey || apiKey.trim() === '') {
 
 const trimmedKey = apiKey.trim();
 const keyLength = trimmedKey.length;
-const keyPreview = trimmedKey.substring(0, 10) + '...';
+const keyPreview = `${trimmedKey.substring(0, 10)}...`;
 
 console.log(`✅ API Key found: ${keyPreview}`);
 console.log(`   Length: ${keyLength} characters`);
@@ -50,30 +50,30 @@ console.log('🧪 Testing API key with Gemini...\n');
 
 try {
   const genAI = new GoogleGenerativeAI(trimmedKey);
-  
+
   // Try different models
   const modelsToTry = ['gemini-pro', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-  
+
   let success = false;
   let workingModel = null;
-  
+
   for (const modelName of modelsToTry) {
     try {
       console.log(`   Trying model: ${modelName}...`);
       const model = genAI.getGenerativeModel({ model: modelName });
-      
+
       // Test with a simple prompt
       const result = await model.generateContent('Say "Hello" in one word.');
       const response = await result.response;
       const text = response.text();
-      
+
       console.log(`   ✅ ${modelName} works! Response: "${text.trim()}"`);
       workingModel = modelName;
       success = true;
       break;
     } catch (error) {
       console.log(`   ❌ ${modelName} failed: ${error.message}`);
-      
+
       // Check for specific error types
       if (error.message.includes('API key') || error.message.includes('401') || error.message.includes('403')) {
         console.log('\n❌ API key is invalid or expired!');
@@ -93,7 +93,7 @@ try {
       }
     }
   }
-  
+
   if (success) {
     console.log(`\n✅ SUCCESS! Your API key is valid and working with model: ${workingModel}`);
     console.log('   You can now use AI features in the application.\n');
@@ -118,4 +118,3 @@ try {
   console.log('5. Restart server completely\n');
   process.exit(1);
 }
-

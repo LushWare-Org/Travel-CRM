@@ -25,10 +25,10 @@ if (!apiKey || apiKey.trim() === '') {
 }
 
 const trimmedKey = apiKey.trim();
-const keyPreview = trimmedKey.substring(0, 15) + '...';
+const keyPreview = `${trimmedKey.substring(0, 15)}...`;
 const keyLength = trimmedKey.length;
 
-console.log(`\n📋 API Key Information:`);
+console.log('\n📋 API Key Information:');
 console.log(`   Preview: ${keyPreview}`);
 console.log(`   Length: ${keyLength} characters`);
 console.log(`   Format: ${trimmedKey.startsWith('AIza') ? '✅ Valid' : '❌ Invalid'}`);
@@ -43,10 +43,10 @@ console.log('\n🧪 Testing API Key with Gemini SDK...\n');
 
 try {
   const genAI = new GoogleGenerativeAI(trimmedKey);
-  
+
   // Try to list available models (if SDK supports it)
   console.log('📝 Attempting to test with different models...\n');
-  
+
   // Extended list of possible model names
   const allModelsToTry = [
     'gemini-pro',
@@ -59,20 +59,20 @@ try {
     'models/gemini-1.5-flash',
     'models/gemini-1.5-pro',
   ];
-  
+
   let anySuccess = false;
   const results = [];
-  
+
   for (const modelName of allModelsToTry) {
     const cleanName = modelName.replace(/^models\//, '');
     try {
       console.log(`   Testing: ${cleanName}...`);
-      
+
       const model = genAI.getGenerativeModel({ model: cleanName });
       const result = await model.generateContent('Say "Hello"');
       const response = await result.response;
       const text = await response.text();
-      
+
       console.log(`   ✅ ${cleanName} WORKS! Response: "${text.trim()}"`);
       results.push({ model: cleanName, status: '✅ WORKS', response: text.trim() });
       anySuccess = true;
@@ -80,7 +80,7 @@ try {
     } catch (error) {
       const errorMsg = error.message || '';
       let status = '❌ Failed';
-      
+
       if (errorMsg.includes('404') || errorMsg.includes('not found')) {
         status = '❌ 404 Not Found';
       } else if (errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('API key')) {
@@ -100,20 +100,20 @@ try {
       } else {
         status = `❌ Error: ${errorMsg.substring(0, 40)}...`;
       }
-      
+
       results.push({ model: cleanName, status });
     }
   }
-  
-  console.log('\n' + '='.repeat(60));
+
+  console.log(`\n${'='.repeat(60)}`);
   console.log('\n📊 Test Results Summary:\n');
-  
-  results.forEach(r => {
+
+  results.forEach((r) => {
     console.log(`   ${r.status.padEnd(20)} ${r.model}`);
   });
-  
+
   if (anySuccess) {
-    const workingModel = results.find(r => r.status.includes('✅'));
+    const workingModel = results.find((r) => r.status.includes('✅'));
     console.log(`\n✅ SUCCESS! Your API key works with: ${workingModel.model}`);
     console.log('   You can use this model in your application.\n');
     process.exit(0);
@@ -153,4 +153,3 @@ try {
   console.log('   3. Try getting a new key from: https://makersuite.google.com/app/apikey\n');
   process.exit(1);
 }
-

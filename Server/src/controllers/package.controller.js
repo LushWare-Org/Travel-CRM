@@ -54,7 +54,7 @@ export const createPackage = asyncHandler(async (req, res, next) => {
 /**
  * Get all packages with filtering and pagination
  * GET /api/packages
- * 
+ *
  * For public (unauthenticated) requests: Only published packages are returned
  * For salesReps: Only published packages are returned
  * For admins/staff: All packages (or filtered by status param) are returned
@@ -70,13 +70,13 @@ export const getPackages = asyncHandler(async (req, res, next) => {
     });
   }
 
-  const query = req.query;
-  
+  const { query } = req;
+
   // For public (unauthenticated) requests, only return published packages
   if (!req.user && !query.status) {
     query.status = 'published';
   }
-  
+
   // If user is a salesRep and no explicit status is provided, filter to published only
   if (!req.user || (req.user && req.user.role === 'salesRep')) {
     if (!query.status) {

@@ -33,5 +33,3 @@ settingsSchema.statics.getSingleton = async function getSingleton() {
 };
 
 export default mongoose.model('Settings', settingsSchema);
-
-

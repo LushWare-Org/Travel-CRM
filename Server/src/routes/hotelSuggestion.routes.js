@@ -10,4 +10,3 @@ router.use(protect);
 router.post('/suggest', suggestHotels);
 
 export default router;
-

@@ -1,7 +1,7 @@
-import logger from './logger.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import logger from './logger.js';
 
 // Ensure dotenv is loaded
 const __filename = fileURLToPath(import.meta.url);

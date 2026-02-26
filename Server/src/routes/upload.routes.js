@@ -28,7 +28,7 @@ router.post('/single', uploadSingle('image'), uploadController.uploadSingle);
 router.post(
   '/multiple',
   uploadMultiple('images', 10),
-  uploadController.uploadMultiple
+  uploadController.uploadMultiple,
 );
 
 /**
@@ -39,7 +39,7 @@ router.post(
 router.post(
   '/package',
   uploadMultiple('images', 10),
-  uploadController.uploadPackageImages
+  uploadController.uploadPackageImages,
 );
 
 /**
@@ -50,7 +50,7 @@ router.post(
 router.post(
   '/itinerary',
   uploadMultiple('images', 10),
-  uploadController.uploadItineraryImages
+  uploadController.uploadItineraryImages,
 );
 
 /**
@@ -61,7 +61,7 @@ router.post(
 router.post(
   '/profile',
   uploadSingle('image'),
-  uploadController.uploadProfileImage
+  uploadController.uploadProfileImage,
 );
 
 /**

@@ -1,7 +1,11 @@
 import express from 'express';
 import { protect, authorize, checkPermission } from '../middleware/auth.js';
-import { getLeadAnalyticsOverview, getBillingAnalyticsOverview, getPackageAnalyticsOverview, getUserAnalyticsOverview, getSalesRepPersonalPerformance, getWebsiteAnalyticsOverview } from '../controllers/analytics.controller.js';
-import { exportLeadAnalyticsPDF, exportBillingAnalyticsPDF, exportUserAnalyticsPDF, exportPackageAnalyticsPDF, exportWebsiteAnalyticsPDF } from '../controllers/analyticsPDFExport.controller.js';
+import {
+  getLeadAnalyticsOverview, getBillingAnalyticsOverview, getPackageAnalyticsOverview, getUserAnalyticsOverview, getSalesRepPersonalPerformance, getWebsiteAnalyticsOverview,
+} from '../controllers/analytics.controller.js';
+import {
+  exportLeadAnalyticsPDF, exportBillingAnalyticsPDF, exportUserAnalyticsPDF, exportPackageAnalyticsPDF, exportWebsiteAnalyticsPDF,
+} from '../controllers/analyticsPDFExport.controller.js';
 import { apiLimiter } from '../config/rateLimiter.js';
 
 const router = express.Router();
@@ -32,5 +36,3 @@ router.post('/website/export-pdf', protect, authorize('admin', 'salesRep'), expo
 router.get('/salesreps/me/performance', protect, authorize('salesRep'), getSalesRepPersonalPerformance);
 
 export default router;
-
-

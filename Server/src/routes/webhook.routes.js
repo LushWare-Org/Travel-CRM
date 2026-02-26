@@ -17,5 +17,3 @@ router.get('/facebook', verifyWebhook);
 router.post('/facebook', handleLeadWebhook);
 
 export default router;
-
-

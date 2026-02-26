@@ -196,11 +196,8 @@ export const COUNTRY_NAMES = [
   'zimbabwe',
 ];
 
-export const normalizeString = (value = '') =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-
-
+export const normalizeString = (value = '') => value
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .trim();

@@ -19,7 +19,7 @@ const grantAdminPermissions = async () => {
       console.error(`❌ Admin user with email '${adminEmail}' not found!`);
       console.log('\nAvailable admin users:');
       const admins = await User.find({ role: 'admin' }).select('email name');
-      admins.forEach(a => console.log(`  - ${a.email} (${a.name})`));
+      admins.forEach((a) => console.log(`  - ${a.email} (${a.name})`));
       process.exit(1);
     }
 

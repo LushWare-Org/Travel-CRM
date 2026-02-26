@@ -42,9 +42,7 @@ export const uploadMultiple = asyncHandler(async (req, res, next) => {
   const filePaths = req.files.map((file) => file.path);
 
   const results = await Promise.all(
-    filePaths.map((filePath) =>
-      cloudinaryService.uploadWithPreset(filePath, preset)
-    )
+    filePaths.map((filePath) => cloudinaryService.uploadWithPreset(filePath, preset)),
   );
 
   res.status(200).json({
@@ -78,9 +76,7 @@ export const uploadPackageImages = asyncHandler(async (req, res, next) => {
 
   try {
     const results = await Promise.all(
-      filePaths.map((filePath) =>
-        cloudinaryService.uploadWithPreset(filePath, 'package')
-      )
+      filePaths.map((filePath) => cloudinaryService.uploadWithPreset(filePath, 'package')),
     );
 
     console.log('[Upload Controller] Upload successful, count:', results.length);
@@ -110,9 +106,7 @@ export const uploadItineraryImages = asyncHandler(async (req, res, next) => {
 
   const filePaths = req.files.map((file) => file.path);
   const results = await Promise.all(
-    filePaths.map((filePath) =>
-      cloudinaryService.uploadWithPreset(filePath, 'itinerary')
-    )
+    filePaths.map((filePath) => cloudinaryService.uploadWithPreset(filePath, 'itinerary')),
   );
 
   res.status(200).json({
@@ -136,7 +130,7 @@ export const uploadProfileImage = asyncHandler(async (req, res, next) => {
 
   const result = await cloudinaryService.uploadWithPreset(
     req.file.path,
-    'profile'
+    'profile',
   );
 
   res.status(200).json({
@@ -197,7 +191,9 @@ export const deleteMultipleImages = asyncHandler(async (req, res, next) => {
  * @access Public
  */
 export const getOptimizedUrl = asyncHandler(async (req, res, next) => {
-  const { publicId, width, height, quality, format } = req.query;
+  const {
+    publicId, width, height, quality, format,
+  } = req.query;
 
   if (!publicId) {
     return next(new AppError('Public ID is required', 400));

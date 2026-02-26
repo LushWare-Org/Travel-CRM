@@ -13,7 +13,7 @@ import logger from '../config/logger.js';
 
 const formatCustomizedName = (baseName = '', sequence = 1) => {
   const cleanBase = `${baseName}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
-  const suffix = sequence > 1 ? `(Customized-${sequence})` : `(Customized)`;
+  const suffix = sequence > 1 ? `(Customized-${sequence})` : '(Customized)';
   return `${cleanBase} ${suffix}`.trim();
 };
 
@@ -87,7 +87,7 @@ class PackageService {
             const itinerary = await Itinerary.create({
               package: newCustomizedPackage._id,
               packageModel: 'CustomizedPackage',
-              days: days,
+              days,
               createdBy: userId,
               status: packageData.status || 'draft',
             });
@@ -121,14 +121,14 @@ class PackageService {
 
           // Ensure all days have required fields (dayNumber is required by model)
           const validatedDays = days
-            .filter(day => day && (day.dayNumber !== undefined || day.title || day.dayNumber))
+            .filter((day) => day && (day.dayNumber !== undefined || day.title || day.dayNumber))
             .map((day, index) => {
               const dayNumber = day.dayNumber !== undefined && day.dayNumber !== null
                 ? parseInt(day.dayNumber, 10)
                 : (index + 1);
 
               return {
-                dayNumber: dayNumber,
+                dayNumber,
                 title: day.title || `Day ${dayNumber}`,
                 description: day.description || '',
                 locations: Array.isArray(day.locations) ? day.locations : (day.locations ? [day.locations] : []),
@@ -410,7 +410,7 @@ class PackageService {
           // Create new itinerary
           const newItinerary = await Itinerary.create({
             package: pkg._id,
-            days: days,
+            days,
             createdBy: userId,
             status: updateData.status || 'draft',
           });
@@ -525,7 +525,7 @@ class PackageService {
         archived: 0,
       };
 
-      statusCounts.forEach(item => {
+      statusCounts.forEach((item) => {
         if (item._id && statusMap.hasOwnProperty(item._id)) {
           statusMap[item._id] = item.count;
         }

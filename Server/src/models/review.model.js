@@ -46,7 +46,7 @@ const reviewSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 reviewSchema.index({ package: 1, createdAt: -1 });
 reviewSchema.virtual('formattedDate').get(function () {

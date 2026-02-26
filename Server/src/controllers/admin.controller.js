@@ -573,14 +573,30 @@ export const getAdminPermissions = asyncHandler(async (req, res, next) => {
 // @access  Private/Admin
 export const getAvailablePermissions = asyncHandler(async (req, res, next) => {
   const availablePermissions = [
-    { id: 'manage_users', label: 'Manage Website Users', category: 'Users', description: 'Create, edit, and manage customer accounts' },
-    { id: 'manage_sales_reps', label: 'Manage Sales Reps', category: 'Staff', description: 'Manage sales representatives and their assignments' },
-    { id: 'manage_vendors', label: 'Manage Vendors', category: 'Partners', description: 'Manage vendor partnerships and services' },
-    { id: 'manage_admins', label: 'Manage Admins', category: 'System', description: 'Create and manage administrator accounts' },
-    { id: 'view_reports', label: 'View Reports', category: 'Analytics', description: 'Access business reports and analytics' },
-    { id: 'manage_billing', label: 'Manage Billing', category: 'Finance', description: 'Handle billing and payment operations' },
-    { id: 'manage_leads', label: 'Manage Leads', category: 'Sales', description: 'Manage sales leads and lead assignments' },
-    { id: 'manage_packages', label: 'Manage Packages', category: 'Travel', description: 'Manage travel packages and itineraries' },
+    {
+      id: 'manage_users', label: 'Manage Website Users', category: 'Users', description: 'Create, edit, and manage customer accounts',
+    },
+    {
+      id: 'manage_sales_reps', label: 'Manage Sales Reps', category: 'Staff', description: 'Manage sales representatives and their assignments',
+    },
+    {
+      id: 'manage_vendors', label: 'Manage Vendors', category: 'Partners', description: 'Manage vendor partnerships and services',
+    },
+    {
+      id: 'manage_admins', label: 'Manage Admins', category: 'System', description: 'Create and manage administrator accounts',
+    },
+    {
+      id: 'view_reports', label: 'View Reports', category: 'Analytics', description: 'Access business reports and analytics',
+    },
+    {
+      id: 'manage_billing', label: 'Manage Billing', category: 'Finance', description: 'Handle billing and payment operations',
+    },
+    {
+      id: 'manage_leads', label: 'Manage Leads', category: 'Sales', description: 'Manage sales leads and lead assignments',
+    },
+    {
+      id: 'manage_packages', label: 'Manage Packages', category: 'Travel', description: 'Manage travel packages and itineraries',
+    },
   ];
 
   res.status(200).json({

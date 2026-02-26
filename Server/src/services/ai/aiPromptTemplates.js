@@ -25,7 +25,9 @@ Rules:
 - No placeholders
 `;
 
-export const followUpPrompt = ({ leadName, stage, dropOffProbability, leadScore, summary }) => `
+export const followUpPrompt = ({
+  leadName, stage, dropOffProbability, leadScore, summary,
+}) => `
 You are a travel CRM follow-up assistant.
 Create one concise follow-up message for a lead.
 

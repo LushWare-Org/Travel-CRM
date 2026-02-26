@@ -68,10 +68,9 @@ export const updateCustomizedPackage = asyncHandler(async (req, res, next) => {
   const numericFields = ['price', 'duration', 'maxGroupSize'];
   numericFields.forEach((field) => {
     if (updateData[field] !== undefined && updateData[field] !== null && updateData[field] !== '') {
-      const parsed =
-        field === 'price'
-          ? parseFloat(updateData[field])
-          : parseInt(updateData[field], 10);
+      const parsed = field === 'price'
+        ? parseFloat(updateData[field])
+        : parseInt(updateData[field], 10);
       if (!Number.isNaN(parsed)) {
         updateData[field] = parsed;
       }
@@ -132,18 +131,16 @@ export const updateCustomizedPackage = asyncHandler(async (req, res, next) => {
   }
 
   customizedPackage.customizedBy = userId;
-  const computedSequence =
-    updateData.customizationSequence !== undefined && updateData.customizationSequence !== null
-      ? updateData.customizationSequence
-      : customizedPackage.customizationSequence || 1;
+  const computedSequence = updateData.customizationSequence !== undefined && updateData.customizationSequence !== null
+    ? updateData.customizationSequence
+    : customizedPackage.customizationSequence || 1;
   customizedPackage.customizationSequence = computedSequence;
 
-  const baseName =
-    baseNameFromPayload ||
-    updateData.name ||
-    customizedPackage.baseName ||
-    customizedPackage.name ||
-    'Customized Package';
+  const baseName = baseNameFromPayload
+    || updateData.name
+    || customizedPackage.baseName
+    || customizedPackage.name
+    || 'Customized Package';
   customizedPackage.name = formatCustomizedName(baseName, computedSequence);
 
   await customizedPackage.save();
@@ -340,12 +337,12 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
     tags: ['website-customization'],
     remarks: message?.trim()
       ? [
-          {
-            text: `Website customization: ${message.trim()}`,
-            date: new Date(),
-            addedBy: null,
-          },
-        ]
+        {
+          text: `Website customization: ${message.trim()}`,
+          date: new Date(),
+          addedBy: null,
+        },
+      ]
       : [],
   };
 
@@ -387,10 +384,9 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
 
     let sequence = 1;
     try {
-      sequence =
-        (await CustomizedPackage.countDocuments(
-          { customizedForLead: lead._id, originalPackage: pkg._id },
-        ).session(session)) + 1;
+      sequence = (await CustomizedPackage.countDocuments(
+        { customizedForLead: lead._id, originalPackage: pkg._id },
+      ).session(session)) + 1;
     } catch (countError) {
       logger.warn(`Failed to determine customization sequence, defaulting to 1: ${countError.message}`);
     }
@@ -405,11 +401,10 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
       leadName: lead.name,
     });
 
-    const chosenCustomizer =
-      assignedSalesRepId ||
-      pkg.createdBy ||
-      (await findFallbackStaffUser())?._id ||
-      user._id;
+    const chosenCustomizer = assignedSalesRepId
+      || pkg.createdBy
+      || (await findFallbackStaffUser())?._id
+      || user._id;
 
     const customPackagePayload = {
       customizationSequence: sequence,
@@ -501,7 +496,7 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
         const salesRep = assignmentResult.salesRep || await User.findById(lead.assignedTo).select('name email').lean();
         if (salesRep && salesRep.email) {
           logger.info(`Sending lead assignment email to ${salesRep.email} for new lead ${lead._id} (from customization)`);
-          
+
           emailService
             .sendLeadAssignmentEmail({
               salesRep,
@@ -514,14 +509,14 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
             })
             .catch((err) => {
               logger.error(`❌ Failed to send lead assignment email to ${salesRep.email}: ${err.message}`);
-              logger.error(`Email error details:`, err);
+              logger.error('Email error details:', err);
             });
         } else {
           logger.warn(`⚠️  Cannot send assignment email: sales rep ${lead.assignedTo} has no email address`);
         }
       } catch (error) {
         logger.error(`Error preparing lead assignment email: ${error.message}`);
-        logger.error(`Error stack:`, error.stack);
+        logger.error('Error stack:', error.stack);
       }
     }
 
@@ -551,11 +546,11 @@ export const getUserCustomizedPackages = asyncHandler(async (req, res, next) => 
 
   // Find leads with user's email
   const leads = await Lead.find({ email: userEmail.toLowerCase() });
-  const leadIds = leads.map(l => l._id);
+  const leadIds = leads.map((l) => l._id);
 
   // Find customized packages
-  const customizedPackages = await CustomizedPackage.find({ 
-    customizedForLead: { $in: leadIds } 
+  const customizedPackages = await CustomizedPackage.find({
+    customizedForLead: { $in: leadIds },
   })
     .populate('itinerary')
     .populate('originalPackage', 'name destination')

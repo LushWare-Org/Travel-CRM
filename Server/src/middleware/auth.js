@@ -42,7 +42,7 @@ export const protect = asyncHandler(async (req, res, next) => {
     await User.updateOne(
       { _id: req.user._id },
       { $set: { lastActivity: new Date() } },
-      { timestamps: false }
+      { timestamps: false },
     );
 
     next();
@@ -87,9 +87,7 @@ export function checkPermission(...permissions) {
     }
 
     // Check if user has at least one of the required permissions
-    const hasPermission = permissions.some(permission => 
-      req.user.permissions && req.user.permissions.includes(permission)
-    );
+    const hasPermission = permissions.some((permission) => req.user.permissions && req.user.permissions.includes(permission));
 
     if (!hasPermission) {
       throw new AppError(

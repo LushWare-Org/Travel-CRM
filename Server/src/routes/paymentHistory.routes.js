@@ -20,4 +20,3 @@ router.get('/:id/pdf', protect, paymentHistoryController.downloadPaymentHistoryP
 router.get('/:id', protect, paymentHistoryController.getPaymentHistoryById);
 
 export default router;
-
