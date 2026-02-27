@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Menu, X, Home, Users, MapPin, DollarSign, User, LogOut,
-  BarChart3, Briefcase, ChevronRight, Sparkles
+  BarChart3, Briefcase, ChevronRight, Sparkles, Bot
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
@@ -68,7 +68,17 @@ const Sidebar = () => {
       path: "/career",
       requiredPermission: null,
       customCheck: (userRole) => userRole === 'superAdmin'
-    }
+    },
+    {
+      icon: Bot,
+      label: "AI Operations",
+      path: "/ai-operations",
+      requiredPermission: null,
+      customCheck: (userRole, userIsSuperAdmin, hasPermission) => (
+        (userRole === "superAdmin" && userIsSuperAdmin === true)
+        || (userRole === "admin" && hasPermission("view_reports"))
+      ),
+    },
   ];
 
   // Filter navigation items based on permissions and roles

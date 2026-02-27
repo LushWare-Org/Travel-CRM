@@ -448,6 +448,46 @@ export const analyticsAPI = {
   },
 };
 
+// AI Automation API Methods
+export const aiAPI = {
+  recommendPackages: async (payload) => {
+    const api = new ApiService();
+    return api.post("/ai/recommend-packages", payload);
+  },
+  comparePackages: async (payload) => {
+    const api = new ApiService();
+    return api.post("/ai/compare-packages", payload);
+  },
+  generateDocuments: async (payload) => {
+    const api = new ApiService();
+    return api.post("/ai/generate-documents", payload);
+  },
+  submitFollowUpFeedback: async (payload) => {
+    const api = new ApiService();
+    return api.post("/ai/followup-feedback", payload);
+  },
+  getAgentStatus: async () => {
+    const api = new ApiService();
+    return api.get("/ai/agents/status");
+  },
+  overrideAgent: async (payload) => {
+    const api = new ApiService();
+    return api.post("/ai/agents/override", payload);
+  },
+  getLogs: async (params = {}) => {
+    const api = new ApiService();
+    return api.get("/ai/logs", params);
+  },
+  getEvents: async (params = {}) => {
+    const api = new ApiService();
+    return api.get("/ai/events", params);
+  },
+  publishEvent: async (payload) => {
+    const api = new ApiService();
+    return api.post("/ai/events/publish", payload);
+  },
+};
+
 // Billing/Quotation API Methods
 export const quotationAPI = {
   getAll: async (params = {}) => {
