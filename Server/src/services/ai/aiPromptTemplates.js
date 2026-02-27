@@ -44,3 +44,13 @@ Rules:
 - End with a clear next step
 - No markdown
 `;
+
+export const recommendationPrompt = ({
+  input,
+  packages,
+  memoryPreference,
+  limit,
+}) => {
+  // this template is mainly illustrative; actual prompt constructed in service
+  return `Recommendation prompt generated dynamically in agent.`;
+};

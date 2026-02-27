@@ -2,6 +2,8 @@ import Package from '../../../models/package.model.js';
 import Lead from '../../../models/lead.model.js';
 import AIMemoryService from '../aiMemory.service.js';
 import BaseAgent from './baseAgent.js';
+import geminiService from '../../gemini.service.js';
+import logger from '../../../config/logger.js';
 
 const normalizeText = (value) => (value || '').toLowerCase().trim();
 
@@ -33,6 +35,7 @@ class RecommendationAgentService extends BaseAgent {
     return matched[1].includes(c) ? 1 : 0;
   }
 
+  // legacy scoring algorithm (used as fallback)
   scorePackage(pkg, input, memoryPreference = {}) {
     const budget = Number(input.budget || 0);
     const travelers = Number(input.numberOfTravelers || 1);
@@ -82,6 +85,65 @@ class RecommendationAgentService extends BaseAgent {
     };
   }
 
+  /**
+   * Build a prompt for Gemini to score and rank packages
+   */
+  buildRecommendationPrompt(input, packages, memoryPreference = {}, limit = 5) {
+    const lines = [];
+    lines.push('You are a travel package recommendation engine.');
+    lines.push('');
+    lines.push('Customer input:');
+    lines.push(`- Budget: ${input.budget || 'not specified'}`);
+    lines.push(`- Destination: ${input.destination || 'not specified'}`);
+    lines.push(`- Number of travelers: ${input.numberOfTravelers || 'not specified'}`);
+    lines.push(`- Travel purpose: ${input.travelPurpose || 'not specified'}`);
+    if (memoryPreference?.preferredDestination) {
+      lines.push(`- Previously expressed preference for destination: ${memoryPreference.preferredDestination}`);
+    }
+    lines.push('');
+    lines.push('Available packages (each line shows id, name, destination, duration (days), price, maxGroupSize, category, rating, bookings):');
+    packages.forEach((pkg) => {
+      const idStr = pkg._id ? String(pkg._id) : 'unknown';
+      lines.push(`- ${idStr}: ${pkg.name} | ${pkg.destination || 'n/a'} | ${pkg.duration || 'n/a'}d | $${pkg.price || 0} | max ${pkg.maxGroupSize || 0} travelers | category: ${pkg.category || 'n/a'} | rating: ${pkg.rating || 0} | bookings: ${pkg.bookings || 0}`);
+    });
+    lines.push('');
+    lines.push(`Please select the top ${limit} packages that best match the customer. Output only a valid JSON array with objects:`);
+    lines.push('[');
+    lines.push('  {"packageId": "<id>", "score": <0-1>, "reasons": ["reason1","reason2"]},');
+    lines.push('  ... up to limit items');
+    lines.push(']');
+    lines.push('Sort the array by score descending. Do not include any additional text.');
+    lines.push('');
+    return lines.join('\n');
+  }
+
+  /**
+   * Attempt to parse Gemini output into recommendation objects. Returns null if parsing fails.
+   */
+  parseRecommendationResponse(raw, packages, limit) {
+    try {
+      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) return null;
+      const arr = JSON.parse(jsonMatch[0]);
+      if (!Array.isArray(arr)) return null;
+      const recommendations = [];
+      for (let i = 0; i < arr.length && recommendations.length < limit; i += 1) {
+        const item = arr[i];
+        const pkg = packages.find((p) => String(p._id) === String(item.packageId));
+        if (!pkg) continue;
+        recommendations.push({
+          rank: recommendations.length + 1,
+          score: typeof item.score === 'number' ? item.score : 0,
+          explainability: Array.isArray(item.reasons) ? item.reasons : [],
+          package: pkg,
+        });
+      }
+      return recommendations.length ? recommendations : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async recommendPackages(input, limit = 5) {
     const query = {
       isActive: true,
@@ -97,26 +159,39 @@ class RecommendationAgentService extends BaseAgent {
       : null;
     const memoryPreference = memory?.content || {};
 
-    const ranked = packages.map((pkg) => {
-      const result = this.scorePackage(pkg, input, memoryPreference);
-      return {
-        package: pkg,
-        score: result.score,
-        reasons: result.reasons,
-      };
-    });
+    // attempt LLM recommendations
+    let recommendations = null;
+    try {
+      const prompt = this.buildRecommendationPrompt(input, packages, memoryPreference, limit);
+      const raw = await geminiService.generateContent(prompt, { temperature: 0.6, maxTokens: 800 });
+      recommendations = this.parseRecommendationResponse(raw, packages, limit);
+    } catch (error) {
+      // log error and fallback to traditional ranking
+      // avoid crashing when LLM is unavailable
+      // eslint-disable-next-line no-console
+      logger?.warn?.('Gemini recommendation failed, falling back to rule-based scoring:', error.message || error);
+    }
 
-    ranked.sort((a, b) => b.score - a.score);
-    const recommendations = ranked.slice(0, limit).map((entry, index) => ({
-      rank: index + 1,
-      score: entry.score,
-      explainability: entry.reasons,
-      package: entry.package,
-    }));
+    if (!recommendations) {
+      const ranked = packages.map((pkg) => {
+        const result = this.scorePackage(pkg, input, memoryPreference);
+        return {
+          package: pkg,
+          score: result.score,
+          reasons: result.reasons,
+        };
+      });
+      ranked.sort((a, b) => b.score - a.score);
+      recommendations = ranked.slice(0, limit).map((entry, index) => ({
+        rank: index + 1,
+        score: entry.score,
+        explainability: entry.reasons,
+        package: entry.package,
+      }));
+    }
 
     return recommendations;
   }
-
   async comparePackages(packageIds, context = {}) {
     const packages = await Package.find({ _id: { $in: packageIds } })
       .select('name destination duration price maxGroupSize category rating bookings')
