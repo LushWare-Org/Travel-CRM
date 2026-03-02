@@ -51,6 +51,7 @@ const AIAutomation = () => {
   const [agentStatus, setAgentStatus] = useState(null);
   const [logs, setLogs] = useState([]);
   const [events, setEvents] = useState([]);
+  const [followUpLogs, setFollowUpLogs] = useState([]);
 
   const [overridePayload, setOverridePayload] = useState({
     agentName: "customer-messaging-agent",
@@ -136,14 +137,16 @@ const AIAutomation = () => {
   };
 
   const loadOpsData = async () => {
-    const [statusRes, logsRes, eventsRes] = await Promise.all([
+    const [statusRes, logsRes, eventsRes, followUpLogsRes] = await Promise.all([
       runAsync(() => aiAPI.getAgentStatus()),
       runAsync(() => aiAPI.getLogs({ limit: 20 })),
       runAsync(() => aiAPI.getEvents({ limit: 20 })),
+      runAsync(() => aiAPI.getLogs({ limit: 100, agentName: "follow-up-agent" })),
     ]);
     if (statusRes?.data) setAgentStatus(statusRes.data);
     if (logsRes?.data) setLogs(logsRes.data);
     if (eventsRes?.data) setEvents(eventsRes.data);
+    if (followUpLogsRes?.data) setFollowUpLogs(followUpLogsRes.data);
   };
 
   const handleOverride = async () => {
@@ -168,7 +171,46 @@ const AIAutomation = () => {
 
   const handleFeedback = async () => {
     await runAsync(() => aiAPI.submitFollowUpFeedback(feedbackPayload), "Feedback submitted");
+    await loadOpsData();
   };
+
+  const followUpMetrics = (() => {
+    const totalRuns = followUpLogs.length;
+    const completed = followUpLogs.filter((log) => log.status === "completed").length;
+    const failed = followUpLogs.filter((log) => log.status === "failed").length;
+    const skipped = followUpLogs.filter((log) => log.status === "skipped").length;
+
+    const durationSamples = followUpLogs
+      .map((log) => Number(log.durationMs))
+      .filter((durationMs) => Number.isFinite(durationMs) && durationMs >= 0);
+    const averageDurationMs = durationSamples.length
+      ? Math.round(durationSamples.reduce((sum, durationMs) => sum + durationMs, 0) / durationSamples.length)
+      : 0;
+
+    const eventBreakdown = followUpLogs.reduce((acc, log) => {
+      const key = log.eventType || "unknown";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    const highRiskPredictions = followUpLogs.filter(
+      (log) => Number(log.output?.dropOffProbability) >= 0.75,
+    ).length;
+    const generatedMessages = followUpLogs.filter((log) => Boolean(log.output?.message)).length;
+    const successRate = totalRuns ? Math.round((completed / totalRuns) * 100) : 0;
+
+    return {
+      totalRuns,
+      completed,
+      failed,
+      skipped,
+      averageDurationMs,
+      successRate,
+      highRiskPredictions,
+      generatedMessages,
+      eventBreakdown,
+    };
+  })();
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -349,6 +391,78 @@ const AIAutomation = () => {
           </button>
         </Card>
       </div>
+
+      <Card title="Follow-up Agent Performance">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Total Runs</div>
+            <div className="text-2xl font-bold text-slate-900">{followUpMetrics.totalRuns}</div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Success Rate</div>
+            <div className="text-2xl font-bold text-emerald-700">{followUpMetrics.successRate}%</div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Avg Duration</div>
+            <div className="text-2xl font-bold text-slate-900">{followUpMetrics.averageDurationMs} ms</div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Messages Generated</div>
+            <div className="text-2xl font-bold text-sky-700">{followUpMetrics.generatedMessages}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+          <div className="rounded-lg border border-slate-200 p-3">
+            <div className="text-sm font-semibold text-slate-800 mb-2">Status Breakdown</div>
+            <div className="text-sm text-slate-600 space-y-1">
+              <div>Completed: {followUpMetrics.completed}</div>
+              <div>Failed: {followUpMetrics.failed}</div>
+              <div>Skipped: {followUpMetrics.skipped}</div>
+              <div>High Risk Predictions (Larger than 0.75): {followUpMetrics.highRiskPredictions}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-3">
+            <div className="text-sm font-semibold text-slate-800 mb-2">Trigger Mix</div>
+            <div className="text-sm text-slate-600 space-y-1">
+              {Object.entries(followUpMetrics.eventBreakdown).length === 0 ? (
+                <div>No follow-up executions yet.</div>
+              ) : (
+                Object.entries(followUpMetrics.eventBreakdown).map(([eventType, count]) => (
+                  <div key={eventType}>
+                    {eventType}: {count}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <div className="text-sm font-semibold text-slate-800 mb-2">Recent Follow-up Executions</div>
+          <div className="space-y-2 max-h-72 overflow-auto">
+            {followUpLogs.slice(0, 10).map((log) => (
+              <div key={log._id} className="border border-slate-200 rounded-lg p-3 text-sm">
+                <div className="font-medium text-slate-800">{log.eventType}</div>
+                <div className="text-slate-600">
+                  {log.status} | {log.durationMs ?? 0} ms | {new Date(log.createdAt).toLocaleString()}
+                </div>
+                {typeof log.output?.dropOffProbability === "number" && (
+                  <div className="text-slate-500 text-xs mt-1">
+                    Drop-off probability: {(log.output.dropOffProbability * 100).toFixed(0)}%
+                  </div>
+                )}
+              </div>
+            ))}
+            {followUpLogs.length === 0 && (
+              <div className="border border-slate-200 rounded-lg p-3 text-sm text-slate-500">
+                No follow-up agent logs found. Use Refresh Operations after traffic is processed.
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card title="Agent Controls">

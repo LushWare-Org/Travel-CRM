@@ -8,4 +8,6 @@ export const updateSettingsSchema = Joi.object({
   maxOpenLeadsPerRep: Joi.number().integer().min(1),
   skipInactive: Joi.boolean(),
   requireActiveLogin48h: Joi.boolean(), // Only assign to sales reps who logged in within 1 hour
+  autoRecommendationEmails: Joi.boolean(),
+  autoFollowUpEmails: Joi.boolean(),
 });

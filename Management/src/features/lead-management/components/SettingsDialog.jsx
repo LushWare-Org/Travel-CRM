@@ -58,7 +58,7 @@ const SettingsDialog = ({
 
       const response = await adminAPI.updateSettings(backendPayload);
       if (response.success) {
-        setAssignmentSettings(localSettings);
+        setAssignmentSettings((prev) => ({ ...prev, ...localSettings }));
         toast.success('Settings saved successfully');
         onClose();
       } else {
@@ -245,6 +245,7 @@ const SettingsDialog = ({
               />
             </button>
           </div>
+
         </div>
 
         {/* Footer */}

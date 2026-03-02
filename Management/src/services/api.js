@@ -1,6 +1,6 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://api.lushtravelcloud.com/api/v1";
-  // import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+  //import.meta.env.VITE_API_URL || "https://api.lushtravelcloud.com/api/v1";
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
 
 class ApiService {
   constructor() {
@@ -485,6 +485,16 @@ export const aiAPI = {
   publishEvent: async (payload) => {
     const api = new ApiService();
     return api.post("/ai/events/publish", payload);
+  },
+  sendLeadRecommendationsEmail: async (leadId, payload = {}) => {
+    const api = new ApiService();
+    let res = api.post(`/ai/leads/${leadId}/send-recommendations-email`, payload);
+    console.log(payload);
+    return res;
+  },
+  sendLeadFollowUpEmail: async (leadId, payload = {}) => {
+    const api = new ApiService();
+    return api.post(`/ai/leads/${leadId}/send-followup-email`, payload);
   },
 };
 

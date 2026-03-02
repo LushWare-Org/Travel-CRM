@@ -18,6 +18,8 @@ export const updateSettings = asyncHandler(async (req, res) => {
     'maxOpenLeadsPerRep',
     'skipInactive',
     'requireActiveLogin48h',
+    'autoRecommendationEmails',
+    'autoFollowUpEmails',
   ];
 
   updatable.forEach((key) => {

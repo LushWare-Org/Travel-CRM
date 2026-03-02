@@ -9,11 +9,14 @@ class AITriggerService {
     });
   }
 
-  async publishLeadUpdated(lead, source = 'lead.controller') {
+  async publishLeadUpdated(lead, source = 'lead.controller', metadata = {}) {
     return aiEventBusService.publish({
       type: 'lead.updated',
       source,
-      payload: { leadId: String(lead._id) },
+      payload: {
+        leadId: String(lead._id),
+        changedFields: Array.isArray(metadata.changedFields) ? metadata.changedFields : undefined,
+      },
     });
   }
 

@@ -15,7 +15,7 @@ import {
   List,
 } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { leadAPI, adminAPI } from "../services/api";
+import { leadAPI, adminAPI, aiAPI } from "../services/api";
 import toast from "react-hot-toast";
 import LeadStats from "../features/lead-management/components/LeadStats";
 import LeadFilters from "../features/lead-management/components/LeadFilters";
@@ -32,6 +32,7 @@ import ReceiptDialog from "../features/lead-management/components/ReceiptDialog"
 import VoucherDialog from "../features/lead-management/components/VoucherDialog";
 import LeadSectionView from "../features/lead-management/components/LeadSectionView";
 import ActiveSalesRepsDialog from "../features/lead-management/components/ActiveSalesRepsDialog";
+import EmailAutomationWidget from "../features/lead-management/components/EmailAutomationWidget";
 
 const statusColors = {
   new: "bg-blue-100 text-blue-700",
@@ -82,6 +83,8 @@ const LeadManagement = () => {
     mode: "manual",
     strategy: "round-robin",
     requireActiveLogin: false,
+    autoRecommendationEmails: true,
+    autoFollowUpEmails: true,
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -90,6 +93,8 @@ const LeadManagement = () => {
   const [sectionLead, setSectionLead] = useState(null);
   const [showSectionView, setShowSectionView] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
+  const [aiActionLoading, setAiActionLoading] = useState({});
+  const [automationSavingKey, setAutomationSavingKey] = useState("");
 
   const leadsPerPage = 12;
 
@@ -175,6 +180,8 @@ const LeadManagement = () => {
           mode: data.assignmentMode || "manual",
           strategy: data.autoStrategy === 'load_based' ? 'load-based' : 'round-robin',
           requireActiveLogin: data.requireActiveLogin48h || false,
+          autoRecommendationEmails: data.autoRecommendationEmails !== false,
+          autoFollowUpEmails: data.autoFollowUpEmails !== false,
         });
       }
     } catch (err) {
@@ -247,6 +254,76 @@ const LeadManagement = () => {
     setStatusLead(null);
   };
 
+  const handleToggleAutomationSetting = async (key) => {
+    const currentValue = assignmentSettings[key] !== false;
+    const newValue = !currentValue;
+
+    setAutomationSavingKey(key);
+    setAssignmentSettings((prev) => ({ ...prev, [key]: newValue }));
+
+    try {
+      const response = await adminAPI.updateSettings({ [key]: newValue });
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to update automation setting");
+      }
+
+      const data = response?.data || {};
+      setAssignmentSettings((prev) => ({
+        ...prev,
+        autoRecommendationEmails: data.autoRecommendationEmails !== false,
+        autoFollowUpEmails: data.autoFollowUpEmails !== false,
+      }));
+
+      const settingLabel = key === "autoRecommendationEmails" ? "Auto recommendation emails" : "Auto follow-up emails";
+      toast.success(`${settingLabel} ${newValue ? "enabled" : "disabled"}`);
+    } catch (err) {
+      setAssignmentSettings((prev) => ({ ...prev, [key]: currentValue }));
+      toast.error(err.message || "Failed to update automation setting");
+    } finally {
+      setAutomationSavingKey("");
+    }
+  };
+
+  const setLeadAiLoading = (leadId, action, isLoading) => {
+    const key = `${leadId}:${action}`;
+    setAiActionLoading((prev) => ({
+      ...prev,
+      [key]: isLoading,
+    }));
+  };
+
+  const isLeadAiLoading = (leadId, action) => Boolean(aiActionLoading[`${leadId}:${action}`]);
+
+  const handleSendRecommendations = async (lead) => {
+    const leadId = lead?._id || lead?.id;
+    if (!leadId) return;
+
+    try {
+      setLeadAiLoading(leadId, "recommendations", true);
+      await aiAPI.sendLeadRecommendationsEmail(leadId, { limit: 5 });
+      toast.success(`Recommendation email sent to ${lead.name || "lead"}`);
+    } catch (err) {
+      toast.error(err.message || "Failed to send recommendation email");
+    } finally {
+      setLeadAiLoading(leadId, "recommendations", false);
+    }
+  };
+
+  const handleSendFollowUp = async (lead) => {
+    const leadId = lead?._id || lead?.id;
+    if (!leadId) return;
+
+    try {
+      setLeadAiLoading(leadId, "followup", true);
+      await aiAPI.sendLeadFollowUpEmail(leadId);
+      toast.success(`Follow-up email sent to ${lead.name || "lead"}`);
+    } catch (err) {
+      toast.error(err.message || "Failed to send follow-up email");
+    } finally {
+      setLeadAiLoading(leadId, "followup", false);
+    }
+  };
+
   const statusCounts = useMemo(() => {
     const counts = { all: leads.length };
     Object.keys(statusLabels).forEach((status) => {
@@ -284,6 +361,12 @@ const LeadManagement = () => {
                   <LayoutGrid className="w-4 h-4" />
                 </button>
               </div>
+              <EmailAutomationWidget
+                settings={assignmentSettings}
+                savingKey={automationSavingKey}
+                onToggleRecommendation={() => handleToggleAutomationSetting("autoRecommendationEmails")}
+                onToggleFollowUp={() => handleToggleAutomationSetting("autoFollowUpEmails")}
+              />
               <button
                 onClick={fetchLeads}
                 disabled={loading}
@@ -376,6 +459,10 @@ const LeadManagement = () => {
               setSectionLead(lead);
               setShowSectionView(true);
             }}
+            onSendRecommendations={handleSendRecommendations}
+            onSendFollowUp={handleSendFollowUp}
+            isRecommendationSending={(leadId) => isLeadAiLoading(leadId, "recommendations")}
+            isFollowUpSending={(leadId) => isLeadAiLoading(leadId, "followup")}
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={goToPage}

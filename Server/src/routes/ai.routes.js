@@ -10,6 +10,8 @@ import {
   getEventQueue,
   publishEvent,
   submitFollowUpFeedback,
+  sendLeadRecommendationsEmail,
+  sendLeadFollowUpEmail,
 } from '../controllers/ai.controller.js';
 
 const router = express.Router();
@@ -20,6 +22,8 @@ router.post('/recommend-packages', authorize('admin', 'salesRep'), recommendPack
 router.post('/compare-packages', authorize('admin', 'salesRep'), comparePackages);
 router.post('/generate-documents', authorize('admin', 'salesRep'), generateDocuments);
 router.post('/followup-feedback', authorize('admin', 'salesRep'), submitFollowUpFeedback);
+router.post('/leads/:leadId/send-recommendations-email', authorize('admin', 'salesRep'), sendLeadRecommendationsEmail);
+router.post('/leads/:leadId/send-followup-email', authorize('admin', 'salesRep'), sendLeadFollowUpEmail);
 
 router.get('/agents/status', authorize('admin'), getAgentStatus);
 router.post('/agents/override', authorize('admin'), overrideAgent);

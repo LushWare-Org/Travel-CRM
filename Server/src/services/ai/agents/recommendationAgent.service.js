@@ -4,8 +4,24 @@ import AIMemoryService from '../aiMemory.service.js';
 import BaseAgent from './baseAgent.js';
 import geminiService from '../../gemini.service.js';
 import logger from '../../../config/logger.js';
+import emailService from '../../../utils/emailService.js';
+import packageAIPDFGenerator from '../../../utils/packageAIPDFGenerator.js';
+import messagingAgentService from './messagingAgent.service.js';
+import followUpAgentService from './followUpAgent.service.js';
+import Settings from '../../../models/settings.model.js';
 
 const normalizeText = (value) => (value || '').toLowerCase().trim();
+const IMPORTANT_RECOMMENDATION_FIELDS = new Set([
+  'budget',
+  'destination',
+  'destinationCountry',
+  'numberOfTravelers',
+  'tags',
+  'travelDate',
+  'endDate',
+  'package',
+  'customizedPackage',
+]);
 
 class RecommendationAgentService extends BaseAgent {
   constructor() {
@@ -19,6 +35,29 @@ class RecommendationAgentService extends BaseAgent {
       'lead.status.changed',
       'ai.recommendation.requested',
     ].includes(eventType);
+  }
+
+  hasImportantRecommendationChanges(changedFields = []) {
+    if (!Array.isArray(changedFields) || !changedFields.length) return false;
+    return changedFields.some((field) => IMPORTANT_RECOMMENDATION_FIELDS.has(field));
+  }
+
+  didRecommendationsChange(previous = [], next = []) {
+    const prevIds = previous
+      .map((item) => String(item?.package?._id || item?.packageId || ''))
+      .filter(Boolean)
+      .slice(0, 5);
+    const nextIds = next
+      .map((item) => String(item?.package?._id || item?.packageId || ''))
+      .filter(Boolean)
+      .slice(0, 5);
+
+    if (!prevIds.length && nextIds.length) return true;
+    if (prevIds.length !== nextIds.length) return true;
+    for (let i = 0; i < prevIds.length; i += 1) {
+      if (prevIds[i] !== nextIds[i]) return true;
+    }
+    return false;
   }
 
   getPurposeCategoryBoost(purpose = '', category = '') {
@@ -85,9 +124,6 @@ class RecommendationAgentService extends BaseAgent {
     };
   }
 
-  /**
-   * Build a prompt for Gemini to score and rank packages
-   */
   buildRecommendationPrompt(input, packages, memoryPreference = {}, limit = 5) {
     const lines = [];
     lines.push('You are a travel package recommendation engine.');
@@ -117,9 +153,6 @@ class RecommendationAgentService extends BaseAgent {
     return lines.join('\n');
   }
 
-  /**
-   * Attempt to parse Gemini output into recommendation objects. Returns null if parsing fails.
-   */
   parseRecommendationResponse(raw, packages, limit) {
     try {
       const jsonMatch = raw.match(/\[[\s\S]*\]/);
@@ -144,6 +177,129 @@ class RecommendationAgentService extends BaseAgent {
     }
   }
 
+  buildRecommendationMessage(lead, recommendations) {
+    const greetingName = lead?.name || 'there';
+    const leadDestination = lead?.destination || lead?.destinationCountry || 'your destination';
+    const intro = `Hi ${greetingName}, based on your travel details, here are our top package recommendations for ${leadDestination}:`;
+    const packageLines = recommendations.map((item, index) => {
+      const pkg = item.package || {};
+      const reasons = Array.isArray(item.explainability) ? item.explainability.filter(Boolean).slice(0, 2) : [];
+      const reasonText = reasons.length ? ` (${reasons.join('; ')})` : '';
+      return `${index + 1}. ${pkg.name || 'Travel Package'} - ${pkg.destination || 'Destination'} - ${pkg.price ? `USD ${pkg.price}` : 'Price on request'}${reasonText}`;
+    });
+    const outro = 'Reply to this email and we will finalize the best option for you.';
+    return [intro, ...packageLines, '', outro].join('\n');
+  }
+
+  buildRecommendationEmailHtml(lead, recommendations, packageAttachments = []) {
+    const leadDestination = lead?.destination || lead?.destinationCountry || 'your destination';
+    const recommendationRows = recommendations.map((item, index) => {
+      const pkg = item.package || {};
+      return `
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0;">
+            <div style="color: #0F172A; font-size: 16px; font-weight: 600;">${index + 1}. ${pkg.name || 'Travel Package'}</div>
+            <div style="color: #334155; font-size: 14px; margin-top: 4px;">${pkg.destination || 'Destination'} | ${pkg.duration ? `${pkg.duration} days` : 'Duration on request'} | ${pkg.price ? `USD ${pkg.price}` : 'Price on request'}</div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const attachmentRows = packageAttachments.map((entry) => `
+      <li style="margin: 8px 0; color: #334155; font-size: 14px;">
+        <strong>${entry.packageName || 'Travel Package'}</strong>
+      </li>
+    `).join('');
+
+    return emailService.getEmailTemplate(`
+      <h1 style="color: #0F172A; font-size: 28px; margin: 0 0 8px 0;">Your Recommended Travel Options</h1>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 24px 0;">Hi ${lead?.name || 'there'}, here are our top package recommendations for <strong>${leadDestination}</strong>.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 20px 0;">
+        ${recommendationRows}
+      </table>
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; margin: 20px 0;">
+        <h2 style="color: #0F172A; font-size: 18px; margin: 0 0 10px 0;">Attached Package PDFs</h2>
+        <ul style="padding-left: 20px; margin: 0;">
+          ${attachmentRows}
+        </ul>
+      </div>
+      <p style="color: #334155; line-height: 1.6; margin: 20px 0 0 0;">Reply to this email and we will finalize the best option for you.</p>
+    `);
+  }
+
+  async buildPackageAttachments(recommendations) {
+    const seen = new Set();
+    const attachments = [];
+    const packageArtifacts = [];
+    for (const item of recommendations) {
+      const pkg = item?.package || {};
+      const packageId = String(pkg._id || '');
+      if (!packageId || seen.has(packageId)) continue;
+      seen.add(packageId);
+      const pdfBuffer = await packageAIPDFGenerator.generatePackagePDF(packageId);
+      attachments.push({
+        filename: `package-${packageId}.pdf`,
+        content: pdfBuffer,
+      });
+      packageArtifacts.push({
+        packageId,
+        packageName: pkg.name || 'Travel Package',
+      });
+    }
+    return { attachments, packageArtifacts };
+  }
+
+  async autoSendRecommendationAndFollowUp({
+    event,
+    lead,
+    recommendations,
+    settings,
+  }) {
+    if (!lead?.email || !recommendations.length) return;
+
+    const { attachments, packageArtifacts } = await this.buildPackageAttachments(recommendations);
+    const message = this.buildRecommendationMessage(lead, recommendations);
+    const html = this.buildRecommendationEmailHtml(lead, recommendations, packageArtifacts);
+    const subject = `Recommended packages for ${lead.destination || lead.destinationCountry || 'your trip'}`;
+
+    await messagingAgentService.execute({
+      type: 'recommendation.message.requested',
+      correlationId: event.correlationId,
+      payload: {
+        leadId: String(lead._id),
+        subject,
+        message,
+        html,
+        attachments,
+        channels: ['email'],
+      },
+    });
+
+    if (settings?.autoFollowUpEmails && String(lead.status || '').toLowerCase() === 'new') {
+      const followUpResult = await followUpAgentService.execute({
+        type: 'followup.triggered',
+        correlationId: event.correlationId,
+        payload: {
+          leadId: String(lead._id),
+          channels: ['email'],
+          suppressPublish: true,
+        },
+      });
+
+      if (!followUpResult?.skipped && followUpResult?.message) {
+        await messagingAgentService.execute({
+          type: 'followup.message.requested',
+          correlationId: event.correlationId,
+          payload: {
+            leadId: String(lead._id),
+            message: followUpResult.message,
+            channels: ['email'],
+          },
+        });
+      }
+    }
+  }
+
   async recommendPackages(input, limit = 5) {
     const query = {
       isActive: true,
@@ -159,16 +315,12 @@ class RecommendationAgentService extends BaseAgent {
       : null;
     const memoryPreference = memory?.content || {};
 
-    // attempt LLM recommendations
     let recommendations = null;
     try {
       const prompt = this.buildRecommendationPrompt(input, packages, memoryPreference, limit);
       const raw = await geminiService.generateContent(prompt, { temperature: 0.6, maxTokens: 800 });
       recommendations = this.parseRecommendationResponse(raw, packages, limit);
     } catch (error) {
-      // log error and fallback to traditional ranking
-      // avoid crashing when LLM is unavailable
-      // eslint-disable-next-line no-console
       logger?.warn?.('Gemini recommendation failed, falling back to rule-based scoring:', error.message || error);
     }
 
@@ -192,6 +344,7 @@ class RecommendationAgentService extends BaseAgent {
 
     return recommendations;
   }
+
   async comparePackages(packageIds, context = {}) {
     const packages = await Package.find({ _id: { $in: packageIds } })
       .select('name destination duration price maxGroupSize category rating bookings')
@@ -228,7 +381,14 @@ class RecommendationAgentService extends BaseAgent {
       travelPurpose: event.payload?.travelPurpose || lead?.tags?.join(' '),
     };
 
+    const previousRecommendationMemory = leadId
+      ? await AIMemoryService.getLatest('lead', leadId, 'recommendation')
+      : null;
+    const previousRecommendations = previousRecommendationMemory?.content?.recommendations || [];
+
     const recommendations = await this.recommendPackages(input, event.payload?.limit || 5);
+    const settings = await Settings.getSingleton();
+
     if (leadId) {
       await AIMemoryService.upsertMemory({
         scopeType: 'lead',
@@ -240,6 +400,29 @@ class RecommendationAgentService extends BaseAgent {
         confidence: 0.7,
       });
     }
+
+    const shouldAutoSend = (() => {
+      if (!lead?.email) return false;
+      if (!settings?.autoRecommendationEmails) return false;
+      if (event.type === 'lead.created') return true;
+      if (event.type !== 'lead.updated') return false;
+      if (!this.hasImportantRecommendationChanges(event?.payload?.changedFields)) return false;
+      return this.didRecommendationsChange(previousRecommendations, recommendations);
+    })();
+
+    if (shouldAutoSend) {
+      try {
+        await this.autoSendRecommendationAndFollowUp({
+          event,
+          lead,
+          recommendations,
+          settings,
+        });
+      } catch (error) {
+        logger.warn(`Auto recommendation/follow-up send failed for lead ${leadId}: ${error.message}`);
+      }
+    }
+
     return { recommendations };
   }
 }

@@ -9,6 +9,7 @@ import { messagingPrompt } from '../aiPromptTemplates.js';
 const STAGE_MAP = {
   'lead.created': 'new lead',
   'lead.website.inquiry': 'inquiry submitted',
+  'recommendation.message.requested': 'package recommendation',
   'quotation.sent': 'quotation sent',
   'booking.confirmed': 'booking confirmed',
   'travel.pre_reminder': 'pre-travel reminders',
@@ -33,15 +34,51 @@ class MessagingAgentService extends BaseAgent {
     return twilio(sid, token);
   }
 
-  async sendEmail(lead, content) {
+  buildFollowUpEmailHtml(lead, content) {
+    const safeMessage = String(content || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/\n/g, '<br/>');
+    const name = lead?.name || 'there';
+    const destination = lead?.destination || lead?.destinationCountry || 'your trip';
+
+    return emailService.getEmailTemplate(`
+      <h1 style="color: #0F172A; font-size: 28px; margin: 0 0 8px 0;">Following Up On Your Travel Plan</h1>
+      <p style="color: #64748B; line-height: 1.6; margin: 0 0 24px 0;">Hi ${name}, we wanted to check in regarding your plan for <strong>${destination}</strong>.</p>
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; margin: 20px 0;">
+        <p style="color: #334155; font-size: 15px; line-height: 1.7; margin: 0;">${safeMessage}</p>
+      </div>
+      <p style="color: #334155; line-height: 1.6; margin: 20px 0 0 0;">Reply to this email and we will help you finalize everything quickly.</p>
+    `);
+  }
+
+  async sendEmail(lead, content, options = {}) {
     if (!lead?.email) return { channel: 'email', status: 'skipped', reason: 'missing email' };
+    const defaultHtml = options.eventType === 'followup.message.requested'
+      ? this.buildFollowUpEmailHtml(lead, content)
+      : `<p>${String(content || '').replace(/\n/g, '<br/>')}</p>`;
+    const html = options.html || defaultHtml;
+    const subject = options.subject
+      || (options.eventType === 'followup.message.requested'
+        ? `Quick follow-up on your ${lead.destination || 'travel'} plan`
+        : 'Travel Update');
+
     await emailService.sendEmail({
       to: lead.email,
-      subject: 'Travel Update',
+      subject,
       text: content,
-      html: `<p>${content}</p>`,
+      html,
+      attachments: options.attachments || [],
     });
-    return { channel: 'email', status: 'sent' };
+
+    return {
+      channel: 'email',
+      status: 'sent',
+      attachmentCount: Array.isArray(options.attachments) ? options.attachments.length : 0,
+    };
   }
 
   async sendWhatsApp(lead, content) {
@@ -109,7 +146,14 @@ class MessagingAgentService extends BaseAgent {
     const channels = event.payload?.channels || ['email', 'whatsapp', 'sms', 'inapp'];
     const deliveries = [];
 
-    if (channels.includes('email')) deliveries.push(await this.sendEmail(lead, content));
+    if (channels.includes('email')) {
+      deliveries.push(await this.sendEmail(lead, content, {
+        subject: event.payload?.subject,
+        html: event.payload?.html,
+        attachments: event.payload?.attachments,
+        eventType: event.type,
+      }));
+    }
     if (channels.includes('whatsapp')) deliveries.push(await this.sendWhatsApp(lead, content));
     if (channels.includes('sms')) deliveries.push(await this.sendSMS(lead, content));
     if (channels.includes('inapp')) deliveries.push({ channel: 'inapp', status: 'queued' });

@@ -436,7 +436,9 @@ export const updateLead = asyncHandler(async (req, res, next) => {
     logger.info(`ℹ️  Email not sent: Lead already assigned to the same sales rep (${newAssignedTo})`);
   }
 
-  aiTriggerService.publishLeadUpdated(lead).catch((error) => {
+  const changedFields = Object.keys(req.body || {}).filter((key) => req.body[key] !== undefined);
+
+  aiTriggerService.publishLeadUpdated(lead, 'lead.controller', { changedFields }).catch((error) => {
     logger.error(`AI trigger failed for lead updated ${lead._id}: ${error.message}`);
   });
   if (previousStatus !== lead.status) {

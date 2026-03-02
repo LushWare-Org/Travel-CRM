@@ -11,7 +11,7 @@ class FollowUpAgentService extends BaseAgent {
   }
 
   shouldHandle(eventType) {
-    return ['lead.created', 'lead.updated', 'quotation.sent', 'followup.triggered'].includes(eventType);
+    return ['quotation.sent', 'followup.triggered'].includes(eventType);
   }
 
   computeLeadScore(lead) {
@@ -95,16 +95,18 @@ class FollowUpAgentService extends BaseAgent {
       tags: ['follow-up'],
     });
 
-    await aiEventBusService.publish({
-      type: 'followup.message.requested',
-      source: this.name,
-      payload: {
-        leadId: String(lead._id),
-        message,
-        channels: ['email', 'whatsapp'],
-      },
-      correlationId: event.correlationId,
-    });
+    if (!event.payload?.suppressPublish) {
+      await aiEventBusService.publish({
+        type: 'followup.message.requested',
+        source: this.name,
+        payload: {
+          leadId: String(lead._id),
+          message,
+          channels: event.payload?.channels || ['email', 'whatsapp'],
+        },
+        correlationId: event.correlationId,
+      });
+    }
 
     return {
       leadScore, dropOffProbability, followUpDate, message,

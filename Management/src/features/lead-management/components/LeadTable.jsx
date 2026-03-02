@@ -15,6 +15,9 @@ import {
   Package,
   Users,
   FolderOpen,
+  Sparkles,
+  Send,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { quotationAPI, invoiceAPI, receiptAPI } from "../../../services/api";
@@ -40,6 +43,10 @@ const LeadTable = ({
   highlightedLeadId,
   onStatusClick,
   onSectionClick,
+  onSendRecommendations,
+  onSendFollowUp,
+  isRecommendationSending,
+  isFollowUpSending,
   viewMode = 'grid',
 }) => {
   const paginationStart = (currentPage - 1) * leadsPerPage + 1;
@@ -77,6 +84,20 @@ const LeadTable = ({
     e.stopPropagation();
     if (onVoucherClick) {
       onVoucherClick(lead);
+    }
+  };
+
+  const handleSendRecommendationsClick = (e, lead) => {
+    e.stopPropagation();
+    if (onSendRecommendations) {
+      onSendRecommendations(lead);
+    }
+  };
+
+  const handleSendFollowUpClick = (e, lead) => {
+    e.stopPropagation();
+    if (onSendFollowUp) {
+      onSendFollowUp(lead);
     }
   };
 
@@ -201,6 +222,8 @@ const LeadTable = ({
             const packageInfo = getPackageDisplay(lead);
             const statusColor = statusColors[lead.status] || statusColors.new;
             const statusLabel = statusLabels[lead.status] || "New";
+            const recommendationSending = isRecommendationSending ? isRecommendationSending(leadId) : false;
+            const followUpSending = isFollowUpSending ? isFollowUpSending(leadId) : false;
 
             return (
               <div
@@ -305,6 +328,36 @@ const LeadTable = ({
 
                 {/* Document Actions Section */}
                 <div className="px-5 py-4 bg-gray-50 rounded-b-xl border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-3">AI Actions</p>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <button
+                      onClick={(e) => handleSendRecommendationsClick(e, lead)}
+                      disabled={recommendationSending || followUpSending}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-sky-700 bg-white border border-sky-200 rounded-lg hover:bg-sky-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                      title="Send recommended packages by email"
+                    >
+                      {recommendationSending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      Recommend
+                    </button>
+                    <button
+                      onClick={(e) => handleSendFollowUpClick(e, lead)}
+                      disabled={followUpSending || recommendationSending}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-indigo-700 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                      title="Send follow-up message by email"
+                    >
+                      {followUpSending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      Follow-up
+                    </button>
+                  </div>
+
                   <p className="text-xs font-medium text-gray-500 mb-3">Documents</p>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {/* Quotation */}
@@ -514,6 +567,8 @@ const LeadTable = ({
               const leadId = (lead._id || lead.id)?.toString();
               const isHighlighted =
                 highlightedLeadId && leadId === highlightedLeadId.toString();
+              const recommendationSending = isRecommendationSending ? isRecommendationSending(leadId) : false;
+              const followUpSending = isFollowUpSending ? isFollowUpSending(leadId) : false;
 
               return (
                 <tr
@@ -667,6 +722,30 @@ const LeadTable = ({
                         title="View Documents"
                       >
                         <FileText className="w-4 h-4 text-blue-700" />
+                      </button>
+                      <button
+                        onClick={(e) => handleSendRecommendationsClick(e, lead)}
+                        disabled={recommendationSending || followUpSending}
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        title="Send Recommended Packages Email"
+                      >
+                        {recommendationSending ? (
+                          <Loader2 className="w-4 h-4 text-sky-600 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-sky-600" />
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => handleSendFollowUpClick(e, lead)}
+                        disabled={followUpSending || recommendationSending}
+                        className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        title="Send Follow-up Email"
+                      >
+                        {followUpSending ? (
+                          <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4 text-indigo-600" />
+                        )}
                       </button>
                     </div>
                   </td>
