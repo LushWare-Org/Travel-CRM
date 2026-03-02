@@ -17,9 +17,6 @@ export const seedLeads = async () => {
     const adminUser = users.find((u) => u.role === 'admin');
     const salesRepUser = users.find((u) => u.role === 'salesRep');
 
-    // Sales rep names (these should NOT match any customer names)
-    const salesReps = ['Sarah Johnson', 'Mike Chen', 'Lisa Anderson', 'David Brown'];
-
     // Sample leads data - 15 leads with ALL statuses represented
     const leads = [
       // Status: new (2 leads)

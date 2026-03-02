@@ -16,9 +16,6 @@ class HotelSuggestionService {
    */
   async suggestHotels(destination, packageType, category, location, count = 5) {
     try {
-      // Prioritize locations if available, otherwise use destination
-      const searchLocation = location || destination;
-
       const prompt = `You are a travel expert. Based on the following information, suggest ${count} best matching hotels:
 
 Destination: ${destination || 'Not specified'}

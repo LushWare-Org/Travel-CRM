@@ -27,7 +27,7 @@ const getPaymentDetails = () => {
 };
 
 // Customer Reviews - These should be customized per deployment or made configurable
-const DESTINATION_REVIEWS = {
+const _DESTINATION_REVIEWS = {
   Generic: [
     {
       name: 'Happy Customer', rating: 5, text: 'Amazing experience! The itinerary was perfectly planned and executed. Highly recommended!', time: '1 month ago',
@@ -221,7 +221,7 @@ const drawModernHeader = (doc, title) => {
 };
 
 // Draw Modern Footer
-const drawModernFooter = (doc, pageNum, totalPages) => {
+const _drawModernFooter = (doc, pageNum, totalPages) => {
   const pageHeight = 842;
   const footerHeight = 50;
   const footerY = pageHeight - footerHeight;
@@ -243,7 +243,7 @@ const drawModernFooter = (doc, pageNum, totalPages) => {
 };
 
 // Legacy aliases for backward compatibility
-const drawWaveHeader = drawModernHeader;
+const _drawWaveHeader = drawModernHeader;
 const drawFooterWave = () => { }; // Deprecated, use drawModernFooter instead
 
 export async function generateQuotationPDF(quotation, lead) {
@@ -638,7 +638,6 @@ export async function generateQuotationPDF(quotation, lead) {
           }
 
           // Highlights / Details (Locations, Meals)
-          const metaY = contentY;
           const metaText = [];
 
           if (day.locations && day.locations.length > 0) metaText.push(`Locations: ${day.locations.join(', ')}`);
@@ -789,10 +788,10 @@ export async function generateQuotationPDF(quotation, lead) {
 
       // Determine Destination for Review Matching
       const dest = (lead?.destination || quotation.package?.destination || quotation.package?.name || '').toLowerCase();
-      let selectedReviews = DESTINATION_REVIEWS['Generic'];
-      if (dest.includes('maldives')) selectedReviews = DESTINATION_REVIEWS['Maldives'];
-      else if (dest.includes('dubai') || dest.includes('uae')) selectedReviews = DESTINATION_REVIEWS['Dubai'];
-      else if (dest.includes('europe') || dest.includes('swiss') || selectedReviews.includes('paris')) selectedReviews = DESTINATION_REVIEWS['Europe'];
+      let selectedReviews = _DESTINATION_REVIEWS.Generic;
+      if (dest.includes('maldives')) selectedReviews = _DESTINATION_REVIEWS.Maldives;
+      else if (dest.includes('dubai') || dest.includes('uae')) selectedReviews = _DESTINATION_REVIEWS.Dubai;
+      else if (dest.includes('europe') || dest.includes('swiss') || selectedReviews.includes('paris')) selectedReviews = _DESTINATION_REVIEWS.Europe;
 
       // Render Reviews as Grid or Cards
       // We will stack them vertically to be safe on PDF
@@ -977,7 +976,6 @@ export async function generateQuotationPDF(quotation, lead) {
             if (imgBuffer) {
               // Draw Image
               // Calculate aspects to center vertically in a 28px height box
-              const aspect = 28 / 28; // height constrained
               // PDFKit scales by width automatically if height not provided, but we want to fit
               doc.image(imgBuffer, lx, logoY, {
                 width: logo.width, height: 28, fit: [logo.width, 28], align: 'center', valign: 'center',
@@ -1311,8 +1309,6 @@ const numberToWords = (n) => {
   const single = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
   const double = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
-  const numToString = n.toString();
 
   if (n === 0) return 'Zero';
 
@@ -1817,8 +1813,6 @@ export function generateReceiptPDF(receipt, invoice, lead) {
         const balance = Math.max(0, totalAmt - paidAmt);
 
         const summaryX = 355;
-        const summaryW = 200;
-
         doc.fillColor(colors.gray).fontSize(10).font('Helvetica-Bold').text('ACCOUNT SUMMARY', summaryX, y);
         y += 15;
 

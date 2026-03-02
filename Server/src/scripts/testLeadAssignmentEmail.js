@@ -5,7 +5,6 @@ import { dirname, join } from 'path';
 import User from '../models/user.model.js';
 import Lead from '../models/lead.model.js';
 import emailService from '../utils/emailService.js';
-import logger from '../config/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

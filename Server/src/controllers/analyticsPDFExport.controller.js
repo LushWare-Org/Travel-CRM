@@ -12,8 +12,6 @@ import Booking from '../models/booking.model.js';
 import Package from '../models/package.model.js';
 import logger from '../config/logger.js';
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 /**
  * Export Lead Analytics as PDF
  * @route POST /api/v1/analytics/leads/export-pdf
@@ -114,11 +112,6 @@ export const exportBillingAnalyticsPDF = asyncHandler(async (req, res) => {
     const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
     const paidAmount = invoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
     const outstandingAmount = totalRevenue - paidAmount;
-
-    const paymentStatuses = invoices.reduce((acc, inv) => {
-      acc[inv.status] = (acc[inv.status] || 0) + 1;
-      return acc;
-    }, {});
 
     // Build stats
     const stats = [

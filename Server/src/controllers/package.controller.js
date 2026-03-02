@@ -6,9 +6,7 @@
 
 import { validationResult } from 'express-validator';
 import packageService from '../services/package.service.js';
-import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import logger from '../config/logger.js';
 
 /**
  * Create a new package

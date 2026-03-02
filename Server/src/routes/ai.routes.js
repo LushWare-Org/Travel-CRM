@@ -12,6 +12,8 @@ import {
   submitFollowUpFeedback,
   sendLeadRecommendationsEmail,
   sendLeadFollowUpEmail,
+  runRiskDetectionBatch,
+  publishRiskOutbox,
 } from '../controllers/ai.controller.js';
 
 const router = express.Router();
@@ -24,6 +26,8 @@ router.post('/generate-documents', authorize('admin', 'salesRep'), generateDocum
 router.post('/followup-feedback', authorize('admin', 'salesRep'), submitFollowUpFeedback);
 router.post('/leads/:leadId/send-recommendations-email', authorize('admin', 'salesRep'), sendLeadRecommendationsEmail);
 router.post('/leads/:leadId/send-followup-email', authorize('admin', 'salesRep'), sendLeadFollowUpEmail);
+router.post('/risk-detection/run', authorize('admin'), runRiskDetectionBatch);
+router.post('/risk-outbox/publish', authorize('admin'), publishRiskOutbox);
 
 router.get('/agents/status', authorize('admin'), getAgentStatus);
 router.post('/agents/override', authorize('admin'), overrideAgent);

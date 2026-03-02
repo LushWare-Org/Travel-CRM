@@ -1,7 +1,7 @@
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { APIFeatures, getPaginationData } from '../utils/apiFeatures.js';
+import { APIFeatures } from '../utils/apiFeatures.js';
 import logger from '../config/logger.js';
 import emailService from '../utils/emailService.js';
 

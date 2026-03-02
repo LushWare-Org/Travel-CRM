@@ -5,15 +5,6 @@ import { fileURLToPath } from 'url';
 import axios from 'axios';
 import BRANDING from '../config/branding.js';
 
-// Helper function to convert RGB array to hex
-const rgbToHex = (rgb) => {
-  const [r, g, b] = rgb;
-  return `#${[r, g, b].map((x) => {
-    const hex = x.toString(16);
-    return hex.length === 1 ? `0${hex}` : hex;
-  }).join('')}`;
-};
-
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
@@ -116,7 +107,6 @@ export async function generateVoucherPDF(voucher, lead) {
     const logoBuffer = loadLogo();
 
     // Get Package Image (Cover)
-    let heroImageBuffer = null;
     const galleryImages = [];
     const pkg = voucher.package || voucher.customizedPackage || {};
     const packageDetails = voucher.packageDetails || {};
@@ -130,7 +120,7 @@ export async function generateVoucherPDF(voucher, lead) {
     }
 
     if (coverImageUrl) {
-      heroImageBuffer = await fetchImage(coverImageUrl);
+      await fetchImage(coverImageUrl);
     }
 
     // Determine Gallery Images Source

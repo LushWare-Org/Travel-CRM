@@ -2,7 +2,6 @@ import Lead from '../models/lead.model.js';
 import Invoice from '../models/invoice.model.js';
 import Booking from '../models/booking.model.js';
 import Itinerary from '../models/itinerary.model.js';
-import Package from '../models/package.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { COUNTRY_NAMES, normalizeString } from '../utils/countryUtils.js';
 import PackageAnalyticsService from '../services/itineraryAnalytics.service.js';
@@ -965,13 +964,6 @@ export const getUserAnalyticsOverview = asyncHandler(async (req, res) => {
       : 0;
 
     // 6. New Users This Period (Last item in trend data)
-    const currentPeriod = trendData[trendData.length - 1] || {};
-    const previousPeriod = trendData[trendData.length - 2] || {};
-
-    const newUsersTrend = previousPeriod.totalNewUsers
-      ? ((currentPeriod.totalNewUsers - previousPeriod.totalNewUsers) / previousPeriod.totalNewUsers * 100).toFixed(1)
-      : 0;
-
     const stats = {
       totalUsers,
       activeUsers,

@@ -343,14 +343,6 @@ class EmailService {
       ? `${BRANDING.company.name} Quotation - ${quotationNumber}`
       : `${BRANDING.company.name} Quotation`;
 
-    const totalsSection = `
-      <ul>
-        <li><strong>Total Amount:</strong> ${this.formatCurrency(quotation.totalAmount)}</li>
-        <li><strong>Valid Until:</strong> ${this.formatDate(quotation.validUntil)}</li>
-        <li><strong>Status:</strong> ${quotation.status?.toUpperCase() || 'DRAFT'}</li>
-      </ul>
-    `;
-
     const content = `
       <h1 style="color: #0F172A; font-size: 28px; margin: 0 0 8px 0;">Your Quotation 📋</h1>
       <p style="color: #64748B; line-height: 1.6; margin: 0 0 24px 0;">Dear ${customerName},</p>

@@ -23,7 +23,6 @@ try {
   console.log('\n📋 .env File Analysis:\n');
 
   let foundGeminiKey = false;
-  let geminiLine = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -31,7 +30,6 @@ try {
     // Check for GEMINI_API_KEY
     if (line.toUpperCase().includes('GEMINI')) {
       foundGeminiKey = true;
-      geminiLine = { lineNumber: i + 1, content: line };
 
       console.log(`✅ Found GEMINI_API_KEY on line ${i + 1}:`);
       console.log(`   ${line.substring(0, 50)}${line.length > 50 ? '...' : ''}`);

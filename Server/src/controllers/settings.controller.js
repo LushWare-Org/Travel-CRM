@@ -1,5 +1,4 @@
 import asyncHandler from '../utils/asyncHandler.js';
-import AppError from '../utils/appError.js';
 import Settings from '../models/settings.model.js';
 
 export const getSettings = asyncHandler(async (req, res) => {

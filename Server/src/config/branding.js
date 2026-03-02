@@ -110,7 +110,7 @@ export const BRANDING = {
  * Helper function to get the full company contact info string
  */
 export const getContactInfo = () => {
-  const { contact, urls } = BRANDING;
+  const { contact } = BRANDING;
   return `Contact us: ${contact.email} | ${contact.phone}`;
 };
 

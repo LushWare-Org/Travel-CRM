@@ -11,7 +11,6 @@
 
 import Itinerary from '../models/itinerary.model.js';
 import Package from '../models/package.model.js';
-import CustomizedPackage from '../models/customizedPackage.model.js';
 import Lead from '../models/lead.model.js';
 import logger from '../config/logger.js';
 
@@ -236,7 +235,8 @@ class PackageAnalyticsService {
 
       return enriched
         .filter((item) => item.destination !== 'Unknown')
-        .sort((a, b) => b.inquiries - a.inquiries);
+        .sort((a, b) => b.inquiries - a.inquiries)
+        .slice(0, limit);
     } catch (error) {
       logger.error('Error in getDestinationPerformance:', error);
       throw error;

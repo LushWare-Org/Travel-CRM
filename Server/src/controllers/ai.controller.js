@@ -13,6 +13,8 @@ import AIEvent from '../models/aiEvent.model.js';
 import aiEventBusService from '../services/ai/aiEventBus.service.js';
 import emailService from '../utils/emailService.js';
 import packageAIPDFGenerator from '../utils/packageAIPDFGenerator.js';
+import riskDetectionAgentService from '../services/ai/agents/riskDetectionAgent.service.js';
+import riskOutboxPublisherWorker from '../services/ai/riskOutboxPublisher.worker.js';
 
 export const recommendPackages = asyncHandler(async (req, res) => {
   const recommendations = await recommendationAgentService.recommendPackages(req.body, req.body.limit || 5);
@@ -135,6 +137,24 @@ export const submitFollowUpFeedback = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: 'Follow-up feedback recorded',
+  });
+});
+
+export const runRiskDetectionBatch = asyncHandler(async (req, res) => {
+  const { date } = req.body || {};
+  const result = await riskDetectionAgentService.runDailyRiskDetection(date);
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+});
+
+export const publishRiskOutbox = asyncHandler(async (req, res) => {
+  const limit = Math.min(200, Math.max(1, Number(req.body?.limit || 50)));
+  const result = await riskOutboxPublisherWorker.publishPendingOutboxEvents({ limit });
+  res.status(200).json({
+    success: true,
+    data: result,
   });
 });
 

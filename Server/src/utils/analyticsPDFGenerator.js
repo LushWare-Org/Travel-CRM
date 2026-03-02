@@ -55,7 +55,6 @@ const loadLogo = () => {
  */
 async function generateAnalyticsPDF(options) {
   const {
-    analyticsType = 'analytics',
     title = 'Analytics Report',
     timeRange = 'monthly',
     stats = [],

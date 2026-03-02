@@ -45,12 +45,7 @@ Rules:
 - No markdown
 `;
 
-export const recommendationPrompt = ({
-  input,
-  packages,
-  memoryPreference,
-  limit,
-}) => {
+export const recommendationPrompt = () => {
   // this template is mainly illustrative; actual prompt constructed in service
   return `Recommendation prompt generated dynamically in agent.`;
 };

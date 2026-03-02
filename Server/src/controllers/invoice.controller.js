@@ -228,7 +228,6 @@ export const updateInvoice = asyncHandler(async (req, res, next) => {
   // Preserve payment information if invoice was already paid
   const existingPaidAmount = invoiceDoc.paidAmount || 0;
   const existingPayments = invoiceDoc.payments || [];
-  const existingPaymentStatus = invoiceDoc.paymentStatus;
 
   invoiceDoc.lastModifiedBy = req.user.id;
 
@@ -537,7 +536,7 @@ export const downloadInvoicePDF = asyncHandler(async (req, res, next) => {
       // fs.unlinkSync(pdfPath);
     });
 
-    fileStream.on('error', (error) => next(new AppError('Error reading PDF file', 500)));
+    fileStream.on('error', () => next(new AppError('Error reading PDF file', 500)));
   } catch (error) {
     return next(new AppError(`Error generating PDF: ${error.message}`, 500));
   }
