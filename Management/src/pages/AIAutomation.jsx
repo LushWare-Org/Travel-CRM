@@ -69,6 +69,12 @@ const AIAutomation = () => {
     leadId: "",
     outcome: "responded",
   });
+  const [riskPayload, setRiskPayload] = useState({
+    date: "",
+    outboxLimit: "50",
+  });
+  const [riskRunResult, setRiskRunResult] = useState(null);
+  const [riskOutboxResult, setRiskOutboxResult] = useState(null);
 
   const runAsync = async (fn, successMessage) => {
     setLoading(true);
@@ -172,6 +178,35 @@ const AIAutomation = () => {
   const handleFeedback = async () => {
     await runAsync(() => aiAPI.submitFollowUpFeedback(feedbackPayload), "Feedback submitted");
     await loadOpsData();
+  };
+
+  const handleRiskSimulation = async () => {
+    const payload = {};
+    if (riskPayload.date?.trim()) {
+      payload.date = riskPayload.date.trim();
+    }
+
+    const response = await runAsync(
+      () => aiAPI.runRiskDetection(payload),
+      "Risk detection batch completed",
+    );
+    if (response?.data) {
+      setRiskRunResult(response.data);
+      await loadOpsData();
+    }
+  };
+
+  const handleRiskOutboxPublish = async () => {
+    const response = await runAsync(
+      () => aiAPI.publishRiskOutbox({
+        limit: Number(riskPayload.outboxLimit || 50),
+      }),
+      "Risk outbox published",
+    );
+    if (response?.data) {
+      setRiskOutboxResult(response.data);
+      await loadOpsData();
+    }
   };
 
   const followUpMetrics = (() => {
@@ -465,6 +500,51 @@ const AIAutomation = () => {
       </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Card title="Risk Detection Agent Simulation">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Score Date (optional YYYY-MM-DD)"
+              value={riskPayload.date}
+              onChange={(e) => setRiskPayload((p) => ({ ...p, date: e.target.value }))}
+              placeholder="2026-03-05"
+            />
+            <Input
+              label="Outbox Publish Limit"
+              value={riskPayload.outboxLimit}
+              onChange={(e) => setRiskPayload((p) => ({ ...p, outboxLimit: e.target.value }))}
+              placeholder="50"
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={handleRiskSimulation}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60"
+            >
+              Simulate Daily Risk Batch
+            </button>
+            <button
+              onClick={handleRiskOutboxPublish}
+              disabled={loading}
+              className="px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60"
+            >
+              Publish Risk Outbox
+            </button>
+          </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <pre className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs overflow-auto max-h-56">
+              {riskRunResult
+                ? JSON.stringify(riskRunResult, null, 2)
+                : "Run summary will appear here after simulation."}
+            </pre>
+            <pre className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs overflow-auto max-h-56">
+              {riskOutboxResult
+                ? JSON.stringify(riskOutboxResult, null, 2)
+                : "Outbox publish summary will appear here."}
+            </pre>
+          </div>
+        </Card>
+
         <Card title="Agent Controls">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Input

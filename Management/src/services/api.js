@@ -486,6 +486,14 @@ export const aiAPI = {
     const api = new ApiService();
     return api.post("/ai/events/publish", payload);
   },
+  runRiskDetection: async (payload = {}) => {
+    const api = new ApiService();
+    return api.post("/ai/risk-detection/run", payload);
+  },
+  publishRiskOutbox: async (payload = {}) => {
+    const api = new ApiService();
+    return api.post("/ai/risk-outbox/publish", payload);
+  },
   sendLeadRecommendationsEmail: async (leadId, payload = {}) => {
     const api = new ApiService();
     let res = api.post(`/ai/leads/${leadId}/send-recommendations-email`, payload);
