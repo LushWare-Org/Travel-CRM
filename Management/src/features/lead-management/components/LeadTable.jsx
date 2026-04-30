@@ -15,6 +15,7 @@ import {
   Package,
   Users,
   FolderOpen,
+  Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { quotationAPI, invoiceAPI, receiptAPI } from "../../../services/api";
@@ -40,6 +41,8 @@ const LeadTable = ({
   highlightedLeadId,
   onStatusClick,
   onSectionClick,
+  onDeleteClick,
+  canDelete,
   viewMode = 'grid',
 }) => {
   const paginationStart = (currentPage - 1) * leadsPerPage + 1;
@@ -224,15 +227,31 @@ const LeadTable = ({
                         ID: {leadId?.slice(-8)}
                       </p>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStatusClick?.(lead);
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-transform hover:scale-105 ${statusColor}`}
-                    >
-                      {statusLabel}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStatusClick?.(lead);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-transform hover:scale-105 ${statusColor}`}
+                      >
+                        {statusLabel}
+                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm("Are you sure you want to delete this lead? This action cannot be undone.")) {
+                              onDeleteClick?.(lead);
+                            }
+                          }}
+                          className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
+                          title="Delete Lead"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Contact Info */}
@@ -668,6 +687,20 @@ const LeadTable = ({
                       >
                         <FileText className="w-4 h-4 text-blue-700" />
                       </button>
+                      {canDelete && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm("Are you sure you want to delete this lead? This action cannot be undone.")) {
+                              onDeleteClick?.(lead);
+                            }
+                          }}
+                          className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-red-200"
+                          title="Delete Lead"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

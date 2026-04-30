@@ -449,8 +449,13 @@ export const downloadQuotationPDF = asyncHandler(async (req, res, next) => {
       path: 'lead',
       populate: [
         {
+          path: 'assignedTo',
+          select: 'name email phone mobile',
+        },
+        {
           path: 'package',
           select: 'name description destination duration price images coverImage inclusions exclusions highlights itinerary',
+          populate: { path: 'itinerary', select: 'days' }
         },
         {
           path: 'customizedPackage',
@@ -475,10 +480,16 @@ export const downloadQuotationPDF = asyncHandler(async (req, res, next) => {
     .populate({
       path: 'package',
       select: 'name description destination duration price images coverImage inclusions exclusions highlights itinerary',
-      populate: {
-        path: 'originalPackage',
-        select: 'name images coverImage inclusions exclusions highlights',
-      },
+      populate: [
+        {
+          path: 'originalPackage',
+          select: 'name images coverImage inclusions exclusions highlights',
+        },
+        {
+          path: 'itinerary',     
+          select: 'days',        
+        }
+      ],
     })
     .populate('createdBy');
 

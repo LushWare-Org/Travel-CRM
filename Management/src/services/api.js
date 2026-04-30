@@ -267,10 +267,15 @@ export const leadAPI = {
     return api.get(`/leads/status/${status}`);
   },
 
-  // Search leads
   searchLeads: async (query) => {
     const api = new ApiService();
     return api.get("/leads/search", { query });
+  },
+
+  // Get lead statistics
+  getLeadStats: async () => {
+    const api = new ApiService();
+    return api.get("/leads/stats");
   },
 
   // Add remark

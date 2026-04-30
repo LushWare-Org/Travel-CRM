@@ -15,7 +15,7 @@ import {
   List,
 } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { leadAPI, adminAPI } from "../services/api";
+import { leadAPI, adminAPI, authAPI } from "../services/api";
 import toast from "react-hot-toast";
 import LeadStats from "../features/lead-management/components/LeadStats";
 import LeadFilters from "../features/lead-management/components/LeadFilters";
@@ -55,13 +55,21 @@ const statusLabels = {
 
 const LeadManagement = () => {
   const [leads, setLeads] = useState([]);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState([]);
+  
+  const [statsSummary, setStatsSummary] = useState(null);
+  const [statusCounts, setStatusCounts] = useState({ all: 0 });
+  
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showRemarksDialog, setShowRemarksDialog] = useState(false);
@@ -73,9 +81,13 @@ const LeadManagement = () => {
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [showVoucherDialog, setShowVoucherDialog] = useState(false);
+  
   const [selectedLead, setSelectedLead] = useState(null);
   const [statusLead, setStatusLead] = useState(null);
   const [billingLead, setBillingLead] = useState(null);
+  const [sectionLead, setSectionLead] = useState(null);
+  const [showSectionView, setShowSectionView] = useState(false);
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [salesReps, setSalesReps] = useState([]);
   const [assignmentSettings, setAssignmentSettings] = useState({
@@ -86,51 +98,116 @@ const LeadManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const highlightedLeadId = searchParams.get("leadId");
-  const hasJumpedToLead = useRef(false);
-  const [sectionLead, setSectionLead] = useState(null);
-  const [showSectionView, setShowSectionView] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
+  
+  const currentUser = authAPI.getStoredUser();
+  const canDelete = currentUser?.role === 'admin' || currentUser?.role === 'super-admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin';
+
+  const handleDeleteLead = async (leadId) => {
+    try {
+      const response = await leadAPI.deleteLead(leadId);
+      if (response.success) {
+        toast.success("Lead deleted successfully");
+        fetchLeads();
+        fetchLeadStats();
+      } else {
+        toast.error(response.message || "Failed to delete lead");
+      }
+    } catch (err) {
+      toast.error(err.message || "Error deleting lead");
+    }
+  };
+  
+  // Mobile responsive view mode auto-detection
+  const [viewMode, setViewMode] = useState(window.innerWidth < 1024 ? 'grid' : 'table');
 
   const leadsPerPage = 12;
 
+  // Handle window resize for responsive view
   useEffect(() => {
-    fetchLeads();
-    fetchSalesReps();
-    fetchAssignmentSettings();
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setViewMode('grid');
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Debounce Search Term to prevent spamming the API
   useEffect(() => {
-    if (highlightedLeadId && leads.length > 0 && !hasJumpedToLead.current) {
-      const leadIndex = filteredLeads.findIndex(
-        (lead) =>
-          (lead._id || lead.id)?.toString() === highlightedLeadId.toString()
-      );
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to first page on new search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-      if (leadIndex !== -1) {
-        const targetPage = Math.floor(leadIndex / leadsPerPage) + 1;
-        setCurrentPage(targetPage);
-        hasJumpedToLead.current = true;
+  // Refetch leads when filters or page change
+  useEffect(() => {
+    fetchLeads();
+    fetchLeadStats();
+  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, currentPage]);
+
+  useEffect(() => {
+    fetchSalesReps();
+    fetchAssignmentSettings();
+    fetchLeadStats();
+  }, []);
+
+  const fetchLeadStats = async () => {
+    try {
+      const response = await leadAPI.getLeadStats();
+      if (response.success) {
+        setStatsSummary(response.summary || null);
+        const transformedCounts = { all: response.summary?.total || 0 };
+        (response.data || []).forEach(item => {
+          transformedCounts[item._id] = item.count;
+        });
+        setStatusCounts(transformedCounts);
       }
+    } catch (e) {
+      console.error("Failed to load stats", e);
     }
-  }, [highlightedLeadId, leads, leadsPerPage]);
+  };
 
   const fetchLeads = async () => {
     try {
       setLoading(true);
       setError(null);
       const params = {
-        limit: 1000,
-        page: 1,
+        limit: leadsPerPage,
+        page: currentPage,
       };
-      if (searchTerm) {
-        params.search = searchTerm;
+      
+      if (debouncedSearch) params.query = debouncedSearch; // The backend uses ?query= for search
+      if (filterStatus !== "all") params.status = filterStatus;
+      if (filterTravelDateStart) params['travelDate[gte]'] = filterTravelDateStart;
+      if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
+      if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
+      
+      // Note: backend search uses leadAPI.searchLeads for query, but standard filters for standard endpoint.
+      // If there is a search term, use the search endpoint, else standard endpoint.
+      let response;
+      if (debouncedSearch) {
+        response = await leadAPI.searchLeads(debouncedSearch);
+        // The search endpoint might not have full pagination built the same way
+      } else {
+        response = await leadAPI.getAllLeads(params);
       }
-      const response = await leadAPI.getAllLeads(params);
+
       if (response.success) {
-        const leadsData = Array.isArray(response.data)
-          ? response.data
-          : response.data?.leads || response.data?.data || [];
+        const leadsData = Array.isArray(response.data) ? response.data : response.data?.leads || [];
         setLeads(leadsData);
+        
+        // Handle pagination metadata from server
+        if (response.pagination) {
+          setTotalPages(response.pagination.pages || 1);
+          setTotalLeads(response.pagination.total || leadsData.length);
+        } else {
+          // Fallback if search endpoint doesn't return pagination
+          setTotalPages(1);
+          setTotalLeads(response.count || leadsData.length);
+        }
       } else {
         setLeads([]);
       }
@@ -143,9 +220,9 @@ const LeadManagement = () => {
   };
 
   const fetchSalesReps = async () => {
+    // ... existing logic ...
     try {
       const response = await adminAPI.getSalesReps();
-      // Handle both response formats: { success: true, data } and { status: 'success', data: { users } }
       if (response.success || response.status === 'success') {
         const repsData = Array.isArray(response.data)
           ? response.data
@@ -160,16 +237,14 @@ const LeadManagement = () => {
         }));
         setSalesReps(formattedReps);
       }
-    } catch (err) {
-      console.error("Error fetching sales reps:", err);
-    }
+    } catch (err) {}
   };
 
   const fetchAssignmentSettings = async () => {
+    // ... existing logic ...
     try {
       const response = await adminAPI.getSettings();
       if (response.success && response.data) {
-        // Map backend field names to frontend field names
         const data = response.data;
         setAssignmentSettings({
           mode: data.assignmentMode || "manual",
@@ -177,48 +252,8 @@ const LeadManagement = () => {
           requireActiveLogin: data.requireActiveLogin48h || false,
         });
       }
-    } catch (err) {
-      console.error("Error fetching assignment settings:", err);
-    }
+    } catch (err) {}
   };
-
-  const filteredLeads = leads.filter((lead) => {
-    const searchLower = searchTerm.toLowerCase();
-    const leadId = (lead._id || lead.id)?.toString() || "";
-    const matchesSearch =
-      (lead.name || "").toLowerCase().includes(searchLower) ||
-      (lead.email || "").toLowerCase().includes(searchLower) ||
-      (lead.phone || "").includes(searchTerm) ||
-      (lead.city || "").toLowerCase().includes(searchLower) ||
-      (lead.destination || "").toLowerCase().includes(searchLower) ||
-      (lead.salesRep || "").toLowerCase().includes(searchLower) ||
-      (lead.adviser || "").toLowerCase().includes(searchLower) ||
-      leadId.toLowerCase().includes(searchLower) ||
-      leadId.substring(0, 8).toLowerCase().includes(searchLower);
-    const matchesStatus =
-      filterStatus === "all" || lead.status === filterStatus;
-    const matchesTravelDate =
-      (!filterTravelDateStart ||
-        (lead.travelDate || "") >= filterTravelDateStart) &&
-      (!filterTravelDateEnd || (lead.travelDate || "") <= filterTravelDateEnd);
-    const matchesPlatform =
-      filterPlatforms.length === 0 || filterPlatforms.includes(lead.platform);
-    const isHighlightedLead =
-      highlightedLeadId && leadId === highlightedLeadId.toString();
-    return (
-      (matchesSearch &&
-        matchesStatus &&
-        matchesTravelDate &&
-        matchesPlatform) ||
-      isHighlightedLead
-    );
-  });
-
-  const totalPages = Math.ceil(filteredLeads.length / leadsPerPage);
-  const paginatedLeads = filteredLeads.slice(
-    (currentPage - 1) * leadsPerPage,
-    currentPage * leadsPerPage
-  );
 
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -240,20 +275,13 @@ const LeadManagement = () => {
       await leadAPI.updateLeadStatus(leadId, newStatus);
       toast.success("Status updated successfully");
       fetchLeads();
+      fetchLeadStats();
     } catch (err) {
       toast.error("Failed to update status");
     }
     setShowStatusDialog(false);
     setStatusLead(null);
   };
-
-  const statusCounts = useMemo(() => {
-    const counts = { all: leads.length };
-    Object.keys(statusLabels).forEach((status) => {
-      counts[status] = leads.filter((l) => l.status === status).length;
-    });
-    return counts;
-  }, [leads]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -316,9 +344,9 @@ const LeadManagement = () => {
       <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Stats Cards */}
         <LeadStats
-          leads={leads}
+          summary={statsSummary}
           salesReps={salesReps}
-          onAssignSuccess={fetchLeads}
+          onAssignSuccess={() => { fetchLeads(); fetchLeadStats(); }}
         />
 
         {/* Filters */}
@@ -332,10 +360,10 @@ const LeadManagement = () => {
         />
 
         {/* Lead Cards Grid */}
-        {!loading && !error && filteredLeads.length > 0 && (
+        {!loading && !error && leads.length > 0 && (
           <LeadTable
             viewMode={viewMode}
-            leads={paginatedLeads}
+            leads={leads}
             loading={loading}
             error={error}
             statusColors={statusColors}
@@ -380,8 +408,10 @@ const LeadManagement = () => {
             totalPages={totalPages}
             onPageChange={goToPage}
             leadsPerPage={leadsPerPage}
-            totalLeads={filteredLeads.length}
+            totalLeads={totalLeads}
             highlightedLeadId={highlightedLeadId}
+            canDelete={canDelete}
+            onDeleteClick={handleDeleteLead}
           />
         )}
 
@@ -405,7 +435,7 @@ const LeadManagement = () => {
           </div>
         )}
 
-        {!loading && !error && filteredLeads.length === 0 && (
+        {!loading && !error && leads.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200">
             <Users className="w-12 h-12 text-gray-300 mb-4" />
             <p className="text-gray-500 font-medium">No leads found</p>

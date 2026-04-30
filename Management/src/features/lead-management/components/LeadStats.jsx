@@ -6,7 +6,7 @@ import {
 import { leadAPI } from "../../../services/api";
 import toast from "react-hot-toast";
 
-const LeadStats = ({ leads, salesReps, onAssignSuccess }) => {
+const LeadStats = ({ summary, salesReps, onAssignSuccess }) => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState(null);
   const [modalLeads, setModalLeads] = useState([]);
@@ -14,27 +14,28 @@ const LeadStats = ({ leads, salesReps, onAssignSuccess }) => {
   const [selectedRep, setSelectedRep] = useState("");
   const [assigningLeads, setAssigningLeads] = useState({});
 
-  const stats = useMemo(() => {
-    const total = leads.length;
-    const assigned = leads.filter((l) => l.assignedTo || l.salesRep).length;
-    const unassigned = total - assigned;
-    const converted = leads.filter((l) => l.status === "converted").length;
-    const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : 0;
+  // Fallback if summary is not yet loaded
+  const stats = summary || { total: 0, assigned: 0, unassigned: 0, converted: 0, conversionRate: "0.0" };
 
-    return { total, assigned, unassigned, converted, conversionRate };
-  }, [leads]);
+  const handleStatClick = async (type) => {
+    // We now fetch these lists from server, or we can just disable click-to-view for now
+    // if performance allows, we can add it back with an API call:
+    try {
+      let filtered = [];
+      const res = await leadAPI.getAllLeads({ limit: 50, status: type === 'converted' ? 'converted' : undefined });
+      const apiLeads = res.data?.leads || res.data || [];
+      if (type === "total") filtered = apiLeads;
+      else if (type === "assigned") filtered = apiLeads.filter((l) => l.assignedTo || l.salesRep);
+      else if (type === "unassigned") filtered = apiLeads.filter((l) => !l.assignedTo && !l.salesRep);
 
-  const handleStatClick = (type) => {
-    let filtered = [];
-    if (type === "total") filtered = leads;
-    else if (type === "assigned") filtered = leads.filter((l) => l.assignedTo || l.salesRep);
-    else if (type === "unassigned") filtered = leads.filter((l) => !l.assignedTo && !l.salesRep);
-
-    setModalType(type);
-    setModalLeads(filtered);
-    setShowModal(true);
-    setSearchTerm("");
-    setSelectedRep("");
+      setModalType(type);
+      setModalLeads(filtered);
+      setShowModal(true);
+      setSearchTerm("");
+      setSelectedRep("");
+    } catch (e) {
+      toast.error("Failed to load leads list");
+    }
   };
 
   const handleAssign = async (leadId, repId) => {

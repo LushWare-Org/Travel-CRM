@@ -662,23 +662,61 @@ export const getMyLeads = asyncHandler(async (req, res, next) => {
 
 // @desc    Get lead statistics
 // @route   GET /api/v1/leads/stats
-// @access  Private (Admin)
+// @access  Private (Admin, SalesRep)
 export const getLeadStats = asyncHandler(async (req, res, next) => {
-  const stats = await Lead.aggregate([
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
+  const matchStage = {};
+  if (req.user.role === 'salesRep') {
+    matchStage.assignedTo = req.user._id;
+  }
+
+  const [statusStats, assignmentStats] = await Promise.all([
+    Lead.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
       },
-    },
-    {
-      $sort: { count: -1 },
-    },
+      {
+        $sort: { count: -1 },
+      },
+    ]),
+    Lead.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          assigned: {
+            $sum: {
+              $cond: [
+                { $or: [{ $ifNull: ['$assignedTo', false] }, { $ifNull: ['$salesRep', false] }] },
+                1,
+                0,
+              ],
+            },
+          },
+          converted: {
+            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          },
+        },
+      },
+    ]),
   ]);
+
+  const assignment = assignmentStats[0] || { total: 0, assigned: 0, converted: 0 };
 
   res.status(200).json({
     success: true,
-    data: stats,
+    data: statusStats,
+    summary: {
+      total: assignment.total,
+      assigned: assignment.assigned,
+      unassigned: assignment.total - assignment.assigned,
+      converted: assignment.converted,
+      conversionRate: assignment.total > 0 ? ((assignment.converted / assignment.total) * 100).toFixed(1) : "0.0"
+    }
   });
 });
 

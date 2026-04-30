@@ -293,6 +293,11 @@ export async function generateQuotationPDF(quotation, lead) {
       // 4. Fallback to regular package
       else {
         mainPackage = lead?.package || quotation.package || {};
+        if (mainPackage.itinerary && mainPackage.itinerary.days) {
+          itineraryDays = mainPackage.itinerary.days;
+        } else if (mainPackage.days) {
+          itineraryDays = mainPackage.days;
+        }
         console.log('[PDF] Using regular package:', mainPackage.name);
       }
 
@@ -395,7 +400,7 @@ export async function generateQuotationPDF(quotation, lead) {
       let yPos = 410;
       const cardX = 40;
       const cardWidth = 515;
-      const cardHeight = 120;
+      const cardHeight = 170;
 
       // Card background with subtle border
       doc.roundedRect(cardX, yPos, cardWidth, cardHeight, 8).fill(PALETTE.white);
@@ -463,6 +468,25 @@ export async function generateQuotationPDF(quotation, lead) {
         doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text('Estimated Total', col2X, yPos);
         doc.fillColor(PALETTE.primary).font('Helvetica-Bold').fontSize(14)
           .text(formatCurrency(quotation.totalAmount), col2X, yPos + 10);
+      }
+
+      // Row 3: Assigned Sales Rep
+      yPos += 38;
+      doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9).text('Assigned Sales Rep', col1X, yPos);
+      
+      const assignedTo = lead?.assignedTo;
+      let repName = 'Not assigned yet';
+      let repDetails = '';
+      if (assignedTo && assignedTo.name) {
+         repName = assignedTo.name;
+         if (assignedTo.email) repDetails += `${assignedTo.email}`;
+         if (assignedTo.phone || assignedTo.mobile) repDetails += `${repDetails ? ' | ' : ''}${assignedTo.phone || assignedTo.mobile}`;
+      }
+      doc.fillColor(PALETTE.black).font('Helvetica-Bold').fontSize(11)
+         .text(repName, col1X, yPos + 12);
+      if (repDetails) {
+         doc.fillColor(PALETTE.gray).font('Helvetica').fontSize(9)
+            .text(repDetails, col1X, yPos + 26);
       }
 
       yPos += 60;
