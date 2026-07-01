@@ -1,18 +1,18 @@
 // =============================================================
-// user-service — owns: User, VendorProfile
-// Handles: user CRUD, roles, permissions, vendor management
-// Cross-service references: createdById (self-ref within service)
-// VendorProfile is extracted from the User model to normalise
-// vendor-only fields (1:1, only present when role = vendor)
+// user-service — PostgreSQL schema: "users"
+// Shared DB, isolated namespace. VendorProfile is a 1:1
+// extension of User, only populated when role = vendor.
 // =============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["users"]
 }
 
 enum UserRole {
@@ -21,6 +21,8 @@ enum UserRole {
   vendor
   admin
   superAdmin
+
+  @@schema("users")
 }
 
 enum VendorStatus {
@@ -28,6 +30,8 @@ enum VendorStatus {
   verified
   suspended
   rejected
+
+  @@schema("users")
 }
 
 enum ServiceType {
@@ -37,13 +41,13 @@ enum ServiceType {
   restaurant
   guide
   other
+
+  @@schema("users")
 }
 
-// Stored as a PostgreSQL text[] array on User.permissions
-// Validated in the service layer (not at DB level)
-// Valid values: manage_users | manage_sales_reps | manage_vendors |
-//               manage_admins | view_reports | manage_billing |
-//               view_billing | manage_leads | manage_packages
+// Valid permission strings (validated in service layer, stored as text[]):
+// manage_users | manage_sales_reps | manage_vendors | manage_admins
+// view_reports | manage_billing | view_billing | manage_leads | manage_packages
 
 model User {
   id                       String         @id @default(uuid())
@@ -52,7 +56,7 @@ model User {
   phone                    String?
   phoneCountry             String?        @default("US") @db.VarChar(2)
   phoneE164                String?        @unique
-  password                 String         // bcrypt hash, never returned in API responses
+  password                 String         // bcrypt hash — never exposed in API responses
 
   role                     UserRole       @default(customer)
   isSuperAdmin             Boolean        @default(false)
@@ -67,7 +71,6 @@ model User {
   mustChangePassword       Boolean        @default(false)
   canBeDeleted             Boolean        @default(true)
 
-  // Auth token columns (hashed tokens, never plain values)
   passwordChangedAt        DateTime?
   emailVerificationToken   String?
   emailVerificationExpire  DateTime?
@@ -76,12 +79,11 @@ model User {
   lastLogin                DateTime?
   lastActivity             DateTime       @default(now())
 
-  // Self-referential: which admin/superAdmin created this account
+  // Self-referential within this schema
   createdById              String?
   createdBy                User?          @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdUsers             User[]         @relation("UserCreatedBy")
 
-  // 1:1 vendor extension — only populated when role = vendor
   vendorProfile            VendorProfile?
 
   createdAt                DateTime       @default(now())
@@ -89,6 +91,7 @@ model User {
 
   @@index([role, isActive])
   @@index([lastActivity])
+  @@schema("users")
 }
 
 model VendorProfile {
@@ -128,4 +131,6 @@ model VendorProfile {
 
   createdAt                   DateTime     @default(now())
   updatedAt                   DateTime     @updatedAt
+
+  @@schema("users")
 }

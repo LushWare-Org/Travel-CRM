@@ -1,37 +1,27 @@
 // =============================================================
-// billing-service — owns: Invoice, InvoiceItem, Quotation,
-//   QuotationItem, QuotationImage, QuotationRevision,
-//   PaymentReceipt, PaymentHistory, CreditNote, CreditNoteItem,
-//   Voucher, VoucherLocationDate, VoucherMealPlan,
-//   VoucherItinerarySummary
-//
-// Handles: all financial documents, PDF generation, payment
-//   tracking, credit notes, vouchers
+// billing-service — PostgreSQL schema: "billing"
+// Shared DB, isolated namespace.
 //
 // Design decisions:
-//   • Mongoose embedded arrays (items, payments, creditNotes,
-//     revisionHistory) become proper child tables.
-//   • Customer details are denormalised as snapshot columns on
-//     each document (name, email, phone, address) so PDFs
-//     remain accurate even if the customer record changes.
-//   • Voucher.packageDetails is stored as JSONB because it is
-//     a large snapshot copied at creation time and never
-//     queried by sub-fields.
-//   • VoucherItinerarySummary.locations and .activities use
-//     PostgreSQL text[] arrays.
-//   • Auto-increment document numbers (INV-YYYYMM-NNNNN etc.)
-//     are generated in the service layer, not the DB, to match
-//     the existing Mongoose pre-save hook behaviour.
-//   • All cross-service refs are plain UUID strings.
+//   • Mongoose embedded arrays → proper child tables with FK.
+//   • Customer details denormalised as snapshot columns on each
+//     document so PDFs stay accurate after customer updates.
+//   • Voucher.packageDetails → Json (JSONB) snapshot.
+//   • VoucherItinerarySummary.locations/activities → text[].
+//   • Document numbers (INV-YYYYMM-NNNNN etc.) generated in
+//     service layer, matching existing Mongoose pre-save logic.
+//   • All cross-schema refs are plain UUID strings.
 // =============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["billing"]
 }
 
 // ─── Shared enums ─────────────────────────────────────────────
@@ -40,6 +30,8 @@ enum DiscountType {
   percentage
   fixed
   none
+
+  @@schema("billing")
 }
 
 enum ItemCategory {
@@ -52,6 +44,8 @@ enum ItemCategory {
   visa
   package
   other
+
+  @@schema("billing")
 }
 
 enum Currency {
@@ -61,6 +55,8 @@ enum Currency {
   GBP
   AUD
   INR
+
+  @@schema("billing")
 }
 
 enum PaymentMethod {
@@ -72,6 +68,8 @@ enum PaymentMethod {
   upi
   wallet
   other
+
+  @@schema("billing")
 }
 
 enum CardType {
@@ -80,6 +78,8 @@ enum CardType {
   amex
   discover
   other
+
+  @@schema("billing")
 }
 
 enum PaymentGateway {
@@ -88,6 +88,8 @@ enum PaymentGateway {
   paypal
   square
   other
+
+  @@schema("billing")
 }
 
 // ─── Invoice enums ────────────────────────────────────────────
@@ -95,8 +97,10 @@ enum PaymentGateway {
 enum InvoiceType {
   invoice
   proforma
-  tax_invoice        @map("tax-invoice")
-  commercial_invoice @map("commercial-invoice")
+  tax_invoice         @map("tax-invoice")
+  commercial_invoice  @map("commercial-invoice")
+
+  @@schema("billing")
 }
 
 enum InvoiceStatus {
@@ -108,6 +112,8 @@ enum InvoiceStatus {
   overdue
   cancelled
   refunded
+
+  @@schema("billing")
 }
 
 enum InvoicePaymentStatus {
@@ -116,6 +122,8 @@ enum InvoicePaymentStatus {
   paid
   overpaid
   refunded
+
+  @@schema("billing")
 }
 
 // ─── Quotation enums ──────────────────────────────────────────
@@ -124,11 +132,15 @@ enum QuotationType {
   standard
   custom
   package_based @map("package-based")
+
+  @@schema("billing")
 }
 
 enum QuotationMode {
   summary
   detailed
+
+  @@schema("billing")
 }
 
 enum QuotationStatus {
@@ -139,6 +151,8 @@ enum QuotationStatus {
   rejected
   expired
   converted
+
+  @@schema("billing")
 }
 
 // ─── PaymentReceipt enums ─────────────────────────────────────
@@ -149,6 +163,8 @@ enum ReceiptStatus {
   partial_payment  @map("partial-payment")
   refunded
   cancelled
+
+  @@schema("billing")
 }
 
 enum ReceiptPaymentType {
@@ -157,6 +173,8 @@ enum ReceiptPaymentType {
   full_payment  @map("full-payment")
   final_payment @map("final-payment")
   refund
+
+  @@schema("billing")
 }
 
 // ─── PaymentHistory enums ─────────────────────────────────────
@@ -166,6 +184,8 @@ enum PaymentHistoryStatus {
   verified
   reconciled
   cancelled
+
+  @@schema("billing")
 }
 
 enum PaymentHistoryType {
@@ -173,6 +193,8 @@ enum PaymentHistoryType {
   installment
   full_payment @map("full-payment")
   refund
+
+  @@schema("billing")
 }
 
 // ─── CreditNote enums ─────────────────────────────────────────
@@ -185,6 +207,8 @@ enum CreditNoteType {
   service_not_provided  @map("service-not-provided")
   quality_issue         @map("quality-issue")
   other
+
+  @@schema("billing")
 }
 
 enum CreditNoteStatus {
@@ -193,6 +217,8 @@ enum CreditNoteStatus {
   applied
   refunded
   cancelled
+
+  @@schema("billing")
 }
 
 enum RefundStatus {
@@ -201,6 +227,8 @@ enum RefundStatus {
   completed
   failed
   not_applicable @map("not-applicable")
+
+  @@schema("billing")
 }
 
 enum RefundMethod {
@@ -210,6 +238,8 @@ enum RefundMethod {
   credit_balance  @map("credit-balance")
   voucher
   other
+
+  @@schema("billing")
 }
 
 // ─── Voucher enums ────────────────────────────────────────────
@@ -220,6 +250,8 @@ enum VoucherStatus {
   viewed
   confirmed
   cancelled
+
+  @@schema("billing")
 }
 
 // ─── Invoice ──────────────────────────────────────────────────
@@ -228,15 +260,15 @@ model Invoice {
   id                   String               @id @default(uuid())
   invoiceNumber        String               @unique
 
-  // Cross-service UUIDs
-  leadId               String               // → lead-service Lead.id
-  quotationId          String?              // → billing-service Quotation.id
-  bookingId            String?              // → booking-service Booking.id
-  createdById          String               // → user-service User.id
+  // Cross-schema UUID refs
+  leadId               String               // → leads.Lead.id
+  quotationId          String?              // → billing.Quotation.id (same schema)
+  bookingId            String?              // → bookings.Booking.id
+  createdById          String               // → users.User.id
   lastModifiedById     String?
   cancelledById        String?
 
-  // Customer snapshot (copied at creation for PDF accuracy)
+  // Customer snapshot (denormalised for PDF accuracy)
   customerName         String
   customerEmail        String
   customerPhone        String?
@@ -298,6 +330,7 @@ model Invoice {
   @@index([paymentStatus])
   @@index([createdAt])
   @@index([type])
+  @@schema("billing")
 }
 
 model InvoiceItem {
@@ -314,6 +347,7 @@ model InvoiceItem {
   order       Int          @default(0)
 
   @@index([invoiceId])
+  @@schema("billing")
 }
 
 // ─── Quotation ────────────────────────────────────────────────
@@ -322,13 +356,13 @@ model Quotation {
   id                   String          @id @default(uuid())
   quotationNumber      String          @unique
 
-  // Cross-service UUIDs
-  leadId               String          // → lead-service Lead.id
-  packageId            String?         // → package-service Package.id
-  itineraryId          String?         // → package-service ManualItinerary.id
-  createdById          String          // → user-service User.id
+  // Cross-schema UUID refs
+  leadId               String          // → leads.Lead.id
+  packageId            String?         // → packages.Package.id
+  itineraryId          String?         // → packages.ManualItinerary.id
+  createdById          String          // → users.User.id
   lastModifiedById     String?
-  convertedToInvoiceId String?         // → billing-service Invoice.id
+  convertedToInvoiceId String?         // → billing.Invoice.id (same schema)
 
   // Customer snapshot
   customerName         String
@@ -382,6 +416,7 @@ model Quotation {
   @@index([leadId, createdAt])
   @@index([status, validUntil])
   @@index([createdAt])
+  @@schema("billing")
 }
 
 model QuotationItem {
@@ -397,6 +432,7 @@ model QuotationItem {
   order       Int          @default(0)
 
   @@index([quotationId])
+  @@schema("billing")
 }
 
 model QuotationImage {
@@ -407,6 +443,7 @@ model QuotationImage {
   isCover     Boolean   @default(false)
 
   @@index([quotationId])
+  @@schema("billing")
 }
 
 model QuotationRevision {
@@ -414,11 +451,12 @@ model QuotationRevision {
   quotationId  String
   quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   version      Int
-  modifiedById String?   // → user-service User.id
+  modifiedById String?   // → users.User.id
   modifiedAt   DateTime  @default(now())
   changes      String?
 
   @@index([quotationId])
+  @@schema("billing")
 }
 
 // ─── PaymentReceipt ───────────────────────────────────────────
@@ -427,16 +465,16 @@ model PaymentReceipt {
   id                   String             @id @default(uuid())
   receiptNumber        String             @unique
 
-  // Cross-service UUIDs
-  leadId               String             // → lead-service Lead.id
+  // Cross-schema UUID refs
+  leadId               String             // → leads.Lead.id
   invoiceId            String
   invoice              Invoice            @relation(fields: [invoiceId], references: [id])
-  createdById          String
+  createdById          String             // → users.User.id
   lastModifiedById     String?
   verifiedById         String?
   reconciledById       String?
   cancelledById        String?
-  refundForId          String?            // → billing-service PaymentReceipt.id (self-ref for refunds)
+  refundForId          String?            // → billing.PaymentReceipt.id (self-ref for refunds)
 
   // Customer snapshot
   customerName         String
@@ -458,7 +496,7 @@ model PaymentReceipt {
   previousBalance      Float              @default(0)
   outstandingBalance   Float              @default(0)
 
-  // Payment details (all nullable; relevant subset used per method)
+  // Payment details (nullable; relevant subset used per method)
   cardType             CardType?
   cardLastFour         String?
   bankName             String?
@@ -499,6 +537,7 @@ model PaymentReceipt {
   @@index([paymentMethod])
   @@index([verified, reconciled])
   @@index([transactionId])
+  @@schema("billing")
 }
 
 // ─── PaymentHistory ───────────────────────────────────────────
@@ -510,9 +549,9 @@ model PaymentHistory {
   receiptId            String
   receipt              PaymentReceipt       @relation(fields: [receiptId], references: [id])
 
-  // Cross-service UUIDs
-  leadId               String
-  invoiceId            String
+  // Cross-schema UUID refs
+  leadId               String               // → leads.Lead.id
+  invoiceId            String               // → billing.Invoice.id
 
   // Customer snapshot
   customerName         String
@@ -530,7 +569,7 @@ model PaymentHistory {
   notes                String?
   internalNotes        String?
 
-  createdById          String
+  createdById          String               // → users.User.id
   verifiedById         String?
   reconciledById       String?
   cancelledById        String?
@@ -547,6 +586,7 @@ model PaymentHistory {
   @@index([receiptId])
   @@index([paymentDate])
   @@index([status])
+  @@schema("billing")
 }
 
 // ─── CreditNote ───────────────────────────────────────────────
@@ -555,11 +595,11 @@ model CreditNote {
   id                   String           @id @default(uuid())
   creditNoteNumber     String           @unique
 
-  // Cross-service UUIDs
-  leadId               String
+  // Cross-schema UUID refs
+  leadId               String           // → leads.Lead.id
   invoiceId            String
   invoice              Invoice          @relation(fields: [invoiceId], references: [id])
-  createdById          String
+  createdById          String           // → users.User.id
   lastModifiedById     String?
   approvedById         String?
   rejectedById         String?
@@ -625,6 +665,7 @@ model CreditNote {
   @@index([refundStatus])
   @@index([createdAt])
   @@index([type])
+  @@schema("billing")
 }
 
 model CreditNoteItem {
@@ -639,6 +680,7 @@ model CreditNoteItem {
   order          Int        @default(0)
 
   @@index([creditNoteId])
+  @@schema("billing")
 }
 
 // ─── Voucher ──────────────────────────────────────────────────
@@ -647,11 +689,11 @@ model Voucher {
   id                    String                    @id @default(uuid())
   voucherNumber         String                    @unique
 
-  // Cross-service UUIDs
-  leadId                String                    // → lead-service Lead.id
-  packageId             String?                   // → package-service Package.id
-  customizedPackageId   String?                   // → package-service CustomizedPackage.id
-  createdById           String
+  // Cross-schema UUID refs
+  leadId                String                    // → leads.Lead.id
+  packageId             String?                   // → packages.Package.id
+  customizedPackageId   String?                   // → packages.CustomizedPackage.id
+  createdById           String                    // → users.User.id
   lastModifiedById      String?
 
   // Customer snapshot
@@ -660,9 +702,10 @@ model Voucher {
   customerPhone         String?
   customerAddress       String?
 
-  // Full package details snapshot at time of voucher creation (JSONB)
+  // Full package details snapshot at creation time (JSONB).
   // Shape: { name, destination, duration, category, inclusions[],
-  //          exclusions[], highlights[], price, coverImage{url,public_id},
+  //          exclusions[], highlights[], price,
+  //          coverImage{url,public_id},
   //          images[{url,public_id,isCover}] }
   packageDetails        Json?
 
@@ -691,19 +734,21 @@ model Voucher {
 
   @@index([leadId, createdAt])
   @@index([status])
+  @@schema("billing")
 }
 
 model VoucherLocationDate {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   voucherId String
-  voucher   Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  voucher   Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
   location  String?
   hotelName String?
   checkIn   DateTime?
   checkOut  DateTime?
-  order     Int      @default(0)
+  order     Int       @default(0)
 
   @@index([voucherId])
+  @@schema("billing")
 }
 
 model VoucherMealPlan {
@@ -717,6 +762,7 @@ model VoucherMealPlan {
   dinner    Boolean  @default(false)
 
   @@index([voucherId])
+  @@schema("billing")
 }
 
 model VoucherItinerarySummary {
@@ -732,4 +778,5 @@ model VoucherItinerarySummary {
   order             Int      @default(0)
 
   @@index([voucherId])
+  @@schema("billing")
 }

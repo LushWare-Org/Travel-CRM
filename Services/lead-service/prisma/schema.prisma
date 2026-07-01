@@ -1,29 +1,25 @@
 // =============================================================
-// lead-service — owns: Lead, LeadRemark, LeadStatusHistory,
-//   LeadCommunicationLog, LeadStatusOption, Settings
-//
-// Handles: sales pipeline, lead assignment, status tracking,
-//   communication logging, assignment mode settings
+// lead-service — PostgreSQL schema: "leads"
+// Shared DB, isolated namespace.
 //
 // Design decisions:
 //   • Mongoose embedded arrays (remarks, statusHistory,
-//     communicationLogs) become proper child tables with FK
-//     to Lead — enables individual record queries/deletes.
-//   • tags and itineraryVersionIds are simple text[] arrays.
-//   • notificationSettings object is flattened into boolean
-//     columns on Lead (notifNewLead, notifStatusChange, etc.).
-//   • Settings is a singleton (enforced in service layer).
-//   • All cross-service refs (packageId, assignedToId, etc.)
-//     are plain UUID strings — no FK constraints.
+//     communicationLogs) → proper child tables with FK to Lead.
+//   • notificationSettings object → flattened boolean columns.
+//   • tags and itineraryVersionIds → text[] arrays.
+//   • Settings is a singleton — enforced in service layer.
+//   • All cross-schema refs are plain UUID strings.
 // =============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["leads"]
 }
 
 enum LeadSource {
@@ -36,6 +32,8 @@ enum LeadSource {
   referral
   walk_in       @map("walk-in")
   other
+
+  @@schema("leads")
 }
 
 enum LeadPlatform {
@@ -47,6 +45,8 @@ enum LeadPlatform {
   Email         @map("Email")
   Referral      @map("Referral")
   Walk_in       @map("Walk-in")
+
+  @@schema("leads")
 }
 
 enum LeadStatus {
@@ -57,22 +57,30 @@ enum LeadStatus {
   converted
   lost
   not_interested @map("not-interested")
+
+  @@schema("leads")
 }
 
 enum LeadPriority {
   low
   medium
   high
+
+  @@schema("leads")
 }
 
 enum AssignmentMode {
   manual
   auto
+
+  @@schema("leads")
 }
 
 enum AssignmentStrategy {
   round_robin
   load_based
+
+  @@schema("leads")
 }
 
 enum CommunicationLogType {
@@ -81,6 +89,8 @@ enum CommunicationLogType {
   meeting
   message
   other
+
+  @@schema("leads")
 }
 
 // ─── Lead ─────────────────────────────────────────────────────
@@ -102,10 +112,10 @@ model Lead {
   travelDate            DateTime?
   endDate               DateTime?
 
-  // Cross-service UUIDs (no FK constraints)
-  packageId             String?      // → package-service Package.id
-  customizedPackageId   String?      // → package-service CustomizedPackage.id
-  convertedBookingId    String?      // → booking-service Booking.id
+  // Cross-schema UUID refs
+  packageId             String?      // → packages.Package.id
+  customizedPackageId   String?      // → packages.CustomizedPackage.id
+  convertedBookingId    String?      // → bookings.Booking.id
 
   packageName           String?      // denormalised snapshot for display
   leadDateTime          DateTime     @default(now())
@@ -116,15 +126,15 @@ model Lead {
   status                LeadStatus   @default(new)
   priority              LeadPriority @default(medium)
 
-  // Cross-service UUIDs
-  assignedToId          String?      // → user-service User.id (salesRep)
-  assignedById          String?      // → user-service User.id (admin/auto)
+  // Cross-schema UUID refs
+  assignedToId          String?      // → users.User.id (salesRep)
+  assignedById          String?      // → users.User.id (admin/auto)
   assignmentMode        AssignmentMode @default(manual)
 
-  // Itinerary cross-service refs
-  currentItineraryId    String?      // → package-service Itinerary.id
-  manualItineraryId     String?      // → package-service ManualItinerary.id
-  itineraryVersionIds   String[]     // → package-service Itinerary.id[]
+  // Itinerary cross-schema refs
+  currentItineraryId    String?      // → packages.Itinerary.id
+  manualItineraryId     String?      // → packages.ManualItinerary.id
+  itineraryVersionIds   String[]     // → packages.Itinerary.id[]
 
   // Notification preferences (flattened from Mongoose embedded object)
   notifNewLead          Boolean      @default(true)
@@ -154,20 +164,22 @@ model Lead {
   @@index([leadDateTime])
   @@index([assignmentMode])
   @@index([city])
+  @@schema("leads")
 }
 
-// ─── Lead child tables (replaces Mongoose embedded arrays) ────
+// ─── Lead child tables ────────────────────────────────────────
 
 model LeadRemark {
   id        String   @id @default(uuid())
   leadId    String
   lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   text      String?
-  addedById String?  // → user-service User.id
+  addedById String?  // → users.User.id
   date      DateTime @default(now())
   addedAt   DateTime @default(now())
 
   @@index([leadId])
+  @@schema("leads")
 }
 
 model LeadStatusHistory {
@@ -175,23 +187,25 @@ model LeadStatusHistory {
   leadId      String
   lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   status      String
-  changedById String?  // → user-service User.id
+  changedById String?  // → users.User.id
   changedAt   DateTime @default(now())
   notes       String?
 
   @@index([leadId])
+  @@schema("leads")
 }
 
 model LeadCommunicationLog {
-  id      String               @id @default(uuid())
+  id      String                @id @default(uuid())
   leadId  String
-  lead    Lead                 @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  date    DateTime             @default(now())
+  lead    Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  date    DateTime              @default(now())
   type    CommunicationLogType?
   notes   String?
-  byId    String?              // → user-service User.id
+  byId    String?               // → users.User.id
 
   @@index([leadId])
+  @@schema("leads")
 }
 
 // ─── LeadStatusOption ─────────────────────────────────────────
@@ -206,29 +220,32 @@ model LeadStatusOption {
   isActive    Boolean  @default(true)
   isDefault   Boolean  @default(false)
   description String?
-  createdById String?  // → user-service User.id
+  createdById String?  // → users.User.id
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([order])
   @@index([isActive])
+  @@schema("leads")
 }
 
-// ─── Settings (singleton — lead assignment configuration) ──────
+// ─── Settings (singleton) ─────────────────────────────────────
 
 model Settings {
   id                    String             @id @default(uuid())
   assignmentMode        AssignmentMode     @default(manual)
   autoStrategy          AssignmentStrategy @default(round_robin)
-  enabledSalesRepIds    String[]           // → user-service User.id[]
+  enabledSalesRepIds    String[]           // → users.User.id[]
   roundRobinIndex       Int                @default(0)
   maxOpenLeadsPerRep    Int                @default(100)
   skipInactive          Boolean            @default(true)
   requireActiveLogin48h Boolean            @default(false)
-  updatedById           String?            // → user-service User.id
+  updatedById           String?            // → users.User.id
 
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
-  // Service layer enforces only one row exists (getSingleton pattern)
+  // Only one row allowed — enforced by getSingleton() in service layer
+
+  @@schema("leads")
 }

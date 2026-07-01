@@ -1,23 +1,21 @@
 // =============================================================
-// booking-service — owns: Booking, BookingTraveler
-//
-// Handles: booking lifecycle (pending → confirmed → completed),
-//   traveler details, payment status tracking at booking level
+// booking-service — PostgreSQL schema: "bookings"
+// Shared DB, isolated namespace.
 //
 // Design decisions:
-//   • Booking.travelers[] embedded array → BookingTraveler table
-//     (enables individual traveler updates and queries).
-//   • All cross-service refs (userId, packageId, invoiceId,
-//     assignedToId) are plain UUID strings.
+//   • Booking.travelers[] embedded array → BookingTraveler table.
+//   • All cross-schema refs are plain UUID strings.
 // =============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["bookings"]
 }
 
 enum PaymentStatus {
@@ -25,6 +23,8 @@ enum PaymentStatus {
   partial
   paid
   refunded
+
+  @@schema("bookings")
 }
 
 enum BookingStatus {
@@ -32,12 +32,16 @@ enum BookingStatus {
   confirmed
   cancelled
   completed
+
+  @@schema("bookings")
 }
 
 enum TravelerGender {
   male
   female
   other
+
+  @@schema("bookings")
 }
 
 // ─── Booking ──────────────────────────────────────────────────
@@ -45,11 +49,11 @@ enum TravelerGender {
 model Booking {
   id                  String        @id @default(uuid())
 
-  // Cross-service UUIDs (no FK constraints)
-  userId              String        // → user-service User.id (customer)
-  packageId           String        // → package-service Package.id
-  invoiceId           String?       // → billing-service Invoice.id
-  assignedToId        String?       // → user-service User.id (salesRep)
+  // Cross-schema UUID refs
+  userId              String        // → users.User.id (customer)
+  packageId           String        // → packages.Package.id
+  invoiceId           String?       // → billing.Invoice.id
+  assignedToId        String?       // → users.User.id (salesRep)
 
   travelDate          DateTime?
   endDate             DateTime?
@@ -77,9 +81,10 @@ model Booking {
   @@index([travelDate])
   @@index([assignedToId])
   @@index([endDate])
+  @@schema("bookings")
 }
 
-// ─── BookingTraveler (replaces Mongoose embedded travelers[]) ──
+// ─── BookingTraveler ──────────────────────────────────────────
 
 model BookingTraveler {
   id        String          @id @default(uuid())
@@ -92,4 +97,5 @@ model BookingTraveler {
   idNumber  String?
 
   @@index([bookingId])
+  @@schema("bookings")
 }

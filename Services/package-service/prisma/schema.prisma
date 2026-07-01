@@ -1,28 +1,24 @@
 // =============================================================
-// package-service — owns: Package, PackageImage, Itinerary,
-//   ManualItinerary, CustomizedPackage, CustomizedPackageImage,
-//   Review
-//
-// Handles: package catalog, AI generation, itineraries, reviews
+// package-service — PostgreSQL schema: "packages"
+// Shared DB, isolated namespace.
 //
 // Design decisions:
-//   • Itinerary.days and CustomizedPackage.days are stored as
-//     Json (PostgreSQL JSONB) because they are deeply nested,
-//     always read/written as a whole unit, and never queried
-//     by individual sub-fields at the DB level.
-//   • Simple string arrays (inclusions, exclusions, highlights,
-//     terms) use PostgreSQL text[].
-//   • Cross-service IDs (createdById, leadId, etc.) are plain
-//     UUID strings — no FK constraints across service boundaries.
+//   • Itinerary.days and CustomizedPackage.days → Json (JSONB):
+//     deeply nested, always read/written as a whole unit.
+//   • String arrays (inclusions, exclusions, etc.) → text[].
+//   • Cross-schema refs are plain UUID strings (no FK across
+//     schema boundaries — enforced at service layer).
 // =============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["packages"]
 }
 
 enum PackageCategory {
@@ -31,6 +27,8 @@ enum PackageCategory {
   family
   group
   wild_safari @map("wild safari")
+
+  @@schema("packages")
 }
 
 enum PackageType {
@@ -38,25 +36,32 @@ enum PackageType {
   Deluxe
   Luxury
   Premium
+
+  @@schema("packages")
 }
 
 enum PackageStatus {
   draft
   published
   archived
+
+  @@schema("packages")
 }
 
 enum ItineraryStatus {
   draft
   published
   archived
+
+  @@schema("packages")
 }
 
-// Used for CustomizedPackage only
 enum CpDifficulty {
   easy
   moderate
   difficult
+
+  @@schema("packages")
 }
 
 enum CpCategory {
@@ -70,6 +75,8 @@ enum CpCategory {
   beach
   heritage
   other
+
+  @@schema("packages")
 }
 
 // ─── Package ──────────────────────────────────────────────────
@@ -84,28 +91,24 @@ model Package {
   price               Float?
   maxGroupSize        Int             @default(10)
   difficulty          String?
-
   category            PackageCategory @default(family)
   packageType         PackageType     @default(Standard)
 
-  // Cover image (flattened from Mongoose embedded object)
   coverImagePublicId  String?
   coverImageUrl       String?
 
-  // Simple string arrays stored as PostgreSQL text[]
   inclusions          String[]
   exclusions          String[]
   highlights          String[]
   terms               String[]
 
-  // FK to Itinerary (same DB — constraint enforced)
+  // FK within same schema — constraint enforced
   itineraryId         String?         @unique
   itinerary           Itinerary?      @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
 
   isActive            Boolean         @default(true)
   isFeatured          Boolean         @default(false)
   status              PackageStatus   @default(draft)
-
   availableFrom       DateTime        @default(now())
   availableTo         DateTime?
 
@@ -114,11 +117,11 @@ model Package {
   views               Int             @default(0)
   bookings            Int             @default(0)
 
-  // Cross-service UUIDs (no FK constraints)
-  createdById         String?         // → user-service User.id
-  customizedForLeadId String?         // → lead-service Lead.id
-  originalPackageId   String?         // → package-service Package.id (self, for copies)
-  customizedById      String?         // → user-service User.id
+  // Cross-schema UUID refs (no FK constraints)
+  createdById         String?         // → users.User.id
+  customizedForLeadId String?         // → leads.Lead.id
+  originalPackageId   String?         // → packages.Package.id (self-ref for copies)
+  customizedById      String?         // → users.User.id
   customizationNotes  String?         @db.VarChar(500)
 
   images              PackageImage[]
@@ -142,6 +145,7 @@ model Package {
   @@index([isActive, category])
   @@index([isActive, isFeatured])
   @@index([isActive, status])
+  @@schema("packages")
 }
 
 model PackageImage {
@@ -153,22 +157,19 @@ model PackageImage {
   order     Int     @default(0)
 
   @@index([packageId])
+  @@schema("packages")
 }
 
-// ─── Itinerary (AI-generated or linked to a Package) ──────────
+// ─── Itinerary ────────────────────────────────────────────────
 
 model Itinerary {
   id               String          @id @default(uuid())
-
-  // packageId identifies which Package or CustomizedPackage owns this.
-  // packageModelType distinguishes the owner type (replaces Mongoose refPath).
   packageId        String?
   packageModelType String          @default("Package") // "Package" | "CustomizedPackage"
 
-  // JSONB: array of day objects — always read/written as a whole.
-  // Shape per element (mirrors Mongoose subdoc):
-  // { dayNumber, title, description, locations[], activities[],
-  //   accommodation{name,type,rating,address,contactNumber},
+  // JSONB — deeply nested day objects, always read/written as a whole.
+  // Shape per element: { dayNumber, title, description, locations[],
+  //   activities[], accommodation{name,type,rating,address,contactNumber},
   //   meals{breakfast,lunch,dinner}, transport,
   //   places[{name,description,duration,images[{public_id,url}]}],
   //   images[{public_id,url}], notes }
@@ -177,18 +178,17 @@ model Itinerary {
   status           ItineraryStatus @default(draft)
   version          Int             @default(1)
 
-  // Computed metadata (mirrors Mongoose pre-save hook calculation)
+  // Computed metadata (mirrors Mongoose pre-save hook logic)
   metaTotalActivities  Int         @default(0)
   metaTotalLocations   Int         @default(0)
   metaTotalPlaces      Int         @default(0)
   metaBreakfastCount   Int         @default(0)
   metaLunchCount       Int         @default(0)
   metaDinnerCount      Int         @default(0)
-  metaLastModifiedById String?     // → user-service User.id
+  metaLastModifiedById String?     // → users.User.id
 
-  createdById      String?         // → user-service User.id
+  createdById      String?         // → users.User.id
 
-  // Back-relation: one Itinerary is linked to at most one Package
   package          Package?
 
   createdAt        DateTime        @default(now())
@@ -197,16 +197,16 @@ model Itinerary {
   @@index([packageId])
   @@index([status, createdAt])
   @@index([createdById])
+  @@schema("packages")
 }
 
-// ─── ManualItinerary (hand-crafted, linked to a Lead) ─────────
+// ─── ManualItinerary ──────────────────────────────────────────
 
 model ManualItinerary {
   id               String          @id @default(uuid())
+  leadId           String          // cross-schema ref → leads.Lead.id
 
-  leadId           String          // cross-service ref → lead-service Lead.id
-
-  // JSONB: same shape as Itinerary.days
+  // JSONB — same shape as Itinerary.days
   days             Json            @default("[]")
 
   status           ItineraryStatus @default(draft)
@@ -228,6 +228,7 @@ model ManualItinerary {
   @@index([leadId, createdAt])
   @@index([status, createdAt])
   @@index([createdById])
+  @@schema("packages")
 }
 
 // ─── CustomizedPackage ────────────────────────────────────────
@@ -252,11 +253,9 @@ model CustomizedPackage {
   highlights            String[]
   terms                 String[]
 
-  // Optional link to an Itinerary record in this same DB
-  itineraryId           String?
+  itineraryId           String?      // → packages.Itinerary.id (same schema)
 
-  // Inline day data (may duplicate Itinerary.days for portability)
-  // JSONB shape identical to Itinerary.days
+  // JSONB — inline day data (same shape as Itinerary.days)
   days                  Json         @default("[]")
 
   isActive              Boolean      @default(true)
@@ -268,11 +267,11 @@ model CustomizedPackage {
   views                 Int          @default(0)
   bookings              Int          @default(0)
 
-  // Cross-service UUIDs
-  createdById           String?
-  customizedForLeadId   String       // → lead-service Lead.id (required)
-  originalPackageId     String       // → package-service Package.id (required)
-  customizedById        String       // → user-service User.id (required)
+  // Cross-schema UUID refs
+  createdById           String?      // → users.User.id
+  customizedForLeadId   String       // → leads.Lead.id
+  originalPackageId     String       // → packages.Package.id
+  customizedById        String       // → users.User.id
   customizationNotes    String?      @db.VarChar(500)
 
   images                CustomizedPackageImage[]
@@ -285,6 +284,7 @@ model CustomizedPackage {
   @@index([customizedById])
   @@index([createdAt])
   @@index([isActive])
+  @@schema("packages")
 }
 
 model CustomizedPackageImage {
@@ -296,6 +296,7 @@ model CustomizedPackageImage {
   order               Int               @default(0)
 
   @@index([customizedPackageId])
+  @@schema("packages")
 }
 
 // ─── Review ───────────────────────────────────────────────────
@@ -304,9 +305,7 @@ model Review {
   id         String   @id @default(uuid())
   packageId  String
   package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
-
-  authorId   String?  // cross-service ref → user-service User.id (nullable = guest review)
-
+  authorId   String?  // cross-schema ref → users.User.id (null = guest review)
   name       String
   email      String?
   rating     Int      // 1–5, validated in service layer
@@ -318,4 +317,5 @@ model Review {
   updatedAt  DateTime @updatedAt
 
   @@index([packageId, createdAt])
+  @@schema("packages")
 }

@@ -1,27 +1,31 @@
 // =============================================================
-// auth-service — owns: OTP
-// Handles: login, register, JWT issuance, OTP, password reset
-// Cross-service references: userId (UUID string, no FK constraint)
+// auth-service — PostgreSQL schema: "auth"
+// Shared DB, isolated namespace. All cross-service refs are
+// plain UUID strings (no FK constraints across schemas).
 // =============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["auth"]
 }
 
 enum OtpType {
   login
   passwordReset
   emailVerification
+
+  @@schema("auth")
 }
 
 model Otp {
   id        String   @id @default(uuid())
-  userId    String   // cross-service ref → user-service User.id
+  userId    String   // cross-schema ref → users.User.id
   code      String   @db.VarChar(6)
   type      OtpType  @default(login)
   email     String
@@ -29,11 +33,12 @@ model Otp {
   attempts  Int      @default(0)
   ipAddress String?
   userAgent String?
-  expiresAt DateTime // service layer deletes expired records (TTL equivalent)
+  expiresAt DateTime // service layer runs a cleanup job (replaces MongoDB TTL index)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, type])
   @@index([email])
-  @@index([expiresAt]) // for cleanup jobs
+  @@index([expiresAt])
+  @@schema("auth")
 }

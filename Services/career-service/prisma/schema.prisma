@@ -1,23 +1,22 @@
 // =============================================================
-// career-service — owns: Career, Vacancy
-//
-// Handles: job applications (Career) and job postings (Vacancy)
+// career-service — PostgreSQL schema: "careers"
+// Shared DB, isolated namespace.
 //
 // Design decisions:
-//   • Career.resume embedded object → flattened to resumeUrl +
-//     resumeFileName columns.
-//   • Vacancy.experience.min → flattened to experienceMin.
-//   • reviewedById is a plain UUID string (cross-service ref
-//     to user-service User.id).
+//   • Career.resume embedded object → flattened columns.
+//   • Vacancy.experience.min → experienceMin column.
+//   • reviewedById / createdById are cross-schema UUID refs.
 // =============================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["careers"]
 }
 
 enum CareerStatus {
@@ -26,6 +25,8 @@ enum CareerStatus {
   shortlisted
   rejected
   hired
+
+  @@schema("careers")
 }
 
 enum VacancyType {
@@ -34,12 +35,16 @@ enum VacancyType {
   Contract
   Temporary
   Internship
+
+  @@schema("careers")
 }
 
 enum VacancyStatus {
   active
   closed
   draft
+
+  @@schema("careers")
 }
 
 // ─── Career (job applications) ────────────────────────────────
@@ -56,7 +61,7 @@ model Career {
   agreeTerms     Boolean
   status         CareerStatus @default(pending)
   adminNotes     String?      @db.VarChar(2000)
-  reviewedById   String?      // → user-service User.id
+  reviewedById   String?      // → users.User.id
   reviewedAt     DateTime?
   emailSent      Boolean      @default(false)
   emailSentAt    DateTime?
@@ -68,6 +73,7 @@ model Career {
   @@index([position])
   @@index([status])
   @@index([createdAt])
+  @@schema("careers")
 }
 
 // ─── Vacancy (job postings) ───────────────────────────────────
@@ -78,10 +84,10 @@ model Vacancy {
   description       String        @db.VarChar(2000)
   type              VacancyType   @default(Full_Time)
   location          String
-  experienceMin     Int           @default(0) // years
+  experienceMin     Int           @default(0) // years; flattened from experience.min
   status            VacancyStatus @default(draft)
   applicationsCount Int           @default(0)
-  createdById       String        // → user-service User.id
+  createdById       String        // → users.User.id
   closingDate       DateTime?
 
   createdAt         DateTime      @default(now())
@@ -89,4 +95,5 @@ model Vacancy {
 
   @@index([status, createdAt])
   @@index([position])
+  @@schema("careers")
 }
