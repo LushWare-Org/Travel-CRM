@@ -1,0 +1,234 @@
+// =============================================================
+// lead-service — owns: Lead, LeadRemark, LeadStatusHistory,
+//   LeadCommunicationLog, LeadStatusOption, Settings
+//
+// Handles: sales pipeline, lead assignment, status tracking,
+//   communication logging, assignment mode settings
+//
+// Design decisions:
+//   • Mongoose embedded arrays (remarks, statusHistory,
+//     communicationLogs) become proper child tables with FK
+//     to Lead — enables individual record queries/deletes.
+//   • tags and itineraryVersionIds are simple text[] arrays.
+//   • notificationSettings object is flattened into boolean
+//     columns on Lead (notifNewLead, notifStatusChange, etc.).
+//   • Settings is a singleton (enforced in service layer).
+//   • All cross-service refs (packageId, assignedToId, etc.)
+//     are plain UUID strings — no FK constraints.
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LeadSource {
+  manual
+  website
+  booking
+  social_media  @map("social-media")
+  phone_call    @map("phone-call")
+  email
+  referral
+  walk_in       @map("walk-in")
+  other
+}
+
+enum LeadPlatform {
+  Manual_Entry  @map("Manual Entry")
+  Website_Form  @map("Website Form")
+  Paid_Package  @map("Paid Package")
+  Social_Media  @map("Social Media")
+  Phone_Call    @map("Phone Call")
+  Email         @map("Email")
+  Referral      @map("Referral")
+  Walk_in       @map("Walk-in")
+}
+
+enum LeadStatus {
+  new
+  contacted
+  interested
+  quoted
+  converted
+  lost
+  not_interested @map("not-interested")
+}
+
+enum LeadPriority {
+  low
+  medium
+  high
+}
+
+enum AssignmentMode {
+  manual
+  auto
+}
+
+enum AssignmentStrategy {
+  round_robin
+  load_based
+}
+
+enum CommunicationLogType {
+  call
+  email
+  meeting
+  message
+  other
+}
+
+// ─── Lead ─────────────────────────────────────────────────────
+
+model Lead {
+  id                    String       @id @default(uuid())
+  name                  String?
+  email                 String?
+  phone                 String?
+  whatsapp              String?
+  city                  String?
+  salesRep              String?      // legacy free-text field kept for compatibility
+  time                  String?
+  source                LeadSource   @default(manual)
+  platform              LeadPlatform @default(Manual_Entry)
+  fromCountry           String?
+  destinationCountry    String?
+  destination           String?
+  travelDate            DateTime?
+  endDate               DateTime?
+
+  // Cross-service UUIDs (no FK constraints)
+  packageId             String?      // → package-service Package.id
+  customizedPackageId   String?      // → package-service CustomizedPackage.id
+  convertedBookingId    String?      // → booking-service Booking.id
+
+  packageName           String?      // denormalised snapshot for display
+  leadDateTime          DateTime     @default(now())
+  numberOfTravelers     Int?
+  budget                String?
+  message               String?
+
+  status                LeadStatus   @default(new)
+  priority              LeadPriority @default(medium)
+
+  // Cross-service UUIDs
+  assignedToId          String?      // → user-service User.id (salesRep)
+  assignedById          String?      // → user-service User.id (admin/auto)
+  assignmentMode        AssignmentMode @default(manual)
+
+  // Itinerary cross-service refs
+  currentItineraryId    String?      // → package-service Itinerary.id
+  manualItineraryId     String?      // → package-service ManualItinerary.id
+  itineraryVersionIds   String[]     // → package-service Itinerary.id[]
+
+  // Notification preferences (flattened from Mongoose embedded object)
+  notifNewLead          Boolean      @default(true)
+  notifStatusChange     Boolean      @default(true)
+  notifAssignment       Boolean      @default(true)
+  notifFollowUp         Boolean      @default(true)
+
+  followUpDate          DateTime?
+  quoteSent             Boolean      @default(false)
+  quoteAmount           Float?
+  lostReason            String?
+  tags                  String[]
+
+  remarks               LeadRemark[]
+  statusHistory         LeadStatusHistory[]
+  communicationLogs     LeadCommunicationLog[]
+
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@index([assignedToId, status, createdAt])
+  @@index([followUpDate])
+  @@index([source, createdAt])
+  @@index([platform])
+  @@index([fromCountry, destinationCountry])
+  @@index([leadDateTime])
+  @@index([assignmentMode])
+  @@index([city])
+}
+
+// ─── Lead child tables (replaces Mongoose embedded arrays) ────
+
+model LeadRemark {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  text      String?
+  addedById String?  // → user-service User.id
+  date      DateTime @default(now())
+  addedAt   DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model LeadStatusHistory {
+  id          String   @id @default(uuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status      String
+  changedById String?  // → user-service User.id
+  changedAt   DateTime @default(now())
+  notes       String?
+
+  @@index([leadId])
+}
+
+model LeadCommunicationLog {
+  id      String               @id @default(uuid())
+  leadId  String
+  lead    Lead                 @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  date    DateTime             @default(now())
+  type    CommunicationLogType?
+  notes   String?
+  byId    String?              // → user-service User.id
+
+  @@index([leadId])
+}
+
+// ─── LeadStatusOption ─────────────────────────────────────────
+
+model LeadStatusOption {
+  id          String   @id @default(uuid())
+  statusName  String   @unique
+  displayName String
+  color       String   @default("#6B7280")
+  icon        String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  description String?
+  createdById String?  // → user-service User.id
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+  @@index([isActive])
+}
+
+// ─── Settings (singleton — lead assignment configuration) ──────
+
+model Settings {
+  id                    String             @id @default(uuid())
+  assignmentMode        AssignmentMode     @default(manual)
+  autoStrategy          AssignmentStrategy @default(round_robin)
+  enabledSalesRepIds    String[]           // → user-service User.id[]
+  roundRobinIndex       Int                @default(0)
+  maxOpenLeadsPerRep    Int                @default(100)
+  skipInactive          Boolean            @default(true)
+  requireActiveLogin48h Boolean            @default(false)
+  updatedById           String?            // → user-service User.id
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  // Service layer enforces only one row exists (getSingleton pattern)
+}

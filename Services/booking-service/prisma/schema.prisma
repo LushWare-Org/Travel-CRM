@@ -1,0 +1,95 @@
+// =============================================================
+// booking-service — owns: Booking, BookingTraveler
+//
+// Handles: booking lifecycle (pending → confirmed → completed),
+//   traveler details, payment status tracking at booking level
+//
+// Design decisions:
+//   • Booking.travelers[] embedded array → BookingTraveler table
+//     (enables individual traveler updates and queries).
+//   • All cross-service refs (userId, packageId, invoiceId,
+//     assignedToId) are plain UUID strings.
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  pending
+  partial
+  paid
+  refunded
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+  completed
+}
+
+enum TravelerGender {
+  male
+  female
+  other
+}
+
+// ─── Booking ──────────────────────────────────────────────────
+
+model Booking {
+  id                  String        @id @default(uuid())
+
+  // Cross-service UUIDs (no FK constraints)
+  userId              String        // → user-service User.id (customer)
+  packageId           String        // → package-service Package.id
+  invoiceId           String?       // → billing-service Invoice.id
+  assignedToId        String?       // → user-service User.id (salesRep)
+
+  travelDate          DateTime?
+  endDate             DateTime?
+  numberOfTravelers   Int
+  totalAmount         Float
+  paidAmount          Float         @default(0)
+  paymentStatus       PaymentStatus @default(pending)
+  bookingStatus       BookingStatus @default(pending)
+
+  specialRequests     String?
+  notes               String?
+
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  confirmedAt         DateTime?
+  completedAt         DateTime?
+
+  travelers           BookingTraveler[]
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([bookingStatus])
+  @@index([travelDate])
+  @@index([assignedToId])
+  @@index([endDate])
+}
+
+// ─── BookingTraveler (replaces Mongoose embedded travelers[]) ──
+
+model BookingTraveler {
+  id        String          @id @default(uuid())
+  bookingId String
+  booking   Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  name      String
+  age       Int
+  gender    TravelerGender?
+  idType    String?
+  idNumber  String?
+
+  @@index([bookingId])
+}

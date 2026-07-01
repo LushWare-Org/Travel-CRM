@@ -1,0 +1,131 @@
+// =============================================================
+// user-service — owns: User, VendorProfile
+// Handles: user CRUD, roles, permissions, vendor management
+// Cross-service references: createdById (self-ref within service)
+// VendorProfile is extracted from the User model to normalise
+// vendor-only fields (1:1, only present when role = vendor)
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  customer
+  salesRep
+  vendor
+  admin
+  superAdmin
+}
+
+enum VendorStatus {
+  pending_verification
+  verified
+  suspended
+  rejected
+}
+
+enum ServiceType {
+  hotel
+  transport
+  activity
+  restaurant
+  guide
+  other
+}
+
+// Stored as a PostgreSQL text[] array on User.permissions
+// Validated in the service layer (not at DB level)
+// Valid values: manage_users | manage_sales_reps | manage_vendors |
+//               manage_admins | view_reports | manage_billing |
+//               view_billing | manage_leads | manage_packages
+
+model User {
+  id                       String         @id @default(uuid())
+  name                     String         @db.VarChar(50)
+  email                    String         @unique @db.VarChar(255)
+  phone                    String?
+  phoneCountry             String?        @default("US") @db.VarChar(2)
+  phoneE164                String?        @unique
+  password                 String         // bcrypt hash, never returned in API responses
+
+  role                     UserRole       @default(customer)
+  isSuperAdmin             Boolean        @default(false)
+  permissions              String[]       // validated against allowed list in service layer
+
+  avatarPublicId           String?
+  avatarUrl                String?
+
+  isActive                 Boolean        @default(true)
+  isEmailVerified          Boolean        @default(false)
+  isTempPassword           Boolean        @default(false)
+  mustChangePassword       Boolean        @default(false)
+  canBeDeleted             Boolean        @default(true)
+
+  // Auth token columns (hashed tokens, never plain values)
+  passwordChangedAt        DateTime?
+  emailVerificationToken   String?
+  emailVerificationExpire  DateTime?
+  resetPasswordToken       String?
+  resetPasswordExpire      DateTime?
+  lastLogin                DateTime?
+  lastActivity             DateTime       @default(now())
+
+  // Self-referential: which admin/superAdmin created this account
+  createdById              String?
+  createdBy                User?          @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers             User[]         @relation("UserCreatedBy")
+
+  // 1:1 vendor extension — only populated when role = vendor
+  vendorProfile            VendorProfile?
+
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  @@index([role, isActive])
+  @@index([lastActivity])
+}
+
+model VendorProfile {
+  id                          String       @id @default(uuid())
+  userId                      String       @unique
+  user                        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessName                String?
+  serviceType                 ServiceType?
+  businessRegistrationNumber  String?      @unique
+  taxIdentificationNumber     String?
+
+  // Address (flattened from Mongoose embedded object)
+  addressStreet               String?
+  addressCity                 String?
+  addressState                String?
+  addressZipCode              String?
+  addressCountry              String?
+
+  // Contact person (flattened)
+  contactPersonName           String?
+  contactPersonPhone          String?
+  contactPersonEmail          String?
+  contactPersonDesignation    String?
+
+  // Bank details (flattened)
+  bankAccountName             String?
+  bankAccountNumber           String?
+  bankName                    String?
+  bankBranchName              String?
+  bankIfscCode                String?
+  bankSwiftCode               String?
+
+  rating                      Float        @default(0)
+  totalBookings               Int          @default(0)
+  vendorStatus                VendorStatus @default(pending_verification)
+
+  createdAt                   DateTime     @default(now())
+  updatedAt                   DateTime     @updatedAt
+}

@@ -1,0 +1,735 @@
+// =============================================================
+// billing-service — owns: Invoice, InvoiceItem, Quotation,
+//   QuotationItem, QuotationImage, QuotationRevision,
+//   PaymentReceipt, PaymentHistory, CreditNote, CreditNoteItem,
+//   Voucher, VoucherLocationDate, VoucherMealPlan,
+//   VoucherItinerarySummary
+//
+// Handles: all financial documents, PDF generation, payment
+//   tracking, credit notes, vouchers
+//
+// Design decisions:
+//   • Mongoose embedded arrays (items, payments, creditNotes,
+//     revisionHistory) become proper child tables.
+//   • Customer details are denormalised as snapshot columns on
+//     each document (name, email, phone, address) so PDFs
+//     remain accurate even if the customer record changes.
+//   • Voucher.packageDetails is stored as JSONB because it is
+//     a large snapshot copied at creation time and never
+//     queried by sub-fields.
+//   • VoucherItinerarySummary.locations and .activities use
+//     PostgreSQL text[] arrays.
+//   • Auto-increment document numbers (INV-YYYYMM-NNNNN etc.)
+//     are generated in the service layer, not the DB, to match
+//     the existing Mongoose pre-save hook behaviour.
+//   • All cross-service refs are plain UUID strings.
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Shared enums ─────────────────────────────────────────────
+
+enum DiscountType {
+  percentage
+  fixed
+  none
+}
+
+enum ItemCategory {
+  accommodation
+  transportation
+  activity
+  food
+  guide
+  insurance
+  visa
+  package
+  other
+}
+
+enum Currency {
+  LKR
+  USD
+  EUR
+  GBP
+  AUD
+  INR
+}
+
+enum PaymentMethod {
+  cash
+  card
+  bank_transfer  @map("bank-transfer")
+  online
+  cheque
+  upi
+  wallet
+  other
+}
+
+enum CardType {
+  visa
+  mastercard
+  amex
+  discover
+  other
+}
+
+enum PaymentGateway {
+  stripe
+  razorpay
+  paypal
+  square
+  other
+}
+
+// ─── Invoice enums ────────────────────────────────────────────
+
+enum InvoiceType {
+  invoice
+  proforma
+  tax_invoice        @map("tax-invoice")
+  commercial_invoice @map("commercial-invoice")
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  viewed
+  paid
+  partial
+  overdue
+  cancelled
+  refunded
+}
+
+enum InvoicePaymentStatus {
+  unpaid
+  partial
+  paid
+  overpaid
+  refunded
+}
+
+// ─── Quotation enums ──────────────────────────────────────────
+
+enum QuotationType {
+  standard
+  custom
+  package_based @map("package-based")
+}
+
+enum QuotationMode {
+  summary
+  detailed
+}
+
+enum QuotationStatus {
+  draft
+  sent
+  viewed
+  accepted
+  rejected
+  expired
+  converted
+}
+
+// ─── PaymentReceipt enums ─────────────────────────────────────
+
+enum ReceiptStatus {
+  paid_in_advance  @map("paid-in-advance")
+  paid_in_full     @map("paid-in-full")
+  partial_payment  @map("partial-payment")
+  refunded
+  cancelled
+}
+
+enum ReceiptPaymentType {
+  advance
+  installment
+  full_payment  @map("full-payment")
+  final_payment @map("final-payment")
+  refund
+}
+
+// ─── PaymentHistory enums ─────────────────────────────────────
+
+enum PaymentHistoryStatus {
+  pending
+  verified
+  reconciled
+  cancelled
+}
+
+enum PaymentHistoryType {
+  advance
+  installment
+  full_payment @map("full-payment")
+  refund
+}
+
+// ─── CreditNote enums ─────────────────────────────────────────
+
+enum CreditNoteType {
+  refund
+  cancellation
+  discount
+  error_correction      @map("error-correction")
+  service_not_provided  @map("service-not-provided")
+  quality_issue         @map("quality-issue")
+  other
+}
+
+enum CreditNoteStatus {
+  draft
+  issued
+  applied
+  refunded
+  cancelled
+}
+
+enum RefundStatus {
+  pending
+  processing
+  completed
+  failed
+  not_applicable @map("not-applicable")
+}
+
+enum RefundMethod {
+  original_method @map("original-method")
+  bank_transfer   @map("bank-transfer")
+  cheque
+  credit_balance  @map("credit-balance")
+  voucher
+  other
+}
+
+// ─── Voucher enums ────────────────────────────────────────────
+
+enum VoucherStatus {
+  draft
+  sent
+  viewed
+  confirmed
+  cancelled
+}
+
+// ─── Invoice ──────────────────────────────────────────────────
+
+model Invoice {
+  id                   String               @id @default(uuid())
+  invoiceNumber        String               @unique
+
+  // Cross-service UUIDs
+  leadId               String               // → lead-service Lead.id
+  quotationId          String?              // → billing-service Quotation.id
+  bookingId            String?              // → booking-service Booking.id
+  createdById          String               // → user-service User.id
+  lastModifiedById     String?
+  cancelledById        String?
+
+  // Customer snapshot (copied at creation for PDF accuracy)
+  customerName         String
+  customerEmail        String
+  customerPhone        String?
+  customerAddress      String?
+  customerGstNumber    String?
+
+  type                 InvoiceType          @default(invoice)
+
+  subtotal             Float                @default(0)
+  taxRate              Float                @default(0)
+  taxAmount            Float                @default(0)
+  discountType         DiscountType         @default(none)
+  discountValue        Float                @default(0)
+  discountAmount       Float                @default(0)
+  serviceChargeRate    Float                @default(0)
+  serviceChargeAmount  Float                @default(0)
+  totalAmount          Float                @default(0)
+  paidAmount           Float                @default(0)
+  outstandingAmount    Float                @default(0)
+
+  status               InvoiceStatus        @default(draft)
+  paymentStatus        InvoicePaymentStatus @default(unpaid)
+
+  dueDate              DateTime
+  issueDate            DateTime             @default(now())
+  paidDate             DateTime?
+
+  notes                String?
+  terms                String?
+  paymentTerms         String?
+  paymentInstructions  String?
+
+  // Bank details snapshot (flattened)
+  bankAccountName      String?
+  bankAccountNumber    String?
+  bankName             String?
+  bankIfscCode         String?
+  bankSwiftCode        String?
+  bankBranch           String?
+
+  pdfUrl               String?
+  sentAt               DateTime?
+  emailSent            Boolean              @default(false)
+  viewedAt             DateTime?
+  remindersSent        Int                  @default(0)
+  lastReminderSent     DateTime?
+  cancelledAt          DateTime?
+  cancellationReason   String?
+
+  items                InvoiceItem[]
+  payments             PaymentReceipt[]
+  creditNotes          CreditNote[]
+
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([status, dueDate])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model InvoiceItem {
+  id          String       @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  category    ItemCategory @default(other)
+  quantity    Int          @default(1)
+  unitPrice   Float
+  totalPrice  Float
+  taxRate     Float        @default(0)
+  notes       String?
+  order       Int          @default(0)
+
+  @@index([invoiceId])
+}
+
+// ─── Quotation ────────────────────────────────────────────────
+
+model Quotation {
+  id                   String          @id @default(uuid())
+  quotationNumber      String          @unique
+
+  // Cross-service UUIDs
+  leadId               String          // → lead-service Lead.id
+  packageId            String?         // → package-service Package.id
+  itineraryId          String?         // → package-service ManualItinerary.id
+  createdById          String          // → user-service User.id
+  lastModifiedById     String?
+  convertedToInvoiceId String?         // → billing-service Invoice.id
+
+  // Customer snapshot
+  customerName         String
+  customerEmail        String
+  customerPhone        String?
+  customerAddress      String?
+  customerGstNumber    String?
+
+  type                 QuotationType   @default(standard)
+  mode                 QuotationMode   @default(summary)
+
+  subtotal             Float           @default(0)
+  taxRate              Float           @default(0)
+  taxAmount            Float           @default(0)
+  discountType         DiscountType    @default(none)
+  discountValue        Float           @default(0)
+  discountAmount       Float           @default(0)
+  serviceChargeRate    Float           @default(0)
+  serviceChargeAmount  Float           @default(0)
+  totalAmount          Float           @default(0)
+
+  status               QuotationStatus @default(draft)
+  issueDate            DateTime        @default(now())
+  validUntil           DateTime
+  notes                String?
+  terms                String?
+  paymentTerms         String?
+
+  includedServices     String[]
+  excludedServices     String[]
+
+  coverImage           String?         // legacy field kept for compatibility
+  pdfUrl               String?
+  sentAt               DateTime?
+  emailSent            Boolean         @default(false)
+  viewedAt             DateTime?
+  acceptedAt           DateTime?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  expiresAt            DateTime?
+
+  version              Int             @default(1)
+
+  items                QuotationItem[]
+  images               QuotationImage[]
+  revisionHistory      QuotationRevision[]
+
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([status, validUntil])
+  @@index([createdAt])
+}
+
+model QuotationItem {
+  id          String       @id @default(uuid())
+  quotationId String
+  quotation   Quotation    @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  description String
+  category    ItemCategory @default(other)
+  quantity    Int          @default(1)
+  unitPrice   Float
+  totalPrice  Float
+  notes       String?
+  order       Int          @default(0)
+
+  @@index([quotationId])
+}
+
+model QuotationImage {
+  id          String    @id @default(uuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  url         String?
+  isCover     Boolean   @default(false)
+
+  @@index([quotationId])
+}
+
+model QuotationRevision {
+  id           String    @id @default(uuid())
+  quotationId  String
+  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  version      Int
+  modifiedById String?   // → user-service User.id
+  modifiedAt   DateTime  @default(now())
+  changes      String?
+
+  @@index([quotationId])
+}
+
+// ─── PaymentReceipt ───────────────────────────────────────────
+
+model PaymentReceipt {
+  id                   String             @id @default(uuid())
+  receiptNumber        String             @unique
+
+  // Cross-service UUIDs
+  leadId               String             // → lead-service Lead.id
+  invoiceId            String
+  invoice              Invoice            @relation(fields: [invoiceId], references: [id])
+  createdById          String
+  lastModifiedById     String?
+  verifiedById         String?
+  reconciledById       String?
+  cancelledById        String?
+  refundForId          String?            // → billing-service PaymentReceipt.id (self-ref for refunds)
+
+  // Customer snapshot
+  customerName         String
+  customerEmail        String
+  customerPhone        String?
+  customerAddress      String?
+
+  amount               Float
+  currency             Currency           @default(LKR)
+  paymentMethod        PaymentMethod
+  paymentDate          DateTime           @default(now())
+  transactionId        String?
+
+  receiptStatus        ReceiptStatus      @default(partial_payment)
+  paymentType          ReceiptPaymentType
+  notes                String?
+  internalNotes        String?
+
+  previousBalance      Float              @default(0)
+  outstandingBalance   Float              @default(0)
+
+  // Payment details (all nullable; relevant subset used per method)
+  cardType             CardType?
+  cardLastFour         String?
+  bankName             String?
+  bankAccountNumber    String?
+  bankTransactionRef   String?
+  chequeNumber         String?
+  chequeDate           DateTime?
+  chequeBank           String?
+  paymentGateway       PaymentGateway?
+  gatewayTransactionId String?
+  gatewayPaymentId     String?
+  upiId                String?
+  upiTransactionId     String?
+
+  verified             Boolean            @default(false)
+  verifiedAt           DateTime?
+  reconciled           Boolean            @default(false)
+  reconciledAt         DateTime?
+
+  pdfUrl               String?
+  sentAt               DateTime?
+  emailSent            Boolean            @default(false)
+
+  cancelledAt          DateTime?
+  cancellationReason   String?
+  refundReason         String?
+
+  paymentHistories     PaymentHistory[]
+
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([invoiceId, paymentDate])
+  @@index([receiptStatus])
+  @@index([paymentDate])
+  @@index([createdAt])
+  @@index([paymentMethod])
+  @@index([verified, reconciled])
+  @@index([transactionId])
+}
+
+// ─── PaymentHistory ───────────────────────────────────────────
+
+model PaymentHistory {
+  id                   String               @id @default(uuid())
+  paymentHistoryNumber String               @unique
+
+  receiptId            String
+  receipt              PaymentReceipt       @relation(fields: [receiptId], references: [id])
+
+  // Cross-service UUIDs
+  leadId               String
+  invoiceId            String
+
+  // Customer snapshot
+  customerName         String
+  customerEmail        String
+  customerPhone        String?
+  customerAddress      String?
+
+  amount               Float
+  currency             Currency             @default(LKR)
+  paymentMethod        PaymentMethod
+  paymentDate          DateTime
+  transactionId        String?
+  paymentType          PaymentHistoryType   @default(installment)
+  status               PaymentHistoryStatus @default(pending)
+  notes                String?
+  internalNotes        String?
+
+  createdById          String
+  verifiedById         String?
+  reconciledById       String?
+  cancelledById        String?
+
+  verifiedAt           DateTime?
+  reconciledAt         DateTime?
+  cancelledAt          DateTime?
+
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([leadId, paymentDate])
+  @@index([invoiceId, paymentDate])
+  @@index([receiptId])
+  @@index([paymentDate])
+  @@index([status])
+}
+
+// ─── CreditNote ───────────────────────────────────────────────
+
+model CreditNote {
+  id                   String           @id @default(uuid())
+  creditNoteNumber     String           @unique
+
+  // Cross-service UUIDs
+  leadId               String
+  invoiceId            String
+  invoice              Invoice          @relation(fields: [invoiceId], references: [id])
+  createdById          String
+  lastModifiedById     String?
+  approvedById         String?
+  rejectedById         String?
+  cancelledById        String?
+
+  // Customer snapshot
+  customerName         String
+  customerEmail        String
+  customerPhone        String
+  customerAddress      String?
+
+  type                 CreditNoteType
+  reason               String
+
+  subtotal             Float            @default(0)
+  taxAmount            Float            @default(0)
+  totalAmount          Float            @default(0)
+
+  status               CreditNoteStatus @default(draft)
+  refundStatus         RefundStatus     @default(not_applicable)
+  refundMethod         RefundMethod?
+
+  // Refund details (flattened from Mongoose embedded object)
+  refundTransactionId  String?
+  refundProcessedAt    DateTime?
+  refundBankName       String?
+  refundAccountNumber  String?
+  refundChequeNumber   String?
+  refundNotes          String?
+
+  appliedToInvoice     Boolean          @default(false)
+  appliedAt            DateTime?
+
+  voucherGenerated     Boolean          @default(false)
+  voucherCode          String?
+  voucherValue         Float?
+  voucherExpiryDate    DateTime?
+
+  issueDate            DateTime         @default(now())
+  notes                String?
+  internalNotes        String?
+
+  approvalRequired     Boolean          @default(true)
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+
+  pdfUrl               String?
+  sentAt               DateTime?
+  emailSent            Boolean          @default(false)
+
+  cancelledAt          DateTime?
+  cancellationReason   String?
+
+  items                CreditNoteItem[]
+
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([invoiceId, issueDate])
+  @@index([status])
+  @@index([refundStatus])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model CreditNoteItem {
+  id             String     @id @default(uuid())
+  creditNoteId   String
+  creditNote     CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  description    String
+  originalAmount Float
+  creditAmount   Float
+  quantity       Int        @default(1)
+  notes          String?
+  order          Int        @default(0)
+
+  @@index([creditNoteId])
+}
+
+// ─── Voucher ──────────────────────────────────────────────────
+
+model Voucher {
+  id                    String                    @id @default(uuid())
+  voucherNumber         String                    @unique
+
+  // Cross-service UUIDs
+  leadId                String                    // → lead-service Lead.id
+  packageId             String?                   // → package-service Package.id
+  customizedPackageId   String?                   // → package-service CustomizedPackage.id
+  createdById           String
+  lastModifiedById      String?
+
+  // Customer snapshot
+  customerName          String
+  customerEmail         String
+  customerPhone         String?
+  customerAddress       String?
+
+  // Full package details snapshot at time of voucher creation (JSONB)
+  // Shape: { name, destination, duration, category, inclusions[],
+  //          exclusions[], highlights[], price, coverImage{url,public_id},
+  //          images[{url,public_id,isCover}] }
+  packageDetails        Json?
+
+  travelStartDate       DateTime?
+  travelEndDate         DateTime?
+
+  notes                 String?
+  terms                 String[]
+  specialInstructions   String?
+
+  status                VoucherStatus             @default(draft)
+  emailSent             Boolean                   @default(false)
+  emailSentAt           DateTime?
+  whatsappSent          Boolean                   @default(false)
+  whatsappSentAt        DateTime?
+  viewedAt              DateTime?
+  confirmedAt           DateTime?
+  pdfUrl                String?
+
+  locationDates         VoucherLocationDate[]
+  mealPlans             VoucherMealPlan[]
+  itinerarySummary      VoucherItinerarySummary[]
+
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([status])
+}
+
+model VoucherLocationDate {
+  id        String   @id @default(uuid())
+  voucherId String
+  voucher   Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  location  String?
+  hotelName String?
+  checkIn   DateTime?
+  checkOut  DateTime?
+  order     Int      @default(0)
+
+  @@index([voucherId])
+}
+
+model VoucherMealPlan {
+  id        String   @id @default(uuid())
+  voucherId String
+  voucher   Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  dayNumber Int
+  dayTitle  String?
+  breakfast Boolean  @default(false)
+  lunch     Boolean  @default(false)
+  dinner    Boolean  @default(false)
+
+  @@index([voucherId])
+}
+
+model VoucherItinerarySummary {
+  id                String   @id @default(uuid())
+  voucherId         String
+  voucher           Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  dayNumber         Int
+  title             String?
+  locations         String[]
+  activities        String[]
+  accommodationName String?
+  accommodationType String?
+  order             Int      @default(0)
+
+  @@index([voucherId])
+}

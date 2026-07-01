@@ -1,0 +1,39 @@
+// =============================================================
+// auth-service — owns: OTP
+// Handles: login, register, JWT issuance, OTP, password reset
+// Cross-service references: userId (UUID string, no FK constraint)
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OtpType {
+  login
+  passwordReset
+  emailVerification
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  userId    String   // cross-service ref → user-service User.id
+  code      String   @db.VarChar(6)
+  type      OtpType  @default(login)
+  email     String
+  isUsed    Boolean  @default(false)
+  attempts  Int      @default(0)
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime // service layer deletes expired records (TTL equivalent)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, type])
+  @@index([email])
+  @@index([expiresAt]) // for cleanup jobs
+}

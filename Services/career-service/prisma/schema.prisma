@@ -1,0 +1,92 @@
+// =============================================================
+// career-service — owns: Career, Vacancy
+//
+// Handles: job applications (Career) and job postings (Vacancy)
+//
+// Design decisions:
+//   • Career.resume embedded object → flattened to resumeUrl +
+//     resumeFileName columns.
+//   • Vacancy.experience.min → flattened to experienceMin.
+//   • reviewedById is a plain UUID string (cross-service ref
+//     to user-service User.id).
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CareerStatus {
+  pending
+  under_review @map("under-review")
+  shortlisted
+  rejected
+  hired
+}
+
+enum VacancyType {
+  Full_Time  @map("Full Time")
+  Part_Time  @map("Part Time")
+  Contract
+  Temporary
+  Internship
+}
+
+enum VacancyStatus {
+  active
+  closed
+  draft
+}
+
+// ─── Career (job applications) ────────────────────────────────
+
+model Career {
+  id             String       @id @default(uuid())
+  fullName       String       @db.VarChar(100)
+  email          String
+  phone          String
+  position       String
+  resumeUrl      String?
+  resumeFileName String?
+  coverLetter    String       @db.VarChar(2000)
+  agreeTerms     Boolean
+  status         CareerStatus @default(pending)
+  adminNotes     String?      @db.VarChar(2000)
+  reviewedById   String?      // → user-service User.id
+  reviewedAt     DateTime?
+  emailSent      Boolean      @default(false)
+  emailSentAt    DateTime?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([email])
+  @@index([position])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─── Vacancy (job postings) ───────────────────────────────────
+
+model Vacancy {
+  id                String        @id @default(uuid())
+  position          String        @db.VarChar(100)
+  description       String        @db.VarChar(2000)
+  type              VacancyType   @default(Full_Time)
+  location          String
+  experienceMin     Int           @default(0) // years
+  status            VacancyStatus @default(draft)
+  applicationsCount Int           @default(0)
+  createdById       String        // → user-service User.id
+  closingDate       DateTime?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([position])
+}

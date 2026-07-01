@@ -1,0 +1,321 @@
+// =============================================================
+// package-service — owns: Package, PackageImage, Itinerary,
+//   ManualItinerary, CustomizedPackage, CustomizedPackageImage,
+//   Review
+//
+// Handles: package catalog, AI generation, itineraries, reviews
+//
+// Design decisions:
+//   • Itinerary.days and CustomizedPackage.days are stored as
+//     Json (PostgreSQL JSONB) because they are deeply nested,
+//     always read/written as a whole unit, and never queried
+//     by individual sub-fields at the DB level.
+//   • Simple string arrays (inclusions, exclusions, highlights,
+//     terms) use PostgreSQL text[].
+//   • Cross-service IDs (createdById, leadId, etc.) are plain
+//     UUID strings — no FK constraints across service boundaries.
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PackageCategory {
+  honeymoon
+  couple
+  family
+  group
+  wild_safari @map("wild safari")
+}
+
+enum PackageType {
+  Standard
+  Deluxe
+  Luxury
+  Premium
+}
+
+enum PackageStatus {
+  draft
+  published
+  archived
+}
+
+enum ItineraryStatus {
+  draft
+  published
+  archived
+}
+
+// Used for CustomizedPackage only
+enum CpDifficulty {
+  easy
+  moderate
+  difficult
+}
+
+enum CpCategory {
+  honeymoon
+  family
+  adventure
+  budget
+  luxury
+  religious
+  wildlife
+  beach
+  heritage
+  other
+}
+
+// ─── Package ──────────────────────────────────────────────────
+
+model Package {
+  id                  String          @id @default(uuid())
+  name                String?         @db.VarChar(100)
+  slug                String?         @unique
+  description         String?         @db.VarChar(2000)
+  destination         String?
+  duration            Int?
+  price               Float?
+  maxGroupSize        Int             @default(10)
+  difficulty          String?
+
+  category            PackageCategory @default(family)
+  packageType         PackageType     @default(Standard)
+
+  // Cover image (flattened from Mongoose embedded object)
+  coverImagePublicId  String?
+  coverImageUrl       String?
+
+  // Simple string arrays stored as PostgreSQL text[]
+  inclusions          String[]
+  exclusions          String[]
+  highlights          String[]
+  terms               String[]
+
+  // FK to Itinerary (same DB — constraint enforced)
+  itineraryId         String?         @unique
+  itinerary           Itinerary?      @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
+
+  isActive            Boolean         @default(true)
+  isFeatured          Boolean         @default(false)
+  status              PackageStatus   @default(draft)
+
+  availableFrom       DateTime        @default(now())
+  availableTo         DateTime?
+
+  rating              Float           @default(0)
+  numReviews          Int             @default(0)
+  views               Int             @default(0)
+  bookings            Int             @default(0)
+
+  // Cross-service UUIDs (no FK constraints)
+  createdById         String?         // → user-service User.id
+  customizedForLeadId String?         // → lead-service Lead.id
+  originalPackageId   String?         // → package-service Package.id (self, for copies)
+  customizedById      String?         // → user-service User.id
+  customizationNotes  String?         @db.VarChar(500)
+
+  images              PackageImage[]
+  reviews             Review[]
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([category])
+  @@index([destination])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([status])
+  @@index([createdById])
+  @@index([price])
+  @@index([rating])
+  @@index([bookings])
+  @@index([createdAt])
+  @@index([customizedForLeadId])
+  @@index([originalPackageId])
+  @@index([isActive, category])
+  @@index([isActive, isFeatured])
+  @@index([isActive, status])
+}
+
+model PackageImage {
+  id        String  @id @default(uuid())
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  publicId  String?
+  url       String?
+  order     Int     @default(0)
+
+  @@index([packageId])
+}
+
+// ─── Itinerary (AI-generated or linked to a Package) ──────────
+
+model Itinerary {
+  id               String          @id @default(uuid())
+
+  // packageId identifies which Package or CustomizedPackage owns this.
+  // packageModelType distinguishes the owner type (replaces Mongoose refPath).
+  packageId        String?
+  packageModelType String          @default("Package") // "Package" | "CustomizedPackage"
+
+  // JSONB: array of day objects — always read/written as a whole.
+  // Shape per element (mirrors Mongoose subdoc):
+  // { dayNumber, title, description, locations[], activities[],
+  //   accommodation{name,type,rating,address,contactNumber},
+  //   meals{breakfast,lunch,dinner}, transport,
+  //   places[{name,description,duration,images[{public_id,url}]}],
+  //   images[{public_id,url}], notes }
+  days             Json            @default("[]")
+
+  status           ItineraryStatus @default(draft)
+  version          Int             @default(1)
+
+  // Computed metadata (mirrors Mongoose pre-save hook calculation)
+  metaTotalActivities  Int         @default(0)
+  metaTotalLocations   Int         @default(0)
+  metaTotalPlaces      Int         @default(0)
+  metaBreakfastCount   Int         @default(0)
+  metaLunchCount       Int         @default(0)
+  metaDinnerCount      Int         @default(0)
+  metaLastModifiedById String?     // → user-service User.id
+
+  createdById      String?         // → user-service User.id
+
+  // Back-relation: one Itinerary is linked to at most one Package
+  package          Package?
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([packageId])
+  @@index([status, createdAt])
+  @@index([createdById])
+}
+
+// ─── ManualItinerary (hand-crafted, linked to a Lead) ─────────
+
+model ManualItinerary {
+  id               String          @id @default(uuid())
+
+  leadId           String          // cross-service ref → lead-service Lead.id
+
+  // JSONB: same shape as Itinerary.days
+  days             Json            @default("[]")
+
+  status           ItineraryStatus @default(draft)
+  version          Int             @default(1)
+
+  metaTotalActivities  Int         @default(0)
+  metaTotalLocations   Int         @default(0)
+  metaTotalPlaces      Int         @default(0)
+  metaBreakfastCount   Int         @default(0)
+  metaLunchCount       Int         @default(0)
+  metaDinnerCount      Int         @default(0)
+  metaLastModifiedById String?
+
+  createdById      String?
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([leadId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdById])
+}
+
+// ─── CustomizedPackage ────────────────────────────────────────
+
+model CustomizedPackage {
+  id                    String       @id @default(uuid())
+  customizationSequence Int          @default(1)
+  name                  String       @db.VarChar(100)
+  description           String       @db.VarChar(2000)
+  destination           String
+  duration              Int
+  price                 Float
+  maxGroupSize          Int          @default(10)
+  difficulty            CpDifficulty @default(moderate)
+  category              CpCategory   @default(other)
+
+  coverImagePublicId    String?
+  coverImageUrl         String?
+
+  inclusions            String[]
+  exclusions            String[]
+  highlights            String[]
+  terms                 String[]
+
+  // Optional link to an Itinerary record in this same DB
+  itineraryId           String?
+
+  // Inline day data (may duplicate Itinerary.days for portability)
+  // JSONB shape identical to Itinerary.days
+  days                  Json         @default("[]")
+
+  isActive              Boolean      @default(true)
+  isFeatured            Boolean      @default(false)
+  availableFrom         DateTime     @default(now())
+  availableTo           DateTime?
+  rating                Float        @default(0)
+  numReviews            Int          @default(0)
+  views                 Int          @default(0)
+  bookings              Int          @default(0)
+
+  // Cross-service UUIDs
+  createdById           String?
+  customizedForLeadId   String       // → lead-service Lead.id (required)
+  originalPackageId     String       // → package-service Package.id (required)
+  customizedById        String       // → user-service User.id (required)
+  customizationNotes    String?      @db.VarChar(500)
+
+  images                CustomizedPackageImage[]
+
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([customizedForLeadId])
+  @@index([originalPackageId])
+  @@index([customizedById])
+  @@index([createdAt])
+  @@index([isActive])
+}
+
+model CustomizedPackageImage {
+  id                  String            @id @default(uuid())
+  customizedPackageId String
+  package             CustomizedPackage @relation(fields: [customizedPackageId], references: [id], onDelete: Cascade)
+  publicId            String?
+  url                 String?
+  order               Int               @default(0)
+
+  @@index([customizedPackageId])
+}
+
+// ─── Review ───────────────────────────────────────────────────
+
+model Review {
+  id         String   @id @default(uuid())
+  packageId  String
+  package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  authorId   String?  // cross-service ref → user-service User.id (nullable = guest review)
+
+  name       String
+  email      String?
+  rating     Int      // 1–5, validated in service layer
+  comment    String   @db.VarChar(1000)
+  isApproved Boolean  @default(true)
+  helpful    Int      @default(0)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([packageId, createdAt])
+}
