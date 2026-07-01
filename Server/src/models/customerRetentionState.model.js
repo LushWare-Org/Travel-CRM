@@ -11,7 +11,7 @@ const customerRetentionStateSchema = new mongoose.Schema(
     },
     retentionStatus: {
       type: String,
-      enum: ['HEALTHY', 'AT_RISK', 'FOLLOW_UP_STAGE_1', 'FOLLOW_UP_STAGE_2', 'FOLLOW_UP_STAGE_3', 'ESCALATED', 'RECOVERED'],
+      enum: ['HEALTHY', 'AT_RISK', 'FOLLOW_UP_STAGE_1', 'FOLLOW_UP_STAGE_2', 'FOLLOW_UP_STAGE_3', 'ESCALATED', 'RECOVERED', 'CHURNED'],
       default: 'HEALTHY',
       index: true,
     },

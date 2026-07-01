@@ -19,6 +19,7 @@ const settingsSchema = new mongoose.Schema(
     requireActiveLogin48h: { type: Boolean, default: false }, // Only assign to sales reps who logged in within 1 hour
     autoRecommendationEmails: { type: Boolean, default: true },
     autoFollowUpEmails: { type: Boolean, default: true },
+    autoFollowUpsEnabled: { type: Boolean, default: true },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true },

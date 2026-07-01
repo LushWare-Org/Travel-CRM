@@ -5,14 +5,18 @@ import aiEventBusService from './aiEventBus.service.js';
 import logger from '../../config/logger.js';
 import riskDetectionAgentService from './agents/riskDetectionAgent.service.js';
 import riskOutboxPublisherWorker from './riskOutboxPublisher.worker.js';
+import churnPredictionService from './churnPrediction.service.js';
+import RetentionFollowUp from '../../models/retentionFollowUp.model.js';
 
 class AISchedulerService {
   constructor() {
     this.followUpTicker = null;
+    this.retentionFollowUpTicker = null;
     this.riskCron = null;
     this.riskOutboxTicker = null;
     this.isRiskBatchRunning = false;
     this.isOutboxPublishing = false;
+    this.isRetentionFollowUpRunning = false;
   }
 
   start() {
@@ -57,7 +61,8 @@ class AISchedulerService {
         }
         this.isRiskBatchRunning = true;
         try {
-          await riskDetectionAgentService.runDailyRiskDetection();
+          await churnPredictionService.runDailyChurnPrediction();
+          await riskDetectionAgentService.runRiskDetectionFromLatestScores();
           await riskOutboxPublisherWorker.publishPendingOutboxEvents();
         } catch (error) {
           logger.error(`[AIScheduler] Risk detection batch failed: ${error.message}`);
@@ -84,10 +89,48 @@ class AISchedulerService {
       }, outboxPollMs);
     }
 
+    if (!this.retentionFollowUpTicker) {
+      const pollMs = Number(process.env.RETENTION_FOLLOWUP_POLL_MS || 60_000);
+      this.retentionFollowUpTicker = setInterval(async () => {
+        if (this.isRetentionFollowUpRunning) return;
+        this.isRetentionFollowUpRunning = true;
+
+        try {
+          const dueFollowUps = await RetentionFollowUp.find({
+            type: 'churn_retention',
+            status: 'pending',
+            scheduledAt: { $lte: new Date() },
+          })
+            .sort({ scheduledAt: 1 })
+            .limit(20)
+            .lean();
+
+          await Promise.all(dueFollowUps.map(async (followUp) => {
+            await aiEventBusService.publish({
+              type: 'retention.followup.triggered',
+              source: 'ai-scheduler',
+              payload: {
+                followUpId: String(followUp._id),
+                customerId: String(followUp.customerId),
+                leadId: followUp.leadId ? String(followUp.leadId) : undefined,
+                template: followUp.template,
+                channels: followUp.channels || ['email'],
+              },
+            });
+          }));
+        } catch (error) {
+          logger.error(`[AIScheduler] Retention follow-up scheduler failed: ${error.message}`);
+        } finally {
+          this.isRetentionFollowUpRunning = false;
+        }
+      }, pollMs);
+    }
+
     logger.info('[AIScheduler] Started', {
       riskCron: process.env.AI_RISK_DETECTION_CRON || '15 2 * * *',
       riskCronTimezone: process.env.AI_RISK_DETECTION_CRON_TZ || 'UTC',
       outboxPollMs: Number(process.env.RISK_OUTBOX_POLL_MS || 60_000),
+      retentionFollowUpPollMs: Number(process.env.RETENTION_FOLLOWUP_POLL_MS || 60_000),
     });
   }
 }

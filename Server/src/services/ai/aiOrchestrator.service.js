@@ -5,6 +5,7 @@ import messagingAgentService from './agents/messagingAgent.service.js';
 import recommendationAgentService from './agents/recommendationAgent.service.js';
 import followUpAgentService from './agents/followUpAgent.service.js';
 import documentGenerationAgentService from './agents/documentGenerationAgent.service.js';
+import retentionLifecycleAgentService from './agents/retentionLifecycleAgent.service.js';
 import logger from '../../config/logger.js';
 
 class AIOrchestratorService {
@@ -14,6 +15,7 @@ class AIOrchestratorService {
       recommendationAgentService,
       followUpAgentService,
       documentGenerationAgentService,
+      retentionLifecycleAgentService,
     ];
     this.started = false;
   }

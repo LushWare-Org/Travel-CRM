@@ -494,6 +494,33 @@ export const aiAPI = {
     const api = new ApiService();
     return api.post("/ai/risk-outbox/publish", payload);
   },
+  getCustomersForSimulation: async () => {
+    const api = new ApiService();
+    return api.get("/users", {
+      role: "customer",
+      isActive: true,
+      limit: 200,
+      page: 1,
+      fields: "_id,name,email",
+      sort: "-updatedAt",
+    });
+  },
+  simulateChurn: async (customerId) => {
+    const api = new ApiService();
+    return api.post(`/ai/simulate/churn/${customerId}`, {});
+  },
+  simulateRisk: async (customerId) => {
+    const api = new ApiService();
+    return api.post(`/ai/simulate/risk/${customerId}`, {});
+  },
+  simulateFollowUp: async (customerId, payload = {}) => {
+    const api = new ApiService();
+    return api.post(`/ai/simulate/followup/${customerId}`, payload);
+  },
+  simulateRecover: async (customerId, payload = {}) => {
+    const api = new ApiService();
+    return api.post(`/ai/simulate/recover/${customerId}`, payload);
+  },
   sendLeadRecommendationsEmail: async (leadId, payload = {}) => {
     const api = new ApiService();
     let res = api.post(`/ai/leads/${leadId}/send-recommendations-email`, payload);

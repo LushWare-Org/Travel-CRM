@@ -19,6 +19,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
     'requireActiveLogin48h',
     'autoRecommendationEmails',
     'autoFollowUpEmails',
+    'autoFollowUpsEnabled',
   ];
 
   updatable.forEach((key) => {

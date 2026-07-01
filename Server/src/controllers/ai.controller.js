@@ -15,6 +15,12 @@ import emailService from '../utils/emailService.js';
 import packageAIPDFGenerator from '../utils/packageAIPDFGenerator.js';
 import riskDetectionAgentService from '../services/ai/agents/riskDetectionAgent.service.js';
 import riskOutboxPublisherWorker from '../services/ai/riskOutboxPublisher.worker.js';
+import churnPredictionService from '../services/ai/churnPrediction.service.js';
+import CustomerRetentionState from '../models/customerRetentionState.model.js';
+import RetentionFollowUp from '../models/retentionFollowUp.model.js';
+import User from '../models/user.model.js';
+import retentionLifecycleAgentService from '../services/ai/agents/retentionLifecycleAgent.service.js';
+import retentionLoggerService from '../services/ai/retentionLogger.service.js';
 
 export const recommendPackages = asyncHandler(async (req, res) => {
   const recommendations = await recommendationAgentService.recommendPackages(req.body, req.body.limit || 5);
@@ -142,10 +148,14 @@ export const submitFollowUpFeedback = asyncHandler(async (req, res, next) => {
 
 export const runRiskDetectionBatch = asyncHandler(async (req, res) => {
   const { date } = req.body || {};
-  const result = await riskDetectionAgentService.runDailyRiskDetection(date);
+  const churn = await churnPredictionService.runDailyChurnPrediction(date);
+  const risk = await riskDetectionAgentService.runRiskDetectionFromLatestScores(date);
   res.status(200).json({
     success: true,
-    data: result,
+    data: {
+      churn,
+      risk,
+    },
   });
 });
 
@@ -419,6 +429,206 @@ export const sendLeadFollowUpEmail = asyncHandler(async (req, res, next) => {
       leadId: String(lead._id),
       followUp: followUpResult,
       delivery,
+    },
+  });
+});
+
+const getSimulatorSnapshot = async (customerId) => {
+  const [customer, retentionState, pendingFollowUp] = await Promise.all([
+    User.findById(customerId).select('_id name email').lean(),
+    CustomerRetentionState.findOne({ customer: customerId }).lean(),
+    RetentionFollowUp.findOne({
+      customerId,
+      type: 'churn_retention',
+      status: { $in: ['pending', 'processing', 'sent'] },
+    })
+      .sort({ createdAt: -1 })
+      .lean(),
+  ]);
+
+  return {
+    customer: customer || null,
+    retentionState: retentionState || null,
+    followUp: pendingFollowUp || null,
+  };
+};
+
+export const simulateChurnPrediction = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const prediction = await churnPredictionService.predictCustomerChurn(customerId);
+  await retentionLoggerService.log(customerId, 'simulation.churn.predicted', prediction);
+  const snapshot = await getSimulatorSnapshot(customerId);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      prediction,
+      ...snapshot,
+      activeStage: 'churn_model',
+      priority: prediction.riskLevel,
+    },
+  });
+});
+
+export const simulateRiskDetection = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const result = await riskDetectionAgentService.detectRiskFromLatestScore(customerId);
+  const snapshot = await getSimulatorSnapshot(customerId);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      riskDetection: result,
+      ...snapshot,
+      activeStage: 'risk_detection',
+    },
+  });
+});
+
+export const simulateFollowUp = asyncHandler(async (req, res, next) => {
+  const { customerId } = req.params;
+  const action = req.body?.action || 'create';
+
+  if (action === 'create') {
+    const state = await CustomerRetentionState.findOne({ customer: customerId }).lean();
+    if (!state || state.retentionStatus !== 'AT_RISK') {
+      return next(new AppError('Customer is not in AT_RISK state', 400));
+    }
+    const created = await riskDetectionAgentService.ensureChurnFollowUpForCustomer({
+      customerId,
+      scheduledAt: state.nextFollowUpAt || new Date(),
+      template: 'retention_stage_1',
+      metadata: {
+        source: 'simulation',
+      },
+    });
+    const snapshot = await getSimulatorSnapshot(customerId);
+    return res.status(200).json({
+      success: true,
+      data: {
+        action,
+        created,
+        ...snapshot,
+        activeStage: 'retention_state',
+      },
+    });
+  }
+
+  if (action === 'run') {
+    const followUp = await RetentionFollowUp.findOne({
+      customerId,
+      type: 'churn_retention',
+      status: 'pending',
+    })
+      .sort({ scheduledAt: 1 })
+      .lean();
+    if (!followUp) {
+      return next(new AppError('No pending churn follow-up found', 404));
+    }
+
+    const followUpResult = await followUpAgentService.execute({
+      type: 'retention.followup.triggered',
+      source: 'simulation',
+      correlationId: req.body?.correlationId || crypto.randomUUID(),
+      payload: {
+        followUpId: String(followUp._id),
+        customerId,
+        suppressPublish: true,
+      },
+    });
+
+    const delivery = await messagingAgentService.execute({
+      type: 'retention.message.requested',
+      source: 'simulation',
+      correlationId: req.body?.correlationId || crypto.randomUUID(),
+      payload: {
+        customerId,
+        leadId: followUpResult?.leadId,
+        message: followUpResult?.message,
+        template: followUpResult?.template,
+        channels: followUpResult?.channels || ['email'],
+      },
+    });
+
+    const snapshot = await getSimulatorSnapshot(customerId);
+    return res.status(200).json({
+      success: true,
+      data: {
+        action,
+        followUpResult,
+        delivery,
+        ...snapshot,
+        activeStage: 'messaging_agent',
+      },
+    });
+  }
+
+  return next(new AppError('Unsupported follow-up simulation action', 400));
+});
+
+export const simulateRecovery = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const event = req.body?.event || 'reply_positive';
+
+  let result = null;
+  if (['purchase', 'book_service', 'reply_positive'].includes(event)) {
+    const eventType = event === 'purchase'
+      ? 'receipt.created'
+      : (event === 'book_service' ? 'booking.confirmed' : 'retention.customer.positive_reply');
+
+    result = await retentionLifecycleAgentService.execute({
+      type: eventType,
+      source: 'simulation',
+      payload: {
+        customerId,
+      },
+    });
+  } else if (event === 'ignore') {
+    const state = await CustomerRetentionState.findOne({ customer: customerId });
+    const nextStatus = (state?.followUpStage || 0) >= 3 ? 'CHURNED' : 'ESCALATED';
+    await CustomerRetentionState.findOneAndUpdate(
+      { customer: customerId },
+      {
+        $set: {
+          retentionStatus: nextStatus,
+          updatedAt: new Date(),
+        },
+      },
+      { new: true, upsert: true },
+    );
+    await retentionLoggerService.log(customerId, 'simulation.customer.ignored', {
+      retentionStatus: nextStatus,
+    });
+    result = { customerId, retentionStatus: nextStatus };
+  } else if (event === 'reply_negative') {
+    await CustomerRetentionState.findOneAndUpdate(
+      { customer: customerId },
+      {
+        $set: {
+          retentionStatus: 'CHURNED',
+          nextFollowUpAt: null,
+          updatedAt: new Date(),
+        },
+      },
+      { new: true, upsert: true },
+    );
+    await retentionLoggerService.log(customerId, 'simulation.customer.replied_negative', {
+      retentionStatus: 'CHURNED',
+    });
+    result = { customerId, retentionStatus: 'CHURNED' };
+  } else {
+    result = { skipped: true, reason: 'unsupported recovery event' };
+  }
+
+  const snapshot = await getSimulatorSnapshot(customerId);
+  res.status(200).json({
+    success: true,
+    data: {
+      event,
+      result,
+      ...snapshot,
+      finalState: snapshot.retentionState?.retentionStatus || null,
+      activeStage: 'retention_state',
     },
   });
 });

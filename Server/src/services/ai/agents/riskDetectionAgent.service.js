@@ -3,9 +3,13 @@ import Lead from '../../../models/lead.model.js';
 import PaymentReceipt from '../../../models/paymentReceipt.model.js';
 import CustomerRetentionState from '../../../models/customerRetentionState.model.js';
 import CustomerRiskSnapshot from '../../../models/customerRiskSnapshot.model.js';
+import CustomerChurnScore from '../../../models/customerChurnScore.model.js';
+import RetentionFollowUp from '../../../models/retentionFollowUp.model.js';
 import EventOutbox from '../../../models/eventOutbox.model.js';
+import Settings from '../../../models/settings.model.js';
 import logger from '../../../config/logger.js';
 import churnModelPredictorService from './churnModelPredictor.service.js';
+import retentionLoggerService from '../retentionLogger.service.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const RECOVERY_SOURCE_STATES = new Set([
@@ -15,6 +19,12 @@ const RECOVERY_SOURCE_STATES = new Set([
   'FOLLOW_UP_STAGE_3',
   'ESCALATED',
 ]);
+
+const ACTIVE_FOLLOWUP_STATUSES = ['pending', 'processing'];
+const isAutoFollowUpsEnabled = (settings) => {
+  if (typeof settings?.autoFollowUpsEnabled === 'boolean') return settings.autoFollowUpsEnabled;
+  return settings?.autoFollowUpEmails !== false;
+};
 
 const sourceToAcquisitionChannel = (source) => {
   const normalized = String(source || '').toLowerCase();
@@ -85,7 +95,7 @@ export const resolveRetentionTransition = ({
       updates: {
         retentionStatus: 'AT_RISK',
         followUpStage: 0,
-        nextFollowUpAt: new Date(now.getTime() + (riskLevel === 'CRITICAL' ? 2 * 60 * 60 * 1000 : MS_PER_DAY)),
+        nextFollowUpAt: new Date(now.getTime() + MS_PER_DAY),
       },
     };
   }
@@ -404,6 +414,202 @@ class RiskDetectionAgentService {
     };
   }
 
+  async findLatestLeadIdForCustomer(customerId) {
+    const customer = await User.findById(customerId).select('email').lean();
+    if (!customer?.email) return null;
+
+    const lead = await Lead.findOne({ email: String(customer.email).toLowerCase() })
+      .sort({ updatedAt: -1 })
+      .select('_id')
+      .lean();
+
+    return lead?._id || null;
+  }
+
+  async ensureChurnFollowUpForCustomer({
+    customerId,
+    scheduledAt,
+    template = 'retention_stage_1',
+    metadata = {},
+  }) {
+    const activeFollowUp = await RetentionFollowUp.findOne({
+      customerId,
+      type: 'churn_retention',
+      status: { $in: ACTIVE_FOLLOWUP_STATUSES },
+    }).lean();
+    if (activeFollowUp) return { created: false, followUp: activeFollowUp };
+
+    const settings = await Settings.getSingleton();
+    if (!isAutoFollowUpsEnabled(settings)) {
+      await retentionLoggerService.log(customerId, 'retention.followup.skipped.toggle_off', {
+        scheduledAt,
+      });
+      return { created: false, reason: 'auto follow-ups disabled' };
+    }
+
+    const leadId = await this.findLatestLeadIdForCustomer(customerId);
+    const followUp = await RetentionFollowUp.create({
+      customerId,
+      leadId: leadId || null,
+      type: 'churn_retention',
+      template,
+      scheduledAt: scheduledAt || new Date(Date.now() + MS_PER_DAY),
+      status: 'pending',
+      channels: ['email'],
+      metadata,
+    });
+
+    await retentionLoggerService.log(customerId, 'retention.followup.created', {
+      followUpId: String(followUp._id),
+      template,
+      scheduledAt: followUp.scheduledAt,
+    });
+
+    return { created: true, followUp };
+  }
+
+  async applyRiskScoreToRetentionState({
+    customerId,
+    pChurn,
+    riskLevel,
+    scoredAt = new Date(),
+    modelVersion = 'advanced_xgb_churn_model',
+    priorityScore = 0,
+  }) {
+    const now = new Date();
+    const currentState = await CustomerRetentionState.findOne({ customer: customerId });
+    const transition = resolveRetentionTransition({
+      riskLevel,
+      currentState,
+      now,
+    });
+
+    const sharedUpdates = {
+      lastRiskLevel: riskLevel,
+      lastScoredAt: scoredAt,
+      lastPriorityScore: priorityScore,
+      lastChurnProbability: pChurn,
+      modelVersion,
+    };
+
+    const stateUpdate = {
+      ...sharedUpdates,
+      ...transition.updates,
+    };
+
+    await CustomerRetentionState.findOneAndUpdate(
+      { customer: customerId },
+      {
+        $set: stateUpdate,
+        $setOnInsert: {
+          customer: customerId,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+
+    if (transition.action === 'AT_RISK') {
+      await this.ensureChurnFollowUpForCustomer({
+        customerId,
+        scheduledAt: transition.updates?.nextFollowUpAt || new Date(Date.now() + MS_PER_DAY),
+        template: 'retention_stage_1',
+        metadata: {
+          riskLevel,
+          pChurn,
+          triggeredAt: now.toISOString(),
+        },
+      });
+    }
+
+    await retentionLoggerService.log(customerId, 'retention.state.updated', {
+      transitionAction: transition.action,
+      retentionStatus: stateUpdate.retentionStatus,
+      followUpStage: stateUpdate.followUpStage,
+      nextFollowUpAt: stateUpdate.nextFollowUpAt,
+      riskLevel,
+      pChurn,
+    });
+
+    return transition;
+  }
+
+  async detectRiskFromLatestScore(customerId) {
+    const latestScore = await CustomerChurnScore.findOne({ customer: customerId })
+      .sort({ scoredAt: -1 })
+      .lean();
+    if (!latestScore) {
+      return { skipped: true, reason: 'no churn score found' };
+    }
+
+    const transition = await this.applyRiskScoreToRetentionState({
+      customerId,
+      pChurn: safeNumber(latestScore.pChurn),
+      riskLevel: latestScore.riskLevel || classifyRisk(latestScore.pChurn),
+      scoredAt: latestScore.scoredAt || new Date(),
+      modelVersion: 'advanced_xgb_churn_model',
+    });
+
+    return {
+      customerId: String(customerId),
+      pChurn: safeNumber(latestScore.pChurn),
+      riskLevel: latestScore.riskLevel || classifyRisk(latestScore.pChurn),
+      transitionAction: transition.action,
+    };
+  }
+
+  async runRiskDetectionFromLatestScores(date) {
+    const scoreDate = startOfDay(date);
+    const activeCustomers = await User.find({ role: 'customer', isActive: true })
+      .select('_id')
+      .lean();
+
+    let processedCustomers = 0;
+    let skippedCustomers = 0;
+    let atRiskCount = 0;
+    let recoveredCount = 0;
+
+    for (const customer of activeCustomers) {
+      const latestScore = await CustomerChurnScore.findOne({
+        customer: customer._id,
+        scoredAt: { $lte: new Date(scoreDate.getTime() + MS_PER_DAY) },
+      })
+        .sort({ scoredAt: -1 })
+        .lean();
+
+      if (!latestScore) {
+        skippedCustomers += 1;
+        continue;
+      }
+
+      const transition = await this.applyRiskScoreToRetentionState({
+        customerId: customer._id,
+        pChurn: safeNumber(latestScore.pChurn),
+        riskLevel: latestScore.riskLevel || classifyRisk(latestScore.pChurn),
+        scoredAt: latestScore.scoredAt || new Date(),
+        modelVersion: 'advanced_xgb_churn_model',
+      });
+      if (transition.action === 'AT_RISK') atRiskCount += 1;
+      if (transition.action === 'RECOVERED') recoveredCount += 1;
+      processedCustomers += 1;
+    }
+
+    const summary = {
+      scoreDate: toDateKey(scoreDate),
+      processedCustomers,
+      skippedCustomers,
+      atRiskCount,
+      recoveredCount,
+      totalActiveCustomers: activeCustomers.length,
+    };
+
+    logger.info('[RiskDetectionAgent] Batch from churn scores completed', summary);
+    return summary;
+  }
+
   async runDailyRiskDetection(date, options = {}) {
     const scoreDate = startOfDay(date);
     const now = new Date();
@@ -455,6 +661,24 @@ class RiskDetectionAgentService {
       const { priorityScore, normalizedLtv } = computePriority(pChurn30d, item.ltv12m, ltvP95);
 
       try {
+        await CustomerChurnScore.findOneAndUpdate(
+          {
+            customer: item.customer._id,
+            scoredAt: scoreDate,
+          },
+          {
+            customer: item.customer._id,
+            pChurn: pChurn30d,
+            riskLevel,
+            scoredAt: scoreDate,
+          },
+          {
+            upsert: true,
+            new: true,
+            setDefaultsOnInsert: true,
+          },
+        );
+
         await CustomerRiskSnapshot.findOneAndUpdate(
           { customer: item.customer._id, scoreDate },
           {
@@ -476,40 +700,14 @@ class RiskDetectionAgentService {
           },
         );
 
-        const currentState = await CustomerRetentionState.findOne({ customer: item.customer._id });
-        const transition = resolveRetentionTransition({
+        const transition = await this.applyRiskScoreToRetentionState({
+          customerId: item.customer._id,
+          pChurn: pChurn30d,
           riskLevel,
-          currentState,
-          now,
-        });
-
-        const sharedUpdates = {
-          lastRiskLevel: riskLevel,
-          lastScoredAt: now,
-          lastPriorityScore: priorityScore,
-          lastChurnProbability: pChurn30d,
+          scoredAt: now,
           modelVersion,
-        };
-
-        const stateUpdate = {
-          ...sharedUpdates,
-          ...transition.updates,
-        };
-
-        await CustomerRetentionState.findOneAndUpdate(
-          { customer: item.customer._id },
-          {
-            $set: stateUpdate,
-            $setOnInsert: {
-              customer: item.customer._id,
-            },
-          },
-          {
-            upsert: true,
-            new: true,
-            setDefaultsOnInsert: true,
-          },
-        );
+          priorityScore,
+        });
 
         if (transition.eventType) {
           await queueOutboxEvent({
@@ -527,6 +725,15 @@ class RiskDetectionAgentService {
             },
           });
         }
+
+        await retentionLoggerService.log(item.customer._id, 'risk.detected', {
+          scoreDate: toDateKey(scoreDate),
+          riskLevel,
+          pChurn: pChurn30d,
+          priorityScore,
+          modelVersion,
+          transitionAction: transition.action,
+        });
 
         if (transition.action === 'AT_RISK') atRiskCount += 1;
         if (transition.action === 'RECOVERED') recoveredCount += 1;

@@ -1,9 +1,11 @@
 import twilio from 'twilio';
 import Lead from '../../../models/lead.model.js';
+import User from '../../../models/user.model.js';
 import geminiService from '../../gemini.service.js';
 import emailService from '../../../utils/emailService.js';
 import AIMemoryService from '../aiMemory.service.js';
 import BaseAgent from './baseAgent.js';
+import retentionLoggerService from '../retentionLogger.service.js';
 import { messagingPrompt } from '../aiPromptTemplates.js';
 
 const STAGE_MAP = {
@@ -16,6 +18,7 @@ const STAGE_MAP = {
   'travel.during_support': 'during-travel assistance',
   'travel.post_feedback': 'post-travel feedback',
   'followup.message.requested': 'follow-up',
+  'retention.message.requested': 'churn-retention follow-up',
 };
 
 class MessagingAgentService extends BaseAgent {
@@ -112,6 +115,9 @@ class MessagingAgentService extends BaseAgent {
 
   async generateMessage({ lead, stage, forcedMessage }) {
     if (forcedMessage) return forcedMessage;
+    if (!lead?._id) {
+      return `Hi ${lead?.name || 'there'}, sharing an update from our team. Reply here and we will help with your next trip.`;
+    }
     const memory = await AIMemoryService.getLatest('lead', lead._id, 'conversation');
     const prompt = messagingPrompt({
       stage,
@@ -131,10 +137,26 @@ class MessagingAgentService extends BaseAgent {
 
   async execute(event) {
     const leadId = event.payload?.leadId;
-    if (!leadId) return { skipped: true, reason: 'missing leadId' };
+    const customerId = event.payload?.customerId;
 
-    const lead = await Lead.findById(leadId);
-    if (!lead) return { skipped: true, reason: 'lead not found' };
+    let lead = null;
+    if (leadId) {
+      lead = await Lead.findById(leadId);
+    } else if (customerId) {
+      const customer = await User.findById(customerId).select('name email phone').lean();
+      if (!customer) return { skipped: true, reason: 'customer not found' };
+      lead = {
+        _id: null,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        whatsapp: customer.phone,
+        destination: 'travel plans',
+        communicationLogs: [],
+      };
+    }
+
+    if (!lead) return { skipped: true, reason: 'lead or customer not found' };
 
     const stage = STAGE_MAP[event.type] || 'customer update';
     const content = await this.generateMessage({
@@ -158,27 +180,39 @@ class MessagingAgentService extends BaseAgent {
     if (channels.includes('sms')) deliveries.push(await this.sendSMS(lead, content));
     if (channels.includes('inapp')) deliveries.push({ channel: 'inapp', status: 'queued' });
 
-    lead.communicationLogs.push({
-      type: 'message',
-      notes: `[${stage}] ${content}`,
-      date: new Date(),
-    });
-    await lead.save();
+    if (lead?._id) {
+      lead.communicationLogs.push({
+        type: 'message',
+        notes: `[${stage}] ${content}`,
+        date: new Date(),
+      });
+      await lead.save();
+    }
 
-    await AIMemoryService.upsertMemory({
-      scopeType: 'lead',
-      scopeId: lead._id,
-      memoryType: 'conversation',
-      summary: `${stage} message sent`,
-      content: {
-        stage,
-        message: content,
+    if (lead?._id) {
+      await AIMemoryService.upsertMemory({
+        scopeType: 'lead',
+        scopeId: lead._id,
+        memoryType: 'conversation',
+        summary: `${stage} message sent`,
+        content: {
+          stage,
+          message: content,
+          deliveries,
+        },
+        lastAgent: this.name,
+        confidence: 0.8,
+        tags: ['messaging'],
+      });
+    }
+
+    if (event.type === 'retention.message.requested' && customerId) {
+      await retentionLoggerService.log(customerId, 'retention.message.sent', {
+        template: event.payload?.template,
         deliveries,
-      },
-      lastAgent: this.name,
-      confidence: 0.8,
-      tags: ['messaging'],
-    });
+        stage,
+      });
+    }
 
     return { stage, message: content, deliveries };
   }

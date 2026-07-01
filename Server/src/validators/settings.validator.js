@@ -10,4 +10,5 @@ export const updateSettingsSchema = Joi.object({
   requireActiveLogin48h: Joi.boolean(), // Only assign to sales reps who logged in within 1 hour
   autoRecommendationEmails: Joi.boolean(),
   autoFollowUpEmails: Joi.boolean(),
+  autoFollowUpsEnabled: Joi.boolean(),
 });

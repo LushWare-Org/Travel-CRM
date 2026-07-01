@@ -79,6 +79,16 @@ const Sidebar = () => {
         || (userRole === "admin" && hasPermission("view_reports"))
       ),
     },
+    {
+      icon: Sparkles,
+      label: "AI Retention Simulator",
+      path: "/ai-retention-simulator",
+      requiredPermission: null,
+      customCheck: (userRole, userIsSuperAdmin, hasPermission) => (
+        (userRole === "superAdmin" && userIsSuperAdmin === true)
+        || (userRole === "admin" && hasPermission("view_reports"))
+      ),
+    },
   ];
 
   // Filter navigation items based on permissions and roles

@@ -14,6 +14,10 @@ import {
   sendLeadFollowUpEmail,
   runRiskDetectionBatch,
   publishRiskOutbox,
+  simulateChurnPrediction,
+  simulateRiskDetection,
+  simulateFollowUp,
+  simulateRecovery,
 } from '../controllers/ai.controller.js';
 
 const router = express.Router();
@@ -28,6 +32,10 @@ router.post('/leads/:leadId/send-recommendations-email', authorize('admin', 'sal
 router.post('/leads/:leadId/send-followup-email', authorize('admin', 'salesRep'), sendLeadFollowUpEmail);
 router.post('/risk-detection/run', authorize('admin'), runRiskDetectionBatch);
 router.post('/risk-outbox/publish', authorize('admin'), publishRiskOutbox);
+router.post('/simulate/churn/:customerId', authorize('admin'), simulateChurnPrediction);
+router.post('/simulate/risk/:customerId', authorize('admin'), simulateRiskDetection);
+router.post('/simulate/followup/:customerId', authorize('admin'), simulateFollowUp);
+router.post('/simulate/recover/:customerId', authorize('admin'), simulateRecovery);
 
 router.get('/agents/status', authorize('admin'), getAgentStatus);
 router.post('/agents/override', authorize('admin'), overrideAgent);
