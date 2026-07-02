@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     open: true,
     proxy: {
-      "/api": "https://api.lushtravelcloud.com/api",
+      "/api": "https://api.lushtravelcloud.com",
     },
     hmr: {
       overlay: false,
@@ -22,6 +22,6 @@ export default defineConfig({
     port: 3000,
   },
   define: {
-    'process.env': JSON.stringify(process.env),
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
   },
 });

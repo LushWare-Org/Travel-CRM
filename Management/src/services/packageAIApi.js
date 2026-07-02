@@ -49,8 +49,9 @@ const packageAIApi = {
    * @returns {Promise<Blob>} PDF blob
    */
   downloadPDF: async (packageId) => {
+    const baseURL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
     const response = await fetch(
-      `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/v1/packages/${packageId}/ai-pdf`,
+      `${baseURL}/packages/${packageId}/ai-pdf`,
       {
         method: 'GET',
         headers: {

@@ -33,7 +33,7 @@ const BRANDING = {
     // ==========================================
     urls: {
         website: import.meta.env.VITE_COMPANY_WEBSITE || 'https://www.example.com',
-        api: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+        api: import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1',
     },
 
     // ==========================================

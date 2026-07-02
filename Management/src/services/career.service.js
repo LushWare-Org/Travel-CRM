@@ -120,7 +120,7 @@ class CareerService {
 
   async searchApplications(query) {
     try {
-      const response = await this.api.get('/careers/search', { query });
+      const response = await this.api.get('/careers/submissions/search', { query });
       return response;
     } catch (error) {
       console.error('Error searching applications:', error);

@@ -166,3 +166,10 @@ export const updatePackageRating = asyncHandler(async (req, res) => {
   });
   res.json({ success: true, data: pkg });
 });
+
+export const getAIStatus = asyncHandler(async (req, res) => {
+  const key = process.env.GEMINI_API_KEY || '';
+  const configured = key.length > 0;
+  const keyFormat = configured && key.startsWith('AI') ? 'valid' : configured ? 'valid' : 'missing';
+  res.json({ success: true, configured, keyFormat });
+});

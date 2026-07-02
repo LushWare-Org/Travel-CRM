@@ -21,27 +21,16 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
   useEffect(() => {
     const checkAIStatus = async () => {
       try {
-        const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) { setAiConfigured(false); return; }
 
-        if (!token) {
-          setAiConfigured(false);
-          return;
-        }
-
+        const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
         const response = await fetch(`${apiBaseUrl}/packages/ai-status`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
-            setAiConfigured(null);
-            return;
-          }
+          if (response.status === 401 || response.status === 403) { setAiConfigured(null); return; }
           throw new Error(`HTTP ${response.status}`);
         }
 

@@ -59,8 +59,13 @@ const PUBLIC_PATTERNS = [
   // Auth
   [/^\/api\/v1\/auth\/(register|login|login-step[12]|resend-otp|forgot-password|reset-temp-password|verify-email)/, 'ALL'],
   [/^\/api\/v1\/auth\/reset-password\//, 'ALL'],
-  // Public package browsing
-  [/^\/api\/v1\/packages/, 'GET'],
+  // Public package browsing — explicit paths only; admin/AI sub-routes remain protected
+  [/^\/api\/v1\/packages\/?(\?.*)?$/,           'GET'], // list
+  [/^\/api\/v1\/packages\/featured\//,           'GET'], // featured
+  [/^\/api\/v1\/packages\/stats\//,              'GET'], // stats
+  [/^\/api\/v1\/packages\/search\//,             'GET'], // search
+  [/^\/api\/v1\/packages\/category\//,           'GET'], // by category
+  [/^\/api\/v1\/packages\/[^/]+\/?(\?.*)?$/,    'GET'], // single package view /:id
   [/^\/api\/v1\/reviews/, 'GET'],
   [/^\/api\/v1\/itineraries/, 'GET'],
   // Public forms

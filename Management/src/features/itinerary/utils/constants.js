@@ -163,7 +163,7 @@ export const TRANSPORT_OPTIONS = [
   { value: 'Mixed', label: 'Mixed Transport' },
 ];
 
-export const IMAGE_UPLOAD_API_KEY = '4e08e03047ee0d48610586ad270e2b39';
+export const IMAGE_UPLOAD_API_KEY = import.meta.env.VITE_IMGBB_API_KEY || '';
 export const IMAGE_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
 
 import BRANDING from '../../../config/branding';

@@ -7,7 +7,7 @@ import html2canvas from 'html2canvas';
 import axios from 'axios';
 
 // API base URL - adjust if needed
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
 
 /**
  * Capture all visible charts from the current page

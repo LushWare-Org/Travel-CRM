@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [token, setToken] = useState(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+  const API_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
   const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
 
   // Initialize auth from localStorage

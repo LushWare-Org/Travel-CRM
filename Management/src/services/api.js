@@ -128,7 +128,7 @@ class ApiService {
         error.message.includes("NetworkError")
       ) {
         const networkError = new Error(
-          "Cannot connect to server. Please make sure the server is running on port 5000."
+          "Cannot connect to server. Please check your network connection and ensure the API server is running."
         );
         networkError.status = 0;
         networkError.statusCode = 0;
