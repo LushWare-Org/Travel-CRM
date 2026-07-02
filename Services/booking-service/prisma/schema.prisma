@@ -13,9 +13,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["bookings"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_bookings"]
 }
 
 enum PaymentStatus {
@@ -24,7 +25,7 @@ enum PaymentStatus {
   paid
   refunded
 
-  @@schema("bookings")
+  @@schema("crm_bookings")
 }
 
 enum BookingStatus {
@@ -33,7 +34,7 @@ enum BookingStatus {
   cancelled
   completed
 
-  @@schema("bookings")
+  @@schema("crm_bookings")
 }
 
 enum TravelerGender {
@@ -41,7 +42,7 @@ enum TravelerGender {
   female
   other
 
-  @@schema("bookings")
+  @@schema("crm_bookings")
 }
 
 // ─── Booking ──────────────────────────────────────────────────
@@ -81,7 +82,7 @@ model Booking {
   @@index([travelDate])
   @@index([assignedToId])
   @@index([endDate])
-  @@schema("bookings")
+  @@schema("crm_bookings")
 }
 
 // ─── BookingTraveler ──────────────────────────────────────────
@@ -97,5 +98,5 @@ model BookingTraveler {
   idNumber  String?
 
   @@index([bookingId])
-  @@schema("bookings")
+  @@schema("crm_bookings")
 }

@@ -10,9 +10,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["users"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_users"]
 }
 
 enum UserRole {
@@ -22,7 +23,7 @@ enum UserRole {
   admin
   superAdmin
 
-  @@schema("users")
+  @@schema("crm_users")
 }
 
 enum VendorStatus {
@@ -31,7 +32,7 @@ enum VendorStatus {
   suspended
   rejected
 
-  @@schema("users")
+  @@schema("crm_users")
 }
 
 enum ServiceType {
@@ -42,7 +43,7 @@ enum ServiceType {
   guide
   other
 
-  @@schema("users")
+  @@schema("crm_users")
 }
 
 // Valid permission strings (validated in service layer, stored as text[]):
@@ -91,7 +92,7 @@ model User {
 
   @@index([role, isActive])
   @@index([lastActivity])
-  @@schema("users")
+  @@schema("crm_users")
 }
 
 model VendorProfile {
@@ -132,5 +133,5 @@ model VendorProfile {
   createdAt                   DateTime     @default(now())
   updatedAt                   DateTime     @updatedAt
 
-  @@schema("users")
+  @@schema("crm_users")
 }

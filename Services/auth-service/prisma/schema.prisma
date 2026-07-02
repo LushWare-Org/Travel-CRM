@@ -10,9 +10,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["auth"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_auth"]
 }
 
 enum OtpType {
@@ -20,7 +21,7 @@ enum OtpType {
   passwordReset
   emailVerification
 
-  @@schema("auth")
+  @@schema("crm_auth")
 }
 
 model Otp {
@@ -40,5 +41,5 @@ model Otp {
   @@index([userId, type])
   @@index([email])
   @@index([expiresAt])
-  @@schema("auth")
+  @@schema("crm_auth")
 }

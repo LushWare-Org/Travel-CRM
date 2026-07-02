@@ -14,9 +14,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["careers"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_careers"]
 }
 
 enum CareerStatus {
@@ -26,7 +27,7 @@ enum CareerStatus {
   rejected
   hired
 
-  @@schema("careers")
+  @@schema("crm_careers")
 }
 
 enum VacancyType {
@@ -36,7 +37,7 @@ enum VacancyType {
   Temporary
   Internship
 
-  @@schema("careers")
+  @@schema("crm_careers")
 }
 
 enum VacancyStatus {
@@ -44,7 +45,7 @@ enum VacancyStatus {
   closed
   draft
 
-  @@schema("careers")
+  @@schema("crm_careers")
 }
 
 // ─── Career (job applications) ────────────────────────────────
@@ -73,7 +74,7 @@ model Career {
   @@index([position])
   @@index([status])
   @@index([createdAt])
-  @@schema("careers")
+  @@schema("crm_careers")
 }
 
 // ─── Vacancy (job postings) ───────────────────────────────────
@@ -95,5 +96,5 @@ model Vacancy {
 
   @@index([status, createdAt])
   @@index([position])
-  @@schema("careers")
+  @@schema("crm_careers")
 }

@@ -19,9 +19,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["billing"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_billing"]
 }
 
 // ─── Shared enums ─────────────────────────────────────────────
@@ -31,7 +32,7 @@ enum DiscountType {
   fixed
   none
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum ItemCategory {
@@ -45,7 +46,7 @@ enum ItemCategory {
   package
   other
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum Currency {
@@ -56,7 +57,7 @@ enum Currency {
   AUD
   INR
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum PaymentMethod {
@@ -69,7 +70,7 @@ enum PaymentMethod {
   wallet
   other
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum CardType {
@@ -79,7 +80,7 @@ enum CardType {
   discover
   other
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum PaymentGateway {
@@ -89,7 +90,7 @@ enum PaymentGateway {
   square
   other
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── Invoice enums ────────────────────────────────────────────
@@ -100,7 +101,7 @@ enum InvoiceType {
   tax_invoice         @map("tax-invoice")
   commercial_invoice  @map("commercial-invoice")
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum InvoiceStatus {
@@ -113,7 +114,7 @@ enum InvoiceStatus {
   cancelled
   refunded
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum InvoicePaymentStatus {
@@ -123,7 +124,7 @@ enum InvoicePaymentStatus {
   overpaid
   refunded
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── Quotation enums ──────────────────────────────────────────
@@ -133,14 +134,14 @@ enum QuotationType {
   custom
   package_based @map("package-based")
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum QuotationMode {
   summary
   detailed
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum QuotationStatus {
@@ -152,7 +153,7 @@ enum QuotationStatus {
   expired
   converted
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── PaymentReceipt enums ─────────────────────────────────────
@@ -164,7 +165,7 @@ enum ReceiptStatus {
   refunded
   cancelled
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum ReceiptPaymentType {
@@ -174,7 +175,7 @@ enum ReceiptPaymentType {
   final_payment @map("final-payment")
   refund
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── PaymentHistory enums ─────────────────────────────────────
@@ -185,7 +186,7 @@ enum PaymentHistoryStatus {
   reconciled
   cancelled
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum PaymentHistoryType {
@@ -194,7 +195,7 @@ enum PaymentHistoryType {
   full_payment @map("full-payment")
   refund
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── CreditNote enums ─────────────────────────────────────────
@@ -208,7 +209,7 @@ enum CreditNoteType {
   quality_issue         @map("quality-issue")
   other
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum CreditNoteStatus {
@@ -218,7 +219,7 @@ enum CreditNoteStatus {
   refunded
   cancelled
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum RefundStatus {
@@ -228,7 +229,7 @@ enum RefundStatus {
   failed
   not_applicable @map("not-applicable")
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 enum RefundMethod {
@@ -239,7 +240,7 @@ enum RefundMethod {
   voucher
   other
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── Voucher enums ────────────────────────────────────────────
@@ -251,7 +252,7 @@ enum VoucherStatus {
   confirmed
   cancelled
 
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── Invoice ──────────────────────────────────────────────────
@@ -330,7 +331,7 @@ model Invoice {
   @@index([paymentStatus])
   @@index([createdAt])
   @@index([type])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model InvoiceItem {
@@ -347,7 +348,7 @@ model InvoiceItem {
   order       Int          @default(0)
 
   @@index([invoiceId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── Quotation ────────────────────────────────────────────────
@@ -416,7 +417,7 @@ model Quotation {
   @@index([leadId, createdAt])
   @@index([status, validUntil])
   @@index([createdAt])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model QuotationItem {
@@ -432,7 +433,7 @@ model QuotationItem {
   order       Int          @default(0)
 
   @@index([quotationId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model QuotationImage {
@@ -443,7 +444,7 @@ model QuotationImage {
   isCover     Boolean   @default(false)
 
   @@index([quotationId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model QuotationRevision {
@@ -456,7 +457,7 @@ model QuotationRevision {
   changes      String?
 
   @@index([quotationId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── PaymentReceipt ───────────────────────────────────────────
@@ -537,7 +538,7 @@ model PaymentReceipt {
   @@index([paymentMethod])
   @@index([verified, reconciled])
   @@index([transactionId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── PaymentHistory ───────────────────────────────────────────
@@ -586,7 +587,7 @@ model PaymentHistory {
   @@index([receiptId])
   @@index([paymentDate])
   @@index([status])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── CreditNote ───────────────────────────────────────────────
@@ -665,7 +666,7 @@ model CreditNote {
   @@index([refundStatus])
   @@index([createdAt])
   @@index([type])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model CreditNoteItem {
@@ -680,7 +681,7 @@ model CreditNoteItem {
   order          Int        @default(0)
 
   @@index([creditNoteId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 // ─── Voucher ──────────────────────────────────────────────────
@@ -734,7 +735,7 @@ model Voucher {
 
   @@index([leadId, createdAt])
   @@index([status])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model VoucherLocationDate {
@@ -748,7 +749,7 @@ model VoucherLocationDate {
   order     Int       @default(0)
 
   @@index([voucherId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model VoucherMealPlan {
@@ -762,7 +763,7 @@ model VoucherMealPlan {
   dinner    Boolean  @default(false)
 
   @@index([voucherId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }
 
 model VoucherItinerarySummary {
@@ -778,5 +779,5 @@ model VoucherItinerarySummary {
   order             Int      @default(0)
 
   @@index([voucherId])
-  @@schema("billing")
+  @@schema("crm_billing")
 }

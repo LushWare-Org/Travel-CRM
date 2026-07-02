@@ -16,9 +16,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["packages"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_packages"]
 }
 
 enum PackageCategory {
@@ -28,7 +29,7 @@ enum PackageCategory {
   group
   wild_safari @map("wild safari")
 
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 enum PackageType {
@@ -37,7 +38,7 @@ enum PackageType {
   Luxury
   Premium
 
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 enum PackageStatus {
@@ -45,7 +46,7 @@ enum PackageStatus {
   published
   archived
 
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 enum ItineraryStatus {
@@ -53,7 +54,7 @@ enum ItineraryStatus {
   published
   archived
 
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 enum CpDifficulty {
@@ -61,7 +62,7 @@ enum CpDifficulty {
   moderate
   difficult
 
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 enum CpCategory {
@@ -76,7 +77,7 @@ enum CpCategory {
   heritage
   other
 
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 // ─── Package ──────────────────────────────────────────────────
@@ -145,7 +146,7 @@ model Package {
   @@index([isActive, category])
   @@index([isActive, isFeatured])
   @@index([isActive, status])
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 model PackageImage {
@@ -157,7 +158,7 @@ model PackageImage {
   order     Int     @default(0)
 
   @@index([packageId])
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 // ─── Itinerary ────────────────────────────────────────────────
@@ -197,7 +198,7 @@ model Itinerary {
   @@index([packageId])
   @@index([status, createdAt])
   @@index([createdById])
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 // ─── ManualItinerary ──────────────────────────────────────────
@@ -228,7 +229,7 @@ model ManualItinerary {
   @@index([leadId, createdAt])
   @@index([status, createdAt])
   @@index([createdById])
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 // ─── CustomizedPackage ────────────────────────────────────────
@@ -284,7 +285,7 @@ model CustomizedPackage {
   @@index([customizedById])
   @@index([createdAt])
   @@index([isActive])
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 model CustomizedPackageImage {
@@ -296,7 +297,7 @@ model CustomizedPackageImage {
   order               Int               @default(0)
 
   @@index([customizedPackageId])
-  @@schema("packages")
+  @@schema("crm_packages")
 }
 
 // ─── Review ───────────────────────────────────────────────────
@@ -317,5 +318,5 @@ model Review {
   updatedAt  DateTime @updatedAt
 
   @@index([packageId, createdAt])
-  @@schema("packages")
+  @@schema("crm_packages")
 }

@@ -17,9 +17,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  schemas  = ["leads"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_leads"]
 }
 
 enum LeadSource {
@@ -33,7 +34,7 @@ enum LeadSource {
   walk_in       @map("walk-in")
   other
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 enum LeadPlatform {
@@ -46,7 +47,7 @@ enum LeadPlatform {
   Referral      @map("Referral")
   Walk_in       @map("Walk-in")
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 enum LeadStatus {
@@ -58,7 +59,7 @@ enum LeadStatus {
   lost
   not_interested @map("not-interested")
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 enum LeadPriority {
@@ -66,21 +67,21 @@ enum LeadPriority {
   medium
   high
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 enum AssignmentMode {
   manual
   auto
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 enum AssignmentStrategy {
   round_robin
   load_based
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 enum CommunicationLogType {
@@ -90,7 +91,7 @@ enum CommunicationLogType {
   message
   other
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 // ─── Lead ─────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ model Lead {
   @@index([leadDateTime])
   @@index([assignmentMode])
   @@index([city])
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 // ─── Lead child tables ────────────────────────────────────────
@@ -179,7 +180,7 @@ model LeadRemark {
   addedAt   DateTime @default(now())
 
   @@index([leadId])
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 model LeadStatusHistory {
@@ -192,7 +193,7 @@ model LeadStatusHistory {
   notes       String?
 
   @@index([leadId])
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 model LeadCommunicationLog {
@@ -205,7 +206,7 @@ model LeadCommunicationLog {
   byId    String?               // → users.User.id
 
   @@index([leadId])
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 // ─── LeadStatusOption ─────────────────────────────────────────
@@ -227,7 +228,7 @@ model LeadStatusOption {
 
   @@index([order])
   @@index([isActive])
-  @@schema("leads")
+  @@schema("crm_leads")
 }
 
 // ─── Settings (singleton) ─────────────────────────────────────
@@ -247,5 +248,5 @@ model Settings {
   updatedAt             DateTime           @updatedAt
   // Only one row allowed — enforced by getSingleton() in service layer
 
-  @@schema("leads")
+  @@schema("crm_leads")
 }
