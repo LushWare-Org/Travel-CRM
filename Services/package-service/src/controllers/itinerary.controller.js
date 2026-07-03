@@ -40,8 +40,7 @@ export const getItinerary = asyncHandler(async (req, res) => {
 
 export const getItineraryByPackage = asyncHandler(async (req, res) => {
   const it = await prisma.itinerary.findFirst({ where: { packageId: req.params.packageId } });
-  if (!it) throw new AppError('Itinerary not found for this package', 404);
-  res.json({ success: true, data: it });
+  res.json({ success: true, data: it || null });
 });
 
 export const createItinerary = asyncHandler(async (req, res) => {
@@ -56,7 +55,7 @@ export const createItinerary = asyncHandler(async (req, res) => {
 export const updateItinerary = asyncHandler(async (req, res) => {
   const existing = await prisma.itinerary.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Itinerary not found', 404);
-  const { days, ...rest } = req.body;
+  const { days, package: _pkg, createdBy: _cb, ...rest } = req.body;
   const meta = days ? computeMeta(days) : {};
   const it = await prisma.itinerary.update({
     where: { id: req.params.id },

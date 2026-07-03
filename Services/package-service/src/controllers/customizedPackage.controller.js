@@ -25,7 +25,7 @@ export const getCustomizedPackageById = asyncHandler(async (req, res) => {
 export const updateCustomizedPackage = asyncHandler(async (req, res) => {
   const existing = await prisma.customizedPackage.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Customized package not found', 404);
-  const { images, ...body } = req.body;
+  const { images, customizedBy: _cby, lead: _lead, ...body } = req.body;
   const data = { ...body };
   if (images) {
     await prisma.customizedPackageImage.deleteMany({ where: { customizedPackageId: req.params.id } });

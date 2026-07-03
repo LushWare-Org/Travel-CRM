@@ -115,7 +115,14 @@ export const updateLead = asyncHandler(async (req, res) => {
   const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
   if (!canManage && lead.assignedToId !== user.id) throw new AppError('Not authorized to update this lead', 403);
 
-  const { statusChangeNotes, remarks, statusHistory, communicationLogs, ...updateData } = req.body;
+  const {
+    statusChangeNotes, remarks, statusHistory, communicationLogs,
+    // Strip relation objects — frontend may send populated relations; Prisma only
+    // accepts the scalar FK fields (packageId, assignedToId, etc.)
+    package: _pkg, assignedTo: _assignedTo, convertedBooking: _booking,
+    customizedPackage: _custPkg, createdBy: _createdBy,
+    ...updateData
+  } = req.body;
 
   // Track status change
   const statusHistoryCreate = [];
@@ -191,7 +198,7 @@ export const assignLead = asyncHandler(async (req, res) => {
 export const unassignLead = asyncHandler(async (req, res) => {
   const updated = await prisma.lead.update({
     where: { id: req.params.id },
-    data: { assignedToId: null, salesRep: null, assignedById: req.user.id },
+    data: { assignedToId: null, assignedById: req.user.id },
   });
   res.json({ success: true, data: updated });
 });

@@ -18,8 +18,8 @@ export const createOrUpdateManualItinerary = asyncHandler(async (req, res) => {
 
 export const getManualItineraryByLead = asyncHandler(async (req, res) => {
   const data = await prisma.manualItinerary.findFirst({ where: { leadId: req.params.leadId } });
-  if (!data) throw new AppError('Manual itinerary not found', 404);
-  res.json({ success: true, data });
+  // Return null when no itinerary exists yet — callers treat absence as "not yet created"
+  res.json({ success: true, data: data || null });
 });
 
 export const deleteManualItinerary = asyncHandler(async (req, res) => {

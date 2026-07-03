@@ -95,9 +95,14 @@ export const createPaymentReceipt = asyncHandler(async (req, res) => {
 export const updatePaymentReceipt = asyncHandler(async (req, res) => {
   const existing = await prisma.paymentReceipt.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Payment receipt not found', 404);
+  const {
+    invoice: _inv, lead: _lead, paymentHistories: _hist,
+    createdBy: _cb, cancelledBy: _cancel, verifiedBy: _ver, reconciledBy: _rec,
+    ...body
+  } = req.body;
   const receipt = await prisma.paymentReceipt.update({
     where: { id: req.params.id },
-    data: { ...req.body, lastModifiedById: req.user.id },
+    data: { ...body, lastModifiedById: req.user.id },
     include: receiptInclude,
   });
   res.json({ success: true, data: receipt });

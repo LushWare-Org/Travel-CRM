@@ -128,7 +128,7 @@ export const updatePackage = asyncHandler(async (req, res) => {
   const existing = await prisma.package.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Package not found', 404);
 
-  const { images, ...body } = req.body;
+  const { images, reviews: _rev, itinerary: _itin, createdBy: _cb, ...body } = req.body;
   if (body.name && body.name !== existing.name && !body.slug) {
     body.slug = slugify(body.name, { lower: true, strict: true });
   }

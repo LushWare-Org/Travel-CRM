@@ -19,7 +19,7 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
-    port: 3000,
+    port: 5174,
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),

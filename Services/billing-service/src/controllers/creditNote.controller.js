@@ -56,7 +56,12 @@ export const createCreditNote = asyncHandler(async (req, res) => {
 export const updateCreditNote = asyncHandler(async (req, res) => {
   const existing = await prisma.creditNote.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Credit note not found', 404);
-  const { items, ...body } = req.body;
+  const {
+    items, lead: _lead, invoice: _inv,
+    createdBy: _cb, lastModifiedBy: _lmb, approvedBy: _app,
+    rejectedBy: _rej, cancelledBy: _cancel,
+    ...body
+  } = req.body;
   const data = { ...body, lastModifiedById: req.user.id };
   if (items) {
     await prisma.creditNoteItem.deleteMany({ where: { creditNoteId: req.params.id } });

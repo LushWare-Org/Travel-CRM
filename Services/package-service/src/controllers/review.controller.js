@@ -51,7 +51,8 @@ export const updateReview = asyncHandler(async (req, res) => {
   if (review.authorId !== req.user.id && !req.user.isSuperAdmin && req.user.role !== 'admin')
     throw new AppError('Not authorized to update this review', 403);
 
-  const updated = await prisma.review.update({ where: { id: req.params.id }, data: req.body });
+  const { package: _pkg, author: _author, ...body } = req.body;
+  const updated = await prisma.review.update({ where: { id: req.params.id }, data: body });
   res.json({ success: true, data: updated });
 });
 

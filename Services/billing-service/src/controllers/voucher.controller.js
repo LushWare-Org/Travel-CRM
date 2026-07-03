@@ -54,7 +54,11 @@ export const updateVoucher = asyncHandler(async (req, res) => {
   if (!existing) throw new AppError('Voucher not found', 404);
   if (existing.status === 'cancelled') throw new AppError('Cannot update a cancelled voucher', 400);
 
-  const { locationDates, mealPlans, itinerarySummary, ...body } = req.body;
+  const {
+    locationDates, mealPlans, itinerarySummary,
+    lead: _lead, createdBy: _cb, lastModifiedBy: _lmb,
+    ...body
+  } = req.body;
   const data = { ...body, lastModifiedById: req.user.id };
 
   if (locationDates) {

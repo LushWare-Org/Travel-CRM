@@ -22,6 +22,7 @@ app.use(cors({
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:3000',
+      'http://localhost:3010',
       'https://lushtravelcloud.com',
       'https://www.lushtravelcloud.com',
     ].filter(Boolean);
@@ -124,10 +125,24 @@ app.use((req, res, next) => {
 });
 
 // ─── Proxy factory ─────────────────────────────────────────────────────────────
+// pathRewrite restores req.originalUrl because Express strips the mount prefix
+// from req.url before passing control to the middleware (e.g. app.use('/api/v1/auth/login', ...)
+// makes req.url === '/' inside the handler). Services expect the full path.
 const proxy = (target) => createProxyMiddleware({
   target,
   changeOrigin: true,
+  pathRewrite: (_path, req) => req.originalUrl,
   on: {
+    proxyRes: (proxyRes) => {
+      // Strip service-level CORS headers so the gateway's cors() middleware wins.
+      // Services set their own Access-Control-Allow-Origin (often hardcoded to one
+      // origin); leaving those headers in the proxied response would override the
+      // gateway's correctly-reflected origin and block other allowed clients.
+      delete proxyRes.headers['access-control-allow-origin'];
+      delete proxyRes.headers['access-control-allow-credentials'];
+      delete proxyRes.headers['access-control-allow-methods'];
+      delete proxyRes.headers['access-control-allow-headers'];
+    },
     error: (err, req, res) => {
       console.error(`[Gateway] Proxy error → ${target}: ${err.message}`);
       if (!res.headersSent) {

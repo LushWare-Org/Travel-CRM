@@ -627,7 +627,7 @@ const ItineraryGenerationContainer = () => {
             <div className="flex items-center gap-2">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               <span className="font-semibold text-slate-800">{pkg.rating || 0}</span>
-              <span className="text-xs text-slate-400">({pkg.reviews || 0})</span>
+              <span className="text-xs text-slate-400">({pkg.numReviews ?? (Array.isArray(pkg.reviews) ? pkg.reviews.length : 0)})</span>
             </div>
             <div className="flex items-center gap-1 text-sm text-slate-500">
               <Users className="w-4 h-4" />

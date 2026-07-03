@@ -94,7 +94,11 @@ export const updateInvoice = asyncHandler(async (req, res) => {
   if (!existing) throw new AppError('Invoice not found', 404);
   if (existing.status === 'cancelled') throw new AppError('Cannot update a cancelled invoice', 400);
 
-  const { items, ...body } = req.body;
+  const {
+    items, lead: _lead, quotation: _quot, payments: _pay,
+    creditNotes: _cn, createdBy: _cb, lastModifiedBy: _lmb,
+    ...body
+  } = req.body;
   const data = { ...body, lastModifiedById: req.user.id };
 
   if (items) {

@@ -71,7 +71,11 @@ export const updateQuotation = asyncHandler(async (req, res) => {
   if (!existing) throw new AppError('Quotation not found', 404);
   if (['converted', 'accepted'].includes(existing.status)) throw new AppError('Cannot update this quotation', 400);
 
-  const { items, images, ...body } = req.body;
+  const {
+    items, images, lead: _lead, createdBy: _cb,
+    lastModifiedBy: _lmb, revisionHistory: _rev,
+    ...body
+  } = req.body;
   const data = { ...body, lastModifiedById: req.user.id, version: { increment: 1 } };
 
   if (items) {
