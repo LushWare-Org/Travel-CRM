@@ -975,783 +975,604 @@ function legacyBuildPDFDocument(pkg, images) {
 
 function buildPDFDocument(pkg, images) {
   try {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 16;
-    const contentWidth = pageWidth - margin * 2;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();   // 210 mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // 297 mm
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2;          // 182 mm
     let yPos = margin;
     let pageNumber = 1;
 
-    const palette = {
-      background: [249, 250, 251],
-      secondaryBackground: [209, 213, 219],
-      primaryText: [31, 41, 55],
-      secondaryText: [75, 85, 99],
-      mutedText: [107, 114, 128],
-      accent: [234, 88, 12],
-      accentDark: [234, 179, 8],
-      badgeBg: [234, 88, 12],
-      badgeText: [255, 255, 255],
-      cardBg: [245, 245, 245],
-      cardBorder: [156, 163, 175],
-      pillBg: [209, 213, 219],
-      timeline: [0, 0, 0],
+    // ── Colour palette ──────────────────────────────────────────
+    const C = {
+      navy:      [18,  52,  96],
+      navyDark:  [11,  33,  63],
+      navyLight: [38,  85, 152],
+      gold:      [186, 148,  58],
+      goldPale:  [250, 232, 160],
+      ink:       [18,  20,  32],
+      body:      [58,  64,  82],
+      muted:     [128, 133, 152],
+      white:     [255, 255, 255],
+      offWhite:  [249, 248, 245],
+      card:      [255, 255, 255],
+      subtle:    [242, 244, 252],
+      border:    [210, 216, 228],
+      success:   [38, 116,  72],
+      steel:     [180, 200, 232],
     };
 
-    const sectionGap = 1; // minimal spacing between stacked sections
-    const footerHeight = 18;
-    const bottomPadding = footerHeight + 2;
+    // ── Layout constants ─────────────────────────────────────────
+    const footerH  = 16;
+    const bottomPad = footerH + 3;
 
-    const ITINERARY_DAY_IMAGE_HEIGHT = 46;
-    const ITINERARY_DAY_IMAGE_PADDING = 2;
-    const ITINERARY_DAY_CARD_IMAGE_SIZE = 30;
-
-    const setBodyFont = () => {
+    // ── Utility helpers ──────────────────────────────────────────
+    const setBody = () => {
       doc.setFont(undefined, 'normal');
-      doc.setTextColor(...palette.secondaryText);
       doc.setFontSize(10);
+      doc.setTextColor(...C.body);
     };
 
-    const applyPageBackground = () => {
-      doc.setFillColor(...palette.background);
-      doc.rect(0, 0, pageWidth, pageHeight, 'F')
+    const applyBg = () => {
+      doc.setFillColor(...C.offWhite);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
     };
 
-    const addFooter = () => {
-      const footerTop = pageHeight - footerHeight;
+    const gap = (n = 4) => { yPos += n; };
 
-      doc.setDrawColor(...palette.timeline);
-      doc.setLineWidth(0.5);
-      doc.line(margin, footerTop, pageWidth - margin, footerTop);
-
-      doc.setFontSize(9);
-      doc.setTextColor(...palette.secondaryText);
-      doc.setFont(undefined, 'bold');
-      doc.text(PDF_CONFIG.company, margin, footerTop + 6);
-
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(...palette.mutedText);
-      const contactText = `${PDF_CONFIG.email}  |  ${PDF_CONFIG.phone}`;
-      doc.text(contactText, pageWidth - margin, footerTop + 6, { align: 'right' });
-
-      doc.setFontSize(8);
-      doc.setTextColor(...palette.secondaryText);
-      doc.text(`Page ${pageNumber}`, pageWidth / 2, footerTop + 6, { align: 'center' });
-
-      pageNumber += 1;
-    };
-
-    const addSectionGap = (amount = sectionGap) => {
-      yPos += amount;
-    };
-
-    const ensureSpace = (requiredSpace) => {
-      const usableHeight = pageHeight - margin - bottomPadding;
-      let spaceNeeded = requiredSpace;
-      if (spaceNeeded > usableHeight) {
-        spaceNeeded = usableHeight;
-      }
-      if (yPos + spaceNeeded > pageHeight - bottomPadding) {
+    const ensureSpace = (needed) => {
+      const clamp = Math.min(needed, pageHeight - bottomPad - margin);
+      if (yPos + clamp > pageHeight - bottomPad) {
         addFooter();
         doc.addPage();
-        applyPageBackground();
-        yPos = margin;
+        applyBg();
+        drawRunningHeader();
+        yPos = margin + 12;
         return true;
       }
       return false;
     };
 
     const formatPrice = (value) => {
-      if (value === null || value === undefined || value === '') {
-        return 'On request';
-      }
-      const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
-      if (!Number.isFinite(numeric)) {
-        return String(value);
-      }
-      return formatCurrency(numeric, { maximumFractionDigits: 0 });
+      if (value === null || value === undefined || value === '') return 'On Request';
+      const n = Number(String(value).replace(/[^0-9.-]/g, ''));
+      if (!Number.isFinite(n)) return String(value);
+      return formatCurrency(n, { maximumFractionDigits: 0 });
     };
 
     const formatDateDisplay = (value) => {
-      if (!value) return 'To be confirmed';
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) {
-        return String(value);
-      }
-      return parsed.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      });
+      if (!value) return 'Year-Round';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     const normalizeDays = () => {
-      const rawDays = pkg.days || pkg.itinerary?.days || [];
-      if (Array.isArray(rawDays)) {
-        return rawDays.slice().sort((a, b) => {
-          const aDay = a.dayNumber ?? a.day ?? 0;
-          const bDay = b.dayNumber ?? b.day ?? 0;
-          return aDay - bDay;
-        });
-      }
-      return Object.values(rawDays)
-        .flat()
-        .sort((a, b) => {
-          const aDay = a.dayNumber ?? a.day ?? 0;
-          const bDay = b.dayNumber ?? b.day ?? 0;
-          return aDay - bDay;
-        });
+      const raw = pkg.days || pkg.itinerary?.days || [];
+      const arr = Array.isArray(raw) ? raw : Object.values(raw).flat();
+      return arr.slice().sort((a, b) => (a.dayNumber ?? a.day ?? 0) - (b.dayNumber ?? b.day ?? 0));
     };
 
     const getDaySegments = (day) => {
-      const segments = [];
+      const segs = [];
       if (Array.isArray(day.timeline)) {
-        day.timeline.forEach((segment) => {
-          if (!segment) return;
-          const label =
-            segment.label ||
-            segment.timeOfDay ||
-            segment.time ||
-            segment.title ||
-            'Experience';
-          const description =
-            segment.description ||
-            segment.summary ||
-            segment.detail ||
-            segment.activity ||
-            segment.notes;
-          if (description) {
-            segments.push({
-              label,
-              description: String(description).trim(),
-            });
-          }
+        day.timeline.forEach((s) => {
+          if (!s) return;
+          const label = s.label || s.timeOfDay || s.time || s.title || 'Experience';
+          const desc  = s.description || s.summary || s.detail || s.activity || s.notes;
+          if (desc) segs.push({ label, description: String(desc).trim() });
         });
       }
-      ['morning', 'afternoon', 'evening', 'night'].forEach((period) => {
-        if (day[period]) {
-          segments.push({
-            label: period,
-            description: String(day[period]).trim(),
-          });
-        }
+      ['morning', 'afternoon', 'evening', 'night'].forEach((p) => {
+        if (day[p]) segs.push({ label: p, description: String(day[p]).trim() });
       });
-      if (!segments.length && day.activities && day.activities.length) {
-        segments.push({
-          label: 'Highlights',
-          description: day.activities.map((act) => String(act).trim()).join(', '),
-        });
-      }
-      if (!segments.length && day.description) {
-        segments.push({
-          label: 'Overview',
-          description: String(day.description).trim(),
-        });
-      }
-      return segments.slice(0, 4);
+      if (!segs.length && day.activities?.length)
+        segs.push({ label: 'Activities', description: day.activities.map((a) => String(a).trim()).join(' · ') });
+      if (!segs.length && day.description)
+        segs.push({ label: 'Overview', description: String(day.description).trim() });
+      return segs.slice(0, 4);
     };
 
     const getMealsText = (meals) => {
       if (!meals) return null;
-      const available = [];
-      if (meals.breakfast) available.push('Breakfast');
-      if (meals.lunch) available.push('Lunch');
-      if (meals.dinner) available.push('Dinner');
-      if (meals.snacks) available.push('Snacks');
-      return available.length ? `Meals: ${available.join(', ')}` : null;
+      const m = [];
+      if (meals.breakfast) m.push('Breakfast');
+      if (meals.lunch)     m.push('Lunch');
+      if (meals.dinner)    m.push('Dinner');
+      if (meals.snacks)    m.push('Snacks');
+      return m.length ? m.join(' · ') : null;
+    };
+
+    // ── Structural elements ───────────────────────────────────────
+    const addFooter = () => {
+      const fy = pageHeight - footerH;
+      // top rule
+      doc.setFillColor(...C.navy);
+      doc.rect(0, fy, pageWidth, 0.8, 'F');
+      // footer band
+      doc.setFillColor(...C.subtle);
+      doc.rect(0, fy + 0.8, pageWidth, footerH - 0.8, 'F');
+
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...C.navy);
+      doc.text(PDF_CONFIG.company, margin, fy + 9);
+
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...C.muted);
+      const contact = `${PDF_CONFIG.email}  ·  ${PDF_CONFIG.phone}  ·  ${PDF_CONFIG.website.replace(/^https?:\/\//, '')}`;
+      doc.text(contact, pageWidth / 2, fy + 9, { align: 'center' });
+      doc.text(`Page ${pageNumber}`, pageWidth - margin, fy + 9, { align: 'right' });
+
+      pageNumber++;
+    };
+
+    const drawRunningHeader = () => {
+      doc.setFillColor(...C.navyDark);
+      doc.rect(0, 0, pageWidth, 10, 'F');
+      doc.setFillColor(...C.gold);
+      doc.rect(0, 10, pageWidth, 0.6, 'F');
+
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...C.white);
+      doc.text(PDF_CONFIG.company.toUpperCase(), margin, 7);
+
+      const pkgLabel = (pkg.name || pkg.destination || 'Itinerary').toUpperCase();
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(...C.steel);
+      doc.text(pkgLabel, pageWidth - margin, 7, { align: 'right' });
     };
 
     const drawSectionHeading = (title, subtitle) => {
-      ensureSpace(14);
+      ensureSpace(18);
+      // gold accent bar
+      doc.setFillColor(...C.gold);
+      doc.rect(margin, yPos, 3.5, 13, 'F');
+      // title
       doc.setFont(undefined, 'bold');
-      doc.setTextColor(...palette.primaryText);
-      doc.setFontSize(15);
-      doc.text(title.toUpperCase(), margin, yPos + 3);
-      doc.setDrawColor(...palette.timeline);
-      doc.setLineWidth(0.6);
-      doc.line(margin, yPos + 4.5, margin + 60, yPos + 4.5);
+      doc.setFontSize(14);
+      doc.setTextColor(...C.navy);
+      doc.text(title.toUpperCase(), margin + 9, yPos + 9.5);
+      yPos += 15;
       if (subtitle) {
         doc.setFont(undefined, 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(...palette.mutedText);
-        const subLines = doc.splitTextToSize(subtitle, contentWidth);
-        doc.text(subLines, margin, yPos + 10);
-        yPos += subLines.length * 4.5 + 10;
-      } else {
-        yPos += 8;
+        doc.setFontSize(9.5);
+        doc.setTextColor(...C.muted);
+        const lines = doc.splitTextToSize(subtitle, contentWidth - 10);
+        doc.text(lines, margin + 9, yPos);
+        yPos += lines.length * 5 + 2;
       }
-      setBodyFont();
+      gap(4);
+      setBody();
     };
 
-    const drawInfoCard = (items) => {
-      const cardHeight = 50;
-      ensureSpace(cardHeight);
-      doc.setFillColor(...palette.cardBg);
-      doc.setDrawColor(...palette.cardBorder);
-      doc.roundedRect(margin, yPos, contentWidth, cardHeight, 8, 8, 'FD');
+    // ── Cover helpers ─────────────────────────────────────────────
 
-      const columnWidth = contentWidth / items.length;
-      items.forEach((item, index) => {
-        const x = margin + index * columnWidth + 6;
-        doc.setFont(undefined, 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...palette.accentDark);
-        doc.text(item.label, x, yPos + 14);
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(25);
-        doc.setTextColor(...palette.primaryText);
-        const lines = doc.splitTextToSize(item.value || '—', columnWidth - 12);
-        doc.text(lines, x, yPos + 24);
-      });
+    const drawCoverHeader = (logoData) => {
+      const hh = 22;
+      doc.setFillColor(...C.navyDark);
+      doc.rect(0, 0, pageWidth, hh, 'F');
+      doc.setFillColor(...C.gold);
+      doc.rect(0, hh - 1, pageWidth, 1, 'F');
 
-      yPos += cardHeight;
-      addSectionGap();
-      setBodyFont();
-    };
-
-    const drawBulletListCard = (title, items, options = {}) => {
-      const { innerPadding: customPadding, bulletColor = palette.accent } = options;
-      const sanitizedItems = (items || [])
-        .map((item) => String(item).trim())
-        .filter(Boolean);
-
-      if (!sanitizedItems.length) {
-        return;
-      }
-
-      const innerPadding = customPadding ?? 16;
-      const innerWidth = contentWidth - innerPadding * 2;
-
-      const lineSets = sanitizedItems.map((item) => doc.splitTextToSize(item, innerWidth - 12));
-
-      const headingHeight = 11;
-      let contentHeight = 0;
-      lineSets.forEach((lines) => {
-        contentHeight += lines.length * 5.2 + 6;
-      });
-      const cardHeight = innerPadding * 2 + headingHeight + contentHeight;
-
-      ensureSpace(cardHeight);
-      doc.setFillColor(...palette.cardBg);
-      doc.setDrawColor(...palette.cardBorder);
-      doc.roundedRect(margin, yPos, contentWidth, cardHeight, 10, 10, 'FD');
-
-      const textX = margin + innerPadding;
-      let cursorY = yPos + innerPadding + 8;
-
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(18);
-      doc.setTextColor(...palette.primaryText);
-      doc.text(title, textX, cursorY);
-
-      cursorY += 12;
-      doc.setFont(undefined, 'normal');
-      doc.setFontSize(11.5);
-      doc.setTextColor(...palette.secondaryText);
-      lineSets.forEach((lines) => {
-        const bulletCenterY = cursorY - 2;
-        doc.setFillColor(...bulletColor);
-        doc.circle(textX, bulletCenterY, 2, 'F');
-        doc.text(lines, textX + 8, cursorY);
-        cursorY += lines.length * 5.2 + 4;
-      });
-
-      yPos += cardHeight;
-      addSectionGap();
-      setBodyFont();
-    };
-
-    const drawOverviewHighlightsCard = (overview, highlightItems, options = {}) => {
-      const { innerPadding: customPadding } = options;
-      const summaryText =
-        overview ||
-        `Experience a bespoke journey with guided experiences, curated stays, and unforgettable highlights in ${pkg.destination || 'your chosen destination'
-        }.`;
-
-      const sanitizedHighlights = (
-        Array.isArray(highlightItems) && highlightItems.length
-          ? highlightItems
-          : [
-            `Guided explorations of ${pkg.destination || 'signature attractions'}`,
-            'Curated accommodations with local character',
-            'Authentic culinary experiences & cultural immersions',
-            'Dedicated travel specialist and concierge support',
-          ]
-      )
-        .map((item) => String(item).trim())
-        .filter(Boolean)
-        .slice(0, 6);
-
-      const innerPadding = customPadding ?? 16;
-      const innerWidth = contentWidth - innerPadding * 2;
-      const overviewFontSize = 13;
-
-      // Trip Overview card
-      doc.setFont(undefined, 'normal');
-      doc.setFontSize(overviewFontSize);
-      const overviewLines = doc.splitTextToSize(summaryText, innerWidth);
-      const overviewDimensions = doc.getTextDimensions(overviewLines);
-      const overviewTextHeight = overviewDimensions.h;
-      const overviewHeadingHeight = 12;
-      const overviewSpacing = 10;
-      const overviewCardHeight =
-        innerPadding * 2 + overviewHeadingHeight + overviewSpacing + overviewTextHeight;
-
-      ensureSpace(overviewCardHeight);
-      doc.setFillColor(...palette.cardBg);
-      doc.setDrawColor(...palette.cardBorder);
-      doc.roundedRect(margin, yPos, contentWidth, overviewCardHeight, 10, 10, 'FD');
-
-      const overviewX = margin + innerPadding;
-      let overviewCursorY = yPos + innerPadding + 8;
-
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor(...palette.primaryText);
-      doc.text('Trip Overview', overviewX, overviewCursorY);
-
-      overviewCursorY += overviewSpacing;
-      doc.setFont(undefined, 'normal');
-      doc.setFontSize(overviewFontSize);
-      doc.setTextColor(...palette.secondaryText);
-      doc.text(overviewLines, overviewX, overviewCursorY, {
-        align: 'justify',
-        maxWidth: innerWidth,
-      });
-
-      yPos += overviewCardHeight;
-      addSectionGap();
-      setBodyFont();
-
-      return { highlightItems: sanitizedHighlights, innerPadding };
-    };
-
-    const drawBrandHeader = (logoData) => {
-      const headerHeight = 28;
-      const headerY = Math.max(8, margin - 4);
-      const headerX = margin;
-      const headerWidth = contentWidth;
-
-      doc.setFillColor(12, 12, 12);
-      doc.roundedRect(headerX, headerY, headerWidth, headerHeight, 6, 6, 'F');
-
-      let cursorX = headerX + 14;
-
+      let lx = margin;
       if (logoData) {
-        const logoHeight = 14;
-        const logoWidth = 56;
         try {
-          doc.addImage(
-            logoData,
-            'PNG',
-            cursorX,
-            headerY + (headerHeight - logoHeight) / 2,
-            logoWidth,
-            logoHeight,
-          );
-          cursorX += logoWidth + 14;
-        } catch (error) {
-          console.warn('Failed to draw brand logo in header:', error);
-        }
+          doc.addImage(logoData, 'PNG', margin, (hh - 13) / 2, 52, 13);
+          lx = margin + 52 + 10;
+        } catch (_) { /* fall through to text */ }
       }
-
       doc.setFont(undefined, 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(255, 255, 255);
-      doc.text(PDF_CONFIG.company, cursorX, headerY + 14);
-
+      doc.setFontSize(12.5);
+      doc.setTextColor(...C.white);
+      doc.text(PDF_CONFIG.company, lx, hh / 2 + 1.5);
       doc.setFont(undefined, 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(210, 210, 210);
-      doc.text(PDF_CONFIG.tagline, cursorX, headerY + 21);
+      doc.setFontSize(8);
+      doc.setTextColor(...C.steel);
+      doc.text(PDF_CONFIG.tagline, lx, hh / 2 + 7.5);
 
-      setBodyFont();
-      return headerY + headerHeight;
+      return hh;
     };
 
+    const drawListCard = (x, y, w, h, title, items, accentColor) => {
+      doc.setFillColor(...C.card);
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(x, y, w, h, 5, 5, 'FD');
+      // left accent bar
+      doc.setFillColor(...accentColor);
+      doc.roundedRect(x, y, 4, h, 2, 2, 'F');
+
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...C.navy);
+      doc.text(title, x + 10, y + 10);
+
+      const innerW = w - 18;
+      let cy = y + 18;
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9.5);
+      items.forEach((item) => {
+        const lines = doc.splitTextToSize(String(item).trim(), innerW - 8);
+        doc.setFillColor(...accentColor);
+        doc.circle(x + 9, cy - 1.5, 1.5, 'F');
+        doc.setTextColor(...C.body);
+        doc.text(lines, x + 14, cy);
+        cy += lines.length * 4.8 + 3;
+      });
+    };
+
+    // ── Day card ─────────────────────────────────────────────────
     const drawDayCard = (day, index) => {
-      const dayNumber = day.dayNumber ?? day.day ?? index + 1;
-      const dayTitle = day.title || `Curated Experience`;
+      const dayNumber  = day.dayNumber ?? day.day ?? index + 1;
+      const dayTitle   = day.title || `Day ${dayNumber} Experience`;
       const locationText = Array.isArray(day.locations)
-        ? day.locations.map((loc) => String(loc).trim()).filter(Boolean).join(' • ')
+        ? day.locations.map((l) => String(l).trim()).filter(Boolean).join(' · ')
         : day.location || '';
 
-      const segments = getDaySegments(day).map((segment) => ({
-        ...segment,
-        label: String(segment.label || 'Experience').toUpperCase(),
+      const segments = getDaySegments(day).map((s) => ({
+        ...s,
+        label: String(s.label || 'Experience').toUpperCase(),
       }));
 
-      const supportingNotes = [];
-      if (day.accommodation?.name) {
-        const accommodationParts = [
-          day.accommodation.name,
-          day.accommodation.type && `(${day.accommodation.type})`,
-        ]
-          .filter(Boolean)
-          .join(' ');
-        supportingNotes.push(`Stay: ${accommodationParts}`);
-      } else if (typeof day.accommodation === 'string') {
-        supportingNotes.push(`Stay: ${day.accommodation}`);
-      }
+      const footerParts = [];
+      if (day.accommodation?.name)       footerParts.push(`Stay: ${day.accommodation.name}`);
+      else if (typeof day.accommodation === 'string' && day.accommodation)
+                                         footerParts.push(`Stay: ${day.accommodation}`);
       const mealsText = getMealsText(day.meals);
-      if (mealsText) supportingNotes.push(mealsText);
-      if (day.transport) {
-        const transportText = String(day.transport);
-        supportingNotes.push(`Transfers: ${transportText.charAt(0).toUpperCase()}${transportText.slice(1)}`);
-      }
+      if (mealsText)                     footerParts.push(`Meals: ${mealsText}`);
+      if (day.transport)                 footerParts.push(`Transfer: ${String(day.transport)}`);
+
+      // Text area: leave left strip (28) + right margin padding (8)
+      const textAreaW = contentWidth - 30;
+      const cardImage = images.dayImages?.[dayNumber] || images.packageImages?.[index + 1] || null;
+      const hasImg    = Boolean(cardImage);
+      const imgW      = hasImg ? 28 : 0;
+
+      const locLines = locationText
+        ? doc.splitTextToSize(locationText, textAreaW - imgW - 4)
+        : [];
+
+      const enriched = segments.map((s) => ({
+        ...s,
+        lines: doc.splitTextToSize(s.description, textAreaW - 6),
+      }));
 
       const noteLines = day.notes
-        ? doc.splitTextToSize(`Note: ${String(day.notes).trim()}`, contentWidth - 60)
+        ? doc.splitTextToSize(`Note: ${String(day.notes).trim()}`, textAreaW - 6)
         : [];
 
-      const locationLines = locationText
-        ? doc.splitTextToSize(locationText, contentWidth - 120)
+      const footerText  = footerParts.join('   ·   ');
+      const footerLines = footerText
+        ? doc.splitTextToSize(footerText, contentWidth - 20)
         : [];
+      const footerBlock = footerLines.length ? footerLines.length * 4.5 + 10 : 0;
 
-      const segmentWidth = contentWidth - 60;
-      const enrichedSegments = segments.map((segment) => ({
-        ...segment,
-        lines: doc.splitTextToSize(segment.description, segmentWidth),
-      }));
+      // Card height estimate
+      const headerBlock = 28;
+      let contentBlock  = 8;
+      if (locLines.length) contentBlock += locLines.length * 4.5 + 3;
+      enriched.forEach((s) => { contentBlock += 10 + s.lines.length * 4.8 + 4; });
+      if (noteLines.length) contentBlock += noteLines.length * 4.2 + 4;
+      const cardH = headerBlock + contentBlock + footerBlock;
 
-      const supportingLines = supportingNotes.length
-        ? doc.splitTextToSize(supportingNotes.join('  •  '), segmentWidth)
-        : [];
+      ensureSpace(cardH + 5);
+      const ct = yPos; // card top
 
-      let estimatedHeight = 52;
-      estimatedHeight += locationLines.length ? locationLines.length * 4.2 + 3 : 0;
-      enrichedSegments.forEach((segment) => {
-        estimatedHeight += segment.lines.length * 4.4 + 10;
-      });
-      estimatedHeight += supportingLines.length ? supportingLines.length * 4.4 + 6 : 0;
-      estimatedHeight += noteLines.length ? noteLines.length * 4.2 + 4 : 0;
+      // Card background
+      doc.setFillColor(...C.card);
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(margin, ct, contentWidth, cardH, 6, 6, 'FD');
 
-      const cardImage = images.dayImages?.[dayNumber] || images.packageImages?.[index + 1] || null;
+      // Navy header strip: draw navy rounded rect then cover its bottom with a plain navy rect
+      doc.setFillColor(...C.navy);
+      doc.roundedRect(margin, ct, contentWidth, headerBlock, 6, 6, 'F');
+      doc.rect(margin, ct + headerBlock - 6, contentWidth, 6, 'F');
 
-      ensureSpace(estimatedHeight + 4);
-      const cardTop = yPos;
-
-      doc.setFillColor(...palette.cardBg);
-      doc.setDrawColor(...palette.cardBorder);
-      doc.roundedRect(margin, cardTop, contentWidth, estimatedHeight, 12, 12, 'FD');
-
-      // Timeline spine
-      doc.setDrawColor(...palette.timeline);
-      doc.setLineWidth(1);
-      doc.line(margin + 18, cardTop + 26, margin + 18, cardTop + estimatedHeight - 18);
-
-      // Day badge
-      doc.setFillColor(...palette.badgeBg);
-      doc.circle(margin + 18, cardTop + 26, 9, 'F');
+      // Gold day badge
+      const badgeX = margin + 20;
+      const badgeY = ct + headerBlock / 2;
+      doc.setFillColor(...C.gold);
+      doc.circle(badgeX, badgeY, 9, 'F');
       doc.setFont(undefined, 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...palette.badgeText);
-      doc.text(`DAY ${dayNumber}`, margin + 18, cardTop + 27.5, { align: 'center' });
+      doc.setFontSize(6);
+      doc.setTextColor(...C.navyDark);
+      doc.text('DAY', badgeX, badgeY - 1.5, { align: 'center' });
+      doc.setFontSize(11.5);
+      doc.text(String(dayNumber), badgeX, badgeY + 5, { align: 'center' });
 
-      // Optional image
-      const imageSize = ITINERARY_DAY_CARD_IMAGE_SIZE;
-      const imageX = margin + contentWidth - imageSize - 12;
-      const imageY = cardTop + 12;
-      if (cardImage) {
+      // Day title
+      const titleX = margin + 37;
+      const titleMaxW = hasImg ? contentWidth - 37 - imgW - 8 : contentWidth - 37 - 6;
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(12.5);
+      doc.setTextColor(...C.white);
+      const titleLines = doc.splitTextToSize(dayTitle, titleMaxW);
+      doc.text(titleLines[0], titleX, ct + 12);
+
+      // Location
+      if (locLines.length) {
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(...C.steel);
+        doc.text(locLines[0], titleX, ct + 21);
+      }
+
+      // Optional image (top-right corner of header)
+      if (hasImg) {
+        const ix = margin + contentWidth - imgW - 4;
+        const iy = ct + 2;
         try {
-          doc.addImage(cardImage, 'JPEG', imageX + 1.5, imageY + 1.5, imageSize - 3, imageSize - 3);
-        } catch (error) {
-          console.warn('Error adding day image:', error);
-          doc.setFillColor(...palette.pillBg);
-          doc.roundedRect(imageX + 1.5, imageY + 1.5, imageSize - 3, imageSize - 3, 16, 16, 'F');
-        }
-      } else {
-        doc.setFillColor(...palette.pillBg);
-        doc.roundedRect(imageX + 1.5, imageY + 1.5, imageSize - 3, imageSize - 3, 16, 16, 'F');
-        doc.setFont(undefined, 'italic');
-        doc.setFontSize(8);
-        doc.setTextColor(...palette.mutedText);
-        doc.text('Image\npending', imageX + imageSize / 2, imageY + imageSize / 2 - 1, {
-          align: 'center',
-        });
+          doc.addImage(cardImage, 'JPEG', ix, iy, imgW, headerBlock - 4);
+        } catch (_) {}
       }
 
-      // Day heading
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(13);
-      doc.setTextColor(...palette.primaryText);
-      doc.text(dayTitle, margin + 36, cardTop + 18);
-      if (locationLines.length) {
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(...palette.mutedText);
-        doc.text(locationLines, margin + 36, cardTop + 26);
-      }
+      // Content area
+      let cy = ct + headerBlock + 8;
+      const tx = margin + 14;
 
-      let cursorY = cardTop + 36 + locationLines.length * 4.2;
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(...palette.secondaryText);
-      doc.setFontSize(10);
-
-      enrichedSegments.forEach((segment, segIndex) => {
-        const markerY = cursorY + 6;
-        doc.setFillColor(...palette.accent);
-        doc.circle(margin + 18, markerY, 2.2, 'F');
-
+      enriched.forEach((seg) => {
+        // Pill label
+        doc.setFillColor(...C.subtle);
+        doc.setDrawColor(...C.border);
+        doc.setLineWidth(0.2);
+        const pillW = doc.getTextWidth(seg.label) + 14;
+        doc.roundedRect(tx, cy - 4, pillW, 7, 2, 2, 'FD');
+        doc.setFillColor(...C.gold);
+        doc.rect(tx, cy - 4, 3, 7, 'F');
         doc.setFont(undefined, 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...palette.accentDark);
-        doc.text(segment.label, margin + 36, cursorY + 4);
+        doc.setFontSize(8);
+        doc.setTextColor(...C.navy);
+        doc.text(seg.label, tx + 6, cy + 1);
+        cy += 9;
 
+        // Segment description
         doc.setFont(undefined, 'normal');
         doc.setFontSize(10);
-        doc.setTextColor(...palette.secondaryText);
-        doc.text(segment.lines, margin + 36, cursorY + 9);
-        cursorY += segment.lines.length * 4.4 + 12;
-
-        if (segIndex === enrichedSegments.length - 1) {
-          doc.setDrawColor(...palette.timeline);
-          doc.setLineWidth(0.5);
-          doc.circle(margin + 18, markerY, 2.3, 'S');
-        }
+        doc.setTextColor(...C.body);
+        doc.text(seg.lines, tx + 4, cy);
+        cy += seg.lines.length * 4.8 + 5;
       });
 
-      if (supportingLines.length) {
-        doc.setFont(undefined, 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(...palette.accentDark);
-        doc.text('Extras', margin + 36, cursorY);
-
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(...palette.secondaryText);
-        doc.text(supportingLines, margin + 36, cursorY + 5);
-        cursorY += supportingLines.length * 4.4 + 8;
-      }
-
+      // Notes
       if (noteLines.length) {
         doc.setFont(undefined, 'italic');
-        doc.setFontSize(8);
-        doc.setTextColor(...palette.mutedText);
-        doc.text(noteLines, margin + 36, cursorY + 2);
-        cursorY += noteLines.length * 4.2 + 4;
+        doc.setFontSize(8.5);
+        doc.setTextColor(...C.muted);
+        doc.text(noteLines, tx + 4, cy);
+        cy += noteLines.length * 4.2 + 3;
       }
 
-      yPos = cardTop + estimatedHeight;
-      setBodyFont();
+      // Footer strip (accommodation / meals / transport)
+      if (footerLines.length) {
+        const fy2 = ct + cardH - footerBlock;
+        doc.setFillColor(...C.subtle);
+        doc.rect(margin, fy2, contentWidth, footerBlock, 'F');
+        // cover top half of rounded bottom corners
+        doc.roundedRect(margin, fy2, contentWidth, footerBlock, 6, 6, 'F');
+        doc.rect(margin, fy2, contentWidth, 6, 'F');
+
+        doc.setDrawColor(...C.border);
+        doc.setLineWidth(0.2);
+        doc.line(margin + 6, fy2 + 0.5, margin + contentWidth - 6, fy2 + 0.5);
+
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(...C.muted);
+        doc.text(footerLines, tx, fy2 + 7);
+      }
+
+      yPos = ct + cardH + 4;
+      setBody();
     };
 
-    const renderTerms = () => {
-      if (!pkg.terms || !pkg.terms.length) return;
-      drawSectionHeading('Important Notes', 'Key information for a seamless experience');
-      setBodyFont();
-      pkg.terms.forEach((term, index) => {
-        const termText = `${index + 1}. ${String(term).trim()}`;
-        const lines = doc.splitTextToSize(termText, contentWidth - 4);
-        ensureSpace(lines.length * 4.6 + 6);
-        doc.text(lines, margin + 2, yPos);
-        yPos += lines.length * 4.6 + 6;
-      });
-    };
-
-    // Cover Page
-    applyPageBackground();
-    setBodyFont();
+    // ═══════════════════════════════════════════════════════════════
+    // COVER PAGE
+    // ═══════════════════════════════════════════════════════════════
+    applyBg();
+    setBody();
 
     const destinationTitle =
-      pkg.destination ||
-      pkg.name ||
-      pkg.country ||
-      (pkg.region && `${pkg.region} Getaway`) ||
-      'Signature Escape';
+      pkg.destination || pkg.name || pkg.country ||
+      (pkg.region && `${pkg.region} Getaway`) || 'Signature Escape';
+
     const durationText =
-      typeof pkg.duration === 'string'
-        ? pkg.duration
-        : pkg.duration
-          ? `${pkg.duration} Day Trip`
-          : `${normalizeDays().length || 5} Day Trip`;
+      typeof pkg.duration === 'string' ? pkg.duration
+      : pkg.duration ? `${pkg.duration} Days`
+      : `${normalizeDays().length || 5} Days`;
 
-    const headerBottom = drawBrandHeader(images.brandLogo);
+    // 1. Brand header
+    const coverHeaderBottom = drawCoverHeader(images.brandLogo);
 
-    const heroHeight = 90;
-    const heroX = margin;
-    const heroY = headerBottom + 6;
+    // 2. Hero image
+    const heroY = coverHeaderBottom + 2;
+    const heroH = 82;
     if (images.packageImages?.[0]) {
       try {
-        doc.addImage(
-          images.packageImages[0],
-          'JPEG',
-          heroX,
-          heroY,
-          contentWidth,
-          heroHeight,
-        );
-      } catch (error) {
-        console.warn('Error adding cover image:', error);
-        doc.setFillColor(...palette.secondaryBackground);
-        doc.roundedRect(heroX, heroY, contentWidth, heroHeight, 12, 12, 'F');
+        doc.addImage(images.packageImages[0], 'JPEG', margin, heroY, contentWidth, heroH);
+      } catch (_) {
+        doc.setFillColor(...C.navyDark);
+        doc.roundedRect(margin, heroY, contentWidth, heroH, 5, 5, 'F');
       }
     } else {
-      doc.setFillColor(...palette.secondaryBackground);
-      doc.roundedRect(heroX, heroY, contentWidth, heroHeight, 12, 12, 'F');
+      doc.setFillColor(...C.navyDark);
+      doc.roundedRect(margin, heroY, contentWidth, heroH, 5, 5, 'F');
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(28);
+      doc.setTextColor(40, 70, 120);
+      doc.text(destinationTitle.toUpperCase(), pageWidth / 2, heroY + heroH / 2 + 5, { align: 'center' });
     }
 
-    // Title overlay
-    const overlayHeight = 34;
-    const overlayWidth = contentWidth - 52;
-    const overlayX = heroX + 0;
-    const overlayY = heroY + heroHeight - overlayHeight + 1;
+    // 3. Title strip (navy bar immediately below hero)
+    const titleStripY = heroY + heroH;
+    const titleStripH = 34;
+    doc.setFillColor(...C.navyDark);
+    doc.rect(margin, titleStripY, contentWidth, titleStripH, 'F');
+    // gold left accent
+    doc.setFillColor(...C.gold);
+    doc.rect(margin, titleStripY, 5, titleStripH, 'F');
 
-    // Main card
-    doc.setFillColor(
-      palette.cardBg[0],
-      palette.cardBg[1],
-      palette.cardBg[2],
-      220,
-    );
-    doc.setDrawColor(255, 255, 255);
-    doc.roundedRect(overlayX, overlayY, overlayWidth, overlayHeight, 10, 10, 'F');
-
-    // Flatten left corners
-    doc.setFillColor(
-      palette.cardBg[0],
-      palette.cardBg[1],
-      palette.cardBg[2],
-      220,
-    );
-    doc.rect(overlayX, overlayY, 12, overlayHeight, 'F');
-
-    // Accent bar
-    const accentWidth = 4;
-    doc.setFillColor(...palette.accent);
-    doc.rect(overlayX, overlayY, accentWidth, overlayHeight, 'F');
-
-    // Destination text
-    const overlayContentX = overlayX + accentWidth + 12;
-    const overlayContentY = overlayY + 16;
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.text(destinationTitle.toUpperCase(), overlayContentX, overlayContentY);
-
-    // Subtitle/tagline
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text(
-      pkg.category ? `${pkg.category.toUpperCase()} COLLECTION` : 'CURATED ESCAPE',
-      overlayContentX,
-      overlayY + overlayHeight - 13,
-    );
-
-    // Duration text
-    const durationLabel = durationText.toUpperCase();
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...palette.primaryText);
-    doc.setTextColor(255, 255, 255);
-    doc.text(durationLabel, overlayContentX, overlayY + overlayHeight - 8);
-
-    yPos = heroY + heroHeight + 12;
-
-    const { highlightItems, innerPadding: highlightPadding } = drawOverviewHighlightsCard(
-      pkg.description ||
-      `Experience the very best of ${destinationTitle} with a professionally curated program balancing exploration, culture, and moments of pure relaxation.`,
-      pkg.highlights,
-      { innerPadding: 14 },
-    );
-
-    // Investment / quick facts card (restructured - only Max Group Size and Trip Style)
-    const investmentHeight = 45;
-    ensureSpace(investmentHeight);
-    doc.setDrawColor(...palette.cardBorder);
-    doc.roundedRect(margin, yPos, contentWidth, investmentHeight, 9, 9, 'S');
-
-    const leftColumnX = margin + 14;
-    const leftColumnWidth = (contentWidth - 42) / 2; // Half width minus padding
-    const rightColumnX = margin + leftColumnWidth + 28;
-    const rightColumnWidth = (contentWidth - 42) / 2;
-
-    const baseY = yPos + 15;
-
-    // Max Group Size - Left Column
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(11.5);
-    doc.setTextColor(...palette.accent);
-    doc.text('MAX GROUP SIZE', leftColumnX, baseY);
+    doc.setFontSize(20);
+    doc.setTextColor(...C.white);
+    doc.text(destinationTitle.toUpperCase(), margin + 11, titleStripY + 14);
 
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(12.5);
-    doc.setTextColor(...palette.primaryText);
-    const groupSizeValue = pkg.maxGroupSize ? `${pkg.maxGroupSize} Travelers` : 'Tailored to your preference';
-    const groupSizeLines = doc.splitTextToSize(groupSizeValue, leftColumnWidth - 4);
-    doc.text(groupSizeLines, leftColumnX, baseY + 9);
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.steel);
+    const chipLine = [
+      pkg.category ? pkg.category.toUpperCase() : 'CURATED ESCAPE',
+      durationText.toUpperCase(),
+    ].join('    ·    ');
+    doc.text(chipLine, margin + 11, titleStripY + 23);
 
-    // Trip Style - Right Column
+    // Price (right side of title strip)
+    if (pkg.price) {
+      const pText = formatPrice(pkg.price);
+      const pNum  = pText.replace(/[^\d.,]/g, '');
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(17);
+      doc.setTextColor(...C.goldPale);
+      doc.text(pText === 'On Request' ? 'On Request' : `${CURRENCY_CODE} ${pNum}`,
+        margin + contentWidth - 4, titleStripY + 14, { align: 'right' });
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...C.steel);
+      doc.text('PER PERSON', margin + contentWidth - 4, titleStripY + 22, { align: 'right' });
+    }
+
+    yPos = titleStripY + titleStripH + 4;
+
+    // 4. Quick stats row
+    const statsH = 26;
+    ensureSpace(statsH);
+    doc.setFillColor(...C.card);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(margin, yPos, contentWidth, statsH, 5, 5, 'FD');
+    // navy top rule
+    doc.setFillColor(...C.navy);
+    doc.rect(margin, yPos, contentWidth, 1.5, 'F');
+
+    const stats = [
+      { label: 'DURATION',   value: durationText },
+      { label: 'GROUP SIZE', value: pkg.maxGroupSize ? `Up to ${pkg.maxGroupSize}` : 'Flexible' },
+      { label: 'TRIP STYLE', value: pkg.category || pkg.theme || 'Tailored' },
+      { label: 'DEPARTURE',  value: pkg.travelDate ? formatDateDisplay(pkg.travelDate) : 'Year-Round' },
+    ];
+    const statColW = contentWidth / stats.length;
+    stats.forEach((stat, i) => {
+      const sx = margin + i * statColW + 7;
+      if (i > 0) {
+        doc.setDrawColor(...C.border);
+        doc.setLineWidth(0.2);
+        doc.line(margin + i * statColW, yPos + 4, margin + i * statColW, yPos + statsH - 4);
+      }
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...C.gold);
+      doc.text(stat.label, sx, yPos + 9.5);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...C.ink);
+      doc.text(doc.splitTextToSize(stat.value, statColW - 12)[0], sx, yPos + 19.5);
+    });
+    yPos += statsH + 5;
+
+    // 5. Overview card
+    const summaryText = pkg.description ||
+      `Experience the very best of ${destinationTitle} with a professionally curated programme balancing exploration, culture, and moments of pure relaxation.`;
+    doc.setFontSize(10.5);
+    const overviewLines = doc.splitTextToSize(summaryText, contentWidth - 22);
+    const overviewCardH  = 10 + 7 + overviewLines.length * 5.1 + 10;
+    ensureSpace(overviewCardH);
+
+    doc.setFillColor(...C.card);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(margin, yPos, contentWidth, overviewCardH, 5, 5, 'FD');
+    doc.setFillColor(...C.gold);
+    doc.roundedRect(margin, yPos, 4, overviewCardH, 2, 2, 'F');
+
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(11.5);
-    doc.setTextColor(...palette.accent);
-    doc.text('TRIP STYLE', rightColumnX, baseY);
-
+    doc.setFontSize(11);
+    doc.setTextColor(...C.navy);
+    doc.text('About This Journey', margin + 10, yPos + 9);
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(12.5);
-    doc.setTextColor(...palette.primaryText);
-    const tripStyleValue =
-      (pkg.category && `${pkg.category} Journey`) ||
-      pkg.tagline ||
-      pkg.theme ||
-      'Curated Escape';
-    const tripStyleLines = doc.splitTextToSize(tripStyleValue, rightColumnWidth - 4);
-    doc.text(tripStyleLines, rightColumnX, baseY + 9);
+    doc.setFontSize(10.5);
+    doc.setTextColor(...C.body);
+    doc.text(overviewLines, margin + 10, yPos + 17, { maxWidth: contentWidth - 16 });
+    yPos += overviewCardH + 5;
 
-    yPos += investmentHeight;
-    addSectionGap();
+    // 6. Highlights + Inclusions (two columns)
+    const highlights = (Array.isArray(pkg.highlights) && pkg.highlights.length
+      ? pkg.highlights
+      : [
+          `Guided explorations of ${destinationTitle}`,
+          'Curated accommodations with local character',
+          'Authentic culinary experiences',
+          'Dedicated travel specialist support',
+        ]
+    ).map((h) => String(h).trim()).filter(Boolean).slice(0, 6);
 
-    drawBulletListCard('Highlights', highlightItems, { innerPadding: highlightPadding });
-
-    const inclusionItems = (Array.isArray(pkg.inclusions) && pkg.inclusions.length
+    const inclusions = (Array.isArray(pkg.inclusions) && pkg.inclusions.length
       ? pkg.inclusions
       : [
-        'Premium hotel accommodation',
-        'Daily breakfast and curated dining',
-        'Private guided excursions',
-        'All arranged ground transfers',
-        'Entrance fees to listed experiences',
-      ]
-    ).map((item) => String(item).trim());
+          'Premium hotel accommodation',
+          'Daily breakfast & curated dining',
+          'Private guided excursions',
+          'All ground transfers included',
+          'Entrance fees to listed experiences',
+        ]
+    ).map((i) => String(i).trim()).filter(Boolean);
 
-    drawBulletListCard('Inclusions', inclusionItems, {
-      innerPadding: highlightPadding,
-      bulletColor: palette.accent,
-    });
+    const halfW = (contentWidth - 4) / 2;
 
-    const secondaryImage = images.packageImages?.[1];
-    if (secondaryImage) {
-      const imageHeight = 52;
-      const imageTopMargin = 6;
-      ensureSpace(imageHeight + imageTopMargin);
+    const calcListCardH = (items, colW) => {
+      let h = 22;
+      items.forEach((item) => {
+        h += doc.splitTextToSize(String(item).trim(), colW - 18).length * 4.8 + 3;
+      });
+      return h + 6;
+    };
 
-      const imageWidth = contentWidth;
-      const imageX = margin;
-      const imageY = yPos + imageTopMargin;
+    doc.setFontSize(9.5);
+    const hlH   = calcListCardH(highlights, halfW);
+    const inclH = calcListCardH(inclusions, halfW);
+    const twoColH = Math.max(hlH, inclH);
+    ensureSpace(twoColH);
 
+    drawListCard(margin,          yPos, halfW, twoColH, 'Highlights', highlights, C.gold);
+    drawListCard(margin + halfW + 4, yPos, halfW, twoColH, 'Inclusions', inclusions, C.success);
+
+    yPos += twoColH + 5;
+
+    // 7. Secondary image (if available)
+    if (images.packageImages?.[1]) {
+      const imgH = 50;
+      ensureSpace(imgH + 2);
       try {
-        doc.addImage(secondaryImage, 'JPEG', imageX, imageY, imageWidth, imageHeight);
-      } catch (error) {
-        console.warn('Error adding secondary image to inclusions section:', error);
-        doc.setFillColor(...palette.secondaryBackground);
-        doc.rect(imageX, imageY, imageWidth, imageHeight, 'F');
-      }
-
-      yPos = imageY + imageHeight;
-      addSectionGap();
+        doc.addImage(images.packageImages[1], 'JPEG', margin, yPos, contentWidth, imgH);
+        yPos += imgH + 4;
+      } catch (_) {}
     }
 
     addFooter();
-    doc.addPage();
-    applyPageBackground();
-    yPos = margin;
 
-    // Detailed Itinerary Page
+    // ═══════════════════════════════════════════════════════════════
+    // ITINERARY PAGES
+    // ═══════════════════════════════════════════════════════════════
+    doc.addPage();
+    applyBg();
+    drawRunningHeader();
+    yPos = 16;
+
     drawSectionHeading(
       'Detailed Itinerary',
-      'A day-by-day look at your professionally designed escape',
+      'A day-by-day journey through your curated escape',
     );
 
     const days = normalizeDays();
@@ -1759,52 +1580,61 @@ function buildPDFDocument(pkg, images) {
       ensureSpace(20);
       doc.setFont(undefined, 'italic');
       doc.setFontSize(11);
-      doc.setTextColor(...palette.mutedText);
-      doc.text('Detailed day plan will be crafted once we confirm your preferences.', margin, yPos);
+      doc.setTextColor(...C.muted);
+      doc.text('Day-by-day itinerary will be crafted once your preferences are confirmed.', margin, yPos);
       yPos += 18;
     } else {
-      days.forEach((day, index) => {
-        drawDayCard(day, index);
-      });
+      days.forEach((day, i) => drawDayCard(day, i));
     }
 
-    // Package Price Display (after day-by-day itinerary)
-    addSectionGap();
-    const priceCardHeight = 50;
-    ensureSpace(priceCardHeight);
-    doc.setDrawColor(...palette.cardBorder);
-    doc.roundedRect(margin, yPos, contentWidth, priceCardHeight, 9, 9, 'S');
-
-    const priceLeftX = margin + 14;
-    const priceRightX = margin + contentWidth * 0.5 + 14;
-
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(...palette.accent);
-    doc.text('Package Price', priceLeftX, yPos + 18);
+    // Price card
+    gap(4);
+    const priceCardH = 44;
+    ensureSpace(priceCardH);
+    doc.setFillColor(...C.navyDark);
+    doc.roundedRect(margin, yPos, contentWidth, priceCardH, 7, 7, 'F');
+    doc.setFillColor(...C.gold);
+    doc.roundedRect(margin, yPos, 6, priceCardH, 3, 3, 'F');
 
     doc.setFont(undefined, 'bold');
-    doc.setFontSize(28);
-    doc.setTextColor(...palette.primaryText);
-    const priceText = formatINR(pkg.price);
-    const sanitizedPrice = priceText.replace(/[^\d.,]/g, '');
-    doc.text(`${CURRENCY_CODE} ${sanitizedPrice}`, priceLeftX, yPos + 36);
+    doc.setFontSize(9.5);
+    doc.setTextColor(...C.steel);
+    doc.text('PACKAGE INVESTMENT', margin + 14, yPos + 12);
+
+    const priceDisplay = formatPrice(pkg.price);
+    const priceSanitized = priceDisplay.replace(/[^\d.,]/g, '');
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(26);
+    doc.setTextColor(...C.white);
+    doc.text(
+      priceDisplay === 'On Request' ? 'On Request' : `${CURRENCY_CODE} ${priceSanitized}`,
+      margin + 14, yPos + 32,
+    );
 
     if (pkg.priceNotes) {
       doc.setFont(undefined, 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...palette.secondaryText);
-      const priceNotesLines = doc.splitTextToSize(
-        pkg.priceNotes,
-        contentWidth * 0.45 - 4,
-      );
-      doc.text(priceNotesLines, priceRightX, yPos + 20);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...C.steel);
+      const pnLines = doc.splitTextToSize(pkg.priceNotes, contentWidth * 0.42);
+      doc.text(pnLines, margin + contentWidth - 4, yPos + 14, { align: 'right' });
     }
 
-    yPos += priceCardHeight;
-    addSectionGap();
+    yPos += priceCardH + 6;
 
-    renderTerms();
+    // Terms
+    if (pkg.terms?.length) {
+      drawSectionHeading('Important Notes', 'Key information for a seamless experience');
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...C.body);
+      pkg.terms.forEach((term, i) => {
+        const t = `${i + 1}.  ${String(term).trim()}`;
+        const lines = doc.splitTextToSize(t, contentWidth - 4);
+        ensureSpace(lines.length * 5 + 4);
+        doc.text(lines, margin + 2, yPos);
+        yPos += lines.length * 5 + 4;
+      });
+    }
 
     addFooter();
 

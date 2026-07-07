@@ -1,4 +1,4 @@
-export const CURRENCY_CODE = import.meta.env.VITE_CURRENCY_CODE || 'INR';
+export const CURRENCY_CODE = import.meta.env.VITE_CURRENCY_CODE || 'USD';
 export const CURRENCY_SYMBOL = import.meta.env.VITE_CURRENCY_SYMBOL;
 
 export const LOCALE = CURRENCY_CODE === 'INR' ? 'en-IN' : 'en-US';
@@ -58,6 +58,6 @@ export const getCurrencySymbol = () => {
     try {
         return FORMATTER.formatToParts(0).find(part => part.type === 'currency').value;
     } catch (e) {
-        return '₹';
+        return '$';
     }
 };
