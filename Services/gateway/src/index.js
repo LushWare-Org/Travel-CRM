@@ -50,6 +50,7 @@ const SERVICES = {
   lead:         process.env.LEAD_SERVICE_URL          || 'http://localhost:3004',
   booking:      process.env.BOOKING_SERVICE_URL       || 'http://localhost:3005',
   billing:      process.env.BILLING_SERVICE_URL       || 'http://localhost:3006',
+  flight:       process.env.FLIGHT_SERVICE_URL        || 'http://localhost:3010',
   career:       process.env.CAREER_SERVICE_URL        || 'http://localhost:3007',
   notification: process.env.NOTIFICATION_SERVICE_URL  || 'http://localhost:3008',
   analytics:    process.env.ANALYTICS_SERVICE_URL     || 'http://localhost:3009',
@@ -189,6 +190,9 @@ app.use(`${V1}/leads`, proxy(SERVICES.lead));
 
 // Bookings → booking-service
 app.use(`${V1}/bookings`, proxy(SERVICES.booking));
+
+// Flights (Travelport) → flight-service
+app.use(`${V1}/flights`, proxy(SERVICES.flight));
 
 // Billing → billing-service
 app.use(`${V1}/billing`,   proxy(SERVICES.billing));

@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import LeadManagement from "./pages/LeadManagement";
 import ItineraryGeneration from "./pages/ItineraryGeneration";
+import FlightSearch from "./pages/FlightSearch";
 import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
 import CareerManagement from "./pages/CareerManagement";
@@ -70,6 +71,7 @@ function AppContent() {
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/leads" element={<LeadManagement />} />
                   <Route path="/itineraries" element={<ItineraryGeneration />} />
+                  <Route path="/flights" element={<FlightSearch />} />
                   <Route path="/billing" element={<BillingInvoicing />} />
                   <Route path="/users" element={<UserManagement />} />
                   <Route path="/career" element={<CareerManagement />} />

@@ -1,0 +1,133 @@
+// =============================================================
+// flight-service — PostgreSQL schema: "crm_flights"
+// Shared DB, isolated namespace.
+//
+// Design decisions:
+//   • Cross-schema refs (createdById, customerId, invoiceId) are
+//     plain UUID strings — no FK across service boundaries.
+//   • searchSnapshot keeps the normalized Travelport offer used at
+//     booking time, for audit/re-pricing/debugging.
+// =============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_flights"]
+}
+
+enum FlightBookingStatus {
+  quoted
+  pending
+  confirmed
+  ticketed
+  cancelled
+  failed
+
+  @@schema("crm_flights")
+}
+
+enum TripType {
+  oneWay
+  roundTrip
+  multiCity
+
+  @@schema("crm_flights")
+}
+
+enum TravelerType {
+  adult
+  child
+  infant
+
+  @@schema("crm_flights")
+}
+
+// ─── FlightBooking ──────────────────────────────────────────────
+
+model FlightBooking {
+  id                  String              @id @default(uuid())
+
+  pnr                 String?             // airline record locator, once confirmed
+  travelportOrderId   String?             // Travelport's order / universal-record id
+
+  // Cross-schema UUID refs
+  createdById         String              // → crm_users.User.id (agent who booked)
+  customerId          String?             // → crm_users.User.id (find-or-create traveler contact)
+  invoiceId           String?             // → crm_billing (future integration, not wired yet)
+
+  tripType            TripType
+  cabinClass          String
+  currency            String
+  baseFare            Float
+  taxes               Float
+  totalAmount         Float
+
+  status              FlightBookingStatus @default(quoted)
+  searchSnapshot       Json               // raw normalized offer, kept for audit/re-pricing
+  ticketingDeadline   DateTime?
+  bookedAt            DateTime?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  notes               String?
+
+  segments            FlightSegment[]
+  travelers           FlightTraveler[]
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([createdById, createdAt])
+  @@index([status])
+  @@schema("crm_flights")
+}
+
+// ─── FlightSegment ──────────────────────────────────────────────
+
+model FlightSegment {
+  id                String        @id @default(uuid())
+  flightBookingId   String
+  flightBooking     FlightBooking @relation(fields: [flightBookingId], references: [id], onDelete: Cascade)
+
+  sequence          Int
+  marketingCarrier  String
+  operatingCarrier  String?
+  flightNumber      String
+  bookingClass      String?
+  origin            String
+  destination       String
+  departureAt       DateTime
+  arrivalAt         DateTime
+  durationMinutes   Int?
+  stops             Int           @default(0)
+
+  @@index([flightBookingId])
+  @@schema("crm_flights")
+}
+
+// ─── FlightTraveler ─────────────────────────────────────────────
+
+model FlightTraveler {
+  id                  String        @id @default(uuid())
+  flightBookingId     String
+  flightBooking       FlightBooking @relation(fields: [flightBookingId], references: [id], onDelete: Cascade)
+
+  type                TravelerType
+  title               String?
+  firstName           String
+  lastName            String
+  dob                 DateTime?
+  gender              String?
+  passportNumber      String?
+  passportExpiry      DateTime?
+  nationality         String?
+  frequentFlyerNumber String?
+
+  @@index([flightBookingId])
+  @@schema("crm_flights")
+}
