@@ -177,15 +177,24 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleAIPackageGenerated = (generatedPackageData) => {
-    setNewFormData({
-      ...createDefaultPackage(),
-      ...generatedPackageData,
-      status: 'draft',
-      price: 0,
-      images: [],
+    // /generate-ai already persists the package + itinerary in one shot, so this must
+    // flow into the edit path (PUT, same id) rather than the new-package create path —
+    // routing it through "New Package" would create a second, itinerary-less duplicate.
+    setPackages((prev) => [generatedPackageData, ...prev]);
+
+    const days = generatedPackageData.days || generatedPackageData.itinerary?.days || [];
+    const formattedImages = (generatedPackageData.images || []).map(img => {
+      if (typeof img === 'object' && img.url) return img;
+      if (typeof img === 'string') {
+        return { url: img, public_id: img.split('/').pop()?.split('.')[0] || 'unknown' };
+      }
+      return img;
     });
+
+    setEditPackageData({ ...generatedPackageData, days: [...days], images: [...formattedImages] });
+    setImages(formattedImages);
     setShowAIPackageDialog(false);
-    setShowNewPackageDialog(true);
+    setShowEditPackageDialog(true);
   };
 
   const handleViewPackage = async (pkg) => {

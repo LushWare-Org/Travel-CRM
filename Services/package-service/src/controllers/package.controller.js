@@ -9,6 +9,31 @@ const packageInclude = {
   itinerary: true,
 };
 
+// Scalar/relation fields the Package model actually accepts on write. The client can
+// still carry legacy fields (e.g. Mongo-era `coverImage`, form-only `createdDate`,
+// a flat `days` array meant for the itinerary) — those are dropped here rather than
+// left to crash prisma.package.create() with "Unknown argument".
+const PACKAGE_WRITABLE_FIELDS = [
+  'name', 'slug', 'description', 'destination', 'duration', 'price', 'maxGroupSize',
+  'difficulty', 'category', 'packageType', 'coverImagePublicId', 'coverImageUrl',
+  'inclusions', 'exclusions', 'highlights', 'terms', 'isActive', 'isFeatured', 'status',
+  'availableFrom', 'availableTo', 'customizedForLeadId', 'originalPackageId',
+  'customizedById', 'customizationNotes',
+];
+
+const sanitizePackageBody = (body) => {
+  const clean = {};
+  for (const field of PACKAGE_WRITABLE_FIELDS) {
+    if (body[field] !== undefined) clean[field] = body[field];
+  }
+  // Legacy embedded shape from the old Mongo model: coverImage: { public_id, url }
+  if (body.coverImage && typeof body.coverImage === 'object') {
+    if (body.coverImage.public_id) clean.coverImagePublicId = body.coverImage.public_id;
+    if (body.coverImage.url) clean.coverImageUrl = body.coverImage.url;
+  }
+  return clean;
+};
+
 const buildPackageWhere = (query) => {
   const { category, destination, minPrice, maxPrice, isActive, status, isFeatured, search } = query;
   const where = {};
@@ -108,7 +133,8 @@ export const getPackagesByCategory = asyncHandler(async (req, res) => {
 });
 
 export const createPackage = asyncHandler(async (req, res) => {
-  const { images = [], ...body } = req.body;
+  const images = req.body.images || [];
+  const body = sanitizePackageBody(req.body);
   if (body.name && !body.slug) {
     body.slug = slugify(body.name, { lower: true, strict: true });
   }
@@ -128,7 +154,8 @@ export const updatePackage = asyncHandler(async (req, res) => {
   const existing = await prisma.package.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Package not found', 404);
 
-  const { images, reviews: _rev, itinerary: _itin, createdBy: _cb, ...body } = req.body;
+  const { images } = req.body;
+  const body = sanitizePackageBody(req.body);
   if (body.name && body.name !== existing.name && !body.slug) {
     body.slug = slugify(body.name, { lower: true, strict: true });
   }

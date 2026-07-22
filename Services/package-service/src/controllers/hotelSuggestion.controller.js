@@ -12,7 +12,7 @@ export const suggestHotels = asyncHandler(async (req, res) => {
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
   const prompt = `Suggest 5 hotels in ${destination} for ${guests || 2} guests${checkIn ? ` from ${checkIn} to ${checkOut}` : ''}${budget ? ` with a budget of ${budget}` : ''}${preferences ? `. Preferences: ${preferences}` : ''}. Return JSON array with: name, rating, priceRange, amenities (array), description, location.`;
 

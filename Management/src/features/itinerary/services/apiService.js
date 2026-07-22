@@ -94,7 +94,7 @@ class ApiService {
         destination,
         packageType,
         category,
-        nights: parseInt(nights, 10),
+        duration: parseInt(nights, 10),
         description,
       }),
     });
