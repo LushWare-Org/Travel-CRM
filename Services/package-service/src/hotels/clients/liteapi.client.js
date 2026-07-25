@@ -16,18 +16,29 @@ export class LiteApiClient {
   /** @param {import('./interface.js').HotelSearchParams} params */
   async searchHotels(params) {
     try {
-      const { data } = await this.#client().post('/hotels/rates', {
-        ...(params.latitude != null && { latitude: params.latitude }),
-        ...(params.longitude != null && { longitude: params.longitude }),
-        ...(params.radius != null && { radius: params.radius }),
-        radiusUnit: params.radiusUnit || 'km',
+      const body = {
         checkin: params.checkin,
         checkout: params.checkout,
         currency: params.currency || 'USD',
         guestNationality: params.guestNationality || 'US',
         occupancies: params.occupancies || [{ adults: 1 }],
         limit: params.limit || 20,
-      });
+        maxRatesPerHotel: 1,
+      };
+
+      // Location: pick one method based on what's provided
+      if (params.city) {
+        body.cityName = params.city;
+        body.countryCode = params.country || 'LK';
+      } else if (params.latitude != null && params.longitude != null) {
+        body.latitude = params.latitude;
+        body.longitude = params.longitude;
+        body.radius = params.radius || 10;
+      } else if (params.iataCode) {
+        body.iataCode = params.iataCode;
+      }
+
+      const { data } = await this.#client().post('/hotels/rates', body);
       return this.#normalizeOffers(data.data || []);
     } catch (err) {
       this.#unwrapError(err, 'Hotel search failed');
@@ -38,7 +49,7 @@ export class LiteApiClient {
   async getHotelDetails(hotelId) {
     if (!hotelId) throw new Error('hotelId is required');
     try {
-      const { data } = await this.#client().get('/data/hotel', { params: { id: hotelId } });
+      const { data } = await this.#client().post('/data/hotel', { id: hotelId });
       return this.#normalizeDetails(data.data);
     } catch (err) {
       this.#unwrapError(err, 'Hotel details lookup failed');
@@ -47,9 +58,12 @@ export class LiteApiClient {
 
   /** @param {import('./interface.js').PrebookParams} params */
   async prebook(params) {
-    if (!params.rateId) throw new Error('rateId is required');
+    if (!params.offerId) throw new Error('offerId is required');
     try {
-      const { data } = await this.#client().post('/rates/prebook', params);
+      const { data } = await this.#client().post('/rates/prebook', {
+        offerId: params.offerId,
+        usePaymentSdk: true,
+      });
       const d = data.data;
       return { prebookId: d.prebookId || d.id, status: d.status || 'valid', expiresAt: d.expiresAt };
     } catch (err) {
@@ -125,24 +139,33 @@ export class LiteApiClient {
 
   #normalizeOffers(offers) {
     if (!Array.isArray(offers)) return [];
-    return offers.map((o) => ({
-      hotelId: o.hotelId || o.id,
-      name: o.name || o.hotel?.name || 'Unknown',
-      address: o.address || o.hotel?.address || null,
-      starRating: o.starRating || o.hotel?.starRating || 3,
-      images: o.images || o.hotel?.images || [],
-      distance: o.distance || null,
-      latitude: o.latitude || o.hotel?.latitude || null,
-      longitude: o.longitude || o.hotel?.longitude || null,
-      cheapestRate: {
-        roomType: o.roomType || o.cheapestRate?.roomType || 'Standard',
-        boardType: o.boardType || o.cheapestRate?.boardType || 'Room Only',
-        currency: o.currency || 'USD',
-        totalAmount: parseFloat(o.totalAmount || o.cheapestRate?.totalAmount || 0),
-        taxes: parseFloat(o.taxes || o.cheapestRate?.taxes || 0),
-        refundable: o.refundable ?? o.cheapestRate?.refundable ?? false,
-      },
-    }));
+    return offers.map((hotel) => {
+      // LiteAPI returns: { hotelId, roomTypes: [{ rates: [{ rateId, retailRate, boardType, cancellationPolicies, ... }] }] }
+      // plus hotel info may be inline or in a separate .hotels[] array
+      const firstRate = hotel.roomTypes?.[0]?.rates?.[0] || {};
+      const retail = firstRate.retailRate || {};
+      const hotelInfo = hotel.hotel || {};
+
+      return {
+        hotelId: hotel.hotelId,
+        name: hotelInfo.name || hotel.name || 'Unknown',
+        address: hotelInfo.address || hotel.address || null,
+        starRating: hotelInfo.starRating || hotel.starRating || 3,
+        images: hotelInfo.photos || hotel.photos || [],
+        distance: hotel.distance || null,
+        latitude: hotelInfo.location?.latitude || hotel.latitude || null,
+        longitude: hotelInfo.location?.longitude || hotel.longitude || null,
+        cheapestRate: {
+          roomType: firstRate.roomTypeId || firstRate.name || 'Standard',
+          boardType: firstRate.boardType || firstRate.boardName || 'Room Only',
+          currency: retail.currency || hotel.currency || 'USD',
+          totalAmount: parseFloat(retail.total || retail.sellingTotal || 0),
+          taxes: parseFloat(retail.taxesAndFees || 0),
+          refundable: !firstRate.cancellationPolicies?.some((p) => p.nonRefundable),
+          offerId: firstRate.rateId || null,
+        },
+      };
+    });
   }
 
   #normalizeDetails(d) {

@@ -84,7 +84,7 @@
 
 /**
  * @typedef {object} PrebookParams
- * @property {string} rateId — rate identifier from search
+ * @property {string} offerId — offer identifier from search
  * @property {Array<{adults: number, children?: number}>} occupancies
  */
 

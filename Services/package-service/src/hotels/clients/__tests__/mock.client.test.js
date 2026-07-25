@@ -43,7 +43,7 @@ describe('MockHotelClient', () => {
 
   describe('prebook', () => {
     it('should return a prebook token', async () => {
-      const r = await client.prebook({ rateId: 'rate-1', occupancies: [{ adults: 1 }] });
+      const r = await client.prebook({ offerId: 'offer-1' });
       expect(r).toHaveProperty('prebookId');
       expect(r).toHaveProperty('status', 'valid');
     });

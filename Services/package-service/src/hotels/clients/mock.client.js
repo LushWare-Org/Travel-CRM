@@ -50,6 +50,7 @@ export class MockHotelClient {
           totalAmount: Math.round(basePrice * factor * 100) / 100,
           taxes: Math.round(basePrice * factor * 0.12 * 100) / 100,
           refundable: i % 3 !== 0,
+          offerId: `MOCK-OFFER-${i + 1}`,
         },
       };
     });
@@ -88,8 +89,8 @@ export class MockHotelClient {
    * @param {import('./interface.js').PrebookParams} params
    * @returns {Promise<import('./interface.js').PrebookResult>}
    */
-  async prebook({ rateId }) {
-    if (!rateId) throw new Error('rateId is required');
+  async prebook({ offerId }) {
+    if (!offerId) throw new Error('offerId is required');
 
     const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
     return {

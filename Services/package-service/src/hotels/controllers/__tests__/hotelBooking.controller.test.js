@@ -61,7 +61,7 @@ describe('getDetails', () => {
 
 describe('prebook', () => {
   it('should return prebook result', async () => {
-    const req = mockReq({ body: { rateId: 'rate-1', occupancies: [{ adults: 1 }] } });
+    const req = mockReq({ body: { offerId: 'offer-1' } });
     const res = mockRes();
     await prebook(req, res, vi.fn());
     expect(res.json.mock.calls[0][0].success).toBe(true);
