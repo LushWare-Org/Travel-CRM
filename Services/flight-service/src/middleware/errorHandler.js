@@ -1,5 +1,7 @@
+import { INTERNAL_SERVER_ERROR } from '../constants/httpStatus.js';
+
 export default (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
+  const statusCode = err.statusCode || INTERNAL_SERVER_ERROR;
   res.status(statusCode).json({
     success: false,
     status: err.status || 'error',

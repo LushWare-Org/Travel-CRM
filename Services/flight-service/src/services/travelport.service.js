@@ -1,5 +1,19 @@
 import axios from 'axios';
 import AppError from '../utils/appError.js';
+import { BAD_REQUEST, BAD_GATEWAY, SERVICE_UNAVAILABLE } from '../constants/httpStatus.js';
+import {
+  SEARCH_REQUIRED_FIELDS,
+  OFFER_ID_REQUIRED,
+  TRAVELERS_REQUIRED,
+  TRAVELPORT_NOT_CONFIGURED,
+  TRAVELPORT_AUTH_FAILED,
+  TRAVELPORT_SEARCH_FAILED,
+  TRAVELPORT_PRICE_FAILED,
+  TRAVELPORT_BOOK_FAILED,
+  TRAVELPORT_ORDER_ID_REQUIRED,
+  TRAVELPORT_ORDER_RETRIEVE_FAILED,
+  TRAVELPORT_CANCEL_FAILED,
+} from '../constants/errorMessages.js';
 
 // ── Mode ─────────────────────────────────────────────────────────────────
 // Sandbox credentials aren't available yet. While TRAVELPORT_MOCK_MODE=true
@@ -25,7 +39,7 @@ async function getAccessToken() {
 
   const { TRAVELPORT_TOKEN_URL, TRAVELPORT_CLIENT_ID, TRAVELPORT_CLIENT_SECRET } = process.env;
   if (!TRAVELPORT_TOKEN_URL || !TRAVELPORT_CLIENT_ID || !TRAVELPORT_CLIENT_SECRET) {
-    throw new AppError('Travelport is not configured (missing TRAVELPORT_TOKEN_URL/CLIENT_ID/CLIENT_SECRET)', 503);
+    throw new AppError(TRAVELPORT_NOT_CONFIGURED, SERVICE_UNAVAILABLE);
   }
 
   try {
@@ -43,8 +57,8 @@ async function getAccessToken() {
     return cachedToken;
   } catch (err) {
     throw new AppError(
-      `Failed to authenticate with Travelport: ${err.response?.data?.error_description || err.message}`,
-      502
+      `${TRAVELPORT_AUTH_FAILED}: ${err.response?.data?.error_description || err.message}`,
+      BAD_GATEWAY
     );
   }
 }
@@ -125,7 +139,7 @@ function buildMockOffer({ origin, destination, departureDate, returnDate, cabinC
 
 export async function searchFlights({ origin, destination, departureDate, returnDate, adults = 1, children = 0, infants = 0, cabinClass, tripType }) {
   if (!origin || !destination || !departureDate) {
-    throw new AppError('origin, destination and departureDate are required', 400);
+    throw new AppError(SEARCH_REQUIRED_FIELDS, BAD_REQUEST);
   }
 
   if (isMockMode()) {
@@ -148,12 +162,12 @@ export async function searchFlights({ origin, destination, departureDate, return
     });
     return data;
   } catch (err) {
-    unwrapTravelportError(err, 'Flight search failed');
+    unwrapTravelportError(err, TRAVELPORT_SEARCH_FAILED);
   }
 }
 
 export async function priceOffer(offerId) {
-  if (!offerId) throw new AppError('offerId is required', 400);
+  if (!offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
 
   if (isMockMode()) {
     return { offerId, revalidated: true, priceChanged: false };
@@ -164,14 +178,14 @@ export async function priceOffer(offerId) {
     const { data } = await client.post('/air/price', { offerId });
     return data;
   } catch (err) {
-    unwrapTravelportError(err, 'Flight pricing failed');
+    unwrapTravelportError(err, TRAVELPORT_PRICE_FAILED);
   }
 }
 
 export async function createOrder({ offerId, travelers, contact }) {
-  if (!offerId) throw new AppError('offerId is required', 400);
+  if (!offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
   if (!Array.isArray(travelers) || travelers.length === 0) {
-    throw new AppError('At least one traveler is required', 400);
+    throw new AppError(TRAVELERS_REQUIRED, BAD_REQUEST);
   }
 
   if (isMockMode()) {
@@ -189,12 +203,12 @@ export async function createOrder({ offerId, travelers, contact }) {
     const { data } = await client.post('/order', { offerId, travelers, contact });
     return data;
   } catch (err) {
-    unwrapTravelportError(err, 'Flight booking failed');
+    unwrapTravelportError(err, TRAVELPORT_BOOK_FAILED);
   }
 }
 
 export async function getOrder(travelportOrderId) {
-  if (!travelportOrderId) throw new AppError('travelportOrderId is required', 400);
+  if (!travelportOrderId) throw new AppError(TRAVELPORT_ORDER_ID_REQUIRED, BAD_REQUEST);
 
   if (isMockMode()) {
     return { travelportOrderId, status: 'confirmed' };
@@ -205,12 +219,12 @@ export async function getOrder(travelportOrderId) {
     const { data } = await client.get(`/order/${travelportOrderId}`);
     return data;
   } catch (err) {
-    unwrapTravelportError(err, 'Failed to retrieve order');
+    unwrapTravelportError(err, TRAVELPORT_ORDER_RETRIEVE_FAILED);
   }
 }
 
 export async function cancelOrder(travelportOrderId) {
-  if (!travelportOrderId) throw new AppError('travelportOrderId is required', 400);
+  if (!travelportOrderId) throw new AppError(TRAVELPORT_ORDER_ID_REQUIRED, BAD_REQUEST);
 
   if (isMockMode()) {
     return { travelportOrderId, status: 'cancelled' };
@@ -221,6 +235,6 @@ export async function cancelOrder(travelportOrderId) {
     const { data } = await client.post(`/order/${travelportOrderId}/cancel`);
     return data;
   } catch (err) {
-    unwrapTravelportError(err, 'Failed to cancel order');
+    unwrapTravelportError(err, TRAVELPORT_CANCEL_FAILED);
   }
 }

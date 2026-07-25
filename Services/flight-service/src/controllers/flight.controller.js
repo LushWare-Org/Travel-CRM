@@ -3,6 +3,17 @@ import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import * as travelport from '../services/travelport.service.js';
+import { SALES_REP, CUSTOMER } from '../constants/roles.js';
+import { CREATED, BAD_REQUEST, NOT_FOUND } from '../constants/httpStatus.js';
+import {
+  SEARCH_REQUIRED_FIELDS,
+  OFFER_ID_REQUIRED,
+  OFFER_REQUIRED,
+  TRAVELERS_REQUIRED,
+  CONTACT_EMAIL_REQUIRED,
+  BOOKING_NOT_FOUND,
+  BOOKING_ALREADY_CANCELLED,
+} from '../constants/errorMessages.js';
 
 // ── cross-schema helpers (mirrors Services/booking-service's pattern) ─────
 
@@ -45,7 +56,7 @@ export const search = asyncHandler(async (req, res) => {
   const { origin, destination, departureDate, returnDate, adults, children, infants, cabinClass, tripType } = req.body || {};
 
   if (!origin || !destination || !departureDate) {
-    throw new AppError('origin, destination and departureDate are required', 400);
+    throw new AppError(SEARCH_REQUIRED_FIELDS, BAD_REQUEST);
   }
 
   const offers = await travelport.searchFlights({
@@ -65,7 +76,7 @@ export const search = asyncHandler(async (req, res) => {
 
 export const price = asyncHandler(async (req, res) => {
   const { offerId } = req.body || {};
-  if (!offerId) throw new AppError('offerId is required', 400);
+  if (!offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
 
   const result = await travelport.priceOffer(offerId);
   res.json({ success: true, data: result });
@@ -74,9 +85,9 @@ export const price = asyncHandler(async (req, res) => {
 export const book = asyncHandler(async (req, res) => {
   const { offer, tripType, travelers, contact } = req.body || {};
 
-  if (!offer?.offerId) throw new AppError('offer is required', 400);
-  if (!Array.isArray(travelers) || travelers.length === 0) throw new AppError('At least one traveler is required', 400);
-  if (!contact?.email) throw new AppError('contact.email is required', 400);
+  if (!offer?.offerId) throw new AppError(OFFER_REQUIRED, BAD_REQUEST);
+  if (!Array.isArray(travelers) || travelers.length === 0) throw new AppError(TRAVELERS_REQUIRED, BAD_REQUEST);
+  if (!contact?.email) throw new AppError(CONTACT_EMAIL_REQUIRED, BAD_REQUEST);
 
   const customer = await findOrCreateCustomer(contact);
 
@@ -135,12 +146,12 @@ export const book = asyncHandler(async (req, res) => {
     include: { segments: true, travelers: true },
   });
 
-  res.status(201).json({ success: true, data: booking });
+  res.status(CREATED).json({ success: true, data: booking });
 });
 
 export const listBookings = asyncHandler(async (req, res) => {
   const { status } = req.query;
-  const isScopedToOwn = req.user.role === 'salesRep' && !req.user.isSuperAdmin;
+  const isScopedToOwn = req.user.role === SALES_REP && !req.user.isSuperAdmin;
 
   const bookings = await prisma.flightBooking.findMany({
     where: {
@@ -156,27 +167,27 @@ export const listBookings = asyncHandler(async (req, res) => {
 
 export const getBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const isScopedToOwn = req.user.role === 'salesRep' && !req.user.isSuperAdmin;
+  const isScopedToOwn = req.user.role === SALES_REP && !req.user.isSuperAdmin;
 
   const booking = await prisma.flightBooking.findFirst({
     where: { id, ...(isScopedToOwn && { createdById: req.user.id }) },
     include: { segments: true, travelers: true },
   });
 
-  if (!booking) throw new AppError('Flight booking not found', 404);
+  if (!booking) throw new AppError(BOOKING_NOT_FOUND, NOT_FOUND);
   res.json({ success: true, data: booking });
 });
 
 export const cancelBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body || {};
-  const isScopedToOwn = req.user.role === 'salesRep' && !req.user.isSuperAdmin;
+  const isScopedToOwn = req.user.role === SALES_REP && !req.user.isSuperAdmin;
 
   const booking = await prisma.flightBooking.findFirst({
     where: { id, ...(isScopedToOwn && { createdById: req.user.id }) },
   });
-  if (!booking) throw new AppError('Flight booking not found', 404);
-  if (booking.status === 'cancelled') throw new AppError('Booking is already cancelled', 400);
+  if (!booking) throw new AppError(BOOKING_NOT_FOUND, NOT_FOUND);
+  if (booking.status === 'cancelled') throw new AppError(BOOKING_ALREADY_CANCELLED, BAD_REQUEST);
 
   if (booking.travelportOrderId) {
     await travelport.cancelOrder(booking.travelportOrderId);
