@@ -1,14 +1,54 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, Component } from "react";
 import {
   Plane, Search, Calendar, X, ChevronRight, ChevronLeft, ChevronDown,
   Loader2, CheckCircle2, Ban, ArrowRightLeft, Luggage, ListChecks,
   Clock, Filter, SlidersHorizontal, Copy, ExternalLink, AlertCircle,
-  ArrowUpDown, Info,
+  ArrowUpDown, Info, AlertTriangle, Users,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { flightAPI } from "../services/flight.service";
 import AirportAutocomplete from "../components/AirportAutocomplete";
 import PassengerSelector from "../components/PassengerSelector";
+
+// ═══════════════════════════════════════════════════════════════════
+//  Error boundary — catches render crashes
+// ═══════════════════════════════════════════════════════════════════
+class FlightErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error("[FlightSearch] Render crash:", error, info);
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-8 max-w-lg mx-auto mt-20">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-red-800 mb-2">Something went wrong</h3>
+            <p className="text-sm text-red-600 mb-4">{this.state.error.message}</p>
+            <pre className="text-xs text-left bg-red-100 rounded-lg p-3 mb-4 max-h-40 overflow-auto whitespace-pre-wrap">
+              {this.state.error.stack?.slice(0, 800)}
+            </pre>
+            <button
+              onClick={() => this.setState({ error: null, info: null })}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  Constants
@@ -376,12 +416,15 @@ export default function FlightSearch() {
   //  Booking flow
   // ══════════════════════════════════════════════════════════════
   const selectOffer = useCallback((offer) => {
+    console.log("[FlightSearch] selectOffer called", { offerId: offer?.offerId, adults: form.adults, children: form.children, infants: form.infants });
     setSelectedOffer(offer);
-    setTravelers([
+    const newTravelers = [
       ...Array.from({ length: form.adults }, () => emptyTraveler("adult")),
       ...Array.from({ length: form.children }, () => emptyTraveler("child")),
       ...Array.from({ length: form.infants }, () => emptyTraveler("infant")),
-    ]);
+    ];
+    console.log("[FlightSearch] travelers created", { count: newTravelers.length, types: newTravelers.map(t => t.type) });
+    setTravelers(newTravelers);
     setStep("travelers");
   }, [form.adults, form.children, form.infants]);
 
@@ -479,6 +522,7 @@ export default function FlightSearch() {
   //  Render
   // ══════════════════════════════════════════════════════════════
   return (
+    <FlightErrorBoundary>
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-6">
@@ -521,6 +565,7 @@ export default function FlightSearch() {
       {activeTab === "search" && (
         <>
           {/* ── Search form ────────────────────────────────── */}
+          {step === "results" && (
           <form onSubmit={handleSearch} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
             {/* Trip type + cabin */}
             <div className="flex flex-wrap items-center gap-4 mb-5">
@@ -640,6 +685,7 @@ export default function FlightSearch() {
               </div>
             </div>
           </form>
+          )}
 
           {/* ══════════════════════════════════════════════════ */}
           {/*  RESULTS                                             */}
@@ -1274,5 +1320,6 @@ export default function FlightSearch() {
         </div>
       )}
     </div>
+    </FlightErrorBoundary>
   );
 }
