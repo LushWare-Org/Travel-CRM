@@ -181,7 +181,8 @@ export class LiteApiClient {
   #unwrapError(err, fallbackMessage) {
     if (err.message?.startsWith('LITEAPI_') || err.message?.includes('required')) throw err;
     const status = err.response?.status || 502;
-    const message = err.response?.data?.message || err.response?.data?.error || err.message || fallbackMessage;
+    const raw = err.response?.data?.message || err.response?.data?.error || err.message || fallbackMessage;
+    const message = typeof raw === 'object' ? JSON.stringify(raw) : raw;
     throw new Error(`LiteAPI error (${status}): ${message}`);
   }
 }
