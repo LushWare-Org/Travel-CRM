@@ -2,8 +2,7 @@ import crypto from 'crypto';
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
-import * as travelport from '../services/travelport.service.js';
-import { SALES_REP, CUSTOMER } from '../constants/roles.js';
+import { SALES_REP } from '../constants/roles.js';
 import { CREATED, BAD_REQUEST, NOT_FOUND } from '../constants/httpStatus.js';
 import {
   SEARCH_REQUIRED_FIELDS,
@@ -59,7 +58,7 @@ export const search = asyncHandler(async (req, res) => {
     throw new AppError(SEARCH_REQUIRED_FIELDS, BAD_REQUEST);
   }
 
-  const offers = await travelport.searchFlights({
+  const offers = await req.flightClient.searchFlights({
     origin: String(origin).toUpperCase(),
     destination: String(destination).toUpperCase(),
     departureDate,
@@ -78,7 +77,7 @@ export const price = asyncHandler(async (req, res) => {
   const { offerId } = req.body || {};
   if (!offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
 
-  const result = await travelport.priceOffer(offerId);
+  const result = await req.flightClient.priceOffer(offerId);
   res.json({ success: true, data: result });
 });
 
@@ -91,7 +90,7 @@ export const book = asyncHandler(async (req, res) => {
 
   const customer = await findOrCreateCustomer(contact);
 
-  const order = await travelport.createOrder({
+  const order = await req.flightClient.createOrder({
     offerId: offer.offerId,
     travelers,
     contact,
@@ -190,7 +189,7 @@ export const cancelBooking = asyncHandler(async (req, res) => {
   if (booking.status === 'cancelled') throw new AppError(BOOKING_ALREADY_CANCELLED, BAD_REQUEST);
 
   if (booking.travelportOrderId) {
-    await travelport.cancelOrder(booking.travelportOrderId);
+    await req.flightClient.cancelOrder(booking.travelportOrderId);
   }
 
   const updated = await prisma.flightBooking.update({

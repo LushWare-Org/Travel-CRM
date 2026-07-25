@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import flightRoutes from './routes/flight.routes.js';
 import { extractUser } from './middleware/auth.js';
+import { injectFlightClient } from './middleware/flightClient.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
@@ -16,6 +17,7 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(cookieParser());
 app.use(extractUser);
+app.use(injectFlightClient);
 
 app.use('/api/v1/flights', flightRoutes);
 

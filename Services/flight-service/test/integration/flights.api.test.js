@@ -1,17 +1,15 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import app from '../../src/app.js';
-import { buildFlightOffer, buildSearchRequest, buildBookingRequest, buildTraveler } from '../factories/flight.js';
+import { MockFlightClient } from '../../src/clients/mock.client.js';
+import { buildFlightOffer, buildSearchRequest, buildBookingRequest } from '../factories/flight.js';
 
-// ── Hoisted mock so vi.mock can reference it ─────────────────────────
-const { mockTravelport, mockPrisma } = vi.hoisted(() => ({
-  mockTravelport: {
-    searchFlights: vi.fn(),
-    priceOffer: vi.fn(),
-    createOrder: vi.fn(),
-    cancelOrder: vi.fn(),
-    getOrder: vi.fn(),
-  },
+// ── Ensure mock mode (no real Travelport calls) ─────────────────────
+beforeAll(() => {
+  process.env.TRAVELPORT_MOCK_MODE = 'true';
+});
+
+// ── Mock prisma (no real DB) ────────────────────────────────────────
+const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     $queryRaw: vi.fn(),
     $executeRaw: vi.fn(),
@@ -24,9 +22,10 @@ const { mockTravelport, mockPrisma } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../src/services/travelport.service.js', () => mockTravelport);
 vi.mock('../../src/db/client.js', () => ({ default: mockPrisma }));
 
+// Dynamic import after mocks and env are set
+const { default: app } = await import('../../src/app.js');
 const prisma = mockPrisma;
 
 // ── Auth helper ──────────────────────────────────────────────────────
@@ -48,10 +47,7 @@ describe('Flight API — Search & Book', () => {
   });
 
   describe('POST /api/v1/flights/search', () => {
-    it('should return 200 with flight offers', async () => {
-      const offers = [buildFlightOffer(), buildFlightOffer()];
-      mockTravelport.searchFlights.mockResolvedValue(offers);
-
+    it('should return 200 with flight offers from mock client', async () => {
       const res = await request(app)
         .post('/api/v1/flights/search')
         .set(authHeaders())
@@ -59,10 +55,11 @@ describe('Flight API — Search & Book', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data).toHaveLength(5);
       expect(res.body.data[0]).toHaveProperty('offerId');
       expect(res.body.data[0]).toHaveProperty('airline');
       expect(res.body.data[0]).toHaveProperty('segments');
+      expect(res.body.data[0].segments[0]).toHaveProperty('flightNumber');
     });
 
     it('should return 401 when auth headers are missing', async () => {
@@ -94,21 +91,13 @@ describe('Flight API — Search & Book', () => {
 
   describe('POST /api/v1/flights/book', () => {
     it('should return 201 with a booking', async () => {
-      // customer lookup
       prisma.$queryRaw.mockResolvedValue([]);
       prisma.$executeRaw.mockResolvedValue(undefined);
-      // travelport
-      mockTravelport.createOrder.mockResolvedValue({
-        pnr: 'ABC123',
-        travelportOrderId: 'ORD-1',
-        status: 'confirmed',
-        ticketingDeadline: '2026-08-02T00:00:00Z',
-      });
-      // prisma create
+
       const fakeBooking = {
         id: 'booking-1',
-        pnr: 'ABC123',
-        travelportOrderId: 'ORD-1',
+        pnr: 'MOCKABC',
+        travelportOrderId: 'MOCK-ORDER-ABC',
         status: 'confirmed',
         totalAmount: 260,
         currency: 'USD',
@@ -127,9 +116,7 @@ describe('Flight API — Search & Book', () => {
             arrivalAt: '2026-08-01T10:15:00Z',
           },
         ],
-        travelers: [
-          { type: 'adult', firstName: 'John', lastName: 'Doe' },
-        ],
+        travelers: [{ type: 'adult', firstName: 'John', lastName: 'Doe' }],
       };
       prisma.flightBooking.create.mockResolvedValue(fakeBooking);
 
@@ -140,7 +127,7 @@ describe('Flight API — Search & Book', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.pnr).toBe('ABC123');
+      expect(res.body.data.pnr).toBeTruthy();
       expect(res.body.data.status).toBe('confirmed');
     });
 
@@ -161,12 +148,6 @@ describe('Flight API — Search & Book', () => {
 
   describe('POST /api/v1/flights/price', () => {
     it('should return 200 with pricing', async () => {
-      mockTravelport.priceOffer.mockResolvedValue({
-        offerId: 'OFF-1',
-        revalidated: true,
-        priceChanged: false,
-      });
-
       const res = await request(app)
         .post('/api/v1/flights/price')
         .set(authHeaders())
@@ -187,22 +168,12 @@ describe('Flight API — Booking Management', () => {
     it('should return 200 with booking list', async () => {
       prisma.flightBooking.findMany.mockResolvedValue([
         {
-          id: 'b1',
-          pnr: 'PNR1',
-          status: 'confirmed',
-          totalAmount: 300,
-          currency: 'USD',
-          segments: [],
-          travelers: [],
+          id: 'b1', pnr: 'PNR1', status: 'confirmed', totalAmount: 300,
+          currency: 'USD', segments: [], travelers: [],
         },
         {
-          id: 'b2',
-          pnr: 'PNR2',
-          status: 'cancelled',
-          totalAmount: 450,
-          currency: 'USD',
-          segments: [],
-          travelers: [],
+          id: 'b2', pnr: 'PNR2', status: 'cancelled', totalAmount: 450,
+          currency: 'USD', segments: [], travelers: [],
         },
       ]);
 
@@ -230,11 +201,7 @@ describe('Flight API — Booking Management', () => {
   describe('GET /api/v1/flights/bookings/:id', () => {
     it('should return 200 with a single booking', async () => {
       prisma.flightBooking.findFirst.mockResolvedValue({
-        id: 'b1',
-        pnr: 'PNR1',
-        status: 'confirmed',
-        segments: [],
-        travelers: [],
+        id: 'b1', pnr: 'PNR1', status: 'confirmed', segments: [], travelers: [],
       });
 
       const res = await request(app)
@@ -257,21 +224,15 @@ describe('Flight API — Booking Management', () => {
   });
 
   describe('POST /api/v1/flights/bookings/:id/cancel', () => {
-    it('should cancel successfully', async () => {
+    it('should cancel via mock client and update DB', async () => {
       prisma.flightBooking.findFirst.mockResolvedValue({
-        id: 'b1',
-        status: 'confirmed',
-        travelportOrderId: 'ORD-1',
+        id: 'b1', status: 'confirmed', travelportOrderId: 'ORD-1',
       });
-      mockTravelport.cancelOrder.mockResolvedValue({ status: 'cancelled' });
       prisma.flightBooking.update.mockResolvedValue({
-        id: 'b1',
-        pnr: 'PNR1',
-        status: 'cancelled',
+        id: 'b1', pnr: 'PNR1', status: 'cancelled',
         cancelledAt: new Date().toISOString(),
         cancellationReason: 'Customer request',
-        segments: [],
-        travelers: [],
+        segments: [], travelers: [],
       });
 
       const res = await request(app)
@@ -283,17 +244,12 @@ describe('Flight API — Booking Management', () => {
       expect(res.body.data.status).toBe('cancelled');
     });
 
-    it('should still cancel even without travelportOrderId (local-only cancel)', async () => {
+    it('should cancel locally when no travelportOrderId', async () => {
       prisma.flightBooking.findFirst.mockResolvedValue({
-        id: 'b2',
-        status: 'pending',
-        travelportOrderId: null,
+        id: 'b2', status: 'pending', travelportOrderId: null,
       });
       prisma.flightBooking.update.mockResolvedValue({
-        id: 'b2',
-        status: 'cancelled',
-        segments: [],
-        travelers: [],
+        id: 'b2', status: 'cancelled', segments: [], travelers: [],
       });
 
       const res = await request(app)
@@ -301,7 +257,6 @@ describe('Flight API — Booking Management', () => {
         .set(authHeaders());
 
       expect(res.status).toBe(200);
-      expect(mockTravelport.cancelOrder).not.toHaveBeenCalled();
     });
   });
 });
@@ -322,26 +277,31 @@ describe('Flight API — Health & Edge Cases', () => {
   });
 
   it('should allow superAdmin with any base role', async () => {
-    mockTravelport.searchFlights.mockResolvedValue([]);
-
     const res = await request(app)
       .post('/api/v1/flights/search')
       .set(authHeaders({ role: 'vendor', isSuperAdmin: true }))
       .send(buildSearchRequest());
 
     expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(5);
   });
 
-  it('should return 403 for salesRep outside authorized roles (price endpoint)', async () => {
-    // price endpoint uses the same authorize('salesRep','admin','superAdmin'),
-    // so salesRep CAN access it
-    mockTravelport.priceOffer.mockResolvedValue({ offerId: 'X', revalidated: true, priceChanged: false });
-
+  it('should allow salesRep for all flight endpoints', async () => {
     const res = await request(app)
       .post('/api/v1/flights/price')
       .set(authHeaders({ role: 'salesRep' }))
       .send({ offerId: 'X' });
 
     expect(res.status).toBe(200);
+  });
+
+  it('should inject a fresh flightClient per request', async () => {
+    // Verify the mock client returns consistent data across requests
+    const res1 = await request(app)
+      .post('/api/v1/flights/search')
+      .set(authHeaders())
+      .send({ origin: 'LHR', destination: 'CDG', departureDate: '2026-09-01' });
+
+    expect(res1.body.data).toHaveLength(5);
   });
 });

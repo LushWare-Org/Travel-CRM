@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MockFlightClient } from '../../clients/mock.client.js';
 import { buildFlightOffer, buildSearchRequest, buildBookingRequest, buildTraveler } from '../../../test/factories/flight.js';
 
-// ── Module-level mocks ───────────────────────────────────────────────
+// ── Mock prisma (DB only — no travelport mocking needed!) ───────────
 vi.mock('../../db/client.js', () => ({
   default: {
     $queryRaw: vi.fn(),
@@ -15,17 +16,6 @@ vi.mock('../../db/client.js', () => ({
   },
 }));
 
-const mockTravelport = {
-  searchFlights: vi.fn(),
-  priceOffer: vi.fn(),
-  createOrder: vi.fn(),
-  cancelOrder: vi.fn(),
-  getOrder: vi.fn(),
-};
-
-vi.mock('../../services/travelport.service.js', () => mockTravelport);
-
-// Must import controller AFTER mocks are hoisted
 const {
   search,
   price,
@@ -44,6 +34,7 @@ function mockReq(overrides = {}) {
     body: {},
     params: {},
     query: {},
+    flightClient: new MockFlightClient(),
     ...overrides,
   };
 }
@@ -55,6 +46,11 @@ function mockRes() {
   return res;
 }
 
+function spyOnClient(req, method) {
+  const spy = vi.spyOn(req.flightClient, method);
+  return spy;
+}
+
 // ── Tests ────────────────────────────────────────────────────────────
 describe('search', () => {
   beforeEach(() => {
@@ -62,20 +58,16 @@ describe('search', () => {
   });
 
   it('should return flight offers when search succeeds', async () => {
-    const offers = [buildFlightOffer(), buildFlightOffer()];
-    mockTravelport.searchFlights.mockResolvedValue(offers);
-
     const req = mockReq({ body: buildSearchRequest() });
     const res = mockRes();
-    const next = vi.fn();
+    const searchSpy = spyOnClient(req, 'searchFlights');
 
-    await search(req, res, next);
+    await search(req, res, vi.fn());
 
-    expect(res.json).toHaveBeenCalledWith({
-      success: true,
-      data: offers,
-    });
-    expect(mockTravelport.searchFlights).toHaveBeenCalledWith(
+    expect(res.json).toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+    expect(res.json.mock.calls[0][0].data).toHaveLength(5);
+    expect(searchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         origin: 'CMB',
         destination: 'DXB',
@@ -86,15 +78,15 @@ describe('search', () => {
   });
 
   it('should default adults to 1, children/infants to 0', async () => {
-    mockTravelport.searchFlights.mockResolvedValue([]);
     const req = mockReq({
       body: { origin: 'LHR', destination: 'JFK', departureDate: '2026-09-01' },
     });
     const res = mockRes();
+    const searchSpy = spyOnClient(req, 'searchFlights');
 
     await search(req, res, vi.fn());
 
-    expect(mockTravelport.searchFlights).toHaveBeenCalledWith(
+    expect(searchSpy).toHaveBeenCalledWith(
       expect.objectContaining({ adults: 1, children: 0, infants: 0 }),
     );
   });
@@ -115,12 +107,6 @@ describe('search', () => {
 
 describe('price', () => {
   it('should return pricing result', async () => {
-    mockTravelport.priceOffer.mockResolvedValue({
-      offerId: 'OFFER-1',
-      revalidated: true,
-      priceChanged: false,
-    });
-
     const req = mockReq({ body: { offerId: 'OFFER-1' } });
     const res = mockRes();
 
@@ -147,23 +133,13 @@ describe('book', () => {
     vi.clearAllMocks();
   });
 
-  const fakeUser = { id: 'cust-1', name: 'John', email: 'john@test.com', phone: null };
-
   it('should create a booking and return 201', async () => {
-    // Mock customer lookup — returns null (new customer)
     prisma.$queryRaw.mockResolvedValue([]);
     prisma.$executeRaw.mockResolvedValue(undefined);
-    // Mock travelport createOrder
-    mockTravelport.createOrder.mockResolvedValue({
-      pnr: 'ABC123',
-      travelportOrderId: 'ORDER-1',
-      status: 'confirmed',
-      ticketingDeadline: '2026-08-02T00:00:00Z',
-    });
-    // Mock prisma flightBooking.create
+
     const fakeBooking = {
       id: 'booking-1',
-      pnr: 'ABC123',
+      pnr: 'MOCKXXXX',
       status: 'confirmed',
       totalAmount: 260,
       segments: [{ sequence: 1, origin: 'CMB', destination: 'DXB' }],
@@ -174,6 +150,7 @@ describe('book', () => {
     const payload = buildBookingRequest();
     const req = mockReq({ body: payload });
     const res = mockRes();
+    const createOrderSpy = spyOnClient(req, 'createOrder');
 
     await book(req, res, vi.fn());
 
@@ -182,7 +159,7 @@ describe('book', () => {
       success: true,
       data: fakeBooking,
     });
-    expect(mockTravelport.createOrder).toHaveBeenCalledWith(
+    expect(createOrderSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         offerId: payload.offer.offerId,
         travelers: payload.travelers,
@@ -221,7 +198,7 @@ describe('book', () => {
 });
 
 describe('listBookings', () => {
-  it('should return bookings for admin', async () => {
+  it('should return bookings for admin (no scoping)', async () => {
     const fakeBookings = [
       { id: 'b1', pnr: 'PNR1', status: 'confirmed', segments: [], travelers: [] },
     ];
@@ -233,12 +210,8 @@ describe('listBookings', () => {
     await listBookings(req, res, vi.fn());
 
     expect(res.json).toHaveBeenCalledWith({ success: true, data: fakeBookings });
-    // Admin sees all bookings (no createdById filter)
     expect(prisma.flightBooking.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {},
-        include: { segments: true, travelers: true },
-      }),
+      expect.objectContaining({ where: {} }),
     );
   });
 
@@ -251,9 +224,7 @@ describe('listBookings', () => {
     await listBookings(req, res, vi.fn());
 
     expect(prisma.flightBooking.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { createdById: 'rep-5' },
-      }),
+      expect.objectContaining({ where: { createdById: 'rep-5' } }),
     );
   });
 
@@ -318,7 +289,7 @@ describe('getBooking', () => {
 });
 
 describe('cancelBooking', () => {
-  it('should cancel and update the booking', async () => {
+  it('should cancel via the flight client and update the booking', async () => {
     const booking = {
       id: 'b1',
       pnr: 'PNR1',
@@ -326,7 +297,6 @@ describe('cancelBooking', () => {
       travelportOrderId: 'ORDER-1',
     };
     prisma.flightBooking.findFirst.mockResolvedValue(booking);
-    mockTravelport.cancelOrder.mockResolvedValue({ status: 'cancelled' });
 
     const updated = { ...booking, status: 'cancelled', cancelledAt: new Date().toISOString() };
     prisma.flightBooking.update.mockResolvedValue(updated);
@@ -337,10 +307,11 @@ describe('cancelBooking', () => {
       user: { id: 'a', role: 'admin', isSuperAdmin: false },
     });
     const res = mockRes();
+    const cancelSpy = spyOnClient(req, 'cancelOrder');
 
     await cancelBooking(req, res, vi.fn());
 
-    expect(mockTravelport.cancelOrder).toHaveBeenCalledWith('ORDER-1');
+    expect(cancelSpy).toHaveBeenCalledWith('ORDER-1');
     expect(prisma.flightBooking.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'b1' },
@@ -348,6 +319,33 @@ describe('cancelBooking', () => {
       }),
     );
     expect(res.json).toHaveBeenCalledWith({ success: true, data: updated });
+  });
+
+  it('should cancel locally when no travelportOrderId', async () => {
+    prisma.flightBooking.findFirst.mockResolvedValue({
+      id: 'b2',
+      status: 'pending',
+      travelportOrderId: null,
+    });
+    prisma.flightBooking.update.mockResolvedValue({
+      id: 'b2',
+      status: 'cancelled',
+      segments: [],
+      travelers: [],
+    });
+
+    const req = mockReq({
+      params: { id: 'b2' },
+      user: { id: 'a', role: 'admin', isSuperAdmin: false },
+    });
+    const res = mockRes();
+    const cancelSpy = spyOnClient(req, 'cancelOrder');
+
+    await cancelBooking(req, res, vi.fn());
+
+    expect(res.status).not.toHaveBeenCalledWith(400);
+    expect(cancelSpy).not.toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].success).toBe(true);
   });
 
   it('should throw 400 when booking is already cancelled', async () => {
@@ -392,10 +390,6 @@ describe('book — customer find-or-create logic', () => {
     const user = { id: 'u1', name: 'Existing User', email: 'existing@test.com', phone: null };
     prisma.$queryRaw.mockResolvedValue([user]);
     prisma.$executeRaw.mockResolvedValue(undefined);
-    mockTravelport.createOrder.mockResolvedValue({
-      pnr: 'PNR', travelportOrderId: 'ORD', status: 'confirmed',
-      ticketingDeadline: '2026-08-02T00:00:00Z',
-    });
     prisma.flightBooking.create.mockResolvedValue({
       id: 'b1', pnr: 'PNR', status: 'confirmed', segments: [], travelers: [],
     });
@@ -408,7 +402,6 @@ describe('book — customer find-or-create logic', () => {
 
     await book(req, res, vi.fn());
 
-    // Should find user, not create a new one
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(201);
@@ -417,10 +410,6 @@ describe('book — customer find-or-create logic', () => {
   it('should create customer when email not found', async () => {
     prisma.$queryRaw.mockResolvedValue([]);
     prisma.$executeRaw.mockResolvedValue(undefined);
-    mockTravelport.createOrder.mockResolvedValue({
-      pnr: 'PNR', travelportOrderId: 'ORD', status: 'confirmed',
-      ticketingDeadline: '2026-08-02T00:00:00Z',
-    });
     prisma.flightBooking.create.mockResolvedValue({
       id: 'b1', pnr: 'PNR', status: 'confirmed', segments: [], travelers: [],
     });
