@@ -4,15 +4,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { SALES_REP } from '../constants/roles.js';
 import { CREATED, BAD_REQUEST, NOT_FOUND } from '../constants/httpStatus.js';
-import {
-  SEARCH_REQUIRED_FIELDS,
-  OFFER_ID_REQUIRED,
-  OFFER_REQUIRED,
-  TRAVELERS_REQUIRED,
-  CONTACT_EMAIL_REQUIRED,
-  BOOKING_NOT_FOUND,
-  BOOKING_ALREADY_CANCELLED,
-} from '../constants/errorMessages.js';
+import { BOOKING_NOT_FOUND, BOOKING_ALREADY_CANCELLED } from '../constants/errorMessages.js';
 
 // ── cross-schema helpers (mirrors Services/booking-service's pattern) ─────
 
@@ -52,20 +44,16 @@ async function findOrCreateCustomer({ name, email, phone }) {
 // ── controllers ────────────────────────────────────────────────────────
 
 export const search = asyncHandler(async (req, res) => {
-  const { origin, destination, departureDate, returnDate, adults, children, infants, cabinClass, tripType } = req.body || {};
-
-  if (!origin || !destination || !departureDate) {
-    throw new AppError(SEARCH_REQUIRED_FIELDS, BAD_REQUEST);
-  }
+  const { origin, destination, departureDate, returnDate, adults, children, infants, cabinClass, tripType } = req.body;
 
   const offers = await req.flightClient.searchFlights({
-    origin: String(origin).toUpperCase(),
-    destination: String(destination).toUpperCase(),
+    origin,
+    destination,
     departureDate,
     returnDate: returnDate || undefined,
-    adults: Number(adults) || 1,
-    children: Number(children) || 0,
-    infants: Number(infants) || 0,
+    adults: adults ?? 1,
+    children: children ?? 0,
+    infants: infants ?? 0,
     cabinClass: cabinClass || 'Economy',
     tripType: tripType || (returnDate ? 'roundTrip' : 'oneWay'),
   });
@@ -75,19 +63,12 @@ export const search = asyncHandler(async (req, res) => {
 });
 
 export const price = asyncHandler(async (req, res) => {
-  const { offerId } = req.body || {};
-  if (!offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
-
-  const result = await req.flightClient.priceOffer(offerId);
+  const result = await req.flightClient.priceOffer(req.body.offerId);
   res.json({ success: true, data: result });
 });
 
 export const book = asyncHandler(async (req, res) => {
-  const { offer, tripType, travelers, contact } = req.body || {};
-
-  if (!offer?.offerId) throw new AppError(OFFER_REQUIRED, BAD_REQUEST);
-  if (!Array.isArray(travelers) || travelers.length === 0) throw new AppError(TRAVELERS_REQUIRED, BAD_REQUEST);
-  if (!contact?.email) throw new AppError(CONTACT_EMAIL_REQUIRED, BAD_REQUEST);
+  const { offer, tripType, travelers, contact } = req.body;
 
   const customer = await findOrCreateCustomer(contact);
 
@@ -95,6 +76,8 @@ export const book = asyncHandler(async (req, res) => {
     offerId: offer.offerId,
     travelers,
     contact,
+    totalAmount: offer.fareTotal,
+    currency: offer.currency,
   });
 
   const booking = await prisma.flightBooking.create({

@@ -168,11 +168,11 @@ describe('Flight API — Booking Management', () => {
     it('should return 200 with booking list', async () => {
       prisma.flightBooking.findMany.mockResolvedValue([
         {
-          id: 'b1', pnr: 'PNR1', status: 'confirmed', totalAmount: 300,
+          id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', pnr: 'PNR1', status: 'confirmed', totalAmount: 300,
           currency: 'USD', segments: [], travelers: [],
         },
         {
-          id: 'b2', pnr: 'PNR2', status: 'cancelled', totalAmount: 450,
+          id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901', pnr: 'PNR2', status: 'cancelled', totalAmount: 450,
           currency: 'USD', segments: [], travelers: [],
         },
       ]);
@@ -201,22 +201,22 @@ describe('Flight API — Booking Management', () => {
   describe('GET /api/v1/flights/bookings/:id', () => {
     it('should return 200 with a single booking', async () => {
       prisma.flightBooking.findFirst.mockResolvedValue({
-        id: 'b1', pnr: 'PNR1', status: 'confirmed', segments: [], travelers: [],
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', pnr: 'PNR1', status: 'confirmed', segments: [], travelers: [],
       });
 
       const res = await request(app)
-        .get('/api/v1/flights/bookings/b1')
+        .get('/api/v1/flights/bookings/a1b2c3d4-e5f6-7890-abcd-ef1234567890')
         .set(authHeaders());
 
       expect(res.status).toBe(200);
-      expect(res.body.data.id).toBe('b1');
+      expect(res.body.data.id).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
     });
 
     it('should return 404 when not found', async () => {
       prisma.flightBooking.findFirst.mockResolvedValue(null);
 
       const res = await request(app)
-        .get('/api/v1/flights/bookings/ghost')
+        .get('/api/v1/flights/bookings/00000000-0000-0000-0000-000000000000')
         .set(authHeaders());
 
       expect(res.status).toBe(404);
@@ -226,17 +226,17 @@ describe('Flight API — Booking Management', () => {
   describe('POST /api/v1/flights/bookings/:id/cancel', () => {
     it('should cancel via mock client and update DB', async () => {
       prisma.flightBooking.findFirst.mockResolvedValue({
-        id: 'b1', status: 'confirmed', travelportOrderId: 'ORD-1',
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', status: 'confirmed', travelportOrderId: 'ORD-1',
       });
       prisma.flightBooking.update.mockResolvedValue({
-        id: 'b1', pnr: 'PNR1', status: 'cancelled',
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', pnr: 'PNR1', status: 'cancelled',
         cancelledAt: new Date().toISOString(),
         cancellationReason: 'Customer request',
         segments: [], travelers: [],
       });
 
       const res = await request(app)
-        .post('/api/v1/flights/bookings/b1/cancel')
+        .post('/api/v1/flights/bookings/a1b2c3d4-e5f6-7890-abcd-ef1234567890/cancel')
         .set(authHeaders())
         .send({ reason: 'Customer request' });
 
@@ -246,14 +246,14 @@ describe('Flight API — Booking Management', () => {
 
     it('should cancel locally when no travelportOrderId', async () => {
       prisma.flightBooking.findFirst.mockResolvedValue({
-        id: 'b2', status: 'pending', travelportOrderId: null,
+        id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901', status: 'pending', travelportOrderId: null,
       });
       prisma.flightBooking.update.mockResolvedValue({
-        id: 'b2', status: 'cancelled', segments: [], travelers: [],
+        id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901', status: 'cancelled', segments: [], travelers: [],
       });
 
       const res = await request(app)
-        .post('/api/v1/flights/bookings/b2/cancel')
+        .post('/api/v1/flights/bookings/b2c3d4e5-f6a7-8901-bcde-f12345678901/cancel')
         .set(authHeaders());
 
       expect(res.status).toBe(200);

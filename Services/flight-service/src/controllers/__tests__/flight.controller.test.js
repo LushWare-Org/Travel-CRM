@@ -181,21 +181,7 @@ describe('book', () => {
     expect(next.mock.calls[0][0].message).toContain('traveler');
   });
 
-  it('should throw when contact email is missing', async () => {
-    const req = mockReq({
-      body: {
-        offer: { offerId: 'X' },
-        travelers: [buildTraveler()],
-        contact: { name: 'John' },
-      },
-    });
-    const next = vi.fn();
-
-    await book(req, mockRes(), next);
-
-    expect(next.mock.calls[0][0].statusCode).toBe(400);
-    expect(next.mock.calls[0][0].message).toContain('email');
-  });
+  // Contact email validation is handled by Zod middleware (tested via integration tests)
 });
 
 describe('listBookings', () => {
