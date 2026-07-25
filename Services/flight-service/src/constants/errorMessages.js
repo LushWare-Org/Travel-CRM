@@ -27,6 +27,14 @@ export const TRAVELPORT_ORDER_ID_REQUIRED = 'travelportOrderId is required';
 export const TRAVELPORT_ORDER_RETRIEVE_FAILED = 'Failed to retrieve order';
 export const TRAVELPORT_CANCEL_FAILED = 'Failed to cancel order';
 
+// ── Duffel ───────────────────────────────────────────────────────────
+export const DUFFEL_NOT_CONFIGURED =
+  'Duffel is not configured (missing DUFFEL_ACCESS_TOKEN)';
+export const DUFFEL_SEARCH_FAILED = 'Duffel flight search failed';
+export const DUFFEL_BOOK_FAILED = 'Duffel flight booking failed';
+export const DUFFEL_ORDER_RETRIEVE_FAILED = 'Duffel order retrieval failed';
+export const DUFFEL_CANCEL_FAILED = 'Duffel order cancellation failed';
+
 // ── Auth ─────────────────────────────────────────────────────────────
 export const NOT_AUTHORIZED = 'Not authorized to access this route';
 export const ROLE_NOT_AUTHORIZED = (role) => `Role '${role}' is not authorized to access this route`;
