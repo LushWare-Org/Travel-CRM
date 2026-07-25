@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Menu, X, Home, Users, MapPin, DollarSign, User, LogOut,
-  BarChart3, Briefcase, ChevronRight, Sparkles, Plane
+  BarChart3, Briefcase, ChevronRight, Sparkles, Plane, Hotel
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
@@ -61,6 +61,7 @@ const Sidebar = () => {
       }
     },
     { icon: Plane, label: "Flights", path: "/flights", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
+    { icon: Hotel, label: "Hotels", path: "/hotels", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
     { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
     { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] },
     {
