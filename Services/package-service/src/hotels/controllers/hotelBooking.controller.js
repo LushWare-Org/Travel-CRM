@@ -16,6 +16,29 @@ function getClient(req) {
 
 export const search = asyncHandler(async (req, res) => {
   const offers = await getClient(req).searchHotels(req.body);
+
+  // Enrich with hotel names + images via batch lookup — search response only has hotelId + rates
+  if (offers.length > 0) {
+    const hotelIds = [...new Set(offers.map((o) => o.hotelId))];
+    try {
+      const details = await getClient(req).getHotelsByIds(hotelIds);
+      const detailMap = new Map(details.filter(Boolean).map((d) => [d.hotelId, d]));
+      for (const offer of offers) {
+        const d = detailMap.get(offer.hotelId);
+        if (d) {
+          offer.name = d.name || offer.name;
+          offer.starRating = d.starRating || offer.starRating;
+          offer.images = d.images?.length ? d.images : offer.images;
+          offer.address = d.address || offer.address;
+          offer.latitude = d.latitude || offer.latitude;
+          offer.longitude = d.longitude || offer.longitude;
+        }
+      }
+    } catch (err) {
+      req.log.warn({ err: err.message }, 'Batch hotel details fetch failed, using search data only');
+    }
+  }
+
   req.log.info({ count: offers.length }, 'Hotel search completed');
   res.json({ success: true, data: offers });
 });

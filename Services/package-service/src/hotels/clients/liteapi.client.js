@@ -34,6 +34,7 @@ export class LiteApiClient {
         occupancies,
         limit: params.limit || 20,
         maxRatesPerHotel: 1,
+        includeHotelData: true,
       };
 
       // Location: pick one method based on what's provided
@@ -59,10 +60,22 @@ export class LiteApiClient {
   async getHotelDetails(hotelId) {
     if (!hotelId) throw new Error('hotelId is required');
     try {
-      const { data } = await this.#client().post('/data/hotel', { id: hotelId });
+      const { data } = await this.#client().get('/data/hotel', { params: { id: hotelId } });
       return this.#normalizeDetails(data.data);
     } catch (err) {
       this.#unwrapError(err, 'Hotel details lookup failed');
+    }
+  }
+
+  /** @param {string[]} hotelIds */
+  async getHotelsByIds(hotelIds) {
+    if (!hotelIds?.length) return [];
+    try {
+      const { data } = await this.#client().get('/data/hotels', { params: { hotelIds: hotelIds.join(',') } });
+      const list = Array.isArray(data.data) ? data.data : [];
+      return list.map((h) => this.#normalizeDetails(h));
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel batch details failed');
     }
   }
 
@@ -187,19 +200,21 @@ export class LiteApiClient {
 
   #normalizeDetails(d) {
     if (!d) return null;
+    const images = d.hotelImages?.map((img) => img.url || img.urlHd).filter(Boolean) || [];
+    if (d.main_photo) images.unshift(d.main_photo);
     return {
       hotelId: d.hotelId || d.id,
       name: d.name || 'Unknown',
       address: d.address || null,
-      starRating: d.starRating || 3,
-      images: d.images || [],
-      amenities: d.amenities || d.facilities || [],
-      checkinTime: d.checkinTime || d.checkInTime || null,
-      checkoutTime: d.checkoutTime || d.checkOutTime || null,
-      description: d.description || null,
+      starRating: d.starRating || 0,
+      images: [...new Set(images)],
+      amenities: d.hotelFacilities || d.facilities || [],
+      checkinTime: d.checkinCheckoutTimes?.checkIn || d.checkInTime || null,
+      checkoutTime: d.checkinCheckoutTimes?.checkOut || d.checkOutTime || null,
+      description: d.hotelDescription || d.description || null,
       policies: d.policies || [],
-      latitude: d.latitude || null,
-      longitude: d.longitude || null,
+      latitude: d.location?.latitude || d.latitude || null,
+      longitude: d.location?.longitude || d.longitude || null,
     };
   }
 
