@@ -4,7 +4,11 @@ import AIRPORTS from "../data/airports";
 
 /**
  * Airport autocomplete — search by city name, airport name, or IATA code.
- * Keyboard navigable, click-outside-to-close, debounced filtering.
+ * Keyboard navigable, click-outside-to-close.
+ *
+ * @param {"popular"|"all"} listMode - default list shown on focus before typing.
+ *   "popular" (default) — curated shortlist of major hubs
+ *   "all" — every airport in alphabetical order
  */
 export default function AirportAutocomplete({
   value = "",
@@ -12,7 +16,8 @@ export default function AirportAutocomplete({
   placeholder = "City or airport",
   label,
   id,
-  excludeCode,  // prevent selecting the same airport for dest when already chosen as origin
+  excludeCode,
+  listMode = "popular",
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -28,7 +33,18 @@ export default function AirportAutocomplete({
     }
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter airports based on input
+  // ── Default list (shown on focus before typing) ──────────────────
+  const popularCodes = ["DXB", "LHR", "JFK", "SIN", "CMB", "MLE", "BKK", "CDG", "IST", "DEL", "KUL", "AUH"];
+
+  /** Airports shown on focus when input is empty */
+  const defaultList = useMemo(() => {
+    if (listMode === "all") return [...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city));
+    return popularCodes.map((c) => AIRPORTS.find((a) => a.code === c)).filter(Boolean);
+  }, [listMode]);
+
+  const defaultLabel = listMode === "all" ? "All airports" : "Popular airports";
+
+  // Filter airports based on typed input
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || query === value) return [];
@@ -43,6 +59,12 @@ export default function AirportAutocomplete({
     });
     return filtered.slice(0, 15);
   }, [query, value, excludeCode]);
+
+  const showDefault = !query && open;
+  const showResults = open && results.length > 0;
+
+  /** Combined list for keyboard navigation */
+  const navList = showDefault ? defaultList : results;
 
   // Click outside → close
   useEffect(() => {
@@ -74,13 +96,13 @@ export default function AirportAutocomplete({
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightIdx((prev) => (prev < results.length - 1 ? prev + 1 : 0));
+      setHighlightIdx((prev) => (prev < navList.length - 1 ? prev + 1 : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightIdx((prev) => (prev > 0 ? prev - 1 : results.length - 1));
+      setHighlightIdx((prev) => (prev > 0 ? prev - 1 : navList.length - 1));
     } else if (e.key === "Enter" && highlightIdx >= 0) {
       e.preventDefault();
-      handleSelect(results[highlightIdx]);
+      handleSelect(navList[highlightIdx]);
     } else if (e.key === "Escape") {
       setOpen(false);
       setHighlightIdx(-1);
@@ -121,7 +143,7 @@ export default function AirportAutocomplete({
           type="text"
           value={query}
           onChange={handleInputChange}
-          onFocus={() => query && setOpen(true)}
+          onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoComplete="off"
@@ -138,7 +160,36 @@ export default function AirportAutocomplete({
         )}
       </div>
 
-      {open && results.length > 0 && (
+      {/* Default list — shown on focus before typing */}
+      {showDefault && (
+        <div className="absolute z-50 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-72 overflow-y-auto">
+          <div className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+            {defaultLabel}
+          </div>
+          {defaultList.map((ap, idx) => (
+            <button
+              key={ap.code}
+              type="button"
+              onClick={() => handleSelect(ap)}
+              className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${
+                idx === highlightIdx ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <span className="shrink-0 w-10 h-7 flex items-center justify-center rounded bg-blue-50 text-blue-700 font-bold text-xs">
+                {ap.code}
+              </span>
+              <div className="min-w-0">
+                <div className="font-medium truncate">{ap.city}</div>
+                <div className="text-xs text-gray-400 truncate">{ap.name}</div>
+              </div>
+              <span className="ml-auto text-xs text-gray-400 shrink-0">{ap.country}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Search results */}
+      {showResults && (
         <div className="absolute z-50 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-60 overflow-y-auto">
           {results.map((ap, idx) => (
             <button
@@ -162,7 +213,7 @@ export default function AirportAutocomplete({
         </div>
       )}
 
-      {open && query && results.length === 0 && (
+      {open && query && !showDefault && results.length === 0 && (
         <div className="absolute z-50 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg p-4 text-center">
           <Search className="w-5 h-5 text-gray-300 mx-auto mb-1" />
           <p className="text-sm text-gray-500">No airports found</p>
