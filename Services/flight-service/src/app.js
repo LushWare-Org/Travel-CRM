@@ -2,20 +2,25 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import flightRoutes from './routes/flight.routes.js';
 import { extractUser } from './middleware/auth.js';
 import { injectFlightClient } from './middleware/flightClient.js';
+import { correlationId, requestLogger } from './middleware/requestLogger.js';
 import errorHandler from './middleware/errorHandler.js';
+import logger from './config/logger.js';
 
 const app = express();
 
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
-app.use(morgan('dev'));
 app.use(express.json());
 app.use(cookieParser());
+
+// Request ID + structured logging (replaces morgan)
+app.use(correlationId);
+app.use(requestLogger);
+
 app.use(extractUser);
 app.use(injectFlightClient);
 

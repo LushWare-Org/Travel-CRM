@@ -1,6 +1,7 @@
 import { MockFlightClient } from './mock.client.js';
 import { TravelportClient } from './travelport.client.js';
 import { DuffelClient } from './duffel.client.js';
+import logger from '../config/logger.js';
 
 /**
  * Create the configured flight API client.

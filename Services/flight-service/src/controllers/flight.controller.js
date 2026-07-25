@@ -70,6 +70,7 @@ export const search = asyncHandler(async (req, res) => {
     tripType: tripType || (returnDate ? 'roundTrip' : 'oneWay'),
   });
 
+  req.log.info({ origin, destination, departureDate, count: offers.length }, 'Flight search completed');
   res.json({ success: true, data: offers });
 });
 
@@ -145,6 +146,7 @@ export const book = asyncHandler(async (req, res) => {
     include: { segments: true, travelers: true },
   });
 
+  req.log.info({ bookingId: booking.id, pnr: booking.pnr }, 'Flight booked');
   res.status(CREATED).json({ success: true, data: booking });
 });
 

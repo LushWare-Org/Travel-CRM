@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AppError from '../utils/appError.js';
+import logger from '../config/logger.js';
 import { BAD_REQUEST, BAD_GATEWAY, SERVICE_UNAVAILABLE } from '../constants/httpStatus.js';
 import {
   SEARCH_REQUIRED_FIELDS,
@@ -26,6 +27,7 @@ export class TravelportClient {
     this._cachedToken = null;
     /** @type {number} */
     this._cachedTokenExpiresAt = 0;
+    logger.info('Using TravelportClient — real GDS integration');
   }
 
   // ── Public API (implements FlightApiClient) ──────────────────────

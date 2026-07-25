@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AppError from '../utils/appError.js';
+import logger from '../config/logger.js';
 import { BAD_REQUEST, BAD_GATEWAY, SERVICE_UNAVAILABLE, NOT_FOUND } from '../constants/httpStatus.js';
 import {
   SEARCH_REQUIRED_FIELDS,
@@ -36,6 +37,7 @@ const DUFFEL_BASE_URL = 'https://api.duffel.com';
 export class DuffelClient {
   constructor() {
     this.#ensureConfig();
+    logger.info('Using DuffelClient — live Duffel API integration');
   }
 
   // ── Public API (implements FlightApiClient) ──────────────────────

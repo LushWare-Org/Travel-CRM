@@ -1,6 +1,7 @@
 import AppError from '../utils/appError.js';
 import { BAD_REQUEST } from '../constants/httpStatus.js';
 import { SEARCH_REQUIRED_FIELDS, OFFER_ID_REQUIRED, TRAVELERS_REQUIRED, TRAVELPORT_ORDER_ID_REQUIRED } from '../constants/errorMessages.js';
+import logger from '../config/logger.js';
 
 /**
  * @implements {import('./interface.js').FlightApiClient}
@@ -16,7 +17,7 @@ export class MockFlightClient {
       { code: 'QR', name: 'Qatar Airways' },
       { code: 'SQ', name: 'Singapore Airlines' },
     ]);
-    console.info('[flight-service] Using MockFlightClient — no external API calls.');
+    logger.info('Using MockFlightClient — no external API calls');
   }
 
   // ── Public API (implements FlightApiClient) ──────────────────────
