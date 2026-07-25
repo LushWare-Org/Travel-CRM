@@ -12,6 +12,7 @@ import itineraryRoutes from './routes/itinerary.routes.js';
 import manualItineraryRoutes from './routes/manualItinerary.routes.js';
 import customizedPackageRoutes from './routes/customizedPackage.routes.js';
 import hotelSuggestionRoutes from './routes/hotelSuggestion.routes.js';
+import hotelBookingRoutes from './hotels/routes/hotelBooking.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 
 const app = express();
@@ -31,6 +32,7 @@ app.use(`${V1}/itineraries`, itineraryRoutes);
 app.use(`${V1}/manual-itineraries`, manualItineraryRoutes);
 app.use(`${V1}/customized-packages`, customizedPackageRoutes);
 app.use(`${V1}/hotels`, hotelSuggestionRoutes);
+app.use(`${V1}/hotels`, hotelBookingRoutes);
 app.use(`${V1}/upload`, uploadRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'package-service' }));

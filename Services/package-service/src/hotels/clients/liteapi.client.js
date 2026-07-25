@@ -1,0 +1,187 @@
+import axios from 'axios';
+
+/**
+ * @implements {import('./interface.js').HotelApiClient}
+ *
+ * LiteAPI hotel booking integration.
+ * Auth: x-api-key header (API key)
+ * Base URL: https://api.liteapi.travel/v3.0
+ */
+export class LiteApiClient {
+  constructor() {
+    this.#ensureConfig();
+    console.info('[package-service] Using LiteApiClient — real hotel API integration.');
+  }
+
+  /** @param {import('./interface.js').HotelSearchParams} params */
+  async searchHotels(params) {
+    try {
+      const { data } = await this.#client().post('/hotels/rates', {
+        ...(params.latitude != null && { latitude: params.latitude }),
+        ...(params.longitude != null && { longitude: params.longitude }),
+        ...(params.radius != null && { radius: params.radius }),
+        radiusUnit: params.radiusUnit || 'km',
+        checkin: params.checkin,
+        checkout: params.checkout,
+        currency: params.currency || 'USD',
+        guestNationality: params.guestNationality || 'US',
+        occupancies: params.occupancies || [{ adults: 1 }],
+        limit: params.limit || 20,
+      });
+      return this.#normalizeOffers(data.data || []);
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel search failed');
+    }
+  }
+
+  /** @param {string} hotelId */
+  async getHotelDetails(hotelId) {
+    if (!hotelId) throw new Error('hotelId is required');
+    try {
+      const { data } = await this.#client().get('/data/hotel', { params: { id: hotelId } });
+      return this.#normalizeDetails(data.data);
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel details lookup failed');
+    }
+  }
+
+  /** @param {import('./interface.js').PrebookParams} params */
+  async prebook(params) {
+    if (!params.rateId) throw new Error('rateId is required');
+    try {
+      const { data } = await this.#client().post('/rates/prebook', params);
+      const d = data.data;
+      return { prebookId: d.prebookId || d.id, status: d.status || 'valid', expiresAt: d.expiresAt };
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel prebook failed');
+    }
+  }
+
+  /** @param {import('./interface.js').BookParams} params */
+  async book(params) {
+    if (!params.prebookId) throw new Error('prebookId is required');
+    if (!params.guests?.length) throw new Error('At least one guest is required');
+    if (!params.contact?.email) throw new Error('contact.email is required');
+    try {
+      const { data } = await this.#client().post('/rates/book', params);
+      return this.#normalizeBooking(data.data);
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel booking failed');
+    }
+  }
+
+  /** @param {import('./interface.js').ListBookingsParams} params */
+  async listBookings(params = {}) {
+    try {
+      const { data } = await this.#client().get('/bookings');
+      const bookings = Array.isArray(data.data) ? data.data : [];
+      return bookings.map((b) => this.#normalizeBooking(b));
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel bookings list failed');
+    }
+  }
+
+  /** @param {string} bookingId */
+  async getBooking(bookingId) {
+    if (!bookingId) throw new Error('bookingId is required');
+    try {
+      const { data } = await this.#client().get(`/bookings/${bookingId}`);
+      return this.#normalizeBooking(data.data);
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel booking retrieval failed');
+    }
+  }
+
+  /** @param {string} bookingId @param {string} [reason] */
+  async cancelBooking(bookingId, reason) {
+    if (!bookingId) throw new Error('bookingId is required');
+    try {
+      await this.#client().put(`/bookings/${bookingId}`);
+      return { bookingId, status: 'cancelled' };
+    } catch (err) {
+      this.#unwrapError(err, 'Hotel cancellation failed');
+    }
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────
+
+  #ensureConfig() {
+    if (!process.env.LITEAPI_API_KEY) {
+      throw new Error('LITEAPI_API_KEY is not configured');
+    }
+    this._apiKey = process.env.LITEAPI_API_KEY;
+  }
+
+  #client() {
+    return axios.create({
+      baseURL: 'https://api.liteapi.travel/v3.0',
+      headers: {
+        'x-api-key': this._apiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  #normalizeOffers(offers) {
+    if (!Array.isArray(offers)) return [];
+    return offers.map((o) => ({
+      hotelId: o.hotelId || o.id,
+      name: o.name || o.hotel?.name || 'Unknown',
+      address: o.address || o.hotel?.address || null,
+      starRating: o.starRating || o.hotel?.starRating || 3,
+      images: o.images || o.hotel?.images || [],
+      distance: o.distance || null,
+      latitude: o.latitude || o.hotel?.latitude || null,
+      longitude: o.longitude || o.hotel?.longitude || null,
+      cheapestRate: {
+        roomType: o.roomType || o.cheapestRate?.roomType || 'Standard',
+        boardType: o.boardType || o.cheapestRate?.boardType || 'Room Only',
+        currency: o.currency || 'USD',
+        totalAmount: parseFloat(o.totalAmount || o.cheapestRate?.totalAmount || 0),
+        taxes: parseFloat(o.taxes || o.cheapestRate?.taxes || 0),
+        refundable: o.refundable ?? o.cheapestRate?.refundable ?? false,
+      },
+    }));
+  }
+
+  #normalizeDetails(d) {
+    if (!d) return null;
+    return {
+      hotelId: d.hotelId || d.id,
+      name: d.name || 'Unknown',
+      address: d.address || null,
+      starRating: d.starRating || 3,
+      images: d.images || [],
+      amenities: d.amenities || d.facilities || [],
+      checkinTime: d.checkinTime || d.checkInTime || null,
+      checkoutTime: d.checkoutTime || d.checkOutTime || null,
+      description: d.description || null,
+      policies: d.policies || [],
+      latitude: d.latitude || null,
+      longitude: d.longitude || null,
+    };
+  }
+
+  #normalizeBooking(b) {
+    return {
+      bookingId: b.bookingId || b.id,
+      pnr: b.pnr || b.confirmationCode || null,
+      status: b.status || 'confirmed',
+      hotelName: b.hotelName || b.hotel?.name || 'Unknown',
+      checkin: b.checkin || b.checkIn || null,
+      checkout: b.checkout || b.checkOut || null,
+      totalAmount: parseFloat(b.totalAmount || b.total || 0),
+      currency: b.currency || 'USD',
+      cancelledAt: b.cancelledAt || null,
+      cancellationReason: b.cancellationReason || null,
+    };
+  }
+
+  #unwrapError(err, fallbackMessage) {
+    if (err.message?.startsWith('LITEAPI_') || err.message?.includes('required')) throw err;
+    const status = err.response?.status || 502;
+    const message = err.response?.data?.message || err.response?.data?.error || err.message || fallbackMessage;
+    throw new Error(`LiteAPI error (${status}): ${message}`);
+  }
+}
