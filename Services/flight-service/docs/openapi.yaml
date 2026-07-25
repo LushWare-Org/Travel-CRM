@@ -42,7 +42,7 @@ info:
     - No configuration needed (default for development)
     - Returns realistic fake data across 4 airlines (BA, EK, QR, SQ)
     - **Persistence**: PostgreSQL schema `crm_flights` via Prisma
-  version: "1.0.0"
+  version: "1.1.0"
   contact:
     name: "Trip Sky Way Engineering"
 
@@ -89,6 +89,21 @@ components:
         stack:
           type: string
           description: "Stack trace (development mode only)"
+
+    # ── Validation Error ──────────────────────────────────────────
+    ValidationError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        status:
+          type: string
+          enum: [fail]
+        message:
+          type: string
+          description: "Human-readable field-level error summary"
+          example: "Validation failed: destination — Must be uppercase IATA code; travelers.0.firstName — First name is required"
 
     # ── Flight Segment ─────────────────────────────────────────────
     FlightSegment:
@@ -189,6 +204,12 @@ components:
         refundable:
           type: boolean
           example: true
+        passengerIds:
+          type: array
+          items:
+            type: string
+          description: "Passenger IDs from the offer request (required for booking via Duffel)"
+          example: ["pas_0000B8gLbxm7jv6uGDEhIE"]
         segments:
           type: array
           items:
@@ -611,9 +632,11 @@ paths:
       tags: [Search]
       summary: "Search available flights"
       description: |
-        Searches for flight availability via the Travelport GDS.
+        Searches for flight availability via the configured provider (Duffel, Travelport, or mock).
         Returns a list of offers with pricing and segment details.
         In mock mode, returns 5 realistic fake offers.
+        Input is validated via Zod: IATA codes must be 3-letter uppercase,
+        origin and destination must differ, dates must be YYYY-MM-DD format.
       security:
         - BearerAuth: []
       requestBody:
@@ -695,19 +718,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/SearchResponse"
         "400":
-          description: "Missing required parameters"
+          description: "Validation failed — missing/invalid fields (IATA codes, dates, pax counts)"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                $ref: "#/components/schemas/ValidationError"
         "401":
           description: "Not authenticated"
         "403":
           description: "Role not authorized (requires salesRep, admin, or superAdmin)"
         "502":
-          description: "Travelport API error"
+          description: "Provider API error (Duffel / Travelport)"
         "503":
-          description: "Travelport not configured"
+          description: "Provider not configured"
 
   # ── PRICE ───────────────────────────────────────────────────────
   /flights/price:
@@ -739,7 +762,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/PriceResponse"
         "400":
-          description: "offerId is required"
+          description: "Validation failed — offerId is required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
         "401":
           description: "Not authenticated"
         "403":
@@ -778,6 +805,16 @@ paths:
                   minItems: 1
                   items:
                     $ref: "#/components/schemas/FlightTraveler"
+                totalAmount:
+                  type: number
+                  description: "Total fare from the offer (required for Duffel payment)"
+                  example: 259.60
+                currency:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  description: "Currency code from the offer (required for Duffel payment)"
+                  example: "USD"
                 contact:
                   $ref: "#/components/schemas/Contact"
               required: [offer, travelers, contact]
@@ -827,7 +864,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/BookingResponse"
         "400":
-          description: "Missing required fields (offer, travelers, contact.email)"
+          description: "Validation failed — travelers min 1, names required, email format, offerId required"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
         "401":
           description: "Not authenticated"
         "403":
@@ -934,8 +975,10 @@ paths:
       summary: "Get live flight details"
       description: |
         Fetches real-time flight status, aircraft info, terminal/gate,
-        baggage allowance, and seat map availability from the GDS.
-        **[PENDING IMPLEMENTATION]**
+        baggage allowance, and seat map availability.
+        Note: Duffel provider returns a stub with limited data — live
+        flight status is only available via airline-specific APIs.
+        Mock provider returns full mock details.
       security:
         - BearerAuth: []
       parameters:
