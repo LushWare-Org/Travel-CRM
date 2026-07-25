@@ -1,0 +1,1066 @@
+openapi: "3.0.3"
+info:
+  title: "Trip Sky Way — Flight Service API"
+  description: |
+    Flight search, pricing, booking and management API for the Trip Sky Way travel CRM.
+    All endpoints proxy through the API Gateway which handles JWT verification and
+    forwards user context via `x-user-*` headers.
+
+    ## Authentication
+    The gateway verifies the JWT Bearer token and forwards these headers to the service:
+    - `x-user-id` — UUID of the authenticated user
+    - `x-user-role` — one of `salesRep`, `admin`, `superAdmin`
+    - `x-user-email` — user's email address
+    - `x-user-name` — user's display name
+    - `x-user-permissions` — JSON array of permission strings
+    - `x-user-is-super-admin` — `"true"` or `"false"`
+
+    ## Roles
+    All flight endpoints require one of: `salesRep`, `admin`, `superAdmin`.
+    SuperAdmin bypasses all role checks.
+
+    ## Backend Providers
+    - **Primary**: Travelport+ (GDS) via OAuth2 — search, price, book, cancel
+    - **Fallback**: Mock mode for development (`TRAVELPORT_MOCK_MODE=true`)
+    - **Persistence**: PostgreSQL schema `crm_flights` via Prisma
+  version: "1.0.0"
+  contact:
+    name: "Trip Sky Way Engineering"
+
+servers:
+  - url: "https://api.lushtravelcloud.com/api/v1"
+    description: "Production (via Gateway)"
+  - url: "http://localhost:3000/api/v1"
+    description: "Local (via Gateway)"
+  - url: "http://localhost:3010/api/v1"
+    description: "Local (flight-service directly, bypasses gateway auth)"
+
+tags:
+  - name: "Search"
+    description: "Flight availability search"
+  - name: "Booking"
+    description: "Booking lifecycle — create, retrieve, cancel"
+  - name: "Reference"
+    description: "Airlines, airports, flight details lookup"
+
+# ══════════════════════════════════════════════════════════════════════
+#  COMPONENTS — Reusable Schemas
+# ══════════════════════════════════════════════════════════════════════
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT token verified by the API Gateway"
+
+  schemas:
+    # ── Error ──────────────────────────────────────────────────────
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        status:
+          type: string
+          enum: [fail, error]
+        message:
+          type: string
+        stack:
+          type: string
+          description: "Stack trace (development mode only)"
+
+    # ── Flight Segment ─────────────────────────────────────────────
+    FlightSegment:
+      type: object
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+          description: "Order of this segment in the journey"
+        marketingCarrier:
+          type: string
+          minLength: 2
+          maxLength: 3
+          example: "EK"
+          description: "IATA airline code of the marketing carrier"
+        operatingCarrier:
+          type: string
+          nullable: true
+          minLength: 2
+          maxLength: 3
+          example: "EK"
+          description: "IATA airline code of the operating carrier (if different)"
+        flightNumber:
+          type: string
+          example: "EK502"
+          description: "Flight number including carrier code"
+        bookingClass:
+          type: string
+          nullable: true
+          example: "Y"
+          description: "Fare booking class / RBD code"
+        origin:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "DXB"
+          description: "IATA airport code of departure"
+        destination:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "CMB"
+          description: "IATA airport code of arrival"
+        departureAt:
+          type: string
+          format: date-time
+          example: "2026-08-01T08:30:00Z"
+        arrivalAt:
+          type: string
+          format: date-time
+          example: "2026-08-01T14:45:00Z"
+        durationMinutes:
+          type: integer
+          nullable: true
+          example: 375
+        stops:
+          type: integer
+          minimum: 0
+          default: 0
+
+    # ── Flight Offer (search result) ───────────────────────────────
+    FlightOffer:
+      type: object
+      properties:
+        offerId:
+          type: string
+          description: "Unique offer identifier for pricing/booking"
+          example: "MOCK-OFFER-CMBDXB-2026-08-01-0"
+        airline:
+          type: string
+          example: "Emirates"
+        airlineCode:
+          type: string
+          minLength: 2
+          maxLength: 3
+          example: "EK"
+        cabinClass:
+          type: string
+          enum: ["Economy", "Premium Economy", "Business", "First"]
+          example: "Economy"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "USD"
+        baseFare:
+          type: number
+          minimum: 0
+          example: 220.00
+        taxes:
+          type: number
+          minimum: 0
+          example: 39.60
+        fareTotal:
+          type: number
+          minimum: 0
+          example: 259.60
+        refundable:
+          type: boolean
+          example: true
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlightSegment"
+      required:
+        - offerId
+        - airline
+        - airlineCode
+        - cabinClass
+        - currency
+        - baseFare
+        - taxes
+        - fareTotal
+        - refundable
+        - segments
+
+    # ── Flight Traveler ────────────────────────────────────────────
+    FlightTraveler:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [adult, child, infant]
+          example: "adult"
+        title:
+          type: string
+          nullable: true
+          enum: [Mr, Mrs, Ms, Miss]
+          example: "Mr"
+        firstName:
+          type: string
+          example: "John"
+        lastName:
+          type: string
+          example: "Doe"
+        dob:
+          type: string
+          format: date
+          nullable: true
+          example: "1990-05-15"
+        gender:
+          type: string
+          nullable: true
+          enum: [M, F]
+          example: "M"
+        passportNumber:
+          type: string
+          nullable: true
+          example: "A12345678"
+        passportExpiry:
+          type: string
+          format: date
+          nullable: true
+          example: "2028-12-31"
+        nationality:
+          type: string
+          nullable: true
+          minLength: 2
+          maxLength: 2
+          example: "LK"
+        frequentFlyerNumber:
+          type: string
+          nullable: true
+          example: "EK123456789"
+      required:
+        - type
+        - firstName
+        - lastName
+
+    # ── Contact ────────────────────────────────────────────────────
+    Contact:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        phone:
+          type: string
+          nullable: true
+          example: "+94123456789"
+      required:
+        - email
+
+    # ── Flight Booking ─────────────────────────────────────────────
+    FlightBooking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        pnr:
+          type: string
+          nullable: true
+          description: "Airline record locator / PNR"
+          example: "MOCKA3F8K2"
+        travelportOrderId:
+          type: string
+          nullable: true
+          description: "Travelport universal record / order ID"
+        createdById:
+          type: string
+          format: uuid
+          description: "Agent who created the booking"
+        customerId:
+          type: string
+          format: uuid
+          nullable: true
+          description: "Customer (traveler contact) user ID"
+        tripType:
+          type: string
+          enum: [oneWay, roundTrip, multiCity]
+        cabinClass:
+          type: string
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        baseFare:
+          type: number
+        taxes:
+          type: number
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum: [quoted, pending, confirmed, ticketed, cancelled, failed]
+        ticketingDeadline:
+          type: string
+          format: date-time
+          nullable: true
+        bookedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancellationReason:
+          type: string
+          nullable: true
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlightSegment"
+        travelers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlightTraveler"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── Flight Details (live lookup) ───────────────────────────────
+    FlightDetails:
+      type: object
+      properties:
+        flightNumber:
+          type: string
+          example: "EK502"
+        status:
+          type: string
+          enum: [ON_TIME, DELAYED, CANCELLED, DEPARTED, ARRIVED, SCHEDULED]
+          example: "ON_TIME"
+        aircraft:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "77W"
+            name:
+              type: string
+              example: "Boeing 777-300ER"
+        departure:
+          type: object
+          properties:
+            airport:
+              type: string
+              example: "DXB"
+            terminal:
+              type: string
+              example: "3"
+            gate:
+              type: string
+              nullable: true
+              example: "B12"
+            scheduled:
+              type: string
+              format: date-time
+            estimated:
+              type: string
+              format: date-time
+              nullable: true
+            actual:
+              type: string
+              format: date-time
+              nullable: true
+        arrival:
+          type: object
+          properties:
+            airport:
+              type: string
+              example: "CMB"
+            terminal:
+              type: string
+              example: "1"
+            gate:
+              type: string
+              nullable: true
+            scheduled:
+              type: string
+              format: date-time
+            estimated:
+              type: string
+              format: date-time
+              nullable: true
+            actual:
+              type: string
+              format: date-time
+              nullable: true
+        baggage:
+          type: object
+          properties:
+            checked:
+              type: string
+              example: "30kg"
+            cabin:
+              type: string
+              example: "7kg"
+        seatMap:
+          type: object
+          properties:
+            available:
+              type: boolean
+              example: true
+        mealService:
+          type: boolean
+          example: true
+        wifiAvailable:
+          type: boolean
+          example: true
+
+    # ── Airline ────────────────────────────────────────────────────
+    Airline:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 2
+          maxLength: 3
+          example: "EK"
+        name:
+          type: string
+          example: "Emirates"
+        logoUrl:
+          type: string
+          format: uri
+          nullable: true
+        alliance:
+          type: string
+          nullable: true
+          example: "Star Alliance"
+
+    # ── Airport ───────────────────────────────────────────────────
+    Airport:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "CMB"
+        name:
+          type: string
+          example: "Bandaranaike International Airport"
+        city:
+          type: string
+          example: "Colombo"
+        country:
+          type: string
+          minLength: 2
+          maxLength: 2
+          example: "LK"
+        timezone:
+          type: string
+          example: "Asia/Colombo"
+
+    # ── Check-in Info ──────────────────────────────────────────────
+    CheckinInfo:
+      type: object
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        pnr:
+          type: string
+        checkinAvailable:
+          type: boolean
+        checkinUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: "Airline check-in URL if available"
+        checkinOpensAt:
+          type: string
+          format: date-time
+          nullable: true
+        checkinClosesAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ── Pagination ─────────────────────────────────────────────────
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+        pages:
+          type: integer
+
+    # ── Success Wrappers ───────────────────────────────────────────
+    SearchResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlightOffer"
+      required: [success, data]
+
+    PriceResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            offerId: { type: string }
+            revalidated: { type: boolean }
+            priceChanged: { type: boolean }
+      required: [success, data]
+
+    BookingResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          $ref: "#/components/schemas/FlightBooking"
+      required: [success, data]
+
+    BookingListResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlightBooking"
+      required: [success, data]
+
+    DetailsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          $ref: "#/components/schemas/FlightDetails"
+      required: [success, data]
+
+    AirlinesResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Airline"
+      required: [success, data]
+
+    AirportsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Airport"
+      required: [success, data]
+
+    CheckinResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          $ref: "#/components/schemas/CheckinInfo"
+      required: [success, data]
+
+# ══════════════════════════════════════════════════════════════════════
+#  PATHS
+# ══════════════════════════════════════════════════════════════════════
+paths:
+  # ── SEARCH ──────────────────────────────────────────────────────
+  /flights/search:
+    post:
+      tags: [Search]
+      summary: "Search available flights"
+      description: |
+        Searches for flight availability via the Travelport GDS.
+        Returns a list of offers with pricing and segment details.
+        In mock mode, returns 5 realistic fake offers.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origin:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  description: "IATA airport code"
+                  example: "CMB"
+                destination:
+                  type: string
+                  minLength: 3
+                  maxLength: 3
+                  description: "IATA airport code"
+                  example: "DXB"
+                departureDate:
+                  type: string
+                  format: date
+                  description: "YYYY-MM-DD"
+                  example: "2026-08-01"
+                returnDate:
+                  type: string
+                  format: date
+                  description: "Required for round-trip"
+                  example: "2026-08-15"
+                adults:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                  example: 1
+                children:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                infants:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                cabinClass:
+                  type: string
+                  enum: ["Economy", "Premium Economy", "Business", "First"]
+                  default: "Economy"
+                tripType:
+                  type: string
+                  enum: [oneWay, roundTrip]
+                  default: "oneWay"
+              required: [origin, destination, departureDate]
+            examples:
+              oneWay:
+                summary: "One-way search"
+                value:
+                  origin: "CMB"
+                  destination: "DXB"
+                  departureDate: "2026-08-01"
+                  adults: 1
+                  cabinClass: "Economy"
+                  tripType: "oneWay"
+              roundTrip:
+                summary: "Round-trip search"
+                value:
+                  origin: "LHR"
+                  destination: "JFK"
+                  departureDate: "2026-09-10"
+                  returnDate: "2026-09-20"
+                  adults: 2
+                  cabinClass: "Business"
+                  tripType: "roundTrip"
+      responses:
+        "200":
+          description: "Search results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          description: "Missing required parameters"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: "Not authenticated"
+        "403":
+          description: "Role not authorized (requires salesRep, admin, or superAdmin)"
+        "502":
+          description: "Travelport API error"
+        "503":
+          description: "Travelport not configured"
+
+  # ── PRICE ───────────────────────────────────────────────────────
+  /flights/price:
+    post:
+      tags: [Search]
+      summary: "Revalidate and price a flight offer"
+      description: |
+        Confirms the offer is still available and the price hasn't changed.
+        Should be called before booking to ensure fare validity.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                offerId:
+                  type: string
+                  description: "The offer ID returned by /flights/search"
+                  example: "MOCK-OFFER-CMBDXB-2026-08-01-0"
+              required: [offerId]
+      responses:
+        "200":
+          description: "Pricing result"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceResponse"
+        "400":
+          description: "offerId is required"
+        "401":
+          description: "Not authenticated"
+        "403":
+          description: "Role not authorized"
+
+  # ── BOOK ────────────────────────────────────────────────────────
+  /flights/book:
+    post:
+      tags: [Booking]
+      summary: "Book a flight and create a PNR"
+      description: |
+        Books the selected flight offer. Creates or finds the customer in
+        `crm_users`, creates a `FlightBooking` record with segments and
+        travelers in `crm_flights`. Returns the booking with PNR.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                offer:
+                  type: object
+                  description: "The full offer object from /flights/search"
+                  properties:
+                    offerId:
+                      type: string
+                  required: [offerId]
+                tripType:
+                  type: string
+                  enum: [oneWay, roundTrip, multiCity]
+                travelers:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: "#/components/schemas/FlightTraveler"
+                contact:
+                  $ref: "#/components/schemas/Contact"
+              required: [offer, travelers, contact]
+            examples:
+              basic:
+                summary: "Single adult booking"
+                value:
+                  offer:
+                    offerId: "MOCK-OFFER-CMBDXB-2026-08-01-0"
+                    airline: "Emirates"
+                    airlineCode: "EK"
+                    cabinClass: "Economy"
+                    currency: "USD"
+                    baseFare: 220.00
+                    taxes: 39.60
+                    fareTotal: 259.60
+                    refundable: true
+                    segments:
+                      - sequence: 1
+                        marketingCarrier: "EK"
+                        operatingCarrier: "EK"
+                        flightNumber: "EK137"
+                        bookingClass: "Y"
+                        origin: "CMB"
+                        destination: "DXB"
+                        departureAt: "2026-08-01T06:00:00Z"
+                        arrivalAt: "2026-08-01T10:15:00Z"
+                        durationMinutes: 255
+                        stops: 0
+                  tripType: "oneWay"
+                  travelers:
+                    - type: "adult"
+                      title: "Mr"
+                      firstName: "John"
+                      lastName: "Doe"
+                      dob: "1990-05-15"
+                      nationality: "LK"
+                  contact:
+                    name: "John Doe"
+                    email: "john@example.com"
+                    phone: "+94123456789"
+      responses:
+        "201":
+          description: "Booking created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "400":
+          description: "Missing required fields (offer, travelers, contact.email)"
+        "401":
+          description: "Not authenticated"
+        "403":
+          description: "Role not authorized"
+
+  # ── LIST BOOKINGS ───────────────────────────────────────────────
+  /flights/bookings:
+    get:
+      tags: [Booking]
+      summary: "List all flight bookings"
+      description: |
+        Returns all flight bookings with segments and travelers.
+        Sales reps see only their own bookings; admins and superAdmins see all.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [quoted, pending, confirmed, ticketed, cancelled, failed]
+          description: "Filter by booking status"
+      responses:
+        "200":
+          description: "List of bookings"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingListResponse"
+        "401":
+          description: "Not authenticated"
+        "403":
+          description: "Role not authorized"
+
+  # ── GET BOOKING ─────────────────────────────────────────────────
+  /flights/bookings/{id}:
+    get:
+      tags: [Booking]
+      summary: "Get a single flight booking"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "Booking details with segments and travelers"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "401":
+          description: "Not authenticated"
+        "403":
+          description: "Role not authorized"
+        "404":
+          description: "Booking not found"
+    # ── CANCEL BOOKING ──────────────────────────────────────────
+  /flights/bookings/{id}/cancel:
+    post:
+      tags: [Booking]
+      summary: "Cancel a flight booking"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: "Reason for cancellation"
+                  example: "Customer requested cancellation"
+      responses:
+        "200":
+          description: "Booking cancelled"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "400":
+          description: "Booking already cancelled"
+        "401":
+          description: "Not authenticated"
+        "404":
+          description: "Booking not found"
+
+  # ── FLIGHT DETAILS ──────────────────────────────────────────────
+  /flights/details:
+    get:
+      tags: [Reference]
+      summary: "Get live flight details"
+      description: |
+        Fetches real-time flight status, aircraft info, terminal/gate,
+        baggage allowance, and seat map availability from the GDS.
+        **[PENDING IMPLEMENTATION]**
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: flightNumber
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "EK502"
+        - name: departureDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-08-01"
+        - name: origin
+          in: query
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+          example: "DXB"
+        - name: destination
+          in: query
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+          example: "CMB"
+      responses:
+        "200":
+          description: "Flight details"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetailsResponse"
+        "400":
+          description: "flightNumber and departureDate are required"
+
+  # ── AIRLINES ────────────────────────────────────────────────────
+  /flights/airlines:
+    get:
+      tags: [Reference]
+      summary: "List available airlines"
+      description: |
+        Returns a list of airlines with IATA codes, names, and optional
+        alliance info. Useful for search autocomplete and display.
+        **[PENDING IMPLEMENTATION]**
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: "Search by airline name or code"
+          example: "Emirates"
+      responses:
+        "200":
+          description: "List of airlines"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AirlinesResponse"
+
+  # ── AIRPORTS ────────────────────────────────────────────────────
+  /flights/airports:
+    get:
+      tags: [Reference]
+      summary: "Airport lookup / autocomplete"
+      description: |
+        Search airports by IATA code or city/airport name.
+        **[PENDING IMPLEMENTATION]**
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Search query — IATA code or partial name"
+          example: "Colombo"
+      responses:
+        "200":
+          description: "Matching airports"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AirportsResponse"
+
+  # ── CHECK-IN ────────────────────────────────────────────────────
+  /flights/bookings/{id}/checkin:
+    get:
+      tags: [Booking]
+      summary: "Get check-in status for a booking"
+      description: |
+        Returns check-in availability, airline check-in URL, and time window.
+        **[PENDING IMPLEMENTATION]**
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "Check-in information"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckinResponse"
+        "404":
+          description: "Booking not found"
+
+  # ── RETRIEVE BOOKING ────────────────────────────────────────────
+  /flights/bookings/{id}/retrieve:
+    post:
+      tags: [Booking]
+      summary: "Retrieve/refresh booking from GDS"
+      description: |
+        Pulls the latest booking status from the Travelport GDS and updates
+        the local database. Use when the booking status may have changed
+        externally (e.g., airline schedule change, ticketing).
+        **[PENDING IMPLEMENTATION]**
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "Updated booking"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "404":
+          description: "Booking not found"
