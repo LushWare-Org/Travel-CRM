@@ -16,12 +16,22 @@ export class LiteApiClient {
   /** @param {import('./interface.js').HotelSearchParams} params */
   async searchHotels(params) {
     try {
+      // LiteAPI expects children as array of ages (e.g. [5, 8]), not a count
+      const occupancies = (params.occupancies || [{ adults: 1 }]).map((o) => ({
+        adults: o.adults || 1,
+        children: Array.isArray(o.children)
+          ? o.children
+          : o.children > 0
+            ? Array(o.children).fill(8) // default age 8 when count is given
+            : [],
+      }));
+
       const body = {
         checkin: params.checkin,
         checkout: params.checkout,
         currency: params.currency || 'USD',
         guestNationality: params.guestNationality || 'US',
-        occupancies: params.occupancies || [{ adults: 1 }],
+        occupancies,
         limit: params.limit || 20,
         maxRatesPerHotel: 1,
       };
@@ -140,28 +150,35 @@ export class LiteApiClient {
   #normalizeOffers(offers) {
     if (!Array.isArray(offers)) return [];
     return offers.map((hotel) => {
-      // LiteAPI returns: { hotelId, roomTypes: [{ rates: [{ rateId, retailRate, boardType, cancellationPolicies, ... }] }] }
-      // plus hotel info may be inline or in a separate .hotels[] array
+      // LiteAPI v3.0 shape: { hotelId, roomTypes: [{ rates: [{ rateId, boardType, retailRate, ... }] }] }
+      // hotel details (name, photos, starRating) are NOT in search response — use /data/hotel to fetch
       const firstRate = hotel.roomTypes?.[0]?.rates?.[0] || {};
       const retail = firstRate.retailRate || {};
-      const hotelInfo = hotel.hotel || {};
+
+      // total/currency are arrays of objects: [{ amount: 233.24, currency: "USD" }]
+      const totalItem = Array.isArray(retail.total) ? retail.total[0] : retail.total;
+      const taxItem = Array.isArray(retail.taxesAndFees) ? retail.taxesAndFees[0] : retail.taxesAndFees;
 
       return {
         hotelId: hotel.hotelId,
-        name: hotelInfo.name || hotel.name || 'Unknown',
-        address: hotelInfo.address || hotel.address || null,
-        starRating: hotelInfo.starRating || hotel.starRating || 3,
-        images: hotelInfo.photos || hotel.photos || [],
+        name: hotel.name || hotel.hotel?.name || 'Unknown',
+        address: hotel.address || hotel.hotel?.address || null,
+        starRating: hotel.starRating || hotel.hotel?.starRating || 0,
+        images: hotel.photos || hotel.hotel?.photos || [],
         distance: hotel.distance || null,
-        latitude: hotelInfo.location?.latitude || hotel.latitude || null,
-        longitude: hotelInfo.location?.longitude || hotel.longitude || null,
+        latitude: hotel.latitude || hotel.hotel?.location?.latitude || null,
+        longitude: hotel.longitude || hotel.hotel?.location?.longitude || null,
         cheapestRate: {
-          roomType: firstRate.roomTypeId || firstRate.name || 'Standard',
-          boardType: firstRate.boardType || firstRate.boardName || 'Room Only',
-          currency: retail.currency || hotel.currency || 'USD',
-          totalAmount: parseFloat(retail.total || retail.sellingTotal || 0),
-          taxes: parseFloat(retail.taxesAndFees || 0),
-          refundable: !firstRate.cancellationPolicies?.some((p) => p.nonRefundable),
+          roomType: firstRate.name || firstRate.roomTypeId || 'Standard',
+          boardType: firstRate.boardType || firstRate.boardName || 'RO',
+          currency: totalItem?.currency || hotel.currency || 'USD',
+          totalAmount: parseFloat(totalItem?.amount || 0) || 0,
+          taxes: parseFloat(taxItem?.amount || 0) || 0,
+          refundable: firstRate.cancellationPolicies
+            ? (Array.isArray(firstRate.cancellationPolicies)
+                ? !firstRate.cancellationPolicies.some((p) => p?.nonRefundable)
+                : !firstRate.cancellationPolicies?.nonRefundable)
+            : true,
           offerId: firstRate.rateId || null,
         },
       };
