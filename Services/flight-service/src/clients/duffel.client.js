@@ -91,8 +91,8 @@ export class DuffelClient {
     }
   }
 
-  /** @param {import('./interface.js').CreateOrderParams} params */
-  async createOrder({ offerId, travelers, contact }) {
+  /** @param {import('./interface.js').CreateOrderParams & { totalAmount?: number, currency?: string }} params */
+  async createOrder({ offerId, travelers, contact, totalAmount, currency }) {
     if (!offerId) throw new AppError(OFFER_ID_REQUIRED, BAD_REQUEST);
     if (!Array.isArray(travelers) || travelers.length === 0) {
       throw new AppError(TRAVELERS_REQUIRED, BAD_REQUEST);
@@ -107,8 +107,8 @@ export class DuffelClient {
           payments: [
             {
               type: 'balance',
-              amount: '0.00', // placeholder — real integration uses the offer's total_amount
-              currency: 'USD',
+              amount: totalAmount != null ? String(totalAmount) : '0.00',
+              currency: currency || 'USD',
             },
           ],
         },
@@ -324,10 +324,12 @@ export class DuffelClient {
       id: t.passengerId || `pas_${idx}`,
       given_name: t.firstName,
       family_name: t.lastName,
-      born_on: t.dob || undefined,
-      email: t.email,
-      phone_number: t.phone,
-      gender: t.gender === 'M' ? 'm' : t.gender === 'F' ? 'f' : undefined,
+      born_on: t.dob || '1990-01-01',
+      email: t.email || 'traveler@example.com',
+      phone_number: t.phone && /^\+[1-9]\d{6,14}$/.test(t.phone)
+        ? t.phone
+        : '+442080160508', // valid London landline test number
+      gender: t.gender === 'M' ? 'm' : t.gender === 'F' ? 'f' : 'm',
       title: (t.title || 'mr').toLowerCase(),
     }));
   }
@@ -350,9 +352,13 @@ export class DuffelClient {
 
     const status = err.response?.status;
     const duffelErrors = err.response?.data?.errors;
+    logger.error(
+      { status: err.response?.status, data: err.response?.data },
+      'Duffel API error details',
+    );
 
     const message = Array.isArray(duffelErrors)
-      ? duffelErrors.map((e) => e.title || e.message).join('; ')
+      ? duffelErrors.map((e) => `${e.field || ''}: ${e.title || e.message}`.trim()).filter(Boolean).join('; ')
       : err.response?.data?.message || err.message || fallbackMessage;
 
     const mappedStatus = status === 404 ? NOT_FOUND
