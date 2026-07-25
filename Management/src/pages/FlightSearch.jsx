@@ -390,13 +390,14 @@ export default function FlightSearch() {
   };
 
   const goToReview = () => {
-    for (const t of travelers) {
+    for (let i = 0; i < travelers.length; i++) {
+      const t = travelers[i];
       if (!t.firstName || !t.lastName) {
         toast.error("Every traveler needs a first and last name");
         return;
       }
       if (t.type === "adult" && !t.gender) {
-        toast.error(`Gender is required for ${t.firstName || `traveler ${travelers.indexOf(t) + 1}`}`);
+        toast.error(`Gender is required for traveler ${i + 1}`);
         return;
       }
     }
@@ -846,27 +847,30 @@ export default function FlightSearch() {
 
               {/* Group travelers by type */}
               {(["adult", "child", "infant"]).map((type) => {
-                const ofType = travelers.filter((t) => t.type === type);
-                if (ofType.length === 0) return null;
+                const indexes = travelers
+                  .map((t, i) => (t.type === type ? i : -1))
+                  .filter((i) => i >= 0);
+                if (indexes.length === 0) return null;
                 const label = type === "adult" ? "Adults" : type === "child" ? "Children" : "Infants";
                 return (
                   <div key={type} className="mb-5">
-                    <div className="text-xs font-semibold text-gray-400 uppercase mb-3">{label} ({ofType.length})</div>
-                    {ofType.map((t) => {
-                      const globalIdx = travelers.indexOf(t);
+                    <div className="text-xs font-semibold text-gray-400 uppercase mb-3">{label} ({indexes.length})</div>
+                    {indexes.map((idx, n) => {
+                      const t = travelers[idx];
+                      if (!t) return null;
                       return (
-                        <div key={globalIdx} className="border border-gray-200 rounded-lg p-4 mb-3 hover:border-gray-300 transition-colors">
+                        <div key={idx} className="border border-gray-200 rounded-lg p-4 mb-3 hover:border-gray-300 transition-colors">
                           <div className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold">
-                              {globalIdx + 1}
+                              {idx + 1}
                             </span>
-                            Traveler {globalIdx + 1}
+                            Traveler {idx + 1}
                             <span className="text-xs font-normal text-gray-400 capitalize">({t.type})</span>
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <select
                               value={t.title}
-                              onChange={(e) => updateTraveler(globalIdx, "title", e.target.value)}
+                              onChange={(e) => updateTraveler(idx, "title", e.target.value)}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             >
                               {["Mr", "Mrs", "Ms", "Miss"].map((x) => <option key={x} value={x}>{x}</option>)}
@@ -874,26 +878,26 @@ export default function FlightSearch() {
                             <input
                               placeholder="First name *"
                               value={t.firstName}
-                              onChange={(e) => updateTraveler(globalIdx, "firstName", e.target.value)}
+                              onChange={(e) => updateTraveler(idx, "firstName", e.target.value)}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder:text-gray-300"
                             />
                             <input
                               placeholder="Last name *"
                               value={t.lastName}
-                              onChange={(e) => updateTraveler(globalIdx, "lastName", e.target.value)}
+                              onChange={(e) => updateTraveler(idx, "lastName", e.target.value)}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder:text-gray-300"
                             />
                             <input
                               type="date"
                               value={t.dob}
-                              onChange={(e) => updateTraveler(globalIdx, "dob", e.target.value)}
+                              onChange={(e) => updateTraveler(idx, "dob", e.target.value)}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                               title="Date of birth"
                             />
                             {t.type === "adult" && (
                               <select
                                 value={t.gender}
-                                onChange={(e) => updateTraveler(globalIdx, "gender", e.target.value)}
+                                onChange={(e) => updateTraveler(idx, "gender", e.target.value)}
                                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                               >
                                 <option value="">Gender *</option>
@@ -904,28 +908,28 @@ export default function FlightSearch() {
                             <input
                               placeholder="Passport number"
                               value={t.passportNumber}
-                              onChange={(e) => updateTraveler(globalIdx, "passportNumber", e.target.value.toUpperCase())}
+                              onChange={(e) => updateTraveler(idx, "passportNumber", e.target.value.toUpperCase())}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder:text-gray-300 font-mono"
                               maxLength={12}
                             />
                             <input
                               type="date"
                               value={t.passportExpiry}
-                              onChange={(e) => updateTraveler(globalIdx, "passportExpiry", e.target.value)}
+                              onChange={(e) => updateTraveler(idx, "passportExpiry", e.target.value)}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                               title="Passport expiry date"
                             />
                             <input
                               placeholder="Nationality (e.g. LK)"
                               value={t.nationality}
-                              onChange={(e) => updateTraveler(globalIdx, "nationality", e.target.value.toUpperCase())}
+                              onChange={(e) => updateTraveler(idx, "nationality", e.target.value.toUpperCase())}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder:text-gray-300"
                               maxLength={2}
                             />
                             <input
                               placeholder="Frequent flyer #"
                               value={t.frequentFlyerNumber}
-                              onChange={(e) => updateTraveler(globalIdx, "frequentFlyerNumber", e.target.value)}
+                              onChange={(e) => updateTraveler(idx, "frequentFlyerNumber", e.target.value)}
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder:text-gray-300"
                             />
                           </div>
