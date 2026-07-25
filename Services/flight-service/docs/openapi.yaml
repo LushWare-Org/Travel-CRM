@@ -20,8 +20,27 @@ info:
     SuperAdmin bypasses all role checks.
 
     ## Backend Providers
-    - **Primary**: Travelport+ (GDS) via OAuth2 — search, price, book, cancel
-    - **Fallback**: Mock mode for development (`TRAVELPORT_MOCK_MODE=true`)
+    Provider selection is driven by environment variables:
+    1. `DUFFEL_ACCESS_TOKEN` set → **Duffel** (token-based auth, modern REST API)
+    2. `TRAVELPORT_MOCK_MODE` not `false` → **Mock** (deterministic fake data, zero network)
+    3. Otherwise → **Travelport+** (GDS via OAuth2 client credentials)
+
+    ### Duffel
+    - Auth: Bearer token (`DUFFEL_ACCESS_TOKEN`)
+    - Base URL: `https://api.duffel.com`
+    - Version: `Duffel-Version: v2` header
+    - Rate limit: 60 req/min
+    - Key differences: search returns pre-priced offers (no separate price step),
+      cancellation is two-step (create → confirm), all requests wrapped in `{ data: {...} }`
+
+    ### Travelport+
+    - Auth: OAuth2 client credentials grant
+    - Requires: `TRAVELPORT_TOKEN_URL`, `TRAVELPORT_CLIENT_ID`, `TRAVELPORT_CLIENT_SECRET`
+    - Sandbox credentials not yet provisioned
+
+    ### Mock
+    - No configuration needed (default for development)
+    - Returns realistic fake data across 4 airlines (BA, EK, QR, SQ)
     - **Persistence**: PostgreSQL schema `crm_flights` via Prisma
   version: "1.0.0"
   contact:
