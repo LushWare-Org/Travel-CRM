@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   X, Plus, Loader2, Calendar, Copy, User, Mail, Phone,
   MapPin, Plane, Users, Globe, Package, MessageSquare,
-  ChevronDown, ChevronUp, Sparkles, Save
+  ChevronDown, ChevronUp, Sparkles, Save, ArrowRightLeft,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
@@ -10,8 +10,8 @@ import 'react-phone-number-input/style.css';
 import { leadAPI, packageAPI, manualItineraryAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import LocationAutocomplete from './LocationAutocomplete';
+import AirportAutocomplete from '../../../components/AirportAutocomplete';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
-import DestinationSelector from '../../itinerary/components/DestinationSelector';
 import { createDefaultDay } from '../../itinerary/types/index.js';
 
 const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
@@ -28,6 +28,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     package: true,
     remarks: false,
     itinerary: false,
+    transfers: false,
   });
   const [formData, setFormData] = useState({
     name: "",
@@ -38,12 +39,18 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     city: "",
     salesRep: "",
     assignedTo: "",
-    destination: "",
     platform: "",
     travelDate: "",
     endDate: "",
     package: "",
     packageName: "",
+    // Transfer flights
+    inboundFrom: "",
+    inboundTo: "",
+    inboundDate: "",
+    outboundFrom: "",
+    outboundTo: "",
+    outboundDate: "",
     remarks: [{ text: "", date: "" }],
   });
 
@@ -123,6 +130,25 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       const assignedTo = isSalesRep && user?._id ? user._id : (formData.assignedTo || undefined);
       const salesRepName = isSalesRep && user?.name ? user.name : (formData.salesRep || undefined);
 
+      // Build optional transfer flights array
+      const optionalFlights = [];
+      if (formData.inboundFrom || formData.inboundTo) {
+        optionalFlights.push({
+          origin: formData.inboundFrom,
+          destination: formData.inboundTo,
+          date: formData.inboundDate || undefined,
+          flightType: 'to-start',
+        });
+      }
+      if (formData.outboundFrom || formData.outboundTo) {
+        optionalFlights.push({
+          origin: formData.outboundFrom,
+          destination: formData.outboundTo,
+          date: formData.outboundDate || undefined,
+          flightType: 'return-home',
+        });
+      }
+
       const leadData = {
         name: formData.name?.trim() || undefined,
         email: formData.email?.trim() || undefined,
@@ -131,7 +157,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         whatsapp: formData.whatsapp || undefined,
         salesRep: salesRepName,
         assignedTo: assignedTo,
-        destination: formData.destination || undefined,
         platform: formData.platform || "Manual Entry",
         source: "manual",
         travelDate: formData.travelDate || undefined,
@@ -139,6 +164,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         package: formData.package || undefined,
         packageName: formData.packageName || undefined,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
+        optionalFlights: optionalFlights.length > 0 ? optionalFlights : undefined,
         remarks: formData.remarks.filter((r) => r.text.trim() !== "").map(r => ({
           text: r.text.trim(),
           date: r.date || new Date().toISOString().split("T")[0]
@@ -169,12 +195,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         whatsapp: "",
         salesRep: "",
         assignedTo: "",
-        destination: "",
         platform: "",
         travelDate: "",
         endDate: "",
         package: "",
         packageName: "",
+        inboundFrom: "",
+        inboundTo: "",
+        inboundDate: "",
+        outboundFrom: "",
+        outboundTo: "",
+        outboundDate: "",
         remarks: [{ text: "", date: "" }],
       });
       setItineraryDays([]);
@@ -350,24 +381,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
             {expandedSections.travel && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
-                <InputField label="Departure City" icon={MapPin}>
-                  <LocationAutocomplete
-                    value={formData.city}
-                    onChange={(value) => setFormData({ ...formData, city: value })}
-                    placeholder="e.g., Colombo, Sri Lanka"
-                  />
-                </InputField>
+                <div className="md:col-span-2">
+                  <InputField label="Departure City" icon={MapPin}>
+                    <LocationAutocomplete
+                      value={formData.city}
+                      onChange={(value) => setFormData({ ...formData, city: value })}
+                      placeholder="e.g., Colombo, Sri Lanka"
+                    />
+                  </InputField>
+                </div>
 
-                <InputField label="Destination" icon={MapPin}>
-                  <DestinationSelector
-                    value={formData.destination}
-                    onChange={(event) =>
-                      setFormData({ ...formData, destination: event.target.value })
-                    }
-                  />
-                </InputField>
-
-                <InputField label="Travel Date (Start)" icon={Calendar}>
+                <InputField label="Travel Date" icon={Calendar}>
                   <input
                     type="date"
                     value={formData.travelDate}
@@ -376,7 +400,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                   />
                 </InputField>
 
-                <InputField label="End Date" icon={Calendar}>
+                <InputField label="Return Date" icon={Calendar}>
                   <input
                     type="date"
                     value={formData.endDate}
@@ -403,13 +427,13 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                   />
                 </InputField>
 
-                <InputField label="Platform / Source" icon={Globe}>
+                <InputField label="Lead Source" icon={Globe}>
                   <select
                     value={formData.platform}
                     onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                   >
-                    <option value="">Select Platform</option>
+                    <option value="">Select Source</option>
                     <option value="Website Form">🌐 Website Form</option>
                     <option value="Social Media">📱 Social Media</option>
                     <option value="Phone Call">📞 Phone Call</option>
@@ -624,6 +648,78 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     />
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+          {/* Transfer Flights Section */}
+          <div className="space-y-4">
+            <SectionHeader
+              icon={ArrowRightLeft}
+              title="Transfer Flights"
+              subtitle="Optional: flights to reach the trip and return home"
+              section="transfers"
+              gradient="from-cyan-500 to-blue-600"
+            />
+
+            {expandedSections.transfers && (
+              <div className="p-4 bg-cyan-50/50 rounded-2xl border border-cyan-100 space-y-4">
+                {/* Inbound Transfer */}
+                <div className="bg-white rounded-xl border border-cyan-200 p-4">
+                  <h4 className="text-sm font-semibold text-cyan-800 mb-3">Inbound Transfer — Getting to the Trip</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <InputField label="Flying From (Home Airport)" icon={MapPin}>
+                      <AirportAutocomplete
+                        value={formData.inboundFrom}
+                        onChange={(code) => setFormData({ ...formData, inboundFrom: code })}
+                        placeholder="e.g., LHR, London"
+                      />
+                    </InputField>
+                    <InputField label="Flying To (Trip Start)" icon={MapPin}>
+                      <AirportAutocomplete
+                        value={formData.inboundTo}
+                        onChange={(code) => setFormData({ ...formData, inboundTo: code })}
+                        placeholder="e.g., CMB, Colombo"
+                      />
+                    </InputField>
+                    <InputField label="Preferred Date" icon={Calendar}>
+                      <input
+                        type="date"
+                        value={formData.inboundDate}
+                        onChange={(e) => setFormData({ ...formData, inboundDate: e.target.value })}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 transition-all"
+                      />
+                    </InputField>
+                  </div>
+                </div>
+
+                {/* Outbound Transfer */}
+                <div className="bg-white rounded-xl border border-cyan-200 p-4">
+                  <h4 className="text-sm font-semibold text-cyan-800 mb-3">Outbound Transfer — Returning Home</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <InputField label="Flying From (Trip End)" icon={MapPin}>
+                      <AirportAutocomplete
+                        value={formData.outboundFrom}
+                        onChange={(code) => setFormData({ ...formData, outboundFrom: code })}
+                        placeholder="e.g., CMB, Colombo"
+                      />
+                    </InputField>
+                    <InputField label="Flying To (Home Airport)" icon={MapPin}>
+                      <AirportAutocomplete
+                        value={formData.outboundTo}
+                        onChange={(code) => setFormData({ ...formData, outboundTo: code })}
+                        placeholder="e.g., LHR, London"
+                      />
+                    </InputField>
+                    <InputField label="Preferred Date" icon={Calendar}>
+                      <input
+                        type="date"
+                        value={formData.outboundDate}
+                        onChange={(e) => setFormData({ ...formData, outboundDate: e.target.value })}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 transition-all"
+                      />
+                    </InputField>
+                  </div>
+                </div>
               </div>
             )}
           </div>
