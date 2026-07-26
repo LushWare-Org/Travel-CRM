@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import flightRoutes from './routes/flight.routes.js';
+import leadFlightRoutes from './routes/leadFlight.routes.js';
 import { extractUser } from './middleware/auth.js';
 import { injectFlightClient } from './middleware/flightClient.js';
 import { correlationId, requestLogger } from './middleware/requestLogger.js';
@@ -25,6 +26,7 @@ app.use(extractUser);
 app.use(injectFlightClient);
 
 app.use('/api/v1/flights', flightRoutes);
+app.use('/api/v1/flights', leadFlightRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'flight-service' }));
 app.use(errorHandler);

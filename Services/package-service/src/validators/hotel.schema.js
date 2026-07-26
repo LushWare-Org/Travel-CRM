@@ -59,3 +59,16 @@ export const listBookingsQuerySchema = z.object({
 export const bookingIdParamSchema = z.object({
   id: z.string().uuid('Invalid booking ID'),
 });
+
+/** Route params — leadId */
+export const leadIdParamSchema = z.object({
+  leadId: z.string().uuid('Invalid lead ID'),
+});
+
+/** POST /hotels/book-with-context — same as book but with lead context */
+export const bookWithContextSchema = bookSchema.extend({
+  leadId: z.string().uuid().optional(),
+  packageId: z.string().uuid().optional(),
+  customizedPackageId: z.string().uuid().optional(),
+  dayNumber: z.coerce.number().int().positive().optional(),
+});

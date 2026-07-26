@@ -80,3 +80,24 @@ export const listBookingsQuerySchema = z.object({
 export const bookingIdParamSchema = z.object({
   id: z.string().uuid('Invalid booking ID'),
 });
+
+/** Route params — leadId */
+export const leadIdParamSchema = z.object({
+  leadId: z.string().uuid('Invalid lead ID'),
+});
+
+/** POST /flights/book-for-lead — same as book but with lead context */
+export const leadBookSchema = bookSchema.extend({
+  leadId: z.string().uuid().optional(),
+  packageId: z.string().uuid().optional(),
+  customizedPackageId: z.string().uuid().optional(),
+  dayNumber: z.coerce.number().int().positive().optional(),
+  flightType: z.enum(['itinerary', 'optional']).default('itinerary'),
+});
+
+/** PATCH /flights/bookings/:id/link-day */
+export const linkDaySchema = z.object({
+  leadId: z.string().uuid().optional(),
+  dayNumber: z.coerce.number().int().positive().optional(),
+  flightType: z.enum(['itinerary', 'optional']).optional(),
+});
