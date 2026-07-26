@@ -456,15 +456,14 @@ const ItineraryEditor = ({
 
                 <FieldGroup label="Transport" icon={Car}>
                   <select
-                    value={day.transport || ''}
+                    value={day.transport || 'car'}
                     onChange={(e) => onDayChange(day.dayNumber, { transport: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all appearance-none cursor-pointer"
                   >
-                    <option value="">Select transport type</option>
+                    <option value="car">🚗 Car</option>
                     <option value="flight">✈️ Flight</option>
                     <option value="train">🚂 Train</option>
                     <option value="bus">🚌 Bus</option>
-                    <option value="car">🚗 Car</option>
                     <option value="boat">⛵ Boat</option>
                     <option value="walk">🚶 Walk</option>
                     <option value="other">📦 Other</option>

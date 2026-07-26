@@ -77,7 +77,7 @@ export const createDefaultDay = (dayNumber = 1) => ({
     lunch: false,
     dinner: false,
   },
-  transport: '',
+  transport: 'car',
   // Flight preferences (when transport === 'flight')
   // Package template: { origin, destination, cabinClass, departureTime, airlinePreference }
   // Lead level: { ...template + flightBookingId, bookingReference, flightNumber, carrierName, departureDateTime, arrivalDateTime, totalAmount, currency, status }
