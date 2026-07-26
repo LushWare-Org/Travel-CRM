@@ -180,13 +180,18 @@ const ItineraryEditor = ({
   const [currentDayForHotel, setCurrentDayForHotel] = useState(null);
   const [currentDayLocations, setCurrentDayLocations] = useState([]);
   const [autoFillingHotel, setAutoFillingHotel] = useState(false);
-  const [expandedDays, setExpandedDays] = useState({});
+  const [expandedDays, setExpandedDays] = useState(() => {
+    // Initialize all days expanded synchronously — no post-mount flicker
+    const init = {};
+    days.forEach(day => { init[day.dayNumber] = true; });
+    return init;
+  });
   const [showFlightModal, setShowFlightModal] = useState(false);
   const [currentDayForFlight, setCurrentDayForFlight] = useState(null);
   const [showHotelModal, setShowHotelModal] = useState(false);
   const [hotelModalMode, setHotelModalMode] = useState('suggest');
 
-  // Initialize all days as expanded
+  // Ensure new days (added after initial render) are expanded
   useEffect(() => {
     const expanded = {};
     days.forEach(day => {
