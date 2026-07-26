@@ -351,10 +351,19 @@ model HotelBooking {
   searchSnapshot    Json                // raw offer at booking time
   cancellationReason String?
   cancelledAt       DateTime?
+
+  // Lead / day context — cross-schema UUID refs
+  leadId              String?
+  packageId           String?
+  customizedPackageId String?
+  dayNumber           Int?
+
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
   @@index([createdById, createdAt])
   @@index([status])
+  @@index([leadId])
+  @@index([leadId, dayNumber])
   @@schema("crm_packages")
 }

@@ -149,6 +149,10 @@ model Lead {
   lostReason            String?
   tags                  String[]
 
+  // Optional transfer flights metadata
+  // [{ origin, destination, date, flightType: "to-start"|"return-home", flightBookingId, status, flightNumber, carrier, notes }]
+  optionalFlights       Json?        @default("[]")
+
   remarks               LeadRemark[]
   statusHistory         LeadStatusHistory[]
   communicationLogs     LeadCommunicationLog[]
