@@ -320,3 +320,41 @@ model Review {
   @@index([packageId, createdAt])
   @@schema("crm_packages")
 }
+
+// ─── HotelBooking ─────────────────────────────────────────────
+
+enum HotelBookingStatus {
+  pending
+  confirmed
+  cancelled
+  failed
+
+  @@schema("crm_packages")
+}
+
+model HotelBooking {
+  id                String              @id @default(uuid())
+  liteapiBookingId  String?
+  hotelId           String
+  hotelName         String
+  hotelAddress      String?
+  hotelImage        String?
+  checkin           DateTime
+  checkout          DateTime
+  currency          String              @default("USD")
+  totalAmount       Float
+  status            HotelBookingStatus  @default(pending)
+  createdById       String              // agent who booked — cross-schema ref → users.User
+  customerId        String?             // cross-schema ref → users.User
+  guestInfo         Json                // [{ firstName, lastName, title }]
+  roomDetails       Json                // { roomType, boardType, ... }
+  searchSnapshot    Json                // raw offer at booking time
+  cancellationReason String?
+  cancelledAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([createdById, createdAt])
+  @@index([status])
+  @@schema("crm_packages")
+}
