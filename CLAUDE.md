@@ -63,7 +63,7 @@ Each service has its own `package.json` — there is no root workspace. Commands
 - All API routes are prefixed `/api/v1/`
 - Use `zod` for input validation (already a root dependency)
 - Environment files: `.env` per service, never commit real credentials
-- **Git commits:** Use `Kevin Sanjula` as the author name. Never add `Co-Authored-By: Claude` or any Anthropic/Claude email to commits — all commits must be under my name only.
+- **Git commits:** Never add `Co-Authored-By: Claude` or any Anthropic/Claude email to commit messages
 
 ## Logging
 
