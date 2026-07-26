@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   X, Plus, Loader2, Calendar, Copy, User, Mail, Phone,
   MapPin, Plane, Users, Globe, Package, MessageSquare,
-  ChevronDown, ChevronUp, Sparkles, Save, ArrowRightLeft, Search,
-  CheckCircle2,
+  ChevronDown, ChevronUp, Sparkles, Save, ArrowRightLeft,
+  Settings2, Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
@@ -17,32 +17,41 @@ import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import { createDefaultDay } from '../../itinerary/types/index.js';
 import { FlightSelectionModal } from '../../shared';
 
-function FlightBookedCard({ flight, onRemove }) {
-  if (!flight) return null;
-  const seg = flight.segments?.[0] || {};
+function FlightPreferenceCard({ prefs, onEdit, onRemove }) {
+  if (!prefs) return null;
   return (
-    <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-3">
+    <div className="bg-blue-50 rounded-xl border border-blue-200 p-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+            <Settings2 className="w-4 h-4 text-blue-600" />
           </div>
           <div>
             <div className="text-sm font-semibold text-gray-900">
-              {seg.origin} → {seg.destination}
+              {prefs.origin || '?'} → {prefs.destination || '?'}
             </div>
             <div className="text-xs text-gray-500">
-              {seg.marketingCarrier}{seg.flightNumber?.replace(seg.marketingCarrier, '')} · {flight.pnr && <span className="font-mono font-medium text-gray-700">PNR: {flight.pnr}</span>}
+              {prefs.cabinClass || 'Economy'}{prefs.airlinePreference ? ` · ${prefs.airlinePreference}` : ''}{prefs.departureTime ? ` · ${prefs.departureTime}` : ''}
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-xs text-red-600 hover:text-red-700 font-medium"
-        >
-          Remove
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+            title="Edit preferences"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-red-600 hover:text-red-700 font-medium px-2"
+          >
+            Remove
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -81,16 +90,9 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     endDate: "",
     package: "",
     packageName: "",
-    // Transfer flights
-    inboundFrom: "",
-    inboundTo: "",
-    inboundDate: "",
-    outboundFrom: "",
-    outboundTo: "",
-    outboundDate: "",
-    // Booked transfer flight results
-    inboundFlight: null,
-    outboundFlight: null,
+    // Flight preference objects from template modal
+    inboundFlightPrefs: null,
+    outboundFlightPrefs: null,
     remarks: [{ text: "", date: "" }],
   });
 
@@ -170,32 +172,26 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       const assignedTo = isSalesRep && user?._id ? user._id : (formData.assignedTo || undefined);
       const salesRepName = isSalesRep && user?.name ? user.name : (formData.salesRep || undefined);
 
-      // Build optional transfer flights array
+      // Build optional transfer flights array from flight preferences
       const optionalFlights = [];
-      if (formData.inboundFrom || formData.inboundTo || formData.inboundFlight) {
+      if (formData.inboundFlightPrefs) {
         optionalFlights.push({
-          origin: formData.inboundFrom,
-          destination: formData.inboundTo,
-          date: formData.inboundDate || undefined,
+          origin: formData.inboundFlightPrefs.origin,
+          destination: formData.inboundFlightPrefs.destination,
           flightType: 'to-start',
-          flightBookingId: formData.inboundFlight?.id || undefined,
-          pnr: formData.inboundFlight?.pnr || undefined,
-          flightNumber: formData.inboundFlight?.segments?.[0]?.flightNumber || undefined,
-          carrier: formData.inboundFlight?.segments?.[0]?.marketingCarrier || undefined,
-          status: formData.inboundFlight?.status || undefined,
+          cabinClass: formData.inboundFlightPrefs.cabinClass,
+          departureTime: formData.inboundFlightPrefs.departureTime,
+          airlinePreference: formData.inboundFlightPrefs.airlinePreference,
         });
       }
-      if (formData.outboundFrom || formData.outboundTo || formData.outboundFlight) {
+      if (formData.outboundFlightPrefs) {
         optionalFlights.push({
-          origin: formData.outboundFrom,
-          destination: formData.outboundTo,
-          date: formData.outboundDate || undefined,
+          origin: formData.outboundFlightPrefs.origin,
+          destination: formData.outboundFlightPrefs.destination,
           flightType: 'return-home',
-          flightBookingId: formData.outboundFlight?.id || undefined,
-          pnr: formData.outboundFlight?.pnr || undefined,
-          flightNumber: formData.outboundFlight?.segments?.[0]?.flightNumber || undefined,
-          carrier: formData.outboundFlight?.segments?.[0]?.marketingCarrier || undefined,
-          status: formData.outboundFlight?.status || undefined,
+          cabinClass: formData.outboundFlightPrefs.cabinClass,
+          departureTime: formData.outboundFlightPrefs.departureTime,
+          airlinePreference: formData.outboundFlightPrefs.airlinePreference,
         });
       }
 
@@ -252,14 +248,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         endDate: "",
         package: "",
         packageName: "",
-        inboundFrom: "",
-        inboundTo: "",
-        inboundDate: "",
-        outboundFrom: "",
-        outboundTo: "",
-        outboundDate: "",
-        inboundFlight: null,
-        outboundFlight: null,
+        inboundFlightPrefs: null,
+        outboundFlightPrefs: null,
         remarks: [{ text: "", date: "" }],
       });
       setItineraryDays([]);
@@ -716,7 +706,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
             <SectionHeader
               icon={ArrowRightLeft}
               title="Transfer Flights"
-              subtitle="Optional: flights to reach the trip and return home"
+              subtitle="Optional: flight route preferences to reach the trip and return home"
               section="transfers"
               gradient="from-cyan-500 to-blue-600"
             />
@@ -725,99 +715,55 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               <div className="p-4 bg-cyan-50/50 rounded-2xl border border-cyan-100 space-y-4">
                 {/* Inbound Transfer */}
                 <div className="bg-white rounded-xl border border-cyan-200 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-cyan-800">Inbound Transfer — Getting to the Trip</h4>
-                    {(formData.inboundFrom && formData.inboundTo) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTransferFlightType('inbound');
-                          setShowTransferFlightModal(true);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white text-xs rounded-lg hover:bg-cyan-700 transition-colors"
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                        Search Flights
-                      </button>
-                    )}
-                  </div>
-                  {formData.inboundFlight ? (
-                    <FlightBookedCard flight={formData.inboundFlight} onRemove={() => setFormData({ ...formData, inboundFlight: null })} />
+                  <h4 className="text-sm font-semibold text-cyan-800 mb-3">Inbound Transfer — Getting to the Trip</h4>
+                  {formData.inboundFlightPrefs ? (
+                    <FlightPreferenceCard
+                      prefs={formData.inboundFlightPrefs}
+                      onEdit={() => {
+                        setTransferFlightType('inbound');
+                        setShowTransferFlightModal(true);
+                      }}
+                      onRemove={() => setFormData({ ...formData, inboundFlightPrefs: null })}
+                    />
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <InputField label="Flying From (Home Airport)" icon={MapPin}>
-                        <AirportAutocomplete
-                          value={formData.inboundFrom}
-                          onChange={(code) => setFormData({ ...formData, inboundFrom: code })}
-                          placeholder="e.g., LHR, London"
-                          prioritizeCountry={formData.fromCountry || undefined}
-                        />
-                      </InputField>
-                      <InputField label="Flying To (Trip Start)" icon={MapPin}>
-                        <AirportAutocomplete
-                          value={formData.inboundTo}
-                          onChange={(code) => setFormData({ ...formData, inboundTo: code })}
-                          placeholder="e.g., CMB, Colombo"
-                        />
-                      </InputField>
-                      <InputField label="Preferred Date" icon={Calendar}>
-                        <input
-                          type="date"
-                          value={formData.inboundDate}
-                          onChange={(e) => setFormData({ ...formData, inboundDate: e.target.value })}
-                          className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 transition-all"
-                        />
-                      </InputField>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTransferFlightType('inbound');
+                        setShowTransferFlightModal(true);
+                      }}
+                      className="w-full py-3 border-2 border-dashed border-cyan-300 text-cyan-700 rounded-xl hover:bg-cyan-50 hover:border-cyan-400 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Inbound Flight Preferences
+                    </button>
                   )}
                 </div>
 
                 {/* Outbound Transfer */}
                 <div className="bg-white rounded-xl border border-cyan-200 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-cyan-800">Outbound Transfer — Returning Home</h4>
-                    {(formData.outboundFrom && formData.outboundTo) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTransferFlightType('outbound');
-                          setShowTransferFlightModal(true);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white text-xs rounded-lg hover:bg-cyan-700 transition-colors"
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                        Search Flights
-                      </button>
-                    )}
-                  </div>
-                  {formData.outboundFlight ? (
-                    <FlightBookedCard flight={formData.outboundFlight} onRemove={() => setFormData({ ...formData, outboundFlight: null })} />
+                  <h4 className="text-sm font-semibold text-cyan-800 mb-3">Outbound Transfer — Returning Home</h4>
+                  {formData.outboundFlightPrefs ? (
+                    <FlightPreferenceCard
+                      prefs={formData.outboundFlightPrefs}
+                      onEdit={() => {
+                        setTransferFlightType('outbound');
+                        setShowTransferFlightModal(true);
+                      }}
+                      onRemove={() => setFormData({ ...formData, outboundFlightPrefs: null })}
+                    />
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <InputField label="Flying From (Trip End)" icon={MapPin}>
-                        <AirportAutocomplete
-                          value={formData.outboundFrom}
-                          onChange={(code) => setFormData({ ...formData, outboundFrom: code })}
-                          placeholder="e.g., CMB, Colombo"
-                        />
-                      </InputField>
-                      <InputField label="Flying To (Home Airport)" icon={MapPin}>
-                        <AirportAutocomplete
-                          value={formData.outboundTo}
-                          onChange={(code) => setFormData({ ...formData, outboundTo: code })}
-                          placeholder="e.g., LHR, London"
-                          prioritizeCountry={formData.fromCountry || undefined}
-                        />
-                      </InputField>
-                      <InputField label="Preferred Date" icon={Calendar}>
-                        <input
-                          type="date"
-                          value={formData.outboundDate}
-                          onChange={(e) => setFormData({ ...formData, outboundDate: e.target.value })}
-                          className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 transition-all"
-                        />
-                      </InputField>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTransferFlightType('outbound');
+                        setShowTransferFlightModal(true);
+                      }}
+                      className="w-full py-3 border-2 border-dashed border-cyan-300 text-cyan-700 rounded-xl hover:bg-cyan-50 hover:border-cyan-400 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Outbound Flight Preferences
+                    </button>
                   )}
                 </div>
               </div>
@@ -825,23 +771,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           </div>
         </div>
 
-        {/* Transfer Flight Booking Modal */}
+        {/* Transfer Flight Preference Modal (template mode — saves preferences only, no booking) */}
         <FlightSelectionModal
           isOpen={showTransferFlightModal}
           onClose={() => setShowTransferFlightModal(false)}
-          mode="booking"
-          initialData={{
-            origin: transferFlightType === 'inbound' ? formData.inboundFrom : formData.outboundFrom,
-            destination: transferFlightType === 'inbound' ? formData.inboundTo : formData.outboundTo,
-            cabinClass: 'Economy',
-          }}
-          travelDate={transferFlightType === 'inbound' ? formData.inboundDate : formData.outboundDate}
-          tripType="oneWay"
-          onBookFlight={(booking) => {
+          mode="template"
+          initialData={transferFlightType === 'inbound' ? (formData.inboundFlightPrefs || {}) : (formData.outboundFlightPrefs || {})}
+          onSelectTemplate={(prefs) => {
             if (transferFlightType === 'inbound') {
-              setFormData({ ...formData, inboundFlight: booking });
+              setFormData({ ...formData, inboundFlightPrefs: prefs });
             } else {
-              setFormData({ ...formData, outboundFlight: booking });
+              setFormData({ ...formData, outboundFlightPrefs: prefs });
             }
             setShowTransferFlightModal(false);
           }}

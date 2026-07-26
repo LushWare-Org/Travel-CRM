@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plane, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plane, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, Settings2, Pencil } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { flightAPI } from '../../../services/flight.service';
 import { FlightSelectionModal } from '../../shared';
@@ -31,12 +31,6 @@ export default function LeadFlightBookingsSection({
   const [flightModalPrefill, setFlightModalPrefill] = useState({});
   const [expanded, setExpanded] = useState(true);
 
-  const leadContext = leadId ? {
-    leadId,
-    flightType: flightModalType,
-    dayNumber: flightModalDay,
-  } : {};
-
   const fetchBookings = async () => {
     if (!leadId) return;
     setLoading(true);
@@ -65,24 +59,24 @@ export default function LeadFlightBookingsSection({
     }
   };
 
-  const handleBookFlight = (bookingData) => {
+  const handleFlightTemplate = (prefs) => {
     const dayNumber = flightModalDay;
     if (dayNumber && onUpdateDay) {
-      const bookingSeg = bookingData.segments?.[0] || {};
+      // Itinerary day flight — save preferences to the day
       onUpdateDay(dayNumber, {
         flight: {
           ...(itineraryDays.find(d => d.dayNumber === dayNumber)?.flight || {}),
-          flightBookingId: bookingData.id,
-          bookingReference: bookingData.pnr,
-          flightNumber: bookingSeg.flightNumber,
-          carrierName: bookingSeg.marketingCarrier,
-          departureDateTime: bookingSeg.departureAt,
-          arrivalDateTime: bookingSeg.arrivalAt,
-          totalAmount: bookingData.totalAmount,
-          currency: bookingData.currency,
-          status: bookingData.status,
+          origin: prefs.origin,
+          destination: prefs.destination,
+          cabinClass: prefs.cabinClass,
+          departureTime: prefs.departureTime,
+          airlinePreference: prefs.airlinePreference,
         },
       });
+      toast.success(`Flight preferences saved for Day ${dayNumber}`);
+    } else {
+      // Optional transfer flight — preferences stored for reference
+      toast.success('Flight preferences saved');
     }
     fetchBookings();
   };
@@ -137,19 +131,25 @@ export default function LeadFlightBookingsSection({
                 {flightDays.map(day => {
                   const dayBooking = bookings.find(b => b.dayNumber === day.dayNumber && b.flightType === 'itinerary');
                   const booked = !!dayBooking;
+                  const hasPrefs = !booked && day.flight?.origin;
                   return (
                     <div key={day.dayNumber} className="bg-white rounded-xl border border-gray-200 p-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="text-sm font-semibold text-gray-700">Day {day.dayNumber}</span>
-                          {day.flight?.origin && (
+                          {(booked || hasPrefs) && (
                             <span className="ml-2 text-sm text-gray-600">
-                              {day.flight.origin} → {day.flight.destination}
+                              {(dayBooking?.segments?.[0]?.origin || day.flight?.origin)} → {(dayBooking?.segments?.[dayBooking?.segments?.length - 1]?.destination || day.flight?.destination)}
                             </span>
                           )}
                           {booked && (
                             <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700">
                               Booked
+                            </span>
+                          )}
+                          {hasPrefs && (
+                            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700">
+                              Preferences Set
                             </span>
                           )}
                         </div>
@@ -164,7 +164,8 @@ export default function LeadFlightBookingsSection({
                             }}
                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
                           >
-                            <Plus className="w-3.5 h-3.5" /> Book Now
+                            {hasPrefs ? <Pencil className="w-3.5 h-3.5" /> : <Settings2 className="w-3.5 h-3.5" />}
+                            {hasPrefs ? 'Edit' : 'Set Preferences'}
                           </button>
                         ) : (
                           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -193,6 +194,13 @@ export default function LeadFlightBookingsSection({
                           {' · '}{fmtMoney(dayBooking.totalAmount, dayBooking.currency)}
                         </div>
                       )}
+                      {hasPrefs && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          {day.flight.cabinClass || 'Economy'}
+                          {day.flight.airlinePreference ? ` · ${day.flight.airlinePreference}` : ''}
+                          {day.flight.departureTime ? ` · ${day.flight.departureTime}` : ''}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -204,7 +212,7 @@ export default function LeadFlightBookingsSection({
             <div className="text-center py-6 text-gray-400">
               <Plane className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No flights in this itinerary</p>
-              <p className="text-xs mt-1">Set transport to "flight" on an itinerary day to book flights</p>
+              <p className="text-xs mt-1">Set transport to "flight" on an itinerary day to add flight preferences</p>
             </div>
           )}
 
@@ -255,7 +263,7 @@ export default function LeadFlightBookingsSection({
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-xs rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" /> Add Flight to Start
+                <Settings2 className="w-3.5 h-3.5" /> Add Flight Preferences to Start
               </button>
               <button
                 type="button"
@@ -267,22 +275,20 @@ export default function LeadFlightBookingsSection({
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-xs rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" /> Add Return Flight Home
+                <Settings2 className="w-3.5 h-3.5" /> Add Return Flight Preferences
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Flight Booking Modal */}
+      {/* Flight Preference Modal (template mode — saves preferences only, no booking) */}
       <FlightSelectionModal
         isOpen={showFlightModal}
         onClose={() => { setShowFlightModal(false); setFlightModalDay(null); }}
-        mode="booking"
+        mode="template"
         initialData={flightModalPrefill}
-        travelDate={travelDate || undefined}
-        leadContext={leadContext}
-        onBookFlight={handleBookFlight}
+        onSelectTemplate={handleFlightTemplate}
       />
     </div>
   );
