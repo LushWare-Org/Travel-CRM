@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import HotelService from '../../../services/hotel.service';
 import toast from 'react-hot-toast';
+import { COUNTRIES_PRIORITY } from '../../../data/countries';
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 const tomorrowStr = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; };
@@ -370,10 +371,9 @@ export default function HotelSelectionModal({
                   <label className="block text-xs font-medium text-gray-500 mb-1">Country</label>
                   <select value={searchForm.country} onChange={(e) => setSearchForm({ ...searchForm, country: e.target.value })}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none">
-                    <option value="LK">Sri Lanka</option><option value="AE">UAE</option><option value="IN">India</option>
-                    <option value="MV">Maldives</option><option value="TH">Thailand</option><option value="SG">Singapore</option>
-                    <option value="MY">Malaysia</option><option value="GB">UK</option><option value="US">USA</option>
-                    <option value="FR">France</option><option value="IT">Italy</option><option value="JP">Japan</option>
+                    {COUNTRIES_PRIORITY.map((c) => (
+                      <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
