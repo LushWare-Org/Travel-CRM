@@ -39,6 +39,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     city: "",
     salesRep: "",
     assignedTo: "",
+    fromCountry: "",
     platform: "",
     travelDate: "",
     endDate: "",
@@ -154,6 +155,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         email: formData.email?.trim() || undefined,
         phone: formData.phone || undefined,
         city: formData.city || undefined,
+        fromCountry: formData.fromCountry || undefined,
         whatsapp: formData.whatsapp || undefined,
         salesRep: salesRepName,
         assignedTo: assignedTo,
@@ -195,6 +197,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         whatsapp: "",
         salesRep: "",
         assignedTo: "",
+        fromCountry: "",
         platform: "",
         travelDate: "",
         endDate: "",
@@ -381,15 +384,48 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
             {expandedSections.travel && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
-                <div className="md:col-span-2">
-                  <InputField label="Departure City" icon={MapPin}>
-                    <LocationAutocomplete
-                      value={formData.city}
-                      onChange={(value) => setFormData({ ...formData, city: value })}
-                      placeholder="e.g., Colombo, Sri Lanka"
-                    />
-                  </InputField>
-                </div>
+                <InputField label="Departure City" icon={MapPin}>
+                  <LocationAutocomplete
+                    value={formData.city}
+                    onChange={(value) => setFormData({ ...formData, city: value })}
+                    placeholder="e.g., Colombo, Sri Lanka"
+                  />
+                </InputField>
+
+                <InputField label="Country of Residence" icon={Globe}>
+                  <select
+                    value={formData.fromCountry}
+                    onChange={(e) => setFormData({ ...formData, fromCountry: e.target.value })}
+                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
+                  >
+                    <option value="">Select country</option>
+                    <option value="LK">Sri Lanka</option>
+                    <option value="IN">India</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="US">United States</option>
+                    <option value="AE">UAE</option>
+                    <option value="SA">Saudi Arabia</option>
+                    <option value="AU">Australia</option>
+                    <option value="CA">Canada</option>
+                    <option value="DE">Germany</option>
+                    <option value="FR">France</option>
+                    <option value="IT">Italy</option>
+                    <option value="SG">Singapore</option>
+                    <option value="MY">Malaysia</option>
+                    <option value="TH">Thailand</option>
+                    <option value="MV">Maldives</option>
+                    <option value="JP">Japan</option>
+                    <option value="CN">China</option>
+                    <option value="RU">Russia</option>
+                    <option value="ZA">South Africa</option>
+                    <option value="BD">Bangladesh</option>
+                    <option value="NP">Nepal</option>
+                    <option value="PK">Pakistan</option>
+                    <option value="QA">Qatar</option>
+                    <option value="KW">Kuwait</option>
+                    <option value="OM">Oman</option>
+                  </select>
+                </InputField>
 
                 <InputField label="Travel Date" icon={Calendar}>
                   <input
@@ -672,6 +708,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                         value={formData.inboundFrom}
                         onChange={(code) => setFormData({ ...formData, inboundFrom: code })}
                         placeholder="e.g., LHR, London"
+                        prioritizeCountry={formData.fromCountry || undefined}
                       />
                     </InputField>
                     <InputField label="Flying To (Trip Start)" icon={MapPin}>
@@ -708,6 +745,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                         value={formData.outboundTo}
                         onChange={(code) => setFormData({ ...formData, outboundTo: code })}
                         placeholder="e.g., LHR, London"
+                        prioritizeCountry={formData.fromCountry || undefined}
                       />
                     </InputField>
                     <InputField label="Preferred Date" icon={Calendar}>

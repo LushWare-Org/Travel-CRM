@@ -18,6 +18,7 @@ export default function AirportAutocomplete({
   id,
   excludeCode,
   listMode = "popular",
+  prioritizeCountry,
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -38,13 +39,31 @@ export default function AirportAutocomplete({
 
   /** Airports shown on focus when input is empty */
   const defaultList = useMemo(() => {
-    if (listMode === "all") return [...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city));
-    return popularCodes.map((c) => AIRPORTS.find((a) => a.code === c)).filter(Boolean);
-  }, [listMode]);
+    if (listMode === "all") {
+      const all = [...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city));
+      if (prioritizeCountry) {
+        all.sort((a, b) => {
+          const aMatch = a.country === prioritizeCountry ? 0 : 1;
+          const bMatch = b.country === prioritizeCountry ? 0 : 1;
+          return aMatch - bMatch;
+        });
+      }
+      return all;
+    }
+    const popular = popularCodes.map((c) => AIRPORTS.find((a) => a.code === c)).filter(Boolean);
+    // Also include top airports from the prioritized country
+    if (prioritizeCountry) {
+      const countryAirports = AIRPORTS.filter(
+        (a) => a.country === prioritizeCountry && !popularCodes.includes(a.code),
+      ).slice(0, 3);
+      return [...countryAirports, ...popular];
+    }
+    return popular;
+  }, [listMode, prioritizeCountry]);
 
   const defaultLabel = listMode === "all" ? "All airports" : "Popular airports";
 
-  // Filter airports based on typed input
+  // Filter airports based on typed input, boosting matches from prioritizeCountry
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || query === value) return [];
@@ -57,8 +76,16 @@ export default function AirportAutocomplete({
         a.country.toLowerCase().includes(q)
       );
     });
+    // Boost airports in the prioritized country
+    if (prioritizeCountry) {
+      filtered.sort((a, b) => {
+        const aMatch = a.country === prioritizeCountry ? 0 : 1;
+        const bMatch = b.country === prioritizeCountry ? 0 : 1;
+        return aMatch - bMatch;
+      });
+    }
     return filtered.slice(0, 15);
-  }, [query, value, excludeCode]);
+  }, [query, value, excludeCode, prioritizeCountry]);
 
   const showDefault = !query && open;
   const showResults = open && results.length > 0;
