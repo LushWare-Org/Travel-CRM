@@ -118,3 +118,50 @@ export const cancelBooking = asyncHandler(async (req, res) => {
   });
   res.json({ success: true, data: updated });
 });
+
+// ── Lead-scoped controllers ─────────────────────────────────────────
+
+export const bookWithContext = asyncHandler(async (req, res) => {
+  const { prebookId, guests, contact, offer, leadId, packageId, customizedPackageId, dayNumber } = req.body;
+
+  const result = await getClient(req).book({ prebookId, guests, contact });
+
+  const booking = await prisma.hotelBooking.create({
+    data: {
+      liteapiBookingId: result.bookingId,
+      hotelId: offer?.hotelId || 'unknown',
+      hotelName: result.hotelName || offer?.name || 'Unknown',
+      hotelAddress: offer?.address || null,
+      hotelImage: offer?.images?.[0] || null,
+      checkin: new Date(result.checkin || offer?.checkin),
+      checkout: new Date(result.checkout || offer?.checkout),
+      currency: result.currency || 'USD',
+      totalAmount: result.totalAmount || 0,
+      status: 'confirmed',
+      createdById: req.user?.id || 'unknown',
+      customerId: contact?.customerId || null,
+      guestInfo: guests,
+      roomDetails: offer?.cheapestRate || {},
+      searchSnapshot: offer || {},
+      leadId: leadId || null,
+      packageId: packageId || null,
+      customizedPackageId: customizedPackageId || null,
+      dayNumber: dayNumber ? parseInt(dayNumber, 10) : null,
+    },
+  });
+
+  req.log.info({ bookingId: booking.id, leadId, dayNumber }, 'Hotel booked with lead context');
+  res.status(CREATED).json({ success: true, data: booking });
+});
+
+export const getHotelBookingsByLead = asyncHandler(async (req, res) => {
+  const { leadId } = req.params;
+  const isScoped = req.user?.role === SALES_REP && !req.user?.isSuperAdmin;
+
+  const bookings = await prisma.hotelBooking.findMany({
+    where: { leadId, ...(isScoped && { createdById: req.user.id }) },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json({ success: true, data: bookings });
+});

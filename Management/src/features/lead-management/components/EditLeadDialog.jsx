@@ -19,6 +19,8 @@ import { getCountryCodeFromDestination } from '../../itinerary/utils/destination
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import DestinationSelector from '../../itinerary/components/DestinationSelector';
 import { createDefaultDay } from '../../itinerary/types/index.js';
+import LeadFlightBookingsSection from './LeadFlightBookingsSection';
+import LeadHotelBookingsSection from './LeadHotelBookingsSection';
 
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const { user } = useAuth();
@@ -1299,6 +1301,38 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
               </div>
             )}
           </div>
+
+          {/* Flight & Hotel Bookings — only shown for existing leads */}
+          {lead?._id && (
+            <>
+              <LeadFlightBookingsSection
+                leadId={lead._id || lead.id}
+                itineraryDays={itineraryDays}
+                travelDate={formData.travelDate}
+                onUpdateDay={(dayNumber, updates) => {
+                  setItineraryDays(prev =>
+                    prev.map(day =>
+                      day.dayNumber === dayNumber ? { ...day, ...updates } : day
+                    )
+                  );
+                }}
+              />
+
+              <LeadHotelBookingsSection
+                leadId={lead._id || lead.id}
+                itineraryDays={itineraryDays}
+                travelDate={formData.travelDate}
+                endDate={formData.endDate}
+                onUpdateDay={(dayNumber, updates) => {
+                  setItineraryDays(prev =>
+                    prev.map(day =>
+                      day.dayNumber === dayNumber ? { ...day, ...updates } : day
+                    )
+                  );
+                }}
+              />
+            </>
+          )}
         </div>
 
         {/* Footer Actions */}

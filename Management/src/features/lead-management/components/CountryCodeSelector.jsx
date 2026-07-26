@@ -1,59 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { COUNTRIES } from '../../../data/countries';
 
-// Common country codes list
-const countryCodes = [
-  { code: '+1', country: 'US', name: 'United States' },
-  { code: '+1', country: 'CA', name: 'Canada' },
-  { code: '+44', country: 'GB', name: 'United Kingdom' },
-  { code: '+91', country: 'IN', name: 'India' },
-  { code: '+94', country: 'LK', name: 'Sri Lanka' },
-  { code: '+61', country: 'AU', name: 'Australia' },
-  { code: '+971', country: 'AE', name: 'UAE' },
-  { code: '+966', country: 'SA', name: 'Saudi Arabia' },
-  { code: '+65', country: 'SG', name: 'Singapore' },
-  { code: '+60', country: 'MY', name: 'Malaysia' },
-  { code: '+66', country: 'TH', name: 'Thailand' },
-  { code: '+62', country: 'ID', name: 'Indonesia' },
-  { code: '+63', country: 'PH', name: 'Philippines' },
-  { code: '+84', country: 'VN', name: 'Vietnam' },
-  { code: '+86', country: 'CN', name: 'China' },
-  { code: '+81', country: 'JP', name: 'Japan' },
-  { code: '+82', country: 'KR', name: 'South Korea' },
-  { code: '+33', country: 'FR', name: 'France' },
-  { code: '+49', country: 'DE', name: 'Germany' },
-  { code: '+39', country: 'IT', name: 'Italy' },
-  { code: '+34', country: 'ES', name: 'Spain' },
-  { code: '+31', country: 'NL', name: 'Netherlands' },
-  { code: '+32', country: 'BE', name: 'Belgium' },
-  { code: '+41', country: 'CH', name: 'Switzerland' },
-  { code: '+43', country: 'AT', name: 'Austria' },
-  { code: '+46', country: 'SE', name: 'Sweden' },
-  { code: '+47', country: 'NO', name: 'Norway' },
-  { code: '+45', country: 'DK', name: 'Denmark' },
-  { code: '+358', country: 'FI', name: 'Finland' },
-  { code: '+351', country: 'PT', name: 'Portugal' },
-  { code: '+30', country: 'GR', name: 'Greece' },
-  { code: '+48', country: 'PL', name: 'Poland' },
-  { code: '+7', country: 'RU', name: 'Russia' },
-  { code: '+27', country: 'ZA', name: 'South Africa' },
-  { code: '+20', country: 'EG', name: 'Egypt' },
-  { code: '+234', country: 'NG', name: 'Nigeria' },
-  { code: '+254', country: 'KE', name: 'Kenya' },
-  { code: '+52', country: 'MX', name: 'Mexico' },
-  { code: '+55', country: 'BR', name: 'Brazil' },
-  { code: '+54', country: 'AR', name: 'Argentina' },
-  { code: '+56', country: 'CL', name: 'Chile' },
-  { code: '+57', country: 'CO', name: 'Colombia' },
-  { code: '+51', country: 'PE', name: 'Peru' },
-  { code: '+64', country: 'NZ', name: 'New Zealand' },
-  { code: '+880', country: 'BD', name: 'Bangladesh' },
-  { code: '+92', country: 'PK', name: 'Pakistan' },
-  { code: '+880', country: 'BD', name: 'Bangladesh' },
-  { code: '+95', country: 'MM', name: 'Myanmar' },
-  { code: '+977', country: 'NP', name: 'Nepal' },
-  { code: '+960', country: 'MV', name: 'Maldives' },
-].sort((a, b) => a.name.localeCompare(b.name));
+// Derived from centralized country data — single source of truth
+const countryCodes = COUNTRIES
+  .map((c) => ({ code: c.phoneCode, country: c.code, name: c.name }))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 const CountryCodeSelector = ({ value, onChange, className = '' }) => {
   const [isOpen, setIsOpen] = useState(false);

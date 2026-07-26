@@ -20,6 +20,42 @@ import { VALIDATION_MESSAGES } from '../../utils/constants';
 import { createDefaultDay } from '../../types/index.js';
 import { formatCurrency } from '../../../../utils/currency.js';
 
+// ═══════════════════════════════════════════════════════════════════
+//  StableSectionCard — defined at module scope so React never
+//  unmounts/remounts it on parent re-renders. This prevents the
+//  ItineraryEditor (and other children) from losing scroll position
+//  and internal state when a day field changes.
+// ═══════════════════════════════════════════════════════════════════
+function StableSectionCard({ id, icon: Icon, title, description, children, gradient, expanded, onToggle }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white hover:from-slate-100 hover:to-slate-50 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className={`w-10 h-10 bg-gradient-to-br ${gradient || 'from-slate-500 to-slate-600'} rounded-xl flex items-center justify-center shadow-sm`}>
+            <Icon className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-left">
+            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
+            <p className="text-sm text-slate-500">{description}</p>
+          </div>
+        </div>
+        <div className={`w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center transition-transform ${expanded ? 'rotate-180' : ''}`}>
+          <ChevronDown className="w-5 h-5 text-slate-500" />
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-6 pb-6 pt-2 border-t border-slate-100">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const NewEditPackageForm = ({
   formData,
   setFormData,
@@ -197,42 +233,14 @@ const NewEditPackageForm = ({
     onSave?.(dataToSave);
   };
 
-  // Section Card Component
-  const SectionCard = ({ id, icon: Icon, title, description, children, gradient = 'from-slate-500 to-slate-600' }) => (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md">
-      <button
-        type="button"
-        onClick={() => toggleSection(id)}
-        className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white hover:from-slate-100 hover:to-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-4">
-          <div className={`w-10 h-10 bg-gradient-to-br ${gradient} rounded-xl flex items-center justify-center shadow-sm`}>
-            <Icon className="w-5 h-5 text-white" />
-          </div>
-          <div className="text-left">
-            <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
-            <p className="text-sm text-slate-500">{description}</p>
-          </div>
-        </div>
-        <div className={`w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center transition-transform ${expandedSections[id] ? 'rotate-180' : ''}`}>
-          <ChevronDown className="w-5 h-5 text-slate-500" />
-        </div>
-      </button>
-
-      {expandedSections[id] && (
-        <div className="px-6 pb-6 pt-2 border-t border-slate-100">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       {/* Basic Info Section */}
       {!onlyItineraryEditable ? (
-        <SectionCard
+        <StableSectionCard
           id="basic"
+          expanded={expandedSections.basic}
+          onToggle={toggleSection}
           icon={FileText}
           title="Basic Information"
           description="Package name, destination, and description"
@@ -243,7 +251,7 @@ const NewEditPackageForm = ({
             onChange={handleBasicInfoChange}
             packageId={localFormData._id || localFormData.id || null}
           />
-        </SectionCard>
+        </StableSectionCard>
       ) : (
         <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -274,8 +282,10 @@ const NewEditPackageForm = ({
 
       {/* Package Details Section */}
       {!onlyItineraryEditable ? (
-        <SectionCard
+        <StableSectionCard
           id="details"
+          expanded={expandedSections.details}
+          onToggle={toggleSection}
           icon={DollarSign}
           title="Package Details"
           description="Pricing, duration, and package type"
@@ -293,7 +303,7 @@ const NewEditPackageForm = ({
             onFormChange={handleDetailsChange}
             onNightsChange={handleDurationChange}
           />
-        </SectionCard>
+        </StableSectionCard>
       ) : (
         <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -359,8 +369,10 @@ const NewEditPackageForm = ({
 
       {/* Images Section */}
       {!onlyItineraryEditable && (
-        <SectionCard
+        <StableSectionCard
           id="images"
+          expanded={expandedSections.images}
+          onToggle={toggleSection}
           icon={Image}
           title="Package Images"
           description="Upload attractive images for your package"
@@ -372,12 +384,14 @@ const NewEditPackageForm = ({
             onImageRemove={onImageRemove}
             isUploading={isUploadingImages}
           />
-        </SectionCard>
+        </StableSectionCard>
       )}
 
       {/* Itinerary Section */}
-      <SectionCard
+      <StableSectionCard
         id="itinerary"
+        expanded={expandedSections.itinerary}
+        onToggle={toggleSection}
         icon={Calendar}
         title="Day-wise Itinerary"
         description="Plan activities and experiences for each day"
@@ -425,7 +439,7 @@ const NewEditPackageForm = ({
             </button>
           </div>
         )}
-      </SectionCard>
+      </StableSectionCard>
 
       {/* Action Buttons */}
       {!hideLeadManagementButtons ? (

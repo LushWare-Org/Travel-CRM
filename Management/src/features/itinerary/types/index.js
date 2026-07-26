@@ -60,13 +60,28 @@ export const createDefaultDay = (dayNumber = 1) => ({
     rating: 0,
     address: '',
     contactNumber: '',
+    // Extended fields from hotel selection
+    hotelId: null,
+    hotelProvider: null,
+    hotelImage: null,
+    roomType: null,
+    boardType: null,
+    checkin: null,
+    checkout: null,
+    totalAmount: null,
+    currency: null,
+    bookingIds: [],
   },
   meals: {
     breakfast: false,
     lunch: false,
     dinner: false,
   },
-  transport: '',
+  transport: 'car',
+  // Flight preferences (when transport === 'flight')
+  // Package template: { origin, destination, cabinClass, departureTime, airlinePreference }
+  // Lead level: { ...template + flightBookingId, bookingReference, flightNumber, carrierName, departureDateTime, arrivalDateTime, totalAmount, currency, status }
+  flight: null,
   places: [],
   images: [],
   notes: '',

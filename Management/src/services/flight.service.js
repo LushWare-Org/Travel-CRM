@@ -63,6 +63,44 @@ class FlightService {
       throw error;
     }
   }
+
+  // ── Lead-scoped endpoints ───────────────────────────────────────
+
+  async bookForLead(payload) {
+    try {
+      return await this.api.post('/flights/book-for-lead', payload);
+    } catch (error) {
+      console.error('Error booking flight for lead:', error);
+      throw error;
+    }
+  }
+
+  async getByLead(leadId) {
+    try {
+      return await this.api.get(`/flights/bookings/by-lead/${leadId}`);
+    } catch (error) {
+      console.error('Error fetching lead flight bookings:', error);
+      throw error;
+    }
+  }
+
+  async getOptionalFlights(leadId) {
+    try {
+      return await this.api.get(`/flights/bookings/by-lead/${leadId}/optional-flights`);
+    } catch (error) {
+      console.error('Error fetching optional flights:', error);
+      throw error;
+    }
+  }
+
+  async linkToDay(bookingId, payload) {
+    try {
+      return await this.api.patch(`/flights/bookings/${bookingId}/link-day`, payload);
+    } catch (error) {
+      console.error('Error linking flight to day:', error);
+      throw error;
+    }
+  }
 }
 
 export const flightAPI = new FlightService();
