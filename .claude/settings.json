@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch",
+      "Bash(git *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(mkdir -p *)",
+      "Bash(touch *)",
+      "Bash(which *)",
+      "Bash(node --version)",
+      "Bash(node -e *)",
+      "Bash(cd */ && npm run *)",
+      "Bash(cd */ && npm test *)",
+      "Bash(cd */ && npx *)",
+      "Bash(cd */ && node *)",
+      "Bash(curl *localhost:300*)",
+      "Bash(curl *localhost:517*)",
+      "Bash(curl -* localhost:300*)",
+      "Bash(curl -* localhost:517*)"
+    ],
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -rf *)",
+      "Bash(curl *--data* production*)",
+      "Bash(curl *--data* api.lushtravelcloud.com*)",
+      "Read(**/.env)"
+    ]
+  }
+}
