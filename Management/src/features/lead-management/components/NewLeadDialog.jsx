@@ -11,9 +11,9 @@ import { leadAPI, packageAPI, manualItineraryAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import LocationAutocomplete from './LocationAutocomplete';
 import AirportAutocomplete from '../../../components/AirportAutocomplete';
+import CountrySelect from '../../../components/CountrySelect';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import { createDefaultDay } from '../../itinerary/types/index.js';
-import { COUNTRIES_PRIORITY } from '../../../data/countries';
 
 const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const { user } = useAuth();
@@ -394,16 +394,11 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 </InputField>
 
                 <InputField label="Country of Residence" icon={Globe}>
-                  <select
+                  <CountrySelect
                     value={formData.fromCountry}
-                    onChange={(e) => setFormData({ ...formData, fromCountry: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
-                  >
-                    <option value="">Select country</option>
-                    {COUNTRIES_PRIORITY.map((c) => (
-                      <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-                    ))}
-                  </select>
+                    onChange={(code) => setFormData({ ...formData, fromCountry: code })}
+                    placeholder="Search country..."
+                  />
                 </InputField>
 
                 <InputField label="Travel Date" icon={Calendar}>
