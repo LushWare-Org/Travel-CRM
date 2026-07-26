@@ -8,7 +8,7 @@ import {
   Trash2, Plus, Upload, X, Search, Loader,
   MapPin, Activity, Utensils, Car, Building2,
   StickyNote, Image as ImageIcon, ChevronDown, ChevronUp,
-  Coffee, UtensilsCrossed, Moon, Check
+  Coffee, UtensilsCrossed, Moon, Check, Star, Phone, Bed,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { uploadItineraryImages } from '../../../services/cloudinaryService';
@@ -16,6 +16,152 @@ import Swal from 'sweetalert2';
 import ActivitySelector from './ActivitySelector';
 import LocationSelector from './LocationSelector';
 import { FlightSelectionModal, HotelSelectionModal } from '../../shared';
+
+// ═══════════════════════════════════════════════════════════════════
+//  Hotel Stay Card — shown when a hotel is selected from the API
+// ═══════════════════════════════════════════════════════════════════
+function HotelStayCard({ accommodation, onSearch, onRemove }) {
+  const [expanded, setExpanded] = useState(false);
+  const acc = accommodation || {};
+
+  function fmtMoney(amount, currency) {
+    if (amount == null) return null;
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(amount);
+  }
+
+  const priceStr = fmtMoney(acc.totalAmount, acc.currency);
+
+  return (
+    <div className="bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="flex flex-col sm:flex-row gap-4 p-4">
+        {/* Image */}
+        <div className="w-full sm:w-40 h-32 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+          {acc.hotelImage ? (
+            <img src={acc.hotelImage} alt={acc.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Building2 className="w-10 h-10 text-gray-300" />
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <h4 className="text-base font-bold text-gray-900">{acc.name}</h4>
+
+          {/* Stars */}
+          <div className="flex items-center gap-0.5 mt-1">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Star
+                key={i}
+                className={`w-4 h-4 ${acc.rating != null && i < Math.round(Number(acc.rating)) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`}
+              />
+            ))}
+            {acc.rating != null && acc.rating > 0 && (
+              <span className="ml-1 text-xs text-gray-500">{Number(acc.rating).toFixed(1)}</span>
+            )}
+            {(!acc.rating || acc.rating === 0) && (
+              <span className="ml-1 text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* Address */}
+          {acc.address && (
+            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1.5">
+              <MapPin className="w-3 h-3 shrink-0" /> {acc.address}
+            </p>
+          )}
+
+          {/* Badges row */}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {acc.roomType && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
+                <Bed className="w-3 h-3" /> {acc.roomType}
+              </span>
+            )}
+            {acc.boardType && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
+                {acc.boardType}
+              </span>
+            )}
+            {acc.refundable && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                Refundable
+              </span>
+            )}
+            {priceStr && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 font-semibold">
+                {priceStr}{acc.cheapestRate ? '' : '/night'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex sm:flex-col gap-2 shrink-0 items-end">
+          <button
+            type="button"
+            onClick={onSearch}
+            className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+          >
+            Change
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+
+      {/* Expand toggle */}
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-4 py-2 flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+      >
+        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        {expanded ? 'Less details' : 'More details'}
+      </button>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 text-xs text-gray-600">
+          {acc.contactNumber && (
+            <div className="flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span>{acc.contactNumber}</span>
+            </div>
+          )}
+          {acc.address && (
+            <div className="flex items-center gap-1.5 sm:col-span-2">
+              <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span>{acc.address}</span>
+            </div>
+          )}
+          {priceStr && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-gray-400 shrink-0">Price:</span>
+              <span className="font-semibold text-gray-800">{priceStr}</span>
+            </div>
+          )}
+          {acc.type && (
+            <div className="flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span className="capitalize">{acc.type}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 sm:col-span-2">
+            <span className="text-gray-400 shrink-0">Hotel ID:</span>
+            <span className="font-mono text-gray-400">{acc.hotelId || '—'}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const ItineraryEditor = ({
   days = [],
@@ -359,82 +505,78 @@ const ItineraryEditor = ({
 
               {/* Row 4: Accommodation */}
               <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <Building2 className="w-4 h-4 text-slate-400" />
-                    Accommodation
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {autoFillingHotel && days.find(d => d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
-                        <Loader className="w-3 h-3 animate-spin" />
-                        <span>Finding best match...</span>
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentDayForHotel(day.dayNumber);
-                        const dayLocations = day.locations && day.locations.length > 0 ? day.locations : [];
-                        setCurrentDayLocations(dayLocations);
-                        setHotelModalMode('suggest');
-                        setShowHotelModal(true);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
-                      title="Search for hotel suggestions"
-                    >
-                      <Search className="w-4 h-4" />
-                      Search Hotels
-                    </button>
-                  </div>
-                </div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+                  <Building2 className="w-4 h-4 text-slate-400" />
+                  Accommodation
+                </label>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <input
-                    type="text"
-                    value={day.accommodation?.name || ''}
-                    onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, name: e.target.value } })}
-                    placeholder="Hotel/Resort name"
-                    className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                {day.accommodation?.name ? (
+                  /* ── Hotel Card (selected) ──────────────────── */
+                  <HotelStayCard
+                    accommodation={day.accommodation}
+                    onSearch={() => {
+                      setCurrentDayForHotel(day.dayNumber);
+                      setCurrentDayLocations(day.locations || []);
+                      setHotelModalMode('suggest');
+                      setShowHotelModal(true);
+                    }}
+                    onRemove={() => {
+                      onDayChange(day.dayNumber, {
+                        accommodation: { name: '', type: '', rating: 0, address: '', contactNumber: '', hotelId: null, hotelImage: null, roomType: null, boardType: null, totalAmount: null, currency: null, refundable: null, bookingIds: [] },
+                      });
+                    }}
                   />
-                  <select
-                    value={day.accommodation?.type || ''}
-                    onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, type: e.target.value } })}
-                    className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Select type</option>
-                    <option value="hotel">🏨 Hotel</option>
-                    <option value="resort">🌴 Resort</option>
-                    <option value="guesthouse">🏡 Guesthouse</option>
-                    <option value="homestay">🏠 Homestay</option>
-                    <option value="camp">⛺ Camp</option>
-                    <option value="other">📦 Other</option>
-                  </select>
-                  <input
-                    type="text"
-                    value={day.accommodation?.address || ''}
-                    onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, address: e.target.value } })}
-                    placeholder="Address"
-                    className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-                  />
-                  <input
-                    type="text"
-                    value={day.accommodation?.contactNumber || ''}
-                    onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, contactNumber: e.target.value } })}
-                    placeholder="Contact number"
-                    className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-                  />
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="5"
-                    value={day.accommodation?.rating || ''}
-                    onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, rating: parseFloat(e.target.value) || 0 } })}
-                    placeholder="Rating (0-5)"
-                    className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-                  />
-                </div>
+                ) : (
+                  /* ── No hotel selected — search prompt ─────── */
+                  <div className="text-center py-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                    <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm text-slate-500 mb-3">No hotel selected for this day</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentDayForHotel(day.dayNumber);
+                          setCurrentDayLocations(day.locations || []);
+                          setHotelModalMode('suggest');
+                          setShowHotelModal(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
+                      >
+                        <Search className="w-4 h-4" />
+                        Search Hotels
+                      </button>
+                      <span className="text-xs text-slate-400">or fill below</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 px-3">
+                      <input
+                        type="text"
+                        value={day.accommodation?.name || ''}
+                        onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, name: e.target.value } })}
+                        placeholder="Hotel name (manual)"
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      />
+                      <select
+                        value={day.accommodation?.type || ''}
+                        onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, type: e.target.value } })}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      >
+                        <option value="">Type</option>
+                        <option value="hotel">Hotel</option>
+                        <option value="resort">Resort</option>
+                        <option value="guesthouse">Guesthouse</option>
+                        <option value="homestay">Homestay</option>
+                        <option value="camp">Camp</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {autoFillingHotel && days.find(d => d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
+                  <div className="flex items-center gap-1 mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+                    <Loader className="w-3 h-3 animate-spin" />
+                    <span>Finding best match...</span>
+                  </div>
+                )}
               </div>
 
               {/* Row 5: Notes */}
@@ -559,17 +701,17 @@ const ItineraryEditor = ({
             onDayChange(currentDayForHotel, {
               accommodation: {
                 name: hotel.name,
-                address: hotel.address,
+                address: hotel.address || '',
                 contactNumber: hotel.contactNumber || '',
-                rating: hotel.rating !== undefined && hotel.rating !== null
-                  ? parseFloat(hotel.rating)
-                  : (day?.accommodation?.rating !== undefined ? day.accommodation.rating : ''),
+                rating: hotel.starRating ?? hotel.rating ?? (day?.accommodation?.rating || ''),
                 type: day?.accommodation?.type || 'hotel',
                 hotelId: hotel.hotelId || hotel.id || null,
-                hotelProvider: hotel.hotelProvider || null,
                 hotelImage: hotel.images?.[0] || hotel.hotelImage || null,
-                roomType: hotel.roomType || hotel.cheapestRate?.roomType || null,
-                boardType: hotel.boardType || hotel.cheapestRate?.boardType || null,
+                roomType: hotel.cheapestRate?.roomType || hotel.roomType || null,
+                boardType: hotel.cheapestRate?.boardType || hotel.boardType || null,
+                totalAmount: hotel.cheapestRate?.totalAmount ?? hotel.totalAmount ?? null,
+                currency: hotel.cheapestRate?.currency || hotel.currency || null,
+                refundable: hotel.cheapestRate?.refundable ?? hotel.refundable ?? null,
               },
             });
           }
