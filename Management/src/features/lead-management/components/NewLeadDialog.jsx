@@ -437,7 +437,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 <InputField label="Package" icon={Package}>
                   <select
                     value={formData.package || ''}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const packageId = e.target.value;
                       const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
                       setFormData({
@@ -446,6 +446,29 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                         packageName: selectedPackage?.name || '',
                         destination: selectedPackage?.destination || formData.destination
                       });
+
+                      // Load package itinerary into the manual itinerary editor
+                      if (packageId && selectedPackage) {
+                        try {
+                          const response = await packageAPI.getById(packageId);
+                          if (response.success || response.status === 'success') {
+                            const pkg = response.data?.data || response.data;
+                            let days = [];
+                            if (pkg?.itinerary?.days) {
+                              days = pkg.itinerary.days;
+                            } else if (Array.isArray(pkg?.days)) {
+                              days = pkg.days;
+                            }
+                            if (days.length > 0) {
+                              setItineraryDays(days);
+                              setShowManualItinerary(true);
+                              setExpandedSections(prev => ({ ...prev, itinerary: true }));
+                            }
+                          }
+                        } catch (err) {
+                          console.error('Error loading package itinerary:', err);
+                        }
+                      }
                     }}
                     disabled={loadingPackages}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"

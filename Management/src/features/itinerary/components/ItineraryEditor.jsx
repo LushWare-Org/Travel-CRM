@@ -15,7 +15,7 @@ import { uploadItineraryImages } from '../../../services/cloudinaryService';
 import Swal from 'sweetalert2';
 import ActivitySelector from './ActivitySelector';
 import LocationSelector from './LocationSelector';
-import HotelSuggestionsModal from './HotelSuggestionsModal';
+import { FlightSelectionModal, HotelSelectionModal } from '../../shared';
 
 const ItineraryEditor = ({
   days = [],
@@ -31,11 +31,14 @@ const ItineraryEditor = ({
   hideDescription = false,
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
-  const [showHotelModal, setShowHotelModal] = useState(false);
   const [currentDayForHotel, setCurrentDayForHotel] = useState(null);
   const [currentDayLocations, setCurrentDayLocations] = useState([]);
   const [autoFillingHotel, setAutoFillingHotel] = useState(false);
   const [expandedDays, setExpandedDays] = useState({});
+  const [showFlightModal, setShowFlightModal] = useState(false);
+  const [currentDayForFlight, setCurrentDayForFlight] = useState(null);
+  const [showHotelModal, setShowHotelModal] = useState(false);
+  const [hotelModalMode, setHotelModalMode] = useState('suggest');
 
   // Initialize all days as expanded
   useEffect(() => {
@@ -318,6 +321,42 @@ const ItineraryEditor = ({
                 </FieldGroup>
               </div>
 
+              {/* Flight Info Card — when transport is flight */}
+              {day.transport === 'flight' && (
+                <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-800">
+                      {day.flight?.origin
+                        ? `${day.flight.origin} → ${day.flight.destination}`
+                        : 'No flight selected'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrentDayForFlight(day.dayNumber);
+                        setShowFlightModal(true);
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      {day.flight?.origin ? 'Edit Flight' : 'Select Flight'}
+                    </button>
+                  </div>
+                  {day.flight?.origin && (
+                    <div className="mt-2 text-xs text-blue-700 space-y-0.5">
+                      <p className="font-medium">{day.flight.origin} → {day.flight.destination}</p>
+                      <p>Airline: {day.flight.airlinePreference || 'Any'} | Cabin: {day.flight.cabinClass || 'Economy'}</p>
+                      {day.flight.departureTime && <p>Preferred: {day.flight.departureTime}</p>}
+                      {day.flight.flightNumber && (
+                        <>
+                          <p className="mt-1 font-medium text-green-700">Booked: {day.flight.flightNumber} ({day.flight.carrierName})</p>
+                          <p>PNR: {day.flight.bookingReference} | Status: {day.flight.status}</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Row 4: Accommodation */}
               <div className="bg-white rounded-xl border border-slate-200 p-4">
                 <div className="flex justify-between items-center mb-4">
@@ -338,6 +377,7 @@ const ItineraryEditor = ({
                         setCurrentDayForHotel(day.dayNumber);
                         const dayLocations = day.locations && day.locations.length > 0 ? day.locations : [];
                         setCurrentDayLocations(dayLocations);
+                        setHotelModalMode('suggest');
                         setShowHotelModal(true);
                       }}
                       className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
@@ -489,14 +529,30 @@ const ItineraryEditor = ({
         Add Another Day
       </button>
 
-      {/* Hotel Suggestions Modal */}
-      <HotelSuggestionsModal
-        isOpen={showHotelModal}
-        onClose={() => {
-          setShowHotelModal(false);
-          setCurrentDayForHotel(null);
-          setCurrentDayLocations([]);
+      {/* Flight Selection Modal — template mode */}
+      <FlightSelectionModal
+        isOpen={showFlightModal}
+        onClose={() => { setShowFlightModal(false); setCurrentDayForFlight(null); }}
+        mode="template"
+        initialData={currentDayForFlight ? (days.find(d => d.dayNumber === currentDayForFlight)?.flight || {}) : {}}
+        onSelectTemplate={(flightData) => {
+          if (currentDayForFlight) {
+            onDayChange(currentDayForFlight, { flight: flightData });
+          }
+          setShowFlightModal(false);
+          setCurrentDayForFlight(null);
         }}
+      />
+
+      {/* Unified Hotel Selection Modal */}
+      <HotelSelectionModal
+        isOpen={showHotelModal}
+        onClose={() => { setShowHotelModal(false); setCurrentDayForHotel(null); }}
+        mode={hotelModalMode}
+        destination={destination}
+        packageType={packageType}
+        category={category}
+        locations={currentDayLocations}
         onSelectHotel={(hotel) => {
           if (currentDayForHotel) {
             const day = days.find(d => d.dayNumber === currentDayForHotel);
@@ -509,14 +565,15 @@ const ItineraryEditor = ({
                   ? parseFloat(hotel.rating)
                   : (day?.accommodation?.rating !== undefined ? day.accommodation.rating : ''),
                 type: day?.accommodation?.type || 'hotel',
+                hotelId: hotel.hotelId || hotel.id || null,
+                hotelProvider: hotel.hotelProvider || null,
+                hotelImage: hotel.images?.[0] || hotel.hotelImage || null,
+                roomType: hotel.roomType || hotel.cheapestRate?.roomType || null,
+                boardType: hotel.boardType || hotel.cheapestRate?.boardType || null,
               },
             });
           }
         }}
-        destination={destination}
-        packageType={packageType}
-        category={category}
-        locations={currentDayLocations}
       />
     </div>
   );
