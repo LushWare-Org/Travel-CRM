@@ -2,7 +2,9 @@ import crypto from 'crypto';
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
-import * as travelport from '../services/travelport.service.js';
+import { SALES_REP } from '../constants/roles.js';
+import { CREATED, BAD_REQUEST, NOT_FOUND } from '../constants/httpStatus.js';
+import { BOOKING_NOT_FOUND, BOOKING_ALREADY_CANCELLED } from '../constants/errorMessages.js';
 
 // ── cross-schema helpers (mirrors Services/booking-service's pattern) ─────
 
@@ -42,48 +44,40 @@ async function findOrCreateCustomer({ name, email, phone }) {
 // ── controllers ────────────────────────────────────────────────────────
 
 export const search = asyncHandler(async (req, res) => {
-  const { origin, destination, departureDate, returnDate, adults, children, infants, cabinClass, tripType } = req.body || {};
+  const { origin, destination, departureDate, returnDate, adults, children, infants, cabinClass, tripType } = req.body;
 
-  if (!origin || !destination || !departureDate) {
-    throw new AppError('origin, destination and departureDate are required', 400);
-  }
-
-  const offers = await travelport.searchFlights({
-    origin: String(origin).toUpperCase(),
-    destination: String(destination).toUpperCase(),
+  const offers = await req.flightClient.searchFlights({
+    origin,
+    destination,
     departureDate,
     returnDate: returnDate || undefined,
-    adults: Number(adults) || 1,
-    children: Number(children) || 0,
-    infants: Number(infants) || 0,
+    adults: adults ?? 1,
+    children: children ?? 0,
+    infants: infants ?? 0,
     cabinClass: cabinClass || 'Economy',
     tripType: tripType || (returnDate ? 'roundTrip' : 'oneWay'),
   });
 
+  req.log.info({ origin, destination, departureDate, count: offers.length }, 'Flight search completed');
   res.json({ success: true, data: offers });
 });
 
 export const price = asyncHandler(async (req, res) => {
-  const { offerId } = req.body || {};
-  if (!offerId) throw new AppError('offerId is required', 400);
-
-  const result = await travelport.priceOffer(offerId);
+  const result = await req.flightClient.priceOffer(req.body.offerId);
   res.json({ success: true, data: result });
 });
 
 export const book = asyncHandler(async (req, res) => {
-  const { offer, tripType, travelers, contact } = req.body || {};
-
-  if (!offer?.offerId) throw new AppError('offer is required', 400);
-  if (!Array.isArray(travelers) || travelers.length === 0) throw new AppError('At least one traveler is required', 400);
-  if (!contact?.email) throw new AppError('contact.email is required', 400);
+  const { offer, tripType, travelers, contact } = req.body;
 
   const customer = await findOrCreateCustomer(contact);
 
-  const order = await travelport.createOrder({
+  const order = await req.flightClient.createOrder({
     offerId: offer.offerId,
     travelers,
     contact,
+    totalAmount: offer.fareTotal,
+    currency: offer.currency,
   });
 
   const booking = await prisma.flightBooking.create({
@@ -135,12 +129,13 @@ export const book = asyncHandler(async (req, res) => {
     include: { segments: true, travelers: true },
   });
 
-  res.status(201).json({ success: true, data: booking });
+  req.log.info({ bookingId: booking.id, pnr: booking.pnr }, 'Flight booked');
+  res.status(CREATED).json({ success: true, data: booking });
 });
 
 export const listBookings = asyncHandler(async (req, res) => {
   const { status } = req.query;
-  const isScopedToOwn = req.user.role === 'salesRep' && !req.user.isSuperAdmin;
+  const isScopedToOwn = req.user.role === SALES_REP && !req.user.isSuperAdmin;
 
   const bookings = await prisma.flightBooking.findMany({
     where: {
@@ -156,30 +151,30 @@ export const listBookings = asyncHandler(async (req, res) => {
 
 export const getBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const isScopedToOwn = req.user.role === 'salesRep' && !req.user.isSuperAdmin;
+  const isScopedToOwn = req.user.role === SALES_REP && !req.user.isSuperAdmin;
 
   const booking = await prisma.flightBooking.findFirst({
     where: { id, ...(isScopedToOwn && { createdById: req.user.id }) },
     include: { segments: true, travelers: true },
   });
 
-  if (!booking) throw new AppError('Flight booking not found', 404);
+  if (!booking) throw new AppError(BOOKING_NOT_FOUND, NOT_FOUND);
   res.json({ success: true, data: booking });
 });
 
 export const cancelBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body || {};
-  const isScopedToOwn = req.user.role === 'salesRep' && !req.user.isSuperAdmin;
+  const isScopedToOwn = req.user.role === SALES_REP && !req.user.isSuperAdmin;
 
   const booking = await prisma.flightBooking.findFirst({
     where: { id, ...(isScopedToOwn && { createdById: req.user.id }) },
   });
-  if (!booking) throw new AppError('Flight booking not found', 404);
-  if (booking.status === 'cancelled') throw new AppError('Booking is already cancelled', 400);
+  if (!booking) throw new AppError(BOOKING_NOT_FOUND, NOT_FOUND);
+  if (booking.status === 'cancelled') throw new AppError(BOOKING_ALREADY_CANCELLED, BAD_REQUEST);
 
   if (booking.travelportOrderId) {
-    await travelport.cancelOrder(booking.travelportOrderId);
+    await req.flightClient.cancelOrder(booking.travelportOrderId);
   }
 
   const updated = await prisma.flightBooking.update({

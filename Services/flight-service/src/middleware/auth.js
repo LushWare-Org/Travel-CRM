@@ -1,4 +1,6 @@
 import AppError from '../utils/appError.js';
+import { UNAUTHORIZED, FORBIDDEN } from '../constants/httpStatus.js';
+import { NOT_AUTHORIZED, ROLE_NOT_AUTHORIZED } from '../constants/errorMessages.js';
 
 export const extractUser = (req, res, next) => {
   const userId = req.headers['x-user-id'];
@@ -16,12 +18,12 @@ export const extractUser = (req, res, next) => {
 };
 
 export const requireAuth = (req, res, next) => {
-  if (!req.user) return next(new AppError('Not authorized to access this route', 401));
+  if (!req.user) return next(new AppError(NOT_AUTHORIZED, UNAUTHORIZED));
   next();
 };
 
 export const authorize = (...roles) => (req, res, next) => {
-  if (!req.user) return next(new AppError('Not authorized', 401));
+  if (!req.user) return next(new AppError(NOT_AUTHORIZED, UNAUTHORIZED));
   if (req.user.isSuperAdmin || roles.includes(req.user.role)) return next();
-  next(new AppError(`Role '${req.user.role}' is not authorized to access this route`, 403));
+  next(new AppError(ROLE_NOT_AUTHORIZED(req.user.role), FORBIDDEN));
 };
