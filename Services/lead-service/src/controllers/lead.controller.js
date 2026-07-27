@@ -3,6 +3,7 @@ import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
+import { validateTransition } from '../services/state-machine.service.js';
 
 // ─── Auto-assignment helper ────────────────────────────────────────────────────
 async function autoAssignSalesRep(leadData) {
@@ -154,6 +155,22 @@ export const updateLead = asyncHandler(async (req, res) => {
     throw new AppError(messages, 400);
   }
   const validatedBody = parsed.data;
+
+  // Run state machine validation when lifecycleStatus changes
+  if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
+    const currentStatus = lead.lifecycleStatus || 'NEW';
+    const mergedFinancials = { ...(lead.financials || {}), ...(validatedBody.financials || {}) };
+    try {
+      validateTransition({
+        currentStatus,
+        nextStatus: validatedBody.lifecycleStatus,
+        financials: mergedFinancials,
+        lostReason: validatedBody.lostReason || lead.lostReason,
+      });
+    } catch (err) {
+      throw new AppError(err.message, 400);
+    }
+  }
 
   // Track status change on old status field
   const statusHistoryCreate = [];

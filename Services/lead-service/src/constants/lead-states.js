@@ -4,8 +4,18 @@ export const LIFECYCLE_STATUSES = [
   'BOOKING_FAILED', 'CANCELLED',
 ];
 
-// Populated in Phase 2
-export const ALLOWED_TRANSITIONS = {};
+export const ALLOWED_TRANSITIONS = {
+  NEW:                ['DRAFTING', 'CLOSED_LOST'],
+  DRAFTING:           ['QUOTED', 'CLOSED_LOST'],
+  QUOTED:             ['REVISION', 'APPROVED', 'CLOSED_LOST'],
+  REVISION:           ['DRAFTING', 'QUOTED', 'APPROVED', 'CLOSED_LOST'],
+  APPROVED:           ['BOOKING_IN_PROGRESS', 'CLOSED_LOST'],
+  BOOKING_IN_PROGRESS: ['CONFIRMED', 'BOOKING_FAILED'],
+  BOOKING_FAILED:     ['BOOKING_IN_PROGRESS', 'REVISION', 'CLOSED_LOST'],
+  CONFIRMED:          ['CANCELLED'],
+  CLOSED_LOST:        [],
+  CANCELLED:          [],
+};
 
 export const TERMINAL_STATUSES = ['CLOSED_LOST', 'CANCELLED'];
 
