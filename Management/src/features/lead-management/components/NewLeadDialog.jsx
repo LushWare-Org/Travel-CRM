@@ -216,7 +216,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           text: r.text.trim(),
           date: r.date || new Date().toISOString().split("T")[0]
         })),
-        status: "new"
+        status: "new",
+        lifecycleStatus: "NEW",
       };
 
       const response = await leadAPI.createLead(leadData);

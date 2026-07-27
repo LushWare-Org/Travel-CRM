@@ -21,6 +21,8 @@ import DestinationSelector from '../../itinerary/components/DestinationSelector'
 import { createDefaultDay } from '../../itinerary/types/index.js';
 import LeadFlightBookingsSection from './LeadFlightBookingsSection';
 import LeadHotelBookingsSection from './LeadHotelBookingsSection';
+import LeadStatusBadge from './LeadStatusBadge';
+import PricingSection from './PricingSection';
 
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const { user } = useAuth();
@@ -1301,6 +1303,42 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
               </div>
             )}
           </div>
+
+          {/* Lifecycle Status & Pricing — only shown for existing leads */}
+          {lead?._id && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700">Lifecycle Status</h3>
+                  <LeadStatusBadge status={lead.lifecycleStatus ?? lead.status} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Trigger the parent's status change dialog
+                    const event = new CustomEvent('open-status-change', { detail: lead });
+                    window.dispatchEvent(event);
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
+                >
+                  Change Status
+                </button>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing</h3>
+                <PricingSection
+                  leadId={lead._id || lead.id}
+                  financials={lead.financials}
+                  onFinancialsUpdated={(updated) => {
+                    if (lead._id || lead.id) {
+                      lead.financials = updated;
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Flight & Hotel Bookings — only shown for existing leads */}
           {lead?._id && (

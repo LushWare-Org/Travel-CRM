@@ -202,8 +202,9 @@ const LeadTable = ({
             const leadId = lead._id || lead.id;
             const isHighlighted = highlightedLeadId && leadId === highlightedLeadId;
             const packageInfo = getPackageDisplay(lead);
-            const statusColor = statusColors[lead.status] || statusColors.new;
-            const statusLabel = statusLabels[lead.status] || "New";
+            const displayStatus = lead.lifecycleStatus ?? lead.status;
+            const statusColor = statusColors[displayStatus] || statusColors.new;
+            const statusLabel = statusLabels[displayStatus] || "New";
 
             return (
               <div
@@ -529,7 +530,8 @@ const LeadTable = ({
           </thead>
           <tbody className="divide-y divide-gray-200">
             {leads.map((lead) => {
-              const statusColor = (statusColors && statusColors[lead.status]) || "bg-gray-100 text-gray-800";
+              const displayStatus = lead.lifecycleStatus ?? lead.status;
+              const statusColor = (statusColors && statusColors[displayStatus]) || "bg-gray-100 text-gray-800";
               const leadId = (lead._id || lead.id)?.toString();
               const isHighlighted =
                 highlightedLeadId && leadId === highlightedLeadId.toString();
@@ -630,8 +632,8 @@ const LeadTable = ({
                       onClick={(e) => handleStatusClick(e, lead)}
                       title="Click to change status"
                     >
-                      {(statusLabels && statusLabels[lead.status]) ||
-                        lead.status ||
+                      {(statusLabels && statusLabels[displayStatus]) ||
+                        lead.lifecycleStatus || lead.status ||
                         "N/A"}
                     </button>
                   </td>
