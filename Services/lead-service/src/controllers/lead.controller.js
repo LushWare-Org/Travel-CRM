@@ -4,6 +4,7 @@ import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
 import { validateTransition } from '../services/state-machine.service.js';
+import { computeFinancials } from '../services/pricing.service.js';
 
 // ─── Auto-assignment helper ────────────────────────────────────────────────────
 async function autoAssignSalesRep(leadData) {
@@ -157,11 +158,12 @@ export const updateLead = asyncHandler(async (req, res) => {
   const validatedBody = parsed.data;
 
   // Run state machine validation when lifecycleStatus changes
+  let transitionResult = null;
   if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
     const currentStatus = lead.lifecycleStatus || 'NEW';
     const mergedFinancials = { ...(lead.financials || {}), ...(validatedBody.financials || {}) };
     try {
-      validateTransition({
+      transitionResult = validateTransition({
         currentStatus,
         nextStatus: validatedBody.lifecycleStatus,
         financials: mergedFinancials,
@@ -180,6 +182,12 @@ export const updateLead = asyncHandler(async (req, res) => {
   // Track lifecycleStatus change
   if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
     statusHistoryCreate.push({ status: validatedBody.lifecycleStatus, changedById: user.id, notes: validatedBody.statusChangeNotes || 'Status updated' });
+  }
+
+  // Auto-recalculate financials on BOOKING_IN_PROGRESS -> CONFIRMED
+  if (transitionResult?.recalculate) {
+    const mergedForRecalc = { ...(lead.financials || {}), ...(validatedBody.financials || {}) };
+    validatedBody.financials = computeFinancials(mergedForRecalc);
   }
 
   // Build Prisma-compatible update payload
