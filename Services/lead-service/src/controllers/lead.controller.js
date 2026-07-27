@@ -108,22 +108,31 @@ export const getLeads = asyncHandler(async (req, res) => {
   const { user } = req;
   const { page = 1, limit = 10, search, status, sortBy = 'createdAt', order = 'desc' } = req.query;
 
-  const where = {};
-  if (user.role === 'salesRep') where.assignedToId = user.id;
+  const where = { AND: [] };
+  if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
+
   if (status) {
-    where.OR = [
-      { status },
-      { lifecycleStatus: status.toUpperCase() },
-    ];
+    // Determine if this is a lifecycle status (uppercase) or old status (lowercase)
+    const isLifecycle = status === status.toUpperCase() && status !== status.toLowerCase();
+    if (isLifecycle) {
+      where.AND.push({ lifecycleStatus: status });
+    } else {
+      where.AND.push({ status });
+    }
   }
+
   if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
-      { phone: { contains: search, mode: 'insensitive' } },
-      { destination: { contains: search, mode: 'insensitive' } },
-    ];
+    where.AND.push({
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+        { destination: { contains: search, mode: 'insensitive' } },
+      ],
+    });
   }
+
+  if (where.AND.length === 0) delete where.AND;
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const [leads, total] = await Promise.all([
@@ -301,12 +310,13 @@ export const unassignLead = asyncHandler(async (req, res) => {
 
 export const getLeadsByStatus = asyncHandler(async (req, res) => {
   const status = req.params.status;
-  const where = {
-    OR: [
-      { status },
-      { lifecycleStatus: status.toUpperCase() },
-    ],
-  };
+  const isLifecycle = status === status.toUpperCase() && status !== status.toLowerCase();
+  const where = {};
+  if (isLifecycle) {
+    where.lifecycleStatus = status;
+  } else {
+    where.status = status;
+  }
   const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json({ success: true, count: leads.length, data: leads });
 });
@@ -319,14 +329,19 @@ export const getMyLeads = asyncHandler(async (req, res) => {
 export const getLeadStats = asyncHandler(async (req, res) => {
   const where = req.user.role === 'salesRep' ? { assignedToId: req.user.id } : {};
   const [byStatus, totals] = await Promise.all([
-    prisma.lead.groupBy({ by: ['status'], _count: true, where }),
+    prisma.lead.groupBy({ by: ['lifecycleStatus'], _count: true, where }),
     prisma.lead.aggregate({
       _count: true,
       where,
     }),
   ]);
   const total = totals._count;
-  res.json({ success: true, data: byStatus, summary: { total, byStatus } });
+  // Map Prisma groupBy output to frontend-compatible shape
+  const mapped = (byStatus || []).map(item => ({
+    _id: item.lifecycleStatus,
+    count: item._count,
+  }));
+  res.json({ success: true, data: mapped, summary: { total, byStatus: mapped } });
 });
 
 export const searchLeads = asyncHandler(async (req, res) => {
