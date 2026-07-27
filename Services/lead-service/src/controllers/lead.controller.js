@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
 
 // ─── Auto-assignment helper ────────────────────────────────────────────────────
 async function autoAssignSalesRep(leadData) {
@@ -24,7 +25,13 @@ async function autoAssignSalesRep(leadData) {
 
 export const createLead = asyncHandler(async (req, res) => {
   const { user } = req;
-  const body = { ...req.body };
+
+  const parsed = createLeadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+  const body = { ...parsed.data };
 
   if (!body.status) body.status = 'new';
 
@@ -45,19 +52,40 @@ export const createLead = asyncHandler(async (req, res) => {
     }
   }
 
-  const { remarks = [], statusChangeNotes, ...leadFields } = body;
+  const statusForHistory = body.status || 'new';
+  const remarksList = body.remarks || [];
 
   const lead = await prisma.lead.create({
     data: {
-      ...leadFields,
-      travelDate: leadFields.travelDate ? new Date(leadFields.travelDate) : null,
-      endDate: leadFields.endDate ? new Date(leadFields.endDate) : null,
-      tags: leadFields.tags || [],
+      name: body.name,
+      email: body.email,
+      phone: body.phone,
+      whatsapp: body.whatsapp,
+      city: body.city,
+      source: body.source,
+      platform: body.platform,
+      fromCountry: body.fromCountry,
+      destinationCountry: body.destinationCountry,
+      destination: body.destination,
+      travelDate: body.travelDate ? new Date(body.travelDate) : null,
+      endDate: body.endDate ? new Date(body.endDate) : null,
+      packageId: body.packageId,
+      packageName: body.packageName,
+      numberOfTravelers: body.numberOfTravelers,
+      budget: body.budget,
+      message: body.message,
+      status: statusForHistory,
+      lifecycleStatus: body.lifecycleStatus || null,
+      financials: body.financials || {},
+      priority: body.priority,
+      assignedToId: body.assignedToId,
+      tags: body.tags || [],
+      lostReason: body.lostReason,
       remarks: {
-        create: remarks.map((r) => ({ text: r.text, date: r.date ? new Date(r.date) : new Date(), addedById: r.addedBy || user.id || null })),
+        create: remarksList.map((r) => ({ text: r.text, date: r.date ? new Date(r.date) : new Date(), addedById: r.addedBy || user.id || null })),
       },
       statusHistory: {
-        create: [{ status: body.status || 'new', changedById: user.id, notes: 'Initial status' }],
+        create: [{ status: statusForHistory, changedById: user.id, notes: 'Initial status' }],
       },
     },
     include: { remarks: true, statusHistory: true },
@@ -72,7 +100,12 @@ export const getLeads = asyncHandler(async (req, res) => {
 
   const where = {};
   if (user.role === 'salesRep') where.assignedToId = user.id;
-  if (status) where.status = status;
+  if (status) {
+    where.OR = [
+      { status },
+      { lifecycleStatus: status.toUpperCase() },
+    ];
+  }
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
@@ -115,27 +148,50 @@ export const updateLead = asyncHandler(async (req, res) => {
   const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
   if (!canManage && lead.assignedToId !== user.id) throw new AppError('Not authorized to update this lead', 403);
 
-  const {
-    statusChangeNotes, remarks, statusHistory, communicationLogs,
-    // Strip relation objects — frontend may send populated relations; Prisma only
-    // accepts the scalar FK fields (packageId, assignedToId, etc.)
-    package: _pkg, assignedTo: _assignedTo, convertedBooking: _booking,
-    customizedPackage: _custPkg, createdBy: _createdBy,
-    ...updateData
-  } = req.body;
+  const parsed = updateLeadSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+  const validatedBody = parsed.data;
 
-  // Track status change
+  // Track status change on old status field
   const statusHistoryCreate = [];
-  if (updateData.status && updateData.status !== lead.status) {
-    statusHistoryCreate.push({ status: updateData.status, changedById: user.id, notes: statusChangeNotes || 'Status updated' });
+  if (validatedBody.status && validatedBody.status !== lead.status) {
+    statusHistoryCreate.push({ status: validatedBody.status, changedById: user.id, notes: validatedBody.statusChangeNotes || 'Status updated' });
+  }
+  // Track lifecycleStatus change
+  if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
+    statusHistoryCreate.push({ status: validatedBody.lifecycleStatus, changedById: user.id, notes: validatedBody.statusChangeNotes || 'Status updated' });
+  }
+
+  // Build Prisma-compatible update payload
+  const updateData = {};
+  const scalarFields = [
+    'name', 'email', 'phone', 'whatsapp', 'city', 'source', 'platform',
+    'fromCountry', 'destinationCountry', 'destination', 'packageId', 'packageName',
+    'numberOfTravelers', 'budget', 'message', 'status', 'lifecycleStatus',
+    'priority', 'assignedToId', 'tags', 'lostReason',
+  ];
+  for (const field of scalarFields) {
+    if (validatedBody[field] !== undefined) {
+      updateData[field] = validatedBody[field];
+    }
+  }
+  if (validatedBody.financials !== undefined) {
+    updateData.financials = validatedBody.financials;
+  }
+  if (validatedBody.travelDate !== undefined) {
+    updateData.travelDate = validatedBody.travelDate ? new Date(validatedBody.travelDate) : null;
+  }
+  if (validatedBody.endDate !== undefined) {
+    updateData.endDate = validatedBody.endDate ? new Date(validatedBody.endDate) : null;
   }
 
   const updated = await prisma.lead.update({
     where: { id: req.params.id },
     data: {
       ...updateData,
-      travelDate: updateData.travelDate !== undefined ? (updateData.travelDate ? new Date(updateData.travelDate) : null) : undefined,
-      endDate: updateData.endDate !== undefined ? (updateData.endDate ? new Date(updateData.endDate) : null) : undefined,
       ...(statusHistoryCreate.length && { statusHistory: { create: statusHistoryCreate } }),
     },
     include: { remarks: true, statusHistory: { orderBy: { changedAt: 'desc' } } },
@@ -204,7 +260,14 @@ export const unassignLead = asyncHandler(async (req, res) => {
 });
 
 export const getLeadsByStatus = asyncHandler(async (req, res) => {
-  const leads = await prisma.lead.findMany({ where: { status: req.params.status }, orderBy: { createdAt: 'desc' } });
+  const status = req.params.status;
+  const where = {
+    OR: [
+      { status },
+      { lifecycleStatus: status.toUpperCase() },
+    ],
+  };
+  const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json({ success: true, count: leads.length, data: leads });
 });
 

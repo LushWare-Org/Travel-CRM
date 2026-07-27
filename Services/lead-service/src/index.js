@@ -3,10 +3,16 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import pino from 'pino';
 
 import errorHandler from './middleware/errorHandler.js';
 import leadRoutes from './routes/lead.routes.js';
 import prisma from './db/client.js';
+
+const logger = pino({
+  name: 'lead-service',
+  level: process.env.LOG_LEVEL || 'info',
+});
 
 const app = express();
 app.use(helmet());
@@ -27,9 +33,9 @@ const PORT = process.env.PORT || 3004;
 const start = async () => {
   await prisma.$connect();
   app.listen(PORT, '0.0.0.0', () =>
-    console.log(`[lead-service] Running on http://0.0.0.0:${PORT}`)
+    logger.info({ port: PORT }, 'lead-service started')
   );
 };
-start().catch((err) => { console.error(err); process.exit(1); });
+start().catch((err) => { logger.error(err, 'Failed to start lead-service'); process.exit(1); });
 
 export default app;
