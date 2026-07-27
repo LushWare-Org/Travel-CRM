@@ -104,10 +104,10 @@ export class MockHotelClient {
    * @param {import('./interface.js').BookParams} params
    * @returns {Promise<import('./interface.js').BookingResult>}
    */
-  async book({ prebookId, guests, contact }) {
+  async book({ prebookId, guests, contact, holder }) {
     if (!prebookId) throw new Error('prebookId is required');
     if (!guests?.length) throw new Error('At least one guest is required');
-    if (!contact?.email) throw new Error('contact.email is required');
+    if (!holder?.email && !contact?.email) throw new Error('holder.email is required');
 
     const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
     return {

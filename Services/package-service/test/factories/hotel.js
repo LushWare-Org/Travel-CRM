@@ -12,6 +12,7 @@ export function buildHotelOffer(overrides = {}) {
     latitude: overrides.latitude ?? faker.location.latitude(),
     longitude: overrides.longitude ?? faker.location.longitude(),
     cheapestRate: {
+      offerId: rate.offerId || faker.string.uuid(),
       roomType: rate.roomType || 'Deluxe King',
       boardType: rate.boardType || 'Bed & Breakfast',
       currency: rate.currency || 'USD',

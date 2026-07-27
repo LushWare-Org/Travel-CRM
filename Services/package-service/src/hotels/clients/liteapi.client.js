@@ -5,7 +5,8 @@ import axios from 'axios';
  *
  * LiteAPI hotel booking integration.
  * Auth: x-api-key header (API key)
- * Base URL: https://api.liteapi.travel/v3.0
+ * Search/Data: https://api.liteapi.travel/v3.0 (search, hotel details)
+ * Booking:     https://book.liteapi.travel/v3.0 (prebook, book, cancel)
  */
 export class LiteApiClient {
   constructor() {
@@ -83,7 +84,7 @@ export class LiteApiClient {
   async prebook(params) {
     if (!params.offerId) throw new Error('offerId is required');
     try {
-      const { data } = await this.#client().post('/rates/prebook', {
+      const { data } = await this.#bookClient().post('/rates/prebook', {
         offerId: params.offerId,
         usePaymentSdk: true,
       });
@@ -99,8 +100,28 @@ export class LiteApiClient {
     if (!params.prebookId) throw new Error('prebookId is required');
     if (!params.guests?.length) throw new Error('At least one guest is required');
     if (!params.contact?.email) throw new Error('contact.email is required');
+
+    const contactName = (params.contact.name || `${params.guests[0].firstName} ${params.guests[0].lastName}`).split(' ');
+
+    const body = {
+      prebookId: params.prebookId,
+      holder: {
+        firstName: params.holder?.firstName || contactName[0] || 'Guest',
+        lastName: params.holder?.lastName || contactName.slice(1).join(' ') || 'User',
+        email: params.contact.email,
+      },
+      guests: params.guests.map((g, i) => ({
+        occupancyNumber: g.occupancyNumber || 1,
+        email: g.email || params.contact.email,
+        firstName: g.firstName,
+        lastName: g.lastName,
+        title: g.title || 'Mr',
+      })),
+      payment: { method: params.paymentMethod || 'ACC_CREDIT_CARD' },
+    };
+
     try {
-      const { data } = await this.#client().post('/rates/book', params);
+      const { data } = await this.#bookClient().post('/rates/book', body);
       return this.#normalizeBooking(data.data);
     } catch (err) {
       this.#unwrapError(err, 'Hotel booking failed');
@@ -110,7 +131,7 @@ export class LiteApiClient {
   /** @param {import('./interface.js').ListBookingsParams} params */
   async listBookings(params = {}) {
     try {
-      const { data } = await this.#client().get('/bookings');
+      const { data } = await this.#bookClient().get('/bookings');
       const bookings = Array.isArray(data.data) ? data.data : [];
       return bookings.map((b) => this.#normalizeBooking(b));
     } catch (err) {
@@ -122,7 +143,7 @@ export class LiteApiClient {
   async getBooking(bookingId) {
     if (!bookingId) throw new Error('bookingId is required');
     try {
-      const { data } = await this.#client().get(`/bookings/${bookingId}`);
+      const { data } = await this.#bookClient().get(`/bookings/${bookingId}`);
       return this.#normalizeBooking(data.data);
     } catch (err) {
       this.#unwrapError(err, 'Hotel booking retrieval failed');
@@ -133,7 +154,7 @@ export class LiteApiClient {
   async cancelBooking(bookingId, reason) {
     if (!bookingId) throw new Error('bookingId is required');
     try {
-      await this.#client().put(`/bookings/${bookingId}`);
+      await this.#bookClient().put(`/bookings/${bookingId}`);
       return { bookingId, status: 'cancelled' };
     } catch (err) {
       this.#unwrapError(err, 'Hotel cancellation failed');
@@ -152,6 +173,17 @@ export class LiteApiClient {
   #client() {
     return axios.create({
       baseURL: 'https://api.liteapi.travel/v3.0',
+      headers: {
+        'x-api-key': this._apiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  #bookClient() {
+    return axios.create({
+      baseURL: 'https://book.liteapi.travel/v3.0',
       headers: {
         'x-api-key': this._apiKey,
         Accept: 'application/json',
@@ -192,7 +224,7 @@ export class LiteApiClient {
                 ? !firstRate.cancellationPolicies.some((p) => p?.nonRefundable)
                 : !firstRate.cancellationPolicies?.nonRefundable)
             : true,
-          offerId: firstRate.rateId || null,
+          offerId: hotel.roomTypes?.[0]?.offerId || null,
         },
       };
     });
@@ -222,7 +254,7 @@ export class LiteApiClient {
     return {
       bookingId: b.bookingId || b.id,
       pnr: b.pnr || b.confirmationCode || null,
-      status: b.status || 'confirmed',
+      status: (b.status || 'confirmed').toLowerCase(),
       hotelName: b.hotelName || b.hotel?.name || 'Unknown',
       checkin: b.checkin || b.checkIn || null,
       checkout: b.checkout || b.checkOut || null,
