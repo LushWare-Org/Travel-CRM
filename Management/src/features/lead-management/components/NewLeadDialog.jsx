@@ -108,7 +108,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         }));
       }
     }
-  }, [isOpen, isSalesRep, user]);
+  }, [isOpen, isSalesRep, user?._id]);
 
   const fetchPackages = async () => {
     try {

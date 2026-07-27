@@ -253,7 +253,7 @@ export const AuthProvider = ({ children }) => {
     return user.role === requiredRole;
   }, [user]);
 
-  const value = {
+  const value = React.useMemo(() => ({
     user,
     loading,
     isAuthenticated,
@@ -263,7 +263,7 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     changePassword,
     hasRole,
-  };
+  }), [user, loading, isAuthenticated, token, login, logout, updateProfile, changePassword, hasRole]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
