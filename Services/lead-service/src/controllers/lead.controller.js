@@ -28,7 +28,14 @@ async function autoAssignSalesRep(leadData) {
 export const createLead = asyncHandler(async (req, res) => {
   const { user } = req;
 
-  const parsed = createLeadSchema.safeParse(req.body);
+  // Strip frontend-only fields that aren't in the DB schema or Zod validator
+  const {
+    package: _pkg, assignedTo: _assignedTo, salesRep: _salesRep,
+    customizedPackage: _custPkg, convertedBooking: _booking, createdBy: _createdBy,
+    ...cleanCreateBody
+  } = req.body;
+
+  const parsed = createLeadSchema.safeParse(cleanCreateBody);
   if (!parsed.success) {
     const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
     throw new AppError(messages, 400);
@@ -150,7 +157,14 @@ export const updateLead = asyncHandler(async (req, res) => {
   const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
   if (!canManage && lead.assignedToId !== user.id) throw new AppError('Not authorized to update this lead', 403);
 
-  const parsed = updateLeadSchema.safeParse(req.body);
+  // Strip frontend-only fields that aren't in the DB schema or Zod validator
+  const {
+    package: _pkg, assignedTo: _assignedTo, salesRep: _salesRep,
+    customizedPackage: _custPkg, convertedBooking: _booking, createdBy: _createdBy,
+    ...cleanBody
+  } = req.body;
+
+  const parsed = updateLeadSchema.safeParse(cleanBody);
   if (!parsed.success) {
     const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
     throw new AppError(messages, 400);
