@@ -71,6 +71,19 @@ export const createLeadSchema = z.object({
     addedBy: z.string().optional(),
   })).optional(),
   statusChangeNotes: z.string().optional().nullable(),
+  optionalFlights: z.array(z.object({
+    origin: z.string().optional(),
+    destination: z.string().optional(),
+    flightType: z.string().optional(),
+    cabinClass: z.string().optional(),
+    departureTime: z.string().optional(),
+    airlinePreference: z.string().optional(),
+    flightBookingId: z.string().optional(),
+    status: z.string().optional(),
+    flightNumber: z.string().optional(),
+    carrier: z.string().optional(),
+    notes: z.string().optional(),
+  }).passthrough()).optional(),
 }).strict();
 
 // ── Update lead schema ──────────────────────────────────────────
@@ -101,4 +114,17 @@ export const updateLeadSchema = z.object({
   tags: z.array(z.string()).optional(),
   lostReason: z.string().optional().nullable(),
   statusChangeNotes: z.string().optional().nullable(),
+  optionalFlights: z.array(z.object({
+    origin: z.string().optional(),
+    destination: z.string().optional(),
+    flightType: z.string().optional(),
+    cabinClass: z.string().optional(),
+    departureTime: z.string().optional(),
+    airlinePreference: z.string().optional(),
+    flightBookingId: z.string().optional(),
+    status: z.string().optional(),
+    flightNumber: z.string().optional(),
+    carrier: z.string().optional(),
+    notes: z.string().optional(),
+  }).passthrough()).optional(),
 }).strict();
