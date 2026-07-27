@@ -209,7 +209,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (lifecycleStatus = 'NEW') => {
     try {
       setIsSubmitting(true);
       const assignedTo = isSalesRep && user?._id ? user._id : (formData.assignedTo || undefined);
@@ -260,7 +260,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           date: r.date || new Date().toISOString().split("T")[0]
         })),
         status: "new",
-        lifecycleStatus: "NEW",
+        lifecycleStatus,
       };
 
       const response = await leadAPI.createLead(leadData);
@@ -808,15 +808,33 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold"
+            className="px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold"
             type="button"
           >
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
+            onClick={() => handleSubmit('DRAFTING')}
             disabled={isSubmitting}
-            className="flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+            className="flex-1 px-4 py-3.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl hover:from-indigo-600 hover:to-violet-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25"
+            type="button"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-5 h-5" />
+                Save & Draft
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => handleSubmit('NEW')}
+            disabled={isSubmitting}
+            className="flex-1 px-4 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
             type="button"
           >
             {isSubmitting ? (

@@ -90,6 +90,7 @@ export const createLead = asyncHandler(async (req, res) => {
       assignedToId: body.assignedToId,
       tags: body.tags || [],
       lostReason: body.lostReason,
+      optionalFlights: body.optionalFlights || [],
       remarks: {
         create: remarksList.map((r) => ({ text: r.text, date: r.date ? new Date(r.date) : new Date(), addedById: r.addedBy || user.id || null })),
       },
@@ -210,7 +211,7 @@ export const updateLead = asyncHandler(async (req, res) => {
     'name', 'email', 'phone', 'whatsapp', 'city', 'source', 'platform',
     'fromCountry', 'destinationCountry', 'destination', 'packageId', 'packageName',
     'numberOfTravelers', 'budget', 'message', 'status', 'lifecycleStatus',
-    'priority', 'assignedToId', 'tags', 'lostReason',
+    'priority', 'assignedToId', 'tags', 'lostReason', 'optionalFlights',
   ];
   for (const field of scalarFields) {
     if (validatedBody[field] !== undefined) {
