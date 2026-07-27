@@ -84,7 +84,7 @@ export const createLead = asyncHandler(async (req, res) => {
       budget: body.budget,
       message: body.message,
       status: statusForHistory,
-      lifecycleStatus: body.lifecycleStatus || null,
+      lifecycleStatus: body.lifecycleStatus || 'NEW',
       financials: body.financials || {},
       priority: body.priority,
       assignedToId: body.assignedToId,
@@ -195,6 +195,19 @@ export const updateLead = asyncHandler(async (req, res) => {
       });
     } catch (err) {
       throw new AppError(err.message, 400);
+    }
+  }
+
+  // Guardrail: if old status is updated but lifecycleStatus is not, auto-map it
+  const OLD_TO_NEW = {
+    new: 'NEW', contacted: 'NEW', interested: 'DRAFTING',
+    quoted: 'QUOTED', converted: 'APPROVED',
+    lost: 'CLOSED_LOST', not_interested: 'CLOSED_LOST',
+  };
+  if (validatedBody.status && !validatedBody.lifecycleStatus) {
+    const mapped = OLD_TO_NEW[validatedBody.status];
+    if (mapped && mapped !== lead.lifecycleStatus) {
+      validatedBody.lifecycleStatus = mapped;
     }
   }
 
@@ -408,6 +421,7 @@ export const createWebsiteContactLead = asyncHandler(async (req, res) => {
       travelDate: travelDate ? new Date(travelDate) : null,
       message: message?.trim() || null,
       status: 'new',
+      lifecycleStatus: 'NEW',
       tags: ['website-contact-form'],
       assignedToId: assignedId || null,
       assignmentMode: assignedId ? 'auto' : 'manual',
