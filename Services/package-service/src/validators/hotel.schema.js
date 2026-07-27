@@ -29,6 +29,11 @@ export const detailsSchema = z.object({
   hotelId: z.string().min(1, 'hotelId is required'),
 });
 
+/** POST /hotels/prebook */
+export const prebookSchema = z.object({
+  offerId: z.string().min(1, 'offerId is required'),
+});
+
 /** POST /hotels/book */
 export const bookSchema = z.object({
   prebookId: z.string().min(1, 'prebookId is required'),
