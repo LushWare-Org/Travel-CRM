@@ -17,6 +17,49 @@ import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import { createDefaultDay } from '../../itinerary/types/index.js';
 import { FlightSelectionModal } from '../../shared';
 
+// ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
+
+function InputField({ label, required, icon: Icon, children }) {
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function SectionHeader({ icon: Icon, title, subtitle, section, gradient, expanded, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(section)}
+      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expanded
+          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
+          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+        }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-xl ${expanded ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
+          <Icon className={`w-5 h-5 ${expanded ? 'text-white' : 'text-gray-600'}`} />
+        </div>
+        <div className="text-left">
+          <h3 className="font-semibold">{title}</h3>
+          <p className={`text-xs ${expanded ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
+        </div>
+      </div>
+      {expanded ? (
+        <ChevronUp className="w-5 h-5" />
+      ) : (
+        <ChevronDown className="w-5 h-5" />
+      )}
+    </button>
+  );
+}
+
 function FlightPreferenceCard({ prefs, onEdit, onRemove }) {
   if (!prefs) return null;
   return (
@@ -267,45 +310,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
   if (!isOpen) return null;
 
-  // Section Header Component
-  const SectionHeader = ({ icon: Icon, title, subtitle, section, gradient }) => (
-    <button
-      type="button"
-      onClick={() => toggleSection(section)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expandedSections[section]
-          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
-          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-        }`}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${expandedSections[section] ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
-          <Icon className={`w-5 h-5 ${expandedSections[section] ? 'text-white' : 'text-gray-600'}`} />
-        </div>
-        <div className="text-left">
-          <h3 className="font-semibold">{title}</h3>
-          <p className={`text-xs ${expandedSections[section] ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
-        </div>
-      </div>
-      {expandedSections[section] ? (
-        <ChevronUp className="w-5 h-5" />
-      ) : (
-        <ChevronDown className="w-5 h-5" />
-      )}
-    </button>
-  );
-
-  // Input Field Component
-  const InputField = ({ label, required, icon: Icon, children }) => (
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -344,6 +348,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           {/* Personal Information Section */}
           <div className="space-y-4">
             <SectionHeader
+              expanded={expandedSections.personal}
+              onToggle={toggleSection}
               icon={User}
               title="Personal Information"
               subtitle="Contact details of the lead"
@@ -417,6 +423,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           {/* Travel Details Section */}
           <div className="space-y-4">
             <SectionHeader
+              expanded={expandedSections.travel}
+              onToggle={toggleSection}
               icon={Plane}
               title="Travel Details"
               subtitle="Trip information and dates"
@@ -500,6 +508,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           {/* Package & Assignment Section */}
           <div className="space-y-4">
             <SectionHeader
+              expanded={expandedSections.package}
+              onToggle={toggleSection}
               icon={Package}
               title="Package & Assignment"
               subtitle="Select package and sales representative"
@@ -593,6 +603,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           {/* Remarks Section */}
           <div className="space-y-4">
             <SectionHeader
+              expanded={expandedSections.remarks}
+              onToggle={toggleSection}
               icon={MessageSquare}
               title="Remarks & Notes"
               subtitle="Add optional comments about this lead"
@@ -643,6 +655,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           {/* Manual Itinerary Section */}
           <div className="space-y-4">
             <SectionHeader
+              expanded={expandedSections.itinerary}
+              onToggle={toggleSection}
               icon={Calendar}
               title="Manual Itinerary"
               subtitle="Optional: Create a custom itinerary"
@@ -705,6 +719,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           {/* Transfer Flights Section */}
           <div className="space-y-4">
             <SectionHeader
+              expanded={expandedSections.transfers}
+              onToggle={toggleSection}
               icon={ArrowRightLeft}
               title="Transfer Flights"
               subtitle="Optional: flight route preferences to reach the trip and return home"
