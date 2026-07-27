@@ -1305,7 +1305,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           </div>
 
           {/* Lifecycle Status & Pricing — only shown for existing leads */}
-          {lead?._id && (
+          {(lead?._id || lead?.id) && (
             <div className="space-y-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -1341,7 +1341,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
           )}
 
           {/* Flight & Hotel Bookings — only shown for existing leads */}
-          {lead?._id && (
+          {(lead?._id || lead?.id) && (
             <>
               <LeadFlightBookingsSection
                 leadId={lead._id || lead.id}
