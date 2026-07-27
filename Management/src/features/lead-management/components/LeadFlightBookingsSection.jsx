@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plane, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, Settings2, Pencil } from 'lucide-react';
+import { Plane, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, Settings2, Pencil, ExternalLink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { flightAPI } from '../../../services/flight.service';
 import { FlightSelectionModal } from '../../shared';
+import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';
 
 function fmtDate(iso) {
   if (!iso) return '-';
@@ -16,6 +17,7 @@ function fmtMoney(amount, currency) {
 
 export default function LeadFlightBookingsSection({
   leadId,
+  leadStatus,
   itineraryDays = [],
   travelDate,
   onUpdateDay,
@@ -130,30 +132,35 @@ export default function LeadFlightBookingsSection({
               <div className="space-y-2">
                 {flightDays.map(day => {
                   const dayBooking = bookings.find(b => b.dayNumber === day.dayNumber && b.flightType === 'itinerary');
-                  const booked = !!dayBooking;
-                  const hasPrefs = !booked && day.flight?.origin;
+                  const booked = !!dayBooking && dayBooking.status !== 'cancelled' && dayBooking.status !== 'failed';
+                  const failed = !!dayBooking && dayBooking.status === 'failed';
+                  const hasPrefs = !booked && !failed && day.flight?.origin;
+                  const itemState = deriveItemState(leadStatus, booked, failed);
+                  const stateLabel = ITEM_STATE_LABELS[itemState];
+                  const stateColor = ITEM_STATE_COLORS[itemState];
                   return (
                     <div key={day.dayNumber} className="bg-white rounded-xl border border-gray-200 p-3">
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-semibold text-gray-700">Day {day.dayNumber}</span>
                           {(booked || hasPrefs) && (
-                            <span className="ml-2 text-sm text-gray-600">
+                            <span className="text-sm text-gray-600">
                               {(dayBooking?.segments?.[0]?.origin || day.flight?.origin)} → {(dayBooking?.segments?.[dayBooking?.segments?.length - 1]?.destination || day.flight?.destination)}
                             </span>
                           )}
-                          {booked && (
-                            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700">
-                              Booked
-                            </span>
-                          )}
-                          {hasPrefs && (
-                            <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700">
-                              Preferences Set
-                            </span>
-                          )}
+                          <span className={`px-1.5 py-0.5 text-xs rounded-full border ${stateColor}`}>
+                            {stateLabel}
+                          </span>
                         </div>
-                        {!booked ? (
+                        {itemState === 'PENDING' ? (
+                          <button
+                            type="button"
+                            disabled
+                            className="flex items-center gap-1 px-3 py-1.5 bg-gray-300 text-gray-500 text-xs rounded-lg cursor-not-allowed"
+                          >
+                            <Settings2 className="w-3.5 h-3.5" /> Set Preferences
+                          </button>
+                        ) : itemState === 'READY_TO_BOOK' ? (
                           <button
                             type="button"
                             onClick={() => {
@@ -165,12 +172,18 @@ export default function LeadFlightBookingsSection({
                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
                           >
                             {hasPrefs ? <Pencil className="w-3.5 h-3.5" /> : <Settings2 className="w-3.5 h-3.5" />}
-                            {hasPrefs ? 'Edit' : 'Set Preferences'}
+                            {hasPrefs ? 'Edit' : 'Book Flight'}
                           </button>
-                        ) : (
+                        ) : itemState === 'BOOKED' ? (
                           <div className="flex items-center gap-2 text-xs text-gray-500">
                             <span className="font-mono font-medium text-gray-900">{dayBooking.pnr || '-'}</span>
                             <span className="capitalize">{dayBooking.status}</span>
+                            {dayBooking.supplierPortalUrl && (
+                              <a href={dayBooking.supplierPortalUrl} target="_blank" rel="noopener noreferrer"
+                                 className="flex items-center gap-1 text-blue-600 hover:text-blue-700">
+                                <ExternalLink className="w-3 h-3" /> Portal
+                              </a>
+                            )}
                             {dayBooking.status !== 'cancelled' && (
                               <button
                                 type="button"
@@ -184,6 +197,22 @@ export default function LeadFlightBookingsSection({
                               </button>
                             )}
                           </div>
+                        ) : itemState === 'FAILED' && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-red-600 font-medium">Booking failed</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFlightModalDay(day.dayNumber);
+                                setFlightModalType('itinerary');
+                                setFlightModalPrefill(day.flight || { origin: '', destination: '' });
+                                setShowFlightModal(true);
+                              }}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <AlertCircle className="w-3.5 h-3.5" /> Resolve
+                            </button>
+                          </div>
                         )}
                       </div>
                       {booked && (
@@ -192,6 +221,11 @@ export default function LeadFlightBookingsSection({
                             <span key={i}>{s.origin} → {s.destination} on {fmtDate(s.departureAt)}{i < (dayBooking.segments?.length || 1) - 1 ? ' · ' : ''}</span>
                           ))}
                           {' · '}{fmtMoney(dayBooking.totalAmount, dayBooking.currency)}
+                        </div>
+                      )}
+                      {failed && (
+                        <div className="mt-1 text-xs text-red-600">
+                          Booking attempt failed — manual intervention required. Check with supplier or search for alternatives.
                         </div>
                       )}
                       {hasPrefs && (

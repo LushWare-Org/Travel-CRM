@@ -1307,6 +1307,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             <>
               <LeadFlightBookingsSection
                 leadId={lead._id || lead.id}
+                leadStatus={lead.lifecycleStatus ?? lead.status}
                 itineraryDays={itineraryDays}
                 travelDate={formData.travelDate}
                 onUpdateDay={(dayNumber, updates) => {
@@ -1320,6 +1321,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
               <LeadHotelBookingsSection
                 leadId={lead._id || lead.id}
+                leadStatus={lead.lifecycleStatus ?? lead.status}
                 itineraryDays={itineraryDays}
                 travelDate={formData.travelDate}
                 endDate={formData.endDate}

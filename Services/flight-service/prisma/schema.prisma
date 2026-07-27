@@ -79,6 +79,8 @@ model FlightBooking {
   segments            FlightSegment[]
   travelers           FlightTraveler[]
 
+  supplierPortalUrl  String?             // external supplier booking management URL
+
   // Lead / day context — cross-schema UUID refs
   leadId              String?
   packageId           String?
