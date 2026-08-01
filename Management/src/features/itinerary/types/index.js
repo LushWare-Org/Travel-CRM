@@ -1,124 +1,140 @@
 /**
- * Type definitions for Itinerary feature
- * This file contains all TypeScript-like type definitions and constants
- * Aligned with backend Mongoose models
+ * Type definitions and constants for the Package feature.
+ * Aligned with package-service relational schema.
  */
 
-export const PACKAGE_STATUS = {
-  DRAFT: 'draft',
-  PUBLISHED: 'published',
-  ARCHIVED: 'archived',
-};
-
 export const PACKAGE_CATEGORY = {
-  HONEYMOON: 'honeymoon',
-  FAMILY: 'family',
-  ADVENTURE: 'adventure',
-  BUDGET: 'budget',
-  LUXURY: 'luxury',
-  RELIGIOUS: 'religious',
-  WILDLIFE: 'wildlife',
-  BEACH: 'beach',
-  HERITAGE: 'heritage',
-  OTHER: 'other',
+  HONEYMOON: 'HONEYMOON',
+  COUPLE: 'COUPLE',
+  FAMILY: 'FAMILY',
+  GROUP: 'GROUP',
+  WILD_SAFARI: 'WILD_SAFARI',
 };
 
-export const DIFFICULTY_LEVEL = {
-  EASY: 'easy',
-  MODERATE: 'moderate',
-  DIFFICULT: 'difficult',
+export const MARGIN_TYPE = {
+  PERCENTAGE: 'PERCENTAGE',
+  FIXED: 'FIXED',
 };
 
-export const ACCOMMODATION_TYPES = {
-  HOTEL: 'hotel',
-  RESORT: 'resort',
-  GUESTHOUSE: 'guesthouse',
-  HOMESTAY: 'homestay',
-  CAMP: 'camp',
-  OTHER: 'other',
+export const PLACE_TYPE = {
+  CITY: 'CITY',
+  ATTRACTION: 'ATTRACTION',
+  REGION: 'REGION',
+  AIRPORT: 'AIRPORT',
 };
 
-export const TRANSPORT_TYPES = {
-  FLIGHT: 'flight',
-  TRAIN: 'train',
-  BUS: 'bus',
-  CAR: 'car',
-  BOAT: 'boat',
-  WALK: 'walk',
-  OTHER: 'other',
+export const ROUTE_TYPE = {
+  DAILY_ROUTING: 'DAILY_ROUTING',
+  POINT_TO_POINT: 'POINT_TO_POINT',
 };
 
-// Default day structure matching backend
+export const TRANSPORT_MODE = {
+  FLIGHT: 'FLIGHT',
+  CAR: 'CAR',
+  TRAIN: 'TRAIN',
+  BOAT: 'BOAT',
+  VAN: 'VAN',
+};
+
+export const PRICING_MODEL = {
+  PER_KM: 'PER_KM',
+  PER_PERSON: 'PER_PERSON',
+  PER_VEHICLE: 'PER_VEHICLE',
+};
+
+// Legacy display-friendly category labels (mapped to enum values)
+export const CATEGORY_OPTIONS = [
+  { value: 'HONEYMOON', label: 'Honeymoon' },
+  { value: 'COUPLE', label: 'Couple' },
+  { value: 'FAMILY', label: 'Family' },
+  { value: 'GROUP', label: 'Group' },
+  { value: 'WILD_SAFARI', label: 'Wild Safari' },
+];
+
+// Transport display labels
+export const TRANSPORT_OPTIONS = [
+  { value: 'CAR', label: 'Car', icon: '🚗' },
+  { value: 'VAN', label: 'Van', icon: '🚐' },
+  { value: 'FLIGHT', label: 'Flight', icon: '✈️' },
+  { value: 'TRAIN', label: 'Train', icon: '🚂' },
+  { value: 'BOAT', label: 'Boat', icon: '⛵' },
+];
+
+// Relational day shape matching backend ItineraryDay + junctions
 export const createDefaultDay = (dayNumber = 1) => ({
   dayNumber,
   title: '',
   description: '',
-  activities: [],
-  accommodation: {
-    name: '',
-    type: '',
-    rating: 0,
-    address: '',
-    contactNumber: '',
-    // Extended fields from hotel selection
-    hotelId: null,
-    hotelProvider: null,
-    hotelImage: null,
-    roomType: null,
-    boardType: null,
-    checkin: null,
-    checkout: null,
-    totalAmount: null,
-    currency: null,
-    bookingIds: [],
-  },
-  meals: {
-    breakfast: false,
-    lunch: false,
-    dinner: false,
-  },
-  transport: 'car',
-  // Flight preferences (when transport === 'flight')
-  // Package template: { origin, destination, cabinClass, departureTime, airlinePreference }
-  // Lead level: { ...template + flightBookingId, bookingReference, flightNumber, carrierName, departureDateTime, arrivalDateTime, totalAmount, currency, status }
-  flight: null,
+  breakfastCount: 1,
+  lunchCount: 0,
+  dinnerCount: 1,
+  mealPriceOverride: null,
   places: [],
-  images: [],
-  notes: '',
+  activities: [],
+  transports: [{
+    routeType: 'DAILY_ROUTING',
+    transportMode: 'CAR',
+    pricingModel: 'PER_VEHICLE',
+    unitCost: 0,
+    distanceKm: null,
+    originPlaceId: null,
+    destinationPlaceId: null,
+  }],
+});
+
+// Default place entry
+export const createDefaultPlace = (orderIndex = 0) => ({
+  placeId: null,
+  customName: '',
+  orderIndex,
+});
+
+// Default activity entry
+export const createDefaultActivity = (orderIndex = 0) => ({
+  activityId: null,
+  name: '',
+  defaultCost: 0,
+  costOverride: null,
+  orderIndex,
 });
 
 export const PACKAGE_DEFAULTS = {
-  status: PACKAGE_STATUS.DRAFT,
   images: [],
   coverImage: null,
   inclusions: [],
   exclusions: [],
-  highlights: [],
-  terms: [],
-  days: [],
+  termsAndConditions: '',
+  itineraryDays: [],
   bookings: 0,
   rating: 0,
   numReviews: 0,
   views: 0,
   isActive: true,
   isFeatured: false,
+  defaultMarginType: 'PERCENTAGE',
+  defaultMarginInput: 20,
+  currency: 'USD',
 };
 
-/**
- * Default package structure aligned with backend Package model
- */
+// New package blueprint
 export const createDefaultPackage = (overrides = {}) => ({
-  _id: null,
-  name: '',
+  title: '',
   description: '',
-  destination: '', // Backend requires this, not "region"
-  duration: 1,
-  price: 0, // Must be a number, not a string
-  maxGroupSize: 10,
-  difficulty: DIFFICULTY_LEVEL.MODERATE,
-  category: PACKAGE_CATEGORY.OTHER,
+  destination: '',
+  durationDays: 1,
+  category: PACKAGE_CATEGORY.FAMILY,
+  basePrice: 0,
   ...PACKAGE_DEFAULTS,
-  createdDate: new Date().toISOString().split('T')[0],
-  updatedDate: new Date().toISOString().split('T')[0],
   ...overrides,
 });
+
+// Legacy compat helpers (deprecated — use new field names directly)
+export const LEGACY_CATEGORY_MAP = {
+  adventure: 'FAMILY', budget: 'FAMILY', luxury: 'FAMILY',
+  religious: 'FAMILY', wildlife: 'WILD_SAFARI', beach: 'FAMILY',
+  heritage: 'FAMILY', other: 'FAMILY', honeymoon: 'HONEYMOON',
+  couple: 'COUPLE', family: 'FAMILY', group: 'GROUP',
+  'wild safari': 'WILD_SAFARI',
+};
+
+export const mapLegacyCategory = (cat) => LEGACY_CATEGORY_MAP[cat?.toLowerCase()] || 'FAMILY';

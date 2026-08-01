@@ -1,7 +1,7 @@
 /**
  * Basic Package Info Form Component - Redesigned
  * Modern card-based layout with premium styling
- * Handles package name, description, category, destination, highlights, inclusions, and exclusions
+ * Handles package title, description, category, destination, inclusions, and exclusions
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -85,7 +85,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
       const response = await packageAIApi.generateFromTitle({
         title: title.trim(),
         destination: formData.destination || null,
-        duration: formData.duration || null,
+        duration: formData.durationDays || null,
         category: formData.category || null,
       });
 
@@ -95,7 +95,6 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         onChange({
           ...formData,
           description: aiContent.description || formData.description,
-          highlights: aiContent.highlights || formData.highlights,
           inclusions: aiContent.inclusions || formData.inclusions,
           exclusions: aiContent.exclusions || formData.exclusions,
         });
@@ -152,7 +151,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
   };
 
   const handleAIGenerate = async () => {
-    if (!formData.name || formData.name.trim() === '') {
+    if (!formData.title || formData.title.trim() === '') {
       toast.error('Please enter a package name first');
       return;
     }
@@ -164,7 +163,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
     }
 
     setAutoGenerateEnabled(false);
-    await generateAIContent(formData.name);
+    await generateAIContent(formData.title);
   };
 
   // Input Card Component
@@ -216,13 +215,13 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         <div className="flex items-stretch gap-3">
           <input
             type="text"
-            name="name"
-            value={formData.name || ''}
+            name="title"
+            value={formData.title || ''}
             onChange={handleChange}
             placeholder="e.g., 7-Day Sri Lanka Adventure"
             className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
           />
-          {formData.name && formData.name.trim().length >= 3 && (
+          {formData.title && formData.title.trim().length >= 3 && (
             <button
               type="button"
               onClick={handleAIGenerate}
@@ -241,7 +240,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         </div>
 
         {/* AI Status Messages */}
-        {formData.name && formData.name.trim().length >= 3 && (
+        {formData.title && formData.title.trim().length >= 3 && (
           <>
             {aiConfigured === false && (
               <div className="mt-4 bg-rose-50 rounded-xl border border-rose-200 p-4">
@@ -294,21 +293,8 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         />
       </InputCard>
 
-      {/* Three Column Grid for Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Highlights */}
-        <InputCard label="Highlights" icon={Star} hint="Separate with commas" className="lg:col-span-1">
-          <textarea
-            name="highlights"
-            placeholder="Free WiFi, Breakfast included, City tour..."
-            value={getArrayFieldValue('highlights')}
-            onChange={(e) => handleArrayFieldChange('highlights', e.target.value)}
-            onBlur={(e) => handleArrayFieldBlur('highlights', e.target.value)}
-            rows="4"
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none"
-          />
-        </InputCard>
-
+      {/* Two Column Grid for Lists */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Inclusions */}
         <InputCard label="Inclusions" icon={CheckCircle} hint="What's included (comma separated)" className="lg:col-span-1">
           <textarea
