@@ -434,22 +434,11 @@ export const adminAPI = {
 };
 
 // Manual Itinerary API Methods
+// Manual Itinerary API — MOVED to lead-service (stub for migration)
 export const manualItineraryAPI = {
-  // Get manual itinerary by lead ID
-  getByLead: async (leadId) => {
-    const api = new ApiService();
-    return api.get(`/manual-itineraries/lead/${leadId}`);
-  },
-  // Create or update manual itinerary
-  createOrUpdate: async (leadId, days) => {
-    const api = new ApiService();
-    return api.post(`/manual-itineraries/lead/${leadId}`, { days });
-  },
-  // Delete manual itinerary
-  delete: async (itineraryId) => {
-    const api = new ApiService();
-    return api.delete(`/manual-itineraries/${itineraryId}`);
-  },
+  getByLead: async () => { throw new Error('manualItineraryAPI has moved to lead-service'); },
+  createOrUpdate: async () => { throw new Error('manualItineraryAPI has moved to lead-service'); },
+  delete: async () => { throw new Error('manualItineraryAPI has moved to lead-service'); },
 };
 
 // Analytics API Methods
@@ -770,40 +759,42 @@ export const packageAPI = {
     const api = new ApiService();
     return api.put(`/packages/${id}`, packageData);
   },
-  // Get itinerary by package ID
-  getItineraryByPackage: async (packageId) => {
-    const api = new ApiService();
-    return api.get(`/itineraries/package/${packageId}`);
-  },
 };
 
-// Customized Package API Methods
+// Customized Package API — MOVED to lead-service (stub for migration)
 export const customizedPackageAPI = {
-  // Get customized package by ID
-  getById: async (id) => {
+  getById: async () => { throw new Error('customizedPackageAPI has moved to lead-service'); },
+  getItineraryByPackage: async () => { throw new Error('customizedPackageAPI has moved to lead-service'); },
+  update: async () => { throw new Error('customizedPackageAPI has moved to lead-service'); },
+};
+
+// Itinerary API — now embedded in package response (stub for migration)
+export const itineraryAPI = {
+  getById: async () => { throw new Error('itineraryAPI: itinerary days are now embedded in the package response'); },
+  getByPackage: async () => { throw new Error('itineraryAPI: itinerary days are now embedded in the package response'); },
+};
+
+// Place API Methods
+export const placeAPI = {
+  getAll: async (params = {}) => {
     const api = new ApiService();
-    return api.get(`/customized-packages/${id}`);
+    return api.get('/places', params);
   },
-  // Get itinerary by customized package ID
-  getItineraryByPackage: async (packageId) => {
+  create: async (data) => {
     const api = new ApiService();
-    return api.get(`/itineraries/package/${packageId}`);
-  },
-  update: async (id, payload) => {
-    const api = new ApiService();
-    return api.put(`/customized-packages/${id}`, payload);
+    return api.post('/places', data);
   },
 };
 
-// Itinerary API Methods
-export const itineraryAPI = {
-  getById: async (id) => {
+// Activity API Methods
+export const activityAPI = {
+  getAll: async (params = {}) => {
     const api = new ApiService();
-    return api.get(`/itineraries/${id}`);
+    return api.get('/activities', params);
   },
-  getByPackage: async (packageId) => {
+  create: async (data) => {
     const api = new ApiService();
-    return api.get(`/itineraries/package/${packageId}`);
+    return api.post('/activities', data);
   },
 };
 

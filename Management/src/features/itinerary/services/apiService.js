@@ -1,14 +1,10 @@
 /**
- * Enhanced API Service with Proper Error Handling
- * Handles all communication with the backend
- * Follows best practices for API integration
+ * API Service for packages and related endpoints.
+ * Handles all communication with the package-service backend.
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
 
-/**
- * Enhanced request wrapper with error handling and logging
- */
 async function makeRequest(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -23,11 +19,6 @@ async function makeRequest(endpoint, options = {}) {
   };
 
   try {
-    console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
-    if (options.body) {
-      console.log(`[API Request Body]:`, JSON.parse(options.body));
-    }
-
     const response = await fetch(url, config);
     const data = await response.json();
 
@@ -36,34 +27,12 @@ async function makeRequest(endpoint, options = {}) {
       error.status = response.status;
       error.data = data;
       error.errors = data.errors || [];
-      
-      // Log detailed validation errors with FULL details
-      if (data.errors && Array.isArray(data.errors)) {
-        console.error('%c[VALIDATION ERRORS]:', 'color: red; font-weight: bold; font-size: 14px;');
-        data.errors.forEach((err, index) => {
-          console.error(`%c  Error ${index + 1}:`, 'color: red; font-weight: bold;');
-          console.error('    Field:', err.param || err.field || 'unknown');
-          console.error('    Message:', err.msg || err.message || 'No message');
-          console.error('    Value:', err.value);
-          console.error('    Location:', err.location || 'body');
-        });
-      }
-      
       throw error;
     }
 
     return data;
   } catch (error) {
     console.error(`[API Error] ${endpoint}:`, error.message);
-    if (error.errors && error.errors.length > 0) {
-      console.error('%c[DETAILED ERRORS]:', 'color: red; font-weight: bold;');
-      error.errors.forEach((err, index) => {
-        console.error(`%c  Error ${index + 1}:`, 'color: red;');
-        console.error('    Field:', err.param || err.field || 'unknown');
-        console.error('    Message:', err.msg || err.message || 'No message');
-        console.error('    Value:', err.value);
-      });
-    }
     throw error;
   }
 }
@@ -78,7 +47,6 @@ class ApiService {
   }
 
   static async getPackagesProtected(params = {}) {
-    // Protected endpoint that automatically filters published packages for salesReps
     const queryString = new URLSearchParams(params).toString();
     return makeRequest(`/packages/protected/all${queryString ? `?${queryString}` : ''}`);
   }
@@ -101,28 +69,53 @@ class ApiService {
   }
 
   static async createPackage(packageData) {
-    // Clean the data - remove _id fields and internal properties
     const cleanData = {
-      ...packageData,
+      title: packageData.title || packageData.name,
+      description: packageData.description,
+      destination: packageData.destination,
+      durationDays: packageData.durationDays || packageData.duration,
+      category: packageData.category,
+      coverImage: packageData.coverImage || packageData.coverImageUrl,
+      inclusions: packageData.inclusions || [],
+      exclusions: packageData.exclusions || [],
+      termsAndConditions: packageData.termsAndConditions || (packageData.terms || []).join('. '),
+      basePrice: packageData.basePrice ?? packageData.price,
+      defaultMarginType: packageData.defaultMarginType || 'PERCENTAGE',
+      defaultMarginInput: packageData.defaultMarginInput ?? 20,
+      currency: packageData.currency || 'USD',
+      isActive: packageData.isActive ?? (packageData.status === 'published'),
+      isFeatured: packageData.isFeatured ?? false,
+      images: (packageData.images || []).map((img) => ({
+        url: img.url || img,
+        altText: img.altText || img.alt_text,
+      })),
+      itineraryDays: (packageData.itineraryDays || packageData.days || []).map((day) => ({
+        dayNumber: day.dayNumber,
+        title: day.title || '',
+        description: day.description || '',
+        breakfastCount: day.breakfastCount ?? (day.meals?.breakfast ? 1 : 0),
+        lunchCount: day.lunchCount ?? (day.meals?.lunch ? 1 : 0),
+        dinnerCount: day.dinnerCount ?? (day.meals?.dinner ? 1 : 0),
+        mealPriceOverride: day.mealPriceOverride ?? null,
+        places: (day.places || (day.locations || []).map((l, i) => ({ customName: l, orderIndex: i }))),
+        activities: (day.activities || []).map((a, i) => ({
+          activityId: a.activityId,
+          name: typeof a === 'string' ? a : a.name,
+          costOverride: a.costOverride ?? null,
+          orderIndex: a.orderIndex ?? i,
+        })),
+        transports: (day.transports || (day.transport ? [{ routeType: 'DAILY_ROUTING', transportMode: String(day.transport).toUpperCase(), pricingModel: 'PER_VEHICLE', unitCost: 0 }] : [])),
+      })),
     };
-    delete cleanData._id;
+
     delete cleanData.id;
+    delete cleanData._id;
     delete cleanData._v;
     delete cleanData.__v;
     delete cleanData.createdAt;
     delete cleanData.createdBy;
     delete cleanData.slug;
-    
-    // Ensure days array is preserved
-    if (packageData.days) {
-      cleanData.days = packageData.days;
-    }
-    
-    console.log('[API Service] Sending package data with days:', cleanData.days?.length || 0);
-    if (cleanData.days && cleanData.days.length > 0) {
-      console.log('[API Service] First day sample:', JSON.stringify(cleanData.days[0], null, 2));
-    }
-    
+
     return makeRequest('/packages', {
       method: 'POST',
       body: JSON.stringify(cleanData),
@@ -130,17 +123,20 @@ class ApiService {
   }
 
   static async updatePackage(id, packageData) {
-    // Clean the data - remove _id fields and internal properties
-    const cleanData = {
-      ...packageData,
-    };
+    const cleanData = { ...packageData };
     delete cleanData._id;
+    delete cleanData.id;
     delete cleanData._v;
     delete cleanData.__v;
     delete cleanData.createdAt;
     delete cleanData.createdBy;
     delete cleanData.slug;
-    
+
+    // Map legacy fields to new field names
+    if (cleanData.name && !cleanData.title) cleanData.title = cleanData.name;
+    if (cleanData.price !== undefined && cleanData.basePrice === undefined) cleanData.basePrice = cleanData.price;
+    if (cleanData.terms && !cleanData.termsAndConditions) cleanData.termsAndConditions = cleanData.terms.join('. ');
+
     return makeRequest(`/packages/${id}`, {
       method: 'PUT',
       body: JSON.stringify(cleanData),
@@ -148,9 +144,7 @@ class ApiService {
   }
 
   static async deletePackage(id) {
-    return makeRequest(`/packages/${id}`, {
-      method: 'DELETE',
-    });
+    return makeRequest(`/packages/${id}`, { method: 'DELETE' });
   }
 
   static async getFeaturedPackages(limit = 6) {
@@ -169,102 +163,24 @@ class ApiService {
     return makeRequest(`/packages/category/${category}?limit=${limit}`);
   }
 
-  // ==================== ITINERARY ENDPOINTS ====================
+  // ==================== PLACES & ACTIVITIES ====================
 
-  static async getItineraries(params = {}) {
+  static async getPlaces(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    return makeRequest(`/itineraries${queryString ? `?${queryString}` : ''}`);
+    return makeRequest(`/places${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async getItinerary(id) {
-    return makeRequest(`/itineraries/${id}`);
+  static async createPlace(data) {
+    return makeRequest('/places', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  static async getItineraryByPackage(packageId) {
-    return makeRequest(`/itineraries/package/${packageId}`);
+  static async getActivities(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return makeRequest(`/activities${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async createItinerary(itineraryData) {
-    return makeRequest('/itineraries', {
-      method: 'POST',
-      body: JSON.stringify(itineraryData),
-    });
-  }
-
-  static async updateItinerary(id, itineraryData) {
-    return makeRequest(`/itineraries/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(itineraryData),
-    });
-  }
-
-  static async deleteItinerary(id) {
-    return makeRequest(`/itineraries/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  static async getDropdownOptions() {
-    return makeRequest('/itineraries/dropdown-options');
-  }
-
-  // ==================== DAY ENDPOINTS ====================
-
-  static async addDay(itineraryId, dayData) {
-    return makeRequest(`/itineraries/${itineraryId}/days`, {
-      method: 'POST',
-      body: JSON.stringify(dayData),
-    });
-  }
-
-  static async updateDay(itineraryId, dayNumber, dayData) {
-    return makeRequest(`/itineraries/${itineraryId}/days/${dayNumber}`, {
-      method: 'PUT',
-      body: JSON.stringify(dayData),
-    });
-  }
-
-  static async deleteDay(itineraryId, dayNumber) {
-    return makeRequest(`/itineraries/${itineraryId}/days/${dayNumber}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // ==================== PREVIEW & EXPORT ====================
-
-  static async previewItinerary(id) {
-    return makeRequest(`/itineraries/${id}/preview`);
-  }
-
-  static async downloadItineraryPDF(id) {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const url = `${API_BASE_URL}/itineraries/${id}/pdf`;
-
-    try {
-      const response = await fetch(url, {
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to download PDF');
-      }
-
-      return response.blob();
-    } catch (error) {
-      console.error('[API Error] Download PDF failed:', error);
-      throw error;
-    }
-  }
-
-  // ==================== CLONE ENDPOINT ====================
-
-  static async cloneItinerary(id, targetPackageId) {
-    return makeRequest(`/itineraries/${id}/clone`, {
-      method: 'POST',
-      body: JSON.stringify({ targetPackageId }),
-    });
+  static async createActivity(data) {
+    return makeRequest('/activities', { method: 'POST', body: JSON.stringify(data) });
   }
 }
 
