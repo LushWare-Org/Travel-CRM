@@ -1,6 +1,7 @@
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import { computeMargin } from '../../../shared/pricing-engine/src/index.js';
 import {
   serializePackage,
   serializePackageList,
@@ -221,4 +222,37 @@ export const getAIStatus = asyncHandler(async (req, res) => {
   const configured = key.length > 0;
   const keyFormat = configured && key.startsWith('AI') ? 'valid' : 'valid';
   res.json({ success: true, configured, keyFormat });
+});
+
+// ── Pricing preview ───────────────────────────────────────────
+
+export const calculatePrice = asyncHandler(async (req, res) => {
+  const {
+    itineraryDays = [],
+    basePrice: explicitBasePrice,
+    defaultMarginType = 'PERCENTAGE',
+    defaultMarginInput = 0,
+  } = req.body || {};
+
+  const days = Array.isArray(itineraryDays) ? itineraryDays : [];
+  const activities = days.flatMap((day) => day.activities || []);
+  const transports = days.flatMap((day) => day.transports || []);
+
+  // Always recompute from the itinerary so the breakdown reflects real costs.
+  const pricing = recomputeBasePrice(days, activities, transports);
+
+  // Hybrid pricing: a positive basePrice is an explicit override (used when the
+  // itinerary has no cost data yet); otherwise the recomputed value stands.
+  const basePrice = Number(explicitBasePrice) > 0 ? Number(explicitBasePrice) : pricing.basePrice;
+  const margin = computeMargin(basePrice, defaultMarginType, Number(defaultMarginInput) || 0);
+
+  res.json({
+    success: true,
+    data: {
+      basePrice,
+      sellPrice: margin.sellPrice,
+      margin: margin.marginAmount,
+      breakdown: pricing.breakdown,
+    },
+  });
 });

@@ -31,6 +31,9 @@ router.get('/:id', validateParams(packageIdParamSchema), packageController.getPa
 router.post('/generate-ai',         requireAuth, authorize('admin', 'staff'), generateAIPackage);
 router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), generateContentFromTitle);
 
+// ── Pricing ───────────────────────────────────────────────────────────────────
+router.post('/calculate-price', requireAuth, packageController.calculatePrice);
+
 // ── Package CRUD ──────────────────────────────────────────────────────────────
 router.post('/',      requireAuth, authorize('admin', 'staff'), validateBody(createPackageSchema), packageController.createPackage);
 router.put('/:id',    requireAuth, authorize('admin', 'staff'), validateParams(packageIdParamSchema), validateBody(updatePackageSchema), packageController.updatePackage);
