@@ -93,11 +93,11 @@ enum HotelBookingStatus {
 
 model Package {
   id                  String          @id @default(uuid())
-  title               String          @db.VarChar(255)
+  title               String          @default("") @db.VarChar(255)
   slug                String?         @unique
   description         String?         @db.Text
   destination         String?         @db.VarChar(255)   // denormalized search/filter aid
-  durationDays        Int             @map("duration_days")
+  durationDays        Int             @default(1) @map("duration_days")
   category            PackageCategory @default(FAMILY)
   coverImage          String?         @db.VarChar(500)   @map("cover_image")
 

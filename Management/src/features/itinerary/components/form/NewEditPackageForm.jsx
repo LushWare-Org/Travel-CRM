@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import {
-  Save, Send, X, Info, ChevronDown, ChevronUp,
+  Save, Send, X, Info, ChevronDown, ChevronUp, Loader,
   FileText, DollarSign, Image, Calendar, Sparkles, Eye
 } from 'lucide-react';
 import BasicPackageInfo from './BasicPackageInfo';
@@ -69,6 +69,7 @@ const NewEditPackageForm = ({
   onlyItineraryEditable = false,
 }) => {
   const [localFormData, setLocalFormData] = useState(formData);
+  const [saving, setSaving] = useState(false);
   const [showItinerary, setShowItinerary] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
@@ -80,17 +81,17 @@ const NewEditPackageForm = ({
   useEffect(() => {
     let initialData = { ...formData };
 
-    if ((!initialData.days || initialData.days.length === 0) && initialData.duration && initialData.duration > 0) {
-      console.log('[Form] Initializing empty days array with', initialData.duration, 'days');
-      const newDays = [];
-      for (let i = 1; i <= initialData.duration; i++) {
-        newDays.push(createDefaultDay(i));
+    if ((!initialData.days || initialData.days.length === 0)) {
+      const dur = initialData.durationDays || initialData.duration;
+      if (dur && dur > 0) {
+        const newDays = [];
+        for (let i = 1; i <= dur; i++) newDays.push(createDefaultDay(i));
+        initialData.days = newDays;
       }
-      initialData.days = newDays;
     }
 
     setLocalFormData(initialData);
-  }, [formData]);
+  }, []); // Only run on mount
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -145,7 +146,7 @@ const NewEditPackageForm = ({
   const handleDayChange = (dayNumber, dayData) => {
     setLocalFormData((prev) => ({
       ...prev,
-      days: prev.days.map((day) =>
+      days: (prev.days || []).map((day) =>
         day.dayNumber === dayNumber ? { ...day, ...dayData } : day
       ),
     }));
@@ -459,17 +460,19 @@ const NewEditPackageForm = ({
           <div className="flex gap-3">
             <button
               onClick={() => handleSave('draft')}
-              className="flex-1 px-6 py-3.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium flex items-center justify-center gap-2"
+              disabled={saving}
+              className="flex-1 px-6 py-3.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save className="w-5 h-5" />
-              Save as Draft
+              {saving ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+              {saving ? 'Saving...' : 'Save as Draft'}
             </button>
             <button
               onClick={() => handleSave('published')}
-              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl hover:from-emerald-600 hover:to-teal-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
+              disabled={saving}
+              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl hover:from-emerald-600 hover:to-teal-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send className="w-5 h-5" />
-              Publish
+              {saving ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+              {saving ? 'Publishing...' : 'Publish'}
             </button>
             <button
               onClick={onCancel}

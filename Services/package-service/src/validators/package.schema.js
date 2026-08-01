@@ -20,19 +20,19 @@ const imageSchema = z.object({
 // ─── Day sub-schemas ───────────────────────────────────────────
 
 const dayPlace = z.object({
-  placeId: z.string().uuid().optional(),
-  customName: z.string().optional(),
+  placeId: z.string().uuid().optional().nullable(),
+  customName: z.string().optional().nullable(),
   orderIndex: z.number().int().min(0).default(0),
 }).refine((d) => d.placeId || d.customName, {
   message: 'At least one of placeId or customName is required',
 });
 
 const dayActivity = z.object({
-  activityId: z.string().uuid().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  defaultCost: decimal().optional(),
-  costOverride: decimal().optional(),
+  activityId: z.string().uuid().optional().nullable(),
+  name: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  defaultCost: decimal().optional().nullable(),
+  costOverride: decimal().optional().nullable(),
   orderIndex: z.number().int().min(0).default(0),
 }).refine((d) => d.activityId || d.name, {
   message: 'At least one of activityId or name is required',

@@ -118,7 +118,7 @@ class ApiService {
 
     return makeRequest('/packages', {
       method: 'POST',
-      body: JSON.stringify(cleanData),
+      body: JSON.stringify(cleanData, (key, value) => value === null ? undefined : value),
     });
   }
 
@@ -139,7 +139,7 @@ class ApiService {
 
     return makeRequest(`/packages/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(cleanData),
+      body: JSON.stringify(cleanData, (key, value) => value === null ? undefined : value),
     });
   }
 
