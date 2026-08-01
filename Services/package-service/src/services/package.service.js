@@ -338,8 +338,14 @@ export async function resolveActivityCatalogIds(days) {
 export function assembleWhere(query) {
   const where = {};
 
-  if (query.isActive !== undefined) where.isActive = query.isActive;
-  if (query.isFeatured !== undefined) where.isFeatured = query.isFeatured;
+  // Express query strings arrive as strings ("true"/"false"), but Prisma
+  // expects real booleans — coerce both representations.
+  if (query.isActive !== undefined) {
+    where.isActive = query.isActive === 'true' || query.isActive === true;
+  }
+  if (query.isFeatured !== undefined) {
+    where.isFeatured = query.isFeatured === 'true' || query.isFeatured === true;
+  }
   if (query.category) where.category = query.category;
 
   if (query.search) {
@@ -352,8 +358,8 @@ export function assembleWhere(query) {
 
   if (query.minPrice !== undefined || query.maxPrice !== undefined) {
     where.basePrice = {};
-    if (query.minPrice !== undefined) where.basePrice.gte = query.minPrice;
-    if (query.maxPrice !== undefined) where.basePrice.lte = query.maxPrice;
+    if (query.minPrice !== undefined) where.basePrice.gte = Number(query.minPrice);
+    if (query.maxPrice !== undefined) where.basePrice.lte = Number(query.maxPrice);
   }
 
   return where;

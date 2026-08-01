@@ -226,6 +226,20 @@ describe('assembleWhere', () => {
     expect(assembleWhere({ isActive: true })).toEqual({ isActive: true });
   });
 
+  it('coerces string booleans from query strings to real booleans', () => {
+    expect(assembleWhere({ isActive: 'true', isFeatured: 'false' })).toEqual({
+      isActive: true,
+      isFeatured: false,
+    });
+  });
+
+  it('coerces mixed boolean representations', () => {
+    expect(assembleWhere({ isActive: true, isFeatured: 'true' })).toEqual({
+      isActive: true,
+      isFeatured: true,
+    });
+  });
+
   it('filters by category', () => {
     expect(assembleWhere({ category: 'HONEYMOON' })).toEqual({ category: 'HONEYMOON' });
   });
@@ -239,6 +253,13 @@ describe('assembleWhere', () => {
   it('filters by price range', () => {
     const where = assembleWhere({ minPrice: 100, maxPrice: 500 });
     expect(where.basePrice).toEqual({ gte: 100, lte: 500 });
+  });
+
+  it('parses string price filters into numbers', () => {
+    const where = assembleWhere({ minPrice: '100', maxPrice: '500' });
+    expect(where.basePrice).toEqual({ gte: 100, lte: 500 });
+    expect(typeof where.basePrice.gte).toBe('number');
+    expect(typeof where.basePrice.lte).toBe('number');
   });
 
   it('filters by min price only', () => {
