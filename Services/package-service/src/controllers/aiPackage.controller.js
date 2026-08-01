@@ -3,101 +3,84 @@ import slugify from 'slugify';
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import { serializePackage } from '../services/package.service.js';
 
-// Frontend exposes more display categories than the PackageCategory enum supports;
-// map down to a valid value (mirrors Server/src/services/aiPackageGeneration.service.js).
+// Map frontend display categories to valid PackageCategory enum values.
 const CATEGORY_MAP = {
-  adventure: 'family',
-  budget: 'family',
-  luxury: 'family',
-  religious: 'family',
-  wildlife: 'wild safari',
-  beach: 'family',
-  heritage: 'family',
-  other: 'family',
-  honeymoon: 'honeymoon',
-  couple: 'couple',
-  family: 'family',
-  group: 'group',
-  'wild safari': 'wild safari',
+  adventure: 'FAMILY', budget: 'FAMILY', luxury: 'FAMILY',
+  religious: 'FAMILY', wildlife: 'WILD_SAFARI', beach: 'FAMILY',
+  heritage: 'FAMILY', other: 'FAMILY', honeymoon: 'HONEYMOON',
+  couple: 'COUPLE', family: 'FAMILY', group: 'GROUP',
+  'wild safari': 'WILD_SAFARI',
 };
-const toValidCategory = (category) => CATEGORY_MAP[String(category || 'family').toLowerCase()] || 'family';
+const toValidCategory = (category) => CATEGORY_MAP[String(category || 'family').toLowerCase()] || 'FAMILY';
 
-const placeholderDay = (dayNumber) => ({
-  dayNumber,
-  title: `Day ${dayNumber}`,
-  description: '',
-  locations: [],
-  activities: [],
-  accommodation: { name: '', address: '', contactNumber: '', rating: 0, type: 'hotel' },
-  meals: { breakfast: true, lunch: false, dinner: true },
-  transport: '',
-  places: [],
-  images: [],
-  notes: '',
-});
-
-// Guarantees exactly `duration` fully-shaped day entries — the AI is asked for this,
-// but Gemini can under-generate or truncate on longer itineraries, so pad/normalize
-// rather than let a short array or missing sub-field reach the client as-is.
-const normalizeDays = (days, duration) => {
-  const source = Array.isArray(days) ? days : [];
-  const result = [];
-  for (let i = 0; i < duration; i += 1) {
-    const dayNumber = i + 1;
-    const day = source[i];
-    if (!day) {
-      result.push(placeholderDay(dayNumber));
-      continue;
-    }
-    result.push({
-      dayNumber: day.dayNumber || dayNumber,
-      title: day.title || `Day ${dayNumber}`,
-      description: day.description || '',
-      locations: Array.isArray(day.locations) ? day.locations : [],
-      activities: Array.isArray(day.activities) ? day.activities : [],
-      accommodation: {
-        name: day.accommodation?.name || '',
-        address: day.accommodation?.address || '',
-        contactNumber: day.accommodation?.contactNumber || day.accommodation?.contact || '',
-        rating: day.accommodation?.rating !== undefined && day.accommodation?.rating !== null
-          ? parseFloat(day.accommodation.rating) || 0
-          : 0,
-        type: day.accommodation?.type || 'hotel',
-      },
-      meals: {
-        breakfast: day.meals?.breakfast === true,
-        lunch: day.meals?.lunch === true,
-        dinner: day.meals?.dinner === true,
-      },
-      transport: day.transport || '',
-      places: Array.isArray(day.places) ? day.places : [],
-      images: [],
-      notes: day.notes || '',
-    });
-  }
-  return result;
+const toUpperCategory = (cat) => {
+  const m = CATEGORY_MAP[cat?.toLowerCase()];
+  return m || 'FAMILY';
 };
 
-// ── Shared helper ─────────────────────────────────────────────────────────────
+// Map AI-generated legacy day shape → relational ItineraryDay rows.
+function mapDaysToRelational(normalizedDays) {
+  return normalizedDays.map((day, i) => ({
+    dayNumber: day.dayNumber || (i + 1),
+    title: day.title,
+    description: day.description,
+    breakfastCount: day.meals?.breakfast ? 1 : 0,
+    lunchCount: day.meals?.lunch ? 1 : 0,
+    dinnerCount: day.meals?.dinner ? 1 : 0,
+    places: {
+      create: (day.locations || []).map((loc, j) => ({
+        customName: loc,
+        orderIndex: j,
+      })),
+    },
+    activities: {
+      create: (day.activities || []).map((name, j) => ({
+        orderIndex: j,
+        // ActivityCatalog reference resolved by name later if needed; for AI draft,
+        // activities are created inline via a fallback — controller just stores the name.
+      })),
+    },
+    transports: day.transport ? {
+      create: [{
+        routeType: 'DAILY_ROUTING',
+        transportMode: mapTransportMode(day.transport),
+        pricingModel: 'PER_VEHICLE',
+        unitCost: 0, // AI cannot price — admin fills later
+      }],
+    } : undefined,
+  }));
+}
+
+function mapTransportMode(transport) {
+  const t = (transport || '').toLowerCase();
+  if (t.includes('flight') || t.includes('plane')) return 'FLIGHT';
+  if (t.includes('train') || t.includes('rail')) return 'TRAIN';
+  if (t.includes('boat') || t.includes('ferry') || t.includes('speedboat')) return 'BOAT';
+  if (t.includes('van') || t.includes('bus') || t.includes('coach')) return 'VAN';
+  return 'CAR';
+}
+
+// ── Shared helper ─────────────────────────────────────────────
+
 async function buildAIContent(pkg) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
   const prompt = `Generate compelling marketing content for a travel package with these details:
-Name: "${pkg.name || 'Travel Package'}"
-Destination: ${pkg.destination || 'Exotic destination'}
-Duration: ${pkg.duration || '?'} days
-Category: ${pkg.category || 'family'}
+  Title: "${pkg.title || 'Travel Package'}"
+  Destination: ${pkg.destination || 'Exotic destination'}
+  Duration: ${pkg.durationDays || '?'} days
+  Category: ${pkg.category || 'FAMILY'}
 
-Return ONLY a JSON object (no markdown, no extra text):
-{
-  "description": "2-3 engaging sentences about the package experience",
-  "highlights": ["4-6 unique selling points as short phrases"],
-  "inclusions": ["5-8 items included in the package"],
-  "exclusions": ["4-6 items not included"],
-  "terms": ["3-5 concise terms and conditions"]
-}`;
+  Return ONLY a JSON object (no markdown, no extra text):
+  {
+    "description": "2-3 engaging sentences about the package experience",
+    "inclusions": ["5-8 items included in the package"],
+    "exclusions": ["4-6 items not included"],
+    "termsAndConditions": "3-5 concise terms and conditions as a string"
+  }`;
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
@@ -113,7 +96,8 @@ Return ONLY a JSON object (no markdown, no extra text):
   return content;
 }
 
-// ── Create a full package + itinerary from scratch ────────────────────────────
+// ── Create a full package + itinerary days from scratch ───────
+
 export const generateAIPackage = asyncHandler(async (req, res) => {
   const { destination, duration, budget, travelers, preferences } = req.body;
   const category = toValidCategory(req.body.category);
@@ -132,37 +116,29 @@ export const generateAIPackage = asyncHandler(async (req, res) => {
 CRITICAL INSTRUCTIONS:
 1. Respond with ONLY a valid JSON object — no markdown code fences, no text before or after.
 2. The "days" array MUST contain exactly ${duration} entries, one per day, numbered 1 to ${duration}. Do not stop early or summarize remaining days.
-3. Keep each day's "description" under 100 words so the full response fits.
-4. Every day needs a distinct, real-sounding hotel/resort name and address for "accommodation" — do not leave accommodation fields blank.
+3. Each day must include "locations" (array of place names) and "activities" (array of activity names).
 
 Return a JSON object with these exact fields:
 {
-  "name": "Package name",
+  "title": "Package title",
   "description": "2-3 sentence description",
   "destination": "${destination}",
-  "duration": ${duration},
+  "durationDays": ${duration},
   "price": number,
   "category": "${category}",
   "inclusions": ["array", "of", "inclusions"],
   "exclusions": ["array", "of", "exclusions"],
-  "highlights": ["array", "of", "highlights"],
-  "terms": ["array", "of", "terms"],
-  "itinerary": {
-    "days": [
-      {
-        "dayNumber": 1,
-        "title": "Day title",
-        "description": "Day description",
-        "locations": ["location1", "location2"],
-        "activities": ["activity1", "activity2"],
-        "meals": {"breakfast": true, "lunch": true, "dinner": true},
-        "transport": "car / flight / train / boat / walk",
-        "accommodation": {"name": "hotel name", "address": "full address", "contactNumber": "+xx xxx xxx xxxx", "type": "hotel", "rating": 4},
-        "notes": "any traveler-relevant tip for the day"
-      }
-      // ... one object per day, continue through dayNumber ${duration}
-    ]
-  }
+  "days": [
+    {
+      "dayNumber": 1,
+      "title": "Day title",
+      "description": "Day description",
+      "locations": ["location1", "location2"],
+      "activities": ["activity1", "activity2"],
+      "meals": {"breakfast": true, "lunch": true, "dinner": true},
+      "transport": "car"
+    }
+  ]
 }`;
 
   const result = await model.generateContent(prompt);
@@ -177,33 +153,57 @@ Return a JSON object with these exact fields:
   }
   if (!packageData) throw new AppError('AI did not return valid package data', 500);
 
-  const { itinerary: itineraryData, ...pkgBody } = packageData;
-  pkgBody.duration = duration;
-  const normalizedDays = normalizeDays(itineraryData?.days, duration);
-  const slug = slugify(pkgBody.name, { lower: true, strict: true }) + '-' + Date.now();
+  const { days: aiDays, ...pkgBody } = packageData;
+  const d = Number(duration);
+  const days = Array.isArray(aiDays) ? aiDays.slice(0, d) : [];
+
+  // Pad to exactly `duration` days
+  while (days.length < d) {
+    const n = days.length + 1;
+    days.push({ dayNumber: n, title: `Day ${n}`, description: '', locations: [], activities: [], meals: { breakfast: true, dinner: true }, transport: '' });
+  }
+
+  const slug = slugify(pkgBody.title || packageData.title || 'package', { lower: true, strict: true }) + '-' + Date.now();
 
   const pkg = await prisma.package.create({
     data: {
-      ...pkgBody,
-      category: toValidCategory(pkgBody.category),
+      title: pkgBody.title || packageData.title || 'AI Generated Package',
+      description: pkgBody.description || '',
+      destination: pkgBody.destination || destination,
+      durationDays: d,
+      category: toUpperCategory(pkgBody.category || category),
       slug,
-      status: 'draft',
-      createdById: req.user.id,
-      itinerary: {
-        create: {
-          days: normalizedDays,
-          status: 'draft',
-          createdById: req.user.id,
+      coverImage: pkgBody.coverImage || null,
+      inclusions: pkgBody.inclusions || [],
+      exclusions: pkgBody.exclusions || [],
+      termsAndConditions: pkgBody.termsAndConditions || '',
+      basePrice: pkgBody.price || 0,
+      defaultMarginType: 'PERCENTAGE',
+      defaultMarginInput: 20,
+      currency: 'USD',
+      isActive: false,
+      isFeatured: false,
+      createdBy: req.user.id,
+      itineraryDays: { create: mapDaysToRelational(days) },
+    },
+    include: {
+      images: true,
+      itineraryDays: {
+        orderBy: { dayNumber: 'asc' },
+        include: {
+          places: { orderBy: { orderIndex: 'asc' } },
+          activities: { orderBy: { orderIndex: 'asc' } },
+          transports: true,
         },
       },
     },
-    include: { itinerary: true, images: true },
   });
 
-  res.status(201).json({ success: true, data: pkg });
+  res.status(201).json({ success: true, data: serializePackage(pkg) });
 });
 
-// ── Generate content from title — does NOT create anything ────────────────────
+// ── Generate content from title — does NOT create anything ────
+
 export const generateContentFromTitle = asyncHandler(async (req, res) => {
   const { title, destination, duration, category } = req.body;
   if (!title) throw new AppError('title is required', 400);
@@ -226,7 +226,7 @@ Return ONLY a JSON object (no markdown):
   "highlights": ["4-6 unique package highlights as short phrases"],
   "inclusions": ["5-8 items included"],
   "exclusions": ["4-6 items not included"],
-  "terms": ["3-5 key terms and conditions"]
+  "termsAndConditions": "3-5 key terms and conditions as a string"
 }`;
 
   const result = await model.generateContent(prompt);
@@ -244,7 +244,8 @@ Return ONLY a JSON object (no markdown):
   res.json({ success: true, data: content });
 });
 
-// ── Generate AI content for existing package and save it ──────────────────────
+// ── Generate AI content for existing package and save it ──────
+
 export const generateAndSaveAIContent = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const pkg = await prisma.package.findUnique({ where: { id } });
@@ -257,18 +258,21 @@ export const generateAndSaveAIContent = asyncHandler(async (req, res) => {
     where: { id },
     data: {
       description: content.description,
-      highlights:  content.highlights  || [],
-      inclusions:  content.inclusions  || [],
-      exclusions:  content.exclusions  || [],
-      terms:       content.terms       || [],
+      inclusions: content.inclusions || [],
+      exclusions: content.exclusions || [],
+      termsAndConditions: content.termsAndConditions || '',
     },
-    include: { itinerary: true, images: true },
+    include: {
+      images: { orderBy: { orderIndex: 'asc' } },
+      itineraryDays: { orderBy: { dayNumber: 'asc' }, include: { places: true, activities: true, transports: true } },
+    },
   });
 
-  res.json({ success: true, data: updated });
+  res.json({ success: true, data: serializePackage(updated) });
 });
 
-// ── Preview AI content for existing package — does NOT save ───────────────────
+// ── Preview AI content for existing package — does NOT save ───
+
 export const previewAIContent = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const pkg = await prisma.package.findUnique({ where: { id } });
