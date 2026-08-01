@@ -71,7 +71,7 @@ function AppContent() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/leads" element={<LeadManagement />} />
-                  <Route path="/itineraries" element={<ItineraryGeneration />} />
+                  <Route path="/packages" element={<ItineraryGeneration />} />
                   <Route path="/flights" element={<FlightSearch />} />
                   <Route path="/hotels" element={<HotelSearch />} />
                   <Route path="/billing" element={<BillingInvoicing />} />

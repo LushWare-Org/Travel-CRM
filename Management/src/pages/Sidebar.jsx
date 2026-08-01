@@ -51,7 +51,7 @@ const Sidebar = () => {
     {
       icon: MapPin,
       label: "Packages",
-      path: "/itineraries",
+      path: "/packages",
       requiredPermission: null,
       customCheck: (userRole, userIsSuperAdmin, hasPermission) => {
         if (userRole === 'superAdmin' && userIsSuperAdmin === true) return true;
