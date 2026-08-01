@@ -69,6 +69,10 @@ class ApiService {
   }
 
   static async createPackage(packageData) {
+    const rawDays = Array.isArray(packageData.days)
+      ? packageData.days
+      : (Array.isArray(packageData.itineraryDays) ? packageData.itineraryDays : []);
+
     const cleanData = {
       title: packageData.title || packageData.name,
       description: packageData.description,
@@ -89,23 +93,7 @@ class ApiService {
         url: img.url || img,
         altText: img.altText || img.alt_text,
       })),
-      itineraryDays: (packageData.itineraryDays || packageData.days || []).map((day) => ({
-        dayNumber: day.dayNumber,
-        title: day.title || '',
-        description: day.description || '',
-        breakfastCount: day.breakfastCount ?? (day.meals?.breakfast ? 1 : 0),
-        lunchCount: day.lunchCount ?? (day.meals?.lunch ? 1 : 0),
-        dinnerCount: day.dinnerCount ?? (day.meals?.dinner ? 1 : 0),
-        mealPriceOverride: day.mealPriceOverride ?? null,
-        places: (day.places || (day.locations || []).map((l, i) => ({ customName: l, orderIndex: i }))),
-        activities: (day.activities || []).map((a, i) => ({
-          activityId: a.activityId,
-          name: typeof a === 'string' ? a : a.name,
-          costOverride: a.costOverride ?? null,
-          orderIndex: a.orderIndex ?? i,
-        })),
-        transports: (day.transports || (day.transport ? [{ routeType: 'DAILY_ROUTING', transportMode: String(day.transport).toUpperCase(), pricingModel: 'PER_VEHICLE', unitCost: 0 }] : [])),
-      })),
+      itineraryDays: buildItineraryDaysPayload(rawDays),
     };
 
     delete cleanData.id;
@@ -131,6 +119,18 @@ class ApiService {
     delete cleanData.createdAt;
     delete cleanData.createdBy;
     delete cleanData.slug;
+
+    // The editor submits editor-shaped `days` (meals booleans, locations,
+    // transport mode). Convert them to the relational `itineraryDays` shape the
+    // backend persists, and drop both the editor `days` and any stale
+    // `itineraryDays` copied from the GET response so edits (including meal
+    // toggles) actually save.
+    if (Array.isArray(packageData.days)) {
+      cleanData.itineraryDays = buildItineraryDaysPayload(packageData.days);
+      delete cleanData.days;
+    } else if (Array.isArray(packageData.itineraryDays)) {
+      cleanData.itineraryDays = buildItineraryDaysPayload(packageData.itineraryDays);
+    }
 
     // Map legacy fields to new field names
     if (cleanData.name && !cleanData.title) cleanData.title = cleanData.name;
@@ -182,6 +182,79 @@ class ApiService {
   static async createActivity(data) {
     return makeRequest('/activities', { method: 'POST', body: JSON.stringify(data) });
   }
+}
+
+/**
+ * Normalize editor/API day objects into the relational `itineraryDays` payload
+ * the package-service persists. Meal toggles in the editor live on
+ * `day.meals` booleans, so those win over stale `breakfastCount`/`lunchCount`/
+ * `dinnerCount` values copied from the API response.
+ */
+function buildItineraryDaysPayload(days) {
+  return (days || []).filter(Boolean).map((day) => {
+    const dayPlaces = Array.isArray(day.places) && day.places.length > 0
+      ? day.places
+      : (Array.isArray(day.locations) ? day.locations : []);
+
+    const editorActivities = Array.isArray(day.activities)
+      ? day.activities
+      : (typeof day.activities === 'string'
+        ? day.activities.split(',').map((s) => s.trim()).filter(Boolean)
+        : []);
+    // The editor maps relational day activities to plain display names, which
+    // loses the activityId. Prefer the raw relational rows (kept in
+    // _relational.activities) so IDs and catalog costs survive an edit-save.
+    const relationalActivities = Array.isArray(day._relational?.activities) ? day._relational.activities : [];
+    const activities = editorActivities.length > 0 && editorActivities.every((a) => typeof a === 'string') && relationalActivities.length > 0
+      ? relationalActivities
+      : editorActivities;
+
+    const transports = Array.isArray(day.transports) && day.transports.length > 0
+      ? day.transports
+      : (Array.isArray(day._relational?.transports) && day._relational.transports.length > 0
+        ? day._relational.transports
+        : (day.transport
+          ? [{ routeType: 'DAILY_ROUTING', transportMode: String(day.transport).toUpperCase(), pricingModel: 'PER_VEHICLE', unitCost: 0 }]
+          : []));
+
+    const meals = (day.meals && typeof day.meals === 'object') ? day.meals : null;
+
+    return {
+      dayNumber: day.dayNumber,
+      title: day.title || '',
+      description: day.description || '',
+      breakfastCount: meals ? (meals.breakfast ? 1 : 0) : (day.breakfastCount ?? 0),
+      lunchCount: meals ? (meals.lunch ? 1 : 0) : (day.lunchCount ?? 0),
+      dinnerCount: meals ? (meals.dinner ? 1 : 0) : (day.dinnerCount ?? 0),
+      mealPriceOverride: day.mealPriceOverride ?? null,
+      places: dayPlaces.map((p, i) => {
+        if (typeof p === 'string') return { customName: p, orderIndex: i };
+        return {
+          placeId: p.placeId || p.place?.id || undefined,
+          customName: p.customName || p.name || undefined,
+          orderIndex: p.orderIndex ?? i,
+        };
+      }),
+      activities: activities.map((a, i) => {
+        const isObj = a && typeof a === 'object';
+        return {
+          activityId: isObj ? (a.activityId || a.activity?.id || undefined) : undefined,
+          name: isObj ? (a.name || a.activity?.name || undefined) : a,
+          costOverride: isObj ? (a.costOverride ?? null) : null,
+          orderIndex: isObj ? (a.orderIndex ?? i) : i,
+        };
+      }),
+      transports: transports.map((t) => ({
+        routeType: t.routeType || 'DAILY_ROUTING',
+        transportMode: t.transportMode || String(t.transport || day.transport || 'CAR').toUpperCase(),
+        pricingModel: t.pricingModel || 'PER_VEHICLE',
+        unitCost: t.unitCost ?? 0,
+        distanceKm: t.distanceKm ?? null,
+        originPlaceId: t.originPlaceId ?? null,
+        destinationPlaceId: t.destinationPlaceId ?? null,
+      })),
+    };
+  });
 }
 
 export default ApiService;

@@ -17,17 +17,19 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
   if (!pkg) return null;
 
   const formattedPrice = pkg.basePrice ? formatPriceINR(pkg.basePrice) : null;
-  const rawDays = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
+  const rawDays = Array.isArray(pkg.itineraryDays)
+    ? pkg.itineraryDays
+    : (Array.isArray(pkg.days) ? pkg.days : (Array.isArray(pkg.itinerary?.days) ? pkg.itinerary.days : []));
   // Map relational itineraryDays → display-friendly format
-  const days = rawDays.map(d => ({
+  const days = rawDays.filter(Boolean).map(d => ({
     dayNumber: d.dayNumber,
     title: d.title || '',
     description: d.description || '',
-    locations: (d.places || []).map(p => p.place?.name || p.customName).filter(Boolean),
-    activities: (d.activities || []).map(a => a.activity?.name || a.name || '').filter(Boolean),
+    locations: (Array.isArray(d.places) ? d.places : []).map(p => p.place?.name || p.customName).filter(Boolean),
+    activities: (Array.isArray(d.activities) ? d.activities : []).map(a => a.activity?.name || a.name || '').filter(Boolean),
     meals: d.meals || { breakfast: (d.breakfastCount || 0) > 0, lunch: (d.lunchCount || 0) > 0, dinner: (d.dinnerCount || 0) > 0 },
-    transport: (d.transports || [])[0]?.transportMode?.toLowerCase() || d.transport || 'car',
-    places: (d.places || []).map(p => ({ name: p.place?.name || p.customName || '' })),
+    transport: (Array.isArray(d.transports) && d.transports[0]?.transportMode?.toLowerCase()) || d.transport || 'car',
+    places: (Array.isArray(d.places) ? d.places : []).map(p => ({ name: p.place?.name || p.customName || '' })),
   }));
   const nights = pkg.durationDays ? pkg.durationDays - 1 : 0;
 

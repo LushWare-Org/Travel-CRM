@@ -7,6 +7,7 @@ import {
   buildCreateData,
   buildUpdateData,
   recomputeBasePrice,
+  resolveActivityCatalogIds,
   assembleWhere,
   buildInclude,
 } from '../services/package.service.js';
@@ -103,25 +104,28 @@ export const getPackagesByCategory = asyncHandler(async (req, res) => {
 // ── Create ────────────────────────────────────────────────────
 
 export const createPackage = asyncHandler(async (req, res) => {
-  let data = buildCreateData(req.body, req.user.id);
+  const { days: resolvedDays, activityCost } = await resolveActivityCatalogIds(req.body.itineraryDays || []);
+  const body = { ...req.body, itineraryDays: resolvedDays };
+  let data = buildCreateData(body, req.user.id);
 
-  // Hybrid pricing: auto-compute basePrice if not explicitly provided
-  if (req.body.basePrice === undefined && req.body.itineraryDays?.length) {
-    const itinDays = data.itineraryDays.create;
-    const activityItems = itinDays.flatMap((d) =>
-      (d.activities?.create || []).map((a) => ({
-        defaultCost: a.costOverride ?? 0,
+  // Hybrid pricing: auto-compute basePrice when left at 0 (or absent) and an
+  // itinerary was provided — matches the form's "Leave at 0 to auto-compute".
+  const wantsAutoCompute = req.body.basePrice == null || Number(req.body.basePrice) === 0;
+  if (wantsAutoCompute && resolvedDays.length > 0) {
+    const activityItems = resolvedDays.flatMap((d) =>
+      (d.activities || []).map((a) => ({
+        defaultCost: activityCost(a),
         costOverride: a.costOverride,
       }))
     );
-    const transportItems = itinDays.flatMap((d) =>
-      (d.transports?.create || []).map((t) => ({
+    const transportItems = resolvedDays.flatMap((d) =>
+      (d.transports || []).map((t) => ({
         pricingModel: t.pricingModel,
         unitCost: t.unitCost,
         distanceKm: t.distanceKm,
       }))
     );
-    const mealDays = itinDays.map((d) => ({
+    const mealDays = resolvedDays.map((d) => ({
       breakfastCount: d.breakfastCount || 0,
       lunchCount: d.lunchCount || 0,
       dinnerCount: d.dinnerCount || 0,
@@ -145,25 +149,31 @@ export const updatePackage = asyncHandler(async (req, res) => {
   const existing = await prisma.package.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Package not found', 404);
 
-  let data = buildUpdateData(req.body);
+  // Only touch itineraryDays when the client actually sent them, so partial
+  // updates (e.g. title/basePrice only) don't wipe the existing itinerary.
+  const rawDays = req.body.itineraryDays !== undefined ? req.body.itineraryDays : null;
+  const { days: resolvedDays, activityCost } = await resolveActivityCatalogIds(rawDays || []);
+  const body = rawDays ? { ...req.body, itineraryDays: resolvedDays } : req.body;
+  let data = buildUpdateData(body);
 
-  // Hybrid pricing: recompute if itineraryDays changed and no basePrice override provided
-  if (req.body.itineraryDays !== undefined && req.body.basePrice === undefined) {
-    const itinDays = data.itineraryDays.create;
-    const activityItems = itinDays.flatMap((d) =>
-      (d.activities?.create || []).map((a) => ({
-        defaultCost: a.costOverride ?? 0,
+  // Hybrid pricing: recompute when the itinerary changed and basePrice was left
+  // at 0 (auto-compute) — a positive basePrice is an explicit override.
+  const wantsAutoCompute = req.body.basePrice == null || Number(req.body.basePrice) === 0;
+  if (req.body.itineraryDays !== undefined && wantsAutoCompute) {
+    const activityItems = resolvedDays.flatMap((d) =>
+      (d.activities || []).map((a) => ({
+        defaultCost: activityCost(a),
         costOverride: a.costOverride,
       }))
     );
-    const transportItems = itinDays.flatMap((d) =>
-      (d.transports?.create || []).map((t) => ({
+    const transportItems = resolvedDays.flatMap((d) =>
+      (d.transports || []).map((t) => ({
         pricingModel: t.pricingModel,
         unitCost: t.unitCost,
         distanceKm: t.distanceKm,
       }))
     );
-    const mealDays = itinDays.map((d) => ({
+    const mealDays = resolvedDays.map((d) => ({
       breakfastCount: d.breakfastCount || 0,
       lunchCount: d.lunchCount || 0,
       dinnerCount: d.dinnerCount || 0,

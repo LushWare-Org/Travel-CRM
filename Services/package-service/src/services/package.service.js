@@ -1,4 +1,5 @@
 import slugify from 'slugify';
+import prisma from '../db/client.js';
 import { calculateBasePrice } from '../../../shared/pricing-engine/src/index.js';
 
 // ── Include helpers ───────────────────────────────────────────
@@ -274,6 +275,62 @@ export function recomputeBasePrice(days, activities, transports, options = {}) {
     groupSize: options.groupSize,
     mealCostPerPerson: options.mealCostPerPerson,
   });
+}
+
+// ── Activity catalog resolution ────────────────────────────────
+
+/**
+ * The editor submits activities by display name (or keeps an activityId when
+ * one was loaded from the API). PackageDayActivity.activityId is required, so
+ * resolve name-only activities against the Activity_Catalog (create-or-select)
+ * before building Prisma create/update data. Also returns a cost lookup so the
+ * auto-computed base price can use real catalog defaultCosts.
+ *
+ * @param {Array} days — request itineraryDays
+ * @returns {Promise<{ days: Array, activityCost: (a: object) => number }>}
+ */
+export async function resolveActivityCatalogIds(days) {
+  const costById = new Map();
+  const infoByName = new Map(); // name → { id, cost }
+
+  const resolvedDays = await Promise.all((days || []).map(async (day) => {
+    const activities = await Promise.all((day.activities || []).map(async (a) => {
+      if (a.activityId) {
+        if (!costById.has(a.activityId)) {
+          const row = await prisma.activityCatalog.findUnique({ where: { id: a.activityId } });
+          costById.set(a.activityId, row ? Number(row.defaultCost) : 0);
+        }
+        return a;
+      }
+      if (!a.name) return a;
+
+      let info = infoByName.get(a.name);
+      if (!info) {
+        const existing = await prisma.activityCatalog.findUnique({ where: { name: a.name } });
+        if (existing) {
+          info = { id: existing.id, cost: Number(existing.defaultCost) };
+        } else {
+          const created = await prisma.activityCatalog.create({
+            data: { name: a.name, defaultCost: a.defaultCost ?? 0 },
+          });
+          info = { id: created.id, cost: Number(created.defaultCost) };
+        }
+        infoByName.set(a.name, info);
+      }
+      return { ...a, activityId: info.id };
+    }));
+    return { ...day, activities };
+  }));
+
+  return {
+    days: resolvedDays,
+    activityCost: (a) => {
+      if (!a) return 0;
+      if (a.activityId && costById.has(a.activityId)) return costById.get(a.activityId);
+      if (a.name && infoByName.has(a.name)) return infoByName.get(a.name).cost;
+      return 0;
+    },
+  };
 }
 
 // ── Query builder ──────────────────────────────────────────────

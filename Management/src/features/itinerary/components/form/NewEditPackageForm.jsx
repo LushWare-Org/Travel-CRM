@@ -146,7 +146,7 @@ const NewEditPackageForm = ({
   const handleDayChange = (dayNumber, dayData) => {
     setLocalFormData((prev) => ({
       ...prev,
-      days: (prev.days || []).map((day) =>
+      days: (prev.days || []).filter(Boolean).map((day) =>
         day.dayNumber === dayNumber ? { ...day, ...dayData } : day
       ),
     }));
@@ -165,7 +165,7 @@ const NewEditPackageForm = ({
 
   const handleRemoveDay = (dayNumber) => {
     setLocalFormData((prev) => {
-      const filteredDays = prev.days.filter((day) => day.dayNumber !== dayNumber);
+      const filteredDays = (prev.days || []).filter((day) => day && day.dayNumber !== dayNumber);
       const renumberedDays = filteredDays.map((day, index) => ({
         ...day,
         dayNumber: index + 1,

@@ -183,7 +183,7 @@ const ItineraryEditor = ({
   const [expandedDays, setExpandedDays] = useState(() => {
     // Initialize all days expanded synchronously — no post-mount flicker
     const init = {};
-    days.forEach(day => { init[day.dayNumber] = true; });
+    days.forEach(day => { if (day && day.dayNumber != null) init[day.dayNumber] = true; });
     return init;
   });
   const [showFlightModal, setShowFlightModal] = useState(false);
@@ -195,7 +195,7 @@ const ItineraryEditor = ({
   useEffect(() => {
     const expanded = {};
     days.forEach(day => {
-      if (expandedDays[day.dayNumber] === undefined) {
+      if (day && day.dayNumber != null && expandedDays[day.dayNumber] === undefined) {
         expanded[day.dayNumber] = true;
       }
     });
@@ -215,7 +215,7 @@ const ItineraryEditor = ({
 
     try {
       const uploadedImages = await uploadItineraryImages(files);
-      const day = days.find(d => d.dayNumber === dayNumber);
+      const day = days.find(d => d && d.dayNumber === dayNumber);
       const existingImages = day?.images || [];
       const updatedImages = [...existingImages, ...uploadedImages];
       onDayChange(dayNumber, { images: updatedImages });
@@ -229,7 +229,7 @@ const ItineraryEditor = ({
   };
 
   const handleRemoveDayImage = (dayNumber, imageIndex) => {
-    const day = days.find(d => d.dayNumber === dayNumber);
+    const day = days.find(d => d && d.dayNumber === dayNumber);
     const updatedImages = (day?.images || []).filter((_, idx) => idx !== imageIndex);
     onDayChange(dayNumber, { images: updatedImages });
   };
@@ -241,7 +241,7 @@ const ItineraryEditor = ({
     try {
       setAutoFillingHotel(true);
       const { hotelAPI } = await import('../../../services/api');
-      const locationsString = dayLocations.join(', ');
+      const locationsString = (Array.isArray(dayLocations) ? dayLocations : []).join(', ');
 
       const response = await hotelAPI.suggest(
         destination,
@@ -255,7 +255,7 @@ const ItineraryEditor = ({
         const hotels = response.data || [];
         if (hotels.length > 0) {
           const bestMatch = hotels[0];
-          const day = days.find(d => d.dayNumber === dayNumber);
+          const day = days.find(d => d && d.dayNumber === dayNumber);
 
           onDayChange(dayNumber, {
             accommodation: {
@@ -281,12 +281,13 @@ const ItineraryEditor = ({
     const timeouts = [];
 
     days.forEach((day) => {
-      if (day.locations && day.locations.length > 0 && destination) {
+      const dayLocations = day && Array.isArray(day.locations) ? day.locations : [];
+      if (day && dayLocations.length > 0 && destination) {
         const hasAccommodation = day.accommodation?.name && day.accommodation?.address;
 
         if (!hasAccommodation && !autoFillingHotel) {
           const timeoutId = setTimeout(() => {
-            autoFillBestMatchHotel(day.dayNumber, day.locations);
+            autoFillBestMatchHotel(day.dayNumber, dayLocations);
           }, 1500);
 
           timeouts.push(timeoutId);
@@ -297,7 +298,10 @@ const ItineraryEditor = ({
     return () => {
       timeouts.forEach(timeoutId => clearTimeout(timeoutId));
     };
-  }, [days.map(d => `${d.dayNumber}-${d.locations?.join(',')}`).join('|'), destination, packageType, category]);
+  }, [days
+    .filter(Boolean)
+    .map(d => `${d.dayNumber}-${Array.isArray(d.locations) ? d.locations.join(',') : ''}`)
+    .join('|'), destination, packageType, category]);
 
   // Field Group Component
   const FieldGroup = ({ label, icon: Icon, children, className = '' }) => (
@@ -331,7 +335,7 @@ const ItineraryEditor = ({
 
   return (
     <div className="space-y-4">
-      {days.map((day, index) => (
+      {days.filter(Boolean).map((day, index) => (
         <div key={day.dayNumber} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
           {/* Day Header */}
           <div
@@ -438,7 +442,7 @@ const ItineraryEditor = ({
                           checked={day.meals?.[meal.key] || false}
                           onChange={(e) =>
                             onDayChange(day.dayNumber, {
-                              meals: { ...day.meals, [meal.key]: e.target.checked },
+                              meals: { ...(day.meals || {}), [meal.key]: e.target.checked },
                             })
                           }
                           className="sr-only"
@@ -578,7 +582,7 @@ const ItineraryEditor = ({
                   </div>
                 )}
 
-                {autoFillingHotel && days.find(d => d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
+                {autoFillingHotel && days.find(d => d && d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
                   <div className="flex items-center gap-1 mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
                     <Loader className="w-3 h-3 animate-spin" />
                     <span>Finding best match...</span>
@@ -683,7 +687,7 @@ const ItineraryEditor = ({
         isOpen={showFlightModal}
         onClose={() => { setShowFlightModal(false); setCurrentDayForFlight(null); }}
         mode="template"
-        initialData={currentDayForFlight ? (days.find(d => d.dayNumber === currentDayForFlight)?.flight || {}) : {}}
+        initialData={currentDayForFlight ? (days.find(d => d && d.dayNumber === currentDayForFlight)?.flight || {}) : {}}
         onSelectTemplate={(flightData) => {
           if (currentDayForFlight) {
             onDayChange(currentDayForFlight, { flight: flightData });
@@ -704,7 +708,7 @@ const ItineraryEditor = ({
         locations={currentDayLocations}
         onSelectHotel={(hotel) => {
           if (currentDayForHotel) {
-            const day = days.find(d => d.dayNumber === currentDayForHotel);
+            const day = days.find(d => d && d.dayNumber === currentDayForHotel);
             onDayChange(currentDayForHotel, {
               accommodation: {
                 name: hotel.name,
