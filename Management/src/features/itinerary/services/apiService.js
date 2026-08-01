@@ -163,6 +163,24 @@ class ApiService {
     return makeRequest(`/packages/category/${category}?limit=${limit}`);
   }
 
+  static async calculatePrice({ days, itineraryDays, basePrice, defaultMarginType, defaultMarginInput }) {
+    const rawDays = Array.isArray(itineraryDays) && itineraryDays.length > 0
+      ? itineraryDays
+      : (Array.isArray(days) ? days : []);
+
+    const payload = {
+      itineraryDays: buildItineraryDaysPayload(rawDays),
+      basePrice: basePrice ?? 0,
+      defaultMarginType: defaultMarginType || 'PERCENTAGE',
+      defaultMarginInput: defaultMarginInput ?? 0,
+    };
+
+    return makeRequest('/packages/calculate-price', {
+      method: 'POST',
+      body: JSON.stringify(payload, (key, value) => value === null ? undefined : value),
+    });
+  }
+
   // ==================== PLACES & ACTIVITIES ====================
 
   static async getPlaces(params = {}) {

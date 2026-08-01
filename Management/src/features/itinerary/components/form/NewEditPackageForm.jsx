@@ -281,6 +281,80 @@ const NewEditPackageForm = ({
         </div>
       )}
 
+      {/* Images Section */}
+      {!onlyItineraryEditable && (
+        <StableSectionCard
+          id="images"
+          expanded={expandedSections.images}
+          onToggle={toggleSection}
+          icon={Image}
+          title="Package Images"
+          description="Upload attractive images for your package"
+          gradient="from-violet-500 to-purple-600"
+        >
+          <ImageUpload
+            images={images || localFormData.images || []}
+            onImageUpload={onImageUpload}
+            onImageRemove={onImageRemove}
+            isUploading={isUploadingImages}
+          />
+        </StableSectionCard>
+      )}
+
+      {/* Itinerary Section */}
+      <StableSectionCard
+        id="itinerary"
+        expanded={expandedSections.itinerary}
+        onToggle={toggleSection}
+        icon={Calendar}
+        title="Day-wise Itinerary"
+        description="Plan activities and experiences for each day"
+        gradient="from-amber-500 to-orange-600"
+      >
+        {!showItinerary ? (
+          <div className="space-y-6">
+            <ItineraryEditor
+              days={localFormData.days || []}
+              onDayChange={handleDayChange}
+              onAddDay={handleAddDay}
+              onRemoveDay={handleRemoveDay}
+              destination={localFormData.destination || ''}
+              packageType={localFormData.packageType || ''}
+              category={localFormData.category || ''}
+              hideDescription={onlyItineraryEditable}
+            />
+
+            {!hideLeadManagementButtons && (
+              <div className="flex gap-3">
+                <button
+                  onClick={handleItinerarySubmit}
+                  className="flex-1 px-5 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+                >
+                  <Eye className="w-5 h-5" />
+                  Validate & Preview Itinerary
+                </button>
+                <button
+                  onClick={handleResetItinerary}
+                  className="px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <ItineraryDisplay days={localFormData.days || []} />
+            <button
+              onClick={() => setShowItinerary(false)}
+              className="w-full px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
+            >
+              Edit Itinerary
+            </button>
+          </div>
+        )}
+      </StableSectionCard>
+
       {/* Package Details Section */}
       {!onlyItineraryEditable ? (
         <StableSectionCard
@@ -367,80 +441,6 @@ const NewEditPackageForm = ({
           </div>
         </div>
       )}
-
-      {/* Images Section */}
-      {!onlyItineraryEditable && (
-        <StableSectionCard
-          id="images"
-          expanded={expandedSections.images}
-          onToggle={toggleSection}
-          icon={Image}
-          title="Package Images"
-          description="Upload attractive images for your package"
-          gradient="from-violet-500 to-purple-600"
-        >
-          <ImageUpload
-            images={images || localFormData.images || []}
-            onImageUpload={onImageUpload}
-            onImageRemove={onImageRemove}
-            isUploading={isUploadingImages}
-          />
-        </StableSectionCard>
-      )}
-
-      {/* Itinerary Section */}
-      <StableSectionCard
-        id="itinerary"
-        expanded={expandedSections.itinerary}
-        onToggle={toggleSection}
-        icon={Calendar}
-        title="Day-wise Itinerary"
-        description="Plan activities and experiences for each day"
-        gradient="from-amber-500 to-orange-600"
-      >
-        {!showItinerary ? (
-          <div className="space-y-6">
-            <ItineraryEditor
-              days={localFormData.days || []}
-              onDayChange={handleDayChange}
-              onAddDay={handleAddDay}
-              onRemoveDay={handleRemoveDay}
-              destination={localFormData.destination || ''}
-              packageType={localFormData.packageType || ''}
-              category={localFormData.category || ''}
-              hideDescription={onlyItineraryEditable}
-            />
-
-            {!hideLeadManagementButtons && (
-              <div className="flex gap-3">
-                <button
-                  onClick={handleItinerarySubmit}
-                  className="flex-1 px-5 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
-                >
-                  <Eye className="w-5 h-5" />
-                  Validate & Preview Itinerary
-                </button>
-                <button
-                  onClick={handleResetItinerary}
-                  className="px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
-                >
-                  Reset
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <ItineraryDisplay days={localFormData.days || []} />
-            <button
-              onClick={() => setShowItinerary(false)}
-              className="w-full px-5 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-medium"
-            >
-              Edit Itinerary
-            </button>
-          </div>
-        )}
-      </StableSectionCard>
 
       {/* Action Buttons */}
       {!hideLeadManagementButtons ? (
