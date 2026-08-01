@@ -11,7 +11,7 @@ import {
   FileText, DollarSign, Image, Calendar, Sparkles, Eye
 } from 'lucide-react';
 import BasicPackageInfo from './BasicPackageInfo';
-import PackageDetails from './PackageDetails';
+import PriceCalculation from './PriceCalculation';
 import ImageUpload from '../ImageUpload';
 import ItineraryEditor from '../ItineraryEditor';
 import ItineraryDisplay from '../ItineraryDisplay';
@@ -81,13 +81,11 @@ const NewEditPackageForm = ({
   useEffect(() => {
     let initialData = { ...formData };
 
-    if ((!initialData.days || initialData.days.length === 0)) {
-      const dur = initialData.durationDays || initialData.duration;
-      if (dur && dur > 0) {
-        const newDays = [];
-        for (let i = 1; i <= dur; i++) newDays.push(createDefaultDay(i));
-        initialData.days = newDays;
-      }
+    // Duration is derived from the itinerary, not stored separately. Seed one
+    // default day only when starting from a blank create (no days yet) so the
+    // pricing breakdown has something to work with.
+    if (!initialData.days || initialData.days.length === 0) {
+      initialData.days = [createDefaultDay(1)];
     }
 
     setLocalFormData(initialData);
@@ -105,44 +103,6 @@ const NewEditPackageForm = ({
     setLocalFormData(data);
   };
 
-  const handleDurationChange = (nights) => {
-    if (nights === '' || nights === null || nights === undefined) {
-      setLocalFormData((prev) => ({ ...prev, duration: '' }));
-      return;
-    }
-
-    const nightsCount = parseInt(nights, 10);
-    if (isNaN(nightsCount) || nightsCount < 1) {
-      const minNights = 1;
-      const minDays = minNights + 1;
-      let newDays = [...(localFormData.days || [])];
-
-      if (newDays.length === 0) {
-        newDays = [createDefaultDay(1), createDefaultDay(2)];
-      } else if (newDays.length < minDays) {
-        for (let i = newDays.length + 1; i <= minDays; i++) {
-          newDays.push(createDefaultDay(i));
-        }
-      }
-
-      setLocalFormData((prev) => ({ ...prev, duration: minDays, days: newDays }));
-      return;
-    }
-
-    const daysCount = nightsCount + 1;
-    let newDays = [...(localFormData.days || [])];
-
-    if (newDays.length < daysCount) {
-      for (let i = newDays.length + 1; i <= daysCount; i++) {
-        newDays.push(createDefaultDay(i));
-      }
-    } else if (newDays.length > daysCount) {
-      newDays = newDays.slice(0, daysCount);
-    }
-
-    setLocalFormData((prev) => ({ ...prev, duration: daysCount, days: newDays }));
-  };
-
   const handleDayChange = (dayNumber, dayData) => {
     setLocalFormData((prev) => ({
       ...prev,
@@ -157,7 +117,6 @@ const NewEditPackageForm = ({
       const newDayNumber = (prev.days?.length || 0) + 1;
       return {
         ...prev,
-        duration: newDayNumber,
         days: [...(prev.days || []), createDefaultDay(newDayNumber)],
       };
     });
@@ -170,7 +129,7 @@ const NewEditPackageForm = ({
         ...day,
         dayNumber: index + 1,
       }));
-      return { ...prev, duration: renumberedDays.length, days: renumberedDays };
+      return { ...prev, days: renumberedDays };
     });
   };
 
@@ -200,7 +159,7 @@ const NewEditPackageForm = ({
   };
 
   const handleResetItinerary = () => {
-    setLocalFormData((prev) => ({ ...prev, duration: 1, days: [] }));
+    setLocalFormData((prev) => ({ ...prev, days: [] }));
     setShowItinerary(false);
   };
 
@@ -213,6 +172,9 @@ const NewEditPackageForm = ({
       status,
       updatedDate: new Date().toISOString().split('T')[0],
     };
+    // Pricing is always recomputed server-side from the itinerary on save, so
+    // never persist a stale/edited basePrice as an explicit override.
+    delete dataToSave.basePrice;
 
     if (packageId) {
       dataToSave._id = packageId;
@@ -233,6 +195,10 @@ const NewEditPackageForm = ({
     setFormData(dataToSave);
     onSave?.(dataToSave);
   };
+
+  const itineraryDays = (localFormData.days || []).filter(Boolean);
+  const duration = itineraryDays.length;
+  const groupSize = localFormData.groupSize ?? 2;
 
   return (
     <div className="space-y-6">
@@ -322,6 +288,7 @@ const NewEditPackageForm = ({
               packageType={localFormData.packageType || ''}
               category={localFormData.category || ''}
               hideDescription={onlyItineraryEditable}
+              groupSize={groupSize}
             />
 
             {!hideLeadManagementButtons && (
@@ -355,28 +322,22 @@ const NewEditPackageForm = ({
         )}
       </StableSectionCard>
 
-      {/* Package Details Section */}
+      {/* Price Calculation Section */}
       {!onlyItineraryEditable ? (
         <StableSectionCard
           id="details"
           expanded={expandedSections.details}
           onToggle={toggleSection}
           icon={DollarSign}
-          title="Package Details"
-          description="Pricing, duration, and package type"
+          title="Price Calculation"
+          description="Live pricing breakdown computed from itinerary costs"
           gradient="from-emerald-500 to-teal-600"
         >
-          <PackageDetails
+          <PriceCalculation
             formData={localFormData}
-            nightsInput={(() => {
-              if (localFormData.duration === null || localFormData.duration === undefined || localFormData.duration === '' || localFormData.duration === 0) {
-                return '';
-              }
-              const nights = localFormData.duration - 1;
-              return nights >= 1 ? nights : '';
-            })()}
             onFormChange={handleDetailsChange}
-            onNightsChange={handleDurationChange}
+            duration={duration}
+            groupSize={groupSize}
           />
         </StableSectionCard>
       ) : (
@@ -386,14 +347,14 @@ const NewEditPackageForm = ({
               <DollarSign className="w-5 h-5 text-slate-500" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-700">Package Details</h3>
+              <h3 className="text-lg font-semibold text-slate-700">Price Calculation</h3>
               <p className="text-xs text-slate-500">Read-only</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white rounded-xl p-4 border border-slate-200">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Duration</p>
-              <p className="font-medium text-slate-800">{localFormData.duration || 0} Days</p>
+              <p className="font-medium text-slate-800">{duration} Days</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-slate-200">
               <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Price</p>

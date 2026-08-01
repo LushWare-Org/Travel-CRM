@@ -9,6 +9,7 @@ import {
   MapPin, Activity, Utensils, Car, Building2,
   StickyNote, Image as ImageIcon, ChevronDown, ChevronUp,
   Coffee, UtensilsCrossed, Moon, Check, Star, Phone, Bed,
+  Receipt,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { uploadItineraryImages } from '../../../services/cloudinaryService';
@@ -16,6 +17,19 @@ import Swal from 'sweetalert2';
 import ActivitySelector from './ActivitySelector';
 import LocationSelector from './LocationSelector';
 import { FlightSelectionModal, HotelSelectionModal } from '../../shared';
+import {
+  calculateMealCosts,
+  calculateActivityCosts,
+  calculateTransportCosts,
+  DEFAULTS,
+} from '@travel-crm/pricing-engine';
+import {
+  getMealCounts,
+  getDayActivities,
+  getDayTransports,
+  getAccommodationTotal,
+} from '../utils/helpers';
+import { formatCurrency } from '../../../utils/currency.js';
 
 // ═══════════════════════════════════════════════════════════════════
 //  Hotel Stay Card — shown when a hotel is selected from the API
@@ -175,6 +189,7 @@ const ItineraryEditor = ({
   LocationAutocompleteComponent = null,
   hideTitleAndDescription = false,
   hideDescription = false,
+  groupSize = 2,
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
   const [currentDayForHotel, setCurrentDayForHotel] = useState(null);
@@ -190,6 +205,291 @@ const ItineraryEditor = ({
   const [currentDayForFlight, setCurrentDayForFlight] = useState(null);
   const [showHotelModal, setShowHotelModal] = useState(false);
   const [hotelModalMode, setHotelModalMode] = useState('suggest');
+  // Cost subsections are collapsed by default — summary chips show totals.
+  const [expandedCosts, setExpandedCosts] = useState({});
+
+  const toggleCostsExpand = (dayNumber) => {
+    setExpandedCosts(prev => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
+  };
+
+  const handleMealToggle = (day, mealKey, checked) => {
+    onDayChange(day.dayNumber, {
+      meals: { ...(day.meals || {}), [mealKey]: checked },
+      [`${mealKey}Count`]: checked ? 1 : 0,
+    });
+  };
+
+  const handleMealCountChange = (day, field, value) => {
+    const num = Math.max(0, parseInt(value, 10) || 0);
+    onDayChange(day.dayNumber, {
+      [field]: num,
+      meals: { ...(day.meals || {}), [field.replace('Count', '')]: num > 0 },
+    });
+  };
+
+  const handleActivityCostChange = (day, name, field, value) => {
+    const activities = getDayActivities(day);
+    const current = activities.find(a => a.name === name) || { name, defaultCost: 0, costOverride: null };
+    const parsed = value === '' ? null : (parseFloat(value) || 0);
+    onDayChange(day.dayNumber, {
+      activityCosts: {
+        ...(day.activityCosts || {}),
+        [name]: {
+          defaultCost: current.defaultCost,
+          costOverride: field === 'costOverride' ? parsed : current.costOverride,
+        },
+      },
+    });
+  };
+
+  const handleTransportCostChange = (day, patch) => {
+    const current = getDayTransports(day);
+    const base = current[0] || {
+      routeType: 'DAILY_ROUTING',
+      transportMode: String(day.transport || 'CAR').toUpperCase(),
+      pricingModel: 'PER_VEHICLE',
+      unitCost: 0,
+      distanceKm: null,
+    };
+    onDayChange(day.dayNumber, {
+      transports: [{
+        ...base,
+        transportMode: String(day.transport || base.transportMode || 'CAR').toUpperCase(),
+        ...patch,
+      }],
+    });
+  };
+
+  const renderCostsSection = (day) => {
+    const mealCounts = getMealCounts(day);
+    const activityRows = getDayActivities(day);
+    const transportRows = getDayTransports(day);
+    const accommodationTotal = getAccommodationTotal(day);
+    const isExpanded = Boolean(expandedCosts[day.dayNumber]);
+
+    const mealTotal = calculateMealCosts([mealCounts], {
+      mealCostPerPerson: DEFAULTS.mealCostPerPerson,
+    }).total;
+    const activityTotal = calculateActivityCosts(activityRows, { groupSize }).total;
+    const transportTotal = calculateTransportCosts(transportRows, { groupSize }).total;
+
+    const chip = (label, value) => {
+      const hasValue = Number(value) > 0;
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+            hasValue
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-slate-50 border-slate-200 text-slate-400'
+          }`}
+        >
+          {label}: {hasValue ? formatCurrency(value) : '—'}
+        </span>
+      );
+    };
+
+    const mealUnitCost = mealCounts.mealPriceOverride ?? DEFAULTS.mealCostPerPerson;
+    const mealCountSum = mealCounts.breakfastCount + mealCounts.lunchCount + mealCounts.dinnerCount;
+
+    return (
+      <div className="bg-white rounded-xl border border-emerald-200 overflow-hidden">
+        {/* Section header / chips row */}
+        <button
+          type="button"
+          onClick={() => toggleCostsExpand(day.dayNumber)}
+          className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white hover:from-emerald-100/70 transition-colors"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <Receipt className="w-4 h-4 text-emerald-600" />
+            Costs &amp; Pricing
+            <span className="text-xs font-normal text-slate-400">
+              ({isExpanded ? 'editing' : 'collapsed'})
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              {chip('Meals', mealTotal)}
+              {chip('Activities', activityTotal)}
+              {chip('Transport', transportTotal)}
+              {chip('Hotel', accommodationTotal)}
+            </div>
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+              {isExpanded ? <ChevronUp className="w-4 h-4 text-emerald-600" /> : <ChevronDown className="w-4 h-4 text-emerald-600" />}
+            </div>
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="px-4 pb-4 pt-1 border-t border-emerald-100 space-y-4">
+            {/* ── Meals ───────────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Utensils className="w-3.5 h-3.5 text-emerald-500" /> Meals
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                {[
+                  { key: 'breakfastCount', label: 'Breakfasts' },
+                  { key: 'lunchCount', label: 'Lunches' },
+                  { key: 'dinnerCount', label: 'Dinners' },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-xs text-slate-500 mb-1">{field.label}</label>
+                    <input
+                      type="number" min="0"
+                      value={mealCounts[field.key]}
+                      onChange={(e) => handleMealCountChange(day, field.key, e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1" title="Leaves blank to use the $15/person default">
+                    Cost / meal
+                  </label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={mealCounts.mealPriceOverride ?? ''}
+                    placeholder="15"
+                    onChange={(e) => onDayChange(day.dayNumber, {
+                      mealPriceOverride: e.target.value === '' ? null : (parseFloat(e.target.value) || 0),
+                    })}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {mealCountSum} meal{mealCountSum === 1 ? '' : 's'} × {formatCurrency(mealUnitCost)} ={' '}
+                <span className="font-semibold text-emerald-700">{formatCurrency(mealTotal)}</span>
+              </p>
+            </div>
+
+            {/* ── Activities ───────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Activity className="w-3.5 h-3.5 text-emerald-500" /> Activities
+              </label>
+              {activityRows.length === 0 ? (
+                <p className="text-xs text-slate-400">No activities added to this day.</p>
+              ) : (
+                <div className="space-y-2">
+                  {activityRows.map((activity) => {
+                    const unit = activity.costOverride ?? activity.defaultCost ?? 0;
+                    const total = unit * groupSize;
+                    return (
+                      <div key={activity.name} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700 flex-1 min-w-[120px]">{activity.name}</span>
+                        <span className="text-xs text-slate-500">
+                          Default: <span className="font-semibold text-slate-700">{formatCurrency(activity.defaultCost)}</span>
+                        </span>
+                        <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                          Override
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={activity.costOverride ?? ''}
+                            placeholder={String(activity.defaultCost || 0)}
+                            onChange={(e) => handleActivityCostChange(day, activity.name, 'costOverride', e.target.value)}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="w-24 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          />
+                        </label>
+                        <span className="text-xs text-emerald-700 font-medium">
+                          {formatCurrency(unit)} × {groupSize}pp = {formatCurrency(total)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Transport ────────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Car className="w-3.5 h-3.5 text-emerald-500" /> Transport
+              </label>
+              {transportRows.length === 0 ? (
+                <p className="text-xs text-slate-400">No transport configured for this day.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Pricing model</label>
+                    <select
+                      value={transportRows[0].pricingModel || 'PER_VEHICLE'}
+                      onChange={(e) => handleTransportCostChange(day, { pricingModel: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    >
+                      <option value="PER_VEHICLE">Per vehicle</option>
+                      <option value="PER_PERSON">Per person</option>
+                      <option value="PER_KM">Per km</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Unit cost</label>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={transportRows[0].unitCost || ''}
+                      placeholder="0"
+                      onChange={(e) => handleTransportCostChange(day, { unitCost: e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0) })}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                  {transportRows[0].pricingModel === 'PER_KM' && (
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Distance (km)</label>
+                      <input
+                        type="number" min="0" step="0.1"
+                        value={transportRows[0].distanceKm ?? ''}
+                        placeholder="0"
+                        onChange={(e) => handleTransportCostChange(day, { distanceKm: e.target.value === '' ? null : (parseFloat(e.target.value) || 0) })}
+                        onWheel={(e) => e.currentTarget.blur()}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      />
+                    </div>
+                  )}
+                  <div className="col-span-2 sm:col-span-1 flex items-end pb-1">
+                    <p className="text-xs text-slate-500">
+                      {(transportRows[0].pricingModel || 'PER_VEHICLE') === 'PER_PERSON'
+                        ? `${formatCurrency(transportRows[0].unitCost || 0)} × ${groupSize}pp = `
+                        : 'Total = '}
+                      <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Accommodation ────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Building2 className="w-3.5 h-3.5 text-emerald-500" /> Accommodation
+              </label>
+              {day.accommodation?.name ? (
+                <div className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
+                  <span className="text-sm font-medium text-slate-700 flex-1 min-w-[120px]">{day.accommodation.name}</span>
+                  <span className="text-xs text-slate-500">
+                    Total: <span className="font-semibold text-slate-700">{formatCurrency(accommodationTotal)}</span>
+                  </span>
+                  {/* Tech debt: multi-day hotel stays are not yet supported. The
+                      current implementation treats each day's accommodation as an
+                      independent per-night booking. When multi-day stays are
+                      implemented, the pricing engine should de-duplicate consecutive
+                      nights at the same hotel. */}
+                  <span className="text-xs text-slate-400" title="Each day books one per-night stay for now">
+                    {formatCurrency(accommodationTotal)} / night
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">Accommodation: —</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Ensure new days (added after initial render) are expanded
   useEffect(() => {
@@ -440,11 +740,7 @@ const ItineraryEditor = ({
                         <input
                           type="checkbox"
                           checked={day.meals?.[meal.key] || false}
-                          onChange={(e) =>
-                            onDayChange(day.dayNumber, {
-                              meals: { ...(day.meals || {}), [meal.key]: e.target.checked },
-                            })
-                          }
+                          onChange={(e) => handleMealToggle(day, meal.key, e.target.checked)}
                           className="sr-only"
                         />
                         {day.meals?.[meal.key] ? (
@@ -589,6 +885,9 @@ const ItineraryEditor = ({
                   </div>
                 )}
               </div>
+
+              {/* Costs & Pricing */}
+              {renderCostsSection(day)}
 
               {/* Row 5: Notes */}
               <FieldGroup label="Additional Notes" icon={StickyNote}>

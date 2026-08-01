@@ -66,15 +66,35 @@ export const createDefaultDay = (dayNumber = 1) => ({
   title: '',
   description: '',
   meals: { breakfast: true, lunch: false, dinner: true },
+  // Cost fields — source of truth for the pricing engine. The `meals`
+  // booleans above mirror these for the legacy toggle UI (kept in sync).
   breakfastCount: 1,
   lunchCount: 0,
   dinnerCount: 1,
   mealPriceOverride: null,
   places: [],
   activities: [],
+  // Per-activity cost data keyed by activity name so the display-name based
+  // ActivitySelector keeps working while costs live alongside it.
+  activityCosts: {},
   locations: [],
   transport: 'car',
-  accommodation: null,
+  // Each day books its own per-night stay for now (see tech-debt note in the
+  // ItineraryEditor accommodation costs subsection).
+  accommodation: {
+    name: '',
+    type: '',
+    rating: 0,
+    address: '',
+    contactNumber: '',
+    hotelId: null,
+    hotelImage: null,
+    roomType: null,
+    boardType: null,
+    totalAmount: null,
+    currency: 'USD',
+    refundable: null,
+  },
   images: [],
   notes: '',
   transports: [{
