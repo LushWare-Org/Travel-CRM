@@ -28,7 +28,7 @@ export { default as ImageUpload } from './ImageUpload';
 // Form Components
 export { default as NewEditPackageForm } from './form/NewEditPackageForm';
 export { default as BasicPackageInfo } from './form/BasicPackageInfo';
-export { default as PackageDetails } from './form/PackageDetails';
+export { default as PriceCalculation } from './form/PriceCalculation';
 
 // Utility Components
 export { default as MultiSelectDropdown } from './MultiSelectDropdown';

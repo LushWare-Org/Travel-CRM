@@ -163,21 +163,29 @@ class ApiService {
     return makeRequest(`/packages/category/${category}?limit=${limit}`);
   }
 
-  static async calculatePrice({ days, itineraryDays, basePrice, defaultMarginType, defaultMarginInput }) {
+  static async calculatePrice(payload = {}) {
+    const {
+      days,
+      itineraryDays,
+      defaultMarginType = 'PERCENTAGE',
+      defaultMarginInput = 0,
+      groupSize,
+    } = payload;
+
     const rawDays = Array.isArray(itineraryDays) && itineraryDays.length > 0
       ? itineraryDays
       : (Array.isArray(days) ? days : []);
 
-    const payload = {
+    const body = {
       itineraryDays: buildItineraryDaysPayload(rawDays),
-      basePrice: basePrice ?? 0,
-      defaultMarginType: defaultMarginType || 'PERCENTAGE',
-      defaultMarginInput: defaultMarginInput ?? 0,
+      defaultMarginType,
+      defaultMarginInput,
+      ...(groupSize !== undefined && groupSize !== '' ? { groupSize: Number(groupSize) } : {}),
     };
 
     return makeRequest('/packages/calculate-price', {
       method: 'POST',
-      body: JSON.stringify(payload, (key, value) => value === null ? undefined : value),
+      body: JSON.stringify(body, (key, value) => value === null ? undefined : value),
     });
   }
 
@@ -236,15 +244,19 @@ function buildItineraryDaysPayload(days) {
           : []));
 
     const meals = (day.meals && typeof day.meals === 'object') ? day.meals : null;
+    const activityCosts = (day.activityCosts && typeof day.activityCosts === 'object') ? day.activityCosts : {};
 
     return {
       dayNumber: day.dayNumber,
       title: day.title || '',
       description: day.description || '',
-      breakfastCount: meals ? (meals.breakfast ? 1 : 0) : (day.breakfastCount ?? 0),
-      lunchCount: meals ? (meals.lunch ? 1 : 0) : (day.lunchCount ?? 0),
-      dinnerCount: meals ? (meals.dinner ? 1 : 0) : (day.dinnerCount ?? 0),
+      // Explicit count fields (Costs & Pricing subsection) win over the legacy
+      // boolean toggles; loaded days without counts fall back to the booleans.
+      breakfastCount: day.breakfastCount ?? (meals ? (meals.breakfast ? 1 : 0) : 0),
+      lunchCount: day.lunchCount ?? (meals ? (meals.lunch ? 1 : 0) : 0),
+      dinnerCount: day.dinnerCount ?? (meals ? (meals.dinner ? 1 : 0) : 0),
       mealPriceOverride: day.mealPriceOverride ?? null,
+      accommodation: day.accommodation ?? null,
       places: dayPlaces.map((p, i) => {
         if (typeof p === 'string') return { customName: p, orderIndex: i };
         return {
@@ -255,10 +267,23 @@ function buildItineraryDaysPayload(days) {
       }),
       activities: activities.map((a, i) => {
         const isObj = a && typeof a === 'object';
+        const name = isObj ? (a.name || a.activity?.name || '') : (a || '');
+        const cost = name ? activityCosts[name] : null;
+        const relationalRow = Array.isArray(day._relational?.activities)
+          ? day._relational.activities.find((row) =>
+              (row.activity?.name || row.name) === name ||
+              (isObj && a.activityId && row.activityId === a.activityId)
+            )
+          : null;
         return {
           activityId: isObj ? (a.activityId || a.activity?.id || undefined) : undefined,
-          name: isObj ? (a.name || a.activity?.name || undefined) : a,
-          costOverride: isObj ? (a.costOverride ?? null) : null,
+          name: name || undefined,
+          defaultCost:
+            cost?.defaultCost ??
+            (isObj ? (a.defaultCost ?? a.activity?.defaultCost ?? undefined) : undefined) ??
+            relationalRow?.activity?.defaultCost ??
+            undefined,
+          costOverride: cost?.costOverride ?? (isObj ? (a.costOverride ?? null) : null),
           orderIndex: isObj ? (a.orderIndex ?? i) : i,
         };
       }),
