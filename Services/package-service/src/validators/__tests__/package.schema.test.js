@@ -150,13 +150,18 @@ describe('updatePackageSchema', () => {
 });
 
 describe('packageIdParamSchema', () => {
-  it('accepts valid UUID', () => {
+  it('accepts a valid ID string', () => {
     const result = packageIdParamSchema.safeParse({ id: UUID_1 });
     expect(result.success).toBe(true);
   });
 
-  it('rejects non-UUID', () => {
-    const result = packageIdParamSchema.safeParse({ id: 'not-a-uuid' });
+  it('accepts non-UUID IDs (relaxed validation)', () => {
+    const result = packageIdParamSchema.safeParse({ id: '1' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty ID', () => {
+    const result = packageIdParamSchema.safeParse({ id: '' });
     expect(result.success).toBe(false);
   });
 });

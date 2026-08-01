@@ -118,7 +118,7 @@ export const updatePackageSchema = z.object({
 });
 
 export const packageIdParamSchema = z.object({
-  id: z.string().uuid('Invalid package ID'),
+  id: z.string().min(1, 'Invalid package ID'),
 });
 
 export const listPackagesQuerySchema = z.object({
