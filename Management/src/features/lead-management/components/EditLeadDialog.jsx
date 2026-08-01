@@ -21,6 +21,59 @@ import DestinationSelector from '../../itinerary/components/DestinationSelector'
 import { createDefaultDay } from '../../itinerary/types/index.js';
 import LeadFlightBookingsSection from './LeadFlightBookingsSection';
 import LeadHotelBookingsSection from './LeadHotelBookingsSection';
+import LeadStatusBadge from './LeadStatusBadge';
+import PricingSection from './PricingSection';
+
+// ── Module-level components (prevents remounting on re-render) ──
+
+function EditInputField({ label, required, icon: Icon, children }) {
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function EditSectionHeader({ icon: Icon, title, subtitle, section, gradient, count, expanded, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(section)}
+      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expanded
+          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
+          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+        }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-xl ${expanded ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
+          <Icon className={`w-5 h-5 ${expanded ? 'text-white' : 'text-gray-600'}`} />
+        </div>
+        <div className="text-left">
+          <h3 className="font-semibold flex items-center gap-2">
+            {title}
+            {count !== undefined && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${expanded ? 'bg-white/20' : 'bg-gray-200'
+                }`}>
+                {count}
+              </span>
+            )}
+          </h3>
+          <p className={`text-xs ${expanded ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
+        </div>
+      </div>
+      {expanded ? (
+        <ChevronUp className="w-5 h-5" />
+      ) : (
+        <ChevronDown className="w-5 h-5" />
+      )}
+    </button>
+  );
+}
 
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const { user } = useAuth();
@@ -714,53 +767,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     </div>
   );
 
-  // Section Header Component
-  const SectionHeader = ({ icon: Icon, title, subtitle, section, gradient, count }) => (
-    <button
-      type="button"
-      onClick={() => toggleSection(section)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expandedSections[section]
-          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
-          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-        }`}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${expandedSections[section] ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
-          <Icon className={`w-5 h-5 ${expandedSections[section] ? 'text-white' : 'text-gray-600'}`} />
-        </div>
-        <div className="text-left">
-          <h3 className="font-semibold flex items-center gap-2">
-            {title}
-            {count !== undefined && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${expandedSections[section] ? 'bg-white/20' : 'bg-gray-200'
-                }`}>
-                {count}
-              </span>
-            )}
-          </h3>
-          <p className={`text-xs ${expandedSections[section] ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
-        </div>
-      </div>
-      {expandedSections[section] ? (
-        <ChevronUp className="w-5 h-5" />
-      ) : (
-        <ChevronDown className="w-5 h-5" />
-      )}
-    </button>
-  );
-
-  // Input Field Component
-  const InputField = ({ label, required, icon: Icon, children }) => (
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -801,7 +807,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* Personal Information Section */}
           <div className="space-y-4">
-            <SectionHeader
+            <EditSectionHeader
+              expanded={expandedSections.personal}
+              onToggle={toggleSection}
               icon={User}
               title="Personal Information"
               subtitle="Contact details of the lead"
@@ -811,7 +819,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
             {expandedSections.personal && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                <InputField label="Full Name" required icon={User}>
+                <EditInputField label="Full Name" required icon={User}>
                   <input
                     type="text"
                     value={formData.name}
@@ -819,9 +827,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                     placeholder="Enter full name"
                   />
-                </InputField>
+                </EditInputField>
 
-                <InputField label="Email Address" icon={Mail}>
+                <EditInputField label="Email Address" icon={Mail}>
                   <input
                     type="email"
                     value={formData.email}
@@ -829,9 +837,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                     placeholder="email@example.com"
                   />
-                </InputField>
+                </EditInputField>
 
-                <InputField label="Contact Number" required icon={Phone}>
+                <EditInputField label="Contact Number" required icon={Phone}>
                   <PhoneInput
                     international
                     defaultCountry="LK"
@@ -840,7 +848,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     className="phone-input-wrapper"
                     placeholder="Enter phone number"
                   />
-                </InputField>
+                </EditInputField>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -874,7 +882,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
           {/* Travel Details Section */}
           <div className="space-y-4">
-            <SectionHeader
+            <EditSectionHeader
+              expanded={expandedSections.travel}
+              onToggle={toggleSection}
               icon={Plane}
               title="Travel Details"
               subtitle="Trip information and dates"
@@ -884,34 +894,34 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
             {expandedSections.travel && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
-                <InputField label="Departure City" icon={MapPin}>
+                <EditInputField label="Departure City" icon={MapPin}>
                   <LocationAutocomplete
                     value={formData.city}
                     onChange={(value) => setFormData({ ...formData, city: value })}
                     placeholder="e.g., Colombo, Sri Lanka"
                     destination={formData.destination}
                   />
-                </InputField>
+                </EditInputField>
 
-                <InputField label="Destination" icon={MapPin}>
+                <EditInputField label="Destination" icon={MapPin}>
                   <DestinationSelector
                     value={formData.destination}
                     onChange={(event) =>
                       setFormData({ ...formData, destination: event.target.value })
                     }
                   />
-                </InputField>
+                </EditInputField>
 
-                <InputField label="Travel Date (Start)" icon={Calendar}>
+                <EditInputField label="Travel Date (Start)" icon={Calendar}>
                   <input
                     type="date"
                     value={formData.travelDate}
                     onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                   />
-                </InputField>
+                </EditInputField>
 
-                <InputField label="End Date" icon={Calendar}>
+                <EditInputField label="End Date" icon={Calendar}>
                   <input
                     type="date"
                     value={formData.endDate}
@@ -919,9 +929,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     min={formData.travelDate || undefined}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                   />
-                </InputField>
+                </EditInputField>
 
-                <InputField label="Number of Travelers" icon={Users}>
+                <EditInputField label="Number of Travelers" icon={Users}>
                   <input
                     type="number"
                     min="1"
@@ -936,9 +946,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                     placeholder="e.g., 2"
                   />
-                </InputField>
+                </EditInputField>
 
-                <InputField label="Platform / Source" icon={Globe}>
+                <EditInputField label="Platform / Source" icon={Globe}>
                   <select
                     value={formData.platform}
                     onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
@@ -952,14 +962,16 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     <option value="Email">📧 Email</option>
                     <option value="Walk-in">🚶 Walk-in</option>
                   </select>
-                </InputField>
+                </EditInputField>
               </div>
             )}
           </div>
 
           {/* Package & Assignment Section */}
           <div className="space-y-4">
-            <SectionHeader
+            <EditSectionHeader
+              expanded={expandedSections.package}
+              onToggle={toggleSection}
               icon={Package}
               title="Package & Assignment"
               subtitle="Select package and sales representative"
@@ -970,7 +982,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             {expandedSections.package && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
                 <div className="space-y-3">
-                  <InputField label="Package" icon={Package}>
+                  <EditInputField label="Package" icon={Package}>
                     <select
                       value={formData.package || ''}
                       onChange={(e) => {
@@ -1004,7 +1016,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                         );
                       })}
                     </select>
-                  </InputField>
+                  </EditInputField>
                   {formData.package && (
                     <button
                       onClick={handleEditPackage}
@@ -1017,7 +1029,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                   )}
                 </div>
 
-                <InputField label="Sales Representative" icon={User}>
+                <EditInputField label="Sales Representative" icon={User}>
                   <select
                     value={formData.assignedTo || ''}
                     onChange={(e) => {
@@ -1045,14 +1057,16 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                       <option key={rep.id || rep._id} value={rep.id || rep._id}>{rep.name}</option>
                     ))}
                   </select>
-                </InputField>
+                </EditInputField>
               </div>
             )}
           </div>
 
           {/* Remarks Section */}
           <div className="space-y-4">
-            <SectionHeader
+            <EditSectionHeader
+              expanded={expandedSections.remarks}
+              onToggle={toggleSection}
               icon={MessageSquare}
               title="Remarks & Notes"
               subtitle="Add comments about this lead"
@@ -1233,7 +1247,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
           {/* Manual Itinerary Section */}
           <div className="space-y-4">
-            <SectionHeader
+            <EditSectionHeader
+              expanded={expandedSections.itinerary}
+              onToggle={toggleSection}
               icon={Calendar}
               title="Manual Itinerary"
               subtitle={itineraryDays.length > 0 ? `${itineraryDays.length} day${itineraryDays.length > 1 ? 's' : ''} planned` : 'Custom day-by-day plan'}
@@ -1302,11 +1318,48 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             )}
           </div>
 
+          {/* Lifecycle Status & Pricing — only shown for existing leads */}
+          {(lead?._id || lead?.id) && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700">Lifecycle Status</h3>
+                  <LeadStatusBadge status={lead.lifecycleStatus ?? lead.status} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Trigger the parent's status change dialog
+                    const event = new CustomEvent('open-status-change', { detail: lead });
+                    window.dispatchEvent(event);
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
+                >
+                  Change Status
+                </button>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing</h3>
+                <PricingSection
+                  leadId={lead._id || lead.id}
+                  financials={lead.financials}
+                  onFinancialsUpdated={(updated) => {
+                    if (lead._id || lead.id) {
+                      lead.financials = updated;
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Flight & Hotel Bookings — only shown for existing leads */}
-          {lead?._id && (
+          {(lead?._id || lead?.id) && (
             <>
               <LeadFlightBookingsSection
                 leadId={lead._id || lead.id}
+                leadStatus={lead.lifecycleStatus ?? lead.status}
                 itineraryDays={itineraryDays}
                 travelDate={formData.travelDate}
                 onUpdateDay={(dayNumber, updates) => {
@@ -1320,6 +1373,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
               <LeadHotelBookingsSection
                 leadId={lead._id || lead.id}
+                leadStatus={lead.lifecycleStatus ?? lead.status}
                 itineraryDays={itineraryDays}
                 travelDate={formData.travelDate}
                 endDate={formData.endDate}

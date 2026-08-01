@@ -62,6 +62,21 @@ enum LeadStatus {
   @@schema("crm_leads")
 }
 
+enum LeadLifecycleStatus {
+  NEW
+  DRAFTING
+  QUOTED
+  REVISION
+  APPROVED
+  BOOKING_IN_PROGRESS
+  CONFIRMED
+  CLOSED_LOST
+  BOOKING_FAILED
+  CANCELLED
+
+  @@schema("crm_leads")
+}
+
 enum LeadPriority {
   low
   medium
@@ -125,6 +140,8 @@ model Lead {
   message               String?
 
   status                LeadStatus   @default(new)
+  lifecycleStatus       LeadLifecycleStatus?
+  financials            Json?        @default("{}")
   priority              LeadPriority @default(medium)
 
   // Cross-schema UUID refs

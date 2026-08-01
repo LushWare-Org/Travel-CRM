@@ -141,3 +141,5 @@ vite.config.ts.timestamp-*
 # Claude Code (local-only, never commit)
 CLAUDE.local.md
 .claude/settings.local.json
+
+planning/

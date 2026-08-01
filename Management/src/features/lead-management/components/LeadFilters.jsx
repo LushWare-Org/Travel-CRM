@@ -8,16 +8,16 @@ const LeadFilters = ({
   statusCounts,
   onAdvancedFilterClick,
 }) => {
-  // Status configuration with colors matching the lead cards
+  // Lifecycle status configuration matching the 10-state system
   const statuses = [
     { key: "all", label: "All", shortLabel: "All", color: "bg-gray-500", lightBg: "bg-gray-100", textColor: "text-gray-600" },
-    { key: "new", label: "New", shortLabel: "New", color: "bg-blue-500", lightBg: "bg-blue-100", textColor: "text-blue-600" },
-    { key: "contacted", label: "Contacted", shortLabel: "Cont.", color: "bg-cyan-500", lightBg: "bg-cyan-100", textColor: "text-cyan-600" },
-    { key: "interested", label: "Interested", shortLabel: "Inter.", color: "bg-purple-500", lightBg: "bg-purple-100", textColor: "text-purple-600" },
-    { key: "quoted", label: "Quoted", shortLabel: "Quot.", color: "bg-amber-500", lightBg: "bg-amber-100", textColor: "text-amber-600" },
-    { key: "converted", label: "Converted", shortLabel: "Conv.", color: "bg-emerald-500", lightBg: "bg-emerald-100", textColor: "text-emerald-600" },
-    { key: "lost", label: "Lost", shortLabel: "Lost", color: "bg-red-500", lightBg: "bg-red-100", textColor: "text-red-600" },
-    { key: "not_interested", label: "Not Interested", shortLabel: "N/I", color: "bg-gray-400", lightBg: "bg-gray-100", textColor: "text-gray-500" },
+    { key: "NEW", label: "New", shortLabel: "New", color: "bg-blue-500", lightBg: "bg-blue-100", textColor: "text-blue-600" },
+    { key: "DRAFTING", label: "Drafting", shortLabel: "Draft", color: "bg-indigo-500", lightBg: "bg-indigo-100", textColor: "text-indigo-600" },
+    { key: "QUOTED", label: "Quoted", shortLabel: "Quot.", color: "bg-cyan-500", lightBg: "bg-cyan-100", textColor: "text-cyan-600" },
+    { key: "APPROVED", label: "Approved", shortLabel: "Appr.", color: "bg-emerald-500", lightBg: "bg-emerald-100", textColor: "text-emerald-600" },
+    { key: "BOOKING_IN_PROGRESS", label: "Booking", shortLabel: "Book", color: "bg-purple-500", lightBg: "bg-purple-100", textColor: "text-purple-600" },
+    { key: "CONFIRMED", label: "Confirmed", shortLabel: "Conf.", color: "bg-green-500", lightBg: "bg-green-100", textColor: "text-green-600" },
+    { key: "CLOSED_LOST", label: "Lost", shortLabel: "Lost", color: "bg-red-500", lightBg: "bg-red-100", textColor: "text-red-600" },
   ];
 
   return (

@@ -255,6 +255,17 @@ export const leadAPI = {
     return api.put(`/leads/${id}`, { status });
   },
 
+  // Pricing
+  calculatePricing: async (leadId, financials) => {
+    const api = new ApiService();
+    return api.post(`/leads/${leadId}/pricing/calculate`, { financials });
+  },
+
+  applyPricing: async (leadId, financials) => {
+    const api = new ApiService();
+    return api.post(`/leads/${leadId}/pricing/apply`, { financials });
+  },
+
   // Delete lead
   deleteLead: async (id) => {
     const api = new ApiService();

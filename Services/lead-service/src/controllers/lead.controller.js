@@ -2,6 +2,9 @@ import crypto from 'crypto';
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
+import { validateTransition } from '../services/state-machine.service.js';
+import { computeFinancials } from '../services/pricing.service.js';
 
 // ─── Auto-assignment helper ────────────────────────────────────────────────────
 async function autoAssignSalesRep(leadData) {
@@ -24,7 +27,20 @@ async function autoAssignSalesRep(leadData) {
 
 export const createLead = asyncHandler(async (req, res) => {
   const { user } = req;
-  const body = { ...req.body };
+
+  // Strip frontend-only fields that aren't in the DB schema or Zod validator
+  const {
+    package: _pkg, assignedTo: _assignedTo, salesRep: _salesRep,
+    customizedPackage: _custPkg, convertedBooking: _booking, createdBy: _createdBy,
+    ...cleanCreateBody
+  } = req.body;
+
+  const parsed = createLeadSchema.safeParse(cleanCreateBody);
+  if (!parsed.success) {
+    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+  const body = { ...parsed.data };
 
   if (!body.status) body.status = 'new';
 
@@ -45,19 +61,41 @@ export const createLead = asyncHandler(async (req, res) => {
     }
   }
 
-  const { remarks = [], statusChangeNotes, ...leadFields } = body;
+  const statusForHistory = body.status || 'new';
+  const remarksList = body.remarks || [];
 
   const lead = await prisma.lead.create({
     data: {
-      ...leadFields,
-      travelDate: leadFields.travelDate ? new Date(leadFields.travelDate) : null,
-      endDate: leadFields.endDate ? new Date(leadFields.endDate) : null,
-      tags: leadFields.tags || [],
+      name: body.name,
+      email: body.email,
+      phone: body.phone,
+      whatsapp: body.whatsapp,
+      city: body.city,
+      source: body.source,
+      platform: body.platform,
+      fromCountry: body.fromCountry,
+      destinationCountry: body.destinationCountry,
+      destination: body.destination,
+      travelDate: body.travelDate ? new Date(body.travelDate) : null,
+      endDate: body.endDate ? new Date(body.endDate) : null,
+      packageId: body.packageId,
+      packageName: body.packageName,
+      numberOfTravelers: body.numberOfTravelers,
+      budget: body.budget,
+      message: body.message,
+      status: statusForHistory,
+      lifecycleStatus: body.lifecycleStatus || 'NEW',
+      financials: body.financials || {},
+      priority: body.priority,
+      assignedToId: body.assignedToId,
+      tags: body.tags || [],
+      lostReason: body.lostReason,
+      optionalFlights: body.optionalFlights || [],
       remarks: {
-        create: remarks.map((r) => ({ text: r.text, date: r.date ? new Date(r.date) : new Date(), addedById: r.addedBy || user.id || null })),
+        create: remarksList.map((r) => ({ text: r.text, date: r.date ? new Date(r.date) : new Date(), addedById: r.addedBy || user.id || null })),
       },
       statusHistory: {
-        create: [{ status: body.status || 'new', changedById: user.id, notes: 'Initial status' }],
+        create: [{ status: statusForHistory, changedById: user.id, notes: 'Initial status' }],
       },
     },
     include: { remarks: true, statusHistory: true },
@@ -70,17 +108,31 @@ export const getLeads = asyncHandler(async (req, res) => {
   const { user } = req;
   const { page = 1, limit = 10, search, status, sortBy = 'createdAt', order = 'desc' } = req.query;
 
-  const where = {};
-  if (user.role === 'salesRep') where.assignedToId = user.id;
-  if (status) where.status = status;
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
-      { phone: { contains: search, mode: 'insensitive' } },
-      { destination: { contains: search, mode: 'insensitive' } },
-    ];
+  const where = { AND: [] };
+  if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
+
+  if (status) {
+    // Determine if this is a lifecycle status (uppercase) or old status (lowercase)
+    const isLifecycle = status === status.toUpperCase() && status !== status.toLowerCase();
+    if (isLifecycle) {
+      where.AND.push({ lifecycleStatus: status });
+    } else {
+      where.AND.push({ status });
+    }
   }
+
+  if (search) {
+    where.AND.push({
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+        { destination: { contains: search, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  if (where.AND.length === 0) delete where.AND;
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const [leads, total] = await Promise.all([
@@ -115,27 +167,93 @@ export const updateLead = asyncHandler(async (req, res) => {
   const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
   if (!canManage && lead.assignedToId !== user.id) throw new AppError('Not authorized to update this lead', 403);
 
+  // Strip frontend-only fields that aren't in the DB schema or Zod validator
   const {
-    statusChangeNotes, remarks, statusHistory, communicationLogs,
-    // Strip relation objects — frontend may send populated relations; Prisma only
-    // accepts the scalar FK fields (packageId, assignedToId, etc.)
-    package: _pkg, assignedTo: _assignedTo, convertedBooking: _booking,
-    customizedPackage: _custPkg, createdBy: _createdBy,
-    ...updateData
+    package: _pkg, assignedTo: _assignedTo, salesRep: _salesRep,
+    customizedPackage: _custPkg, convertedBooking: _booking, createdBy: _createdBy,
+    ...cleanBody
   } = req.body;
 
-  // Track status change
+  const parsed = updateLeadSchema.safeParse(cleanBody);
+  if (!parsed.success) {
+    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+  const validatedBody = parsed.data;
+
+  // Run state machine validation when lifecycleStatus changes
+  let transitionResult = null;
+  if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
+    const currentStatus = lead.lifecycleStatus || 'NEW';
+    const mergedFinancials = { ...(lead.financials || {}), ...(validatedBody.financials || {}) };
+    try {
+      transitionResult = validateTransition({
+        currentStatus,
+        nextStatus: validatedBody.lifecycleStatus,
+        financials: mergedFinancials,
+        lostReason: validatedBody.lostReason || lead.lostReason,
+      });
+    } catch (err) {
+      throw new AppError(err.message, 400);
+    }
+  }
+
+  // Guardrail: if old status is updated but lifecycleStatus is not, auto-map it
+  const OLD_TO_NEW = {
+    new: 'NEW', contacted: 'NEW', interested: 'DRAFTING',
+    quoted: 'QUOTED', converted: 'APPROVED',
+    lost: 'CLOSED_LOST', not_interested: 'CLOSED_LOST',
+  };
+  if (validatedBody.status && !validatedBody.lifecycleStatus) {
+    const mapped = OLD_TO_NEW[validatedBody.status];
+    if (mapped && mapped !== lead.lifecycleStatus) {
+      validatedBody.lifecycleStatus = mapped;
+    }
+  }
+
+  // Track status change on old status field
   const statusHistoryCreate = [];
-  if (updateData.status && updateData.status !== lead.status) {
-    statusHistoryCreate.push({ status: updateData.status, changedById: user.id, notes: statusChangeNotes || 'Status updated' });
+  if (validatedBody.status && validatedBody.status !== lead.status) {
+    statusHistoryCreate.push({ status: validatedBody.status, changedById: user.id, notes: validatedBody.statusChangeNotes || 'Status updated' });
+  }
+  // Track lifecycleStatus change
+  if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
+    statusHistoryCreate.push({ status: validatedBody.lifecycleStatus, changedById: user.id, notes: validatedBody.statusChangeNotes || 'Status updated' });
+  }
+
+  // Auto-recalculate financials on BOOKING_IN_PROGRESS -> CONFIRMED
+  if (transitionResult?.recalculate) {
+    const mergedForRecalc = { ...(lead.financials || {}), ...(validatedBody.financials || {}) };
+    validatedBody.financials = computeFinancials(mergedForRecalc);
+  }
+
+  // Build Prisma-compatible update payload
+  const updateData = {};
+  const scalarFields = [
+    'name', 'email', 'phone', 'whatsapp', 'city', 'source', 'platform',
+    'fromCountry', 'destinationCountry', 'destination', 'packageId', 'packageName',
+    'numberOfTravelers', 'budget', 'message', 'status', 'lifecycleStatus',
+    'priority', 'assignedToId', 'tags', 'lostReason', 'optionalFlights',
+  ];
+  for (const field of scalarFields) {
+    if (validatedBody[field] !== undefined) {
+      updateData[field] = validatedBody[field];
+    }
+  }
+  if (validatedBody.financials !== undefined) {
+    updateData.financials = validatedBody.financials;
+  }
+  if (validatedBody.travelDate !== undefined) {
+    updateData.travelDate = validatedBody.travelDate ? new Date(validatedBody.travelDate) : null;
+  }
+  if (validatedBody.endDate !== undefined) {
+    updateData.endDate = validatedBody.endDate ? new Date(validatedBody.endDate) : null;
   }
 
   const updated = await prisma.lead.update({
     where: { id: req.params.id },
     data: {
       ...updateData,
-      travelDate: updateData.travelDate !== undefined ? (updateData.travelDate ? new Date(updateData.travelDate) : null) : undefined,
-      endDate: updateData.endDate !== undefined ? (updateData.endDate ? new Date(updateData.endDate) : null) : undefined,
       ...(statusHistoryCreate.length && { statusHistory: { create: statusHistoryCreate } }),
     },
     include: { remarks: true, statusHistory: { orderBy: { changedAt: 'desc' } } },
@@ -204,7 +322,15 @@ export const unassignLead = asyncHandler(async (req, res) => {
 });
 
 export const getLeadsByStatus = asyncHandler(async (req, res) => {
-  const leads = await prisma.lead.findMany({ where: { status: req.params.status }, orderBy: { createdAt: 'desc' } });
+  const status = req.params.status;
+  const isLifecycle = status === status.toUpperCase() && status !== status.toLowerCase();
+  const where = {};
+  if (isLifecycle) {
+    where.lifecycleStatus = status;
+  } else {
+    where.status = status;
+  }
+  const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json({ success: true, count: leads.length, data: leads });
 });
 
@@ -216,14 +342,19 @@ export const getMyLeads = asyncHandler(async (req, res) => {
 export const getLeadStats = asyncHandler(async (req, res) => {
   const where = req.user.role === 'salesRep' ? { assignedToId: req.user.id } : {};
   const [byStatus, totals] = await Promise.all([
-    prisma.lead.groupBy({ by: ['status'], _count: true, where }),
+    prisma.lead.groupBy({ by: ['lifecycleStatus'], _count: true, where }),
     prisma.lead.aggregate({
       _count: true,
       where,
     }),
   ]);
   const total = totals._count;
-  res.json({ success: true, data: byStatus, summary: { total, byStatus } });
+  // Map Prisma groupBy output to frontend-compatible shape
+  const mapped = (byStatus || []).map(item => ({
+    _id: item.lifecycleStatus,
+    count: item._count,
+  }));
+  res.json({ success: true, data: mapped, summary: { total, byStatus: mapped } });
 });
 
 export const searchLeads = asyncHandler(async (req, res) => {
@@ -290,6 +421,7 @@ export const createWebsiteContactLead = asyncHandler(async (req, res) => {
       travelDate: travelDate ? new Date(travelDate) : null,
       message: message?.trim() || null,
       status: 'new',
+      lifecycleStatus: 'NEW',
       tags: ['website-contact-form'],
       assignedToId: assignedId || null,
       assignmentMode: assignedId ? 'auto' : 'manual',

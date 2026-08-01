@@ -352,6 +352,10 @@ model HotelBooking {
   cancellationReason String?
   cancelledAt       DateTime?
 
+  // Booking reference fields
+  supplierPortalUrl  String?
+  pnrCode            String?
+
   // Lead / day context — cross-schema UUID refs
   leadId              String?
   packageId           String?

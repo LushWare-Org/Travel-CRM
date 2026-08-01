@@ -28,4 +28,8 @@ router.patch('/:id/unassign', authorize('admin'), unassignLead);
 router.route('/:id/itinerary').get(authorize('admin', 'salesRep'), getLeadItinerary).put(authorize('admin', 'salesRep'), setLeadItinerary);
 router.get('/:id/itinerary/pdf', authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
 
+// Pricing sub-routes (mergeParams: true handles :id from parent)
+import pricingRoutes from './pricing.routes.js';
+router.use('/:id/pricing', pricingRoutes);
+
 export default router;

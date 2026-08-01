@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Building2, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Building2, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import HotelService from '../../../services/hotel.service';
 import { HotelSelectionModal } from '../../shared';
+import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';
 
 function fmtDate(iso) {
   if (!iso) return '-';
@@ -16,6 +17,7 @@ function fmtMoney(amount, currency) {
 
 export default function LeadHotelBookingsSection({
   leadId,
+  leadStatus,
   itineraryDays = [],
   travelDate,
   endDate,
@@ -120,20 +122,30 @@ export default function LeadHotelBookingsSection({
               <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Itinerary Hotels</div>
               {hotelDays.map(day => {
                 const dayBooking = bookings.find(b => b.dayNumber === day.dayNumber);
-                const booked = !!dayBooking;
+                const booked = !!dayBooking && dayBooking.status !== 'cancelled' && dayBooking.status !== 'failed';
+                const failed = !!dayBooking && dayBooking.status === 'failed';
+                const itemState = deriveItemState(leadStatus, booked, failed);
+                const stateLabel = ITEM_STATE_LABELS[itemState];
+                const stateColor = ITEM_STATE_COLORS[itemState];
                 return (
                   <div key={day.dayNumber} className="bg-white rounded-xl border border-gray-200 p-3">
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-gray-700">Day {day.dayNumber}</span>
-                        <span className="ml-2 text-sm text-gray-600">{day.accommodation?.name}</span>
-                        {booked && (
-                          <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-700">
-                            Booked
-                          </span>
-                        )}
+                        <span className="text-sm text-gray-600">{day.accommodation?.name}</span>
+                        <span className={`px-1.5 py-0.5 text-xs rounded-full border ${stateColor}`}>
+                          {stateLabel}
+                        </span>
                       </div>
-                      {!booked ? (
+                      {itemState === 'PENDING' ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="flex items-center gap-1 px-3 py-1.5 bg-gray-300 text-gray-500 text-xs rounded-lg cursor-not-allowed"
+                        >
+                          <Building2 className="w-3.5 h-3.5" /> Select Hotel
+                        </button>
+                      ) : itemState === 'READY_TO_BOOK' ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -144,9 +156,18 @@ export default function LeadHotelBookingsSection({
                         >
                           <Plus className="w-3.5 h-3.5" /> Book Now
                         </button>
-                      ) : (
+                      ) : itemState === 'BOOKED' ? (
                         <div className="flex items-center gap-2 text-xs text-gray-500">
+                          {dayBooking.pnrCode && (
+                            <span className="font-mono font-medium text-gray-900">{dayBooking.pnrCode}</span>
+                          )}
                           <span className="capitalize">{dayBooking.status}</span>
+                          {dayBooking.supplierPortalUrl && (
+                            <a href={dayBooking.supplierPortalUrl} target="_blank" rel="noopener noreferrer"
+                               className="flex items-center gap-1 text-blue-600 hover:text-blue-700">
+                              <ExternalLink className="w-3 h-3" /> Portal
+                            </a>
+                          )}
                           {dayBooking.status !== 'cancelled' && (
                             <button
                               type="button"
@@ -160,6 +181,20 @@ export default function LeadHotelBookingsSection({
                             </button>
                           )}
                         </div>
+                      ) : itemState === 'FAILED' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-red-600 font-medium">Booking failed</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHotelModalDay(day.dayNumber);
+                              setShowHotelModal(true);
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            <AlertCircle className="w-3.5 h-3.5" /> Resolve
+                          </button>
+                        </div>
                       )}
                     </div>
                     {day.accommodation?.address && (
@@ -169,6 +204,11 @@ export default function LeadHotelBookingsSection({
                       <div className="mt-1 text-xs text-gray-400">
                         {fmtDate(dayBooking.checkin)} → {fmtDate(dayBooking.checkout)}{' · '}
                         {fmtMoney(dayBooking.totalAmount, dayBooking.currency)}
+                      </div>
+                    )}
+                    {failed && (
+                      <div className="mt-1 text-xs text-red-600">
+                        Booking attempt failed — manual intervention required.
                       </div>
                     )}
                   </div>

@@ -32,8 +32,11 @@ import ReceiptDialog from "../features/lead-management/components/ReceiptDialog"
 import VoucherDialog from "../features/lead-management/components/VoucherDialog";
 import LeadSectionView from "../features/lead-management/components/LeadSectionView";
 import ActiveSalesRepsDialog from "../features/lead-management/components/ActiveSalesRepsDialog";
+import { LIFECYCLE_STATUS_COLORS, LIFECYCLE_STATUS_LABELS } from "../features/lead-management/components/LeadStatusBadge";
 
+// Lifecycle status maps (10 states) plus old-status fallbacks
 const statusColors = {
+  ...LIFECYCLE_STATUS_COLORS,
   new: "bg-blue-100 text-blue-700",
   contacted: "bg-amber-100 text-amber-700",
   interested: "bg-purple-100 text-purple-700",
@@ -44,6 +47,7 @@ const statusColors = {
 };
 
 const statusLabels = {
+  ...LIFECYCLE_STATUS_LABELS,
   new: "New",
   contacted: "Contacted",
   interested: "Interested",
@@ -269,15 +273,17 @@ const LeadManagement = () => {
     }
   };
 
-  const handleStatusChange = async (lead, newStatus) => {
+  const handleStatusChange = async (lead, newStatus, reason) => {
     try {
       const leadId = lead._id || lead.id;
-      await leadAPI.updateLeadStatus(leadId, newStatus);
+      const payload = { lifecycleStatus: newStatus };
+      if (reason) payload.lostReason = reason;
+      await leadAPI.updateLead(leadId, payload);
       toast.success("Status updated successfully");
       fetchLeads();
       fetchLeadStats();
     } catch (err) {
-      toast.error("Failed to update status");
+      toast.error(err.message || "Failed to update status");
     }
     setShowStatusDialog(false);
     setStatusLead(null);
