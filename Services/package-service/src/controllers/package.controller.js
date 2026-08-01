@@ -229,9 +229,9 @@ export const getAIStatus = asyncHandler(async (req, res) => {
 export const calculatePrice = asyncHandler(async (req, res) => {
   const {
     itineraryDays = [],
-    basePrice: explicitBasePrice,
     defaultMarginType = 'PERCENTAGE',
     defaultMarginInput = 0,
+    groupSize,
   } = req.body || {};
 
   const days = Array.isArray(itineraryDays) ? itineraryDays : [];
@@ -239,20 +239,33 @@ export const calculatePrice = asyncHandler(async (req, res) => {
   const transports = days.flatMap((day) => day.transports || []);
 
   // Always recompute from the itinerary so the breakdown reflects real costs.
-  const pricing = recomputeBasePrice(days, activities, transports);
+  const pricing = recomputeBasePrice(days, activities, transports, { groupSize });
 
-  // Hybrid pricing: a positive basePrice is an explicit override (used when the
-  // itinerary has no cost data yet); otherwise the recomputed value stands.
-  const basePrice = Number(explicitBasePrice) > 0 ? Number(explicitBasePrice) : pricing.basePrice;
-  const margin = computeMargin(basePrice, defaultMarginType, Number(defaultMarginInput) || 0);
+  // Accommodation is a per-day cost the engine does not model (each day is an
+  // independent per-night booking for now), so add it to the package cost and
+  // expose it as its own breakdown bucket.
+  const accommodationTotal = days.reduce(
+    (sum, day) => sum + Number(day.accommodation?.totalAmount ?? 0),
+    0
+  );
+  const packageCost =
+    Math.round((pricing.basePrice + accommodationTotal) * 100) / 100;
+  const margin = computeMargin(
+    packageCost,
+    defaultMarginType,
+    Number(defaultMarginInput) || 0
+  );
 
   res.json({
     success: true,
     data: {
-      basePrice,
+      packageCost,
       sellPrice: margin.sellPrice,
-      margin: margin.marginAmount,
-      breakdown: pricing.breakdown,
+      margin: { type: defaultMarginType, amount: margin.marginAmount },
+      breakdown: {
+        ...pricing.breakdown,
+        accommodation: { total: accommodationTotal },
+      },
     },
   });
 });
