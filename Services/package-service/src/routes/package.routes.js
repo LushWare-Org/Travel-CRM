@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, authorize } from '../middleware/auth.js';
+import { validateBody, validateParams } from '../middleware/validate.js';
+import { createPackageSchema, updatePackageSchema, packageIdParamSchema } from '../validators/package.schema.js';
 import * as packageController from '../controllers/package.controller.js';
 import {
   generateAIPackage,
@@ -23,16 +25,16 @@ router.get('/protected/all', requireAuth, packageController.getPackages);
 
 // ── Public: list and single-package view ─────────────────────────────────────
 router.get('/', packageController.getPackages);
-router.get('/:id', packageController.getPackageById);
+router.get('/:id', validateParams(packageIdParamSchema), packageController.getPackageById);
 
 // ── AI: full-package generation ───────────────────────────────────────────────
 router.post('/generate-ai',         requireAuth, authorize('admin', 'staff'), generateAIPackage);
 router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), generateContentFromTitle);
 
 // ── Package CRUD ──────────────────────────────────────────────────────────────
-router.post('/',      requireAuth, authorize('admin', 'staff'), packageController.createPackage);
-router.put('/:id',    requireAuth, authorize('admin', 'staff'), packageController.updatePackage);
-router.delete('/:id', requireAuth, authorize('admin'),          packageController.deletePackage);
+router.post('/',      requireAuth, authorize('admin', 'staff'), validateBody(createPackageSchema), packageController.createPackage);
+router.put('/:id',    requireAuth, authorize('admin', 'staff'), validateParams(packageIdParamSchema), validateBody(updatePackageSchema), packageController.updatePackage);
+router.delete('/:id', requireAuth, authorize('admin'),          validateParams(packageIdParamSchema), packageController.deletePackage);
 
 // ── Per-package AI operations (two-segment paths — no conflict with /:id) ─────
 router.post('/:id/generate-ai-content', requireAuth, authorize('admin', 'staff'), generateAndSaveAIContent);
@@ -40,7 +42,7 @@ router.get('/:id/preview-ai-content',   requireAuth, authorize('admin', 'staff')
 router.get('/:id/ai-pdf',               requireAuth,                               downloadAIPdf);
 
 // ── Misc per-package updates ──────────────────────────────────────────────────
-router.post('/:id/increment-bookings', requireAuth, packageController.incrementBookings);
-router.post('/:id/update-rating',      requireAuth, packageController.updatePackageRating);
+router.post('/:id/increment-bookings', requireAuth, validateParams(packageIdParamSchema), packageController.incrementBookings);
+router.post('/:id/update-rating',      requireAuth, validateParams(packageIdParamSchema), packageController.updatePackageRating);
 
 export default router;

@@ -1,174 +1,184 @@
-import slugify from 'slugify';
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import {
+  serializePackage,
+  serializePackageList,
+  buildCreateData,
+  buildUpdateData,
+  recomputeBasePrice,
+  assembleWhere,
+  buildInclude,
+} from '../services/package.service.js';
 
-const packageInclude = {
-  images: { orderBy: { order: 'asc' } },
-  reviews: { where: { isApproved: true }, take: 5, orderBy: { createdAt: 'desc' } },
-  itinerary: true,
-};
-
-// Scalar/relation fields the Package model actually accepts on write. The client can
-// still carry legacy fields (e.g. Mongo-era `coverImage`, form-only `createdDate`,
-// a flat `days` array meant for the itinerary) — those are dropped here rather than
-// left to crash prisma.package.create() with "Unknown argument".
-const PACKAGE_WRITABLE_FIELDS = [
-  'name', 'slug', 'description', 'destination', 'duration', 'price', 'maxGroupSize',
-  'difficulty', 'category', 'packageType', 'coverImagePublicId', 'coverImageUrl',
-  'inclusions', 'exclusions', 'highlights', 'terms', 'isActive', 'isFeatured', 'status',
-  'availableFrom', 'availableTo', 'customizedForLeadId', 'originalPackageId',
-  'customizedById', 'customizationNotes',
-];
-
-const sanitizePackageBody = (body) => {
-  const clean = {};
-  for (const field of PACKAGE_WRITABLE_FIELDS) {
-    if (body[field] !== undefined) clean[field] = body[field];
-  }
-  // Legacy embedded shape from the old Mongo model: coverImage: { public_id, url }
-  if (body.coverImage && typeof body.coverImage === 'object') {
-    if (body.coverImage.public_id) clean.coverImagePublicId = body.coverImage.public_id;
-    if (body.coverImage.url) clean.coverImageUrl = body.coverImage.url;
-  }
-  return clean;
-};
-
-const buildPackageWhere = (query) => {
-  const { category, destination, minPrice, maxPrice, isActive, status, isFeatured, search } = query;
-  const where = {};
-  if (category) where.category = category;
-  if (destination) where.destination = { contains: destination, mode: 'insensitive' };
-  if (minPrice || maxPrice) where.price = { ...(minPrice && { gte: Number(minPrice) }), ...(maxPrice && { lte: Number(maxPrice) }) };
-  if (isActive !== undefined) where.isActive = isActive === 'true';
-  if (status) where.status = status;
-  if (isFeatured !== undefined) where.isFeatured = isFeatured === 'true';
-  if (search) where.OR = [
-    { name: { contains: search, mode: 'insensitive' } },
-    { description: { contains: search, mode: 'insensitive' } },
-    { destination: { contains: search, mode: 'insensitive' } },
-  ];
-  return where;
-};
+// ── List / Search ─────────────────────────────────────────────
 
 export const getPackages = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 12, sort = '-createdAt', ...rest } = req.query;
+  const { page = 1, limit = 12, sort = 'createdAt', order = 'desc', ...rest } = req.query;
   const skip = (Number(page) - 1) * Number(limit);
-  const where = buildPackageWhere(rest);
+  const where = assembleWhere(rest);
 
   const isProtected = req.user && ['admin', 'salesRep'].includes(req.user.role);
   if (!isProtected) {
     where.isActive = true;
-    where.status = 'published';
   }
 
-  const orderBy = sort.startsWith('-')
-    ? { [sort.slice(1)]: 'desc' }
-    : { [sort]: 'asc' };
+  const orderBy = { [sort]: order };
+
+  const include = {
+    images: { orderBy: { orderIndex: 'asc' } },
+  };
 
   const [data, total] = await Promise.all([
-    prisma.package.findMany({ where, include: packageInclude, orderBy, skip, take: Number(limit) }),
+    prisma.package.findMany({ where, include, orderBy, skip, take: Number(limit) }),
     prisma.package.count({ where }),
   ]);
-  res.json({ success: true, count: data.length, total, data });
+  res.json({ success: true, count: data.length, total, data: data.map(serializePackageList) });
 });
+
+// ── Detail ────────────────────────────────────────────────────
 
 export const getPackageById = asyncHandler(async (req, res) => {
   const pkg = await prisma.package.findUnique({
     where: { id: req.params.id },
-    include: { ...packageInclude, reviews: { where: { isApproved: true }, orderBy: { createdAt: 'desc' } } },
+    include: { ...buildInclude(), reviews: { where: { isApproved: true }, orderBy: { createdAt: 'desc' } } },
   });
   if (!pkg) throw new AppError('Package not found', 404);
   await prisma.package.update({ where: { id: req.params.id }, data: { views: { increment: 1 } } });
-  res.json({ success: true, data: pkg });
+  res.json({ success: true, data: serializePackage(pkg) });
 });
+
+// ── Featured ──────────────────────────────────────────────────
 
 export const getFeaturedPackages = asyncHandler(async (req, res) => {
   const data = await prisma.package.findMany({
-    where: { isFeatured: true, isActive: true, status: 'published' },
-    include: packageInclude,
+    where: { isFeatured: true, isActive: true },
+    include: buildInclude(),
     orderBy: { rating: 'desc' },
     take: 12,
   });
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(serializePackageList) });
 });
 
+// ── Stats ─────────────────────────────────────────────────────
+
 export const getPackageStats = asyncHandler(async (req, res) => {
-  const [total, active, featured, published] = await Promise.all([
+  const [total, active, featured] = await Promise.all([
     prisma.package.count(),
     prisma.package.count({ where: { isActive: true } }),
     prisma.package.count({ where: { isFeatured: true } }),
-    prisma.package.count({ where: { status: 'published' } }),
   ]);
   const avgRating = await prisma.package.aggregate({ _avg: { rating: true } });
-  res.json({ success: true, data: { total, active, featured, published, avgRating: avgRating._avg.rating || 0 } });
+  res.json({ success: true, data: { total, active, featured, avgRating: avgRating._avg.rating || 0 } });
 });
+
+// ── Search ────────────────────────────────────────────────────
 
 export const searchPackages = asyncHandler(async (req, res) => {
-  const { q, limit = 10 } = req.query;
+  const { q } = req.query;
   if (!q) throw new AppError('Search query is required', 400);
+  const where = assembleWhere({ search: q });
+  where.isActive = true;
   const data = await prisma.package.findMany({
-    where: {
-      isActive: true, status: 'published',
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { destination: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-      ],
-    },
-    include: packageInclude,
-    take: Number(limit),
+    where,
+    include: buildInclude(),
+    take: 10,
     orderBy: { rating: 'desc' },
   });
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(serializePackageList) });
 });
+
+// ── By Category ───────────────────────────────────────────────
 
 export const getPackagesByCategory = asyncHandler(async (req, res) => {
+  const where = assembleWhere({ category: req.params.category, isActive: true });
   const data = await prisma.package.findMany({
-    where: { category: req.params.category, isActive: true, status: 'published' },
-    include: packageInclude,
+    where,
+    include: buildInclude(),
     orderBy: { rating: 'desc' },
   });
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(serializePackageList) });
 });
+
+// ── Create ────────────────────────────────────────────────────
 
 export const createPackage = asyncHandler(async (req, res) => {
-  const images = req.body.images || [];
-  const body = sanitizePackageBody(req.body);
-  if (body.name && !body.slug) {
-    body.slug = slugify(body.name, { lower: true, strict: true });
+  let data = buildCreateData(req.body, req.user.id);
+
+  // Hybrid pricing: auto-compute basePrice if not explicitly provided
+  if (req.body.basePrice === undefined && req.body.itineraryDays?.length) {
+    const itinDays = data.itineraryDays.create;
+    const activityItems = itinDays.flatMap((d) =>
+      (d.activities?.create || []).map((a) => ({
+        defaultCost: a.costOverride ?? 0,
+        costOverride: a.costOverride,
+      }))
+    );
+    const transportItems = itinDays.flatMap((d) =>
+      (d.transports?.create || []).map((t) => ({
+        pricingModel: t.pricingModel,
+        unitCost: t.unitCost,
+        distanceKm: t.distanceKm,
+      }))
+    );
+    const mealDays = itinDays.map((d) => ({
+      breakfastCount: d.breakfastCount || 0,
+      lunchCount: d.lunchCount || 0,
+      dinnerCount: d.dinnerCount || 0,
+      mealPriceOverride: d.mealPriceOverride,
+    }));
+
+    const pricing = recomputeBasePrice(mealDays, activityItems, transportItems);
+    data.basePrice = pricing.basePrice;
   }
-  body.createdById = req.user.id;
 
   const pkg = await prisma.package.create({
-    data: {
-      ...body,
-      images: { create: images.map((img, idx) => ({ ...img, order: idx })) },
-    },
-    include: packageInclude,
+    data,
+    include: buildInclude(),
   });
-  res.status(201).json({ success: true, data: pkg });
+  res.status(201).json({ success: true, data: serializePackage(pkg) });
 });
+
+// ── Update ────────────────────────────────────────────────────
 
 export const updatePackage = asyncHandler(async (req, res) => {
   const existing = await prisma.package.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new AppError('Package not found', 404);
 
-  const { images } = req.body;
-  const body = sanitizePackageBody(req.body);
-  if (body.name && body.name !== existing.name && !body.slug) {
-    body.slug = slugify(body.name, { lower: true, strict: true });
+  let data = buildUpdateData(req.body);
+
+  // Hybrid pricing: recompute if itineraryDays changed and no basePrice override provided
+  if (req.body.itineraryDays !== undefined && req.body.basePrice === undefined) {
+    const itinDays = data.itineraryDays.create;
+    const activityItems = itinDays.flatMap((d) =>
+      (d.activities?.create || []).map((a) => ({
+        defaultCost: a.costOverride ?? 0,
+        costOverride: a.costOverride,
+      }))
+    );
+    const transportItems = itinDays.flatMap((d) =>
+      (d.transports?.create || []).map((t) => ({
+        pricingModel: t.pricingModel,
+        unitCost: t.unitCost,
+        distanceKm: t.distanceKm,
+      }))
+    );
+    const mealDays = itinDays.map((d) => ({
+      breakfastCount: d.breakfastCount || 0,
+      lunchCount: d.lunchCount || 0,
+      dinnerCount: d.dinnerCount || 0,
+      mealPriceOverride: d.mealPriceOverride,
+    }));
+
+    const pricing = recomputeBasePrice(mealDays, activityItems, transportItems);
+    data.basePrice = pricing.basePrice;
   }
 
-  const data = { ...body };
-  if (images) {
-    await prisma.packageImage.deleteMany({ where: { packageId: req.params.id } });
-    data.images = { create: images.map((img, idx) => ({ ...img, order: idx })) };
-  }
-
-  const pkg = await prisma.package.update({ where: { id: req.params.id }, data, include: packageInclude });
-  res.json({ success: true, data: pkg });
+  const pkg = await prisma.package.update({ where: { id: req.params.id }, data, include: buildInclude() });
+  res.json({ success: true, data: serializePackage(pkg) });
 });
+
+// ── Delete ────────────────────────────────────────────────────
 
 export const deletePackage = asyncHandler(async (req, res) => {
   const existing = await prisma.package.findUnique({ where: { id: req.params.id } });
@@ -177,26 +187,28 @@ export const deletePackage = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Package deleted' });
 });
 
+// ── Utility ───────────────────────────────────────────────────
+
 export const incrementBookings = asyncHandler(async (req, res) => {
   const pkg = await prisma.package.update({
     where: { id: req.params.id },
     data: { bookings: { increment: 1 } },
   });
-  res.json({ success: true, data: pkg });
+  res.json({ success: true, data: serializePackage(pkg) });
 });
 
 export const updatePackageRating = asyncHandler(async (req, res) => {
   const { rating, numReviews } = req.body;
-  const pkg = await prisma.package.update({
-    where: { id: req.params.id },
-    data: { ...(rating !== undefined && { rating }), ...(numReviews !== undefined && { numReviews }) },
-  });
-  res.json({ success: true, data: pkg });
+  const data = {};
+  if (rating !== undefined) data.rating = rating;
+  if (numReviews !== undefined) data.numReviews = numReviews;
+  const pkg = await prisma.package.update({ where: { id: req.params.id }, data });
+  res.json({ success: true, data: serializePackage(pkg) });
 });
 
 export const getAIStatus = asyncHandler(async (req, res) => {
   const key = process.env.GEMINI_API_KEY || '';
   const configured = key.length > 0;
-  const keyFormat = configured && key.startsWith('AI') ? 'valid' : configured ? 'valid' : 'missing';
+  const keyFormat = configured && key.startsWith('AI') ? 'valid' : 'valid';
   res.json({ success: true, configured, keyFormat });
 });
