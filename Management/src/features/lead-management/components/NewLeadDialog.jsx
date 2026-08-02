@@ -215,29 +215,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       const assignedTo = isSalesRep && user?._id ? user._id : (formData.assignedTo || undefined);
       const salesRepName = isSalesRep && user?.name ? user.name : (formData.salesRep || undefined);
 
-      // Build optional transfer flights array from flight preferences
-      const optionalFlights = [];
-      if (formData.inboundFlightPrefs) {
-        optionalFlights.push({
-          origin: formData.inboundFlightPrefs.origin,
-          destination: formData.inboundFlightPrefs.destination,
-          flightType: 'to-start',
-          cabinClass: formData.inboundFlightPrefs.cabinClass,
-          departureTime: formData.inboundFlightPrefs.departureTime,
-          airlinePreference: formData.inboundFlightPrefs.airlinePreference,
-        });
-      }
-      if (formData.outboundFlightPrefs) {
-        optionalFlights.push({
-          origin: formData.outboundFlightPrefs.origin,
-          destination: formData.outboundFlightPrefs.destination,
-          flightType: 'return-home',
-          cabinClass: formData.outboundFlightPrefs.cabinClass,
-          departureTime: formData.outboundFlightPrefs.departureTime,
-          airlinePreference: formData.outboundFlightPrefs.airlinePreference,
-        });
-      }
-
       const leadData = {
         name: formData.name?.trim() || undefined,
         email: formData.email?.trim() || undefined,
@@ -251,15 +228,13 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         source: "manual",
         travelDate: formData.travelDate || undefined,
         endDate: formData.endDate || undefined,
-        package: formData.package || undefined,
+        packageId: formData.package || undefined,
         packageName: formData.packageName || undefined,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
-        optionalFlights: optionalFlights.length > 0 ? optionalFlights : undefined,
         remarks: formData.remarks.filter((r) => r.text.trim() !== "").map(r => ({
           text: r.text.trim(),
           date: r.date || new Date().toISOString().split("T")[0]
         })),
-        status: "new",
         lifecycleStatus,
       };
 

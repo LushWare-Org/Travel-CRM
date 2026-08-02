@@ -238,7 +238,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         endDate: lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
         package: defaultPackageId,
         packageName: defaultPackageName,
-        status: lead.status || 'new',
+        lifecycleStatus: lead.lifecycleStatus || 'NEW',
       });
 
       setRemarks(lead.remarks || []);
@@ -297,9 +297,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         travelDate: formData.travelDate || undefined,
         endDate: formData.endDate || undefined,
         whatsapp: formData.whatsapp || undefined,
-        package: formData.package || null,
+        packageId: formData.package || null,
         packageName: formData.packageName || null,
-        status: formData.status || 'new',
+        lifecycleStatus: formData.lifecycleStatus || 'NEW',
         remarks: remarks.length > 0 ? remarks : undefined,
       };
       if (formData.assignedTo && formData.assignedTo !== '' && formData.assignedTo !== '__name_only') {
@@ -1324,7 +1324,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-700">Lifecycle Status</h3>
-                  <LeadStatusBadge status={lead.lifecycleStatus ?? lead.status} />
+                  <LeadStatusBadge status={lead.lifecycleStatus} />
                 </div>
                 <button
                   type="button"
@@ -1343,10 +1343,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing</h3>
                 <PricingSection
                   leadId={lead._id || lead.id}
-                  financials={lead.financials}
+                  financials={lead.pricing}
+                  travelers={lead.numberOfTravelers || 1}
                   onFinancialsUpdated={(updated) => {
                     if (lead._id || lead.id) {
-                      lead.financials = updated;
+                      lead.pricing = updated;
                     }
                   }}
                 />
@@ -1359,7 +1360,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             <>
               <LeadFlightBookingsSection
                 leadId={lead._id || lead.id}
-                leadStatus={lead.lifecycleStatus ?? lead.status}
+                leadStatus={lead.lifecycleStatus}
                 itineraryDays={itineraryDays}
                 travelDate={formData.travelDate}
                 onUpdateDay={(dayNumber, updates) => {
@@ -1373,7 +1374,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
               <LeadHotelBookingsSection
                 leadId={lead._id || lead.id}
-                leadStatus={lead.lifecycleStatus ?? lead.status}
+                leadStatus={lead.lifecycleStatus}
                 itineraryDays={itineraryDays}
                 travelDate={formData.travelDate}
                 endDate={formData.endDate}

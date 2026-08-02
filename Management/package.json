@@ -20,6 +20,7 @@
     "@stripe/react-stripe-js": "^3.6.0",
     "@stripe/stripe-js": "^7.2.0",
     "@travel-crm/constants": "file:../Services/shared/constants",
+    "@travel-crm/lead-pricing-engine": "file:../Services/shared/lead-pricing-engine",
     "@travel-crm/pricing-engine": "file:../Services/shared/pricing-engine",
     "axios": "^1.8.4",
     "caniuse-lite": "^1.0.30001731",
