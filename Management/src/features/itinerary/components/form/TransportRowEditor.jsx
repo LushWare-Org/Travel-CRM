@@ -8,12 +8,11 @@ import { Car, TrendingUp, Trash2 } from 'lucide-react';
 
 const TRANSPORT_MODE_LABELS = {
   CAR: 'Car',
+  VAN: 'Van',
   FLIGHT: 'Flight',
   TRAIN: 'Train',
   BUS: 'Bus',
   BOAT: 'Boat',
-  WALK: 'Walk',
-  OTHER: 'Other',
 };
 
 const PRICING_MODEL_LABELS = {

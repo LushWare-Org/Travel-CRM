@@ -233,13 +233,28 @@ function buildItineraryDaysPayload(days) {
       ? relationalActivities
       : editorActivities;
 
-    const transports = Array.isArray(day.transports) && day.transports.length > 0
+    const rawTransports = Array.isArray(day.transports) && day.transports.length > 0
       ? day.transports
       : (Array.isArray(day._relational?.transports) && day._relational.transports.length > 0
         ? day._relational.transports
-        : (day.transport
-          ? [{ routeType: 'DAILY_ROUTING', transportMode: String(day.transport).toUpperCase(), pricingModel: 'PER_VEHICLE', unitCost: 0 }]
-          : []));
+        : []);
+
+    // Flight price wins on save: FLIGHT rows that belong to a flight are
+    // re-derived from the flight's totalAmount so the two never desync.
+    // Manual (non-flight) rows and orphan FLIGHT rows are kept untouched.
+    const flights = Array.isArray(day.flights) ? day.flights : [];
+    const linkedFlightRefs = new Set(flights.map(f => f.id));
+    const manualTransports = rawTransports.filter(t =>
+      t.transportMode !== 'FLIGHT' || !(t.flightRef && linkedFlightRefs.has(t.flightRef))
+    );
+    const flightTransports = flights.map(f => ({
+      routeType: 'DAILY_ROUTING',
+      transportMode: 'FLIGHT',
+      pricingModel: 'PER_VEHICLE',
+      unitCost: Number(f.totalAmount) || 0,
+      distanceKm: null,
+    }));
+    const transports = [...manualTransports, ...flightTransports];
 
     const meals = (day.meals && typeof day.meals === 'object') ? day.meals : null;
     const activityCosts = (day.activityCosts && typeof day.activityCosts === 'object') ? day.activityCosts : {};
@@ -255,6 +270,7 @@ function buildItineraryDaysPayload(days) {
       dinnerCount: day.dinnerCount ?? (meals ? (meals.dinner ? 1 : 0) : 0),
       mealPriceOverride: day.mealPriceOverride ?? null,
       accommodation: day.accommodation ?? null,
+      flights,
       places: dayPlaces.map((p, i) => {
         if (typeof p === 'string') return { customName: p, orderIndex: i };
         return {

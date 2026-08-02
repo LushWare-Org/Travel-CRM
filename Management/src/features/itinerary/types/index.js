@@ -33,9 +33,8 @@ export const TRANSPORT_MODE = {
   CAR: 'CAR',
   TRAIN: 'TRAIN',
   BOAT: 'BOAT',
+  VAN: 'VAN',
   BUS: 'BUS',
-  WALK: 'WALK',
-  OTHER: 'OTHER',
 };
 
 export const PRICING_MODEL = {
