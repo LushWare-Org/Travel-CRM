@@ -161,7 +161,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
         packagesList = packagesList.filter(pkg =>
-          pkg.isActive !== false && pkg.status === 'published'
+          pkg.isActive !== false
         );
         setPackages(packagesList);
       } else {
@@ -503,7 +503,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                       setFormData({
                         ...formData,
                         package: packageId,
-                        packageName: selectedPackage?.name || '',
+                        packageName: selectedPackage?.title || selectedPackage?.name || '',
                         destination: selectedPackage?.destination || formData.destination
                       });
 
@@ -537,7 +537,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     {packages && packages.length > 0 ? (
                       packages.map((pkg) => (
                         <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
-                          {pkg.name || 'Unnamed Package'}
+                          {pkg.title || pkg.name || 'Unnamed Package'}
                         </option>
                       ))
                     ) : (

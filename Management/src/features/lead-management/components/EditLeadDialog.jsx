@@ -150,7 +150,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
         packagesList = packagesList.filter((pkg) =>
-          pkg.isActive !== false && pkg.status === 'published'
+          pkg.isActive !== false
         );
 
         if (customPackageId) {
@@ -991,7 +991,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                         setFormData({
                           ...formData,
                           package: packageId,
-                          packageName: selectedPackage?.name || '',
+                          packageName: selectedPackage?.title || selectedPackage?.name || '',
                           destination: selectedPackage?.destination || formData.destination
                         });
                       }}
@@ -1003,7 +1003,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                         const optionId = pkg._id || pkg.id;
                         const baseName =
                           pkg.baseName ||
-                          `${pkg.name || 'Unnamed Package'}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
+                          `${pkg.title || pkg.name || 'Unnamed Package'}`.replace(/\s*\(Customized(-\d+)?\)\s*$/i, '').trim();
                         const sequence = pkg.customizationSequence || pkg.sequence || 0;
                         let label = baseName || 'Unnamed Package';
                         if (pkg.customizedForLead || pkg.isCustomizedPackage) {
