@@ -5,6 +5,7 @@
 
 import { createDefaultDay } from '../types/index.js';
 import { formatCurrency } from '../../../utils/currency.js';
+import { PRICING_MODEL } from '@travel-crm/constants';
 
 /**
  * Generate days array based on duration
@@ -203,11 +204,11 @@ function normalizeTransportRow(t) {
 export const getTransportRowCost = (transport, groupSize = 1) => {
   const unitCost = transport.unitCost || 0;
   switch (transport.pricingModel) {
-    case 'PER_KM':
+    case PRICING_MODEL.PER_KM:
       return unitCost * (transport.distanceKm || 0);
-    case 'PER_PERSON':
+    case PRICING_MODEL.PER_PERSON:
       return unitCost * groupSize;
-    case 'PER_VEHICLE':
+    case PRICING_MODEL.PER_VEHICLE:
     default:
       return unitCost;
   }

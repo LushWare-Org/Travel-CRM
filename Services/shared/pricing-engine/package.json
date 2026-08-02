@@ -16,6 +16,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
+  "dependencies": {
+    "@travel-crm/constants": "file:../constants"
+  },
   "devDependencies": {
     "vitest": "^4.1.10",
     "@vitest/coverage-v8": "^4.0.0"

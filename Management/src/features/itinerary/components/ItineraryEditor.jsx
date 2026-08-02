@@ -37,7 +37,7 @@ import {
   resolveFlightRemove,
   countUnlinkedFlightRows,
 } from '../utils/flightSync';
-import { createDefaultTransportRow } from '../utils/transportDefaults';
+import { createDefaultTransportRow } from '@travel-crm/constants';
 import { formatCurrency } from '../../../utils/currency.js';
 
 // ═══════════════════════════════════════════════════════════════════

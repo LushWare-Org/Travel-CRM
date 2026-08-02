@@ -1,4 +1,5 @@
 import { DEFAULTS } from './config.js';
+import { PRICING_MODEL } from '@travel-crm/constants';
 
 /**
  * @param {Array<{pricingModel: string, unitCost: number, distanceKm?: number|null}>} transports
@@ -11,13 +12,13 @@ export function calculateTransportCosts(transports, config = {}) {
   const rows = transports.map((t) => {
     let cost = 0;
     switch (t.pricingModel) {
-      case 'PER_KM':
+      case PRICING_MODEL.PER_KM:
         cost = t.unitCost * (t.distanceKm || 0);
         break;
-      case 'PER_PERSON':
+      case PRICING_MODEL.PER_PERSON:
         cost = t.unitCost * groupSize;
         break;
-      case 'PER_VEHICLE':
+      case PRICING_MODEL.PER_VEHICLE:
         cost = t.unitCost;
         break;
     }

@@ -308,4 +308,21 @@ describe('transport validation', () => {
     const result = createPackageSchema.safeParse(pkg);
     expect(result.success).toBe(true);
   });
+
+  it('accepts BUS as a transport mode', () => {
+    const pkg = {
+      ...validPackage,
+      itineraryDays: [{
+        ...validPackage.itineraryDays[0],
+        transports: [{
+          routeType: 'DAILY_ROUTING',
+          transportMode: 'BUS',
+          pricingModel: 'PER_PERSON',
+          unitCost: 12,
+        }],
+      }],
+    };
+    const result = createPackageSchema.safeParse(pkg);
+    expect(result.success).toBe(true);
+  });
 });

@@ -1,13 +1,14 @@
 import { z } from 'zod';
+import { TRANSPORT_MODE, PRICING_MODEL, ROUTE_TYPE } from '../../../shared/constants/src/index.js';
 
 // ─── Shared sub-schemas ────────────────────────────────────────
 
 const marginType = z.enum(['PERCENTAGE', 'FIXED']);
 const packageCategory = z.enum(['HONEYMOON', 'COUPLE', 'FAMILY', 'GROUP', 'WILD_SAFARI']);
 const placeType = z.enum(['CITY', 'ATTRACTION', 'REGION', 'AIRPORT']);
-const routeType = z.enum(['DAILY_ROUTING', 'POINT_TO_POINT']);
-const transportMode = z.enum(['FLIGHT', 'CAR', 'TRAIN', 'BOAT', 'VAN']);
-const pricingModel = z.enum(['PER_KM', 'PER_PERSON', 'PER_VEHICLE']);
+const routeType = z.enum(Object.values(ROUTE_TYPE));
+const transportMode = z.enum(Object.values(TRANSPORT_MODE));
+const pricingModel = z.enum(Object.values(PRICING_MODEL));
 
 const decimal = () => z.coerce.number();
 
@@ -47,7 +48,7 @@ const dayTransport = z.object({
   originPlaceId: z.string().uuid().optional().nullable(),
   destinationPlaceId: z.string().uuid().optional().nullable(),
 }).superRefine((t, ctx) => {
-  if (t.routeType === 'POINT_TO_POINT') {
+  if (t.routeType === ROUTE_TYPE.POINT_TO_POINT) {
     if (!t.originPlaceId) {
       ctx.addIssue({ code: 'custom', message: 'originPlaceId is required for POINT_TO_POINT', path: ['originPlaceId'] });
     }
@@ -55,7 +56,7 @@ const dayTransport = z.object({
       ctx.addIssue({ code: 'custom', message: 'destinationPlaceId is required for POINT_TO_POINT', path: ['destinationPlaceId'] });
     }
   }
-  if (t.pricingModel === 'PER_KM' && (t.distanceKm == null || t.distanceKm <= 0)) {
+  if (t.pricingModel === PRICING_MODEL.PER_KM && (t.distanceKm == null || t.distanceKm <= 0)) {
     ctx.addIssue({ code: 'custom', message: 'distanceKm is required for PER_KM pricing', path: ['distanceKm'] });
   }
 });
