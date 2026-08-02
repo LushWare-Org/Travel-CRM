@@ -66,6 +66,7 @@ describe('resolveFlightAdd', () => {
     expect(transports).toHaveLength(1);
     expect(transports[0].flightRef).toBe(flights[0].id);
     expect(transports[0].unitCost).toBe(0);
+    expect(transports[0].pricingModel).toBe('PER_PERSON');
   });
 
   it('claims the first orphan row instead of appending a duplicate', () => {
@@ -233,6 +234,7 @@ describe('resolveFlightEdit', () => {
     expect(result.transports).toHaveLength(1);
     expect(result.transports[0].flightRef).toBe('f-1');
     expect(result.transports[0].unitCost).toBe(0);
+    expect(result.transports[0].pricingModel).toBe('PER_PERSON');
   });
 
   it('is a no-op for an out-of-range index', () => {
@@ -315,6 +317,16 @@ describe('reconcileFlightsForSave', () => {
     const result = reconcileFlightsForSave({ flights, transports: [] });
     expect(result).toHaveLength(1);
     expect(result[0].unitCost).toBe(0);
+    expect(result[0].pricingModel).toBe('PER_PERSON');
+  });
+
+  it('preserves a manually set pricing model on a linked row at save', () => {
+    const flights = [completeFlight({ id: 'f-1', totalAmount: 450 })];
+    const transports = [flightRow({ flightRef: 'f-1', unitCost: 999, pricingModel: 'PER_VEHICLE' })];
+    const result = reconcileFlightsForSave({ flights, transports });
+    expect(result).toHaveLength(1);
+    expect(result[0].pricingModel).toBe('PER_VEHICLE');
+    expect(result[0].unitCost).toBe(450);
   });
 
   it('combines manual rows, orphans and linked flights', () => {

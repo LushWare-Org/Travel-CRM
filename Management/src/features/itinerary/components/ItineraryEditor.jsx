@@ -37,6 +37,7 @@ import {
   resolveFlightRemove,
   countUnlinkedFlightRows,
 } from '../utils/flightSync';
+import { createDefaultTransportRow } from '../utils/transportDefaults';
 import { formatCurrency } from '../../../utils/currency.js';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -265,7 +266,7 @@ const ItineraryEditor = ({
     const current = getDayTransports(day);
     const rows = current.length > 0
       ? current
-      : [{ routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 0, distanceKm: null }];
+      : [createDefaultTransportRow()];
     onDayChange(day.dayNumber, {
       transports: rows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
     });
@@ -276,7 +277,7 @@ const ItineraryEditor = ({
     onDayChange(day.dayNumber, {
       transports: [
         ...current,
-        { routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 0, distanceKm: null },
+        createDefaultTransportRow(),
       ],
     });
   };

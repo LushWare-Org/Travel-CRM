@@ -5,6 +5,7 @@
  */
 
 import { Car, TrendingUp, Trash2 } from 'lucide-react';
+import { applyTransportModeDefault, applyPricingModelChange } from '../../utils/transportDefaults';
 
 const TRANSPORT_MODE_LABELS = {
   CAR: 'Car',
@@ -39,7 +40,7 @@ const TransportRowEditor = ({ transport, onChange, onRemove, index }) => {
           </label>
           <select
             value={row.transportMode || 'CAR'}
-            onChange={(e) => onChange({ transportMode: e.target.value })}
+            onChange={(e) => onChange(applyTransportModeDefault(row, e.target.value))}
             className={fieldClass}
           >
             {Object.entries(TRANSPORT_MODE_LABELS).map(([value, label]) => (
@@ -55,7 +56,7 @@ const TransportRowEditor = ({ transport, onChange, onRemove, index }) => {
           </label>
           <select
             value={row.pricingModel || 'PER_VEHICLE'}
-            onChange={(e) => onChange({ pricingModel: e.target.value })}
+            onChange={(e) => onChange(applyPricingModelChange(row, e.target.value))}
             className={fieldClass}
           >
             {Object.entries(PRICING_MODEL_LABELS).map(([value, label]) => (
