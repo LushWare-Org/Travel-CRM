@@ -1,97 +1,68 @@
+import { computeQuote } from '../../../shared/lead-pricing-engine/src/index.js';
+import { PRICING } from '../../../shared/constants/src/index.js';
+
 /**
- * Rule 1: TotalEstimatedCost = PackageBaseCost + EstimatedFlightCost + EstimatedHotelCost
+ * Convert a persisted LeadCostLine row (Prisma Decimal strings) into the
+ * engine's line descriptor shape.
  */
-export function calculateTotalEstimatedCost(estimated = {}) {
-  return (estimated.packageBaseCost || 0) +
-    (estimated.estimatedFlightCost || 0) +
-    (estimated.estimatedHotelCost || 0);
+export function toLineDescriptor(row) {
+  return {
+    category: row.category,
+    description: row.description,
+    basis: row.basis,
+    quantity: row.quantity,
+    estimatedUnit: Number(row.estimatedUnitPrice) || 0,
+    actualUnit: row.actualUnitPrice != null ? Number(row.actualUnitPrice) : null,
+    marginType: row.marginType || null,
+    marginValue: row.marginValue != null ? Number(row.marginValue) : null,
+    source: row.source,
+  };
 }
 
 /**
- * Rule 2: Quoted Selling Price
- *   PERCENTAGE: TotalEstimatedCost * (1 + MarkupValue / 100)
- *   FLAT_FEE:   TotalEstimatedCost + MarkupValue
+ * Compute the full sell-side pricing for a lead and derive the deposit plan
+ * amount and balance. Pure function — persistence happens in the controller.
  */
-export function calculateQuotedSellingPrice(totalEstimated, markupStrategy, markupValue) {
-  const val = markupValue || 0;
-  if (markupStrategy === 'PERCENTAGE') {
-    return totalEstimated * (1 + val / 100);
-  }
-  return totalEstimated + val; // FLAT_FEE default
-}
+export function computePricing({
+  lines = [],
+  travelers = 1,
+  currency = PRICING.DEFAULT_CURRENCY,
+  marginType = null,
+  marginValue = 0,
+  depositType = null,
+  depositValue = 0,
+  discountType = 'none',
+  discountValue = 0,
+  serviceChargeRate = 0,
+  verifiedPaymentTotal = 0,
+  taxRate = PRICING.TAX_RATE,
+} = {}) {
+  const quote = computeQuote({
+    lines,
+    travelers,
+    currency,
+    marginType,
+    marginValue,
+    taxRate,
+    discountType,
+    discountValue,
+    serviceChargeRate,
+  });
 
-/**
- * Rule 3: BalanceDue = max(0, QuotedSellingPrice - DepositPaid)
- */
-export function calculateBalanceDue(quotedSellingPrice, depositPaid = 0) {
-  return Math.max(0, (quotedSellingPrice || 0) - depositPaid);
-}
-
-/**
- * Rule 4: TotalActualCost = PackageBaseCost + ActualFlightCost + ActualHotelCost
- */
-export function calculateTotalActualCost(estimated = {}, actual = {}) {
-  return (estimated.packageBaseCost || 0) +
-    (actual.actualFlightCost || 0) +
-    (actual.actualHotelCost || 0);
-}
-
-/**
- * Rule 5: FinalRealizedProfit = QuotedSellingPrice - TotalActualCost
- */
-export function calculateFinalRealizedProfit(quotedSellingPrice, totalActualCost) {
-  return (quotedSellingPrice || 0) - (totalActualCost || 0);
-}
-
-/**
- * Compute all pricing fields. This is the main entry point.
- * @param {Object} financials - { estimated, clientPricing, actual }
- * @returns {Object} Complete financials with all computed fields
- */
-export function computeFinancials(financials = {}) {
-  const f = financials || {};
-  const estimated = f.estimated || {};
-  const clientPricing = f.clientPricing || {};
-  const actual = f.actual || {};
-
-  // Rule 1
-  const totalEstimatedCost = calculateTotalEstimatedCost(estimated);
-
-  // Rule 2
-  const quotedSellingPrice = calculateQuotedSellingPrice(
-    totalEstimatedCost,
-    clientPricing.markupStrategy,
-    clientPricing.markupValue,
-  );
-
-  // Rule 3
-  const balanceDue = calculateBalanceDue(quotedSellingPrice, clientPricing.depositPaid);
-
-  // Rule 4
-  const totalActualCost = calculateTotalActualCost(estimated, actual);
-
-  // Rule 5
-  const finalRealizedProfit = calculateFinalRealizedProfit(quotedSellingPrice, totalActualCost);
+  const rawDeposit =
+    depositType === 'PERCENTAGE'
+      ? quote.totalAmount * ((Number(depositValue) || 0) / 100)
+      : depositType === 'FIXED'
+        ? Number(depositValue) || 0
+        : 0;
+  const depositAmount = Math.round(rawDeposit * 100) / 100;
+  const paidAmount = Math.round((Number(verifiedPaymentTotal) || 0) * 100) / 100;
+  const balanceDue = Math.max(0, Math.round((quote.totalAmount - paidAmount) * 100) / 100);
 
   return {
-    estimated: {
-      packageBaseCost: estimated.packageBaseCost || 0,
-      estimatedFlightCost: estimated.estimatedFlightCost || 0,
-      estimatedHotelCost: estimated.estimatedHotelCost || 0,
-      totalEstimatedCost,
-    },
-    clientPricing: {
-      markupStrategy: clientPricing.markupStrategy || 'FLAT_FEE',
-      markupValue: clientPricing.markupValue || 0,
-      quotedSellingPrice,
-      depositPaid: clientPricing.depositPaid || 0,
-      balanceDue,
-    },
-    actual: {
-      actualFlightCost: actual.actualFlightCost ?? null,
-      actualHotelCost: actual.actualHotelCost ?? null,
-      totalActualCost,
-      finalRealizedProfit,
-    },
+    ...quote,
+    depositAmount,
+    paidAmount,
+    balanceDue,
   };
 }
