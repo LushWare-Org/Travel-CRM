@@ -162,15 +162,6 @@ export const getDayTransports = (day) => {
   if (Array.isArray(day?._relational?.transports) && day._relational.transports.length > 0) {
     return day._relational.transports.map(normalizeTransportRow);
   }
-  if (day?.transport) {
-    return [{
-      routeType: 'DAILY_ROUTING',
-      transportMode: String(day.transport).toUpperCase(),
-      pricingModel: 'PER_VEHICLE',
-      unitCost: 0,
-      distanceKm: null,
-    }];
-  }
   return [];
 };
 

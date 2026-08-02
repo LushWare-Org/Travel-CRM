@@ -33,7 +33,9 @@ export const TRANSPORT_MODE = {
   CAR: 'CAR',
   TRAIN: 'TRAIN',
   BOAT: 'BOAT',
-  VAN: 'VAN',
+  BUS: 'BUS',
+  WALK: 'WALK',
+  OTHER: 'OTHER',
 };
 
 export const PRICING_MODEL = {
@@ -78,7 +80,6 @@ export const createDefaultDay = (dayNumber = 1) => ({
   // ActivitySelector keeps working while costs live alongside it.
   activityCosts: {},
   locations: [],
-  transport: 'car',
   // Each day books its own per-night stay for now (see tech-debt note in the
   // ItineraryEditor accommodation costs subsection).
   accommodation: {
@@ -97,15 +98,7 @@ export const createDefaultDay = (dayNumber = 1) => ({
   },
   images: [],
   notes: '',
-  transports: [{
-    routeType: 'DAILY_ROUTING',
-    transportMode: 'CAR',
-    pricingModel: 'PER_VEHICLE',
-    unitCost: 0,
-    distanceKm: null,
-    originPlaceId: null,
-    destinationPlaceId: null,
-  }],
+  transports: [],
 });
 
 // Default place entry
