@@ -8,10 +8,8 @@ describe('createLeadSchema', () => {
       email: 'john@example.com',
       phone: '+1234567890',
       lifecycleStatus: 'NEW',
-      financials: {
-        estimated: { packageBaseCost: 1000, estimatedFlightCost: 500, estimatedHotelCost: 300 },
-        clientPricing: { markupStrategy: 'PERCENTAGE', markupValue: 10 },
-      },
+      numberOfTravelers: 4,
+      packageId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
     });
     expect(result.success).toBe(true);
   });
@@ -49,53 +47,57 @@ describe('createLeadSchema', () => {
     }
   });
 
-  it('rejects negative packageBaseCost in financials', () => {
+  it('rejects legacy financials and status fields', () => {
     const result = createLeadSchema.safeParse({
-      financials: { estimated: { packageBaseCost: -100 } },
+      status: 'new',
+      financials: { estimated: { packageBaseCost: 100 } },
+      optionalFlights: [],
     });
     expect(result.success).toBe(false);
   });
 
-  it('accepts financials with only estimated fields', () => {
+  it('rejects remarks without text', () => {
     const result = createLeadSchema.safeParse({
-      financials: { estimated: { packageBaseCost: 1000, estimatedFlightCost: 500, estimatedHotelCost: 300 } },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects unknown markupStrategy', () => {
-    const result = createLeadSchema.safeParse({
-      financials: { clientPricing: { markupStrategy: 'INVALID' } },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects negative depositPaid', () => {
-    const result = createLeadSchema.safeParse({
-      financials: { clientPricing: { depositPaid: -50 } },
+      remarks: [{ date: '2026-08-02T10:00:00Z' }],
     });
     expect(result.success).toBe(false);
   });
 });
 
 describe('updateLeadSchema', () => {
-  it('accepts partial update', () => {
-    const result = updateLeadSchema.safeParse({ name: 'Updated Name' });
+  it('accepts lifecycleStatus updates with notes', () => {
+    const result = updateLeadSchema.safeParse({
+      lifecycleStatus: 'DRAFTING',
+      statusChangeNotes: 'Started drafting',
+    });
     expect(result.success).toBe(true);
   });
 
-  it('accepts empty body', () => {
-    const result = updateLeadSchema.safeParse({});
+  it('accepts pricing settings', () => {
+    const result = updateLeadSchema.safeParse({
+      pricing: {
+        currency: 'USD',
+        marginType: 'PERCENTAGE',
+        marginValue: 10,
+        depositType: 'FIXED',
+        depositValue: 250,
+        discountType: 'percentage',
+        discountValue: 5,
+        serviceChargeRate: 2,
+      },
+    });
     expect(result.success).toBe(true);
   });
 
-  it('accepts statusChangeNotes', () => {
-    const result = updateLeadSchema.safeParse({ lifecycleStatus: 'QUOTED', statusChangeNotes: 'Sent proposal' });
-    expect(result.success).toBe(true);
+  it('rejects invalid pricing settings', () => {
+    const result = updateLeadSchema.safeParse({
+      pricing: { marginType: 'BOGUS' },
+    });
+    expect(result.success).toBe(false);
   });
 
-  it('rejects unknown fields', () => {
-    const result = updateLeadSchema.safeParse({ bogusField: 'value' });
+  it('rejects unknown keys (strict)', () => {
+    const result = updateLeadSchema.safeParse({ status: 'new' });
     expect(result.success).toBe(false);
   });
 });

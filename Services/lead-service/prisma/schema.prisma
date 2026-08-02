@@ -185,6 +185,7 @@ model Lead {
   // Cross-schema UUID refs
   packageId          String? // → packages.Package.id
   convertedBookingId String? // → bookings.Booking.id
+  currentItineraryId String? // → packages.Itinerary.id (editor ref)
   packageName        String? // denormalised snapshot for display
   leadDateTime       DateTime @default(now())
   numberOfTravelers  Int?
@@ -221,6 +222,7 @@ model Lead {
   remarks           LeadRemark[]
   statusHistory     LeadStatusHistory[]
   communicationLogs LeadCommunicationLog[]
+  internalEvents    LeadInternalEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -275,6 +277,21 @@ model LeadCommunicationLog {
   type   CommunicationLogType?
   notes  String?
   byId   String? // → users.User.id
+
+  @@index([leadId])
+  @@schema("crm_leads")
+}
+
+// ─── Internal event log (billing → lead webhooks) ─────────────
+
+model LeadInternalEvent {
+  id          String   @id @default(uuid())
+  eventId     String   @unique
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        String
+  payload     Json?
+  processedAt DateTime @default(now())
 
   @@index([leadId])
   @@schema("crm_leads")
@@ -336,6 +353,7 @@ model LeadCostLine {
   source             CostLineSource   @default(AUTO)
   dayNumber          Int?
   flightBookingId    String?
+  optionalFlightId   String? // → leads.LeadOptionalFlight.id (same schema)
   orderIndex         Int              @default(0)
 
   createdAt DateTime @default(now())
