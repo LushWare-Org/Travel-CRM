@@ -245,7 +245,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     }
   }, [lead, salesReps]);
 
-  const loadManualItinerary = async () => {
+  const loadLeadItinerary = async () => {
     if (!lead?._id && !lead?.id) return;
     const leadId = lead._id || lead.id;
 
