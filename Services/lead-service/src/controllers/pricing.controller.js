@@ -3,6 +3,7 @@ import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { computePricing } from '../services/pricing.service.js';
 import { recomputeLeadPricing } from './lead.controller.js';
+import { buildAutoCostLines } from '../services/lead-itinerary.service.js';
 
 /**
  * GET /api/v1/leads/:id/pricing — pricing row, cost lines and flights.
@@ -31,9 +32,16 @@ export const getLeadPricing = asyncHandler(async (req, res) => {
  * POST /api/v1/leads/:id/pricing/calculate — dry-run preview, nothing persisted.
  */
 export const calculatePricing = asyncHandler(async (req, res) => {
-  const { lines = [], travelers = 1, ...settings } = req.body;
-  if (!Array.isArray(lines)) throw new AppError('lines array is required', 400);
-  const computed = computePricing({ lines, travelers, ...settings });
+  const { lines, days, travelers = 1, ...settings } = req.body;
+  const resolvedLines = Array.isArray(lines)
+    ? lines
+    : Array.isArray(days)
+      ? buildAutoCostLines(days)
+      : [];
+  if (!Array.isArray(lines) && !Array.isArray(days)) {
+    throw new AppError('lines or days array is required', 400);
+  }
+  const computed = computePricing({ lines: resolvedLines, travelers, ...settings });
   res.json({ success: true, data: { financials: computed } });
 });
 

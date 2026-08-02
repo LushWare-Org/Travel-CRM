@@ -9,6 +9,7 @@ import {
 import { computePricing, toLineDescriptor } from '../services/pricing.service.js';
 import { copyPackageToLead } from '../services/lead-draft.service.js';
 import { handleLeadEvent } from '../services/lead-events.service.js';
+import { applyLeadItinerary, serializeLeadDays } from '../services/lead-itinerary.service.js';
 
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3006';
 
@@ -293,7 +294,7 @@ export const getLead = asyncHandler(async (req, res) => {
     throw new AppError('Not authorized to access this lead', 403);
   }
 
-  res.json({ success: true, data: lead });
+  res.json({ success: true, data: { ...lead, itineraryDays: serializeLeadDays(lead) } });
 });
 
 export const updateLead = asyncHandler(async (req, res) => {
@@ -714,4 +715,40 @@ export const quoteLead = asyncHandler(async (req, res) => {
     include: { pricing: true },
   });
   res.json({ success: true, data: updated });
+});
+
+/**
+ * PUT /api/v1/leads/:id/itinerary — atomic lead itinerary + pricing edit.
+ * Auto-copies the package and moves NEW/REVISION leads to DRAFTING.
+ */
+export const updateLeadItinerary = asyncHandler(async (req, res) => {
+  const { days, pricing } = req.body;
+  if (!Array.isArray(days)) throw new AppError('days array is required', 400);
+
+  const result = await applyLeadItinerary({
+    leadId: req.params.id,
+    days,
+    pricingSettings: pricing || {},
+    actorId: req.user.id,
+  });
+
+  const lead = await prisma.lead.findUnique({
+    where: { id: req.params.id },
+    include: {
+      pricing: true,
+      costLines: { orderBy: { orderIndex: 'asc' } },
+      itineraryDays: {
+        orderBy: { dayNumber: 'asc' },
+        include: { places: true, activities: true, transports: true },
+      },
+    },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      ...result,
+      lead: { ...lead, itineraryDays: serializeLeadDays(lead) },
+    },
+  });
 });

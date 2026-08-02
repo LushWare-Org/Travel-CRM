@@ -8,6 +8,7 @@ import {
   createWebsiteContactLead,
   handleInternalEvent, draftLead, quoteLead,
   listOptionalFlights, addOptionalFlight, deleteOptionalFlight,
+  updateLeadItinerary,
 } from '../controllers/lead.controller.js';
 import {
   getLeadPricing, calculatePricing, applyPricing,
@@ -38,6 +39,7 @@ router.get('/status/:status', authorize('admin', 'salesRep'), getLeadsByStatus);
 router.route('/:id').get(authorize('admin', 'salesRep'), getLead).put(authorize('admin', 'salesRep'), updateLead).delete(authorize('admin'), deleteLead);
 router.post('/:id/draft', authorize('admin', 'salesRep'), draftLead);
 router.post('/:id/quote', authorize('admin', 'salesRep'), quoteLead);
+router.put('/:id/itinerary', authorize('admin', 'salesRep'), updateLeadItinerary);
 router.route('/:id/remarks').post(authorize('admin', 'salesRep'), addRemark).get(authorize('admin', 'salesRep'), getLeadRemarks);
 router.patch('/:id/assign', authorize('admin'), assignLead);
 router.patch('/:id/unassign', authorize('admin'), unassignLead);
