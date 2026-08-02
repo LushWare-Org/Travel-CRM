@@ -241,6 +241,7 @@ const ItineraryGenerationContainer = () => {
           name: p.place?.name || p.customName || '',
           placeId: p.placeId,
         })),
+        flights: apiDay.flights || [],
         accommodation: null,
         _relational: {
           places: apiDay.places || [],
