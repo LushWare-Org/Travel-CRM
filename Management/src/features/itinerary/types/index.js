@@ -3,6 +3,14 @@
  * Aligned with package-service relational schema.
  */
 
+// Enums are owned by @travel-crm/constants — re-exported here so existing
+// importers keep working with a single source of truth.
+export {
+  TRANSPORT_MODE,
+  PRICING_MODEL,
+  ROUTE_TYPE,
+} from '@travel-crm/constants';
+
 export const PACKAGE_CATEGORY = {
   HONEYMOON: 'HONEYMOON',
   COUPLE: 'COUPLE',
@@ -21,26 +29,6 @@ export const PLACE_TYPE = {
   ATTRACTION: 'ATTRACTION',
   REGION: 'REGION',
   AIRPORT: 'AIRPORT',
-};
-
-export const ROUTE_TYPE = {
-  DAILY_ROUTING: 'DAILY_ROUTING',
-  POINT_TO_POINT: 'POINT_TO_POINT',
-};
-
-export const TRANSPORT_MODE = {
-  FLIGHT: 'FLIGHT',
-  CAR: 'CAR',
-  TRAIN: 'TRAIN',
-  BOAT: 'BOAT',
-  VAN: 'VAN',
-  BUS: 'BUS',
-};
-
-export const PRICING_MODEL = {
-  PER_KM: 'PER_KM',
-  PER_PERSON: 'PER_PERSON',
-  PER_VEHICLE: 'PER_VEHICLE',
 };
 
 // Legacy display-friendly category labels (mapped to enum values)

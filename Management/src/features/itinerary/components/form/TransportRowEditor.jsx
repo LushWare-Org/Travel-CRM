@@ -5,22 +5,12 @@
  */
 
 import { Car, TrendingUp, Trash2 } from 'lucide-react';
-import { applyTransportModeDefault, applyPricingModelChange } from '../../utils/transportDefaults';
-
-const TRANSPORT_MODE_LABELS = {
-  CAR: 'Car',
-  VAN: 'Van',
-  FLIGHT: 'Flight',
-  TRAIN: 'Train',
-  BUS: 'Bus',
-  BOAT: 'Boat',
-};
-
-const PRICING_MODEL_LABELS = {
-  PER_VEHICLE: 'Per vehicle',
-  PER_PERSON: 'Per person',
-  PER_KM: 'Per km',
-};
+import {
+  applyTransportModeDefault,
+  applyPricingModelChange,
+  TRANSPORT_MODE_LABELS,
+  PRICING_MODEL_LABELS,
+} from '@travel-crm/constants';
 
 const fieldClass =
   'w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm ' +

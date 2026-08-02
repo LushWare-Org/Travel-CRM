@@ -7,7 +7,7 @@
  * by ItineraryEditor (add/edit/remove) and by the save payload builder.
  */
 
-import { getDefaultPricingModel } from './transportDefaults.js';
+import { getDefaultPricingModel } from '@travel-crm/constants';
 
 export const isFlightIncomplete = (flight) => {
   if (!flight) return true;
