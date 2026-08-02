@@ -30,6 +30,55 @@ export const PRICING_MODEL = {
   PER_VEHICLE: 'PER_VEHICLE',
 };
 
+export const PRICING_BASIS = {
+  PER_PERSON: 'PER_PERSON',
+  PER_ROOM: 'PER_ROOM',
+  PER_VEHICLE: 'PER_VEHICLE',
+  PER_KM: 'PER_KM',
+  FIXED: 'FIXED',
+};
+
+export const MARGIN_TYPE = {
+  PERCENTAGE: 'PERCENTAGE',
+  FIXED: 'FIXED',
+};
+
+export const COST_LINE_SOURCE = {
+  AUTO: 'AUTO',
+  MANUAL: 'MANUAL',
+};
+
+export const OPTIONAL_FLIGHT_TYPE = {
+  TO_START: 'TO_START',
+  RETURN_HOME: 'RETURN_HOME',
+};
+
+export const ACTOR = {
+  USER: 'USER',
+  SYSTEM: 'SYSTEM',
+};
+
+export const PRICING = {
+  TAX_RATE: 18,
+  DEFAULT_CURRENCY: 'USD',
+};
+
+/**
+ * Cost line categories — must stay aligned with the billing-service
+ * ItemCategory enum (asserted by test). FLIGHT lines use 'transportation'.
+ */
+export const COST_LINE_CATEGORY = {
+  ACCOMMODATION: 'accommodation',
+  TRANSPORTATION: 'transportation',
+  ACTIVITY: 'activity',
+  FOOD: 'food',
+  GUIDE: 'guide',
+  INSURANCE: 'insurance',
+  VISA: 'visa',
+  PACKAGE: 'package',
+  OTHER: 'other',
+};
+
 // ─── Labels ───────────────────────────────────────────────────
 
 export const TRANSPORT_MODE_LABELS = {
@@ -45,6 +94,41 @@ export const PRICING_MODEL_LABELS = {
   PER_VEHICLE: 'Per vehicle',
   PER_PERSON: 'Per person',
   PER_KM: 'Per km',
+};
+
+export const PRICING_BASIS_LABELS = {
+  PER_PERSON: 'Per person',
+  PER_ROOM: 'Per room',
+  PER_VEHICLE: 'Per vehicle',
+  PER_KM: 'Per km',
+  FIXED: 'Fixed',
+};
+
+export const MARGIN_TYPE_LABELS = {
+  PERCENTAGE: 'Percentage',
+  FIXED: 'Fixed amount',
+};
+
+export const COST_LINE_SOURCE_LABELS = {
+  AUTO: 'Auto',
+  MANUAL: 'Manual',
+};
+
+export const OPTIONAL_FLIGHT_TYPE_LABELS = {
+  TO_START: 'To start',
+  RETURN_HOME: 'Return home',
+};
+
+export const COST_LINE_CATEGORY_LABELS = {
+  ACCOMMODATION: 'Accommodation',
+  TRANSPORTATION: 'Transportation',
+  ACTIVITY: 'Activity',
+  FOOD: 'Food',
+  GUIDE: 'Guide',
+  INSURANCE: 'Insurance',
+  VISA: 'Visa',
+  PACKAGE: 'Package',
+  OTHER: 'Other',
 };
 
 // ─── Per-mode pricing defaults ────────────────────────────────
