@@ -14,6 +14,7 @@ import LocationAutocomplete from './LocationAutocomplete';
 import AirportAutocomplete from '../../../components/AirportAutocomplete';
 import CountrySelect from '../../../components/CountrySelect';
 import { FlightSelectionModal } from '../../shared';
+import PricingSection from './PricingSection';
 
 // ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
 
@@ -106,12 +107,12 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [showTransferFlightModal, setShowTransferFlightModal] = useState(false);
   const [transferFlightType, setTransferFlightType] = useState('inbound'); // 'inbound' | 'outbound'
+  const [itineraryDays, setItineraryDays] = useState([]);
   const [expandedSections, setExpandedSections] = useState({
     personal: true,
     travel: true,
     package: true,
     remarks: false,
-    itinerary: false,
     transfers: false,
   });
   const [formData, setFormData] = useState({
@@ -259,7 +260,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         remarks: [{ text: "", date: "" }],
       });
       setItineraryDays([]);
-      setShowManualItinerary(false);
 
       onSuccess?.();
       onClose();
@@ -494,27 +494,20 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                         destination: selectedPackage?.destination || formData.destination
                       });
 
-                      // Load package itinerary into the manual itinerary editor
+                      // Load the blueprint days for the live pricing preview
                       if (packageId && selectedPackage) {
                         try {
                           const response = await packageAPI.getById(packageId);
                           if (response.success || response.status === 'success') {
                             const pkg = response.data?.data || response.data;
-                            let days = [];
-                            if (pkg?.itinerary?.days) {
-                              days = pkg.itinerary.days;
-                            } else if (Array.isArray(pkg?.days)) {
-                              days = pkg.days;
-                            }
-                            if (days.length > 0) {
-                              setItineraryDays(days);
-                              setShowManualItinerary(true);
-                              setExpandedSections(prev => ({ ...prev, itinerary: true }));
-                            }
+                            setItineraryDays(Array.isArray(pkg?.itineraryDays) ? pkg.itineraryDays : []);
                           }
                         } catch (err) {
                           console.error('Error loading package itinerary:', err);
+                          setItineraryDays([]);
                         }
+                      } else {
+                        setItineraryDays([]);
                       }
                     }}
                     disabled={loadingPackages}
@@ -701,6 +694,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
             setShowTransferFlightModal(false);
           }}
         />
+
+        {/* Pricing preview — live price for the selected package */}
+        {formData.package && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing Preview</h3>
+            <PricingSection
+              days={itineraryDays}
+              travelers={formData.numberOfTravelers || 1}
+            />
+          </div>
+        )}
 
         {/* Footer Actions */}
         <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">

@@ -52,7 +52,7 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const res = await leadAPI.calculatePricing(leadId, {
+        const payload = {
           days,
           travelers: Number(travelers) || 1,
           marginType: settings.marginType,
@@ -62,7 +62,10 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
           serviceChargeRate: Number(settings.serviceChargeRate) || 0,
           depositType: settings.depositType,
           depositValue: Number(settings.depositValue) || 0,
-        });
+        };
+        const res = leadId
+          ? await leadAPI.calculatePricing(leadId, payload)
+          : await leadAPI.previewPricing(payload);
         setComputed(res.data?.data?.financials || res.data?.financials);
       } catch (err) {
         // keep the last known preview on transient errors

@@ -285,6 +285,12 @@ export const leadAPI = {
     return api.post(`/leads/${leadId}/pricing/calculate`, payload);
   },
 
+  // Standalone preview for the new-lead dialog (no lead exists yet)
+  previewPricing: async (payload) => {
+    const api = new ApiService();
+    return api.post('/leads/pricing/preview', payload);
+  },
+
   applyPricing: async (leadId, payload) => {
     const api = new ApiService();
     return api.post(`/leads/${leadId}/pricing/apply`, payload);

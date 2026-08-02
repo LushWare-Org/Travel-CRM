@@ -46,6 +46,24 @@ export const calculatePricing = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/v1/leads/pricing/preview — standalone preview for the new-lead
+ * dialog (no lead exists yet). Same engine, nothing persisted.
+ */
+export const previewPricing = asyncHandler(async (req, res) => {
+  const { lines, days, travelers = 1, ...settings } = req.body;
+  const resolvedLines = Array.isArray(lines)
+    ? lines
+    : Array.isArray(days)
+      ? buildAutoCostLines(days)
+      : [];
+  if (!Array.isArray(lines) && !Array.isArray(days)) {
+    throw new AppError('lines or days array is required', 400);
+  }
+  const computed = computePricing({ lines: resolvedLines, travelers, ...settings });
+  res.json({ success: true, data: { financials: computed } });
+});
+
+/**
  * POST /api/v1/leads/:id/pricing/apply — replace lines/settings and persist
  * recomputed totals. MANUAL flags travel with the lines; recompute never
  * touches values the client sent (engine recalculates from them).

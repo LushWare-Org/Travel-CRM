@@ -12,6 +12,7 @@ import {
 } from '../controllers/lead.controller.js';
 import {
   getLeadPricing, calculatePricing, applyPricing,
+  previewPricing,
 } from '../controllers/pricing.controller.js';
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.post('/internal/events', (req, res, next) => {
 
 // Protected
 router.use(requireAuth);
+router.post('/pricing/preview', authorize('admin', 'salesRep'), previewPricing);
 router.route('/').post(authorize('admin', 'salesRep'), createLead).get(authorize('admin', 'salesRep'), getLeads);
 router.get('/search', authorize('admin', 'salesRep'), searchLeads);
 router.get('/my-leads', authorize('salesRep'), getMyLeads);
