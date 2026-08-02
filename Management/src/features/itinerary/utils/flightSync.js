@@ -7,6 +7,8 @@
  * by ItineraryEditor (add/edit/remove) and by the save payload builder.
  */
 
+import { getDefaultPricingModel } from './transportDefaults.js';
+
 export const isFlightIncomplete = (flight) => {
   if (!flight) return true;
   return !flight.origin || !flight.destination;
@@ -69,7 +71,7 @@ const syncRowForFlight = (transports, flight) => {
   return [...transports, {
     routeType: 'DAILY_ROUTING',
     transportMode: 'FLIGHT',
-    pricingModel: 'PER_VEHICLE',
+    pricingModel: getDefaultPricingModel('FLIGHT'),
     unitCost: price ?? 0,
     distanceKm: null,
     flightRef: flight.id,
@@ -155,7 +157,7 @@ export const reconcileFlightsForSave = ({ flights = [], transports = [] }) => {
     return {
       routeType: 'DAILY_ROUTING',
       transportMode: 'FLIGHT',
-      pricingModel: 'PER_VEHICLE',
+      pricingModel: linkedRow?.pricingModel || getDefaultPricingModel('FLIGHT'),
       unitCost: price != null ? price : (linkedRow ? (Number(linkedRow.unitCost) || 0) : 0),
       distanceKm: null,
     };
