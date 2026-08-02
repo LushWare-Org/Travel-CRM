@@ -217,6 +217,7 @@ const ItineraryEditor = ({
   const [flightModalTarget, setFlightModalTarget] = useState(null);
   const [showHotelModal, setShowHotelModal] = useState(false);
   const [hotelModalMode, setHotelModalMode] = useState('suggest');
+  const [highlightedFlightSection, setHighlightedFlightSection] = useState(null);
   // Cost subsections are collapsed by default — summary chips show totals.
   const [expandedCosts, setExpandedCosts] = useState({});
 
@@ -331,6 +332,19 @@ const ItineraryEditor = ({
     });
   };
 
+  /**
+   * A FLIGHT transport row exists without a linked flight — take the user to
+   * the Flight Booking section so both stay in sync.
+   */
+  const handleJumpToFlightSection = (day) => {
+    const section = document.getElementById(`day-${day.dayNumber}-flight-section`);
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setHighlightedFlightSection(day.dayNumber);
+    setTimeout(() => setHighlightedFlightSection(null), 1200);
+    const addButton = document.getElementById(`day-${day.dayNumber}-add-flight`);
+    setTimeout(() => addButton?.focus({ preventScroll: true }), 450);
+  };
+
   const renderCostsSection = (day) => {
     const mealCounts = getMealCounts(day);
     const activityRows = getDayActivities(day);
@@ -346,6 +360,9 @@ const ItineraryEditor = ({
     const flightTotal = transportRows
       .filter((row) => row.transportMode === 'FLIGHT')
       .reduce((sum, row) => sum + getTransportRowCost(row, 1), 0);
+    const unlinkedFlightRows = transportRows.filter(
+      (row) => row.transportMode === 'FLIGHT' && !row.flightRef
+    );
 
     const chip = (label, value) => {
       const hasValue = Number(value) > 0;
@@ -511,6 +528,23 @@ const ItineraryEditor = ({
                   Total = <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
                 </p>
               </div>
+              {unlinkedFlightRows.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                  <Plane className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="flex-1 min-w-[160px]">
+                    {unlinkedFlightRows.length === 1
+                      ? 'A flight cost was added — add the flight details so pricing stays in sync.'
+                      : `${unlinkedFlightRows.length} flight costs were added — add the flight details so pricing stays in sync.`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleJumpToFlightSection(day)}
+                    className="px-3 py-1.5 font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+                  >
+                    Add flight details
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* ── Accommodation ────────────────────────────────── */}
@@ -806,13 +840,21 @@ const ItineraryEditor = ({
               </FieldGroup>
 
               {/* Flight Booking — standalone section */}
-              <div className="bg-white rounded-xl border border-sky-200 overflow-hidden">
+              <div
+                id={`day-${day.dayNumber}-flight-section`}
+                className={`bg-white rounded-xl border overflow-hidden transition-shadow ${
+                  highlightedFlightSection === day.dayNumber
+                    ? 'border-sky-400 ring-4 ring-sky-200'
+                    : 'border-sky-200'
+                }`}
+              >
                 <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-sky-50 to-white">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <Plane className="w-4 h-4 text-sky-600" />
                     Flight Booking
                   </div>
                   <button
+                    id={`day-${day.dayNumber}-add-flight`}
                     type="button"
                     onClick={() => handleAddFlight(day)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors"

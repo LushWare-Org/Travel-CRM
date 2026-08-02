@@ -156,13 +156,34 @@ export const getDayActivities = (day) => {
  * from the API). Each row keeps the pricingModel/unitCost/distanceKm fields.
  */
 export const getDayTransports = (day) => {
-  if (Array.isArray(day?.transports) && day.transports.length > 0) {
-    return day.transports.map(normalizeTransportRow);
+  let rows;
+  const hasEditorRows = Array.isArray(day?.transports);
+  if (hasEditorRows && day.transports.length > 0) {
+    rows = day.transports.map(normalizeTransportRow);
+  } else if (Array.isArray(day?._relational?.transports) && day._relational.transports.length > 0) {
+    rows = day._relational.transports.map(normalizeTransportRow);
+  } else {
+    rows = [];
   }
-  if (Array.isArray(day?._relational?.transports) && day._relational.transports.length > 0) {
-    return day._relational.transports.map(normalizeTransportRow);
+
+  // Freshly loaded days have no editor flightRefs on their rows — re-link
+  // FLIGHT rows to the persisted flights (by order) so rows and flights
+  // reconnect. Editor-written rows keep their own flightRefs, so orphan
+  // FLIGHT rows (added manually in Costs & Pricing) stay unlinked.
+  if (!hasEditorRows) {
+    const flights = Array.isArray(day?.flights) ? day.flights : [];
+    if (flights.length > 0) {
+      let flightIndex = 0;
+      rows = rows.map((row) => {
+        if (row.transportMode === 'FLIGHT' && !row.flightRef && flights[flightIndex]) {
+          return { ...row, flightRef: flights[flightIndex++].id };
+        }
+        return row;
+      });
+    }
   }
-  return [];
+
+  return rows;
 };
 
 function normalizeTransportRow(t) {

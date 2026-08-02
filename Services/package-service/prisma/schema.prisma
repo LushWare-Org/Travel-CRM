@@ -68,6 +68,7 @@ enum TransportMode {
   TRAIN
   BOAT
   VAN
+  BUS
 
   @@schema("crm_packages")
 }
@@ -171,6 +172,7 @@ model ItineraryDay {
   lunchCount        Int      @default(0) @map("lunch_count")
   dinnerCount       Int      @default(0) @map("dinner_count")
   mealPriceOverride Decimal? @map("meal_price_override") @db.Decimal(10, 2)
+  flights           Json     @default("[]") // editor flight preferences per day
 
   places            PackageDayPlace[]
   activities        PackageDayActivity[]
