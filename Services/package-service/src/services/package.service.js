@@ -32,6 +32,7 @@ export function serializePackage(pkg) {
     lunchCount: day.lunchCount,
     dinnerCount: day.dinnerCount,
     mealPriceOverride: day.mealPriceOverride ? Number(day.mealPriceOverride) : null,
+    accommodation: day.accommodation || {},
     places: (day.places || []).map((dp) => ({
       id: dp.id,
       placeId: dp.placeId,

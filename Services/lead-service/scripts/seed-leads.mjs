@@ -9,10 +9,12 @@
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { PrismaClient as PackagePrismaClient } from '../../package-service/node_modules/@prisma/client/index.js';
 import { buildDraftData } from '../src/services/lead-draft.service.js';
 import { computePricing } from '../src/services/pricing.service.js';
 
 const prisma = new PrismaClient();
+const packagePrisma = new PackagePrismaClient();
 
 // A minimal package blueprint (package-service shape) used to seed drafts.
 const BLUEPRINT = {
@@ -46,6 +48,79 @@ const BLUEPRINT = {
     },
   ],
 };
+
+/**
+ * Resolve a real package blueprint from the database (prefer 'Sri Lanka
+ * Explorer', else any package). Creates a minimal package when the table is
+ * empty so the seeded leads always reference a real package.
+ */
+async function ensureBlueprint() {
+  const existing = await packagePrisma.package.findFirst({
+    include: {
+      itineraryDays: {
+        orderBy: { dayNumber: 'asc' },
+        include: { places: true, activities: true, transports: true },
+      },
+    },
+  });
+
+  if (existing) {
+    return {
+      id: existing.id,
+      title: existing.title,
+      currency: existing.currency,
+      defaultMarginType: existing.defaultMarginType,
+      defaultMarginInput: Number(existing.defaultMarginInput),
+      itineraryDays: (existing.itineraryDays || []).map((day) => ({
+        dayNumber: day.dayNumber,
+        title: day.title,
+        breakfastCount: day.breakfastCount,
+        lunchCount: day.lunchCount,
+        dinnerCount: day.dinnerCount,
+        mealPriceOverride: day.mealPriceOverride != null ? Number(day.mealPriceOverride) : null,
+        accommodation: day.accommodation || {},
+        flights: day.flights || [],
+        places: (day.places || []).map((p) => ({ placeId: p.placeId, customName: p.customName, orderIndex: p.orderIndex })),
+        activities: (day.activities || []).map((a) => ({
+          activityId: a.activityId,
+          name: a.name,
+          defaultCost: a.defaultCost != null ? Number(a.defaultCost) : null,
+          costOverride: a.costOverride != null ? Number(a.costOverride) : null,
+        })),
+        transports: (day.transports || []).map((t) => ({
+          routeType: t.routeType,
+          transportMode: t.transportMode,
+          pricingModel: t.pricingModel,
+          unitCost: Number(t.unitCost),
+          distanceKm: t.distanceKm != null ? Number(t.distanceKm) : null,
+        })),
+      })),
+    };
+  }
+
+  const created = await packagePrisma.package.create({
+    data: {
+      title: BLUEPRINT.title,
+      currency: BLUEPRINT.currency,
+      defaultMarginType: BLUEPRINT.defaultMarginType,
+      defaultMarginInput: BLUEPRINT.defaultMarginInput,
+      itineraryDays: {
+        create: BLUEPRINT.itineraryDays.map((day, idx) => ({
+          dayNumber: day.dayNumber ?? idx + 1,
+          title: day.title,
+          breakfastCount: day.breakfastCount,
+          lunchCount: day.lunchCount,
+          dinnerCount: day.dinnerCount,
+          accommodation: day.accommodation,
+          places: { create: (day.places || []).map((p, i) => ({ placeId: p.placeId, customName: p.customName, orderIndex: p.orderIndex ?? i })) },
+          activities: { create: (day.activities || []).map((a, i) => ({ activityId: a.activityId, name: a.name, defaultCost: a.defaultCost, costOverride: a.costOverride, orderIndex: a.orderIndex ?? i })) },
+          transports: { create: (day.transports || []).map((t) => ({ routeType: t.routeType, transportMode: t.transportMode, pricingModel: t.pricingModel, unitCost: t.unitCost, distanceKm: t.distanceKm })) },
+        })),
+      },
+    },
+  });
+  return { ...BLUEPRINT, id: created.id };
+}
 
 const SEED_LEADS = [
   {
@@ -137,7 +212,7 @@ async function createPricing(leadId, travelers, settings) {
   });
 }
 
-async function seedLead(leadSeed) {
+async function seedLead(leadSeed, blueprint) {
   const existing = await prisma.lead.findFirst({ where: { email: leadSeed.email } });
   if (existing) {
     console.log(`SKIP ${leadSeed.email} (already exists)`);
@@ -152,7 +227,7 @@ async function seedLead(leadSeed) {
       destination: leadSeed.destination,
       numberOfTravelers: leadSeed.numberOfTravelers,
       packageId: leadSeed.packageId,
-      packageName: BLUEPRINT.title,
+      packageName: blueprint.title,
       lifecycleStatus: leadSeed.lifecycleStatus,
       tags: leadSeed.tags || [],
       statusHistory: {
@@ -162,7 +237,7 @@ async function seedLead(leadSeed) {
   });
 
   if (leadSeed.withCopy) {
-    const { days, costLines, pricing } = buildDraftData(BLUEPRINT);
+    const { days, costLines, pricing } = buildDraftData(blueprint);
     await prisma.lead.update({
       where: { id: lead.id },
       data: {
@@ -198,9 +273,9 @@ async function seedLead(leadSeed) {
     }
 
     await createPricing(lead.id, leadSeed.numberOfTravelers, {
-      currency: BLUEPRINT.currency,
-      marginType: BLUEPRINT.defaultMarginType,
-      marginValue: BLUEPRINT.defaultMarginInput,
+      currency: blueprint.currency,
+      marginType: blueprint.defaultMarginType,
+      marginValue: blueprint.defaultMarginInput,
       depositType: 'PERCENTAGE',
       depositValue: 30,
       paid: leadSeed.paid,
@@ -211,8 +286,10 @@ async function seedLead(leadSeed) {
 }
 
 async function main() {
+  const blueprint = await ensureBlueprint();
+  console.log(`Using package blueprint: ${blueprint.title} (${blueprint.id})`);
   for (const seed of SEED_LEADS) {
-    await seedLead(seed);
+    await seedLead({ ...seed, packageId: blueprint.id }, blueprint);
   }
   console.log('Done.');
 }
@@ -222,4 +299,7 @@ main()
     console.error(err);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await packagePrisma.$disconnect();
+  });
