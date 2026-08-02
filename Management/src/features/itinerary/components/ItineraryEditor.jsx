@@ -28,6 +28,7 @@ import {
   getMealCounts,
   getDayActivities,
   getDayTransports,
+  getTransportRowCost,
   getAccommodationTotal,
 } from '../utils/helpers';
 import { formatCurrency } from '../../../utils/currency.js';
@@ -212,19 +213,15 @@ const ItineraryEditor = ({
     return init;
   });
   const [showFlightModal, setShowFlightModal] = useState(false);
-  const [currentDayForFlight, setCurrentDayForFlight] = useState(null);
+  // { dayNumber, index } — index null means "add a new flight".
+  const [flightModalTarget, setFlightModalTarget] = useState(null);
   const [showHotelModal, setShowHotelModal] = useState(false);
   const [hotelModalMode, setHotelModalMode] = useState('suggest');
   // Cost subsections are collapsed by default — summary chips show totals.
   const [expandedCosts, setExpandedCosts] = useState({});
-  const [expandedFlights, setExpandedFlights] = useState({});
 
   const toggleCostsExpand = (dayNumber) => {
     setExpandedCosts(prev => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
-  };
-
-  const toggleFlightExpand = (dayNumber) => {
-    setExpandedFlights(prev => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
   };
 
   const handleMealToggle = (day, mealKey, checked) => {
@@ -284,23 +281,26 @@ const ItineraryEditor = ({
     });
   };
 
-  const handleFlightFieldChange = (day, field, value) => {
-    onDayChange(day.dayNumber, {
-      flight: { ...(day.flight || {}), [field]: value },
-    });
+  const handleAddFlight = (day) => {
+    setFlightModalTarget({ dayNumber: day.dayNumber, index: null });
+    setShowFlightModal(true);
+  };
+
+  const handleEditFlight = (day, index) => {
+    setFlightModalTarget({ dayNumber: day.dayNumber, index });
+    setShowFlightModal(true);
   };
 
   /**
-   * Add (or update the cost of) a FLIGHT transport row from the booked
-   * flight's price. Called when a flight is (re)selected — manual edits to
-   * the row in Costs & Pricing win until the flight is edited again.
+   * Add (or update the cost of) the FLIGHT transport row that belongs to the
+   * given flight (matched by flightRef). Called when a flight is added or
+   * edited — manual edits to the row in Costs & Pricing win until the flight
+   * is edited again.
    */
-  const syncFlightTransport = (day) => {
-    const price = getFlightPrice(day.flight);
-    if (price == null || price <= 0) return;
-
+  const syncFlightTransport = (day, flight) => {
+    const price = getFlightPrice(flight) ?? 0;
     const rows = getDayTransports(day);
-    const flightIndex = rows.findIndex((row) => row.transportMode === 'FLIGHT');
+    const flightIndex = rows.findIndex((row) => row.flightRef && row.flightRef === flight.id);
     if (flightIndex >= 0) {
       onDayChange(day.dayNumber, {
         transports: rows.map((row, i) => (i === flightIndex ? { ...row, unitCost: price } : row)),
@@ -313,34 +313,22 @@ const ItineraryEditor = ({
           pricingModel: 'PER_VEHICLE',
           unitCost: price,
           distanceKm: null,
+          flightRef: flight.id,
         }],
       });
     }
   };
 
-  const handleRemoveFlight = (day) => {
-    // Keep any FLIGHT transport row — the cost stays editable in Costs & Pricing.
-    onDayChange(day.dayNumber, { flight: null });
-  };
-
-  const renderFlightLocationField = (day, field) => {
-    const value = day.flight?.[field] || '';
-    if (useLocationAutocomplete && LocationAutocompleteComponent) {
-      return (
-        <LocationAutocompleteComponent
-          value={value}
-          onChange={(next) => handleFlightFieldChange(day, field, next)}
-          destination={destination}
-        />
-      );
-    }
-    return (
-      <LocationSelector
-        locations={value ? [value] : []}
-        onChange={(locations) => handleFlightFieldChange(day, field, locations[0] || '')}
-        destination={destination}
-      />
-    );
+  const handleRemoveFlight = (day, index) => {
+    const flights = Array.isArray(day.flights) ? day.flights : [];
+    const removed = flights[index];
+    const rows = getDayTransports(day);
+    onDayChange(day.dayNumber, {
+      flights: flights.filter((_, i) => i !== index),
+      transports: removed
+        ? rows.filter((row) => !(row.flightRef && row.flightRef === removed.id))
+        : rows,
+    });
   };
 
   const renderCostsSection = (day) => {
@@ -355,6 +343,9 @@ const ItineraryEditor = ({
     }).total;
     const activityTotal = calculateActivityCosts(activityRows, { groupSize: 1 }).total;
     const transportTotal = calculateTransportCosts(transportRows, { groupSize: 1 }).total;
+    const flightTotal = transportRows
+      .filter((row) => row.transportMode === 'FLIGHT')
+      .reduce((sum, row) => sum + getTransportRowCost(row, 1), 0);
 
     const chip = (label, value) => {
       const hasValue = Number(value) > 0;
@@ -394,7 +385,7 @@ const ItineraryEditor = ({
               {chip('Meals', mealTotal)}
               {chip('Activities', activityTotal)}
               {chip('Transport', transportTotal)}
-              {chip('Flight', getFlightPrice(day.flight) || 0)}
+              {chip('Flight', flightTotal)}
               {chip('Hotel', accommodationTotal)}
             </div>
             <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
@@ -664,28 +655,6 @@ const ItineraryEditor = ({
     .map(d => `${d.dayNumber}-${Array.isArray(d.locations) ? d.locations.join(',') : ''}`)
     .join('|'), destination, packageType, category]);
 
-  // Auto-add a FLIGHT transport row when a booked flight carries a price.
-  // Only adds missing rows — existing rows keep manual cost overrides.
-  useEffect(() => {
-    days.forEach((day) => {
-      if (!day || !day.flight?.origin) return;
-      const price = getFlightPrice(day.flight);
-      if (price == null || price <= 0) return;
-      const rows = getDayTransports(day);
-      if (rows.some((row) => row.transportMode === 'FLIGHT')) return;
-      onDayChange(day.dayNumber, {
-        transports: [...rows, {
-          routeType: 'DAILY_ROUTING',
-          transportMode: 'FLIGHT',
-          pricingModel: 'PER_VEHICLE',
-          unitCost: price,
-          distanceKm: null,
-        }],
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days]);
-
   // Field Group Component
   const FieldGroup = ({ label, icon: Icon, children, className = '' }) => (
     <div className={`bg-white rounded-xl border border-slate-200 p-4 ${className}`}>
@@ -841,55 +810,41 @@ const ItineraryEditor = ({
 
               {/* Flight Booking — standalone section */}
               <div className="bg-white rounded-xl border border-sky-200 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleFlightExpand(day.dayNumber)}
-                  className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-sky-50 to-white hover:from-sky-100/70 transition-colors"
-                >
+                <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-sky-50 to-white">
                   <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <Plane className="w-4 h-4 text-sky-600" />
                     Flight Booking
-                    <span className="text-xs font-normal text-slate-400">
-                      ({expandedFlights[day.dayNumber] ? 'editing' : 'collapsed'})
-                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-600">
-                      {day.flight?.origin
-                        ? `${day.flight.origin} → ${day.flight.destination}`
-                        : 'No flight selected'}
-                    </span>
-                    <div className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center shrink-0">
-                      {expandedFlights[day.dayNumber]
-                        ? <ChevronUp className="w-4 h-4 text-sky-600" />
-                        : <ChevronDown className="w-4 h-4 text-sky-600" />}
-                    </div>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddFlight(day)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Flight
+                  </button>
+                </div>
 
-                {expandedFlights[day.dayNumber] && (
-                  <div className="px-4 pb-4 pt-3 border-t border-sky-100">
-                    {day.flight?.origin ? (
-                      /* ── Booked flight details ────────────────── */
-                      <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                <div className="px-4 pb-4 pt-3 border-t border-sky-100 space-y-2">
+                  {(Array.isArray(day.flights) ? day.flights : []).length === 0 ? (
+                    <p className="text-xs text-slate-400">No flight selected</p>
+                  ) : (
+                    (day.flights || []).map((flight, index) => (
+                      <div key={flight.id || index} className="bg-blue-50 rounded-xl border border-blue-200 p-4">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                           <span className="text-sm font-medium text-blue-800">
-                            {day.flight.origin} → {day.flight.destination}
+                            {flight.origin ? `${flight.origin} → ${flight.destination}` : 'No flight selected'}
                           </span>
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => {
-                                setCurrentDayForFlight(day.dayNumber);
-                                setShowFlightModal(true);
-                              }}
+                              onClick={() => handleEditFlight(day, index)}
                               className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
                             >
                               Edit Flight
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleRemoveFlight(day)}
+                              onClick={() => handleRemoveFlight(day, index)}
                               className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 transition-colors"
                             >
                               Remove Flight
@@ -897,48 +852,22 @@ const ItineraryEditor = ({
                           </div>
                         </div>
                         <div className="mt-2 text-xs text-blue-700 space-y-0.5">
-                          <p>Airline: {day.flight.airlinePreference || 'Any'} | Cabin: {day.flight.cabinClass || 'Economy'}</p>
-                          {day.flight.departureTime && <p>Preferred: {day.flight.departureTime}</p>}
-                          {getFlightPrice(day.flight) != null && (
-                            <p>
-                              Price: {formatCurrency(getFlightPrice(day.flight))} (auto-added to transport)
-                            </p>
+                          <p>Airline: {flight.airlinePreference || 'Any'} | Cabin: {flight.cabinClass || 'Economy'}</p>
+                          {flight.departureTime && <p>Preferred: {flight.departureTime}</p>}
+                          {getFlightPrice(flight) != null && (
+                            <p>Price: {formatCurrency(getFlightPrice(flight))} (auto-added to transport)</p>
                           )}
-                          {day.flight.flightNumber && (
+                          {flight.flightNumber && (
                             <>
-                              <p className="mt-1 font-medium text-green-700">Booked: {day.flight.flightNumber} ({day.flight.carrierName})</p>
-                              <p>PNR: {day.flight.bookingReference} | Status: {day.flight.status}</p>
+                              <p className="mt-1 font-medium text-green-700">Booked: {flight.flightNumber} ({flight.carrierName})</p>
+                              <p>PNR: {flight.bookingReference} | Status: {flight.status}</p>
                             </>
                           )}
                         </div>
                       </div>
-                    ) : (
-                      /* ── No flight — origin/destination search ── */
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs text-slate-500 mb-1">Origin</label>
-                            {renderFlightLocationField(day, 'origin')}
-                          </div>
-                          <div>
-                            <label className="block text-xs text-slate-500 mb-1">Destination</label>
-                            {renderFlightLocationField(day, 'destination')}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrentDayForFlight(day.dayNumber);
-                            setShowFlightModal(true);
-                          }}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white text-sm rounded-xl hover:from-sky-600 hover:to-blue-700 transition-all shadow-lg shadow-sky-500/25"
-                        >
-                          <Search className="w-4 h-4" /> Search Flights
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Row 4: Accommodation */}
@@ -1095,6 +1024,7 @@ const ItineraryEditor = ({
                   )}
                 </div>
               )}
+
             </div>
           )}
         </div>
@@ -1112,20 +1042,33 @@ const ItineraryEditor = ({
       {/* Flight Selection Modal — template mode */}
       <FlightSelectionModal
         isOpen={showFlightModal}
-        onClose={() => { setShowFlightModal(false); setCurrentDayForFlight(null); }}
+        onClose={() => { setShowFlightModal(false); setFlightModalTarget(null); }}
         mode="template"
-        initialData={currentDayForFlight ? (days.find(d => d && d.dayNumber === currentDayForFlight)?.flight || {}) : {}}
+        initialData={flightModalTarget
+          ? (days.find(d => d && d.dayNumber === flightModalTarget.dayNumber)?.flights || [])[flightModalTarget.index] || {}
+          : {}}
         onSelectTemplate={(flightData) => {
-          if (currentDayForFlight) {
-            const day = days.find(d => d && d.dayNumber === currentDayForFlight);
-            const mergedFlight = { ...(day?.flight || {}), ...flightData };
-            onDayChange(currentDayForFlight, { flight: mergedFlight });
-            if (mergedFlight.origin && mergedFlight.destination) {
-              syncFlightTransport({ ...day, flight: mergedFlight });
-            }
+          if (flightModalTarget) {
+            const day = days.find(d => d && d.dayNumber === flightModalTarget.dayNumber);
+            const flights = Array.isArray(day?.flights) ? day.flights : [];
+            const existing = flightModalTarget.index != null ? flights[flightModalTarget.index] : null;
+            const flightId = existing?.id
+              || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                ? crypto.randomUUID()
+                : `flight-${Date.now()}`);
+            const flight = {
+              ...flightData,
+              id: flightId,
+              totalAmount: flightData.totalAmount ?? flightData.fareTotal ?? 0,
+            };
+            const nextFlights = existing
+              ? flights.map((f, i) => (i === flightModalTarget.index ? flight : f))
+              : [...flights, flight];
+            onDayChange(flightModalTarget.dayNumber, { flights: nextFlights });
+            syncFlightTransport({ ...day, flights: nextFlights }, flight);
           }
           setShowFlightModal(false);
-          setCurrentDayForFlight(null);
+          setFlightModalTarget(null);
         }}
       />
 
