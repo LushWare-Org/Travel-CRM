@@ -267,6 +267,12 @@ export const leadAPI = {
     return api.post(`/leads/${id}/quote`);
   },
 
+  // Atomic itinerary + pricing edit (auto-drafts NEW/REVISION leads)
+  updateLeadItinerary: async (id, payload) => {
+    const api = new ApiService();
+    return api.put(`/leads/${id}/itinerary`, payload);
+  },
+
   // Get pricing row, cost lines and optional flights
   getPricing: async (id) => {
     const api = new ApiService();

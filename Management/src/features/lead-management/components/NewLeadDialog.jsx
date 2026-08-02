@@ -8,13 +8,11 @@ import {
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { leadAPI, packageAPI, manualItineraryAPI } from '../../../services/api';
+import { leadAPI, packageAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import LocationAutocomplete from './LocationAutocomplete';
 import AirportAutocomplete from '../../../components/AirportAutocomplete';
 import CountrySelect from '../../../components/CountrySelect';
-import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
-import { createDefaultDay } from '../../itinerary/types/index.js';
 import { FlightSelectionModal } from '../../shared';
 
 // ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
@@ -106,8 +104,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
-  const [showManualItinerary, setShowManualItinerary] = useState(false);
-  const [itineraryDays, setItineraryDays] = useState([]);
   const [showTransferFlightModal, setShowTransferFlightModal] = useState(false);
   const [transferFlightType, setTransferFlightType] = useState('inbound'); // 'inbound' | 'outbound'
   const [expandedSections, setExpandedSections] = useState({
@@ -240,15 +236,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
       const response = await leadAPI.createLead(leadData);
       const leadId = response.data?._id || response.data?.id;
-
-      if (showManualItinerary && itineraryDays.length > 0) {
-        try {
-          await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
-        } catch (itineraryError) {
-          console.error('Error saving manual itinerary:', itineraryError);
-          toast.error('Lead created but itinerary save failed');
-        }
-      }
 
       toast.success('Lead created successfully');
 
@@ -627,70 +614,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
             )}
           </div>
 
-          {/* Manual Itinerary Section */}
-          <div className="space-y-4">
-            <SectionHeader
-              expanded={expandedSections.itinerary}
-              onToggle={toggleSection}
-              icon={Calendar}
-              title="Manual Itinerary"
-              subtitle="Optional: Create a custom itinerary"
-              section="itinerary"
-              gradient="from-indigo-500 to-violet-600"
-            />
-
-            {expandedSections.itinerary && (
-              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-sm text-gray-600">
-                    Create a custom day-by-day itinerary for this lead
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowManualItinerary(!showManualItinerary);
-                      if (!showManualItinerary && itineraryDays.length === 0) {
-                        setItineraryDays([createDefaultDay(1)]);
-                      }
-                    }}
-                    className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl hover:from-indigo-600 hover:to-violet-700 transition-all font-medium flex items-center gap-2 shadow-lg shadow-indigo-500/25"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    {showManualItinerary ? 'Hide Editor' : 'Open Editor'}
-                  </button>
-                </div>
-
-                {showManualItinerary && (
-                  <div className="mt-4 p-4 bg-white rounded-xl border border-indigo-200">
-                    <ItineraryEditor
-                      days={itineraryDays}
-                      onDayChange={(dayNumber, dayData) => {
-                        setItineraryDays(prev =>
-                          prev.map(day =>
-                            day.dayNumber === dayNumber ? { ...day, ...dayData } : day
-                          )
-                        );
-                      }}
-                      onAddDay={() => {
-                        const newDayNumber = itineraryDays.length + 1;
-                        setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
-                      }}
-                      onRemoveDay={(dayNumber) => {
-                        const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                        const renumberedDays = filteredDays.map((day, index) => ({
-                          ...day,
-                          dayNumber: index + 1,
-                        }));
-                        setItineraryDays(renumberedDays);
-                      }}
-                      destination={formData.destination}
-                      hideTitleAndDescription={true}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
           {/* Transfer Flights Section */}
           <div className="space-y-4">
             <SectionHeader

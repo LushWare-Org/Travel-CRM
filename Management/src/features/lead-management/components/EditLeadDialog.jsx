@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
-import { leadAPI, packageAPI, manualItineraryAPI, customizedPackageAPI } from '../../../services/api';
+import { leadAPI, packageAPI, customizedPackageAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePermission } from '../../../contexts/PermissionContext';
 import { PackageFormModal, NewEditPackageForm } from '../../../features/itinerary/components';
@@ -20,7 +20,6 @@ import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import DestinationSelector from '../../itinerary/components/DestinationSelector';
 import { createDefaultDay } from '../../itinerary/types/index.js';
 import LeadFlightBookingsSection from './LeadFlightBookingsSection';
-import LeadHotelBookingsSection from './LeadHotelBookingsSection';
 import LeadStatusBadge from './LeadStatusBadge';
 import PricingSection from './PricingSection';
 
@@ -91,9 +90,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const [editPackageData, setEditPackageData] = useState(null);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const { images, setImages, removeImage } = useImageUpload();
-  const [showManualItinerary, setShowManualItinerary] = useState(false);
+  const [showItineraryEditor, setShowItineraryEditor] = useState(false);
   const [itineraryDays, setItineraryDays] = useState([]);
-  const [loadingItinerary, setLoadingItinerary] = useState(false);
+  const [itineraryDirty, setItineraryDirty] = useState(false);
+  const [pricingSettings, setPricingSettings] = useState({});
   const [remarks, setRemarks] = useState([]);
   const [editingRemarkIndex, setEditingRemarkIndex] = useState(null);
   const [editRemarkText, setEditRemarkText] = useState('');
@@ -104,7 +104,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     travel: true,
     package: true,
     remarks: false,
-    itinerary: false,
   });
   const [formData, setFormData] = useState({
     name: "",
@@ -242,34 +241,45 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       });
 
       setRemarks(lead.remarks || []);
-      loadManualItinerary();
+      loadLeadItinerary();
     }
   }, [lead, salesReps]);
 
   const loadManualItinerary = async () => {
     if (!lead?._id && !lead?.id) return;
+    const leadId = lead._id || lead.id;
 
     try {
-      setLoadingItinerary(true);
-      const leadId = lead._id || lead.id;
-      const response = await manualItineraryAPI.getByLead(leadId);
+      const fresh = await leadAPI.getLead(leadId);
+      const freshLead = fresh?.data?.data || fresh?.data || fresh;
+      setPricingSettings({
+        marginType: freshLead?.pricing?.marginType || null,
+        marginValue: freshLead?.pricing?.marginValue ?? 0,
+        depositType: freshLead?.pricing?.depositType || 'PERCENTAGE',
+        depositValue: freshLead?.pricing?.depositValue ?? 30,
+        discountType: freshLead?.pricing?.discountType || 'none',
+        discountValue: freshLead?.pricing?.discountValue ?? 0,
+        serviceChargeRate: freshLead?.pricing?.serviceChargeRate ?? 0,
+      });
 
-      if (response.success && response.data) {
-        setItineraryDays(response.data.days || []);
-        setShowManualItinerary(response.data.days && response.data.days.length > 0);
-        if (response.data.days && response.data.days.length > 0) {
-          setExpandedSections(prev => ({ ...prev, itinerary: true }));
-        }
+      // Drafted lead: use the persisted serialized days from the lead API.
+      if (Array.isArray(freshLead?.itineraryDays) && freshLead.itineraryDays.length > 0) {
+        setItineraryDays(freshLead.itineraryDays);
+        return;
+      }
+
+      // NEW lead: prefill the editor with the selected package's blueprint.
+      const packageId = freshLead?.packageId || freshLead?.package?._id || freshLead?.package;
+      if (packageId && freshLead?.lifecycleStatus === 'NEW') {
+        const response = await packageAPI.getById(packageId);
+        const pkg = response.data?.data || response.data;
+        setItineraryDays(pkg?.itineraryDays || []);
       } else {
         setItineraryDays([]);
-        setShowManualItinerary(false);
       }
     } catch (error) {
-      console.error('Error loading manual itinerary:', error);
+      console.error('Error loading lead itinerary:', error);
       setItineraryDays([]);
-      setShowManualItinerary(false);
-    } finally {
-      setLoadingItinerary(false);
     }
   };
 
@@ -309,21 +319,15 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       }
       await leadAPI.updateLead(leadId, updateData);
 
-      if (showManualItinerary && itineraryDays.length > 0) {
+      if (itineraryDirty) {
         try {
-          await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
+          await leadAPI.updateLeadItinerary(leadId, {
+            days: itineraryDays,
+            pricing: pricingSettings,
+          });
         } catch (itineraryError) {
-          console.error('Error saving manual itinerary:', itineraryError);
+          console.error('Error saving itinerary:', itineraryError);
           toast.error('Lead updated but itinerary save failed');
-        }
-      } else if (showManualItinerary && itineraryDays.length === 0) {
-        try {
-          const itineraryResponse = await manualItineraryAPI.getByLead(leadId);
-          if (itineraryResponse.success && itineraryResponse.data?._id) {
-            await manualItineraryAPI.delete(itineraryResponse.data._id);
-          }
-        } catch (deleteError) {
-          console.error('Error deleting manual itinerary:', deleteError);
         }
       }
 
@@ -980,7 +984,8 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             />
 
             {expandedSections.package && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
                 <div className="space-y-3">
                   <EditInputField label="Package" icon={Package}>
                     <select
@@ -994,8 +999,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                           packageName: selectedPackage?.title || selectedPackage?.name || '',
                           destination: selectedPackage?.destination || formData.destination
                         });
+                        // NEW lead: prefill the editor from the newly chosen blueprint.
+                        if ((!lead?.lifecycleStatus || lead.lifecycleStatus === 'NEW') && packageId) {
+                          packageAPI.getById(packageId)
+                            .then((res) => {
+                              const pkg = res.data?.data || res.data;
+                              setItineraryDays(pkg?.itineraryDays || []);
+                            })
+                            .catch(() => setItineraryDays([]));
+                        }
                       }}
-                      disabled={loadingPackages}
+                      disabled={loadingPackages || (lead?.lifecycleStatus && lead.lifecycleStatus !== 'NEW')}
                       className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
@@ -1017,16 +1031,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                       })}
                     </select>
                   </EditInputField>
-                  {formData.package && (
-                    <button
-                      onClick={handleEditPackage}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all font-medium flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25"
-                      type="button"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Customize Package
-                    </button>
-                  )}
                 </div>
 
                 <EditInputField label="Sales Representative" icon={User}>
@@ -1059,6 +1063,59 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                   </select>
                 </EditInputField>
               </div>
+
+              {/* Itinerary editor — collapsed so the dialog stays clean */}
+              {formData.package && (
+                <div className="mt-4 bg-white rounded-2xl border border-emerald-200 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowItineraryEditor(v => !v)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-emerald-50/50 transition-colors"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <Calendar className="w-4 h-4 text-emerald-600" />
+                      Itinerary Editor
+                      <span className="text-xs font-normal text-gray-400">
+                        ({itineraryDays.length || 0} day{itineraryDays.length === 1 ? '' : 's'})
+                      </span>
+                    </span>
+                    {showItineraryEditor ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                  </button>
+
+                  {showItineraryEditor && (
+                    <div className="p-4 border-t border-emerald-100">
+                      <ItineraryEditor
+                        days={itineraryDays}
+                        onDayChange={(dayNumber, dayData) => {
+                          setItineraryDirty(true);
+                          setItineraryDays(prev =>
+                            (prev || []).filter(Boolean).map(day =>
+                              day.dayNumber === dayNumber ? { ...day, ...dayData } : day
+                            )
+                          );
+                        }}
+                        onAddDay={() => {
+                          setItineraryDirty(true);
+                          const newDayNumber = itineraryDays.length + 1;
+                          setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
+                        }}
+                        onRemoveDay={(dayNumber) => {
+                          setItineraryDirty(true);
+                          const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
+                          const renumberedDays = filteredDays.map((day, index) => ({
+                            ...day,
+                            dayNumber: index + 1,
+                          }));
+                          setItineraryDays(renumberedDays);
+                        }}
+                        destination={formData.destination}
+                        hideTitleAndDescription={true}
+                      />
+                    </div>
+                  )}
+                </div>
+                )}
+              </>
             )}
           </div>
 
@@ -1245,80 +1302,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
             )}
           </div>
 
-          {/* Manual Itinerary Section */}
-          <div className="space-y-4">
-            <EditSectionHeader
-              expanded={expandedSections.itinerary}
-              onToggle={toggleSection}
-              icon={Calendar}
-              title="Manual Itinerary"
-              subtitle={itineraryDays.length > 0 ? `${itineraryDays.length} day${itineraryDays.length > 1 ? 's' : ''} planned` : 'Custom day-by-day plan'}
-              section="itinerary"
-              gradient="from-indigo-500 to-violet-600"
-              count={itineraryDays.length > 0 ? itineraryDays.length : undefined}
-            />
-
-            {expandedSections.itinerary && (
-              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-sm text-gray-600">
-                    Create a custom day-by-day itinerary for this lead
-                  </p>
-                  {loadingItinerary ? (
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Loading...</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowManualItinerary(!showManualItinerary);
-                        if (!showManualItinerary && itineraryDays.length === 0) {
-                          setItineraryDays([createDefaultDay(1)]);
-                        }
-                      }}
-                      className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl hover:from-indigo-600 hover:to-violet-700 transition-all font-medium flex items-center gap-2 shadow-lg shadow-indigo-500/25"
-                    >
-                      <Calendar className="w-4 h-4" />
-                      {showManualItinerary ? 'Hide Editor' : (itineraryDays.length > 0 ? 'Show Itinerary' : 'Create Itinerary')}
-                    </button>
-                  )}
-                </div>
-
-                {showManualItinerary && (
-                  <div className="p-4 bg-white rounded-xl border border-indigo-200">
-                    <ItineraryEditor
-                      days={itineraryDays}
-                      onDayChange={(dayNumber, dayData) => {
-                        setItineraryDays(prev =>
-                          (prev || []).filter(Boolean).map(day =>
-                            day.dayNumber === dayNumber ? { ...day, ...dayData } : day
-                          )
-                        );
-                      }}
-                      onAddDay={() => {
-                        const newDayNumber = itineraryDays.length + 1;
-                        setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
-                      }}
-                      onRemoveDay={(dayNumber) => {
-                        const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                        const renumberedDays = filteredDays.map((day, index) => ({
-                          ...day,
-                          dayNumber: index + 1,
-                        }));
-                        setItineraryDays(renumberedDays);
-                      }}
-                      destination={formData.destination}
-                      hideTitleAndDescription={true}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Lifecycle Status & Pricing — only shown for existing leads */}
+          {/* Lifecycle Status, Flight Bookings, then Pricing — existing leads only */}
           {(lead?._id || lead?.id) && (
             <div className="space-y-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -1339,31 +1323,13 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing</h3>
-                <PricingSection
-                  leadId={lead._id || lead.id}
-                  financials={lead.pricing}
-                  travelers={lead.numberOfTravelers || 1}
-                  onFinancialsUpdated={(updated) => {
-                    if (lead._id || lead.id) {
-                      lead.pricing = updated;
-                    }
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Flight & Hotel Bookings — only shown for existing leads */}
-          {(lead?._id || lead?.id) && (
-            <>
               <LeadFlightBookingsSection
                 leadId={lead._id || lead.id}
                 leadStatus={lead.lifecycleStatus}
                 itineraryDays={itineraryDays}
                 travelDate={formData.travelDate}
                 onUpdateDay={(dayNumber, updates) => {
+                  setItineraryDirty(true);
                   setItineraryDays(prev =>
                     (prev || []).filter(Boolean).map(day =>
                       day.dayNumber === dayNumber ? { ...day, ...updates } : day
@@ -1372,21 +1338,20 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 }}
               />
 
-              <LeadHotelBookingsSection
-                leadId={lead._id || lead.id}
-                leadStatus={lead.lifecycleStatus}
-                itineraryDays={itineraryDays}
-                travelDate={formData.travelDate}
-                endDate={formData.endDate}
-                onUpdateDay={(dayNumber, updates) => {
-                  setItineraryDays(prev =>
-                    (prev || []).filter(Boolean).map(day =>
-                      day.dayNumber === dayNumber ? { ...day, ...updates } : day
-                    )
-                  );
-                }}
-              />
-            </>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing</h3>
+                <PricingSection
+                  leadId={lead._id || lead.id}
+                  days={itineraryDays}
+                  travelers={lead.numberOfTravelers || 1}
+                  pricing={pricingSettings}
+                  onSettingsChange={(settings) => {
+                    setItineraryDirty(true);
+                    setPricingSettings(settings);
+                  }}
+                />
+              </div>
+            </div>
           )}
         </div>
 
@@ -1421,35 +1386,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       </div>
 
       {/* Edit Package Dialog */}
-      {editPackageData && (
-        <PackageFormModal
-          isOpen={showEditPackageDialog}
-          title="Customize Package & Itinerary"
-          subtitle={packageModalSubtitle}
-          onClose={() => {
-            setShowEditPackageDialog(false);
-            setEditPackageData(null);
-            setImages([]);
-          }}
-        >
-          <NewEditPackageForm
-            formData={editPackageData}
-            setFormData={setEditPackageData}
-            onSave={handleSaveEditedPackage}
-            onCancel={() => {
-              setShowEditPackageDialog(false);
-              setEditPackageData(null);
-              setImages([]);
-            }}
-            onImageUpload={handleImageUpload}
-            onImageRemove={handleImageRemove}
-            images={images}
-            isUploadingImages={isUploadingImages}
-            hideLeadManagementButtons={true}
-            onlyItineraryEditable={true}
-          />
-        </PackageFormModal>
-      )}
     </div>
   );
 };
