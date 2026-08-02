@@ -1,6 +1,6 @@
 import slugify from 'slugify';
 import prisma from '../db/client.js';
-import { calculateBasePrice } from '../../../shared/pricing-engine/src/index.js';
+import { calculateBasePrice, computeMargin } from '../../../shared/pricing-engine/src/index.js';
 
 // ── Include helpers ───────────────────────────────────────────
 
@@ -76,6 +76,7 @@ export function serializePackage(pkg) {
     basePrice,
     defaultMarginType: pkg.defaultMarginType,
     defaultMarginInput,
+    sellPrice: computeMargin(basePrice, pkg.defaultMarginType, defaultMarginInput).sellPrice,
     currency: pkg.currency,
     isActive: pkg.isActive,
     isFeatured: pkg.isFeatured,
@@ -121,6 +122,7 @@ export function serializePackageList(pkg) {
     basePrice: Number(pkg.basePrice),
     defaultMarginType: pkg.defaultMarginType,
     defaultMarginInput: Number(pkg.defaultMarginInput),
+    sellPrice: computeMargin(Number(pkg.basePrice), pkg.defaultMarginType, Number(pkg.defaultMarginInput)).sellPrice,
     currency: pkg.currency,
     isActive: pkg.isActive,
     isFeatured: pkg.isFeatured,
