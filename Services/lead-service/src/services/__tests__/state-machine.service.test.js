@@ -1,31 +1,30 @@
 import { describe, it, expect } from 'vitest';
-import { validateTransition, StateMachineError } from '../state-machine.service.js';
+import {
+  validateTransition,
+  validateTravelerUpdate,
+  StateMachineError,
+} from '../state-machine.service.js';
 
 describe('validateTransition', () => {
-  // ── Happy path transitions ──────────────────────────
+  // ── Transition table ──────────────────────────────────────────
 
   it('allows NEW -> DRAFTING', () => {
     const r = validateTransition({ currentStatus: 'NEW', nextStatus: 'DRAFTING' });
     expect(r.nextStatus).toBe('DRAFTING');
-    expect(r.recalculate).toBe(false);
   });
 
-  it('allows DRAFTING -> QUOTED when quotedSellingPrice > 0', () => {
+  it('allows DRAFTING -> QUOTED when sellSubtotal > 0', () => {
     const r = validateTransition({
       currentStatus: 'DRAFTING',
       nextStatus: 'QUOTED',
-      financials: { clientPricing: { quotedSellingPrice: 1000 } },
+      pricing: { sellSubtotal: 1000 },
     });
     expect(r.nextStatus).toBe('QUOTED');
   });
 
-  it('allows QUOTED -> APPROVED when depositPaid > 0', () => {
-    const r = validateTransition({
-      currentStatus: 'QUOTED',
-      nextStatus: 'APPROVED',
-      financials: { clientPricing: { depositPaid: 500 } },
-    });
-    expect(r.nextStatus).toBe('APPROVED');
+  it('allows QUOTED -> REVISION', () => {
+    const r = validateTransition({ currentStatus: 'QUOTED', nextStatus: 'REVISION' });
+    expect(r.nextStatus).toBe('REVISION');
   });
 
   it('allows REVISION -> DRAFTING', () => {
@@ -34,8 +33,30 @@ describe('validateTransition', () => {
   });
 
   it('allows REVISION -> QUOTED', () => {
-    const r = validateTransition({ currentStatus: 'REVISION', nextStatus: 'QUOTED' });
+    const r = validateTransition({
+      currentStatus: 'REVISION',
+      nextStatus: 'QUOTED',
+      pricing: { sellSubtotal: 1200 },
+    });
     expect(r.nextStatus).toBe('QUOTED');
+  });
+
+  it('allows QUOTED -> APPROVED when a verified payment covers the deposit', () => {
+    const r = validateTransition({
+      currentStatus: 'QUOTED',
+      nextStatus: 'APPROVED',
+      pricing: { verifiedPaymentTotal: 500, depositAmount: 500 },
+    });
+    expect(r.nextStatus).toBe('APPROVED');
+  });
+
+  it('allows REVISION -> APPROVED when a verified payment covers the deposit', () => {
+    const r = validateTransition({
+      currentStatus: 'REVISION',
+      nextStatus: 'APPROVED',
+      pricing: { verifiedPaymentTotal: 300, depositAmount: 200 },
+    });
+    expect(r.nextStatus).toBe('APPROVED');
   });
 
   it('allows APPROVED -> BOOKING_IN_PROGRESS', () => {
@@ -53,13 +74,19 @@ describe('validateTransition', () => {
     expect(r.nextStatus).toBe('BOOKING_IN_PROGRESS');
   });
 
-  it('allows BOOKING_FAILED -> CLOSED_LOST with lostReason', () => {
+  it('allows BOOKING_FAILED -> REVISION', () => {
+    const r = validateTransition({ currentStatus: 'BOOKING_FAILED', nextStatus: 'REVISION' });
+    expect(r.nextStatus).toBe('REVISION');
+  });
+
+  it('allows BOOKING_IN_PROGRESS -> CONFIRMED when flight and hotel actuals exist', () => {
     const r = validateTransition({
-      currentStatus: 'BOOKING_FAILED',
-      nextStatus: 'CLOSED_LOST',
-      lostReason: 'Client found another provider',
+      currentStatus: 'BOOKING_IN_PROGRESS',
+      nextStatus: 'CONFIRMED',
+      pricing: { flightActualTotal: 300, hotelActualTotal: 200 },
     });
-    expect(r.nextStatus).toBe('CLOSED_LOST');
+    expect(r.nextStatus).toBe('CONFIRMED');
+    expect(r.recalculate).toBe(true);
   });
 
   it('allows CONFIRMED -> CANCELLED', () => {
@@ -67,13 +94,13 @@ describe('validateTransition', () => {
     expect(r.nextStatus).toBe('CANCELLED');
   });
 
-  it('same status is no-op', () => {
+  it('treats same status as a no-op', () => {
     const r = validateTransition({ currentStatus: 'DRAFTING', nextStatus: 'DRAFTING' });
     expect(r.nextStatus).toBe('DRAFTING');
     expect(r.recalculate).toBe(false);
   });
 
-  // ── Blocked transitions ─────────────────────────────
+  // ── Blocked transitions ───────────────────────────────────────
 
   it('blocks DRAFTING -> CONFIRMED (invalid jump)', () => {
     expect(() =>
@@ -99,75 +126,93 @@ describe('validateTransition', () => {
     ).toThrow(StateMachineError);
   });
 
-  // ── Gatekeeper: QUOTED price ────────────────────────
+  it('blocks CANCELLED -> anything (terminal)', () => {
+    expect(() =>
+      validateTransition({ currentStatus: 'CANCELLED', nextStatus: 'NEW' }),
+    ).toThrow(StateMachineError);
+  });
 
-  it('blocks DRAFTING -> QUOTED when quotedSellingPrice is 0', () => {
+  it('throws when currentStatus is missing', () => {
+    expect(() =>
+      validateTransition({ currentStatus: null, nextStatus: 'DRAFTING' }),
+    ).toThrow(StateMachineError);
+  });
+
+  it('throws for unknown statuses', () => {
+    expect(() =>
+      validateTransition({ currentStatus: 'BOGUS', nextStatus: 'DRAFTING' }),
+    ).toThrow(StateMachineError);
+  });
+
+  // ── Gatekeeper: QUOTED sell price ────────────────────────────
+
+  it('blocks DRAFTING -> QUOTED when sellSubtotal is missing', () => {
+    expect(() =>
+      validateTransition({ currentStatus: 'DRAFTING', nextStatus: 'QUOTED' }),
+    ).toThrow(/sellSubtotal/);
+  });
+
+  it('blocks DRAFTING -> QUOTED when sellSubtotal is 0', () => {
     expect(() =>
       validateTransition({
         currentStatus: 'DRAFTING',
         nextStatus: 'QUOTED',
-        financials: { clientPricing: { quotedSellingPrice: 0 } },
+        pricing: { sellSubtotal: 0 },
       }),
-    ).toThrow(/quotedSellingPrice/);
+    ).toThrow(/sellSubtotal/);
   });
 
-  it('blocks DRAFTING -> QUOTED when financials is empty', () => {
+  // ── Gatekeeper: APPROVED deposit ─────────────────────────────
+
+  it('blocks QUOTED -> APPROVED when no payment is recorded', () => {
     expect(() =>
-      validateTransition({ currentStatus: 'DRAFTING', nextStatus: 'QUOTED' }),
-    ).toThrow(/quotedSellingPrice/);
+      validateTransition({ currentStatus: 'QUOTED', nextStatus: 'APPROVED' }),
+    ).toThrow(/verified payment/);
   });
 
-  // ── Gatekeeper: APPROVED deposit ────────────────────
-
-  it('blocks QUOTED -> APPROVED when depositPaid is 0', () => {
+  it('blocks QUOTED -> APPROVED when payment is below the deposit plan', () => {
     expect(() =>
       validateTransition({
         currentStatus: 'QUOTED',
         nextStatus: 'APPROVED',
-        financials: { clientPricing: { depositPaid: 0 } },
+        pricing: { verifiedPaymentTotal: 200, depositAmount: 500 },
       }),
-    ).toThrow(/depositPaid/);
+    ).toThrow(/verified payment/);
   });
 
-  it('blocks REVISION -> APPROVED when depositPaid is missing', () => {
+  it('requires some payment even when the deposit plan is zero', () => {
     expect(() =>
-      validateTransition({ currentStatus: 'REVISION', nextStatus: 'APPROVED' }),
-    ).toThrow(/depositPaid/);
+      validateTransition({
+        currentStatus: 'QUOTED',
+        nextStatus: 'APPROVED',
+        pricing: { verifiedPaymentTotal: 0, depositAmount: 0 },
+      }),
+    ).toThrow(/verified payment/);
   });
 
-  // ── Gatekeeper: CONFIRMED actual costs ──────────────
+  // ── Gatekeeper: CONFIRMED actuals ────────────────────────────
 
-  it('blocks BOOKING_IN_PROGRESS -> CONFIRMED when actualFlightCost is 0', () => {
+  it('blocks BOOKING_IN_PROGRESS -> CONFIRMED without flight actuals', () => {
     expect(() =>
       validateTransition({
         currentStatus: 'BOOKING_IN_PROGRESS',
         nextStatus: 'CONFIRMED',
-        financials: { actual: { actualFlightCost: 0, actualHotelCost: 200 } },
+        pricing: { flightActualTotal: 0, hotelActualTotal: 200 },
       }),
-    ).toThrow(/actualFlightCost/);
+    ).toThrow(/actualFlightCost|flight/);
   });
 
-  it('blocks BOOKING_IN_PROGRESS -> CONFIRMED when actualHotelCost is missing', () => {
+  it('blocks BOOKING_IN_PROGRESS -> CONFIRMED without hotel actuals', () => {
     expect(() =>
       validateTransition({
         currentStatus: 'BOOKING_IN_PROGRESS',
         nextStatus: 'CONFIRMED',
-        financials: { actual: { actualFlightCost: 300 } },
+        pricing: { flightActualTotal: 300 },
       }),
-    ).toThrow(/actualHotelCost/);
+    ).toThrow(/actualHotelCost|hotel/);
   });
 
-  it('allows BOOKING_IN_PROGRESS -> CONFIRMED when both actual costs > 0', () => {
-    const r = validateTransition({
-      currentStatus: 'BOOKING_IN_PROGRESS',
-      nextStatus: 'CONFIRMED',
-      financials: { actual: { actualFlightCost: 300, actualHotelCost: 200 } },
-    });
-    expect(r.nextStatus).toBe('CONFIRMED');
-    expect(r.recalculate).toBe(true);
-  });
-
-  // ── Gatekeeper: CLOSED_LOST reason ──────────────────
+  // ── Gatekeeper: CLOSED_LOST reason ───────────────────────────
 
   it('blocks any -> CLOSED_LOST without lostReason', () => {
     expect(() =>
@@ -175,7 +220,7 @@ describe('validateTransition', () => {
     ).toThrow(/lostReason/);
   });
 
-  it('blocks CLOSED_LOST with empty lostReason string', () => {
+  it('blocks CLOSED_LOST with a blank reason', () => {
     expect(() =>
       validateTransition({
         currentStatus: 'DRAFTING',
@@ -185,76 +230,73 @@ describe('validateTransition', () => {
     ).toThrow(/lostReason/);
   });
 
-  // ── Edge cases ──────────────────────────────────────
-
-  it('throws when currentStatus is null', () => {
-    expect(() =>
-      validateTransition({ currentStatus: null, nextStatus: 'DRAFTING' }),
-    ).toThrow(StateMachineError);
-  });
-
-  it('throws when currentStatus is undefined', () => {
-    expect(() =>
-      validateTransition({ currentStatus: undefined, nextStatus: 'DRAFTING' }),
-    ).toThrow(StateMachineError);
-  });
-
-  it('recalculate flag is true on BOOKING_IN_PROGRESS -> CONFIRMED', () => {
-    const r = validateTransition({
-      currentStatus: 'BOOKING_IN_PROGRESS',
-      nextStatus: 'CONFIRMED',
-      financials: { actual: { actualFlightCost: 500, actualHotelCost: 400 } },
-    });
-    expect(r.recalculate).toBe(true);
-  });
-
-  it('recalculate flag is false on non-CONFIRMED transitions', () => {
-    const r = validateTransition({ currentStatus: 'NEW', nextStatus: 'DRAFTING' });
-    expect(r.recalculate).toBe(false);
-  });
-
-  // ── Additional transition paths ─────────────────────
-
-  it('allows DRAFTING -> CLOSED_LOST with reason', () => {
+  it('allows DRAFTING -> CLOSED_LOST with a reason', () => {
     const r = validateTransition({
       currentStatus: 'DRAFTING',
       nextStatus: 'CLOSED_LOST',
-      lostReason: 'Client not interested',
+      lostReason: 'Client went with a competitor',
     });
     expect(r.nextStatus).toBe('CLOSED_LOST');
   });
 
-  it('allows QUOTED -> REVISION', () => {
-    const r = validateTransition({ currentStatus: 'QUOTED', nextStatus: 'REVISION' });
-    expect(r.nextStatus).toBe('REVISION');
-  });
+  // ── recalculate flag ─────────────────────────────────────────
 
-  it('allows REVISION -> APPROVED with deposit', () => {
-    const r = validateTransition({
-      currentStatus: 'REVISION',
-      nextStatus: 'APPROVED',
-      financials: { clientPricing: { depositPaid: 100 } },
-    });
-    expect(r.nextStatus).toBe('APPROVED');
+  it('recalculate is false for non-CONFIRMED transitions', () => {
+    const r = validateTransition({ currentStatus: 'NEW', nextStatus: 'DRAFTING' });
+    expect(r.recalculate).toBe(false);
   });
+});
 
-  it('allows BOOKING_FAILED -> REVISION', () => {
-    const r = validateTransition({ currentStatus: 'BOOKING_FAILED', nextStatus: 'REVISION' });
-    expect(r.nextStatus).toBe('REVISION');
-  });
-
-  it('allows APPROVED -> CLOSED_LOST with reason', () => {
-    const r = validateTransition({
-      currentStatus: 'APPROVED',
-      nextStatus: 'CLOSED_LOST',
-      lostReason: 'Client went with competitor',
-    });
-    expect(r.nextStatus).toBe('CLOSED_LOST');
-  });
-
-  it('blocks CANCELLED -> anything (terminal)', () => {
+describe('validateTravelerUpdate', () => {
+  it('allows changing travelers while drafting', () => {
     expect(() =>
-      validateTransition({ currentStatus: 'CANCELLED', nextStatus: 'NEW' }),
+      validateTravelerUpdate({
+        currentStatus: 'DRAFTING',
+        previousTravelers: 2,
+        nextTravelers: 4,
+      }),
+    ).not.toThrow();
+  });
+
+  it('allows changing travelers on a new lead', () => {
+    expect(() =>
+      validateTravelerUpdate({
+        currentStatus: 'NEW',
+        previousTravelers: 1,
+        nextTravelers: 2,
+      }),
+    ).not.toThrow();
+  });
+
+  it('blocks changes after QUOTED', () => {
+    expect(() =>
+      validateTravelerUpdate({
+        currentStatus: 'QUOTED',
+        previousTravelers: 2,
+        nextTravelers: 4,
+      }),
     ).toThrow(StateMachineError);
+  });
+
+  it('blocks changes in APPROVED and later states', () => {
+    for (const status of ['APPROVED', 'BOOKING_IN_PROGRESS', 'CONFIRMED', 'BOOKING_FAILED']) {
+      expect(() =>
+        validateTravelerUpdate({
+          currentStatus: status,
+          previousTravelers: 2,
+          nextTravelers: 3,
+        }),
+      ).toThrow(StateMachineError);
+    }
+  });
+
+  it('allows a no-op traveler update anywhere', () => {
+    expect(() =>
+      validateTravelerUpdate({
+        currentStatus: 'CONFIRMED',
+        previousTravelers: 2,
+        nextTravelers: 2,
+      }),
+    ).not.toThrow();
   });
 });

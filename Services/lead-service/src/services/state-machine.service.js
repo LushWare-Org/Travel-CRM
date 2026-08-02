@@ -14,12 +14,14 @@ export class StateMachineError extends Error {
  * @param {Object} params
  * @param {string} params.currentStatus - Current lifecycleStatus (e.g. 'DRAFTING')
  * @param {string} params.nextStatus - Requested new status
- * @param {Object} [params.financials={}] - Lead.financials JSON
+ * @param {Object} [params.pricing={}] - LeadPricing-derived values:
+ *   sellSubtotal, verifiedPaymentTotal, depositAmount,
+ *   flightActualTotal, hotelActualTotal
  * @param {string} [params.lostReason] - Required when transitioning to CLOSED_LOST
  * @returns {{ nextStatus: string, recalculate: boolean }}
  * @throws {StateMachineError}
  */
-export function validateTransition({ currentStatus, nextStatus, financials = {}, lostReason }) {
+export function validateTransition({ currentStatus, nextStatus, pricing = {}, lostReason }) {
   if (!currentStatus) {
     throw new StateMachineError('Lead has no current lifecycle status');
   }
@@ -39,16 +41,18 @@ export function validateTransition({ currentStatus, nextStatus, financials = {},
     );
   }
 
-  const fp = financials || {};
-  const cp = fp.clientPricing || {};
-  const act = fp.actual || {};
+  const p = pricing || {};
+  const sellSubtotal = Number(p.sellSubtotal) || 0;
+  const verifiedPaymentTotal = Number(p.verifiedPaymentTotal) || 0;
+  const depositAmount = Number(p.depositAmount) || 0;
+  const flightActualTotal = Number(p.flightActualTotal) || 0;
+  const hotelActualTotal = Number(p.hotelActualTotal) || 0;
 
   // Gatekeeper: DRAFTING -> QUOTED requires quotedSellingPrice > 0
   if (currentStatus === 'DRAFTING' && nextStatus === 'QUOTED') {
-    const qsp = cp.quotedSellingPrice;
-    if (!qsp || qsp <= 0) {
+    if (sellSubtotal <= 0) {
       throw new StateMachineError(
-        'Cannot transition to QUOTED: quotedSellingPrice must be greater than 0',
+        'Cannot transition to QUOTED: sellSubtotal must be greater than 0',
         'GATEKEEPER_QUOTED_PRICE',
       );
     }
@@ -56,10 +60,10 @@ export function validateTransition({ currentStatus, nextStatus, financials = {},
 
   // Gatekeeper: QUOTED/REVISION -> APPROVED requires depositPaid > 0
   if ((currentStatus === 'QUOTED' || currentStatus === 'REVISION') && nextStatus === 'APPROVED') {
-    const deposit = cp.depositPaid;
-    if (!deposit || deposit <= 0) {
+    const required = depositAmount > 0 ? depositAmount : 0;
+    if (!(verifiedPaymentTotal > 0 && verifiedPaymentTotal >= required)) {
       throw new StateMachineError(
-        'Cannot transition to APPROVED: depositPaid must be greater than 0',
+        'Cannot transition to APPROVED: a verified payment covering the deposit is required',
         'GATEKEEPER_APPROVED_DEPOSIT',
       );
     }
@@ -67,11 +71,9 @@ export function validateTransition({ currentStatus, nextStatus, financials = {},
 
   // Gatekeeper: BOOKING_IN_PROGRESS -> CONFIRMED requires both actual costs > 0
   if (currentStatus === 'BOOKING_IN_PROGRESS' && nextStatus === 'CONFIRMED') {
-    const flightCost = act.actualFlightCost;
-    const hotelCost = act.actualHotelCost;
-    if (!flightCost || flightCost <= 0 || !hotelCost || hotelCost <= 0) {
+    if (flightActualTotal <= 0 || hotelActualTotal <= 0) {
       throw new StateMachineError(
-        'Cannot transition to CONFIRMED: both actualFlightCost and actualHotelCost must be greater than 0',
+        'Cannot transition to CONFIRMED: flight and hotel actuals must both be greater than 0',
         'GATEKEEPER_CONFIRMED_ACTUALS',
       );
     }
@@ -90,4 +92,34 @@ export function validateTransition({ currentStatus, nextStatus, financials = {},
   const recalculate = currentStatus === 'BOOKING_IN_PROGRESS' && nextStatus === 'CONFIRMED';
 
   return { nextStatus, recalculate };
+}
+
+/**
+ * Traveler count drives every PER_PERSON line, so changing it after the lead
+ * has been quoted is blocked — the rep must move back to DRAFTING first.
+ *
+ * @param {Object} params
+ * @param {string} params.currentStatus - lifecycleStatus
+ * @param {number} [params.previousTravelers]
+ * @param {number} [params.nextTravelers]
+ * @throws {StateMachineError}
+ */
+export const TRAVELER_LOCKED_STATUSES = [
+  'QUOTED',
+  'REVISION',
+  'APPROVED',
+  'BOOKING_IN_PROGRESS',
+  'CONFIRMED',
+  'BOOKING_FAILED',
+];
+
+export function validateTravelerUpdate({ currentStatus, previousTravelers, nextTravelers }) {
+  if (nextTravelers == null) return;
+  if (Number(previousTravelers) === Number(nextTravelers)) return;
+  if (TRAVELER_LOCKED_STATUSES.includes(currentStatus)) {
+    throw new StateMachineError(
+      'Cannot change numberOfTravelers after QUOTED; move back to DRAFTING first',
+      'GATEKEEPER_TRAVELERS_LOCKED',
+    );
+  }
 }
