@@ -61,6 +61,7 @@ const mockPkg = {
       places: [{ id: 'dp-1', placeId: 'place-1', place: { id: 'place-1', name: 'City', type: 'CITY' }, customName: null, orderIndex: 0 }],
       activities: [{ id: 'da-1', activityId: 'act-1', activity: { id: 'act-1', name: 'Tour', description: 'City tour', defaultCost: 50 }, costOverride: null, orderIndex: 0 }],
       transports: [{ id: 'dt-1', routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 80, distanceKm: null, originPlaceId: null, destinationPlaceId: null }],
+      flights: [{ id: 'flight-1', origin: 'CMB', destination: 'DXB', cabinClass: 'Economy', airlinePreference: 'Emirates', totalAmount: 0 }],
     },
   ],
   reviews: [{ id: 'r-1', authorId: 'user-2', name: 'Alice', email: 'a@test.com', rating: 5, comment: 'Great!', isApproved: true, helpful: 3, createdAt: new Date('2025-01-01') }],
@@ -83,6 +84,9 @@ describe('serializePackage', () => {
     expect(result.itineraryDays).toHaveLength(1);
     expect(result.itineraryDays[0].places[0].place.name).toBe('City');
     expect(result.itineraryDays[0].activities[0].activity.name).toBe('Tour');
+    expect(result.itineraryDays[0].flights).toEqual([
+      { id: 'flight-1', origin: 'CMB', destination: 'DXB', cabinClass: 'Economy', airlinePreference: 'Emirates', totalAmount: 0 },
+    ]);
     expect(result.images).toHaveLength(1);
     expect(result.reviews).toHaveLength(1);
   });
@@ -188,6 +192,7 @@ describe('buildCreateData', () => {
         places: [{ placeId: 'place-1', orderIndex: 0 }],
         activities: [{ activityId: 'act-1', costOverride: 45, orderIndex: 0 }],
         transports: [{ routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 100 }],
+        flights: [{ id: 'flight-1', origin: 'CMB', destination: 'DXB', totalAmount: 0 }],
       }],
     }, 'user-1');
 
@@ -199,6 +204,7 @@ describe('buildCreateData', () => {
     expect(day.places.create[0].placeId).toBe('place-1');
     expect(day.activities.create[0].costOverride).toBe(45);
     expect(day.transports.create[0].unitCost).toBe(100);
+    expect(day.flights).toEqual([{ id: 'flight-1', origin: 'CMB', destination: 'DXB', totalAmount: 0 }]);
   });
 
   it('uses customName when placeId is missing', () => {

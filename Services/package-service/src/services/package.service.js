@@ -56,6 +56,7 @@ export function serializePackage(pkg) {
       originPlaceId: dt.originPlaceId,
       destinationPlaceId: dt.destinationPlaceId,
     })),
+    flights: day.flights || [],
   }));
 
   const basePrice = Number(pkg.basePrice);
@@ -246,6 +247,7 @@ function buildItineraryDaysData(days) {
         destinationPlaceId: t.destinationPlaceId ?? null,
       })),
     },
+    flights: day.flights ?? [],
   }));
 }
 
