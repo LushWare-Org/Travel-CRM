@@ -805,9 +805,6 @@ const ItineraryEditor = ({
                 </div>
               </FieldGroup>
 
-              {/* Costs & Pricing */}
-              {renderCostsSection(day)}
-
               {/* Flight Booking — standalone section */}
               <div className="bg-white rounded-xl border border-sky-200 overflow-hidden">
                 <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-sky-50 to-white">
@@ -1025,6 +1022,8 @@ const ItineraryEditor = ({
                 </div>
               )}
 
+              {/* Costs & Pricing — last section of the day card */}
+              {renderCostsSection(day)}
             </div>
           )}
         </div>
