@@ -1343,7 +1343,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <PricingSection
                   leadId={lead._id || lead.id}
                   days={itineraryDays}
-                  travelers={lead.numberOfTravelers || 1}
+                  travelers={formData.numberOfTravelers || 1}
                   pricing={pricingSettings}
                   onSettingsChange={(settings) => {
                     setItineraryDirty(true);

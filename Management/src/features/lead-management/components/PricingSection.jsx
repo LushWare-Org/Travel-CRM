@@ -41,11 +41,9 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
   }, [pricing]);
 
   const updateSettings = (patch) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      onSettingsChange?.(next);
-      return next;
-    });
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    onSettingsChange?.(next);
   };
 
   // Debounced live preview whenever days or settings change.
