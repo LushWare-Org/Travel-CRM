@@ -69,13 +69,10 @@ const PUBLIC_PATTERNS = [
   [/^\/api\/v1\/packages\/category\//,           'GET'], // by category
   [/^\/api\/v1\/packages\/[^/]+\/?(\?.*)?$/,    'GET'], // single package view /:id
   [/^\/api\/v1\/reviews/, 'GET'],
-  [/^\/api\/v1\/itineraries/, 'GET'],
   // Public forms
   [/^\/api\/v1\/bookings\/website$/, 'POST'],
   [/^\/api\/v1\/bookings\/recent$/, 'GET'],
   [/^\/api\/v1\/leads\/website-contact$/, 'POST'],
-  [/^\/api\/v1\/manual-itineraries\/website$/, 'POST'],
-  [/^\/api\/v1\/customized-packages\/website$/, 'POST'],
   [/^\/api\/v1\/careers\/apply$/, 'POST'],
   [/^\/api\/v1\/vacancies\/?$/, 'GET'],
   [/^\/api\/v1\/vacancies\/admin\/all$/, 'GET'],
@@ -177,13 +174,12 @@ app.use(`${V1}/sales-reps`, proxy(SERVICES.user));
 app.use(`${V1}/vendors`,    proxy(SERVICES.user));
 
 // Packages → package-service
-app.use(`${V1}/packages`,            proxy(SERVICES.package));
-app.use(`${V1}/reviews`,             proxy(SERVICES.package));
-app.use(`${V1}/itineraries`,         proxy(SERVICES.package));
-app.use(`${V1}/manual-itineraries`,  proxy(SERVICES.package));
-app.use(`${V1}/customized-packages`, proxy(SERVICES.package));
-app.use(`${V1}/hotels`,              proxy(SERVICES.package));
-app.use(`${V1}/upload`,              proxy(SERVICES.package));
+app.use(`${V1}/packages`,    proxy(SERVICES.package));
+app.use(`${V1}/reviews`,     proxy(SERVICES.package));
+app.use(`${V1}/places`,      proxy(SERVICES.package));
+app.use(`${V1}/activities`,  proxy(SERVICES.package));
+app.use(`${V1}/hotels`,      proxy(SERVICES.package));
+app.use(`${V1}/upload`,      proxy(SERVICES.package));
 
 // Leads → lead-service
 app.use(`${V1}/leads`, proxy(SERVICES.lead));

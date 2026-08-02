@@ -9,13 +9,36 @@ import {
   MapPin, Activity, Utensils, Car, Building2,
   StickyNote, Image as ImageIcon, ChevronDown, ChevronUp,
   Coffee, UtensilsCrossed, Moon, Check, Star, Phone, Bed,
+  Receipt, Plane,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { uploadItineraryImages } from '../../../services/cloudinaryService';
 import Swal from 'sweetalert2';
 import ActivitySelector from './ActivitySelector';
 import LocationSelector from './LocationSelector';
+import TransportRowEditor from './form/TransportRowEditor';
 import { FlightSelectionModal, HotelSelectionModal } from '../../shared';
+import {
+  calculateMealCosts,
+  calculateActivityCosts,
+  calculateTransportCosts,
+  DEFAULTS,
+} from '@travel-crm/pricing-engine';
+import {
+  getMealCounts,
+  getDayActivities,
+  getDayTransports,
+  getTransportRowCost,
+  getAccommodationTotal,
+} from '../utils/helpers';
+import {
+  resolveFlightAdd,
+  resolveFlightEdit,
+  resolveFlightRemove,
+  countUnlinkedFlightRows,
+} from '../utils/flightSync';
+import { createDefaultTransportRow } from '@travel-crm/constants';
+import { formatCurrency } from '../../../utils/currency.js';
 
 // ═══════════════════════════════════════════════════════════════════
 //  Hotel Stay Card — shown when a hotel is selected from the API
@@ -163,6 +186,16 @@ function HotelStayCard({ accommodation, onSearch, onRemove }) {
   );
 }
 
+/**
+ * Best-effort flight price lookup across the shapes the flight modal and
+ * loaded packages may produce (totalAmount / fareTotal / price).
+ */
+function getFlightPrice(flight) {
+  if (!flight) return null;
+  const value = flight.totalAmount ?? flight.fareTotal ?? flight.price;
+  return value == null || value === '' ? null : Number(value);
+}
+
 const ItineraryEditor = ({
   days = [],
   onDayChange,
@@ -183,19 +216,347 @@ const ItineraryEditor = ({
   const [expandedDays, setExpandedDays] = useState(() => {
     // Initialize all days expanded synchronously — no post-mount flicker
     const init = {};
-    days.forEach(day => { init[day.dayNumber] = true; });
+    days.forEach(day => { if (day && day.dayNumber != null) init[day.dayNumber] = true; });
     return init;
   });
   const [showFlightModal, setShowFlightModal] = useState(false);
-  const [currentDayForFlight, setCurrentDayForFlight] = useState(null);
+  // { dayNumber, index } — index null means "add a new flight".
+  const [flightModalTarget, setFlightModalTarget] = useState(null);
   const [showHotelModal, setShowHotelModal] = useState(false);
   const [hotelModalMode, setHotelModalMode] = useState('suggest');
+  const [highlightedFlightSection, setHighlightedFlightSection] = useState(null);
+  // Cost subsections are collapsed by default — summary chips show totals.
+  const [expandedCosts, setExpandedCosts] = useState({});
+
+  const toggleCostsExpand = (dayNumber) => {
+    setExpandedCosts(prev => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
+  };
+
+  const handleMealToggle = (day, mealKey, checked) => {
+    onDayChange(day.dayNumber, {
+      meals: { ...(day.meals || {}), [mealKey]: checked },
+      [`${mealKey}Count`]: checked ? 1 : 0,
+    });
+  };
+
+  const handleMealCountChange = (day, field, value) => {
+    const num = Math.max(0, parseInt(value, 10) || 0);
+    onDayChange(day.dayNumber, {
+      [field]: num,
+      meals: { ...(day.meals || {}), [field.replace('Count', '')]: num > 0 },
+    });
+  };
+
+  const handleActivityCostChange = (day, name, field, value) => {
+    const activities = getDayActivities(day);
+    const current = activities.find(a => a.name === name) || { name, defaultCost: 0, costOverride: null };
+    const parsed = value === '' ? null : (parseFloat(value) || 0);
+    onDayChange(day.dayNumber, {
+      activityCosts: {
+        ...(day.activityCosts || {}),
+        [name]: {
+          defaultCost: current.defaultCost,
+          costOverride: field === 'costOverride' ? parsed : current.costOverride,
+        },
+      },
+    });
+  };
+
+  const handleTransportCostChange = (day, index, patch) => {
+    const current = getDayTransports(day);
+    const rows = current.length > 0
+      ? current
+      : [createDefaultTransportRow()];
+    onDayChange(day.dayNumber, {
+      transports: rows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    });
+  };
+
+  const handleAddTransport = (day) => {
+    const current = getDayTransports(day);
+    onDayChange(day.dayNumber, {
+      transports: [
+        ...current,
+        createDefaultTransportRow(),
+      ],
+    });
+  };
+
+  const handleRemoveTransport = (day, index) => {
+    const current = getDayTransports(day);
+    onDayChange(day.dayNumber, {
+      transports: current.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleAddFlight = (day) => {
+    setFlightModalTarget({ dayNumber: day.dayNumber, index: null });
+    setShowFlightModal(true);
+  };
+
+  const handleEditFlight = (day, index) => {
+    setFlightModalTarget({ dayNumber: day.dayNumber, index });
+    setShowFlightModal(true);
+  };
+
+  const handleRemoveFlight = (day, index) => {
+    const flights = Array.isArray(day.flights) ? day.flights : [];
+    const removed = flights[index];
+    if (!removed) return;
+    onDayChange(day.dayNumber, resolveFlightRemove({
+      flights,
+      transports: getDayTransports(day),
+      flightId: removed.id,
+    }));
+  };
+
+  /**
+   * A FLIGHT transport row exists without a linked flight — take the user to
+   * the Flight Booking section so both stay in sync.
+   */
+  const handleJumpToFlightSection = (day) => {
+    const section = document.getElementById(`day-${day.dayNumber}-flight-section`);
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setHighlightedFlightSection(day.dayNumber);
+    setTimeout(() => setHighlightedFlightSection(null), 1200);
+    handleAddFlight(day);
+  };
+
+  const renderCostsSection = (day) => {
+    const mealCounts = getMealCounts(day);
+    const activityRows = getDayActivities(day);
+    const transportRows = getDayTransports(day);
+    const accommodationTotal = getAccommodationTotal(day);
+    const isExpanded = Boolean(expandedCosts[day.dayNumber]);
+
+    const mealTotal = calculateMealCosts([mealCounts], {
+      mealCostPerPerson: DEFAULTS.mealCostPerPerson,
+    }).total;
+    const activityTotal = calculateActivityCosts(activityRows, { groupSize: 1 }).total;
+    const transportTotal = calculateTransportCosts(transportRows, { groupSize: 1 }).total;
+    const flightTotal = transportRows
+      .filter((row) => row.transportMode === 'FLIGHT')
+      .reduce((sum, row) => sum + getTransportRowCost(row, 1), 0);
+    const unlinkedFlightCount = countUnlinkedFlightRows(transportRows);
+
+    const chip = (label, value) => {
+      const hasValue = Number(value) > 0;
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+            hasValue
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-slate-50 border-slate-200 text-slate-400'
+          }`}
+        >
+          {label}: {hasValue ? formatCurrency(value) : '—'}
+        </span>
+      );
+    };
+
+    const mealUnitCost = mealCounts.mealPriceOverride ?? DEFAULTS.mealCostPerPerson;
+    const mealCountSum = mealCounts.breakfastCount + mealCounts.lunchCount + mealCounts.dinnerCount;
+
+    return (
+      <div className="bg-white rounded-xl border border-emerald-200 overflow-hidden">
+        {/* Section header / chips row */}
+        <button
+          type="button"
+          onClick={() => toggleCostsExpand(day.dayNumber)}
+          className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white hover:from-emerald-100/70 transition-colors"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <Receipt className="w-4 h-4 text-emerald-600" />
+            Costs &amp; Pricing
+            <span className="text-xs font-normal text-slate-400">
+              ({isExpanded ? 'editing' : 'collapsed'})
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-1.5 justify-end">
+              {chip('Meals', mealTotal)}
+              {chip('Activities', activityTotal)}
+              {chip('Transport', transportTotal)}
+              {chip('Flight', flightTotal)}
+              {chip('Hotel', accommodationTotal)}
+            </div>
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+              {isExpanded ? <ChevronUp className="w-4 h-4 text-emerald-600" /> : <ChevronDown className="w-4 h-4 text-emerald-600" />}
+            </div>
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="px-4 pb-4 pt-1 border-t border-emerald-100 space-y-4">
+            {/* ── Meals ───────────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Utensils className="w-3.5 h-3.5 text-emerald-500" /> Meals
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                {[
+                  { key: 'breakfastCount', label: 'Breakfasts' },
+                  { key: 'lunchCount', label: 'Lunches' },
+                  { key: 'dinnerCount', label: 'Dinners' },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-xs text-slate-500 mb-1">{field.label}</label>
+                    <input
+                      type="number" min="0"
+                      value={mealCounts[field.key]}
+                      onChange={(e) => handleMealCountChange(day, field.key, e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1" title="Leaves blank to use the $15/person default">
+                    Cost / meal
+                  </label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={mealCounts.mealPriceOverride ?? ''}
+                    placeholder="15"
+                    onChange={(e) => onDayChange(day.dayNumber, {
+                      mealPriceOverride: e.target.value === '' ? null : (parseFloat(e.target.value) || 0),
+                    })}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {mealCountSum} meal{mealCountSum === 1 ? '' : 's'} × {formatCurrency(mealUnitCost)} ={' '}
+                <span className="font-semibold text-emerald-700">{formatCurrency(mealTotal)}</span>
+              </p>
+            </div>
+
+            {/* ── Activities ───────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Activity className="w-3.5 h-3.5 text-emerald-500" /> Activities
+              </label>
+              {activityRows.length === 0 ? (
+                <p className="text-xs text-slate-400">No activities added to this day.</p>
+              ) : (
+                <div className="space-y-2">
+                  {activityRows.map((activity) => {
+                    const unit = activity.costOverride ?? activity.defaultCost ?? 0;
+                    const total = unit;
+                    return (
+                      <div key={activity.name} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700 flex-1 min-w-[120px]">{activity.name}</span>
+                        <span className="text-xs text-slate-500">
+                          Default: <span className="font-semibold text-slate-700">{formatCurrency(activity.defaultCost)}</span>
+                        </span>
+                        <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                          Override
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={activity.costOverride ?? ''}
+                            placeholder={String(activity.defaultCost || 0)}
+                            onChange={(e) => handleActivityCostChange(day, activity.name, 'costOverride', e.target.value)}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="w-24 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                          />
+                        </label>
+                        <span className="text-xs text-emerald-700 font-medium">
+                          {formatCurrency(total)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Transport ────────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Car className="w-3.5 h-3.5 text-emerald-500" /> Transport
+              </label>
+              {transportRows.length === 0 ? (
+                <p className="text-xs text-slate-400">No transport configured for this day.</p>
+              ) : (
+                <div className="space-y-2">
+                  {transportRows.map((row, i) => (
+                    <TransportRowEditor
+                      key={`${day.dayNumber}-transport-${i}`}
+                      index={i}
+                      transport={row}
+                      onChange={(patch) => handleTransportCostChange(day, i, patch)}
+                      onRemove={(idx) => handleRemoveTransport(day, idx)}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => handleAddTransport(day)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Transport
+                </button>
+                <p className="text-xs text-slate-500">
+                  Total = <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
+                </p>
+              </div>
+              {unlinkedFlightCount > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+                  <Plane className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="flex-1 min-w-[160px]">
+                    {unlinkedFlightCount === 1
+                      ? 'A flight cost was added — add the flight details so pricing stays in sync.'
+                      : `${unlinkedFlightCount} flight costs were added — add the flight details so pricing stays in sync.`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleJumpToFlightSection(day)}
+                    className="px-3 py-1.5 font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+                  >
+                    Add flight details
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Accommodation ────────────────────────────────── */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
+                <Building2 className="w-3.5 h-3.5 text-emerald-500" /> Accommodation
+              </label>
+              {day.accommodation?.name ? (
+                <div className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
+                  <span className="text-sm font-medium text-slate-700 flex-1 min-w-[120px]">{day.accommodation.name}</span>
+                  <span className="text-xs text-slate-500">
+                    Total: <span className="font-semibold text-slate-700">{formatCurrency(accommodationTotal)}</span>
+                  </span>
+                  {/* Tech debt: multi-day hotel stays are not yet supported. The
+                      current implementation treats each day's accommodation as an
+                      independent per-night booking. When multi-day stays are
+                      implemented, the pricing engine should de-duplicate consecutive
+                      nights at the same hotel. */}
+                  <span className="text-xs text-slate-400" title="Each day books one per-night stay for now">
+                    {formatCurrency(accommodationTotal)} / night
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">Accommodation: —</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Ensure new days (added after initial render) are expanded
   useEffect(() => {
     const expanded = {};
     days.forEach(day => {
-      if (expandedDays[day.dayNumber] === undefined) {
+      if (day && day.dayNumber != null && expandedDays[day.dayNumber] === undefined) {
         expanded[day.dayNumber] = true;
       }
     });
@@ -215,7 +576,7 @@ const ItineraryEditor = ({
 
     try {
       const uploadedImages = await uploadItineraryImages(files);
-      const day = days.find(d => d.dayNumber === dayNumber);
+      const day = days.find(d => d && d.dayNumber === dayNumber);
       const existingImages = day?.images || [];
       const updatedImages = [...existingImages, ...uploadedImages];
       onDayChange(dayNumber, { images: updatedImages });
@@ -229,7 +590,7 @@ const ItineraryEditor = ({
   };
 
   const handleRemoveDayImage = (dayNumber, imageIndex) => {
-    const day = days.find(d => d.dayNumber === dayNumber);
+    const day = days.find(d => d && d.dayNumber === dayNumber);
     const updatedImages = (day?.images || []).filter((_, idx) => idx !== imageIndex);
     onDayChange(dayNumber, { images: updatedImages });
   };
@@ -241,7 +602,7 @@ const ItineraryEditor = ({
     try {
       setAutoFillingHotel(true);
       const { hotelAPI } = await import('../../../services/api');
-      const locationsString = dayLocations.join(', ');
+      const locationsString = (Array.isArray(dayLocations) ? dayLocations : []).join(', ');
 
       const response = await hotelAPI.suggest(
         destination,
@@ -255,7 +616,7 @@ const ItineraryEditor = ({
         const hotels = response.data || [];
         if (hotels.length > 0) {
           const bestMatch = hotels[0];
-          const day = days.find(d => d.dayNumber === dayNumber);
+          const day = days.find(d => d && d.dayNumber === dayNumber);
 
           onDayChange(dayNumber, {
             accommodation: {
@@ -281,12 +642,13 @@ const ItineraryEditor = ({
     const timeouts = [];
 
     days.forEach((day) => {
-      if (day.locations && day.locations.length > 0 && destination) {
+      const dayLocations = day && Array.isArray(day.locations) ? day.locations : [];
+      if (day && dayLocations.length > 0 && destination) {
         const hasAccommodation = day.accommodation?.name && day.accommodation?.address;
 
         if (!hasAccommodation && !autoFillingHotel) {
           const timeoutId = setTimeout(() => {
-            autoFillBestMatchHotel(day.dayNumber, day.locations);
+            autoFillBestMatchHotel(day.dayNumber, dayLocations);
           }, 1500);
 
           timeouts.push(timeoutId);
@@ -297,7 +659,10 @@ const ItineraryEditor = ({
     return () => {
       timeouts.forEach(timeoutId => clearTimeout(timeoutId));
     };
-  }, [days.map(d => `${d.dayNumber}-${d.locations?.join(',')}`).join('|'), destination, packageType, category]);
+  }, [days
+    .filter(Boolean)
+    .map(d => `${d.dayNumber}-${Array.isArray(d.locations) ? d.locations.join(',') : ''}`)
+    .join('|'), destination, packageType, category]);
 
   // Field Group Component
   const FieldGroup = ({ label, icon: Icon, children, className = '' }) => (
@@ -331,7 +696,7 @@ const ItineraryEditor = ({
 
   return (
     <div className="space-y-4">
-      {days.map((day, index) => (
+      {days.filter(Boolean).map((day, index) => (
         <div key={day.dayNumber} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
           {/* Day Header */}
           <div
@@ -417,98 +782,107 @@ const ItineraryEditor = ({
                 </FieldGroup>
               </div>
 
-              {/* Row 3: Meals and Transport */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <FieldGroup label="Meals Included" icon={Utensils}>
-                  <div className="flex flex-wrap gap-3">
-                    {[
-                      { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'amber' },
-                      { key: 'lunch', label: 'Lunch', icon: UtensilsCrossed, color: 'orange' },
-                      { key: 'dinner', label: 'Dinner', icon: Moon, color: 'violet' },
-                    ].map((meal) => (
-                      <label
-                        key={meal.key}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-all border ${day.meals?.[meal.key]
-                            ? `bg-${meal.color}-100 border-${meal.color}-300 text-${meal.color}-800`
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                          }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={day.meals?.[meal.key] || false}
-                          onChange={(e) =>
-                            onDayChange(day.dayNumber, {
-                              meals: { ...day.meals, [meal.key]: e.target.checked },
-                            })
-                          }
-                          className="sr-only"
-                        />
-                        {day.meals?.[meal.key] ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <meal.icon className="w-4 h-4 opacity-50" />
-                        )}
-                        <span className="text-sm font-medium">{meal.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </FieldGroup>
-
-                <FieldGroup label="Transport" icon={Car}>
-                  <div className="relative">
-                    <select
-                      value={day.transport || 'car'}
-                      onChange={(e) => onDayChange(day.dayNumber, { transport: e.target.value })}
-                      className="w-full px-4 py-3 pr-10 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all appearance-none cursor-pointer"
+              {/* Row 3: Meals */}
+              <FieldGroup label="Meals Included" icon={Utensils}>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'amber' },
+                    { key: 'lunch', label: 'Lunch', icon: UtensilsCrossed, color: 'orange' },
+                    { key: 'dinner', label: 'Dinner', icon: Moon, color: 'violet' },
+                  ].map((meal) => (
+                    <label
+                      key={meal.key}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-all border ${day.meals?.[meal.key]
+                          ? `bg-${meal.color}-100 border-${meal.color}-300 text-${meal.color}-800`
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
                     >
-                      <option value="car">🚗 Car</option>
-                      <option value="flight">✈️ Flight</option>
-                      <option value="train">🚂 Train</option>
-                      <option value="bus">🚌 Bus</option>
-                      <option value="boat">⛵ Boat</option>
-                      <option value="walk">🚶 Walk</option>
-                      <option value="other">📦 Other</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                  </div>
-                </FieldGroup>
-              </div>
-
-              {/* Flight Info Card — when transport is flight */}
-              {day.transport === 'flight' && (
-                <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-blue-800">
-                      {day.flight?.origin
-                        ? `${day.flight.origin} → ${day.flight.destination}`
-                        : 'No flight selected'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentDayForFlight(day.dayNumber);
-                        setShowFlightModal(true);
-                      }}
-                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      {day.flight?.origin ? 'Edit Flight' : 'Select Flight'}
-                    </button>
-                  </div>
-                  {day.flight?.origin && (
-                    <div className="mt-2 text-xs text-blue-700 space-y-0.5">
-                      <p className="font-medium">{day.flight.origin} → {day.flight.destination}</p>
-                      <p>Airline: {day.flight.airlinePreference || 'Any'} | Cabin: {day.flight.cabinClass || 'Economy'}</p>
-                      {day.flight.departureTime && <p>Preferred: {day.flight.departureTime}</p>}
-                      {day.flight.flightNumber && (
-                        <>
-                          <p className="mt-1 font-medium text-green-700">Booked: {day.flight.flightNumber} ({day.flight.carrierName})</p>
-                          <p>PNR: {day.flight.bookingReference} | Status: {day.flight.status}</p>
-                        </>
+                      <input
+                        type="checkbox"
+                        checked={day.meals?.[meal.key] || false}
+                        onChange={(e) => handleMealToggle(day, meal.key, e.target.checked)}
+                        className="sr-only"
+                      />
+                      {day.meals?.[meal.key] ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <meal.icon className="w-4 h-4 opacity-50" />
                       )}
-                    </div>
+                      <span className="text-sm font-medium">{meal.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </FieldGroup>
+
+              {/* Flight Booking — standalone section */}
+              <div
+                id={`day-${day.dayNumber}-flight-section`}
+                className={`bg-white rounded-xl border overflow-hidden transition-shadow ${
+                  highlightedFlightSection === day.dayNumber
+                    ? 'border-sky-400 ring-4 ring-sky-200'
+                    : 'border-sky-200'
+                }`}
+              >
+                <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-sky-50 to-white">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <Plane className="w-4 h-4 text-sky-600" />
+                    Flight Booking
+                  </div>
+                  <button
+                    id={`day-${day.dayNumber}-add-flight`}
+                    type="button"
+                    onClick={() => handleAddFlight(day)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Flight
+                  </button>
+                </div>
+
+                <div className="px-4 pb-4 pt-3 border-t border-sky-100 space-y-2">
+                  {(Array.isArray(day.flights) ? day.flights : []).length === 0 ? (
+                    <p className="text-xs text-slate-400">No flight selected</p>
+                  ) : (
+                    (day.flights || []).map((flight, index) => (
+                      <div key={flight.id || index} className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <span className="text-sm font-medium text-blue-800">
+                            {flight.origin ? `${flight.origin} → ${flight.destination}` : 'No flight selected'}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditFlight(day, index)}
+                              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              Edit Flight
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFlight(day, index)}
+                              className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 transition-colors"
+                            >
+                              Remove Flight
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs text-blue-700 space-y-0.5">
+                          <p>Airline: {flight.airlinePreference || 'Any'} | Cabin: {flight.cabinClass || 'Economy'}</p>
+                          {flight.departureTime && <p>Preferred: {flight.departureTime}</p>}
+                          {getFlightPrice(flight) != null && (
+                            <p>Price: {formatCurrency(getFlightPrice(flight))} (auto-added to transport)</p>
+                          )}
+                          {flight.flightNumber && (
+                            <>
+                              <p className="mt-1 font-medium text-green-700">Booked: {flight.flightNumber} ({flight.carrierName})</p>
+                              <p>PNR: {flight.bookingReference} | Status: {flight.status}</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
-              )}
+              </div>
 
               {/* Row 4: Accommodation */}
               <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -578,7 +952,7 @@ const ItineraryEditor = ({
                   </div>
                 )}
 
-                {autoFillingHotel && days.find(d => d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
+                {autoFillingHotel && days.find(d => d && d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
                   <div className="flex items-center gap-1 mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
                     <Loader className="w-3 h-3 animate-spin" />
                     <span>Finding best match...</span>
@@ -664,6 +1038,9 @@ const ItineraryEditor = ({
                   )}
                 </div>
               )}
+
+              {/* Costs & Pricing — last section of the day card */}
+              {renderCostsSection(day)}
             </div>
           )}
         </div>
@@ -681,15 +1058,30 @@ const ItineraryEditor = ({
       {/* Flight Selection Modal — template mode */}
       <FlightSelectionModal
         isOpen={showFlightModal}
-        onClose={() => { setShowFlightModal(false); setCurrentDayForFlight(null); }}
+        onClose={() => { setShowFlightModal(false); setFlightModalTarget(null); }}
         mode="template"
-        initialData={currentDayForFlight ? (days.find(d => d.dayNumber === currentDayForFlight)?.flight || {}) : {}}
+        initialData={flightModalTarget
+          ? (days.find(d => d && d.dayNumber === flightModalTarget.dayNumber)?.flights || [])[flightModalTarget.index] || {}
+          : {}}
         onSelectTemplate={(flightData) => {
-          if (currentDayForFlight) {
-            onDayChange(currentDayForFlight, { flight: flightData });
+          if (flightModalTarget) {
+            const day = days.find(d => d && d.dayNumber === flightModalTarget.dayNumber);
+            const result = flightModalTarget.index != null
+              ? resolveFlightEdit({
+                  flights: Array.isArray(day?.flights) ? day.flights : [],
+                  transports: getDayTransports(day),
+                  index: flightModalTarget.index,
+                  patch: flightData,
+                })
+              : resolveFlightAdd({
+                  flights: Array.isArray(day?.flights) ? day.flights : [],
+                  transports: getDayTransports(day),
+                  flightData,
+                });
+            onDayChange(flightModalTarget.dayNumber, result);
           }
           setShowFlightModal(false);
-          setCurrentDayForFlight(null);
+          setFlightModalTarget(null);
         }}
       />
 
@@ -704,7 +1096,7 @@ const ItineraryEditor = ({
         locations={currentDayLocations}
         onSelectHotel={(hotel) => {
           if (currentDayForHotel) {
-            const day = days.find(d => d.dayNumber === currentDayForHotel);
+            const day = days.find(d => d && d.dayNumber === currentDayForHotel);
             onDayChange(currentDayForHotel, {
               accommodation: {
                 name: hotel.name,

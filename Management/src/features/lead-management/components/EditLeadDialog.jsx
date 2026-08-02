@@ -1292,7 +1292,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                       days={itineraryDays}
                       onDayChange={(dayNumber, dayData) => {
                         setItineraryDays(prev =>
-                          prev.map(day =>
+                          (prev || []).filter(Boolean).map(day =>
                             day.dayNumber === dayNumber ? { ...day, ...dayData } : day
                           )
                         );
@@ -1364,7 +1364,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 travelDate={formData.travelDate}
                 onUpdateDay={(dayNumber, updates) => {
                   setItineraryDays(prev =>
-                    prev.map(day =>
+                    (prev || []).filter(Boolean).map(day =>
                       day.dayNumber === dayNumber ? { ...day, ...updates } : day
                     )
                   );
@@ -1379,7 +1379,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 endDate={formData.endDate}
                 onUpdateDay={(dayNumber, updates) => {
                   setItineraryDays(prev =>
-                    prev.map(day =>
+                    (prev || []).filter(Boolean).map(day =>
                       day.dayNumber === dayNumber ? { ...day, ...updates } : day
                     )
                   );

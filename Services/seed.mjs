@@ -169,134 +169,223 @@ async function seedUsers() {
 async function seedPackages() {
   console.log('  → crm_packages');
 
-  await pkg.itinerary.createMany({
+  // ── Places (master dictionary) ─────────────────────────────
+  const placeIds = {
+    colombo:       'c1000000-0000-4000-8000-000000000001',
+    sigiriya:      'c1000000-0000-4000-8000-000000000002',
+    dambulla:      'c1000000-0000-4000-8000-000000000003',
+    kandy:         'c1000000-0000-4000-8000-000000000004',
+    nuwaraEliya:   'c1000000-0000-4000-8000-000000000005',
+    bentota:       'c1000000-0000-4000-8000-000000000006',
+    male:          'c1000000-0000-4000-8000-000000000007',
+    northMaleAtoll:'c1000000-0000-4000-8000-000000000008',
+  };
+
+  await pkg.place.createMany({
     data: [
-      {
-        id: ID.itin1,
-        packageId: ID.pkg1,
-        packageModelType: 'Package',
-        status: 'published',
-        version: 1,
-        metaTotalActivities: 6,
-        metaTotalLocations: 4,
-        metaBreakfastCount: 4,
-        metaLunchCount: 2,
-        metaDinnerCount: 4,
-        createdById: ID.admin,
-        days: [
-          { dayNumber: 1, title: 'Arrival in Colombo', description: 'Airport pickup and city tour', locations: ['Colombo'], activities: ['City tour', 'Welcome dinner'], meals: { breakfast: false, lunch: false, dinner: true }, transport: 'car', accommodation: { name: 'Cinnamon Grand', type: 'hotel', rating: 5 }, places: [], notes: 'Pick up at 10am' },
-          { dayNumber: 2, title: 'Sigiriya Rock Fortress', description: 'UNESCO Heritage site visit', locations: ['Sigiriya', 'Dambulla'], activities: ['Rock climbing', 'Cave temples'], meals: { breakfast: true, lunch: true, dinner: true }, transport: 'bus', accommodation: { name: 'Jetwing Lake', type: 'resort', rating: 4 }, places: [{ name: 'Sigiriya Rock', description: 'Ancient rock fortress', duration: '3h' }], notes: '' },
-          { dayNumber: 3, title: 'Kandy & Tea Estates', description: 'Temple of Tooth and tea plantation', locations: ['Kandy', 'Nuwara Eliya'], activities: ['Temple visit', 'Tea tasting'], meals: { breakfast: true, lunch: false, dinner: true }, transport: 'train', accommodation: { name: 'Heritance Tea Factory', type: 'hotel', rating: 4 }, places: [], notes: '' },
-          { dayNumber: 4, title: 'Beach Day at Bentota', description: 'Relax on pristine beaches', locations: ['Bentota'], activities: ['Swimming', 'Water sports'], meals: { breakfast: true, lunch: true, dinner: true }, transport: 'car', accommodation: { name: 'Taj Bentota Resort', type: 'resort', rating: 5 }, places: [], notes: '' },
-        ],
-      },
-      {
-        id: ID.itin2,
-        packageId: ID.pkg2,
-        packageModelType: 'Package',
-        status: 'published',
-        version: 1,
-        metaTotalActivities: 4,
-        metaTotalLocations: 3,
-        metaBreakfastCount: 3,
-        metaDinnerCount: 3,
-        createdById: ID.admin,
-        days: [
-          { dayNumber: 1, title: 'Maldives Arrival', description: 'Seaplane transfer to resort', locations: ['Malé', 'North Malé Atoll'], activities: ['Snorkeling orientation'], meals: { breakfast: false, lunch: true, dinner: true }, transport: 'boat', accommodation: { name: 'Soneva Jani', type: 'resort', rating: 5 }, places: [], notes: '' },
-          { dayNumber: 2, title: 'Reef Exploration', description: 'Full day diving and snorkeling', locations: ['House Reef'], activities: ['Scuba diving', 'Dolphin watching'], meals: { breakfast: true, lunch: true, dinner: true }, transport: 'boat', accommodation: { name: 'Soneva Jani', type: 'resort', rating: 5 }, places: [], notes: '' },
-          { dayNumber: 3, title: 'Sunset Cruise & Departure', description: 'Luxury sunset cruise before departure', locations: ['Malé'], activities: ['Sunset cruise', 'Island shopping'], meals: { breakfast: true, lunch: false, dinner: true }, transport: 'boat', accommodation: { name: 'Soneva Jani', type: 'resort', rating: 5 }, places: [], notes: '' },
-        ],
-      },
+      { id: placeIds.colombo,        name: 'Colombo',          type: 'CITY' },
+      { id: placeIds.sigiriya,       name: 'Sigiriya',         type: 'ATTRACTION', defaultCost: 30 },
+      { id: placeIds.dambulla,       name: 'Dambulla',         type: 'CITY' },
+      { id: placeIds.kandy,          name: 'Kandy',            type: 'CITY' },
+      { id: placeIds.nuwaraEliya,    name: 'Nuwara Eliya',     type: 'CITY' },
+      { id: placeIds.bentota,        name: 'Bentota',          type: 'REGION' },
+      { id: placeIds.male,           name: 'Malé',             type: 'CITY' },
+      { id: placeIds.northMaleAtoll, name: 'North Malé Atoll', type: 'REGION' },
     ],
     skipDuplicates: true,
   });
 
+  // ── Activity Catalog ───────────────────────────────────────
+  const actIds = {
+    cityTour:      'c2000000-0000-4000-8000-000000000001',
+    welcomeDinner: 'c2000000-0000-4000-8000-000000000002',
+    rockClimbing:  'c2000000-0000-4000-8000-000000000003',
+    caveTemples:   'c2000000-0000-4000-8000-000000000004',
+    templeVisit:   'c2000000-0000-4000-8000-000000000005',
+    teaTasting:    'c2000000-0000-4000-8000-000000000006',
+    swimming:      'c2000000-0000-4000-8000-000000000007',
+    waterSports:   'c2000000-0000-4000-8000-000000000008',
+    snorkeling:    'c2000000-0000-4000-8000-000000000009',
+    scubaDiving:   'c2000000-0000-4000-8000-000000000010',
+    dolphinWatch:  'c2000000-0000-4000-8000-000000000011',
+    sunsetCruise:  'c2000000-0000-4000-8000-000000000012',
+    islandShop:    'c2000000-0000-4000-8000-000000000013',
+  };
+
+  await pkg.activityCatalog.createMany({
+    data: [
+      { id: actIds.cityTour,      name: 'City tour',            description: 'Guided city sightseeing',         defaultCost: 25 },
+      { id: actIds.welcomeDinner, name: 'Welcome dinner',       description: 'Traditional welcome meal',         defaultCost: 40 },
+      { id: actIds.rockClimbing,  name: 'Rock climbing',        description: 'Sigiriya rock fortress climb',    defaultCost: 30 },
+      { id: actIds.caveTemples,   name: 'Cave temples',         description: 'Dambulla cave temple complex',    defaultCost: 15 },
+      { id: actIds.templeVisit,   name: 'Temple visit',         description: 'Temple of the Tooth visit',       defaultCost: 10 },
+      { id: actIds.teaTasting,    name: 'Tea tasting',          description: 'Ceylon tea plantation tour',      defaultCost: 20 },
+      { id: actIds.swimming,      name: 'Swimming',             description: 'Beach swimming',                  defaultCost: 0 },
+      { id: actIds.waterSports,   name: 'Water sports',         description: 'Jet ski, banana boat, etc.',      defaultCost: 50 },
+      { id: actIds.snorkeling,    name: 'Snorkeling orientation', description: 'Introductory snorkeling session', defaultCost: 45 },
+      { id: actIds.scubaDiving,   name: 'Scuba diving',         description: 'Full scuba dive with instructor', defaultCost: 120 },
+      { id: actIds.dolphinWatch,  name: 'Dolphin watching',     description: 'Sunset dolphin cruise',           defaultCost: 60 },
+      { id: actIds.sunsetCruise,  name: 'Sunset cruise',        description: 'Luxury sunset cruise',            defaultCost: 80 },
+      { id: actIds.islandShop,    name: 'Island shopping',      description: 'Malé local market shopping',      defaultCost: 0 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // ── Packages ───────────────────────────────────────────────
   await pkg.package.createMany({
     data: [
       {
         id: ID.pkg1,
-        name: 'Sri Lanka Heritage Explorer',
+        title: 'Sri Lanka Heritage Explorer',
         slug: 'sri-lanka-heritage-explorer',
         description: 'Discover the ancient wonders and pristine beaches of Sri Lanka on this 4-day journey through UNESCO Heritage sites, lush tea estates, and tropical coastlines.',
         destination: 'Sri Lanka',
-        duration: 4,
-        price: 1200,
-        maxGroupSize: 12,
-        category: 'family',
-        packageType: 'Standard',
+        durationDays: 4,
+        category: 'FAMILY',
+        coverImage: 'https://picsum.photos/seed/srilanka/800/500',
         inclusions: ['Airport transfers', 'Accommodation (4 nights)', 'Daily breakfast', 'All entry tickets', 'English-speaking guide'],
         exclusions: ['International flights', 'Travel insurance', 'Personal expenses', 'Lunch on day 3'],
-        highlights: ['Sigiriya Rock Fortress', 'Temple of the Tooth', 'Train ride through tea estates', 'Bentota beach'],
-        terms: ['50% advance payment required', 'Cancellation 7 days before: full refund', 'No refund within 48 hours'],
+        termsAndConditions: '50% advance payment required. Cancellation 7 days before: full refund. No refund within 48 hours.',
+        basePrice: 1200,
+        defaultMarginType: 'PERCENTAGE',
+        defaultMarginInput: 20,
+        currency: 'USD',
         isActive: true,
         isFeatured: true,
-        status: 'published',
-        itineraryId: ID.itin1,
         rating: 4.7,
         numReviews: 23,
         views: 412,
         bookings: 18,
-        createdById: ID.admin,
-        coverImagePublicId: 'travel-crm/packages/sri-lanka-cover',
-        coverImageUrl: 'https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=800',
+        createdBy: ID.admin,
       },
       {
         id: ID.pkg2,
-        name: 'Maldives Luxury Escape',
+        title: 'Maldives Luxury Escape',
         slug: 'maldives-luxury-escape',
         description: 'Three nights of pure indulgence in a private overwater villa. Crystal-clear lagoons, world-class diving, and breathtaking sunsets await.',
         destination: 'Maldives',
-        duration: 3,
-        price: 3500,
-        maxGroupSize: 4,
-        category: 'honeymoon',
-        packageType: 'Luxury',
+        durationDays: 3,
+        category: 'HONEYMOON',
+        coverImage: 'https://picsum.photos/seed/maldives/800/500',
         inclusions: ['Seaplane transfers', 'Overwater villa (3 nights)', 'All-inclusive meals', 'Two diving sessions', 'Sunset cruise'],
         exclusions: ['International flights', 'Spa treatments', 'Alcoholic beverages beyond package'],
-        highlights: ['Overwater villa', 'Coral reef diving', 'Private beach', 'Sunset dolphin cruise'],
-        terms: ['Full payment required at booking', 'Non-refundable after 14 days before travel'],
+        termsAndConditions: 'Full payment required at booking. Non-refundable after 14 days before travel.',
+        basePrice: 3500,
+        defaultMarginType: 'PERCENTAGE',
+        defaultMarginInput: 15,
+        currency: 'USD',
         isActive: true,
         isFeatured: true,
-        status: 'published',
-        itineraryId: ID.itin2,
         rating: 4.9,
         numReviews: 11,
         views: 887,
         bookings: 9,
-        createdById: ID.admin,
-        coverImagePublicId: 'travel-crm/packages/maldives-cover',
-        coverImageUrl: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800',
+        createdBy: ID.admin,
       },
       {
         id: ID.pkg3,
-        name: 'Thailand Family Adventure',
+        title: 'Thailand Family Adventure',
         slug: 'thailand-family-adventure',
         description: 'A fun-filled 5-day family package covering Bangkok temples, floating markets, and the golden beaches of Phuket.',
         destination: 'Thailand',
-        duration: 5,
-        price: 1800,
-        maxGroupSize: 20,
-        category: 'family',
-        packageType: 'Deluxe',
+        durationDays: 5,
+        category: 'FAMILY',
+        coverImage: 'https://picsum.photos/seed/thailand/800/500',
         inclusions: ['All hotel stays', 'Daily breakfast and dinner', 'Guided city tours', 'Beach transfers'],
         exclusions: ['International flights', 'Lunch', 'Personal shopping'],
-        highlights: ['Grand Palace Bangkok', 'Floating Market', 'Phi Phi Islands', 'Elephant Sanctuary'],
-        terms: ['30% deposit to confirm', '14-day cancellation policy'],
+        termsAndConditions: '30% deposit to confirm. 14-day cancellation policy.',
+        basePrice: 1800,
+        defaultMarginType: 'FIXED',
+        defaultMarginInput: 300,
+        currency: 'USD',
         isActive: true,
         isFeatured: false,
-        status: 'published',
         rating: 4.5,
         numReviews: 7,
         views: 263,
         bookings: 5,
-        createdById: ID.admin,
-        coverImagePublicId: 'travel-crm/packages/thailand-cover',
-        coverImageUrl: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800',
+        createdBy: ID.admin,
       },
     ],
     skipDuplicates: true,
   });
 
+  // ── Itinerary Days — Sri Lanka (pkg1) ─────────────────────
+  const dayIds = {
+    sl1: 'c3000000-0000-4000-8000-000000000001',
+    sl2: 'c3000000-0000-4000-8000-000000000002',
+    sl3: 'c3000000-0000-4000-8000-000000000003',
+    sl4: 'c3000000-0000-4000-8000-000000000004',
+    mv1: 'c3000000-0000-4000-8000-000000000005',
+    mv2: 'c3000000-0000-4000-8000-000000000006',
+    mv3: 'c3000000-0000-4000-8000-000000000007',
+  };
+
+  await pkg.itineraryDay.createMany({
+    data: [
+      { id: dayIds.sl1, packageId: ID.pkg1, dayNumber: 1, title: 'Arrival in Colombo', description: 'Airport pickup and city tour', breakfastCount: 0, lunchCount: 0, dinnerCount: 1 },
+      { id: dayIds.sl2, packageId: ID.pkg1, dayNumber: 2, title: 'Sigiriya Rock Fortress', description: 'UNESCO Heritage site visit', breakfastCount: 1, lunchCount: 1, dinnerCount: 1 },
+      { id: dayIds.sl3, packageId: ID.pkg1, dayNumber: 3, title: 'Kandy & Tea Estates', description: 'Temple of Tooth and tea plantation', breakfastCount: 1, lunchCount: 0, dinnerCount: 1 },
+      { id: dayIds.sl4, packageId: ID.pkg1, dayNumber: 4, title: 'Beach Day at Bentota', description: 'Relax on pristine beaches', breakfastCount: 1, lunchCount: 1, dinnerCount: 1 },
+      { id: dayIds.mv1, packageId: ID.pkg2, dayNumber: 1, title: 'Maldives Arrival', description: 'Seaplane transfer to resort', breakfastCount: 0, lunchCount: 1, dinnerCount: 1 },
+      { id: dayIds.mv2, packageId: ID.pkg2, dayNumber: 2, title: 'Reef Exploration', description: 'Full day diving and snorkeling', breakfastCount: 1, lunchCount: 1, dinnerCount: 1 },
+      { id: dayIds.mv3, packageId: ID.pkg2, dayNumber: 3, title: 'Sunset Cruise & Departure', description: 'Luxury sunset cruise before departure', breakfastCount: 1, lunchCount: 0, dinnerCount: 1 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // ── Day Places ─────────────────────────────────────────────
+  await pkg.packageDayPlace.createMany({
+    data: [
+      { itineraryDayId: dayIds.sl1, placeId: placeIds.colombo,     orderIndex: 0 },
+      { itineraryDayId: dayIds.sl2, placeId: placeIds.sigiriya,    orderIndex: 0 },
+      { itineraryDayId: dayIds.sl2, placeId: placeIds.dambulla,    orderIndex: 1 },
+      { itineraryDayId: dayIds.sl3, placeId: placeIds.kandy,       orderIndex: 0 },
+      { itineraryDayId: dayIds.sl3, placeId: placeIds.nuwaraEliya, orderIndex: 1 },
+      { itineraryDayId: dayIds.sl4, placeId: placeIds.bentota,     orderIndex: 0 },
+      { itineraryDayId: dayIds.mv1, placeId: placeIds.male,           orderIndex: 0 },
+      { itineraryDayId: dayIds.mv1, placeId: placeIds.northMaleAtoll, orderIndex: 1 },
+      { itineraryDayId: dayIds.mv2, customName: 'House Reef',           orderIndex: 0 },
+      { itineraryDayId: dayIds.mv3, placeId: placeIds.male,           orderIndex: 0 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // ── Day Activities ─────────────────────────────────────────
+  await pkg.packageDayActivity.createMany({
+    data: [
+      { itineraryDayId: dayIds.sl1, activityId: actIds.cityTour,      orderIndex: 0 },
+      { itineraryDayId: dayIds.sl1, activityId: actIds.welcomeDinner, orderIndex: 1 },
+      { itineraryDayId: dayIds.sl2, activityId: actIds.rockClimbing,  orderIndex: 0 },
+      { itineraryDayId: dayIds.sl2, activityId: actIds.caveTemples,   orderIndex: 1 },
+      { itineraryDayId: dayIds.sl3, activityId: actIds.templeVisit,   orderIndex: 0 },
+      { itineraryDayId: dayIds.sl3, activityId: actIds.teaTasting,    orderIndex: 1 },
+      { itineraryDayId: dayIds.sl4, activityId: actIds.swimming,      orderIndex: 0 },
+      { itineraryDayId: dayIds.sl4, activityId: actIds.waterSports,   orderIndex: 1 },
+      { itineraryDayId: dayIds.mv1, activityId: actIds.snorkeling,    orderIndex: 0 },
+      { itineraryDayId: dayIds.mv2, activityId: actIds.scubaDiving,   orderIndex: 0 },
+      { itineraryDayId: dayIds.mv2, activityId: actIds.dolphinWatch,  orderIndex: 1 },
+      { itineraryDayId: dayIds.mv3, activityId: actIds.sunsetCruise,  orderIndex: 0 },
+      { itineraryDayId: dayIds.mv3, activityId: actIds.islandShop,    orderIndex: 1 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // ── Day Transports ─────────────────────────────────────────
+  await pkg.packageDayTransport.createMany({
+    data: [
+      { itineraryDayId: dayIds.sl1, routeType: 'DAILY_ROUTING', transportMode: 'CAR',   pricingModel: 'PER_VEHICLE', unitCost: 80 },
+      { itineraryDayId: dayIds.sl2, routeType: 'DAILY_ROUTING', transportMode: 'VAN',   pricingModel: 'PER_VEHICLE', unitCost: 120 },
+      { itineraryDayId: dayIds.sl3, routeType: 'DAILY_ROUTING', transportMode: 'TRAIN', pricingModel: 'PER_PERSON',  unitCost: 15 },
+      { itineraryDayId: dayIds.sl4, routeType: 'DAILY_ROUTING', transportMode: 'CAR',   pricingModel: 'PER_KM',      unitCost: 2, distanceKm: 80 },
+      { itineraryDayId: dayIds.mv1, routeType: 'POINT_TO_POINT', transportMode: 'BOAT',  pricingModel: 'PER_PERSON',  unitCost: 250, originPlaceId: placeIds.male, destinationPlaceId: placeIds.northMaleAtoll },
+      { itineraryDayId: dayIds.mv2, routeType: 'DAILY_ROUTING',  transportMode: 'BOAT',  pricingModel: 'PER_VEHICLE', unitCost: 180 },
+      { itineraryDayId: dayIds.mv3, routeType: 'DAILY_ROUTING',  transportMode: 'BOAT',  pricingModel: 'PER_VEHICLE', unitCost: 200 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // ── Reviews ────────────────────────────────────────────────
   await pkg.review.createMany({
     data: [
       { packageId: ID.pkg1, authorId: ID.customer1, name: 'David Kumar', email: 'david.kumar@gmail.com', rating: 5, comment: 'Absolutely incredible trip! The guide was knowledgeable and the itinerary was perfectly paced. Sigiriya at sunrise was unforgettable.', isApproved: true, helpful: 12 },
@@ -369,7 +458,7 @@ async function seedLeads() {
       quoteSent: true,
       quoteAmount: 7000,
       convertedBookingId: ID.booking1,
-      tags: ['honeymoon', 'luxury', 'high-value'],
+      tags: ['HONEYMOON', 'luxury', 'high-value'],
       notifNewLead: true,
       notifStatusChange: true,
       notifAssignment: true,
@@ -427,7 +516,7 @@ async function seedLeads() {
       quoteSent: true,
       quoteAmount: 4800,
       followUpDate: new Date('2025-01-10'),
-      tags: ['family', 'kids', 'heritage'],
+      tags: ['FAMILY', 'kids', 'heritage'],
       remarks: {
         create: [
           { text: 'Family trip with young children. Need child-friendly hotel options.', addedById: ID.salesRep2 },

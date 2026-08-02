@@ -37,11 +37,11 @@ const PackageCard = ({
     return null;
   }
 
-  const formattedPrice = formatPriceINR(pkg.price);
-  // Default to 'draft' if status is not set
-  const status = pkg.status || 'draft';
-  // Capitalize first letter for display
-  const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+  const displayPrice = pkg.sellPrice ?? pkg.basePrice;
+  const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
+  // Derive status from isActive (no more draft/published enum)
+  const status = pkg.isActive ? 'published' : 'draft';
+  const statusLabel = pkg.isActive ? 'Published' : 'Draft';
 
   // Check if user is a salesRep (read-only access)
   const isSalesRep = user?.role === 'salesRep';
@@ -81,7 +81,7 @@ const PackageCard = ({
 
       {/* Content Section */}
       <div className="p-4 pb-2">
-        <h3 className="text-lg font-bold text-gray-900">{pkg.name}</h3>
+        <h3 className="text-lg font-bold text-gray-900">{pkg.title}</h3>
         <div className="flex gap-2 mt-2 flex-wrap">
           <span
             className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -101,11 +101,11 @@ const PackageCard = ({
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2 text-gray-600">
             <Calendar className="w-4 h-4" />
-            {pkg.duration || 'N/A'} days
+            {pkg.durationDays || 'N/A'} days
           </div>
           <div className="flex items-center gap-2 text-gray-600">
             <MapPin className="w-4 h-4" />
-            {Array.isArray(pkg.destinations) ? pkg.destinations.join(', ') : pkg.region || 'N/A'}
+            {pkg.destination || 'N/A'}
           </div>
           <div className="flex items-center gap-2 text-gray-600">
             <Briefcase className="w-4 h-4" />
@@ -118,7 +118,7 @@ const PackageCard = ({
           <div className="flex items-center gap-1">
             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
             <span className="text-sm font-semibold">{pkg.rating || 0}</span>
-            <span className="text-xs text-gray-500">({pkg.reviews || 0})</span>
+            <span className="text-xs text-gray-500">({pkg.numReviews || 0})</span>
           </div>
           <div className="text-lg font-bold text-blue-600">{formattedPrice || 'Contact us'}</div>
         </div>

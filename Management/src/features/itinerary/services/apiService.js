@@ -1,14 +1,12 @@
 /**
- * Enhanced API Service with Proper Error Handling
- * Handles all communication with the backend
- * Follows best practices for API integration
+ * API Service for packages and related endpoints.
+ * Handles all communication with the package-service backend.
  */
+
+import { reconcileFlightsForSave } from '../utils/flightSync';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
 
-/**
- * Enhanced request wrapper with error handling and logging
- */
 async function makeRequest(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -23,11 +21,6 @@ async function makeRequest(endpoint, options = {}) {
   };
 
   try {
-    console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
-    if (options.body) {
-      console.log(`[API Request Body]:`, JSON.parse(options.body));
-    }
-
     const response = await fetch(url, config);
     const data = await response.json();
 
@@ -36,34 +29,12 @@ async function makeRequest(endpoint, options = {}) {
       error.status = response.status;
       error.data = data;
       error.errors = data.errors || [];
-      
-      // Log detailed validation errors with FULL details
-      if (data.errors && Array.isArray(data.errors)) {
-        console.error('%c[VALIDATION ERRORS]:', 'color: red; font-weight: bold; font-size: 14px;');
-        data.errors.forEach((err, index) => {
-          console.error(`%c  Error ${index + 1}:`, 'color: red; font-weight: bold;');
-          console.error('    Field:', err.param || err.field || 'unknown');
-          console.error('    Message:', err.msg || err.message || 'No message');
-          console.error('    Value:', err.value);
-          console.error('    Location:', err.location || 'body');
-        });
-      }
-      
       throw error;
     }
 
     return data;
   } catch (error) {
     console.error(`[API Error] ${endpoint}:`, error.message);
-    if (error.errors && error.errors.length > 0) {
-      console.error('%c[DETAILED ERRORS]:', 'color: red; font-weight: bold;');
-      error.errors.forEach((err, index) => {
-        console.error(`%c  Error ${index + 1}:`, 'color: red;');
-        console.error('    Field:', err.param || err.field || 'unknown');
-        console.error('    Message:', err.msg || err.message || 'No message');
-        console.error('    Value:', err.value);
-      });
-    }
     throw error;
   }
 }
@@ -78,7 +49,6 @@ class ApiService {
   }
 
   static async getPackagesProtected(params = {}) {
-    // Protected endpoint that automatically filters published packages for salesReps
     const queryString = new URLSearchParams(params).toString();
     return makeRequest(`/packages/protected/all${queryString ? `?${queryString}` : ''}`);
   }
@@ -101,10 +71,49 @@ class ApiService {
   }
 
   static async createPackage(packageData) {
-    // Clean the data - remove _id fields and internal properties
+    const rawDays = Array.isArray(packageData.days)
+      ? packageData.days
+      : (Array.isArray(packageData.itineraryDays) ? packageData.itineraryDays : []);
+
     const cleanData = {
-      ...packageData,
+      title: packageData.title || packageData.name,
+      description: packageData.description,
+      destination: packageData.destination,
+      durationDays: packageData.durationDays || packageData.duration,
+      category: packageData.category,
+      coverImage: packageData.coverImage || packageData.coverImageUrl,
+      inclusions: packageData.inclusions || [],
+      exclusions: packageData.exclusions || [],
+      termsAndConditions: packageData.termsAndConditions || (packageData.terms || []).join('. '),
+      basePrice: packageData.basePrice ?? packageData.price,
+      defaultMarginType: packageData.defaultMarginType || 'PERCENTAGE',
+      defaultMarginInput: packageData.defaultMarginInput ?? 20,
+      currency: packageData.currency || 'USD',
+      isActive: packageData.isActive ?? (packageData.status === 'published'),
+      isFeatured: packageData.isFeatured ?? false,
+      images: (packageData.images || []).map((img) => ({
+        url: img.url || img,
+        altText: img.altText || img.alt_text,
+      })),
+      itineraryDays: buildItineraryDaysPayload(rawDays),
     };
+
+    delete cleanData.id;
+    delete cleanData._id;
+    delete cleanData._v;
+    delete cleanData.__v;
+    delete cleanData.createdAt;
+    delete cleanData.createdBy;
+    delete cleanData.slug;
+
+    return makeRequest('/packages', {
+      method: 'POST',
+      body: JSON.stringify(cleanData, (key, value) => value === null ? undefined : value),
+    });
+  }
+
+  static async updatePackage(id, packageData) {
+    const cleanData = { ...packageData };
     delete cleanData._id;
     delete cleanData.id;
     delete cleanData._v;
@@ -112,45 +121,32 @@ class ApiService {
     delete cleanData.createdAt;
     delete cleanData.createdBy;
     delete cleanData.slug;
-    
-    // Ensure days array is preserved
-    if (packageData.days) {
-      cleanData.days = packageData.days;
-    }
-    
-    console.log('[API Service] Sending package data with days:', cleanData.days?.length || 0);
-    if (cleanData.days && cleanData.days.length > 0) {
-      console.log('[API Service] First day sample:', JSON.stringify(cleanData.days[0], null, 2));
-    }
-    
-    return makeRequest('/packages', {
-      method: 'POST',
-      body: JSON.stringify(cleanData),
-    });
-  }
 
-  static async updatePackage(id, packageData) {
-    // Clean the data - remove _id fields and internal properties
-    const cleanData = {
-      ...packageData,
-    };
-    delete cleanData._id;
-    delete cleanData._v;
-    delete cleanData.__v;
-    delete cleanData.createdAt;
-    delete cleanData.createdBy;
-    delete cleanData.slug;
-    
+    // The editor submits editor-shaped `days` (meals booleans, locations,
+    // transport mode). Convert them to the relational `itineraryDays` shape the
+    // backend persists, and drop both the editor `days` and any stale
+    // `itineraryDays` copied from the GET response so edits (including meal
+    // toggles) actually save.
+    if (Array.isArray(packageData.days)) {
+      cleanData.itineraryDays = buildItineraryDaysPayload(packageData.days);
+      delete cleanData.days;
+    } else if (Array.isArray(packageData.itineraryDays)) {
+      cleanData.itineraryDays = buildItineraryDaysPayload(packageData.itineraryDays);
+    }
+
+    // Map legacy fields to new field names
+    if (cleanData.name && !cleanData.title) cleanData.title = cleanData.name;
+    if (cleanData.price !== undefined && cleanData.basePrice === undefined) cleanData.basePrice = cleanData.price;
+    if (cleanData.terms && !cleanData.termsAndConditions) cleanData.termsAndConditions = cleanData.terms.join('. ');
+
     return makeRequest(`/packages/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(cleanData),
+      body: JSON.stringify(cleanData, (key, value) => value === null ? undefined : value),
     });
   }
 
   static async deletePackage(id) {
-    return makeRequest(`/packages/${id}`, {
-      method: 'DELETE',
-    });
+    return makeRequest(`/packages/${id}`, { method: 'DELETE' });
   }
 
   static async getFeaturedPackages(limit = 6) {
@@ -169,103 +165,143 @@ class ApiService {
     return makeRequest(`/packages/category/${category}?limit=${limit}`);
   }
 
-  // ==================== ITINERARY ENDPOINTS ====================
+  static async calculatePrice(payload = {}) {
+    const {
+      days,
+      itineraryDays,
+      defaultMarginType = 'PERCENTAGE',
+      defaultMarginInput = 0,
+    } = payload;
 
-  static async getItineraries(params = {}) {
+    const rawDays = Array.isArray(itineraryDays) && itineraryDays.length > 0
+      ? itineraryDays
+      : (Array.isArray(days) ? days : []);
+
+    const body = {
+      itineraryDays: buildItineraryDaysPayload(rawDays),
+      defaultMarginType,
+      defaultMarginInput,
+    };
+
+    return makeRequest('/packages/calculate-price', {
+      method: 'POST',
+      body: JSON.stringify(body, (key, value) => value === null ? undefined : value),
+    });
+  }
+
+  // ==================== PLACES & ACTIVITIES ====================
+
+  static async getPlaces(params = {}) {
     const queryString = new URLSearchParams(params).toString();
-    return makeRequest(`/itineraries${queryString ? `?${queryString}` : ''}`);
+    return makeRequest(`/places${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async getItinerary(id) {
-    return makeRequest(`/itineraries/${id}`);
+  static async createPlace(data) {
+    return makeRequest('/places', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  static async getItineraryByPackage(packageId) {
-    return makeRequest(`/itineraries/package/${packageId}`);
+  static async getActivities(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return makeRequest(`/activities${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async createItinerary(itineraryData) {
-    return makeRequest('/itineraries', {
-      method: 'POST',
-      body: JSON.stringify(itineraryData),
-    });
+  static async createActivity(data) {
+    return makeRequest('/activities', { method: 'POST', body: JSON.stringify(data) });
   }
+}
 
-  static async updateItinerary(id, itineraryData) {
-    return makeRequest(`/itineraries/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(itineraryData),
-    });
-  }
+/**
+ * Normalize editor/API day objects into the relational `itineraryDays` payload
+ * the package-service persists. Meal toggles in the editor live on
+ * `day.meals` booleans, so those win over stale `breakfastCount`/`lunchCount`/
+ * `dinnerCount` values copied from the API response.
+ */
+function buildItineraryDaysPayload(days) {
+  return (days || []).filter(Boolean).map((day) => {
+    const dayPlaces = Array.isArray(day.places) && day.places.length > 0
+      ? day.places
+      : (Array.isArray(day.locations) ? day.locations : []);
 
-  static async deleteItinerary(id) {
-    return makeRequest(`/itineraries/${id}`, {
-      method: 'DELETE',
-    });
-  }
+    const editorActivities = Array.isArray(day.activities)
+      ? day.activities
+      : (typeof day.activities === 'string'
+        ? day.activities.split(',').map((s) => s.trim()).filter(Boolean)
+        : []);
+    // The editor maps relational day activities to plain display names, which
+    // loses the activityId. Prefer the raw relational rows (kept in
+    // _relational.activities) so IDs and catalog costs survive an edit-save.
+    const relationalActivities = Array.isArray(day._relational?.activities) ? day._relational.activities : [];
+    const activities = editorActivities.length > 0 && editorActivities.every((a) => typeof a === 'string') && relationalActivities.length > 0
+      ? relationalActivities
+      : editorActivities;
 
-  static async getDropdownOptions() {
-    return makeRequest('/itineraries/dropdown-options');
-  }
+    const rawTransports = Array.isArray(day.transports) && day.transports.length > 0
+      ? day.transports
+      : (Array.isArray(day._relational?.transports) && day._relational.transports.length > 0
+        ? day._relational.transports
+        : []);
 
-  // ==================== DAY ENDPOINTS ====================
+    const flights = Array.isArray(day.flights) ? day.flights : [];
+    // Flight price wins on save when real (>0); while totalAmount is the
+    // placeholder 0, manual FLIGHT row costs are preserved.
+    const transports = reconcileFlightsForSave({ flights, transports: rawTransports });
 
-  static async addDay(itineraryId, dayData) {
-    return makeRequest(`/itineraries/${itineraryId}/days`, {
-      method: 'POST',
-      body: JSON.stringify(dayData),
-    });
-  }
+    const meals = (day.meals && typeof day.meals === 'object') ? day.meals : null;
+    const activityCosts = (day.activityCosts && typeof day.activityCosts === 'object') ? day.activityCosts : {};
 
-  static async updateDay(itineraryId, dayNumber, dayData) {
-    return makeRequest(`/itineraries/${itineraryId}/days/${dayNumber}`, {
-      method: 'PUT',
-      body: JSON.stringify(dayData),
-    });
-  }
-
-  static async deleteDay(itineraryId, dayNumber) {
-    return makeRequest(`/itineraries/${itineraryId}/days/${dayNumber}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // ==================== PREVIEW & EXPORT ====================
-
-  static async previewItinerary(id) {
-    return makeRequest(`/itineraries/${id}/preview`);
-  }
-
-  static async downloadItineraryPDF(id) {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    const url = `${API_BASE_URL}/itineraries/${id}/pdf`;
-
-    try {
-      const response = await fetch(url, {
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to download PDF');
-      }
-
-      return response.blob();
-    } catch (error) {
-      console.error('[API Error] Download PDF failed:', error);
-      throw error;
-    }
-  }
-
-  // ==================== CLONE ENDPOINT ====================
-
-  static async cloneItinerary(id, targetPackageId) {
-    return makeRequest(`/itineraries/${id}/clone`, {
-      method: 'POST',
-      body: JSON.stringify({ targetPackageId }),
-    });
-  }
+    return {
+      dayNumber: day.dayNumber,
+      title: day.title || '',
+      description: day.description || '',
+      // Explicit count fields (Costs & Pricing subsection) win over the legacy
+      // boolean toggles; loaded days without counts fall back to the booleans.
+      breakfastCount: day.breakfastCount ?? (meals ? (meals.breakfast ? 1 : 0) : 0),
+      lunchCount: day.lunchCount ?? (meals ? (meals.lunch ? 1 : 0) : 0),
+      dinnerCount: day.dinnerCount ?? (meals ? (meals.dinner ? 1 : 0) : 0),
+      mealPriceOverride: day.mealPriceOverride ?? null,
+      accommodation: day.accommodation ?? null,
+      flights,
+      places: dayPlaces.map((p, i) => {
+        if (typeof p === 'string') return { customName: p, orderIndex: i };
+        return {
+          placeId: p.placeId || p.place?.id || undefined,
+          customName: p.customName || p.name || undefined,
+          orderIndex: p.orderIndex ?? i,
+        };
+      }),
+      activities: activities.map((a, i) => {
+        const isObj = a && typeof a === 'object';
+        const name = isObj ? (a.name || a.activity?.name || '') : (a || '');
+        const cost = name ? activityCosts[name] : null;
+        const relationalRow = Array.isArray(day._relational?.activities)
+          ? day._relational.activities.find((row) =>
+              (row.activity?.name || row.name) === name ||
+              (isObj && a.activityId && row.activityId === a.activityId)
+            )
+          : null;
+        return {
+          activityId: isObj ? (a.activityId || a.activity?.id || undefined) : undefined,
+          name: name || undefined,
+          defaultCost:
+            cost?.defaultCost ??
+            (isObj ? (a.defaultCost ?? a.activity?.defaultCost ?? undefined) : undefined) ??
+            relationalRow?.activity?.defaultCost ??
+            undefined,
+          costOverride: cost?.costOverride ?? (isObj ? (a.costOverride ?? null) : null),
+          orderIndex: isObj ? (a.orderIndex ?? i) : i,
+        };
+      }),
+      transports: transports.map((t) => ({
+        routeType: t.routeType || 'DAILY_ROUTING',
+        transportMode: t.transportMode || String(t.transport || day.transport || 'CAR').toUpperCase(),
+        pricingModel: t.pricingModel || 'PER_VEHICLE',
+        unitCost: t.unitCost ?? 0,
+        distanceKm: t.distanceKm ?? null,
+        originPlaceId: t.originPlaceId ?? null,
+        destinationPlaceId: t.destinationPlaceId ?? null,
+      })),
+    };
+  });
 }
 
 export default ApiService;

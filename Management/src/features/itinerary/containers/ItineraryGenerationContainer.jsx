@@ -84,10 +84,8 @@ const ItineraryGenerationContainer = () => {
   // Stats state
   const [stats, setStats] = useState({
     total: 0,
-    published: 0,
-    draft: 0,
-    archived: 0,
-    totalBookings: 0,
+    active: 0,
+    featured: 0,
     avgRating: 0,
   });
 
@@ -105,14 +103,11 @@ const ItineraryGenerationContainer = () => {
   // Status filter tabs
   const statusTabs = [
     { id: null, label: 'All Packages', count: stats.total, gradient: 'from-slate-500 to-slate-600', color: 'slate' },
-    { id: 'published', label: 'Published', count: stats.published, gradient: 'from-emerald-500 to-teal-600', color: 'emerald' },
-    { id: 'draft', label: 'Drafts', count: stats.draft, gradient: 'from-amber-500 to-orange-600', color: 'amber' },
+    { id: 'active', label: 'Active', count: stats.active, gradient: 'from-emerald-500 to-teal-600', color: 'emerald' },
+    { id: 'featured', label: 'Featured', count: stats.featured, gradient: 'from-purple-500 to-pink-600', color: 'purple' },
   ];
 
-  // Filter tabs for sales reps
-  const visibleTabs = isSalesRep
-    ? statusTabs.filter(t => t.id === 'published' || t.id === null)
-    : statusTabs;
+  const visibleTabs = statusTabs;
 
   /**
    * Load package stats from API
@@ -138,7 +133,8 @@ const ItineraryGenerationContainer = () => {
     const loadPackages = async (page = 1) => {
       try {
         const params = { page, limit: itemsPerPage };
-        if (statusFilter) params.status = statusFilter;
+        if (statusFilter === 'active') params.isActive = true;
+        if (statusFilter === 'featured') params.isFeatured = true;
 
         const response = isSalesRep
           ? await ApiService.getPackagesProtected(params)
@@ -227,7 +223,34 @@ const ItineraryGenerationContainer = () => {
       }
 
       const fullPackage = response.data;
-      const days = fullPackage.days || fullPackage.itinerary?.days || [];
+
+      // Map API relational itineraryDays → editor-friendly days
+      const days = (fullPackage.itineraryDays || []).map(apiDay => ({
+        dayNumber: apiDay.dayNumber,
+        title: apiDay.title || '',
+        description: apiDay.description || '',
+        meals: {
+          breakfast: apiDay.breakfastCount > 0,
+          lunch: apiDay.lunchCount > 0,
+          dinner: apiDay.dinnerCount > 0,
+        },
+        mealPriceOverride: apiDay.mealPriceOverride,
+        locations: (apiDay.places || []).map(p => p.place?.name || p.customName).filter(Boolean),
+        activities: (apiDay.activities || []).map(a => a.activity?.name || '').filter(Boolean),
+        places: (apiDay.places || []).map(p => ({
+          name: p.place?.name || p.customName || '',
+          placeId: p.placeId,
+        })),
+        flights: apiDay.flights || [],
+        accommodation: null,
+        _relational: {
+          places: apiDay.places || [],
+          activities: apiDay.activities || [],
+          transports: apiDay.transports || [],
+        },
+        images: [],
+        notes: '',
+      }));
 
       const formattedImages = (fullPackage.images || []).map(img => {
         if (typeof img === 'object' && img.url) return img;
@@ -276,7 +299,6 @@ const ItineraryGenerationContainer = () => {
         }
         if (!cleanDay.title && cleanDay.dayNumber) cleanDay.title = `Day ${cleanDay.dayNumber}`;
         if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
-        if (!cleanDay.transport || cleanDay.transport === '') delete cleanDay.transport;
         if (cleanDay.accommodation) {
           if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
           const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
@@ -285,22 +307,13 @@ const ItineraryGenerationContainer = () => {
         return cleanDay;
       });
 
-      const categoryMap = {
-        'adventure': 'family', 'budget': 'family', 'luxury': 'family', 'religious': 'family',
-        'wildlife': 'wild safari', 'beach': 'family', 'heritage': 'family', 'other': 'family',
-        'honeymoon': 'honeymoon', 'couple': 'couple', 'family': 'family', 'group': 'group', 'wild safari': 'wild safari',
-      };
-      const validCategory = categoryMap[formData.category?.toLowerCase()] || 'family';
-
       const sanitizedData = {
         ...formData,
-        category: validCategory,
-        price: parseFloat(formData.price) || 0,
-        duration: parseInt(formData.duration, 10) || 1,
-        maxGroupSize: parseInt(formData.maxGroupSize, 10) || 10,
+        category: formData.category || 'FAMILY',
+        basePrice: formData.basePrice ?? formData.price ?? 0,
+        durationDays: formData.durationDays || formData.duration || 1,
         days: cleanDays,
-        images: validImages,
-        status: formData.status || 'draft',
+        images: (validImages.length > 0 ? validImages : (formData.images || [])).map(img => ({ url: img.url, altText: img.altText })),
       };
 
       delete sanitizedData._id;
@@ -367,7 +380,6 @@ const ItineraryGenerationContainer = () => {
         }
         if (!cleanDay.title && cleanDay.dayNumber) cleanDay.title = `Day ${cleanDay.dayNumber}`;
         if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
-        if (!cleanDay.transport || cleanDay.transport === '') delete cleanDay.transport;
         if (cleanDay.accommodation) {
           if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
           const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
@@ -376,22 +388,13 @@ const ItineraryGenerationContainer = () => {
         return cleanDay;
       });
 
-      const categoryMap = {
-        'adventure': 'family', 'budget': 'family', 'luxury': 'family', 'religious': 'family',
-        'wildlife': 'wild safari', 'beach': 'family', 'heritage': 'family', 'other': 'family',
-        'honeymoon': 'honeymoon', 'couple': 'couple', 'family': 'family', 'group': 'group', 'wild safari': 'wild safari',
-      };
-      const validCategory = categoryMap[formData.category?.toLowerCase()] || 'family';
-
       const sanitizedData = {
         ...formData,
-        category: validCategory,
-        price: parseFloat(formData.price) || 0,
-        duration: parseInt(formData.duration, 10) || 1,
-        maxGroupSize: parseInt(formData.maxGroupSize, 10) || 1,
+        category: formData.category || 'FAMILY',
+        basePrice: formData.basePrice ?? formData.price ?? 0,
+        durationDays: formData.durationDays || formData.duration || 1,
         days: cleanDays,
-        images: validImages,
-        status: formData.status || 'draft',
+        images: (validImages.length > 0 ? validImages : (formData.images || [])).map(img => ({ url: img.url, altText: img.altText })),
       };
 
       delete sanitizedData._id;
@@ -438,7 +441,7 @@ const ItineraryGenerationContainer = () => {
     if (!pkg) return;
 
     Swal.fire({
-      title: `Delete ${pkg.name}?`,
+      title: `Delete ${pkg.title}?`,
       text: 'This will permanently remove the package.',
       icon: 'warning',
       showCancelButton: true,
@@ -456,7 +459,7 @@ const ItineraryGenerationContainer = () => {
             if (selectedPackage?._id === packageId || selectedPackage?.id === packageId) {
               setSelectedPackage(null);
             }
-            Swal.fire('Deleted', `${pkg.name} ${VALIDATION_MESSAGES.PACKAGE_DELETED}`, 'success');
+            Swal.fire('Deleted', `${pkg.title} ${VALIDATION_MESSAGES.PACKAGE_DELETED}`, 'success');
           } else {
             Swal.fire('Error', response.message || 'Failed to delete package', 'error');
           }
@@ -475,7 +478,7 @@ const ItineraryGenerationContainer = () => {
     }
 
     Swal.fire({
-      title: `Duplicate ${pkg.name}?`,
+      title: `Duplicate ${pkg.title}?`,
       text: 'This will create a copy of the package.',
       icon: 'question',
       showCancelButton: true,
@@ -485,7 +488,7 @@ const ItineraryGenerationContainer = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const duplicateData = { ...pkg, name: `${pkg.name} (Copy)`, status: 'draft', bookings: 0, rating: 0, reviews: 0 };
+          const duplicateData = { ...pkg, title: `${pkg.title} (Copy)`, isActive: false, bookings: 0, rating: 0, numReviews: 0 };
           delete duplicateData._id;
 
           const response = await ApiService.createPackage(duplicateData);
@@ -493,7 +496,7 @@ const ItineraryGenerationContainer = () => {
           if (response.success) {
             setPackages((prev) => [response.data, ...prev]);
             setCurrentPage(1);
-            Swal.fire('Success', `${pkg.name} has been duplicated successfully.`, 'success');
+            Swal.fire('Success', `${pkg.title} has been duplicated successfully.`, 'success');
           } else {
             Swal.fire('Error', response.message || 'Failed to duplicate package', 'error');
           }
@@ -568,9 +571,10 @@ const ItineraryGenerationContainer = () => {
   // Package Card Component
   const PackageCard = ({ pkg }) => {
     if (!pkg || typeof pkg !== 'object') return null;
-    const formattedPrice = formatPriceINR(pkg.price);
-    const status = pkg.status || 'draft';
-    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+    const displayPrice = pkg.sellPrice ?? pkg.basePrice;
+    const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
+    const status = pkg.isActive ? 'published' : 'draft';
+    const statusLabel = pkg.isActive ? 'Published' : 'Draft';
 
     return (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all group">
@@ -608,7 +612,7 @@ const ItineraryGenerationContainer = () => {
 
         {/* Content */}
         <div className="p-5">
-          <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-1">{pkg.name}</h3>
+          <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-1">{pkg.title}</h3>
 
           <div className="flex flex-wrap gap-2 mb-4">
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CATEGORY_COLORS[pkg.category] || 'bg-slate-100 text-slate-700'}`}>
@@ -624,7 +628,7 @@ const ItineraryGenerationContainer = () => {
           <div className="space-y-2 text-sm text-slate-600 mb-4">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-slate-400" />
-              <span>{pkg.duration || 'N/A'} days</span>
+              <span>{pkg.durationDays || 'N/A'} days</span>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-slate-400" />
@@ -636,7 +640,7 @@ const ItineraryGenerationContainer = () => {
             <div className="flex items-center gap-2">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
               <span className="font-semibold text-slate-800">{pkg.rating || 0}</span>
-              <span className="text-xs text-slate-400">({pkg.numReviews ?? (Array.isArray(pkg.reviews) ? pkg.reviews.length : 0)})</span>
+              <span className="text-xs text-slate-400">({pkg.numReviews || 0})</span>
             </div>
             <div className="flex items-center gap-1 text-sm text-slate-500">
               <Users className="w-4 h-4" />

@@ -1,0 +1,26 @@
+{
+  "name": "@travel-crm/pricing-engine",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./meals": "./src/meals.js",
+    "./transport": "./src/transport.js",
+    "./activities": "./src/activities.js",
+    "./margin": "./src/margin.js",
+    "./config": "./src/config.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@travel-crm/constants": "file:../constants"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10",
+    "@vitest/coverage-v8": "^4.0.0"
+  }
+}

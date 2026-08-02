@@ -23,20 +23,28 @@ const PackageStats = ({ stats, onFilterChange, activeFilter }) => {
       showFor: ['admin', 'superAdmin', 'staff'], // Only show for admins/staff
     },
     {
-      label: 'Published',
-      value: stats.published,
+      label: 'Active',
+      value: stats.active ?? 0,
       bgColor: 'bg-green-50',
       hoverColor: 'hover:bg-green-100',
-      filterValue: 'published',
-      showFor: ['admin', 'superAdmin', 'staff', 'salesRep'], // Show for everyone
+      filterValue: 'active',
+      showFor: ['admin', 'superAdmin', 'staff', 'salesRep'],
     },
     {
-      label: 'Draft',
-      value: stats.draft,
+      label: 'Inactive',
+      value: (stats.total ?? 0) - (stats.active ?? 0),
       bgColor: 'bg-yellow-50',
       hoverColor: 'hover:bg-yellow-100',
-      filterValue: 'draft',
-      showFor: ['admin', 'superAdmin', 'staff'], // Only show for admins/staff
+      filterValue: 'inactive',
+      showFor: ['admin', 'superAdmin', 'staff'],
+    },
+    {
+      label: 'Featured',
+      value: stats.featured ?? 0,
+      bgColor: 'bg-purple-50',
+      hoverColor: 'hover:bg-purple-100',
+      filterValue: 'featured',
+      showFor: ['admin', 'superAdmin', 'staff'],
     },
   ];
 

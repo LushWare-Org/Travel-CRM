@@ -16,6 +16,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.15.0",
     "@prisma/client": "^5.22.0",
+    "@travel-crm/constants": "file:../shared/constants",
     "cloudinary": "^2.4.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",

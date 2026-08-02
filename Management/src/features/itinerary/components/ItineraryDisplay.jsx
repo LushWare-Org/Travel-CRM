@@ -53,7 +53,10 @@ const ItineraryDisplay = ({ days = [] }) => {
 
   return (
     <div className="space-y-4">
-      {days.map((day) => (
+      {(days || []).filter(Boolean).map((day) => {
+        const locations = Array.isArray(day.locations) ? day.locations : [];
+        const activities = Array.isArray(day.activities) ? day.activities : [];
+        return (
         <div key={day.dayNumber} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           {/* Day Header */}
           <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-4">
@@ -65,11 +68,11 @@ const ItineraryDisplay = ({ days = [] }) => {
                 <h3 className="text-lg font-semibold">
                   Day {day.dayNumber}{day.title ? `: ${day.title}` : ''}
                 </h3>
-                {day.locations && day.locations.length > 0 && (
+                {locations.length > 0 && (
                   <p className="text-amber-100 text-sm flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3" />
-                    {day.locations.slice(0, 3).join(' → ')}
-                    {day.locations.length > 3 && ` +${day.locations.length - 3} more`}
+                    {locations.slice(0, 3).join(' → ')}
+                    {locations.length > 3 && ` +${locations.length - 3} more`}
                   </p>
                 )}
               </div>
@@ -86,10 +89,10 @@ const ItineraryDisplay = ({ days = [] }) => {
             )}
 
             {/* Locations Covered */}
-            {day.locations && day.locations.length > 0 && (
+            {locations.length > 0 && (
               <Section label="Locations Covered" icon={MapPin}>
                 <div className="flex flex-wrap gap-2">
-                  {day.locations.map((location, idx) => (
+                  {locations.map((location, idx) => (
                     <InfoBadge key={idx} icon={MapPinned} variant="success">
                       {location}
                     </InfoBadge>
@@ -99,10 +102,10 @@ const ItineraryDisplay = ({ days = [] }) => {
             )}
 
             {/* Activities */}
-            {day.activities && day.activities.length > 0 && (
+            {activities.length > 0 && (
               <Section label="Activities" icon={Activity}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {day.activities.map((activity, idx) => (
+                  {activities.map((activity, idx) => (
                     <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg border border-blue-100">
                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                       <span className="text-sm">{activity}</span>
@@ -193,7 +196,7 @@ const ItineraryDisplay = ({ days = [] }) => {
             )}
 
             {/* Places */}
-            {day.places && day.places.length > 0 && (
+            {Array.isArray(day.places) && day.places.length > 0 && (
               <Section label="Places to Visit" icon={MapPin}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {day.places.map((place, idx) => (
@@ -224,7 +227,7 @@ const ItineraryDisplay = ({ days = [] }) => {
             )}
 
             {/* Day Images */}
-            {day.images && day.images.length > 0 && (
+            {Array.isArray(day.images) && day.images.length > 0 && (
               <Section label="Day Images" icon={ImageIcon}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
                   {day.images.map((img, idx) => {
@@ -247,7 +250,8 @@ const ItineraryDisplay = ({ days = [] }) => {
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

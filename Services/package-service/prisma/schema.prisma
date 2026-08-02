@@ -3,11 +3,16 @@
 // Shared DB, isolated namespace.
 //
 // Design decisions:
-//   • Itinerary.days and CustomizedPackage.days → Json (JSONB):
-//     deeply nested, always read/written as a whole unit.
-//   • String arrays (inclusions, exclusions, etc.) → text[].
+//   • Relational day model — Itinerary_Day + junction tables
+//     replace the old JSONB blob for itemized pricing.
+//   • Place + Activity_Catalog are master dictionaries shared
+//     across all packages (create-or-select pattern).
 //   • Cross-schema refs are plain UUID strings (no FK across
 //     schema boundaries — enforced at service layer).
+//   • base_price is the cached vendor-cost total, computed by
+//     the shared pricing engine; admin may override.
+//   • CustomizedPackage + ManualItinerary removed — those are
+//     lead-service responsibilities.
 // =============================================================
 
 generator client {
@@ -22,110 +27,103 @@ datasource db {
   schemas   = ["crm_packages"]
 }
 
+// ─── Enums ─────────────────────────────────────────────────────
+
 enum PackageCategory {
-  honeymoon
-  couple
-  family
-  group
-  wild_safari @map("wild safari")
+  HONEYMOON
+  COUPLE
+  FAMILY
+  GROUP
+  WILD_SAFARI
 
   @@schema("crm_packages")
 }
 
-enum PackageType {
-  Standard
-  Deluxe
-  Luxury
-  Premium
+enum MarginType {
+  PERCENTAGE
+  FIXED
 
   @@schema("crm_packages")
 }
 
-enum PackageStatus {
-  draft
-  published
-  archived
+enum PlaceType {
+  CITY
+  ATTRACTION
+  REGION
+  AIRPORT
 
   @@schema("crm_packages")
 }
 
-enum ItineraryStatus {
-  draft
-  published
-  archived
+enum RouteType {
+  DAILY_ROUTING
+  POINT_TO_POINT
 
   @@schema("crm_packages")
 }
 
-enum CpDifficulty {
-  easy
-  moderate
-  difficult
+enum TransportMode {
+  FLIGHT
+  CAR
+  TRAIN
+  BOAT
+  VAN
+  BUS
 
   @@schema("crm_packages")
 }
 
-enum CpCategory {
-  honeymoon
-  family
-  adventure
-  budget
-  luxury
-  religious
-  wildlife
-  beach
-  heritage
-  other
+enum PricingModel {
+  PER_KM
+  PER_PERSON
+  PER_VEHICLE
 
   @@schema("crm_packages")
 }
 
-// ─── Package ──────────────────────────────────────────────────
+enum HotelBookingStatus {
+  pending
+  confirmed
+  cancelled
+  failed
+
+  @@schema("crm_packages")
+}
+
+// ─── Package (core blueprint) ──────────────────────────────────
 
 model Package {
   id                  String          @id @default(uuid())
-  name                String?         @db.VarChar(100)
+  title               String          @default("") @db.VarChar(255)
   slug                String?         @unique
-  description         String?         @db.VarChar(2000)
-  destination         String?
-  duration            Int?
-  price               Float?
-  maxGroupSize        Int             @default(10)
-  difficulty          String?
-  category            PackageCategory @default(family)
-  packageType         PackageType     @default(Standard)
+  description         String?         @db.Text
+  destination         String?         @db.VarChar(255)   // denormalized search/filter aid
+  durationDays        Int             @default(1) @map("duration_days")
+  category            PackageCategory @default(FAMILY)
+  coverImage          String?         @db.VarChar(500)   @map("cover_image")
 
-  coverImagePublicId  String?
-  coverImageUrl       String?
+  inclusions          Json            @default("[]")      // string[]
+  exclusions          Json            @default("[]")      // string[]
+  termsAndConditions  String?         @db.Text            @map("terms_and_conditions")
 
-  inclusions          String[]
-  exclusions          String[]
-  highlights          String[]
-  terms               String[]
+  basePrice           Decimal         @default(0)         @map("base_price") @db.Decimal(10, 2)
+  defaultMarginType   MarginType      @default(PERCENTAGE) @map("default_margin_type")
+  defaultMarginInput  Decimal         @default(0)         @map("default_margin_input") @db.Decimal(10, 2)
+  currency            String          @default("USD")     @db.VarChar(3)
 
-  // FK within same schema — constraint enforced
-  itineraryId         String?         @unique
-  itinerary           Itinerary?      @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
-
-  isActive            Boolean         @default(true)
-  isFeatured          Boolean         @default(false)
-  status              PackageStatus   @default(draft)
-  availableFrom       DateTime        @default(now())
-  availableTo         DateTime?
+  isActive            Boolean         @default(true)      @map("is_active")
+  isFeatured          Boolean         @default(false)     @map("is_featured")
 
   rating              Float           @default(0)
-  numReviews          Int             @default(0)
+  numReviews          Int             @default(0)         @map("num_reviews")
   views               Int             @default(0)
   bookings            Int             @default(0)
 
-  // Cross-schema UUID refs (no FK constraints)
-  createdById         String?         // → users.User.id
-  customizedForLeadId String?         // → leads.Lead.id
-  originalPackageId   String?         // → packages.Package.id (self-ref for copies)
-  customizedById      String?         // → users.User.id
-  customizationNotes  String?         @db.VarChar(500)
+  // Cross-schema ref (no FK across schema boundaries)
+  createdBy           String?                             @map("created_by")   // → users.User.id
 
   images              PackageImage[]
+  itineraryDays       ItineraryDay[]
   reviews             Review[]
 
   createdAt           DateTime        @default(now())
@@ -135,172 +133,155 @@ model Package {
   @@index([destination])
   @@index([isActive])
   @@index([isFeatured])
-  @@index([status])
-  @@index([createdById])
-  @@index([price])
+  @@index([createdBy])
+  @@index([basePrice])
   @@index([rating])
   @@index([bookings])
   @@index([createdAt])
-  @@index([customizedForLeadId])
-  @@index([originalPackageId])
   @@index([isActive, category])
   @@index([isActive, isFeatured])
-  @@index([isActive, status])
   @@schema("crm_packages")
 }
+
+// ─── Package Image ─────────────────────────────────────────────
 
 model PackageImage {
-  id        String  @id @default(uuid())
-  packageId String
-  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  publicId  String?
-  url       String?
-  order     Int     @default(0)
+  id         String   @id @default(uuid())
+  packageId  String
+  package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  url        String?
+  altText    String?  @db.VarChar(255)  @map("alt_text")
+  orderIndex Int      @default(0)       @map("order_index")
 
   @@index([packageId])
+  @@map("Package_Image")
   @@schema("crm_packages")
 }
 
-// ─── Itinerary ────────────────────────────────────────────────
+// ─── Itinerary Day (daily container) ───────────────────────────
 
-model Itinerary {
-  id               String          @id @default(uuid())
-  packageId        String?
-  packageModelType String          @default("Package") // "Package" | "CustomizedPackage"
+model ItineraryDay {
+  id                String   @id @default(uuid())
+  packageId         String
+  package           Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  dayNumber         Int      @map("day_number")
+  title             String?  @db.VarChar(255)
+  description       String?  @db.Text
 
-  // JSONB — deeply nested day objects, always read/written as a whole.
-  // Shape per element: { dayNumber, title, description, locations[],
-  //   activities[], accommodation{name,type,rating,address,contactNumber},
-  //   meals{breakfast,lunch,dinner}, transport,
-  //   places[{name,description,duration,images[{public_id,url}]}],
-  //   images[{public_id,url}], notes }
-  days             Json            @default("[]")
+  breakfastCount    Int      @default(0) @map("breakfast_count")
+  lunchCount        Int      @default(0) @map("lunch_count")
+  dinnerCount       Int      @default(0) @map("dinner_count")
+  mealPriceOverride Decimal? @map("meal_price_override") @db.Decimal(10, 2)
+  flights           Json     @default("[]") // editor flight preferences per day
 
-  status           ItineraryStatus @default(draft)
-  version          Int             @default(1)
+  places            PackageDayPlace[]
+  activities        PackageDayActivity[]
+  transports        PackageDayTransport[]
 
-  // Computed metadata (mirrors Mongoose pre-save hook logic)
-  metaTotalActivities  Int         @default(0)
-  metaTotalLocations   Int         @default(0)
-  metaTotalPlaces      Int         @default(0)
-  metaBreakfastCount   Int         @default(0)
-  metaLunchCount       Int         @default(0)
-  metaDinnerCount      Int         @default(0)
-  metaLastModifiedById String?     // → users.User.id
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  createdById      String?         // → users.User.id
-
-  package          Package?
-
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-
+  @@unique([packageId, dayNumber])
   @@index([packageId])
-  @@index([status, createdAt])
-  @@index([createdById])
+  @@map("Itinerary_Day")
   @@schema("crm_packages")
 }
 
-// ─── ManualItinerary ──────────────────────────────────────────
+// ─── Place (master dictionary) ─────────────────────────────────
 
-model ManualItinerary {
-  id               String          @id @default(uuid())
-  leadId           String          // cross-schema ref → leads.Lead.id
+model Place {
+  id          String     @id @default(uuid())
+  name        String     @unique @db.VarChar(255)
+  type        PlaceType
+  defaultCost Decimal?   @map("default_cost") @db.Decimal(10, 2)
 
-  // JSONB — same shape as Itinerary.days
-  days             Json            @default("[]")
+  dayPlaces   PackageDayPlace[]
+  origins     PackageDayTransport[]  @relation("TransportOrigin")
+  destinations PackageDayTransport[] @relation("TransportDestination")
 
-  status           ItineraryStatus @default(draft)
-  version          Int             @default(1)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  metaTotalActivities  Int         @default(0)
-  metaTotalLocations   Int         @default(0)
-  metaTotalPlaces      Int         @default(0)
-  metaBreakfastCount   Int         @default(0)
-  metaLunchCount       Int         @default(0)
-  metaDinnerCount      Int         @default(0)
-  metaLastModifiedById String?
-
-  createdById      String?
-
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-
-  @@index([leadId, createdAt])
-  @@index([status, createdAt])
-  @@index([createdById])
+  @@index([type])
   @@schema("crm_packages")
 }
 
-// ─── CustomizedPackage ────────────────────────────────────────
+// ─── Package Day Place (junction) ─────────────────────────────
 
-model CustomizedPackage {
-  id                    String       @id @default(uuid())
-  customizationSequence Int          @default(1)
-  name                  String       @db.VarChar(100)
-  description           String       @db.VarChar(2000)
-  destination           String
-  duration              Int
-  price                 Float
-  maxGroupSize          Int          @default(10)
-  difficulty            CpDifficulty @default(moderate)
-  category              CpCategory   @default(other)
+model PackageDayPlace {
+  id             String       @id @default(uuid())
+  itineraryDayId String
+  itineraryDay   ItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  placeId        String?
+  place          Place?       @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  customName     String?      @db.VarChar(255)  @map("custom_name")
+  orderIndex     Int          @default(0)       @map("order_index")
 
-  coverImagePublicId    String?
-  coverImageUrl         String?
-
-  inclusions            String[]
-  exclusions            String[]
-  highlights            String[]
-  terms                 String[]
-
-  itineraryId           String?      // → packages.Itinerary.id (same schema)
-
-  // JSONB — inline day data (same shape as Itinerary.days)
-  days                  Json         @default("[]")
-
-  isActive              Boolean      @default(true)
-  isFeatured            Boolean      @default(false)
-  availableFrom         DateTime     @default(now())
-  availableTo           DateTime?
-  rating                Float        @default(0)
-  numReviews            Int          @default(0)
-  views                 Int          @default(0)
-  bookings              Int          @default(0)
-
-  // Cross-schema UUID refs
-  createdById           String?      // → users.User.id
-  customizedForLeadId   String       // → leads.Lead.id
-  originalPackageId     String       // → packages.Package.id
-  customizedById        String       // → users.User.id
-  customizationNotes    String?      @db.VarChar(500)
-
-  images                CustomizedPackageImage[]
-
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-
-  @@index([customizedForLeadId])
-  @@index([originalPackageId])
-  @@index([customizedById])
-  @@index([createdAt])
-  @@index([isActive])
+  @@unique([itineraryDayId, orderIndex])
+  @@index([itineraryDayId])
+  @@index([placeId])
+  @@map("Package_Day_Place")
   @@schema("crm_packages")
 }
 
-model CustomizedPackageImage {
-  id                  String            @id @default(uuid())
-  customizedPackageId String
-  package             CustomizedPackage @relation(fields: [customizedPackageId], references: [id], onDelete: Cascade)
-  publicId            String?
-  url                 String?
-  order               Int               @default(0)
+// ─── Activity Catalog (master dictionary) ──────────────────────
 
-  @@index([customizedPackageId])
+model ActivityCatalog {
+  id          String              @id @default(uuid())
+  name        String              @unique @db.VarChar(255)
+  description String?             @db.Text
+  defaultCost Decimal             @map("default_cost") @db.Decimal(10, 2)
+  vendorId    String?             @map("vendor_id")  // cross-schema ref → users.User.id
+
+  dayActivities PackageDayActivity[]
+
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("Activity_Catalog")
   @@schema("crm_packages")
 }
 
-// ─── Review ───────────────────────────────────────────────────
+// ─── Package Day Activity (junction) ───────────────────────────
+
+model PackageDayActivity {
+  id             String          @id @default(uuid())
+  itineraryDayId String
+  itineraryDay   ItineraryDay    @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  activityId     String
+  activity       ActivityCatalog @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  orderIndex     Int             @default(0)      @map("order_index")
+  costOverride   Decimal?        @map("cost_override") @db.Decimal(10, 2)
+
+  @@unique([itineraryDayId, orderIndex])
+  @@index([itineraryDayId])
+  @@index([activityId])
+  @@map("Package_Day_Activity")
+  @@schema("crm_packages")
+}
+
+// ─── Package Day Transport ─────────────────────────────────────
+
+model PackageDayTransport {
+  id                 String        @id @default(uuid())
+  itineraryDayId     String
+  itineraryDay       ItineraryDay  @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  routeType          RouteType     @map("route_type")
+  transportMode      TransportMode @map("transport_mode")
+  pricingModel       PricingModel  @map("pricing_model")
+  unitCost           Decimal       @map("unit_cost") @db.Decimal(10, 2)
+  distanceKm         Decimal?      @map("distance_km") @db.Decimal(8, 2)
+  originPlaceId      String?       @map("origin_place_id")
+  originPlace        Place?        @relation("TransportOrigin", fields: [originPlaceId], references: [id], onDelete: SetNull)
+  destinationPlaceId String?       @map("destination_place_id")
+  destinationPlace   Place?        @relation("TransportDestination", fields: [destinationPlaceId], references: [id], onDelete: SetNull)
+
+  @@index([itineraryDayId])
+  @@map("Package_Day_Transport")
+  @@schema("crm_packages")
+}
+
+// ─── Review (unchanged) ────────────────────────────────────────
 
 model Review {
   id         String   @id @default(uuid())
@@ -321,16 +302,7 @@ model Review {
   @@schema("crm_packages")
 }
 
-// ─── HotelBooking ─────────────────────────────────────────────
-
-enum HotelBookingStatus {
-  pending
-  confirmed
-  cancelled
-  failed
-
-  @@schema("crm_packages")
-}
+// ─── HotelBooking (unchanged) ──────────────────────────────────
 
 model HotelBooking {
   id                String              @id @default(uuid())
@@ -359,7 +331,7 @@ model HotelBooking {
   // Lead / day context — cross-schema UUID refs
   leadId              String?
   packageId           String?
-  customizedPackageId String?
+  customizedPackageId String?   // kept for historical data; no FK
   dayNumber           Int?
 
   createdAt         DateTime            @default(now())

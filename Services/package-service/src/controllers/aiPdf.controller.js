@@ -25,7 +25,12 @@ export const downloadAIPdf = asyncHandler(async (req, res) => {
 
   const pkg = await prisma.package.findUnique({
     where: { id },
-    include: { itinerary: true },
+    include: {
+      itineraryDays: {
+        orderBy: { dayNumber: 'asc' },
+        include: { places: { include: { place: true } }, activities: { include: { activity: true } }, transports: true },
+      },
+    },
   });
   if (!pkg) throw new AppError('Package not found', 404);
 
@@ -34,30 +39,29 @@ export const downloadAIPdf = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="package-${id}.pdf"`);
   doc.pipe(res);
 
-  const PW = doc.page.width - 100; // usable width
+  const PW = doc.page.width - 100;
 
-  // ── Cover header block ─────────────────────────────────────────────────────
+  // ── Cover header block ─────────────────────────────────────
   doc.rect(0, 0, doc.page.width, 110).fill(ACCENT);
   doc.fillColor('#ffffff')
      .fontSize(24).font('Helvetica-Bold')
-     .text(pkg.name || 'Travel Package', 50, 22, { width: PW });
+     .text(pkg.title || 'Travel Package', 50, 22, { width: PW });
 
   const meta = [
     pkg.destination,
-    pkg.duration ? `${pkg.duration} Days` : null,
+    pkg.durationDays ? `${pkg.durationDays} Days` : null,
     pkg.category,
-    pkg.packageType,
   ].filter(Boolean).join('  |  ');
   if (meta) doc.fontSize(11).font('Helvetica').text(meta, 50, 60, { width: PW });
-  if (pkg.price) {
+  if (pkg.basePrice) {
     doc.fontSize(14).font('Helvetica-Bold')
-       .text(`From $${Number(pkg.price).toLocaleString()}`, 50, 82, { width: PW });
+       .text(`From $${Number(pkg.basePrice).toLocaleString()}`, 50, 82, { width: PW });
   }
 
   doc.fillColor('#000000');
   doc.y = 130;
 
-  // ── Overview ───────────────────────────────────────────────────────────────
+  // ── Overview ───────────────────────────────────────────────
   if (pkg.description) {
     sectionTitle(doc, 'Overview');
     doc.fontSize(11).font('Helvetica').fillColor('#000000')
@@ -65,26 +69,22 @@ export const downloadAIPdf = asyncHandler(async (req, res) => {
     doc.moveDown();
   }
 
-  // ── Highlights ─────────────────────────────────────────────────────────────
-  if (pkg.highlights?.length) {
-    sectionTitle(doc, 'Highlights');
-    bulletList(doc, pkg.highlights, '*', PW);
-  }
-
-  // ── Inclusions ─────────────────────────────────────────────────────────────
-  if (pkg.inclusions?.length) {
+  // ── Inclusions ─────────────────────────────────────────────
+  const inclusions = Array.isArray(pkg.inclusions) ? pkg.inclusions : [];
+  if (inclusions.length) {
     sectionTitle(doc, 'Inclusions');
-    bulletList(doc, pkg.inclusions, '+', PW);
+    bulletList(doc, inclusions, '+', PW);
   }
 
-  // ── Exclusions ─────────────────────────────────────────────────────────────
-  if (pkg.exclusions?.length) {
+  // ── Exclusions ─────────────────────────────────────────────
+  const exclusions = Array.isArray(pkg.exclusions) ? pkg.exclusions : [];
+  if (exclusions.length) {
     sectionTitle(doc, 'Exclusions');
-    bulletList(doc, pkg.exclusions, '-', PW);
+    bulletList(doc, exclusions, '-', PW);
   }
 
-  // ── Itinerary ──────────────────────────────────────────────────────────────
-  const days = Array.isArray(pkg.itinerary?.days) ? pkg.itinerary.days : [];
+  // ── Itinerary ──────────────────────────────────────────────
+  const days = pkg.itineraryDays || [];
   if (days.length) {
     doc.addPage();
     doc.rect(0, 0, doc.page.width, 60).fill(ACCENT);
@@ -96,7 +96,7 @@ export const downloadAIPdf = asyncHandler(async (req, res) => {
     days.forEach((day) => {
       if (doc.y > 680) doc.addPage();
 
-      const dayLabel = `Day ${day.dayNumber ?? ''}${day.title ? ': ' + day.title : ''}`;
+      const dayLabel = `Day ${day.dayNumber}${day.title ? ': ' + day.title : ''}`;
       doc.fontSize(12).font('Helvetica-Bold').fillColor(ACCENT).text(dayLabel);
       doc.fillColor('#000000');
 
@@ -107,16 +107,18 @@ export const downloadAIPdf = asyncHandler(async (req, res) => {
       }
 
       const details = [];
-      if (day.activities?.length) details.push(`Activities: ${day.activities.join(', ')}`);
-      if (day.locations?.length)  details.push(`Locations: ${day.locations.join(', ')}`);
-      if (day.transport)          details.push(`Transport: ${day.transport}`);
-      if (day.accommodation?.name) {
-        const accom = day.accommodation;
-        details.push(`Stay: ${accom.name}${accom.type ? ' (' + accom.type + ')' : ''}`);
+      const locationNames = (day.places || []).map(p => p.place?.name || p.customName).filter(Boolean);
+      if (locationNames.length) details.push(`Locations: ${locationNames.join(', ')}`);
+      const activityNames = (day.activities || []).map(a => a.activity?.name).filter(Boolean);
+      if (activityNames.length) details.push(`Activities: ${activityNames.join(', ')}`);
+      if (day.transports?.length) {
+        const t = day.transports[0];
+        details.push(`Transport: ${t.transportMode} (${t.pricingModel})`);
       }
-      const meals = ['breakfast', 'lunch', 'dinner']
-        .filter(m => day.meals?.[m])
-        .map(m => m.charAt(0).toUpperCase() + m.slice(1));
+      const meals = [];
+      if (day.breakfastCount > 0) meals.push(`${day.breakfastCount}x Breakfast`);
+      if (day.lunchCount > 0) meals.push(`${day.lunchCount}x Lunch`);
+      if (day.dinnerCount > 0) meals.push(`${day.dinnerCount}x Dinner`);
       if (meals.length) details.push(`Meals: ${meals.join(', ')}`);
 
       details.forEach(d => {
@@ -127,18 +129,16 @@ export const downloadAIPdf = asyncHandler(async (req, res) => {
     });
   }
 
-  // ── Terms & Conditions ─────────────────────────────────────────────────────
-  if (pkg.terms?.length) {
+  // ── Terms & Conditions ─────────────────────────────────────
+  if (pkg.termsAndConditions) {
     if (doc.y > 580) doc.addPage();
     doc.moveDown(0.5);
     sectionTitle(doc, 'Terms & Conditions');
-    pkg.terms.forEach((t, i) => {
-      doc.fontSize(10).font('Helvetica').fillColor('#000000')
-         .text(`${i + 1}. ${t}`, { width: PW });
-    });
+    doc.fontSize(10).font('Helvetica').fillColor('#000000')
+       .text(pkg.termsAndConditions, { width: PW });
   }
 
-  // ── Footer on last page ────────────────────────────────────────────────────
+  // ── Footer on last page ────────────────────────────────────
   doc.fontSize(8).fillColor(GRAY)
      .text(
        `Generated on ${new Date().toLocaleDateString()}  |  Package ID: ${id}`,

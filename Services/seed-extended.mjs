@@ -131,99 +131,56 @@ async function seedUsers() {
 async function seedPackages() {
   console.log('  → crm_packages (extended)');
 
-  // Itineraries first (no package FK yet — linked via Package.itineraryId)
-  await pkg.itinerary.createMany({
-    data: [
-      {
-        id: N.itin3, packageId: N.pkg4, packageModelType: 'Package', status: 'published', version: 1,
-        metaTotalActivities: 8, metaTotalLocations: 5, metaBreakfastCount: 4, metaLunchCount: 3, metaDinnerCount: 4,
-        createdById: E.admin,
-        days: [
-          { dayNumber:1, title:'Dubai Arrival & City Tour', description:'Arrive Dubai, check in & city overview', locations:['Dubai'], activities:['City tour','Dubai Mall'], meals:{breakfast:false,lunch:false,dinner:true}, transport:'private car', accommodation:{name:'Burj Al Arab',type:'hotel',rating:5}, places:[], notes:'VIP transfer included' },
-          { dayNumber:2, title:'Desert Safari', description:'Full day desert adventure with dune bashing', locations:['Dubai Desert'], activities:['Dune bashing','Camel ride','Belly dance show'], meals:{breakfast:true,lunch:false,dinner:true}, transport:'4x4', accommodation:{name:'Burj Al Arab',type:'hotel',rating:5}, places:[], notes:'Depart 14:00' },
-          { dayNumber:3, title:'Burj Khalifa & Dubai Creek', description:'Top of the world views and old Dubai', locations:['Downtown Dubai','Dubai Creek'], activities:['Burj Khalifa observation deck','Abra ride','Spice Souk'], meals:{breakfast:true,lunch:true,dinner:false}, transport:'metro', accommodation:{name:'Burj Al Arab',type:'hotel',rating:5}, places:[], notes:'' },
-          { dayNumber:4, title:'Abu Dhabi Day Trip', description:'Sheikh Zayed Mosque and Ferrari World', locations:['Abu Dhabi'], activities:['Sheikh Zayed Grand Mosque','Ferrari World'], meals:{breakfast:true,lunch:true,dinner:true}, transport:'coach', accommodation:{name:'Burj Al Arab',type:'hotel',rating:5}, places:[], notes:'Depart 07:30' },
-        ],
-      },
-      {
-        id: N.itin4, packageId: N.pkg5, packageModelType: 'Package', status: 'published', version: 1,
-        metaTotalActivities: 5, metaTotalLocations: 4, metaBreakfastCount: 5, metaLunchCount: 2, metaDinnerCount: 5,
-        createdById: E.admin,
-        days: [
-          { dayNumber:1, title:'Bali Arrival & Seminyak Beach', description:'Arrive, relax on Seminyak beach', locations:['Seminyak'], activities:['Beach relaxation','Sunset cocktails'], meals:{breakfast:false,lunch:false,dinner:true}, transport:'private transfer', accommodation:{name:'The Layar Seminyak',type:'villa',rating:5}, places:[], notes:'' },
-          { dayNumber:2, title:'Ubud & Rice Terraces', description:'Cultural heart of Bali', locations:['Ubud','Tegallalang'], activities:['Rice terrace walk','Monkey Forest','Traditional dance show'], meals:{breakfast:true,lunch:true,dinner:true}, transport:'private car', accommodation:{name:'The Layar Seminyak',type:'villa',rating:5}, places:[], notes:'' },
-          { dayNumber:3, title:'Water Temple & Spa', description:'Sacred water blessing and couples spa', locations:['Tirta Empul','Ubud'], activities:['Water temple purification ritual','Couples spa'], meals:{breakfast:true,lunch:false,dinner:true}, transport:'private car', accommodation:{name:'The Layar Seminyak',type:'villa',rating:5}, places:[], notes:'Spa booking required in advance' },
-          { dayNumber:4, title:'Nusa Penida Island', description:'Dramatic cliffs and crystal clear waters', locations:['Nusa Penida'], activities:['Kelingking Beach','Crystal Bay snorkeling'], meals:{breakfast:true,lunch:true,dinner:true}, transport:'speedboat', accommodation:{name:'The Layar Seminyak',type:'villa',rating:5}, places:[], notes:'' },
-          { dayNumber:5, title:'Cooking Class & Departure', description:'Learn Balinese cuisine before heading home', locations:['Seminyak'], activities:['Balinese cooking class'], meals:{breakfast:true,lunch:true,dinner:false}, transport:'private transfer', accommodation:null, places:[], notes:'Check-out at noon' },
-        ],
-      },
-      {
-        id: N.itin5, packageId: N.pkg6, packageModelType: 'Package', status: 'published', version: 1,
-        metaTotalActivities: 12, metaTotalLocations: 7, metaBreakfastCount: 7, metaLunchCount: 4, metaDinnerCount: 7,
-        createdById: N.admin2,
-        days: [
-          { dayNumber:1, title:'London Arrival',   description:'Arrive Heathrow, city orientation walk', locations:['London'], activities:['Big Ben','Westminster'],     meals:{breakfast:false,lunch:false,dinner:true}, transport:'Tube', accommodation:{name:'The Savoy',type:'hotel',rating:5}, places:[], notes:'' },
-          { dayNumber:2, title:'London Museums',   description:'British Museum and Tate Modern',         locations:['London'], activities:['British Museum','Tower of London'], meals:{breakfast:true,lunch:true,dinner:true}, transport:'Tube', accommodation:{name:'The Savoy',type:'hotel',rating:5}, places:[], notes:'' },
-          { dayNumber:3, title:'Paris by Eurostar',description:'Travel to Paris, Eiffel Tower evening',  locations:['Paris'], activities:['Eiffel Tower','Seine cruise'],  meals:{breakfast:true,lunch:false,dinner:true}, transport:'Eurostar', accommodation:{name:'Le Grand Hôtel',type:'hotel',rating:5}, places:[], notes:'' },
-          { dayNumber:4, title:'Paris Highlights', description:'Louvre, Versailles gardens',            locations:['Paris','Versailles'], activities:['Louvre Museum','Palace of Versailles'], meals:{breakfast:true,lunch:true,dinner:true}, transport:'RER', accommodation:{name:'Le Grand Hôtel',type:'hotel',rating:5}, places:[], notes:'' },
-          { dayNumber:5, title:'Amsterdam Canal Day', description:'Bike along canals, Van Gogh Museum', locations:['Amsterdam'], activities:['Canal bike tour','Van Gogh Museum','Anne Frank House'], meals:{breakfast:true,lunch:true,dinner:true}, transport:'Thalys train', accommodation:{name:'Waldorf Astoria Amsterdam',type:'hotel',rating:5}, places:[], notes:'' },
-          { dayNumber:6, title:'Rome Eternal City', description:'Colosseum, Vatican City',              locations:['Rome'], activities:['Colosseum','Vatican Museums','Trevi Fountain'], meals:{breakfast:true,lunch:false,dinner:true}, transport:'Trenitalia', accommodation:{name:'Rome Cavalieri',type:'hotel',rating:5}, places:[], notes:'' },
-          { dayNumber:7, title:'Rome & Departure',  description:'Morning in Trastevere, afternoon flight', locations:['Rome'], activities:['Trastevere walk'],              meals:{breakfast:true,lunch:true,dinner:false}, transport:'taxi', accommodation:null, places:[], notes:'Flight at 18:00' },
-        ],
-      },
-    ],
-    skipDuplicates: true,
-  });
-
+  // Additional packages
   await pkg.package.createMany({
     data: [
       {
-        id: N.pkg4, name: 'Dubai Luxury Experience', slug: 'dubai-luxury-experience',
-        description: 'Four days of pure opulence in the City of Gold. Iconic skyline, desert adventures, and world-class dining await in one of the world\'s most glamorous destinations.',
-        destination: 'Dubai, UAE', duration: 4, price: 2800, maxGroupSize: 8, category: 'couple', packageType: 'Luxury',
+        id: N.pkg4, title: 'Dubai Luxury Experience', slug: 'dubai-luxury-experience',
+        description: 'Four days of pure opulence in the City of Gold. Iconic skyline, desert adventures, and world-class dining await.',
+        destination: 'Dubai, UAE', durationDays: 4, category: 'COUPLE',
+        coverImage: 'https://picsum.photos/seed/dubai/800/500',
         inclusions: ['5-star hotel (4 nights)','All transfers','Desert safari with dinner','Burj Khalifa tickets','Abu Dhabi day trip'],
         exclusions: ['International flights','Travel insurance','Personal shopping'],
-        highlights: ['Burj Al Arab stay','Desert dune bashing','Sheikh Zayed Mosque','Burj Khalifa At The Top'],
-        terms: ['Full payment required 30 days before travel','Non-refundable within 14 days'],
-        isActive: true, isFeatured: true, status: 'published', itineraryId: N.itin3,
-        rating: 4.8, numReviews: 16, views: 634, bookings: 12, createdById: E.admin,
-        coverImageUrl: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800',
+        termsAndConditions: 'Full payment required 30 days before travel. Non-refundable within 14 days.',
+        basePrice: 2800, defaultMarginType: 'PERCENTAGE', defaultMarginInput: 20, currency: 'USD',
+        isActive: true, isFeatured: true,
+        rating: 4.8, numReviews: 16, views: 634, bookings: 12, createdBy: E.admin,
       },
       {
-        id: N.pkg5, name: 'Bali Honeymoon Bliss', slug: 'bali-honeymoon-bliss',
-        description: 'Five romantic days in the Island of Gods. Private villas, ancient temples, emerald rice terraces, and pristine beaches — everything a honeymoon should be.',
-        destination: 'Bali, Indonesia', duration: 5, price: 2200, maxGroupSize: 2, category: 'honeymoon', packageType: 'Premium',
+        id: N.pkg5, title: 'Bali Honeymoon Bliss', slug: 'bali-honeymoon-bliss',
+        description: 'Five romantic days in the Island of Gods. Private villas, ancient temples, emerald rice terraces, and pristine beaches.',
+        destination: 'Bali, Indonesia', durationDays: 5, category: 'HONEYMOON',
+        coverImage: 'https://picsum.photos/seed/bali/800/500',
         inclusions: ['Private villa (5 nights)','Daily breakfast & dinner','Couples spa (1 session)','All guided tours','Airport transfers'],
         exclusions: ['International flights','Alcoholic beverages','Scuba diving (optional extra)'],
-        highlights: ['Private pool villa','Tirta Empul temple blessing','Tegallalang rice terraces','Nusa Penida day trip'],
-        terms: ['50% deposit to secure booking','Balance due 21 days before travel','Cancellation 14+ days: 50% refund'],
-        isActive: true, isFeatured: true, status: 'published', itineraryId: N.itin4,
-        rating: 4.9, numReviews: 29, views: 1243, bookings: 21, createdById: E.admin,
-        coverImageUrl: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800',
+        termsAndConditions: '50% deposit to secure booking. Balance due 21 days before travel. Cancellation 14+ days: 50% refund.',
+        basePrice: 2200, defaultMarginType: 'PERCENTAGE', defaultMarginInput: 20, currency: 'USD',
+        isActive: true, isFeatured: true,
+        rating: 4.9, numReviews: 29, views: 1243, bookings: 21, createdBy: E.admin,
       },
       {
-        id: N.pkg6, name: 'European Grand Tour', slug: 'european-grand-tour',
-        description: 'Seven days covering the best of London, Paris, Amsterdam, and Rome. An iconic journey through Europe\'s most beloved capitals with premium transport and 5-star stays.',
-        destination: 'Europe (UK, France, Netherlands, Italy)', duration: 7, price: 4500, maxGroupSize: 16, category: 'group', packageType: 'Premium',
+        id: N.pkg6, title: 'European Grand Tour', slug: 'european-grand-tour',
+        description: 'Seven days covering London, Paris, Amsterdam, and Rome. An iconic journey through Europe\'s most beloved capitals.',
+        destination: 'Europe (UK, France, Netherlands, Italy)', durationDays: 7, category: 'GROUP',
+        coverImage: 'https://picsum.photos/seed/europe/800/500',
         inclusions: ['5-star hotels throughout','Eurostar & Thalys rail passes','All city tours','Most meals included'],
         exclusions: ['International flights to/from London','Travel insurance','Optional excursions'],
-        highlights: ['Eiffel Tower after-dark','Louvre Museum private session','Vatican Museums skip-the-line','Amsterdam canal bike tour'],
-        terms: ['30% deposit on booking','Full payment 45 days before departure','Group discount available for 10+'],
-        isActive: true, isFeatured: true, status: 'published', itineraryId: N.itin5,
-        rating: 4.6, numReviews: 8, views: 398, bookings: 4, createdById: N.admin2,
-        coverImageUrl: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=800',
+        termsAndConditions: '30% deposit on booking. Full payment 45 days before departure. Group discount available for 10+.',
+        basePrice: 4500, defaultMarginType: 'FIXED', defaultMarginInput: 500, currency: 'USD',
+        isActive: true, isFeatured: true,
+        rating: 4.6, numReviews: 8, views: 398, bookings: 4, createdBy: N.admin2,
       },
       {
-        id: N.pkg7, name: 'Japan Cultural Journey', slug: 'japan-cultural-journey',
-        description: 'Nine days of ancient temples, neon-lit city streets, bullet trains, and mountain onsen. Japan is a country of breathtaking contrasts — this itinerary covers them all.',
-        destination: 'Japan', duration: 9, price: 3900, maxGroupSize: 12, category: 'family', packageType: 'Deluxe',
+        id: N.pkg7, title: 'Japan Cultural Journey', slug: 'japan-cultural-journey',
+        description: 'Nine days of ancient temples, neon-lit city streets, bullet trains, and mountain onsen.',
+        destination: 'Japan', durationDays: 9, category: 'FAMILY',
+        coverImage: 'https://picsum.photos/seed/japan/800/500',
         inclusions: ['Hotels (9 nights)','JR Pass (7 days)','Tea ceremony','Mt Fuji day trip','Most breakfasts'],
         exclusions: ['International flights','Onsen (optional extra)','Most lunches and dinners'],
-        highlights: ['Fushimi Inari 1000 gates','Shibuya Crossing','Traditional ryokan stay','Hiroshima Peace Memorial'],
-        terms: ['25% deposit on booking','No refund within 30 days of departure'],
-        isActive: true, isFeatured: false, status: 'published',
-        rating: 4.7, numReviews: 5, views: 187, bookings: 3, createdById: N.admin2,
-        coverImageUrl: 'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800',
+        termsAndConditions: '25% deposit on booking. No refund within 30 days of departure.',
+        basePrice: 3900, defaultMarginType: 'PERCENTAGE', defaultMarginInput: 15, currency: 'USD',
+        isActive: true, isFeatured: false,
+        rating: 4.7, numReviews: 5, views: 187, bookings: 3, createdBy: N.admin2,
       },
     ],
     skipDuplicates: true,
@@ -231,19 +188,19 @@ async function seedPackages() {
 
   // Package images for all packages
   const imgs = [
-    { packageId: E.pkg1, url: 'https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=800', order: 0 },
-    { packageId: E.pkg1, url: 'https://images.unsplash.com/photo-1583422409516-2895a77efded?w=800', order: 1 },
-    { packageId: E.pkg2, url: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800', order: 0 },
-    { packageId: E.pkg2, url: 'https://images.unsplash.com/photo-1573843981267-be1999ff37cd?w=800', order: 1 },
-    { packageId: E.pkg3, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', order: 0 },
-    { packageId: N.pkg4, url: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800', order: 0 },
-    { packageId: N.pkg4, url: 'https://images.unsplash.com/photo-1582672060674-bc2bd808a8b5?w=800', order: 1 },
-    { packageId: N.pkg5, url: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800', order: 0 },
-    { packageId: N.pkg5, url: 'https://images.unsplash.com/photo-1552733407-5d5c46c3bb3b?w=800', order: 1 },
-    { packageId: N.pkg6, url: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=800', order: 0 },
-    { packageId: N.pkg6, url: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800', order: 1 },
-    { packageId: N.pkg7, url: 'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=800', order: 0 },
-    { packageId: N.pkg7, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', order: 1 },
+    { packageId: E.pkg1, url: 'https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=800', orderIndex: 0 },
+    { packageId: E.pkg1, url: 'https://picsum.photos/seed/srilanka2/800/500', orderIndex: 1 },
+    { packageId: E.pkg2, url: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800', orderIndex: 0 },
+    { packageId: E.pkg2, url: 'https://picsum.photos/seed/maldives2/800/500', orderIndex: 1 },
+    { packageId: E.pkg3, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', orderIndex: 0 },
+    { packageId: N.pkg4, url: 'https://picsum.photos/seed/dubai/800/500', orderIndex: 0 },
+    { packageId: N.pkg4, url: 'https://picsum.photos/seed/dubai2/800/500', orderIndex: 1 },
+    { packageId: N.pkg5, url: 'https://picsum.photos/seed/bali/800/500', orderIndex: 0 },
+    { packageId: N.pkg5, url: 'https://picsum.photos/seed/bali2/800/500', orderIndex: 1 },
+    { packageId: N.pkg6, url: 'https://picsum.photos/seed/europe/800/500', orderIndex: 0 },
+    { packageId: N.pkg6, url: 'https://picsum.photos/seed/europe2/800/500', orderIndex: 1 },
+    { packageId: N.pkg7, url: 'https://picsum.photos/seed/japan/800/500', orderIndex: 0 },
+    { packageId: N.pkg7, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', orderIndex: 1 },
   ];
   await pkg.packageImage.createMany({ data: imgs, skipDuplicates: true });
 
@@ -262,42 +219,6 @@ async function seedPackages() {
       { packageId: N.pkg7, name: 'Aiko Watanabe',  email: 'aiko.w@docomo.jp', rating: 5, comment: 'As a Japanese national I was sceptical, but this tour showed me parts of my own country I\'d never seen. Outstanding curation.', isApproved: true, helpful: 19 },
     ],
     skipDuplicates: true,
-  });
-
-  // Manual itinerary for lead1
-  await pkg.manualItinerary.upsert({
-    where: { id: N.manItin1 },
-    update: {},
-    create: {
-      id: N.manItin1, leadId: E.lead1, status: 'published', version: 2,
-      metaTotalActivities: 4, metaTotalLocations: 3, metaBreakfastCount: 3, metaDinnerCount: 3,
-      createdById: E.salesRep1,
-      days: [
-        { dayNumber:1, title:'Malé & Seaplane Transfer', locations:['Malé'], activities:['VIP lounge','Seaplane to resort'], meals:{breakfast:false,lunch:false,dinner:true}, accommodation:{name:'Soneva Jani — Water Villa',type:'villa',rating:5}, notes:'Welcome champagne on arrival' },
-        { dayNumber:2, title:'Private Reef Snorkelling',  locations:['House Reef'], activities:['Guided snorkel','Sunset kayak'], meals:{breakfast:true,lunch:true,dinner:true}, accommodation:{name:'Soneva Jani — Water Villa',type:'villa',rating:5}, notes:'' },
-        { dayNumber:3, title:'Dolphin Watch & Spa',       locations:['North Malé Atoll'], activities:['Dolphin cruise','Couples spa'], meals:{breakfast:true,lunch:false,dinner:true}, accommodation:{name:'Soneva Jani — Water Villa',type:'villa',rating:5}, notes:'Spa: 14:00–16:00' },
-      ],
-    },
-  });
-
-  // Customized package
-  await pkg.customizedPackage.upsert({
-    where: { id: N.custPkg1 },
-    update: {},
-    create: {
-      id: N.custPkg1,
-      name: 'Custom Maldives Overwater Honeymoon',
-      description: 'Bespoke honeymoon package tailored specifically for David & Priya Kumar. Extended stay with upgraded villa and private excursions.',
-      destination: 'Maldives', duration: 5, price: 9500, maxGroupSize: 2, category: 'honeymoon', difficulty: 'easy',
-      inclusions: ['Overwater villa (5 nights)','All-inclusive premium dining','Private snorkelling guide','Sunset dolphin cruise','Airport seaplane transfers','Honeymoon setup'],
-      exclusions: ['International flights','Spa treatments (billed separately)'],
-      highlights: ['Private villa with pool','Bioluminescent beach walk','Sunrise yoga on water deck'],
-      terms: ['Full payment required','Strictly non-refundable'],
-      isActive: true, rating: 5, numReviews: 1, views: 3, bookings: 1,
-      createdById: E.salesRep1, customizedForLeadId: E.lead1,
-      originalPackageId: E.pkg2, customizedById: E.salesRep1,
-      customizationNotes: 'Customer requested 5 nights instead of 3, upgraded villa category, and added private guide.',
-    },
   });
 }
 
@@ -566,7 +487,7 @@ async function seedBilling() {
       items: { create: [
         { description: 'Dubai Luxury Experience — 2 persons', category: 'package', quantity: 1, unitPrice: 5600, totalPrice: 5600, order: 0 },
       ]},
-      images: { create: [{ url: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800', isCover: true }] },
+      images: { create: [{ url: 'https://picsum.photos/seed/dubai/800/500', isCover: true }] },
       revisionHistory: { create: [{ version: 1, modifiedById: E.salesRep2, changes: JSON.stringify({ note: 'Added hotel upgrade note' }) }] },
     },
   });

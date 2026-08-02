@@ -5,6 +5,7 @@
 
 import { createDefaultDay } from '../types/index.js';
 import { formatCurrency } from '../../../utils/currency.js';
+import { PRICING_MODEL } from '@travel-crm/constants';
 
 /**
  * Generate days array based on duration
@@ -76,6 +77,147 @@ export const validateItinerary = (days) => {
   });
 
   return errors;
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Pricing normalization helpers — shared by the ItineraryEditor cost
+// subsections and the Price Calculation breakdown so both always use the
+// exact same numbers.
+// ═══════════════════════════════════════════════════════════════════
+
+const getLegacyMealBooleans = (day) => {
+  const meals = day?.meals && typeof day.meals === 'object' ? day.meals : null;
+  if (!meals) return null;
+  return {
+    breakfast: Boolean(meals.breakfast),
+    lunch: Boolean(meals.lunch),
+    dinner: Boolean(meals.dinner),
+  };
+};
+
+/**
+ * Resolve a day's meal counts. Explicit count fields (written by the Costs &
+ * Pricing subsection) win; otherwise fall back to the legacy boolean toggles.
+ */
+export const getMealCounts = (day) => {
+  const booleans = getLegacyMealBooleans(day);
+  return {
+    breakfastCount: day?.breakfastCount ?? (booleans ? (booleans.breakfast ? 1 : 0) : 0),
+    lunchCount: day?.lunchCount ?? (booleans ? (booleans.lunch ? 1 : 0) : 0),
+    dinnerCount: day?.dinnerCount ?? (booleans ? (booleans.dinner ? 1 : 0) : 0),
+    mealPriceOverride:
+      day?.mealPriceOverride == null || day.mealPriceOverride === ''
+        ? null
+        : Number(day.mealPriceOverride),
+  };
+};
+
+/**
+ * Resolve a day's activities into [{ name, defaultCost, costOverride }].
+ * Editor activities are display-name strings (or objects); cost overrides and
+ * catalog default costs live in `day.activityCosts` and `_relational.activities`.
+ */
+export const getDayActivities = (day) => {
+  const raw = Array.isArray(day?.activities)
+    ? day.activities
+    : (typeof day.activities === 'string'
+      ? day.activities.split(',').map((s) => s.trim()).filter(Boolean)
+      : []);
+  const relational = Array.isArray(day?._relational?.activities) ? day._relational.activities : [];
+  const costMap = day?.activityCosts && typeof day.activityCosts === 'object' ? day.activityCosts : {};
+
+  return raw.map((a) => {
+    const isObj = a && typeof a === 'object';
+    const name = isObj ? (a.name || a.activity?.name || '') : (a || '');
+    const stored = relational.find(
+      (row) =>
+        (row.activity?.name || row.name) === name ||
+        (isObj && a.activityId && row.activityId === a.activityId)
+    );
+    const fromMap = name ? costMap[name] : null;
+
+    return {
+      name,
+      defaultCost: Number(
+        fromMap?.defaultCost ??
+        (isObj ? a.defaultCost ?? a.activity?.defaultCost : undefined) ??
+        stored?.activity?.defaultCost ??
+        0
+      ),
+      costOverride:
+        fromMap?.costOverride != null && fromMap.costOverride !== ''
+          ? Number(fromMap.costOverride)
+          : (isObj && a.costOverride != null ? Number(a.costOverride) : null),
+    };
+  }).filter((a) => a.name);
+};
+
+/**
+ * Resolve a day's transport rows (editor rows win over relational rows loaded
+ * from the API). Each row keeps the pricingModel/unitCost/distanceKm fields.
+ */
+export const getDayTransports = (day) => {
+  let rows;
+  const hasEditorRows = Array.isArray(day?.transports);
+  if (hasEditorRows && day.transports.length > 0) {
+    rows = day.transports.map(normalizeTransportRow);
+  } else if (Array.isArray(day?._relational?.transports) && day._relational.transports.length > 0) {
+    rows = day._relational.transports.map(normalizeTransportRow);
+  } else {
+    rows = [];
+  }
+
+  // Freshly loaded days have no editor flightRefs on their rows — re-link
+  // FLIGHT rows to the persisted flights (by order) so rows and flights
+  // reconnect. Editor-written rows keep their own flightRefs, so orphan
+  // FLIGHT rows (added manually in Costs & Pricing) stay unlinked.
+  if (!hasEditorRows) {
+    const flights = Array.isArray(day?.flights) ? day.flights : [];
+    if (flights.length > 0) {
+      let flightIndex = 0;
+      rows = rows.map((row) => {
+        if (row.transportMode === 'FLIGHT' && !row.flightRef && flights[flightIndex]) {
+          return { ...row, flightRef: flights[flightIndex++].id };
+        }
+        return row;
+      });
+    }
+  }
+
+  return rows;
+};
+
+function normalizeTransportRow(t) {
+  return {
+    routeType: t.routeType || 'DAILY_ROUTING',
+    transportMode: t.transportMode || 'CAR',
+    pricingModel: t.pricingModel || 'PER_VEHICLE',
+    unitCost: t.unitCost == null || t.unitCost === '' ? 0 : Number(t.unitCost),
+    distanceKm: t.distanceKm == null || t.distanceKm === '' ? null : Number(t.distanceKm),
+    // Editor-only link to the flight that created this row; dropped by the
+    // save payload/backend mappers so it never reaches the API.
+    flightRef: t.flightRef || null,
+  };
+}
+
+/** Compute one transport row's cost using the pricing engine's PER_* rules. */
+export const getTransportRowCost = (transport, groupSize = 1) => {
+  const unitCost = transport.unitCost || 0;
+  switch (transport.pricingModel) {
+    case PRICING_MODEL.PER_KM:
+      return unitCost * (transport.distanceKm || 0);
+    case PRICING_MODEL.PER_PERSON:
+      return unitCost * groupSize;
+    case PRICING_MODEL.PER_VEHICLE:
+    default:
+      return unitCost;
+  }
+};
+
+/** Total accommodation cost for one day (each day books one per-night stay). */
+export const getAccommodationTotal = (day) => {
+  const amount = Number(day?.accommodation?.totalAmount);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
 };
 
 /**

@@ -16,9 +16,23 @@ import { STATUS_COLORS } from '../utils/constants';
 const PackageDetailsModal = ({ pkg, onClose }) => {
   if (!pkg) return null;
 
-  const formattedPrice = formatPriceINR(pkg.price);
-  const days = pkg.days || pkg.itinerary?.days || [];
-  const nights = pkg.duration ? pkg.duration - 1 : 0;
+  const displayPrice = pkg.sellPrice ?? pkg.basePrice;
+  const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
+  const rawDays = Array.isArray(pkg.itineraryDays)
+    ? pkg.itineraryDays
+    : (Array.isArray(pkg.days) ? pkg.days : (Array.isArray(pkg.itinerary?.days) ? pkg.itinerary.days : []));
+  // Map relational itineraryDays → display-friendly format
+  const days = rawDays.filter(Boolean).map(d => ({
+    dayNumber: d.dayNumber,
+    title: d.title || '',
+    description: d.description || '',
+    locations: (Array.isArray(d.places) ? d.places : []).map(p => p.place?.name || p.customName).filter(Boolean),
+    activities: (Array.isArray(d.activities) ? d.activities : []).map(a => a.activity?.name || a.name || '').filter(Boolean),
+    meals: d.meals || { breakfast: (d.breakfastCount || 0) > 0, lunch: (d.lunchCount || 0) > 0, dinner: (d.dinnerCount || 0) > 0 },
+    transport: (Array.isArray(d.transports) && d.transports[0]?.transportMode?.toLowerCase()) || d.transport || 'car',
+    places: (Array.isArray(d.places) ? d.places : []).map(p => ({ name: p.place?.name || p.customName || '' })),
+  }));
+  const nights = pkg.durationDays ? pkg.durationDays - 1 : 0;
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -85,12 +99,10 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold text-white">{pkg.name}</h2>
-                {pkg.status && (
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(pkg.status)}`}>
-                    {pkg.status.charAt(0).toUpperCase() + pkg.status.slice(1)}
-                  </span>
-                )}
+                <h2 className="text-2xl font-bold text-white">{pkg.title}</h2>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${pkg.isActive ? 'bg-green-100 text-green-800 border-green-300' : 'bg-amber-100 text-amber-800 border-amber-300'}`}>
+                  {pkg.isActive ? 'Active' : 'Draft'}
+                </span>
               </div>
               {pkg.description && (
                 <p className="text-violet-100 text-sm line-clamp-2">{pkg.description}</p>
@@ -125,7 +137,7 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
               />
               <InfoCard
                 label="Duration"
-                value={pkg.duration ? `${pkg.duration}D / ${nights}N` : 'N/A'}
+                value={pkg.durationDays ? `${pkg.durationDays}D / ${nights}N` : 'N/A'}
                 icon={Calendar}
                 gradient="from-amber-500 to-orange-600"
               />
@@ -136,39 +148,21 @@ const PackageDetailsModal = ({ pkg, onClose }) => {
                 gradient="from-violet-500 to-purple-600"
               />
               <InfoCard
-                label="Max Group"
-                value={pkg.maxGroupSize || 10}
-                icon={Users}
+                label="Margin"
+                value={pkg.defaultMarginType === 'PERCENTAGE' ? `${pkg.defaultMarginInput}%` : `$${pkg.defaultMarginInput}`}
+                icon={TrendingUp}
                 gradient="from-rose-500 to-pink-600"
               />
               <InfoCard
-                label="Type"
-                value={pkg.packageType || 'N/A'}
-                icon={Briefcase}
+                label="Reviews"
+                value={`${pkg.rating || 0} (${pkg.numReviews || 0})`}
+                icon={Star}
                 gradient="from-cyan-500 to-blue-600"
               />
             </div>
 
-            {/* Highlights, Inclusions, Exclusions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Highlights */}
-              {pkg.highlights && pkg.highlights.length > 0 && (
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-5">
-                  <h4 className="flex items-center gap-2 text-sm font-semibold text-blue-800 mb-4">
-                    <Sparkles className="w-4 h-4" />
-                    Highlights
-                  </h4>
-                  <ul className="space-y-2">
-                    {pkg.highlights.map((highlight, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-blue-700">
-                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 flex-shrink-0" />
-                        <span>{highlight}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
+            {/* Inclusions & Exclusions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Inclusions */}
               {pkg.inclusions && pkg.inclusions.length > 0 && (
                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100 p-5">
