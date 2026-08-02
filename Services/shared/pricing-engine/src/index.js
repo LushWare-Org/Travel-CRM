@@ -1,4 +1,5 @@
 import { calculateMealCosts } from './meals.js';
+import { calculateAccommodationCosts } from './accommodation.js';
 import { calculateTransportCosts } from './transport.js';
 import { calculateActivityCosts } from './activities.js';
 import { computeMargin } from './margin.js';
@@ -9,6 +10,7 @@ import { DEFAULTS } from './config.js';
  * @param {Array} params.days — day objects with breakfastCount/lunchCount/dinnerCount/mealPriceOverride
  * @param {Array} params.activities — [{defaultCost, costOverride?}]
  * @param {Array} params.transports — [{pricingModel, unitCost, distanceKm?}]
+ * @param {Array} params.accommodation — per-day amounts (number or { totalAmount })
  * @param {number} [params.groupSize] — defaults to 1
  * @param {number} [params.mealCostPerPerson] — defaults to 15
  * @param {'PERCENTAGE'|'FIXED'} [params.marginType] — if omitted, margin not computed
@@ -19,6 +21,7 @@ export function calculateBasePrice({
   days = [],
   activities = [],
   transports = [],
+  accommodation = [],
   groupSize,
   mealCostPerPerson,
   marginType,
@@ -32,9 +35,12 @@ export function calculateBasePrice({
   const meals = calculateMealCosts(days, config);
   const activityResult = calculateActivityCosts(activities, config);
   const transportResult = calculateTransportCosts(transports, config);
+  const accommodationResult = calculateAccommodationCosts(accommodation);
 
   const basePrice =
-    Math.round((meals.total + activityResult.total + transportResult.total) * 100) / 100;
+    Math.round(
+      (meals.total + activityResult.total + transportResult.total + accommodationResult.total) * 100,
+    ) / 100;
 
   const result = {
     basePrice,
@@ -42,6 +48,7 @@ export function calculateBasePrice({
       meals,
       activities: activityResult,
       transports: transportResult,
+      accommodation: accommodationResult,
     },
   };
 
@@ -54,6 +61,7 @@ export function calculateBasePrice({
 
 export {
   calculateMealCosts,
+  calculateAccommodationCosts,
   calculateTransportCosts,
   calculateActivityCosts,
   computeMargin,

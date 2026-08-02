@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.js",
     "./meals": "./src/meals.js",
+    "./accommodation": "./src/accommodation.js",
     "./transport": "./src/transport.js",
     "./activities": "./src/activities.js",
     "./margin": "./src/margin.js",

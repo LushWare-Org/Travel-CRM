@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateBasePrice,
   calculateMealCosts,
+  calculateAccommodationCosts,
   calculateTransportCosts,
   calculateActivityCosts,
   computeMargin,
@@ -47,6 +48,40 @@ describe('calculateMealCosts', () => {
     const days = [{}];
     const result = calculateMealCosts(days);
     expect(result.total).toBe(0);
+  });
+
+  it('scales meal costs by groupSize', () => {
+    const days = [{ breakfastCount: 2, lunchCount: 1, dinnerCount: 0 }];
+    const result = calculateMealCosts(days, { groupSize: 4, mealCostPerPerson: 15 });
+    expect(result.breakfastCost).toBe(2 * 15 * 4);
+    expect(result.lunchCost).toBe(1 * 15 * 4);
+    expect(result.total).toBe(3 * 15 * 4);
+  });
+
+  it('defaults to groupSize 1 so single-person behavior is unchanged', () => {
+    const days = [{ breakfastCount: 2, lunchCount: 1 }];
+    const result = calculateMealCosts(days, { mealCostPerPerson: 15 });
+    expect(result.total).toBe(3 * 15);
+  });
+});
+
+describe('calculateAccommodationCosts', () => {
+  it('returns zeros for empty input', () => {
+    expect(calculateAccommodationCosts([])).toEqual({ total: 0, rows: [] });
+  });
+
+  it('sums per-day accommodation amounts', () => {
+    const result = calculateAccommodationCosts([
+      { totalAmount: 200 },
+      { totalAmount: 150 },
+    ]);
+    expect(result.total).toBe(350);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[1].amount).toBe(150);
+  });
+
+  it('accepts plain numbers as per-day amounts', () => {
+    expect(calculateAccommodationCosts([100, 250.5]).total).toBe(350.5);
   });
 });
 
@@ -186,7 +221,7 @@ describe('calculateBasePrice', () => {
       groupSize: 2,
       mealCostPerPerson: 15,
     });
-    const expected = (4 * 15) + (100 * 2) + 300; // 60 + 200 + 300 = 560
+    const expected = (4 * 15 * 2) + (100 * 2) + 300; // meals scale with groupSize: 120 + 200 + 300 = 620
     expect(result.basePrice).toBe(expected);
   });
 
@@ -219,5 +254,21 @@ describe('calculateBasePrice', () => {
       mealCostPerPerson: 15.555,
     });
     expect(result.basePrice).toBe(Math.round((15.555 + 15.555 + 33.333) * 100) / 100);
+  });
+
+  it('includes accommodation in basePrice and breakdown when provided', () => {
+    const result = calculateBasePrice({
+      days: [{ breakfastCount: 1 }],
+      accommodation: [{ totalAmount: 200 }, { totalAmount: 150 }],
+      groupSize: 1,
+      mealCostPerPerson: 10,
+    });
+    expect(result.breakdown.accommodation.total).toBe(350);
+    expect(result.basePrice).toBe(360);
+  });
+
+  it('defaults accommodation to zero when not provided', () => {
+    const result = calculateBasePrice({ days: [] });
+    expect(result.breakdown.accommodation).toEqual({ total: 0, rows: [] });
   });
 });
