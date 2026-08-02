@@ -31,6 +31,12 @@ import {
   getTransportRowCost,
   getAccommodationTotal,
 } from '../utils/helpers';
+import {
+  resolveFlightAdd,
+  resolveFlightEdit,
+  resolveFlightRemove,
+  countUnlinkedFlightRows,
+} from '../utils/flightSync';
 import { formatCurrency } from '../../../utils/currency.js';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -292,44 +298,15 @@ const ItineraryEditor = ({
     setShowFlightModal(true);
   };
 
-  /**
-   * Add (or update the cost of) the FLIGHT transport row that belongs to the
-   * given flight (matched by flightRef). Called when a flight is added or
-   * edited — manual edits to the row in Costs & Pricing win until the flight
-   * is edited again.
-   */
-  const syncFlightTransport = (day, flight) => {
-    const price = getFlightPrice(flight) ?? 0;
-    const rows = getDayTransports(day);
-    const flightIndex = rows.findIndex((row) => row.flightRef && row.flightRef === flight.id);
-    if (flightIndex >= 0) {
-      onDayChange(day.dayNumber, {
-        transports: rows.map((row, i) => (i === flightIndex ? { ...row, unitCost: price } : row)),
-      });
-    } else {
-      onDayChange(day.dayNumber, {
-        transports: [...rows, {
-          routeType: 'DAILY_ROUTING',
-          transportMode: 'FLIGHT',
-          pricingModel: 'PER_VEHICLE',
-          unitCost: price,
-          distanceKm: null,
-          flightRef: flight.id,
-        }],
-      });
-    }
-  };
-
   const handleRemoveFlight = (day, index) => {
     const flights = Array.isArray(day.flights) ? day.flights : [];
     const removed = flights[index];
-    const rows = getDayTransports(day);
-    onDayChange(day.dayNumber, {
-      flights: flights.filter((_, i) => i !== index),
-      transports: removed
-        ? rows.filter((row) => !(row.flightRef && row.flightRef === removed.id))
-        : rows,
-    });
+    if (!removed) return;
+    onDayChange(day.dayNumber, resolveFlightRemove({
+      flights,
+      transports: getDayTransports(day),
+      flightId: removed.id,
+    }));
   };
 
   /**
@@ -341,8 +318,7 @@ const ItineraryEditor = ({
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setHighlightedFlightSection(day.dayNumber);
     setTimeout(() => setHighlightedFlightSection(null), 1200);
-    const addButton = document.getElementById(`day-${day.dayNumber}-add-flight`);
-    setTimeout(() => addButton?.focus({ preventScroll: true }), 450);
+    handleAddFlight(day);
   };
 
   const renderCostsSection = (day) => {
@@ -360,9 +336,7 @@ const ItineraryEditor = ({
     const flightTotal = transportRows
       .filter((row) => row.transportMode === 'FLIGHT')
       .reduce((sum, row) => sum + getTransportRowCost(row, 1), 0);
-    const unlinkedFlightRows = transportRows.filter(
-      (row) => row.transportMode === 'FLIGHT' && !row.flightRef
-    );
+    const unlinkedFlightCount = countUnlinkedFlightRows(transportRows);
 
     const chip = (label, value) => {
       const hasValue = Number(value) > 0;
@@ -528,13 +502,13 @@ const ItineraryEditor = ({
                   Total = <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
                 </p>
               </div>
-              {unlinkedFlightRows.length > 0 && (
+              {unlinkedFlightCount > 0 && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
                   <Plane className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   <span className="flex-1 min-w-[160px]">
-                    {unlinkedFlightRows.length === 1
+                    {unlinkedFlightCount === 1
                       ? 'A flight cost was added — add the flight details so pricing stays in sync.'
-                      : `${unlinkedFlightRows.length} flight costs were added — add the flight details so pricing stays in sync.`}
+                      : `${unlinkedFlightCount} flight costs were added — add the flight details so pricing stays in sync.`}
                   </span>
                   <button
                     type="button"
@@ -1091,22 +1065,19 @@ const ItineraryEditor = ({
         onSelectTemplate={(flightData) => {
           if (flightModalTarget) {
             const day = days.find(d => d && d.dayNumber === flightModalTarget.dayNumber);
-            const flights = Array.isArray(day?.flights) ? day.flights : [];
-            const existing = flightModalTarget.index != null ? flights[flightModalTarget.index] : null;
-            const flightId = existing?.id
-              || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-                ? crypto.randomUUID()
-                : `flight-${Date.now()}`);
-            const flight = {
-              ...flightData,
-              id: flightId,
-              totalAmount: flightData.totalAmount ?? flightData.fareTotal ?? 0,
-            };
-            const nextFlights = existing
-              ? flights.map((f, i) => (i === flightModalTarget.index ? flight : f))
-              : [...flights, flight];
-            onDayChange(flightModalTarget.dayNumber, { flights: nextFlights });
-            syncFlightTransport({ ...day, flights: nextFlights }, flight);
+            const result = flightModalTarget.index != null
+              ? resolveFlightEdit({
+                  flights: Array.isArray(day?.flights) ? day.flights : [],
+                  transports: getDayTransports(day),
+                  index: flightModalTarget.index,
+                  patch: flightData,
+                })
+              : resolveFlightAdd({
+                  flights: Array.isArray(day?.flights) ? day.flights : [],
+                  transports: getDayTransports(day),
+                  flightData,
+                });
+            onDayChange(flightModalTarget.dayNumber, result);
           }
           setShowFlightModal(false);
           setFlightModalTarget(null);

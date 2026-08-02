@@ -3,6 +3,8 @@
  * Handles all communication with the package-service backend.
  */
 
+import { reconcileFlightsForSave } from '../utils/flightSync';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
 
 async function makeRequest(endpoint, options = {}) {
@@ -239,22 +241,10 @@ function buildItineraryDaysPayload(days) {
         ? day._relational.transports
         : []);
 
-    // Flight price wins on save: FLIGHT rows that belong to a flight are
-    // re-derived from the flight's totalAmount so the two never desync.
-    // Manual (non-flight) rows and orphan FLIGHT rows are kept untouched.
     const flights = Array.isArray(day.flights) ? day.flights : [];
-    const linkedFlightRefs = new Set(flights.map(f => f.id));
-    const manualTransports = rawTransports.filter(t =>
-      t.transportMode !== 'FLIGHT' || !(t.flightRef && linkedFlightRefs.has(t.flightRef))
-    );
-    const flightTransports = flights.map(f => ({
-      routeType: 'DAILY_ROUTING',
-      transportMode: 'FLIGHT',
-      pricingModel: 'PER_VEHICLE',
-      unitCost: Number(f.totalAmount) || 0,
-      distanceKm: null,
-    }));
-    const transports = [...manualTransports, ...flightTransports];
+    // Flight price wins on save when real (>0); while totalAmount is the
+    // placeholder 0, manual FLIGHT row costs are preserved.
+    const transports = reconcileFlightsForSave({ flights, transports: rawTransports });
 
     const meals = (day.meals && typeof day.meals === 'object') ? day.meals : null;
     const activityCosts = (day.activityCosts && typeof day.activityCosts === 'object') ? day.activityCosts : {};
