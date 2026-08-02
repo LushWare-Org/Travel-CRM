@@ -1,0 +1,162 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { mockCount, mockLeadUpdate } = vi.hoisted(() => ({
+  mockCount: vi.fn(),
+  mockLeadUpdate: vi.fn(),
+}));
+
+vi.mock('../../db/client.js', () => ({
+  default: {
+    leadItineraryDay: { count: mockCount },
+    lead: { update: mockLeadUpdate },
+  },
+}));
+
+import {
+  buildDraftData,
+  fetchPackage,
+  copyPackageToLead,
+} from '../lead-draft.service.js';
+import AppError from '../../utils/appError.js';
+
+const packageFixture = {
+  id: 'pkg-1',
+  title: 'Sri Lanka Explorer',
+  currency: 'USD',
+  defaultMarginType: 'PERCENTAGE',
+  defaultMarginInput: 10,
+  itineraryDays: [
+    {
+      dayNumber: 1,
+      title: 'Kandy',
+      description: 'Temple day',
+      breakfastCount: 2,
+      lunchCount: 1,
+      dinnerCount: 1,
+      mealPriceOverride: null,
+      accommodation: { totalAmount: 100, name: 'Kandy Hotel' },
+      flights: [],
+      places: [{ placeId: 'p1', customName: 'Temple of the Tooth', orderIndex: 0 }],
+      activities: [{ activityId: 'a1', name: 'Temple Tour', defaultCost: 50, costOverride: null }],
+      transports: [{ routeType: 'DAILY_ROUTING', transportMode: 'VAN', pricingModel: 'PER_VEHICLE', unitCost: 300, distanceKm: null }],
+    },
+  ],
+};
+
+describe('buildDraftData', () => {
+  it('maps the package into itinerary days, AUTO cost lines and pricing defaults', () => {
+    const data = buildDraftData(packageFixture);
+
+    expect(data.days).toHaveLength(1);
+    expect(data.days[0]).toMatchObject({
+      dayNumber: 1,
+      breakfastCount: 2,
+      lunchCount: 1,
+      dinnerCount: 1,
+      accommodation: { totalAmount: 100, name: 'Kandy Hotel' },
+    });
+    expect(data.days[0].places.create[0]).toEqual({
+      placeId: 'p1',
+      customName: 'Temple of the Tooth',
+      orderIndex: 0,
+    });
+    expect(data.days[0].transports.create[0]).toMatchObject({
+      pricingModel: 'PER_VEHICLE',
+      unitCost: 300,
+    });
+
+    expect(data.costLines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'food', basis: 'PER_PERSON', estimatedUnit: 60, source: 'AUTO' }),
+      expect.objectContaining({ category: 'activity', basis: 'PER_PERSON', estimatedUnit: 50, source: 'AUTO' }),
+      expect.objectContaining({ category: 'transportation', basis: 'PER_VEHICLE', estimatedUnit: 300, source: 'AUTO' }),
+      expect.objectContaining({ category: 'accommodation', basis: 'PER_PERSON', estimatedUnit: 100, source: 'AUTO' }),
+    ]));
+
+    expect(data.pricing).toEqual({
+      currency: 'USD',
+      marginType: 'PERCENTAGE',
+      marginValue: 10,
+    });
+  });
+
+  it('falls back to USD currency and no margin when the package omits them', () => {
+    const data = buildDraftData({ id: 'x', title: 'Basic' });
+    expect(data.pricing).toEqual({
+      currency: 'USD',
+      marginType: null,
+      marginValue: null,
+    });
+  });
+
+  it('builds cost lines with per-person basis from meal counts', () => {
+    const data = buildDraftData(packageFixture);
+    const food = data.costLines.find((l) => l.category === 'food');
+    expect(food).toEqual(expect.objectContaining({
+      basis: 'PER_PERSON',
+      estimatedUnit: 60,
+      description: 'Meals',
+    }));
+  });
+});
+
+describe('fetchPackage', () => {
+  it('returns the package payload from the service response', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { id: 'pkg-1', title: 'Sri Lanka Explorer' } }),
+    });
+    await expect(fetchPackage('pkg-1', fetchImpl)).resolves.toMatchObject({ id: 'pkg-1' });
+    expect(fetchImpl).toHaveBeenCalledWith(expect.stringContaining('/api/v1/packages/pkg-1'));
+  });
+
+  it('throws a 404-style error when the package is missing', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+    await expect(fetchPackage('nope', fetchImpl)).rejects.toThrow(AppError);
+  });
+});
+
+describe('copyPackageToLead', () => {
+  beforeEach(() => {
+    mockCount.mockReset();
+    mockLeadUpdate.mockReset();
+    mockLeadUpdate.mockResolvedValue({ id: 'lead-1' });
+  });
+
+  it('creates itinerary, cost lines and pricing on the first copy', async () => {
+    mockCount.mockResolvedValue(0);
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: packageFixture }),
+    });
+
+    const result = await copyPackageToLead({
+      leadId: 'lead-1',
+      packageId: 'pkg-1',
+      travelers: 2,
+      fetchImpl,
+    });
+
+    expect(result.id).toBe('lead-1');
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'lead-1' },
+      data: expect.objectContaining({
+        packageName: 'Sri Lanka Explorer',
+        pricing: { create: expect.objectContaining({ currency: 'USD', marginType: 'PERCENTAGE' }) },
+        costLines: { create: expect.arrayContaining([expect.objectContaining({ category: 'food' })]) },
+      }),
+    }));
+  });
+
+  it('refuses to copy when the lead already has a draft', async () => {
+    mockCount.mockResolvedValue(1);
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: packageFixture }),
+    });
+
+    await expect(
+      copyPackageToLead({ leadId: 'lead-1', packageId: 'pkg-1', fetchImpl }),
+    ).rejects.toThrow(/already has a draft copy/);
+    expect(mockLeadUpdate).not.toHaveBeenCalled();
+  });
+});
