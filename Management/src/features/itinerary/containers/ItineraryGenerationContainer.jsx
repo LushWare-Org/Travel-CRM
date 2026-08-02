@@ -237,7 +237,6 @@ const ItineraryGenerationContainer = () => {
         mealPriceOverride: apiDay.mealPriceOverride,
         locations: (apiDay.places || []).map(p => p.place?.name || p.customName).filter(Boolean),
         activities: (apiDay.activities || []).map(a => a.activity?.name || '').filter(Boolean),
-        transport: (apiDay.transports || [])[0]?.transportMode?.toLowerCase() || 'car',
         places: (apiDay.places || []).map(p => ({
           name: p.place?.name || p.customName || '',
           placeId: p.placeId,
@@ -299,7 +298,6 @@ const ItineraryGenerationContainer = () => {
         }
         if (!cleanDay.title && cleanDay.dayNumber) cleanDay.title = `Day ${cleanDay.dayNumber}`;
         if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
-        if (!cleanDay.transport || cleanDay.transport === '') delete cleanDay.transport;
         if (cleanDay.accommodation) {
           if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
           const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
@@ -381,7 +379,6 @@ const ItineraryGenerationContainer = () => {
         }
         if (!cleanDay.title && cleanDay.dayNumber) cleanDay.title = `Day ${cleanDay.dayNumber}`;
         if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
-        if (!cleanDay.transport || cleanDay.transport === '') delete cleanDay.transport;
         if (cleanDay.accommodation) {
           if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
           const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');

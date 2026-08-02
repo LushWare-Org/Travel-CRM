@@ -37,7 +37,8 @@ const PackageCard = ({
     return null;
   }
 
-  const formattedPrice = pkg.basePrice ? formatPriceINR(pkg.basePrice) : null;
+  const displayPrice = pkg.sellPrice ?? pkg.basePrice;
+  const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
   // Derive status from isActive (no more draft/published enum)
   const status = pkg.isActive ? 'published' : 'draft';
   const statusLabel = pkg.isActive ? 'Published' : 'Draft';

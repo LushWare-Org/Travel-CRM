@@ -16,7 +16,8 @@ import { STATUS_COLORS } from '../utils/constants';
 const PackageDetailsModal = ({ pkg, onClose }) => {
   if (!pkg) return null;
 
-  const formattedPrice = pkg.basePrice ? formatPriceINR(pkg.basePrice) : null;
+  const displayPrice = pkg.sellPrice ?? pkg.basePrice;
+  const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
   const rawDays = Array.isArray(pkg.itineraryDays)
     ? pkg.itineraryDays
     : (Array.isArray(pkg.days) ? pkg.days : (Array.isArray(pkg.itinerary?.days) ? pkg.itinerary.days : []));

@@ -15,6 +15,14 @@ vi.mock('../../../../shared/pricing-engine/src/index.js', () => ({
     basePrice: 560,
     breakdown: { meals: { total: 60 }, activities: { total: 200 }, transports: { total: 300 } },
   })),
+  computeMargin: vi.fn((basePrice, marginType, marginValue) => {
+    const marginAmount = marginType === 'FIXED' ? marginValue : basePrice * (marginValue / 100);
+    return {
+      basePrice,
+      marginAmount: Math.round(marginAmount * 100) / 100,
+      sellPrice: Math.round((basePrice + marginAmount) * 100) / 100,
+    };
+  }),
 }));
 
 const mockPkg = {
@@ -71,6 +79,7 @@ describe('serializePackage', () => {
     expect(result.title).toBe('Test Package');
     expect(result.basePrice).toBe(1500);
     expect(result.defaultMarginInput).toBe(20);
+    expect(result.sellPrice).toBe(1800);
     expect(result.itineraryDays).toHaveLength(1);
     expect(result.itineraryDays[0].places[0].place.name).toBe('City');
     expect(result.itineraryDays[0].activities[0].activity.name).toBe('Tour');
@@ -86,6 +95,17 @@ describe('serializePackage', () => {
     });
     expect(result.basePrice).toBe(999.99);
     expect(result.defaultMarginInput).toBe(15.5);
+    expect(result.sellPrice).toBe(1154.99);
+  });
+
+  it('applies a FIXED margin to sellPrice', () => {
+    const result = serializePackage({
+      ...mockPkg,
+      basePrice: 1000,
+      defaultMarginType: 'FIXED',
+      defaultMarginInput: 150,
+    });
+    expect(result.sellPrice).toBe(1150);
   });
 
   it('handles missing optional relations', () => {
@@ -99,9 +119,21 @@ describe('serializePackageList', () => {
   it('serializes for list view', () => {
     const result = serializePackageList(mockPkg);
     expect(result.title).toBe('Test Package');
+    expect(result.basePrice).toBe(1500);
+    expect(result.sellPrice).toBe(1800);
     expect(result.images).toHaveLength(1);
     expect(result.itineraryDays).toBeUndefined();
     expect(result.reviews).toBeUndefined();
+  });
+
+  it('applies a FIXED margin to sellPrice in list view', () => {
+    const result = serializePackageList({
+      ...mockPkg,
+      basePrice: 1000,
+      defaultMarginType: 'FIXED',
+      defaultMarginInput: 150,
+    });
+    expect(result.sellPrice).toBe(1150);
   });
 });
 
