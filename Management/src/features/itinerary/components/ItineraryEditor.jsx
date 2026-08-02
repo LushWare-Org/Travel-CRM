@@ -9,13 +9,14 @@ import {
   MapPin, Activity, Utensils, Car, Building2,
   StickyNote, Image as ImageIcon, ChevronDown, ChevronUp,
   Coffee, UtensilsCrossed, Moon, Check, Star, Phone, Bed,
-  Receipt,
+  Receipt, Plane,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { uploadItineraryImages } from '../../../services/cloudinaryService';
 import Swal from 'sweetalert2';
 import ActivitySelector from './ActivitySelector';
 import LocationSelector from './LocationSelector';
+import TransportRowEditor from './form/TransportRowEditor';
 import { FlightSelectionModal, HotelSelectionModal } from '../../shared';
 import {
   calculateMealCosts,
@@ -241,21 +242,30 @@ const ItineraryEditor = ({
     });
   };
 
-  const handleTransportCostChange = (day, patch) => {
+  const handleTransportCostChange = (day, index, patch) => {
     const current = getDayTransports(day);
-    const base = current[0] || {
-      routeType: 'DAILY_ROUTING',
-      transportMode: String(day.transport || 'CAR').toUpperCase(),
-      pricingModel: 'PER_VEHICLE',
-      unitCost: 0,
-      distanceKm: null,
-    };
+    const rows = current.length > 0
+      ? current
+      : [{ routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 0, distanceKm: null }];
     onDayChange(day.dayNumber, {
-      transports: [{
-        ...base,
-        transportMode: String(day.transport || base.transportMode || 'CAR').toUpperCase(),
-        ...patch,
-      }],
+      transports: rows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    });
+  };
+
+  const handleAddTransport = (day) => {
+    const current = getDayTransports(day);
+    onDayChange(day.dayNumber, {
+      transports: [
+        ...current,
+        { routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 0, distanceKm: null },
+      ],
+    });
+  };
+
+  const handleRemoveTransport = (day, index) => {
+    const current = getDayTransports(day);
+    onDayChange(day.dayNumber, {
+      transports: current.filter((_, i) => i !== index),
     });
   };
 
@@ -411,51 +421,30 @@ const ItineraryEditor = ({
               {transportRows.length === 0 ? (
                 <p className="text-xs text-slate-400">No transport configured for this day.</p>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Pricing model</label>
-                    <select
-                      value={transportRows[0].pricingModel || 'PER_VEHICLE'}
-                      onChange={(e) => handleTransportCostChange(day, { pricingModel: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                    >
-                      <option value="PER_VEHICLE">Per vehicle</option>
-                      <option value="PER_PERSON">Per person</option>
-                      <option value="PER_KM">Per km</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Unit cost</label>
-                    <input
-                      type="number" min="0" step="0.01"
-                      value={transportRows[0].unitCost || ''}
-                      placeholder="0"
-                      onChange={(e) => handleTransportCostChange(day, { unitCost: e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0) })}
-                      onWheel={(e) => e.currentTarget.blur()}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                <div className="space-y-2">
+                  {transportRows.map((row, i) => (
+                    <TransportRowEditor
+                      key={`${day.dayNumber}-transport-${i}`}
+                      index={i}
+                      transport={row}
+                      onChange={(patch) => handleTransportCostChange(day, i, patch)}
+                      onRemove={(idx) => handleRemoveTransport(day, idx)}
                     />
-                  </div>
-                  {transportRows[0].pricingModel === 'PER_KM' && (
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Distance (km)</label>
-                      <input
-                        type="number" min="0" step="0.1"
-                        value={transportRows[0].distanceKm ?? ''}
-                        placeholder="0"
-                        onChange={(e) => handleTransportCostChange(day, { distanceKm: e.target.value === '' ? null : (parseFloat(e.target.value) || 0) })}
-                        onWheel={(e) => e.currentTarget.blur()}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                      />
-                    </div>
-                  )}
-                  <div className="col-span-2 sm:col-span-1 flex items-end pb-1">
-                    <p className="text-xs text-slate-500">
-                      Total ={' '}
-                      <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
-                    </p>
-                  </div>
+                  ))}
                 </div>
               )}
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => handleAddTransport(day)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Transport
+                </button>
+                <p className="text-xs text-slate-500">
+                  Total = <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
+                </p>
+              </div>
             </div>
 
             {/* ── Accommodation ────────────────────────────────── */}
@@ -718,94 +707,37 @@ const ItineraryEditor = ({
                 </FieldGroup>
               </div>
 
-              {/* Row 3: Meals and Transport */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <FieldGroup label="Meals Included" icon={Utensils}>
-                  <div className="flex flex-wrap gap-3">
-                    {[
-                      { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'amber' },
-                      { key: 'lunch', label: 'Lunch', icon: UtensilsCrossed, color: 'orange' },
-                      { key: 'dinner', label: 'Dinner', icon: Moon, color: 'violet' },
-                    ].map((meal) => (
-                      <label
-                        key={meal.key}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-all border ${day.meals?.[meal.key]
-                            ? `bg-${meal.color}-100 border-${meal.color}-300 text-${meal.color}-800`
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                          }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={day.meals?.[meal.key] || false}
-                          onChange={(e) => handleMealToggle(day, meal.key, e.target.checked)}
-                          className="sr-only"
-                        />
-                        {day.meals?.[meal.key] ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <meal.icon className="w-4 h-4 opacity-50" />
-                        )}
-                        <span className="text-sm font-medium">{meal.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </FieldGroup>
-
-                <FieldGroup label="Transport" icon={Car}>
-                  <div className="relative">
-                    <select
-                      value={day.transport || 'car'}
-                      onChange={(e) => onDayChange(day.dayNumber, { transport: e.target.value })}
-                      className="w-full px-4 py-3 pr-10 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all appearance-none cursor-pointer"
+              {/* Row 3: Meals */}
+              <FieldGroup label="Meals Included" icon={Utensils}>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'amber' },
+                    { key: 'lunch', label: 'Lunch', icon: UtensilsCrossed, color: 'orange' },
+                    { key: 'dinner', label: 'Dinner', icon: Moon, color: 'violet' },
+                  ].map((meal) => (
+                    <label
+                      key={meal.key}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-all border ${day.meals?.[meal.key]
+                          ? `bg-${meal.color}-100 border-${meal.color}-300 text-${meal.color}-800`
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
                     >
-                      <option value="car">🚗 Car</option>
-                      <option value="flight">✈️ Flight</option>
-                      <option value="train">🚂 Train</option>
-                      <option value="bus">🚌 Bus</option>
-                      <option value="boat">⛵ Boat</option>
-                      <option value="walk">🚶 Walk</option>
-                      <option value="other">📦 Other</option>
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                  </div>
-                </FieldGroup>
-              </div>
-
-              {/* Flight Info Card — when transport is flight */}
-              {day.transport === 'flight' && (
-                <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-blue-800">
-                      {day.flight?.origin
-                        ? `${day.flight.origin} → ${day.flight.destination}`
-                        : 'No flight selected'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentDayForFlight(day.dayNumber);
-                        setShowFlightModal(true);
-                      }}
-                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      {day.flight?.origin ? 'Edit Flight' : 'Select Flight'}
-                    </button>
-                  </div>
-                  {day.flight?.origin && (
-                    <div className="mt-2 text-xs text-blue-700 space-y-0.5">
-                      <p className="font-medium">{day.flight.origin} → {day.flight.destination}</p>
-                      <p>Airline: {day.flight.airlinePreference || 'Any'} | Cabin: {day.flight.cabinClass || 'Economy'}</p>
-                      {day.flight.departureTime && <p>Preferred: {day.flight.departureTime}</p>}
-                      {day.flight.flightNumber && (
-                        <>
-                          <p className="mt-1 font-medium text-green-700">Booked: {day.flight.flightNumber} ({day.flight.carrierName})</p>
-                          <p>PNR: {day.flight.bookingReference} | Status: {day.flight.status}</p>
-                        </>
+                      <input
+                        type="checkbox"
+                        checked={day.meals?.[meal.key] || false}
+                        onChange={(e) => handleMealToggle(day, meal.key, e.target.checked)}
+                        className="sr-only"
+                      />
+                      {day.meals?.[meal.key] ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <meal.icon className="w-4 h-4 opacity-50" />
                       )}
-                    </div>
-                  )}
+                      <span className="text-sm font-medium">{meal.label}</span>
+                    </label>
+                  ))}
                 </div>
-              )}
+              </FieldGroup>
 
               {/* Row 4: Accommodation */}
               <div className="bg-white rounded-xl border border-slate-200 p-4">
