@@ -99,6 +99,9 @@ export const createDefaultDay = (dayNumber = 1) => ({
   images: [],
   notes: '',
   transports: [],
+  // Per-day flights selected via the Flight Booking section. Each flight may
+  // carry a client-side id used to link it to its FLIGHT transport row.
+  flights: [],
 });
 
 // Default place entry

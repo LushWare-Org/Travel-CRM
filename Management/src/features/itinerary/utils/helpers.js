@@ -172,6 +172,9 @@ function normalizeTransportRow(t) {
     pricingModel: t.pricingModel || 'PER_VEHICLE',
     unitCost: t.unitCost == null || t.unitCost === '' ? 0 : Number(t.unitCost),
     distanceKm: t.distanceKm == null || t.distanceKm === '' ? null : Number(t.distanceKm),
+    // Editor-only link to the flight that created this row; dropped by the
+    // save payload/backend mappers so it never reaches the API.
+    flightRef: t.flightRef || null,
   };
 }
 
