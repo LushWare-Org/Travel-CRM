@@ -77,6 +77,29 @@ describe('lead pricing enums', () => {
     expect(prismaValues.sort()).toEqual(Object.values(COST_LINE_CATEGORY).sort());
   });
 
+  it('matches the lead-service Prisma schema enums', () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const schemaPath = path.resolve(here, '../../../../lead-service/prisma/schema.prisma');
+    const schema = readFileSync(schemaPath, 'utf8');
+
+    const parseEnum = (name) => {
+      const match = schema.match(new RegExp(`enum ${name} \\{([^}]*)\\}`));
+      if (!match) throw new Error(`Prisma enum ${name} not found in lead-service schema`);
+      return match[1]
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('@@') && !line.startsWith('//'))
+        .map((line) => line.replace(/ @map\(.*\)/, ''));
+    };
+
+    expect(parseEnum('PricingBasis').sort()).toEqual(Object.values(PRICING_BASIS).sort());
+    expect(parseEnum('MarginType').sort()).toEqual(Object.values(MARGIN_TYPE).sort());
+    expect(parseEnum('CostLineSource').sort()).toEqual(Object.values(COST_LINE_SOURCE).sort());
+    expect(parseEnum('OptionalFlightType').sort()).toEqual(Object.values(OPTIONAL_FLIGHT_TYPE).sort());
+    expect(parseEnum('StatusHistoryActor').sort()).toEqual(Object.values(ACTOR).sort());
+    expect(parseEnum('CostLineCategory').sort()).toEqual(Object.values(COST_LINE_CATEGORY).sort());
+  });
+
   it('provides a label for every pricing basis, margin type, source, flight type and category', () => {
     for (const key of Object.keys(PRICING_BASIS)) {
       expect(typeof PRICING_BASIS_LABELS[key]).toBe('string');
