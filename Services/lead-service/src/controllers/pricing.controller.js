@@ -1,7 +1,7 @@
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { computePricing } from '../services/pricing.service.js';
+import { computePricing, toLineDescriptor } from '../services/pricing.service.js';
 import { recomputeLeadPricing } from './lead.controller.js';
 import { buildAutoCostLines } from '../services/lead-itinerary.service.js';
 
@@ -36,7 +36,7 @@ export const calculatePricing = asyncHandler(async (req, res) => {
   const resolvedLines = Array.isArray(lines)
     ? lines
     : Array.isArray(days)
-      ? buildAutoCostLines(days)
+      ? buildAutoCostLines(days).map(toLineDescriptor)
       : [];
   if (!Array.isArray(lines) && !Array.isArray(days)) {
     throw new AppError('lines or days array is required', 400);
@@ -54,7 +54,7 @@ export const previewPricing = asyncHandler(async (req, res) => {
   const resolvedLines = Array.isArray(lines)
     ? lines
     : Array.isArray(days)
-      ? buildAutoCostLines(days)
+      ? buildAutoCostLines(days).map(toLineDescriptor)
       : [];
   if (!Array.isArray(lines) && !Array.isArray(days)) {
     throw new AppError('lines or days array is required', 400);

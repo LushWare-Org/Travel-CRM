@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computePricing, toLineDescriptor } from '../pricing.service.js';
+import { buildAutoCostLines } from '../lead-itinerary.service.js';
 
 const baseLines = [
   { basis: 'PER_PERSON', estimatedUnit: 100, actualUnit: 90, category: 'activity', description: 'Activity', source: 'AUTO' },
@@ -129,5 +130,25 @@ describe('toLineDescriptor', () => {
     expect(desc.actualUnit).toBe(45.5);
     expect(desc.marginType).toBe('FIXED');
     expect(desc.marginValue).toBe(10);
+  });
+
+  it('maps AUTO cost lines to engine units without zeroing costs', () => {
+    const days = [
+      {
+        breakfastCount: 2,
+        lunchCount: 1,
+        dinnerCount: 1,
+        accommodation: { totalAmount: 100 },
+        activities: [{ defaultCost: 50, costOverride: null }],
+        transports: [{ pricingModel: 'PER_VEHICLE', unitCost: 300 }],
+      },
+    ];
+    const lines = buildAutoCostLines(days).map(toLineDescriptor);
+    const food = lines.find((l) => l.category === 'food');
+    const transport = lines.find((l) => l.category === 'transportation');
+    const accommodation = lines.find((l) => l.category === 'accommodation');
+    expect(food.estimatedUnit).toBe(60);
+    expect(transport.estimatedUnit).toBe(300);
+    expect(accommodation.estimatedUnit).toBe(100);
   });
 });

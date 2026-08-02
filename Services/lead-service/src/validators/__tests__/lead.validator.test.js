@@ -62,6 +62,13 @@ describe('createLeadSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('accepts date-only remark dates', () => {
+    const result = createLeadSchema.safeParse({
+      remarks: [{ text: 'Called the client', date: '2026-08-02' }],
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('updateLeadSchema', () => {

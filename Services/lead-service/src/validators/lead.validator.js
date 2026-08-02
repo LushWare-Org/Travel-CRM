@@ -51,7 +51,7 @@ const leadFields = {
 
 const remarksSchema = z.array(z.object({
   text: z.string().min(1),
-  date: z.string().datetime().optional(),
+  date: z.string().optional(), // date-only (YYYY-MM-DD) or full ISO; parsed by the service
   addedBy: z.string().optional(),
 })).optional();
 

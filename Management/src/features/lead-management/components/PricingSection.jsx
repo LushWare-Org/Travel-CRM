@@ -48,7 +48,7 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
 
   // Debounced live preview whenever days or settings change.
   useEffect(() => {
-    if (!leadId || !Array.isArray(days)) return;
+    if (!Array.isArray(days)) return;
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
