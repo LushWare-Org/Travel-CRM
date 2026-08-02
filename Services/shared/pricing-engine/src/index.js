@@ -9,7 +9,7 @@ import { DEFAULTS } from './config.js';
  * @param {Array} params.days — day objects with breakfastCount/lunchCount/dinnerCount/mealPriceOverride
  * @param {Array} params.activities — [{defaultCost, costOverride?}]
  * @param {Array} params.transports — [{pricingModel, unitCost, distanceKm?}]
- * @param {number} [params.groupSize] — defaults to 2
+ * @param {number} [params.groupSize] — defaults to 1
  * @param {number} [params.mealCostPerPerson] — defaults to 15
  * @param {'PERCENTAGE'|'FIXED'} [params.marginType] — if omitted, margin not computed
  * @param {number} [params.marginValue]

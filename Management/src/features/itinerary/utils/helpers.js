@@ -185,7 +185,7 @@ function normalizeTransportRow(t) {
 }
 
 /** Compute one transport row's cost using the pricing engine's PER_* rules. */
-export const getTransportRowCost = (transport, groupSize = 2) => {
+export const getTransportRowCost = (transport, groupSize = 1) => {
   const unitCost = transport.unitCost || 0;
   switch (transport.pricingModel) {
     case 'PER_KM':

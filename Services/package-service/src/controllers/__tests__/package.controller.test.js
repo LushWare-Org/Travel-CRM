@@ -57,7 +57,6 @@ describe('calculatePrice', () => {
         ],
         defaultMarginType: 'PERCENTAGE',
         defaultMarginInput: 20,
-        groupSize: 3,
       },
     };
     const res = makeRes();
@@ -68,7 +67,6 @@ describe('calculatePrice', () => {
       req.body.itineraryDays,
       [{ name: 'City Tour', defaultCost: 50 }],
       [{ pricingModel: 'PER_VEHICLE', unitCost: 200 }],
-      { groupSize: 3 }
     );
     expect(res.json).toHaveBeenCalledWith({
       success: true,
@@ -86,13 +84,13 @@ describe('calculatePrice', () => {
     });
   });
 
-  it('defaults margin/group size and tolerates an empty body', async () => {
+  it('defaults margin and tolerates an empty body', async () => {
     const req = { body: {} };
     const res = makeRes();
 
     await calculatePrice(req, res);
 
-    expect(recomputeBasePrice).toHaveBeenCalledWith([], [], [], { groupSize: undefined });
+    expect(recomputeBasePrice).toHaveBeenCalledWith([], [], []);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       data: {

@@ -231,7 +231,6 @@ export const calculatePrice = asyncHandler(async (req, res) => {
     itineraryDays = [],
     defaultMarginType = 'PERCENTAGE',
     defaultMarginInput = 0,
-    groupSize,
   } = req.body || {};
 
   const days = Array.isArray(itineraryDays) ? itineraryDays : [];
@@ -239,7 +238,7 @@ export const calculatePrice = asyncHandler(async (req, res) => {
   const transports = days.flatMap((day) => day.transports || []);
 
   // Always recompute from the itinerary so the breakdown reflects real costs.
-  const pricing = recomputeBasePrice(days, activities, transports, { groupSize });
+  const pricing = recomputeBasePrice(days, activities, transports);
 
   // Accommodation is a per-day cost the engine does not model (each day is an
   // independent per-night booking for now), so add it to the package cost and

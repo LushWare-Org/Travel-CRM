@@ -189,7 +189,6 @@ const ItineraryEditor = ({
   LocationAutocompleteComponent = null,
   hideTitleAndDescription = false,
   hideDescription = false,
-  groupSize = 2,
 }) => {
   const [uploadingDayImages, setUploadingDayImages] = useState({});
   const [currentDayForHotel, setCurrentDayForHotel] = useState(null);
@@ -270,8 +269,8 @@ const ItineraryEditor = ({
     const mealTotal = calculateMealCosts([mealCounts], {
       mealCostPerPerson: DEFAULTS.mealCostPerPerson,
     }).total;
-    const activityTotal = calculateActivityCosts(activityRows, { groupSize }).total;
-    const transportTotal = calculateTransportCosts(transportRows, { groupSize }).total;
+    const activityTotal = calculateActivityCosts(activityRows, { groupSize: 1 }).total;
+    const transportTotal = calculateTransportCosts(transportRows, { groupSize: 1 }).total;
 
     const chip = (label, value) => {
       const hasValue = Number(value) > 0;
@@ -376,7 +375,7 @@ const ItineraryEditor = ({
                 <div className="space-y-2">
                   {activityRows.map((activity) => {
                     const unit = activity.costOverride ?? activity.defaultCost ?? 0;
-                    const total = unit * groupSize;
+                    const total = unit;
                     return (
                       <div key={activity.name} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
                         <span className="text-sm font-medium text-slate-700 flex-1 min-w-[120px]">{activity.name}</span>
@@ -395,7 +394,7 @@ const ItineraryEditor = ({
                           />
                         </label>
                         <span className="text-xs text-emerald-700 font-medium">
-                          {formatCurrency(unit)} × {groupSize}pp = {formatCurrency(total)}
+                          {formatCurrency(total)}
                         </span>
                       </div>
                     );
@@ -451,9 +450,7 @@ const ItineraryEditor = ({
                   )}
                   <div className="col-span-2 sm:col-span-1 flex items-end pb-1">
                     <p className="text-xs text-slate-500">
-                      {(transportRows[0].pricingModel || 'PER_VEHICLE') === 'PER_PERSON'
-                        ? `${formatCurrency(transportRows[0].unitCost || 0)} × ${groupSize}pp = `
-                        : 'Total = '}
+                      Total ={' '}
                       <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
                     </p>
                   </div>

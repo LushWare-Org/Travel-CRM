@@ -14,7 +14,6 @@ import {
   TrendingUp,
   AlertTriangle,
   Loader,
-  Users,
 } from 'lucide-react';
 import {
   calculateBasePrice,
@@ -56,14 +55,13 @@ const Divider = () => (
   <div className="my-3 border-t-2 border-dashed border-slate-200" />
 );
 
-const PriceCalculation = ({ formData, onFormChange, duration, groupSize }) => {
+const PriceCalculation = ({ formData, onFormChange, duration }) => {
   const itineraryDays = useMemo(
     () => (Array.isArray(formData.days) ? formData.days.filter(Boolean) : []),
     [formData.days]
   );
 
-  const effectiveGroupSize =
-    Number(groupSize) > 0 ? Number(groupSize) : DEFAULTS.defaultGroupSize;
+  const effectiveGroupSize = 1;
   const marginType = formData.defaultMarginType || 'PERCENTAGE';
   const marginValue = Number(formData.defaultMarginInput) || 0;
 
@@ -135,7 +133,6 @@ const PriceCalculation = ({ formData, onFormChange, duration, groupSize }) => {
           itineraryDays: formData.days,
           defaultMarginType: marginType,
           defaultMarginInput: marginValue,
-          groupSize: effectiveGroupSize,
         });
         if (seq !== verifySeq.current) return;
         setServerResult(response?.data || null);
@@ -171,14 +168,6 @@ const PriceCalculation = ({ formData, onFormChange, duration, groupSize }) => {
     });
   };
 
-  const handleGroupSizeChange = (e) => {
-    const value = e.target.value;
-    onFormChange({
-      ...formData,
-      groupSize: value === '' ? '' : (parseInt(value, 10) || 1),
-    });
-  };
-
   const hasAnyCosts =
     pricing.packageCost > 0 ||
     pricing.accommodationTotal > 0 ||
@@ -206,19 +195,8 @@ const PriceCalculation = ({ formData, onFormChange, duration, groupSize }) => {
 
   return (
     <div className="space-y-4">
-      {/* Group size + margin controls */}
+      {/* Margin controls */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <Users className="w-4 h-4 text-slate-400" />
-          Group Size
-          <input
-            type="number" min="1"
-            value={groupSize === '' || groupSize == null ? '' : effectiveGroupSize}
-            onChange={handleGroupSizeChange}
-            onWheel={(e) => e.currentTarget.blur()}
-            className="w-20 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-          />
-        </label>
         <label className="flex items-center gap-2 text-sm text-slate-600">
           <TrendingUp className="w-4 h-4 text-slate-400" />
           Margin
@@ -260,7 +238,6 @@ const PriceCalculation = ({ formData, onFormChange, duration, groupSize }) => {
               <p className="text-[11px] text-slate-400">Computed live from itinerary costs · {duration} day{duration === 1 ? '' : 's'}</p>
             </div>
           </div>
-          <span className="text-[11px] text-slate-500 font-medium">{effectiveGroupSize}pp</span>
         </div>
 
         <div className="px-5 py-4">
@@ -288,7 +265,7 @@ const PriceCalculation = ({ formData, onFormChange, duration, groupSize }) => {
               <ReceiptLine
                 key={`act-${activity.dayNumber}-${activity.name}`}
                 label={`${activity.name} (Day ${activity.dayNumber})`}
-                value={`${formatCurrency(unit)} × ${effectiveGroupSize}pp = ${formatCurrency(unit * effectiveGroupSize)}`}
+                value={formatCurrency(unit)}
               />
             );
           })}

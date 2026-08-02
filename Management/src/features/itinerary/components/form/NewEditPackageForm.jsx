@@ -198,7 +198,6 @@ const NewEditPackageForm = ({
 
   const itineraryDays = (localFormData.days || []).filter(Boolean);
   const duration = itineraryDays.length;
-  const groupSize = localFormData.groupSize ?? 2;
 
   return (
     <div className="space-y-6">
@@ -288,7 +287,6 @@ const NewEditPackageForm = ({
               packageType={localFormData.packageType || ''}
               category={localFormData.category || ''}
               hideDescription={onlyItineraryEditable}
-              groupSize={groupSize}
             />
 
             {!hideLeadManagementButtons && (
@@ -337,7 +335,6 @@ const NewEditPackageForm = ({
             formData={localFormData}
             onFormChange={handleDetailsChange}
             duration={duration}
-            groupSize={groupSize}
           />
         </StableSectionCard>
       ) : (

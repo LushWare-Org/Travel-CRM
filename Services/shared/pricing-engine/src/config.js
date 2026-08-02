@@ -1,6 +1,6 @@
 export const DEFAULTS = {
   mealCostPerPerson: 15,
-  defaultGroupSize: 2,
+  defaultGroupSize: 1,
 };
 
 export function withDefaults(overrides = {}) {

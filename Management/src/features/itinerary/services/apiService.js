@@ -169,7 +169,6 @@ class ApiService {
       itineraryDays,
       defaultMarginType = 'PERCENTAGE',
       defaultMarginInput = 0,
-      groupSize,
     } = payload;
 
     const rawDays = Array.isArray(itineraryDays) && itineraryDays.length > 0
@@ -180,7 +179,6 @@ class ApiService {
       itineraryDays: buildItineraryDaysPayload(rawDays),
       defaultMarginType,
       defaultMarginInput,
-      ...(groupSize !== undefined && groupSize !== '' ? { groupSize: Number(groupSize) } : {}),
     };
 
     return makeRequest('/packages/calculate-price', {
