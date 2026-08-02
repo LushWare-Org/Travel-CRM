@@ -2,6 +2,7 @@ import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { nextQuotationNumber, nextInvoiceNumber } from '../utils/docNumber.js';
+import { quotationTotals, createOrVersionQuotation } from '../services/quotation.service.js';
 
 const quotationInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -40,23 +41,18 @@ export const createQuotation = asyncHandler(async (req, res) => {
   const { items = [], images = [], ...body } = req.body;
   const quotationNumber = await nextQuotationNumber();
 
-  const subtotal = items.reduce((s, i) => s + (i.unitPrice * i.quantity), 0);
-  const taxAmount = subtotal * ((body.taxRate || 0) / 100);
-  const serviceChargeAmount = subtotal * ((body.serviceChargeRate || 0) / 100);
-  const discountAmount = body.discountType === 'percentage'
-    ? subtotal * ((body.discountValue || 0) / 100)
-    : (body.discountValue || 0);
-  const totalAmount = subtotal + taxAmount + serviceChargeAmount - discountAmount;
+  const totals = quotationTotals(items, {
+    taxRate: body.taxRate,
+    serviceChargeRate: body.serviceChargeRate,
+    discountType: body.discountType,
+    discountValue: body.discountValue,
+  });
 
   const quotation = await prisma.quotation.create({
     data: {
       ...body,
       quotationNumber,
-      subtotal,
-      taxAmount,
-      serviceChargeAmount,
-      discountAmount,
-      totalAmount,
+      ...totals,
       createdById: req.user.id,
       items: { create: items.map((item, idx) => ({ ...item, totalPrice: item.unitPrice * item.quantity, order: idx })) },
       images: { create: images },
@@ -79,14 +75,13 @@ export const updateQuotation = asyncHandler(async (req, res) => {
   const data = { ...body, lastModifiedById: req.user.id, version: { increment: 1 } };
 
   if (items) {
-    const subtotal = items.reduce((s, i) => s + (i.unitPrice * i.quantity), 0);
-    data.subtotal = subtotal;
-    data.taxAmount = subtotal * ((body.taxRate ?? existing.taxRate) / 100);
-    data.serviceChargeAmount = subtotal * ((body.serviceChargeRate ?? existing.serviceChargeRate) / 100);
-    const discountType = body.discountType ?? existing.discountType;
-    const discountValue = body.discountValue ?? existing.discountValue;
-    data.discountAmount = discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue;
-    data.totalAmount = data.subtotal + data.taxAmount + data.serviceChargeAmount - data.discountAmount;
+    const totals = quotationTotals(items, {
+      taxRate: body.taxRate ?? existing.taxRate,
+      serviceChargeRate: body.serviceChargeRate ?? existing.serviceChargeRate,
+      discountType: body.discountType ?? existing.discountType,
+      discountValue: body.discountValue ?? existing.discountValue,
+    });
+    Object.assign(data, totals);
     await prisma.quotationItem.deleteMany({ where: { quotationId: req.params.id } });
     data.items = { create: items.map((item, idx) => ({ ...item, totalPrice: item.unitPrice * item.quantity, order: idx })) };
   }
@@ -96,6 +91,19 @@ export const updateQuotation = asyncHandler(async (req, res) => {
 
   const quotation = await prisma.quotation.update({ where: { id: req.params.id }, data, include: quotationInclude });
   res.json({ success: true, data: quotation });
+});
+
+/**
+ * POST /api/v1/billing/quotations/from-lead
+ * Lead-service snapshot handoff: create version 1 or bump the version of the
+ * lead's existing quotation. Validates totals against the shared engine.
+ */
+export const createQuotationFromLead = asyncHandler(async (req, res) => {
+  const quotation = await createOrVersionQuotation({
+    ...req.body,
+    createdById: req.user.id,
+  });
+  res.status(201).json({ success: true, data: quotation });
 });
 
 export const deleteQuotation = asyncHandler(async (req, res) => {

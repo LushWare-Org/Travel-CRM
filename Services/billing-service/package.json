@@ -8,10 +8,14 @@
     "start": "node src/index.js",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@travel-crm/lead-pricing-engine": "file:../shared/lead-pricing-engine",
+    "@travel-crm/pricing-engine": "file:../shared/pricing-engine",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -23,6 +27,7 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
-    "prisma": "^5.22.0"
+    "prisma": "^5.22.0",
+    "vitest": "^4.1.0"
   }
 }
