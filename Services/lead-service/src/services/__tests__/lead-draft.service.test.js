@@ -66,10 +66,10 @@ describe('buildDraftData', () => {
     });
 
     expect(data.costLines).toEqual(expect.arrayContaining([
-      expect.objectContaining({ category: 'food', basis: 'PER_PERSON', estimatedUnit: 60, source: 'AUTO' }),
-      expect.objectContaining({ category: 'activity', basis: 'PER_PERSON', estimatedUnit: 50, source: 'AUTO' }),
-      expect.objectContaining({ category: 'transportation', basis: 'PER_VEHICLE', estimatedUnit: 300, source: 'AUTO' }),
-      expect.objectContaining({ category: 'accommodation', basis: 'PER_PERSON', estimatedUnit: 100, source: 'AUTO' }),
+      expect.objectContaining({ category: 'food', basis: 'PER_PERSON', estimatedUnitPrice: 60, source: 'AUTO' }),
+      expect.objectContaining({ category: 'activity', basis: 'PER_PERSON', estimatedUnitPrice: 50, source: 'AUTO' }),
+      expect.objectContaining({ category: 'transportation', basis: 'PER_VEHICLE', estimatedUnitPrice: 300, quantity: 1, source: 'AUTO' }),
+      expect.objectContaining({ category: 'accommodation', basis: 'PER_PERSON', estimatedUnitPrice: 100, source: 'AUTO' }),
     ]));
 
     expect(data.pricing).toEqual({
@@ -93,7 +93,7 @@ describe('buildDraftData', () => {
     const food = data.costLines.find((l) => l.category === 'food');
     expect(food).toEqual(expect.objectContaining({
       basis: 'PER_PERSON',
-      estimatedUnit: 60,
+      estimatedUnitPrice: 60,
       description: 'Meals',
     }));
   });

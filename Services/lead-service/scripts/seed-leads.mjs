@@ -138,7 +138,7 @@ async function createPricing(leadId, travelers, settings) {
 }
 
 async function seedLead(leadSeed) {
-  const existing = await prisma.lead.findUnique({ where: { email: leadSeed.email } });
+  const existing = await prisma.lead.findFirst({ where: { email: leadSeed.email } });
   if (existing) {
     console.log(`SKIP ${leadSeed.email} (already exists)`);
     return;

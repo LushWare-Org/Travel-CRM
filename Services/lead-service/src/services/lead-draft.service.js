@@ -63,7 +63,7 @@ export function buildDraftData(packageData) {
     },
   }));
 
-  const costLines = buildItineraryCostLines({
+  const engineLines = buildItineraryCostLines({
     days: days.map((d) => ({
       breakfastCount: d.breakfastCount,
       lunchCount: d.lunchCount,
@@ -72,7 +72,21 @@ export function buildDraftData(packageData) {
     })),
     activities: days.flatMap((d) => d.activities.create),
     transports: days.flatMap((d) => d.transports.create),
-  }).map((line, i) => ({ ...line, orderIndex: i }));
+  });
+
+  // Persistence shape (Prisma column names), not the engine descriptor shape.
+  const costLines = engineLines.map((line, i) => ({
+    category: line.category,
+    description: line.description,
+    basis: line.basis,
+    quantity: line.quantity ?? 1,
+    estimatedUnitPrice: line.estimatedUnit ?? 0,
+    actualUnitPrice: line.actualUnit ?? null,
+    marginType: line.marginType ?? null,
+    marginValue: line.marginValue ?? null,
+    source: line.source ?? 'AUTO',
+    orderIndex: i,
+  }));
 
   return {
     packageId: packageData.id,
