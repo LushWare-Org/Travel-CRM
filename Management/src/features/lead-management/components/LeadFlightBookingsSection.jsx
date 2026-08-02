@@ -64,16 +64,28 @@ export default function LeadFlightBookingsSection({
   const handleFlightTemplate = (prefs) => {
     const dayNumber = flightModalDay;
     if (dayNumber && onUpdateDay) {
-      // Itinerary day flight — save preferences to the day
+      // Itinerary day flight — save preferences into the day's flights[].
+      // Merge into the first flight if one exists, otherwise append a new one
+      // with the editor's flight shape (id + totalAmount).
+      const day = itineraryDays.find(d => d.dayNumber === dayNumber);
+      const flights = Array.isArray(day?.flights) ? day.flights : [];
+      const prefsPatch = {
+        origin: prefs.origin,
+        destination: prefs.destination,
+        cabinClass: prefs.cabinClass,
+        departureTime: prefs.departureTime,
+        airlinePreference: prefs.airlinePreference,
+      };
       onUpdateDay(dayNumber, {
-        flight: {
-          ...(itineraryDays.find(d => d.dayNumber === dayNumber)?.flight || {}),
-          origin: prefs.origin,
-          destination: prefs.destination,
-          cabinClass: prefs.cabinClass,
-          departureTime: prefs.departureTime,
-          airlinePreference: prefs.airlinePreference,
-        },
+        flights: flights.length > 0
+          ? flights.map((f, i) => (i === 0 ? { ...f, ...prefsPatch } : f))
+          : [{
+              ...prefsPatch,
+              id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                ? crypto.randomUUID()
+                : `flight-${Date.now()}`,
+              totalAmount: 0,
+            }],
       });
       toast.success(`Flight preferences saved for Day ${dayNumber}`);
     } else {
@@ -83,8 +95,8 @@ export default function LeadFlightBookingsSection({
     fetchBookings();
   };
 
-  // Days that have flight transport
-  const flightDays = itineraryDays.filter(d => d.transport === 'flight');
+  // Days that have flights selected in the editor
+  const flightDays = itineraryDays.filter(d => Array.isArray(d.flights) && d.flights.length > 0);
   const optionalFlights = bookings.filter(b => b.flightType === 'optional');
 
   if (loading) {
@@ -134,7 +146,8 @@ export default function LeadFlightBookingsSection({
                   const dayBooking = bookings.find(b => b.dayNumber === day.dayNumber && b.flightType === 'itinerary');
                   const booked = !!dayBooking && dayBooking.status !== 'cancelled' && dayBooking.status !== 'failed';
                   const failed = !!dayBooking && dayBooking.status === 'failed';
-                  const hasPrefs = !booked && !failed && day.flight?.origin;
+                  const firstFlight = Array.isArray(day.flights) ? day.flights[0] : null;
+                  const hasPrefs = !booked && !failed && firstFlight?.origin;
                   const itemState = deriveItemState(leadStatus, booked, failed);
                   const stateLabel = ITEM_STATE_LABELS[itemState];
                   const stateColor = ITEM_STATE_COLORS[itemState];
@@ -145,7 +158,7 @@ export default function LeadFlightBookingsSection({
                           <span className="text-sm font-semibold text-gray-700">Day {day.dayNumber}</span>
                           {(booked || hasPrefs) && (
                             <span className="text-sm text-gray-600">
-                              {(dayBooking?.segments?.[0]?.origin || day.flight?.origin)} → {(dayBooking?.segments?.[dayBooking?.segments?.length - 1]?.destination || day.flight?.destination)}
+                              {(dayBooking?.segments?.[0]?.origin || firstFlight?.origin)} → {(dayBooking?.segments?.[dayBooking?.segments?.length - 1]?.destination || firstFlight?.destination)}
                             </span>
                           )}
                           <span className={`px-1.5 py-0.5 text-xs rounded-full border ${stateColor}`}>
@@ -166,7 +179,7 @@ export default function LeadFlightBookingsSection({
                             onClick={() => {
                               setFlightModalDay(day.dayNumber);
                               setFlightModalType('itinerary');
-                              setFlightModalPrefill(day.flight || { origin: '', destination: '' });
+                              setFlightModalPrefill(firstFlight || { origin: '', destination: '' });
                               setShowFlightModal(true);
                             }}
                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
@@ -205,7 +218,7 @@ export default function LeadFlightBookingsSection({
                               onClick={() => {
                                 setFlightModalDay(day.dayNumber);
                                 setFlightModalType('itinerary');
-                                setFlightModalPrefill(day.flight || { origin: '', destination: '' });
+                                setFlightModalPrefill(firstFlight || { origin: '', destination: '' });
                                 setShowFlightModal(true);
                               }}
                               className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
@@ -230,9 +243,9 @@ export default function LeadFlightBookingsSection({
                       )}
                       {hasPrefs && (
                         <div className="mt-1 text-xs text-gray-500">
-                          {day.flight.cabinClass || 'Economy'}
-                          {day.flight.airlinePreference ? ` · ${day.flight.airlinePreference}` : ''}
-                          {day.flight.departureTime ? ` · ${day.flight.departureTime}` : ''}
+                          {firstFlight.cabinClass || 'Economy'}
+                          {firstFlight.airlinePreference ? ` · ${firstFlight.airlinePreference}` : ''}
+                          {firstFlight.departureTime ? ` · ${firstFlight.departureTime}` : ''}
                         </div>
                       )}
                     </div>
@@ -246,7 +259,7 @@ export default function LeadFlightBookingsSection({
             <div className="text-center py-6 text-gray-400">
               <Plane className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No flights in this itinerary</p>
-              <p className="text-xs mt-1">Set transport to "flight" on an itinerary day to add flight preferences</p>
+              <p className="text-xs mt-1">Add a flight in the day's Flight Booking section to set preferences</p>
             </div>
           )}
 
