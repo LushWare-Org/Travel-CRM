@@ -570,7 +570,8 @@ const ItineraryGenerationContainer = () => {
   // Package Card Component
   const PackageCard = ({ pkg }) => {
     if (!pkg || typeof pkg !== 'object') return null;
-    const formattedPrice = pkg.basePrice ? formatPriceINR(pkg.basePrice) : null;
+    const displayPrice = pkg.sellPrice ?? pkg.basePrice;
+    const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
     const status = pkg.isActive ? 'published' : 'draft';
     const statusLabel = pkg.isActive ? 'Published' : 'Draft';
 
