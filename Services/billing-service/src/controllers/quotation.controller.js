@@ -3,6 +3,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { nextQuotationNumber, nextInvoiceNumber } from '../utils/docNumber.js';
 import { quotationTotals, createOrVersionQuotation } from '../services/quotation.service.js';
+import { emitLeadEvent } from '../services/events.client.js';
 
 const quotationInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -134,6 +135,15 @@ export const acceptQuotation = asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { status: 'accepted', acceptedAt: new Date() },
   });
+  try {
+    await emitLeadEvent({
+      type: 'quotation.accepted',
+      leadId: quotation.leadId,
+      payload: { quoteId: quotation.id, version: quotation.version },
+    });
+  } catch (err) {
+    console.error('Failed to notify lead-service of acceptance', err.message);
+  }
   res.json({ success: true, data: quotation });
 });
 
@@ -142,6 +152,15 @@ export const rejectQuotation = asyncHandler(async (req, res) => {
     where: { id: req.params.id },
     data: { status: 'rejected', rejectedAt: new Date(), rejectionReason: req.body.reason },
   });
+  try {
+    await emitLeadEvent({
+      type: 'quotation.rejected',
+      leadId: quotation.leadId,
+      payload: { quoteId: quotation.id, reason: req.body.reason || null },
+    });
+  } catch (err) {
+    console.error('Failed to notify lead-service of rejection', err.message);
+  }
   res.json({ success: true, data: quotation });
 });
 
