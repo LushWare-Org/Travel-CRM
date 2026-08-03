@@ -22,6 +22,7 @@ import { createDefaultDay } from '../../itinerary/types/index.js';
 import LeadFlightBookingsSection from './LeadFlightBookingsSection';
 import LeadStatusBadge from './LeadStatusBadge';
 import PricingSection from './PricingSection';
+import { toEditorDays } from '../utils/toEditorDays';
 
 // ── Module-level components (prevents remounting on re-render) ──
 
@@ -264,7 +265,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
       // Drafted lead: use the persisted serialized days from the lead API.
       if (Array.isArray(freshLead?.itineraryDays) && freshLead.itineraryDays.length > 0) {
-        setItineraryDays(freshLead.itineraryDays);
+        setItineraryDays(toEditorDays(freshLead.itineraryDays));
         return;
       }
 
@@ -273,7 +274,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       if (packageId && freshLead?.lifecycleStatus === 'NEW') {
         const response = await packageAPI.getById(packageId);
         const pkg = response.data?.data || response.data;
-        setItineraryDays(pkg?.itineraryDays || []);
+        setItineraryDays(toEditorDays(pkg?.itineraryDays || []));
       } else {
         setItineraryDays([]);
       }
@@ -1004,7 +1005,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                           packageAPI.getById(packageId)
                             .then((res) => {
                               const pkg = res.data?.data || res.data;
-                              setItineraryDays(pkg?.itineraryDays || []);
+                              setItineraryDays(toEditorDays(pkg?.itineraryDays || []));
                             })
                             .catch(() => setItineraryDays([]));
                         }

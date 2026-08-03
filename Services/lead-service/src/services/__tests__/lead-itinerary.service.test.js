@@ -76,6 +76,32 @@ describe('buildDaysCreateData', () => {
     expect(data[0].activities.create[0]).toMatchObject({ name: 'Tour', defaultCost: 50 });
     expect(data[0].transports.create[0]).toMatchObject({ pricingModel: 'PER_VEHICLE', unitCost: 300 });
   });
+
+  it('handles the editor day shape: string activities, activityCosts and locations', () => {
+    const data = buildDaysCreateData([{
+      dayNumber: 1,
+      breakfastCount: 1,
+      activities: ['Temple Tour', 'Tea Tasting'],
+      activityCosts: {
+        'Temple Tour': { defaultCost: 40, costOverride: 35 },
+        'Tea Tasting': { defaultCost: 25, costOverride: null },
+      },
+      locations: ['Kandy', 'Tea Plantation'],
+      transports: [],
+    }]);
+    expect(data[0].activities.create[0]).toEqual({
+      activityId: null,
+      name: 'Temple Tour',
+      defaultCost: 40,
+      costOverride: 35,
+      orderIndex: 0,
+    });
+    expect(data[0].activities.create[1]).toMatchObject({ name: 'Tea Tasting', costOverride: null });
+    expect(data[0].places.create).toEqual([
+      { placeId: null, customName: 'Kandy', orderIndex: 0 },
+      { placeId: null, customName: 'Tea Plantation', orderIndex: 1 },
+    ]);
+  });
 });
 
 describe('buildAutoCostLines', () => {
@@ -88,6 +114,16 @@ describe('buildAutoCostLines', () => {
       expect.objectContaining({ category: 'accommodation', basis: 'PER_PERSON', estimatedUnitPrice: 100, source: 'AUTO' }),
     ]));
     expect(lines.every((l) => l.estimatedUnitPrice != null)).toBe(true);
+  });
+
+  it('uses activityCosts overrides from the editor shape', () => {
+    const lines = buildAutoCostLines([{
+      dayNumber: 1,
+      activities: ['Temple Tour'],
+      activityCosts: { 'Temple Tour': { defaultCost: 40, costOverride: 35 } },
+    }]);
+    const activity = lines.find((l) => l.category === 'activity');
+    expect(activity.estimatedUnitPrice).toBe(35);
   });
 });
 

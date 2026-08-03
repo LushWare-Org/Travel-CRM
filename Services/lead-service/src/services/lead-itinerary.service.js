@@ -30,20 +30,35 @@ export function buildDaysCreateData(days) {
     accommodation: day.accommodation ?? {},
     flights: day.flights ?? [],
     places: {
-      create: (day.places || []).map((p, i) => ({
-        placeId: p.placeId ?? null,
-        customName: p.customName ?? null,
-        orderIndex: p.orderIndex ?? i,
+      create: (day.locations?.length ? day.locations : (day.places || [])).map((p, i) => ({
+        placeId: typeof p === 'object' ? (p.placeId ?? null) : null,
+        customName: typeof p === 'string' ? p : (p.customName || p.place?.name || null),
+        orderIndex: typeof p === 'object' ? (p.orderIndex ?? i) : i,
       })),
     },
     activities: {
-      create: (day.activities || []).map((a, i) => ({
-        activityId: a.activityId ?? null,
-        name: a.name ?? null,
-        defaultCost: a.defaultCost != null ? Number(a.defaultCost) : null,
-        costOverride: a.costOverride != null ? Number(a.costOverride) : null,
-        orderIndex: a.orderIndex ?? i,
-      })),
+      create: (day.activities || []).map((a, i) => {
+        if (typeof a === 'string') {
+          const costs = (day.activityCosts || {})[a] || {};
+          const rel = (day._relational?.activities || []).find((r) => (r.name || r.activity?.name) === a);
+          return {
+            activityId: rel?.activityId ?? null,
+            name: a,
+            defaultCost: costs.defaultCost ?? rel?.activity?.defaultCost ?? null,
+            costOverride: costs.costOverride ?? rel?.costOverride ?? null,
+            orderIndex: i,
+          };
+        }
+        return {
+          activityId: a.activityId ?? null,
+          name: a.name ?? a.activity?.name ?? null,
+          defaultCost: a.defaultCost != null
+            ? Number(a.defaultCost)
+            : (a.activity?.defaultCost != null ? Number(a.activity.defaultCost) : null),
+          costOverride: a.costOverride != null ? Number(a.costOverride) : null,
+          orderIndex: i,
+        };
+      }),
     },
     transports: {
       create: (day.transports || []).map((t, i) => ({
@@ -71,10 +86,24 @@ export function buildAutoCostLines(days) {
       accommodation: d.accommodation || {},
     })),
     activities: (days || []).flatMap((d) =>
-      (d.activities || []).map((a) => ({
-        defaultCost: a.costOverride ?? a.defaultCost ?? a.activity?.defaultCost ?? 0,
-        costOverride: a.costOverride ?? null,
-      })),
+      (d.activities || []).map((a) => {
+        const name = typeof a === 'string' ? a : (a.name || a.activity?.name || '');
+        const costs = (d.activityCosts || {})[name] || {};
+        const rel = (d._relational?.activities || []).find((r) => (r.name || r.activity?.name) === name);
+        return {
+          defaultCost:
+            costs.defaultCost ??
+            (typeof a === 'object' ? a.defaultCost ?? a.activity?.defaultCost : undefined) ??
+            rel?.activity?.defaultCost ??
+            0,
+          costOverride:
+            costs.costOverride != null && costs.costOverride !== ''
+              ? Number(costs.costOverride)
+              : (typeof a === 'object' && a.costOverride != null
+                ? Number(a.costOverride)
+                : rel?.costOverride ?? null),
+        };
+      }),
     ),
     transports: (days || []).flatMap((d) =>
       (d.transports || []).map((t) => ({
