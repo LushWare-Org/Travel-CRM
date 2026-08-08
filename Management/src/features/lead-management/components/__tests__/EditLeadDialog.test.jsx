@@ -172,6 +172,36 @@ describe('EditLeadDialog — load behavior', () => {
   });
 });
 
+describe('EditLeadDialog — destination field', () => {
+  it('shows a read-only destination label once a package is attached', async () => {
+    renderDialog({ lead: leadFixture({ packageId: PKG_A, packageName: 'Sri Lanka Explorer', destination: 'Sri Lanka' }) });
+    await screen.findByLabelText('Package');
+    const destination = screen.getByLabelText('Destination');
+    expect(destination.tagName).toBe('DIV');
+    expect(destination).toHaveTextContent('Sri Lanka');
+    expect(destination).toHaveTextContent('Set by the selected package');
+  });
+
+  it('shows the editable destination selector when there is no package', async () => {
+    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
+    await screen.findByLabelText('Package');
+    const destination = screen.getByLabelText('Destination');
+    expect(destination.tagName).toBe('INPUT');
+  });
+
+  it('switches from editable to read-only when a package gets selected', async () => {
+    const user = userEvent.setup();
+    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
+
+    expect(screen.getByLabelText('Destination').tagName).toBe('INPUT');
+
+    const select = await screen.findByLabelText('Package');
+    await user.selectOptions(select, PKG_A);
+
+    await waitFor(() => expect(screen.getByLabelText('Destination').tagName).toBe('DIV'));
+  });
+});
+
 describe('EditLeadDialog — field locking by lifecycle status', () => {
   it('leaves package, dates and travelers editable while DRAFTING', async () => {
     renderDialog({ lead: leadFixture({ lifecycleStatus: 'DRAFTING' }) });

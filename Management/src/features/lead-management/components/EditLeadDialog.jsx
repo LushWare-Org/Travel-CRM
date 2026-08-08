@@ -505,12 +505,22 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 </EditInputField>
 
                 <EditInputField label="Destination" icon={MapPin}>
-                  <DestinationSelector
-                    value={formData.destination}
-                    onChange={(event) =>
-                      setFormData({ ...formData, destination: event.target.value })
-                    }
-                  />
+                  {formData.package ? (
+                    <div
+                      aria-label="Destination"
+                      className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl text-gray-600"
+                    >
+                      {formData.destination || 'Not set'}
+                      <span className="block text-xs text-gray-400 mt-0.5">Set by the selected package</span>
+                    </div>
+                  ) : (
+                    <DestinationSelector
+                      value={formData.destination}
+                      onChange={(event) =>
+                        setFormData({ ...formData, destination: event.target.value })
+                      }
+                    />
+                  )}
                 </EditInputField>
 
                 <EditInputField label="Travel Date (Start)" icon={Calendar} locked={isLocked}>
