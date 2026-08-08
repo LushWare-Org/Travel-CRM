@@ -102,6 +102,49 @@ export function buildDraftData(packageData) {
 }
 
 /**
+ * Detects whether a lead's itinerary still matches a package's blueprint
+ * verbatim (no manual edits since it was copied in). Only a pristine
+ * itinerary is safe to silently replace when the lead switches packages.
+ */
+export function isItineraryPristine(lead) {
+  return Boolean(lead?.sourcePackageId) && lead.sourcePackageId === lead.packageId;
+}
+
+/**
+ * Replaces a lead's itinerary + AUTO cost lines with a new package's
+ * blueprint. Only call this when isItineraryPristine(lead) is true for the
+ * *old* package — a customized itinerary must never be silently overwritten.
+ * Preserves the lead's existing pricing settings (margin, deposit, etc.);
+ * callers are responsible for resetting discount before/after, per their
+ * own UX rules.
+ *
+ * @param {Object} params
+ * @param {string} params.leadId
+ * @param {string} params.packageId - the new package to copy in
+ * @param {Function} [params.fetchImpl] - injectable fetch for tests
+ * @param {Object} [params.prismaClient] - injectable Prisma client for tests
+ */
+export async function replaceLeadItineraryFromPackage({ leadId, packageId, fetchImpl = fetch, prismaClient = prisma }) {
+  const pkg = await fetchPackage(packageId, fetchImpl);
+  const { packageName, days, costLines } = buildDraftData(pkg);
+
+  await prismaClient.$transaction([
+    prismaClient.leadItineraryDay.deleteMany({ where: { leadId } }),
+    prismaClient.leadCostLine.deleteMany({ where: { leadId, source: 'AUTO' } }),
+  ]);
+
+  return prismaClient.lead.update({
+    where: { id: leadId },
+    data: {
+      packageName,
+      sourcePackageId: packageId,
+      itineraryDays: { create: days },
+      costLines: { create: costLines },
+    },
+  });
+}
+
+/**
  * One-time detached copy of the package blueprint into the lead's own tables.
  * Refuses to run again once the lead has a draft.
  *
@@ -123,6 +166,7 @@ export async function copyPackageToLead({ leadId, packageId, fetchImpl = fetch }
     where: { id: leadId },
     data: {
       packageName,
+      sourcePackageId: packageId,
       itineraryDays: { create: days },
       costLines: { create: costLines },
       pricing: { create: pricing },

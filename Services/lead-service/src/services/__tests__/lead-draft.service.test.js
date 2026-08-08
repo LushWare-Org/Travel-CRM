@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockCount, mockLeadUpdate } = vi.hoisted(() => ({
+const { mockCount, mockLeadUpdate, mockDayDeleteMany, mockLineDeleteMany, mockTransaction } = vi.hoisted(() => ({
   mockCount: vi.fn(),
   mockLeadUpdate: vi.fn(),
+  mockDayDeleteMany: vi.fn(),
+  mockLineDeleteMany: vi.fn(),
+  mockTransaction: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
   default: {
-    leadItineraryDay: { count: mockCount },
+    leadItineraryDay: { count: mockCount, deleteMany: mockDayDeleteMany },
+    leadCostLine: { deleteMany: mockLineDeleteMany },
     lead: { update: mockLeadUpdate },
+    $transaction: mockTransaction,
   },
 }));
 
@@ -16,6 +21,8 @@ import {
   buildDraftData,
   fetchPackage,
   copyPackageToLead,
+  isItineraryPristine,
+  replaceLeadItineraryFromPackage,
 } from '../lead-draft.service.js';
 import AppError from '../../utils/appError.js';
 
@@ -141,6 +148,7 @@ describe('copyPackageToLead', () => {
       where: { id: 'lead-1' },
       data: expect.objectContaining({
         packageName: 'Sri Lanka Explorer',
+        sourcePackageId: 'pkg-1',
         pricing: { create: expect.objectContaining({ currency: 'USD', marginType: 'PERCENTAGE' }) },
         costLines: { create: expect.arrayContaining([expect.objectContaining({ category: 'food' })]) },
       }),
@@ -158,5 +166,85 @@ describe('copyPackageToLead', () => {
       copyPackageToLead({ leadId: 'lead-1', packageId: 'pkg-1', fetchImpl }),
     ).rejects.toThrow(/already has a draft copy/);
     expect(mockLeadUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('isItineraryPristine', () => {
+  it('is true when sourcePackageId matches the current packageId', () => {
+    expect(isItineraryPristine({ packageId: 'pkg-1', sourcePackageId: 'pkg-1' })).toBe(true);
+  });
+
+  it('is false when the itinerary was manually customized (sourcePackageId cleared)', () => {
+    expect(isItineraryPristine({ packageId: 'pkg-1', sourcePackageId: null })).toBe(false);
+  });
+
+  it('is false when sourcePackageId points at a different, stale package', () => {
+    expect(isItineraryPristine({ packageId: 'pkg-2', sourcePackageId: 'pkg-1' })).toBe(false);
+  });
+
+  it('is false for a lead with no itinerary yet', () => {
+    expect(isItineraryPristine({ packageId: 'pkg-1', sourcePackageId: null })).toBe(false);
+    expect(isItineraryPristine({ packageId: null, sourcePackageId: null })).toBe(false);
+  });
+});
+
+describe('replaceLeadItineraryFromPackage', () => {
+  let mockPrisma;
+
+  beforeEach(() => {
+    mockDayDeleteMany.mockReset();
+    mockLineDeleteMany.mockReset();
+    mockTransaction.mockReset().mockResolvedValue([]);
+    mockLeadUpdate.mockReset().mockResolvedValue({ id: 'lead-1', packageId: 'pkg-2' });
+    mockPrisma = {
+      leadItineraryDay: { deleteMany: mockDayDeleteMany },
+      leadCostLine: { deleteMany: mockLineDeleteMany },
+      lead: { update: mockLeadUpdate },
+      $transaction: mockTransaction,
+    };
+  });
+
+  it('deletes the old itinerary/AUTO cost lines and recreates them from the new package', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: packageFixture }),
+    });
+
+    await replaceLeadItineraryFromPackage({
+      leadId: 'lead-1',
+      packageId: 'pkg-1',
+      fetchImpl,
+      prismaClient: mockPrisma,
+    });
+
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockDayDeleteMany).toHaveBeenCalledWith({ where: { leadId: 'lead-1' } });
+    expect(mockLineDeleteMany).toHaveBeenCalledWith({ where: { leadId: 'lead-1', source: 'AUTO' } });
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'lead-1' },
+      data: expect.objectContaining({
+        packageName: 'Sri Lanka Explorer',
+        sourcePackageId: 'pkg-1',
+        itineraryDays: { create: expect.any(Array) },
+        costLines: { create: expect.arrayContaining([expect.objectContaining({ category: 'food' })]) },
+      }),
+    }));
+  });
+
+  it('does not touch LeadPricing settings — margin/discount stay caller-controlled', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: packageFixture }),
+    });
+
+    await replaceLeadItineraryFromPackage({
+      leadId: 'lead-1',
+      packageId: 'pkg-1',
+      fetchImpl,
+      prismaClient: mockPrisma,
+    });
+
+    const [{ data }] = mockLeadUpdate.mock.calls[0];
+    expect(data).not.toHaveProperty('pricing');
   });
 });

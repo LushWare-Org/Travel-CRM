@@ -232,6 +232,10 @@ export async function applyLeadItinerary({
     data: {
       ...(daysCreate.length ? { itineraryDays: { create: daysCreate } } : {}),
       costLines: { create: autoLines },
+      // A manual itinerary edit means the itinerary no longer matches any
+      // package's blueprint verbatim — switching packages later must not
+      // silently overwrite it.
+      sourcePackageId: null,
       ...(nextStatus !== lead.lifecycleStatus
         ? {
             lifecycleStatus: nextStatus,
