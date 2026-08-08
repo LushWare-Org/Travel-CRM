@@ -30,16 +30,29 @@ export const getLeadPricing = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/v1/leads/:id/pricing/calculate — dry-run preview, nothing persisted.
+ *
+ * When previewing from `days` (an in-progress itinerary edit), the fresh AUTO
+ * lines are recomputed from those days — but MANUAL lines (optional flights,
+ * any other manually-added cost line) aren't derivable from `days` at all, so
+ * they're read from the lead's persisted cost lines and merged in. Persisted
+ * AUTO lines are excluded — they're stale as of the last save; the days-
+ * derived ones supersede them for this preview.
  */
 export const calculatePricing = asyncHandler(async (req, res) => {
   const { lines, days, travelers = 1, ...settings } = req.body;
-  const resolvedLines = Array.isArray(lines)
-    ? lines
-    : Array.isArray(days)
-      ? buildAutoCostLines(days).map(toLineDescriptor)
-      : [];
   if (!Array.isArray(lines) && !Array.isArray(days)) {
     throw new AppError('lines or days array is required', 400);
+  }
+  let resolvedLines;
+  if (Array.isArray(lines)) {
+    resolvedLines = lines;
+  } else {
+    const autoLines = buildAutoCostLines(days).map(toLineDescriptor);
+    const manualLines = await prisma.leadCostLine.findMany({
+      where: { leadId: req.params.id, source: 'MANUAL' },
+      orderBy: { orderIndex: 'asc' },
+    });
+    resolvedLines = [...autoLines, ...manualLines.map(toLineDescriptor)];
   }
   const computed = computePricing({ lines: resolvedLines, travelers, ...settings });
   res.json({ success: true, data: { financials: computed } });
