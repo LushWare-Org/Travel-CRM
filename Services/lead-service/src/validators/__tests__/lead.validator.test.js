@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createLeadSchema, updateLeadSchema } from '../lead.validator.js';
+import { createLeadSchema, updateLeadSchema, addOptionalFlightSchema } from '../lead.validator.js';
 
 describe('createLeadSchema', () => {
   it('accepts valid full payload', () => {
@@ -105,6 +105,49 @@ describe('updateLeadSchema', () => {
 
   it('rejects unknown keys (strict)', () => {
     const result = updateLeadSchema.safeParse({ status: 'new' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('addOptionalFlightSchema', () => {
+  it('accepts a full valid payload', () => {
+    const result = addOptionalFlightSchema.safeParse({
+      flightType: 'TO_START',
+      origin: 'CMB',
+      destination: 'DXB',
+      date: '2026-03-01',
+      cabinClass: 'Business',
+      departureTime: 'morning',
+      airlinePreference: 'EK',
+      notes: 'Prefers window seat',
+      estimatedUnitPrice: 500,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts either flightType direction', () => {
+    for (const flightType of ['TO_START', 'RETURN_HOME']) {
+      expect(addOptionalFlightSchema.safeParse({ flightType }).success).toBe(true);
+    }
+  });
+
+  it('requires flightType', () => {
+    const result = addOptionalFlightSchema.safeParse({ origin: 'CMB' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an unknown flightType', () => {
+    const result = addOptionalFlightSchema.safeParse({ flightType: 'SIDEWAYS' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unknown keys (strict)', () => {
+    const result = addOptionalFlightSchema.safeParse({ flightType: 'TO_START', foo: 'bar' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a negative estimatedUnitPrice', () => {
+    const result = addOptionalFlightSchema.safeParse({ flightType: 'TO_START', estimatedUnitPrice: -10 });
     expect(result.success).toBe(false);
   });
 });

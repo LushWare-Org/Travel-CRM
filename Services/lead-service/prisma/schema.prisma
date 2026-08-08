@@ -449,6 +449,9 @@ model LeadOptionalFlight {
   origin             String?
   destination        String?
   date               DateTime?
+  cabinClass         String?
+  departureTime      String?
+  airlinePreference  String?
   notes              String?
   flightBookingId    String? // → flights.FlightBooking.id
   status             String             @default("PENDING")

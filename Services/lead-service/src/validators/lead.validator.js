@@ -67,3 +67,20 @@ export const updateLeadSchema = z.object({
   remarks: remarksSchema,
   pricing: pricingSchema.optional(),
 }).strict();
+
+// ── Optional transfer flights (LeadOptionalFlight) ───────────────
+
+export const addOptionalFlightSchema = z.object({
+  flightType: z.enum(['TO_START', 'RETURN_HOME']),
+  origin: z.string().optional().nullable(),
+  destination: z.string().optional().nullable(),
+  date: z.string().optional().nullable(),
+  cabinClass: z.string().optional().nullable(),
+  departureTime: z.string().optional().nullable(),
+  airlinePreference: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  estimatedUnitPrice: z.number().min(0).optional(),
+  actualUnitPrice: z.number().min(0).optional().nullable(),
+  marginType: z.enum(['PERCENTAGE', 'FIXED']).nullable().optional(),
+  marginValue: z.number().min(0).nullable().optional(),
+}).strict();

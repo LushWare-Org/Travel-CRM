@@ -1,7 +1,7 @@
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
+import { createLeadSchema, updateLeadSchema, addOptionalFlightSchema } from '../validators/lead.validator.js';
 import {
   validateTransition,
   validateTravelerUpdate,
@@ -654,18 +654,25 @@ export const addOptionalFlight = asyncHandler(async (req, res) => {
   const lead = await loadPricingContext(req.params.id);
   if (!lead) throw new AppError('Lead not found', 404);
 
+  const parsed = addOptionalFlightSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
   const {
     flightType,
     origin,
     destination,
     date,
+    cabinClass,
+    departureTime,
+    airlinePreference,
     notes,
     estimatedUnitPrice = 0,
     actualUnitPrice,
     marginType,
     marginValue,
-  } = req.body;
-  if (!flightType) throw new AppError('flightType is required', 400);
+  } = parsed.data;
 
   const quantity = lead.numberOfTravelers || 1;
   const flight = await prisma.leadOptionalFlight.create({
@@ -675,6 +682,9 @@ export const addOptionalFlight = asyncHandler(async (req, res) => {
       origin: origin ?? null,
       destination: destination ?? null,
       date: date ? new Date(date) : null,
+      cabinClass: cabinClass ?? null,
+      departureTime: departureTime ?? null,
+      airlinePreference: airlinePreference ?? null,
       notes: notes ?? null,
       estimatedUnitPrice: Number(estimatedUnitPrice) || 0,
       actualUnitPrice: actualUnitPrice != null ? Number(actualUnitPrice) : null,

@@ -6,18 +6,40 @@ const {
   mockPricingUpdate,
   mockIsItineraryPristine,
   mockReplaceLeadItineraryFromPackage,
+  mockOptionalFlightCreate,
+  mockOptionalFlightFindMany,
+  mockOptionalFlightFindUnique,
+  mockOptionalFlightDelete,
+  mockCostLineCreate,
+  mockCostLineDeleteMany,
+  mockTransaction,
 } = vi.hoisted(() => ({
   mockLeadFindUnique: vi.fn(),
   mockLeadUpdate: vi.fn(),
   mockPricingUpdate: vi.fn(),
   mockIsItineraryPristine: vi.fn(),
   mockReplaceLeadItineraryFromPackage: vi.fn(),
+  mockOptionalFlightCreate: vi.fn(),
+  mockOptionalFlightFindMany: vi.fn(),
+  mockOptionalFlightFindUnique: vi.fn(),
+  mockOptionalFlightDelete: vi.fn(),
+  mockCostLineCreate: vi.fn(),
+  mockCostLineDeleteMany: vi.fn(),
+  mockTransaction: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
   default: {
     lead: { findUnique: mockLeadFindUnique, update: mockLeadUpdate },
     leadPricing: { update: mockPricingUpdate },
+    leadOptionalFlight: {
+      create: mockOptionalFlightCreate,
+      findMany: mockOptionalFlightFindMany,
+      findUnique: mockOptionalFlightFindUnique,
+      delete: mockOptionalFlightDelete,
+    },
+    leadCostLine: { create: mockCostLineCreate, deleteMany: mockCostLineDeleteMany },
+    $transaction: mockTransaction,
   },
 }));
 
@@ -27,7 +49,7 @@ vi.mock('../../services/lead-draft.service.js', () => ({
   replaceLeadItineraryFromPackage: mockReplaceLeadItineraryFromPackage,
 }));
 
-import { updateLead } from '../lead.controller.js';
+import { updateLead, addOptionalFlight, listOptionalFlights, deleteOptionalFlight } from '../lead.controller.js';
 
 const PKG_A = '11111111-1111-1111-1111-111111111111';
 const PKG_B = '22222222-2222-2222-2222-222222222222';
@@ -180,5 +202,178 @@ describe('updateLead — package switching', () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+});
+
+describe('addOptionalFlight', () => {
+  beforeEach(() => {
+    mockLeadFindUnique.mockReset();
+    mockOptionalFlightCreate.mockReset();
+    mockCostLineCreate.mockReset();
+    mockPricingUpdate.mockReset();
+
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ costLines: [] }));
+    mockCostLineCreate.mockResolvedValue({});
+    mockPricingUpdate.mockResolvedValue({});
+  });
+
+  it('rejects a body with no flightType', async () => {
+    const { req, res, next } = buildReqRes({ body: { origin: 'CMB', destination: 'DXB' } });
+
+    await addOptionalFlight(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/flightType/i) }));
+    expect(mockOptionalFlightCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown flightType', async () => {
+    const { req, res, next } = buildReqRes({ body: { flightType: 'SIDEWAYS' } });
+
+    await addOptionalFlight(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(mockOptionalFlightCreate).not.toHaveBeenCalled();
+  });
+
+  it('persists cabinClass, departureTime and airlinePreference alongside origin/destination', async () => {
+    mockOptionalFlightCreate.mockResolvedValue({ id: 'flight-1', flightType: 'TO_START' });
+
+    const { req, res, next } = buildReqRes({
+      body: {
+        flightType: 'TO_START',
+        origin: 'CMB',
+        destination: 'DXB',
+        cabinClass: 'Business',
+        departureTime: 'morning',
+        airlinePreference: 'EK',
+      },
+    });
+
+    await addOptionalFlight(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockOptionalFlightCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        flightType: 'TO_START',
+        origin: 'CMB',
+        destination: 'DXB',
+        cabinClass: 'Business',
+        departureTime: 'morning',
+        airlinePreference: 'EK',
+      }),
+    }));
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it('defaults cabinClass/departureTime/airlinePreference to null when omitted', async () => {
+    mockOptionalFlightCreate.mockResolvedValue({ id: 'flight-1', flightType: 'RETURN_HOME' });
+
+    const { req, res, next } = buildReqRes({ body: { flightType: 'RETURN_HOME' } });
+
+    await addOptionalFlight(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockOptionalFlightCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        cabinClass: null,
+        departureTime: null,
+        airlinePreference: null,
+      }),
+    }));
+  });
+
+  it('creates a linked MANUAL cost line and recomputes pricing', async () => {
+    mockOptionalFlightCreate.mockResolvedValue({ id: 'flight-1', flightType: 'TO_START' });
+
+    const { req, res, next } = buildReqRes({ body: { flightType: 'TO_START', origin: 'CMB', destination: 'DXB' } });
+
+    await addOptionalFlight(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockCostLineCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ source: 'MANUAL', optionalFlightId: 'flight-1', category: 'transportation' }),
+    }));
+    expect(mockPricingUpdate).toHaveBeenCalled();
+  });
+});
+
+describe('listOptionalFlights', () => {
+  beforeEach(() => {
+    mockLeadFindUnique.mockReset();
+    mockOptionalFlightFindMany.mockReset();
+  });
+
+  it('returns flights for the lead ordered by createdAt', async () => {
+    mockLeadFindUnique.mockResolvedValue({ id: 'lead-1' });
+    mockOptionalFlightFindMany.mockResolvedValue([{ id: 'flight-1' }, { id: 'flight-2' }]);
+
+    const { req, res, next } = buildReqRes();
+
+    await listOptionalFlights(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockOptionalFlightFindMany).toHaveBeenCalledWith({
+      where: { leadId: 'lead-1' },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: [{ id: 'flight-1' }, { id: 'flight-2' }] });
+  });
+
+  it('404s when the lead does not exist', async () => {
+    mockLeadFindUnique.mockResolvedValue(null);
+
+    const { req, res, next } = buildReqRes();
+
+    await listOptionalFlights(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/not found/i) }));
+  });
+});
+
+describe('deleteOptionalFlight', () => {
+  beforeEach(() => {
+    mockOptionalFlightFindUnique.mockReset();
+    mockTransaction.mockReset().mockResolvedValue([]);
+    mockCostLineDeleteMany.mockReset();
+    mockOptionalFlightDelete.mockReset();
+    mockLeadFindUnique.mockReset().mockResolvedValue(leadFixture({ costLines: [] }));
+    mockPricingUpdate.mockReset().mockResolvedValue({});
+  });
+
+  it('removes the linked cost line and the flight, then recomputes pricing', async () => {
+    mockOptionalFlightFindUnique.mockResolvedValue({ id: 'flight-1', leadId: 'lead-1' });
+
+    const { req, res, next } = buildReqRes({ leadId: 'lead-1' });
+    req.params.flightId = 'flight-1';
+
+    await deleteOptionalFlight(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockPricingUpdate).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: {} });
+  });
+
+  it('404s when the flight does not belong to this lead', async () => {
+    mockOptionalFlightFindUnique.mockResolvedValue({ id: 'flight-1', leadId: 'some-other-lead' });
+
+    const { req, res, next } = buildReqRes({ leadId: 'lead-1' });
+    req.params.flightId = 'flight-1';
+
+    await deleteOptionalFlight(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/not found/i) }));
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it('404s when the flight does not exist at all', async () => {
+    mockOptionalFlightFindUnique.mockResolvedValue(null);
+
+    const { req, res, next } = buildReqRes({ leadId: 'lead-1' });
+    req.params.flightId = 'nope';
+
+    await deleteOptionalFlight(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/not found/i) }));
   });
 });
