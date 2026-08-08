@@ -133,6 +133,20 @@ describe('bookWithContextSchema', () => {
     expect(r.success).toBe(false);
   });
 
+  it('should accept a hand-crafted seed-style leadId/packageId/customizedPackageId', () => {
+    // Services/seed-extended.mjs's readable convention (d0000000-..., b0000000-...)
+    // is a valid Prisma primary key but not RFC 4122 v1-5 compliant.
+    const r = bookWithContextSchema.safeParse({
+      prebookId: 'pb-1',
+      guests: [{ firstName: 'John', lastName: 'Doe' }],
+      contact: { email: 'john@test.com' },
+      leadId: 'd0000000-0000-0000-0000-00000000000c',
+      packageId: 'b0000000-0000-0000-0000-000000000001',
+      customizedPackageId: 'b0000000-0000-0000-0000-000000000002',
+    });
+    expect(r.success).toBe(true);
+  });
+
   it('should reject zero dayNumber', () => {
     const r = bookWithContextSchema.safeParse({
       prebookId: 'pb-1',
@@ -182,6 +196,9 @@ describe('bookingIdParamSchema', () => {
   it('should accept UUID', () => {
     expect(bookingIdParamSchema.safeParse({ id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' }).success).toBe(true);
   });
+  it('should accept a hand-crafted seed-style ID', () => {
+    expect(bookingIdParamSchema.safeParse({ id: 'e0000000-0000-0000-0000-00000000000c' }).success).toBe(true);
+  });
   it('should reject non-UUID', () => {
     expect(bookingIdParamSchema.safeParse({ id: 'abc' }).success).toBe(false);
   });
@@ -190,6 +207,9 @@ describe('bookingIdParamSchema', () => {
 describe('leadIdParamSchema', () => {
   it('should accept UUID', () => {
     expect(leadIdParamSchema.safeParse({ leadId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' }).success).toBe(true);
+  });
+  it('should accept a hand-crafted seed-style lead ID', () => {
+    expect(leadIdParamSchema.safeParse({ leadId: 'd0000000-0000-0000-0000-00000000000c' }).success).toBe(true);
   });
   it('should reject non-UUID', () => {
     expect(leadIdParamSchema.safeParse({ leadId: 'abc' }).success).toBe(false);

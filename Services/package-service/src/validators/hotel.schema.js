@@ -2,6 +2,14 @@ import { z } from 'zod';
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD');
 
+// Looser than z.string().uuid(): accepts any UUID-shaped string rather than
+// enforcing RFC 4122 v1-5 version/variant nibbles. Seed data hand-crafts
+// readable IDs (e.g. d0000000-0000-0000-0000-00000000000c) that are valid
+// Prisma primary keys — Prisma stores id/foreign-key columns as plain
+// strings with no format constraint — but fail the strict v1-5 check.
+const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const crossServiceId = (message = 'Invalid ID') => z.string().regex(UUID_SHAPE_RE, message);
+
 const occupancy = z.object({
   adults: z.number().int().min(1).max(9).default(1),
   children: z.number().int().min(0).max(9).default(0),
@@ -62,18 +70,18 @@ export const listBookingsQuerySchema = z.object({
 
 /** Route params with UUID */
 export const bookingIdParamSchema = z.object({
-  id: z.string().uuid('Invalid booking ID'),
+  id: crossServiceId('Invalid booking ID'),
 });
 
 /** Route params — leadId */
 export const leadIdParamSchema = z.object({
-  leadId: z.string().uuid('Invalid lead ID'),
+  leadId: crossServiceId('Invalid lead ID'),
 });
 
 /** POST /hotels/book-with-context — same as book but with lead context */
 export const bookWithContextSchema = bookSchema.extend({
-  leadId: z.string().uuid().optional(),
-  packageId: z.string().uuid().optional(),
-  customizedPackageId: z.string().uuid().optional(),
+  leadId: crossServiceId().optional(),
+  packageId: crossServiceId().optional(),
+  customizedPackageId: crossServiceId().optional(),
   dayNumber: z.coerce.number().int().positive().optional(),
 });
