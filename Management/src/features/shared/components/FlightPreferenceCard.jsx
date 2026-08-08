@@ -33,6 +33,11 @@ export default function FlightPreferenceCard({ prefs, onEdit, onRemove }) {
             <div className="text-xs text-gray-500">
               {prefs.cabinClass || 'Economy'}{prefs.airlinePreference ? ` · ${prefs.airlinePreference}` : ''}{prefs.departureTime ? ` · ${prefs.departureTime}` : ''}
             </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {Number(prefs.estimatedUnitPrice) > 0
+                ? `$${Number(prefs.estimatedUnitPrice).toFixed(2)} per person`
+                : <span className="text-amber-600">No cost set — $0 in pricing</span>}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">

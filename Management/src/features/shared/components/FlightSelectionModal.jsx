@@ -156,6 +156,7 @@ export default function FlightSelectionModal({
     cabinClass: initialData?.cabinClass || 'Economy',
     departureTime: initialData?.departureTime || '',
     airlinePreference: initialData?.airlinePreference || '',
+    estimatedUnitPrice: initialData?.estimatedUnitPrice ?? '',
   });
 
   // ── Booking mode state ──────────────────────────────────────────
@@ -218,6 +219,7 @@ export default function FlightSelectionModal({
       cabinClass: template.cabinClass,
       departureTime: template.departureTime,
       airlinePreference: template.airlinePreference,
+      estimatedUnitPrice: Number(template.estimatedUnitPrice) || 0,
     });
     onClose();
   };
@@ -402,6 +404,20 @@ export default function FlightSelectionModal({
                 maxLength={3}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Cost (per person)</label>
+              <input
+                type="number"
+                aria-label="Estimated Cost (per person)"
+                min="0"
+                step="0.01"
+                value={template.estimatedUnitPrice}
+                onChange={(e) => setTemplate({ ...template, estimatedUnitPrice: e.target.value })}
+                placeholder="0.00"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <p className="mt-1 text-xs text-gray-400">Multiplied by the number of travelers in the lead's pricing.</p>
             </div>
           </div>
 

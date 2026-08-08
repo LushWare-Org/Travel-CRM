@@ -3,6 +3,9 @@
  * outbound (returning-home) leg: origin/destination swap, cabin class and
  * airline preference carry over (same traveler, same trip). Departure time
  * resets — inbound and outbound are different days, no sensible default.
+ * estimatedUnitPrice is deliberately NOT carried over — return-leg pricing
+ * varies independently and silently defaulting it risks an unnoticed
+ * wrong quote; the rep must set it explicitly for each leg.
  */
 export function flipLegForReturn(inboundPrefs) {
   if (!inboundPrefs) return null;

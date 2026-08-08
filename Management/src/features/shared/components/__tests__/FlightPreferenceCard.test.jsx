@@ -33,6 +33,21 @@ describe('FlightPreferenceCard', () => {
     expect(screen.getByText(/economy/i)).toBeInTheDocument();
   });
 
+  it('shows the estimated cost per person when set', () => {
+    render(<FlightPreferenceCard prefs={{ ...prefs, estimatedUnitPrice: 250 }} onEdit={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByText('$250.00 per person')).toBeInTheDocument();
+  });
+
+  it('warns when no cost has been set (contributes $0 to pricing)', () => {
+    render(<FlightPreferenceCard prefs={prefs} onEdit={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByText(/no cost set/i)).toBeInTheDocument();
+  });
+
+  it('treats a cost of exactly 0 the same as unset', () => {
+    render(<FlightPreferenceCard prefs={{ ...prefs, estimatedUnitPrice: 0 }} onEdit={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByText(/no cost set/i)).toBeInTheDocument();
+  });
+
   it('calls onEdit when the card itself is clicked', async () => {
     const onEdit = vi.fn();
     const user = userEvent.setup();
