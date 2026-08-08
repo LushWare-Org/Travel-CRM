@@ -222,6 +222,10 @@ export default function FlightSelectionModal({
     onClose();
   };
 
+  const handleTemplateSwap = () => {
+    setTemplate(t => ({ ...t, origin: t.destination, destination: t.origin }));
+  };
+
   // ═══════════════════════════════════════════════════════════════
   //  Booking mode handlers
   // ═══════════════════════════════════════════════════════════════
@@ -345,6 +349,16 @@ export default function FlightSelectionModal({
                 placeholder="Departure airport"
                 excludeCode={template.destination}
               />
+            </div>
+            <div className="flex justify-center -my-1">
+              <button
+                type="button"
+                onClick={handleTemplateSwap}
+                title="Swap origin and destination"
+                className="p-1.5 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-blue-600 transition-colors"
+              >
+                <ArrowRightLeft className="w-4 h-4 rotate-90" />
+              </button>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Destination</label>
