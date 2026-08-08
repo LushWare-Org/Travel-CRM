@@ -100,6 +100,7 @@ export default function LeadFlightBookingsSection({
         cabinClass: prefs.cabinClass,
         departureTime: prefs.departureTime,
         airlinePreference: prefs.airlinePreference,
+        totalAmount: Number(prefs.estimatedUnitPrice) || 0,
       };
       onUpdateDay(dayNumber, {
         flights: flights.length > 0
@@ -109,7 +110,6 @@ export default function LeadFlightBookingsSection({
               id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
                 ? crypto.randomUUID()
                 : `flight-${Date.now()}`,
-              totalAmount: 0,
             }],
       });
       toast.success(`Flight preferences saved for Day ${dayNumber}`);
@@ -135,6 +135,7 @@ export default function LeadFlightBookingsSection({
         cabinClass: prefs.cabinClass || undefined,
         departureTime: prefs.departureTime || undefined,
         airlinePreference: prefs.airlinePreference || undefined,
+        estimatedUnitPrice: Number(prefs.estimatedUnitPrice) || 0,
       });
       toast.success('Flight preferences saved');
       await fetchOptionalFlights();
@@ -239,7 +240,9 @@ export default function LeadFlightBookingsSection({
                             onClick={() => {
                               setFlightModalDay(day.dayNumber);
                               setFlightModalType('itinerary');
-                              setFlightModalPrefill(firstFlight || { origin: '', destination: '' });
+                              setFlightModalPrefill(firstFlight
+                                ? { ...firstFlight, estimatedUnitPrice: firstFlight.totalAmount }
+                                : { origin: '', destination: '' });
                               setShowFlightModal(true);
                             }}
                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
@@ -278,7 +281,9 @@ export default function LeadFlightBookingsSection({
                               onClick={() => {
                                 setFlightModalDay(day.dayNumber);
                                 setFlightModalType('itinerary');
-                                setFlightModalPrefill(firstFlight || { origin: '', destination: '' });
+                                setFlightModalPrefill(firstFlight
+                                ? { ...firstFlight, estimatedUnitPrice: firstFlight.totalAmount }
+                                : { origin: '', destination: '' });
                                 setShowFlightModal(true);
                               }}
                               className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
@@ -306,6 +311,10 @@ export default function LeadFlightBookingsSection({
                           {firstFlight.cabinClass || 'Economy'}
                           {firstFlight.airlinePreference ? ` · ${firstFlight.airlinePreference}` : ''}
                           {firstFlight.departureTime ? ` · ${firstFlight.departureTime}` : ''}
+                          {' · '}
+                          {Number(firstFlight.totalAmount) > 0
+                            ? `$${Number(firstFlight.totalAmount).toFixed(2)} per person`
+                            : <span className="text-amber-600">no cost set — $0 in pricing</span>}
                         </div>
                       )}
                     </div>

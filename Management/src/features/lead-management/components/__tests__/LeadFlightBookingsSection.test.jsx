@@ -35,6 +35,7 @@ vi.mock('../../../shared', async () => ({
         <span data-testid="modal-initial-cabin">{props.initialData?.cabinClass || ''}</span>
         <span data-testid="modal-initial-airline">{props.initialData?.airlinePreference || ''}</span>
         <span data-testid="modal-initial-departure">{props.initialData?.departureTime || ''}</span>
+        <span data-testid="modal-initial-price">{props.initialData?.estimatedUnitPrice ?? ''}</span>
         <button
           type="button"
           onClick={() =>
@@ -44,6 +45,7 @@ vi.mock('../../../shared', async () => ({
               cabinClass: 'Economy',
               departureTime: 'morning',
               airlinePreference: 'QR',
+              estimatedUnitPrice: 99,
             })
           }
         >
@@ -64,6 +66,7 @@ const toStartFixture = {
   cabinClass: 'Business',
   airlinePreference: 'EK',
   departureTime: 'morning',
+  estimatedUnitPrice: 180,
 };
 
 beforeEach(() => {
@@ -157,6 +160,16 @@ describe('LeadFlightBookingsSection — add flight persists correctly', () => {
 
     await waitFor(() => expect(mockAddFlight).toHaveBeenCalled());
   });
+
+  it('sends the entered estimated cost as estimatedUnitPrice', async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
+    await user.click(screen.getByRole('button', { name: /submit flight/i }));
+
+    await waitFor(() => expect(mockAddFlight).toHaveBeenCalledWith('lead-1', expect.objectContaining({ estimatedUnitPrice: 99 })));
+  });
 });
 
 describe('LeadFlightBookingsSection — inbound to outbound flip default', () => {
@@ -243,6 +256,7 @@ describe('LeadFlightBookingsSection — editing an existing direction', () => {
 
     expect(screen.getByTestId('modal-initial-origin')).toHaveTextContent('CMB');
     expect(screen.getByTestId('modal-initial-destination')).toHaveTextContent('DXB');
+    expect(screen.getByTestId('modal-initial-price')).toHaveTextContent('180');
   });
 
   it('clicking Remove does not also open the edit modal', async () => {
@@ -306,5 +320,43 @@ describe('LeadFlightBookingsSection — itinerary-day flights are unaffected', (
     })));
     expect(mockAddFlight).not.toHaveBeenCalled();
     expect(mockDeleteFlight).not.toHaveBeenCalled();
+  });
+
+  it('writes the entered estimated cost into the day flight as totalAmount', async () => {
+    const onUpdateDay = vi.fn();
+    const user = userEvent.setup();
+    renderSection({
+      itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: '', destination: '' }] }],
+      leadStatus: 'APPROVED',
+      onUpdateDay,
+    });
+
+    await user.click(await screen.findByRole('button', { name: /book flight/i }));
+    await user.click(screen.getByRole('button', { name: /submit flight/i }));
+
+    await waitFor(() => expect(onUpdateDay).toHaveBeenCalledWith(1, expect.objectContaining({
+      flights: expect.arrayContaining([expect.objectContaining({ totalAmount: 99 })]),
+    })));
+  });
+
+  it('prefills the day flight edit modal from the existing totalAmount', async () => {
+    const user = userEvent.setup();
+    renderSection({
+      itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB', totalAmount: 320 }] }],
+      leadStatus: 'APPROVED',
+    });
+
+    await user.click(await screen.findByRole('button', { name: /edit/i }));
+
+    expect(screen.getByTestId('modal-initial-price')).toHaveTextContent('320');
+  });
+
+  it('shows a $0-pricing warning on the day card when no cost has been set', async () => {
+    renderSection({
+      itineraryDays: [{ dayNumber: 1, flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB' }] }],
+      leadStatus: 'APPROVED',
+    });
+
+    expect(await screen.findByText(/no cost set/i)).toBeInTheDocument();
   });
 });
