@@ -113,6 +113,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const [itineraryDays, setItineraryDays] = useState([]);
   const [itineraryDirty, setItineraryDirty] = useState(false);
   const [pricingSettings, setPricingSettings] = useState(emptyPricingSettings);
+  // Bumped whenever a transfer flight is added/edited/removed — those persist
+  // straight to the DB and never touch itineraryDays/pricingSettings, so the
+  // live pricing preview has no other way to know it needs to recompute.
+  const [pricingRefreshToken, setPricingRefreshToken] = useState(0);
   const [remarks, setRemarks] = useState([]);
   const [editingRemarkIndex, setEditingRemarkIndex] = useState(null);
   const [editRemarkText, setEditRemarkText] = useState('');
@@ -943,6 +947,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     )
                   );
                 }}
+                onFlightsChanged={() => setPricingRefreshToken(t => t + 1)}
               />
 
               <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -952,6 +957,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                   days={reconciledItineraryDays}
                   travelers={formData.numberOfTravelers || 1}
                   pricing={pricingSettings}
+                  refreshToken={pricingRefreshToken}
                   onSettingsChange={(settings) => {
                     setItineraryDirty(true);
                     setPricingSettings(settings);

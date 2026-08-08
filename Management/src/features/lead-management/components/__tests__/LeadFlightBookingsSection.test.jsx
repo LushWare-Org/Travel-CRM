@@ -170,6 +170,30 @@ describe('LeadFlightBookingsSection — add flight persists correctly', () => {
 
     await waitFor(() => expect(mockAddFlight).toHaveBeenCalledWith('lead-1', expect.objectContaining({ estimatedUnitPrice: 99 })));
   });
+
+  it('notifies the parent via onFlightsChanged so the pricing preview knows to recompute', async () => {
+    const onFlightsChanged = vi.fn();
+    const user = userEvent.setup();
+    renderSection({ onFlightsChanged });
+
+    await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
+    await user.click(screen.getByRole('button', { name: /submit flight/i }));
+
+    await waitFor(() => expect(onFlightsChanged).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not call onFlightsChanged when addFlight fails', async () => {
+    mockAddFlight.mockRejectedValue(new Error('Network error'));
+    const onFlightsChanged = vi.fn();
+    const user = userEvent.setup();
+    renderSection({ onFlightsChanged });
+
+    await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
+    await user.click(screen.getByRole('button', { name: /submit flight/i }));
+
+    await waitFor(() => expect(mockAddFlight).toHaveBeenCalled());
+    expect(onFlightsChanged).not.toHaveBeenCalled();
+  });
 });
 
 describe('LeadFlightBookingsSection — inbound to outbound flip default', () => {
@@ -282,6 +306,18 @@ describe('LeadFlightBookingsSection — removing a flight', () => {
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
 
     await waitFor(() => expect(mockDeleteFlight).toHaveBeenCalledWith('lead-1', 'flight-to-start'));
+  });
+
+  it('notifies the parent via onFlightsChanged after removing a flight', async () => {
+    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    const onFlightsChanged = vi.fn();
+    const user = userEvent.setup();
+    renderSection({ onFlightsChanged });
+
+    await screen.findByText('CMB → DXB');
+    await user.click(screen.getByRole('button', { name: /^remove$/i }));
+
+    await waitFor(() => expect(onFlightsChanged).toHaveBeenCalledTimes(1));
   });
 });
 

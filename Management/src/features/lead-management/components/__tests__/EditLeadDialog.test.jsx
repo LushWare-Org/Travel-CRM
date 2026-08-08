@@ -52,11 +52,15 @@ vi.mock('../../../itinerary/components/DestinationSelector', () => ({
 }));
 
 vi.mock('../LeadFlightBookingsSection', () => ({
-  default: () => <div data-testid="flight-bookings" />,
+  default: ({ onFlightsChanged }) => (
+    <div data-testid="flight-bookings">
+      <button type="button" onClick={() => onFlightsChanged?.()}>Simulate flight change</button>
+    </div>
+  ),
 }));
 
 vi.mock('../PricingSection', () => ({
-  default: ({ days, pricing, onSettingsChange }) => (
+  default: ({ days, pricing, onSettingsChange, refreshToken }) => (
     <div data-testid="pricing-section">
       <span data-testid="pricing-margin-type">{String(pricing?.marginType)}</span>
       <span data-testid="pricing-margin-value">{String(pricing?.marginValue)}</span>
@@ -64,6 +68,7 @@ vi.mock('../PricingSection', () => ({
       <span data-testid="pricing-discount-value">{String(pricing?.discountValue)}</span>
       <span data-testid="pricing-days-count">{days?.length ?? 0}</span>
       <span data-testid="pricing-first-flight-transport-cost">{String(days?.[0]?.transports?.find(t => t.transportMode === 'FLIGHT')?.unitCost ?? '')}</span>
+      <span data-testid="pricing-refresh-token">{String(refreshToken ?? 0)}</span>
       <button type="button" onClick={() => onSettingsChange({ ...pricing, marginValue: 99 })}>
         Change margin
       </button>
@@ -228,6 +233,18 @@ describe('EditLeadDialog — day-linked flight cost reconciliation', () => {
         }),
       ]),
     })));
+  });
+
+  it('bumps the pricing preview refreshToken when a transfer flight changes', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await screen.findByLabelText('Package');
+    expect(screen.getByTestId('pricing-refresh-token')).toHaveTextContent('0');
+
+    await user.click(screen.getByRole('button', { name: /simulate flight change/i }));
+
+    expect(screen.getByTestId('pricing-refresh-token')).toHaveTextContent('1');
   });
 });
 

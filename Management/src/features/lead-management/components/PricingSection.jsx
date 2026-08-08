@@ -10,7 +10,7 @@ const money = (n) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFra
  * backend engine via /pricing/calculate; nothing persists until the dialog's
  * Save sends { days, pricing } to /leads/:id/itinerary.
  */
-export default function PricingSection({ leadId, days = [], travelers = 1, pricing = {}, onSettingsChange }) {
+export default function PricingSection({ leadId, days = [], travelers = 1, pricing = {}, onSettingsChange, refreshToken = 0 }) {
   const initialized = useRef(false);
   const [settings, setSettings] = useState({
     marginType: pricing.marginType || null,
@@ -46,7 +46,11 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
     onSettingsChange?.(next);
   };
 
-  // Debounced live preview whenever days or settings change.
+  // Debounced live preview whenever days, settings, or refreshToken change.
+  // refreshToken is a manual bump for changes calculatePricing needs to know
+  // about but that don't touch days/travelers/settings — e.g. adding, editing
+  // or removing a transfer flight, which lives in a persisted LeadOptionalFlight
+  // row, not in the itinerary days this component otherwise watches.
   useEffect(() => {
     if (!Array.isArray(days)) return;
     setLoading(true);
@@ -74,7 +78,7 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
       }
     }, 350);
     return () => clearTimeout(timer);
-  }, [leadId, days, travelers, settings]);
+  }, [leadId, days, travelers, settings, refreshToken]);
 
   const inputCls = "w-full px-2 py-1.5 border border-gray-200 rounded text-sm";
   const labelCls = "text-xs text-gray-500";

@@ -24,6 +24,7 @@ export default function LeadFlightBookingsSection({
   itineraryDays = [],
   travelDate,
   onUpdateDay,
+  onFlightsChanged,
 }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -139,6 +140,7 @@ export default function LeadFlightBookingsSection({
       });
       toast.success('Flight preferences saved');
       await fetchOptionalFlights();
+      onFlightsChanged?.();
     } catch (err) {
       toast.error(err.message || 'Failed to save flight preferences');
     }
@@ -150,6 +152,7 @@ export default function LeadFlightBookingsSection({
       await leadAPI.deleteFlight(leadId, flightId);
       toast.success('Flight removed');
       fetchOptionalFlights();
+      onFlightsChanged?.();
     } catch (err) {
       toast.error(err.message || 'Failed to remove flight');
     }
