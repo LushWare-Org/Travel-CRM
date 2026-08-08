@@ -113,13 +113,45 @@ export const TRAVELER_LOCKED_STATUSES = [
   'BOOKING_FAILED',
 ];
 
+function assertFieldEditable(currentStatus, fieldLabel, code) {
+  if (TRAVELER_LOCKED_STATUSES.includes(currentStatus)) {
+    throw new StateMachineError(
+      `Cannot change ${fieldLabel} after QUOTED; move back to DRAFTING first`,
+      code,
+    );
+  }
+}
+
 export function validateTravelerUpdate({ currentStatus, previousTravelers, nextTravelers }) {
   if (nextTravelers == null) return;
   if (Number(previousTravelers) === Number(nextTravelers)) return;
-  if (TRAVELER_LOCKED_STATUSES.includes(currentStatus)) {
-    throw new StateMachineError(
-      'Cannot change numberOfTravelers after QUOTED; move back to DRAFTING first',
-      'GATEKEEPER_TRAVELERS_LOCKED',
-    );
-  }
+  assertFieldEditable(currentStatus, 'numberOfTravelers', 'GATEKEEPER_TRAVELERS_LOCKED');
+}
+
+/**
+ * Package selection drives the itinerary blueprint, so it locks in step with
+ * travelers — same rationale, same unlock path (move back to DRAFTING).
+ */
+export function validatePackageUpdate({ currentStatus, previousPackageId, nextPackageId }) {
+  if (nextPackageId === undefined) return;
+  if ((previousPackageId || null) === (nextPackageId || null)) return;
+  assertFieldEditable(currentStatus, 'package', 'GATEKEEPER_PACKAGE_LOCKED');
+}
+
+/**
+ * Travel dates shape the itinerary/pricing the same way package selection
+ * does, so they share the traveler-lock window.
+ */
+export function validateTravelDatesUpdate({
+  currentStatus,
+  previousTravelDate,
+  nextTravelDate,
+  previousEndDate,
+  nextEndDate,
+}) {
+  const normalize = (d) => (d ? new Date(d).toISOString().split('T')[0] : null);
+  const travelChanged = nextTravelDate !== undefined && normalize(previousTravelDate) !== normalize(nextTravelDate);
+  const endChanged = nextEndDate !== undefined && normalize(previousEndDate) !== normalize(nextEndDate);
+  if (!travelChanged && !endChanged) return;
+  assertFieldEditable(currentStatus, 'travel dates', 'GATEKEEPER_DATES_LOCKED');
 }

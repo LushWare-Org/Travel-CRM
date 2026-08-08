@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   validateTransition,
   validateTravelerUpdate,
+  validatePackageUpdate,
+  validateTravelDatesUpdate,
   StateMachineError,
 } from '../state-machine.service.js';
 
@@ -297,6 +299,104 @@ describe('validateTravelerUpdate', () => {
         previousTravelers: 2,
         nextTravelers: 2,
       }),
+    ).not.toThrow();
+  });
+});
+
+describe('validatePackageUpdate', () => {
+  it('allows changing the package while drafting', () => {
+    expect(() =>
+      validatePackageUpdate({ currentStatus: 'DRAFTING', previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
+    ).not.toThrow();
+  });
+
+  it('allows changing the package on a new lead', () => {
+    expect(() =>
+      validatePackageUpdate({ currentStatus: 'NEW', previousPackageId: null, nextPackageId: 'pkg-1' }),
+    ).not.toThrow();
+  });
+
+  it('blocks changes after QUOTED', () => {
+    expect(() =>
+      validatePackageUpdate({ currentStatus: 'QUOTED', previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
+    ).toThrow(StateMachineError);
+  });
+
+  it('blocks changes while in REVISION — must move back to DRAFTING first', () => {
+    expect(() =>
+      validatePackageUpdate({ currentStatus: 'REVISION', previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
+    ).toThrow(StateMachineError);
+  });
+
+  it('blocks changes in APPROVED and later states', () => {
+    for (const status of ['APPROVED', 'BOOKING_IN_PROGRESS', 'CONFIRMED', 'BOOKING_FAILED']) {
+      expect(() =>
+        validatePackageUpdate({ currentStatus: status, previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
+      ).toThrow(StateMachineError);
+    }
+  });
+
+  it('allows a no-op package update anywhere', () => {
+    expect(() =>
+      validatePackageUpdate({ currentStatus: 'CONFIRMED', previousPackageId: 'pkg-1', nextPackageId: 'pkg-1' }),
+    ).not.toThrow();
+  });
+
+  it('treats null and undefined previous package as equivalent for the no-op check', () => {
+    expect(() =>
+      validatePackageUpdate({ currentStatus: 'QUOTED', previousPackageId: null, nextPackageId: null }),
+    ).not.toThrow();
+  });
+});
+
+describe('validateTravelDatesUpdate', () => {
+  it('allows changing dates while drafting', () => {
+    expect(() =>
+      validateTravelDatesUpdate({
+        currentStatus: 'DRAFTING',
+        previousTravelDate: '2026-01-01',
+        nextTravelDate: '2026-02-01',
+        previousEndDate: '2026-01-10',
+        nextEndDate: '2026-02-10',
+      }),
+    ).not.toThrow();
+  });
+
+  it('blocks travel date changes after QUOTED', () => {
+    expect(() =>
+      validateTravelDatesUpdate({
+        currentStatus: 'QUOTED',
+        previousTravelDate: '2026-01-01',
+        nextTravelDate: '2026-02-01',
+      }),
+    ).toThrow(StateMachineError);
+  });
+
+  it('blocks end date changes after QUOTED', () => {
+    expect(() =>
+      validateTravelDatesUpdate({
+        currentStatus: 'QUOTED',
+        previousEndDate: '2026-01-10',
+        nextEndDate: '2026-02-10',
+      }),
+    ).toThrow(StateMachineError);
+  });
+
+  it('allows a no-op date update anywhere, including different Date object instances for the same day', () => {
+    expect(() =>
+      validateTravelDatesUpdate({
+        currentStatus: 'CONFIRMED',
+        previousTravelDate: new Date('2026-01-01T00:00:00.000Z'),
+        nextTravelDate: '2026-01-01',
+        previousEndDate: new Date('2026-01-10T00:00:00.000Z'),
+        nextEndDate: '2026-01-10',
+      }),
+    ).not.toThrow();
+  });
+
+  it('does nothing when neither date is present in the update', () => {
+    expect(() =>
+      validateTravelDatesUpdate({ currentStatus: 'QUOTED' }),
     ).not.toThrow();
   });
 });
