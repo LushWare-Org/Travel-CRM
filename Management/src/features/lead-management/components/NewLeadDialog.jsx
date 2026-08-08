@@ -3,17 +3,18 @@ import {
   X, Plus, Loader2, Calendar, Copy, User, Mail, Phone,
   MapPin, Plane, Users, Globe, Package, MessageSquare,
   ChevronDown, ChevronUp, Sparkles, Save, ArrowRightLeft,
-  Settings2, Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import { OPTIONAL_FLIGHT_TYPE } from '@travel-crm/constants';
 import { leadAPI, packageAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import LocationAutocomplete from './LocationAutocomplete';
 import AirportAutocomplete from '../../../components/AirportAutocomplete';
 import CountrySelect from '../../../components/CountrySelect';
-import { FlightSelectionModal } from '../../shared';
+import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
+import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
 import PricingSection from './PricingSection';
 
 // ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
@@ -56,46 +57,6 @@ function SectionHeader({ icon: Icon, title, subtitle, section, gradient, expande
         <ChevronDown className="w-5 h-5" />
       )}
     </button>
-  );
-}
-
-function FlightPreferenceCard({ prefs, onEdit, onRemove }) {
-  if (!prefs) return null;
-  return (
-    <div className="bg-blue-50 rounded-xl border border-blue-200 p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Settings2 className="w-4 h-4 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-gray-900">
-              {prefs.origin || '?'} → {prefs.destination || '?'}
-            </div>
-            <div className="text-xs text-gray-500">
-              {prefs.cabinClass || 'Economy'}{prefs.airlinePreference ? ` · ${prefs.airlinePreference}` : ''}{prefs.departureTime ? ` · ${prefs.departureTime}` : ''}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-            title="Edit preferences"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-xs text-red-600 hover:text-red-700 font-medium px-2"
-          >
-            Remove
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -239,6 +200,28 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       const leadId = response.data?._id || response.data?.id;
 
       toast.success('Lead created successfully');
+
+      if (leadId) {
+        const flightSaves = [];
+        if (formData.inboundFlightPrefs) {
+          flightSaves.push(leadAPI.addFlight(leadId, {
+            flightType: OPTIONAL_FLIGHT_TYPE.TO_START,
+            ...formData.inboundFlightPrefs,
+          }));
+        }
+        if (formData.outboundFlightPrefs) {
+          flightSaves.push(leadAPI.addFlight(leadId, {
+            flightType: OPTIONAL_FLIGHT_TYPE.RETURN_HOME,
+            ...formData.outboundFlightPrefs,
+          }));
+        }
+        if (flightSaves.length > 0) {
+          const results = await Promise.allSettled(flightSaves);
+          if (results.some(r => r.status === 'rejected')) {
+            toast.error('Lead created, but some flight preferences failed to save');
+          }
+        }
+      }
 
       setFormData({
         name: "",
@@ -684,7 +667,9 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           isOpen={showTransferFlightModal}
           onClose={() => setShowTransferFlightModal(false)}
           mode="template"
-          initialData={transferFlightType === 'inbound' ? (formData.inboundFlightPrefs || {}) : (formData.outboundFlightPrefs || {})}
+          initialData={transferFlightType === 'inbound'
+            ? (formData.inboundFlightPrefs || {})
+            : getOutboundModalDefaults(formData.inboundFlightPrefs, formData.outboundFlightPrefs)}
           onSelectTemplate={(prefs) => {
             if (transferFlightType === 'inbound') {
               setFormData({ ...formData, inboundFlightPrefs: prefs });
