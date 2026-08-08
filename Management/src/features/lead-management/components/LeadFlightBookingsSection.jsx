@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plane, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, Settings2, Pencil, ExternalLink } from 'lucide-react';
+import { Plane, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, Settings2, Pencil, ExternalLink } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { OPTIONAL_FLIGHT_TYPE } from '@travel-crm/constants';
 import { flightAPI } from '../../../services/flight.service';
-import { FlightSelectionModal } from '../../shared';
+import { leadAPI } from '../../../services/api';
+import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
+import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
 import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';
 
 function fmtDate(iso) {
@@ -21,15 +24,20 @@ export default function LeadFlightBookingsSection({
   itineraryDays = [],
   travelDate,
   onUpdateDay,
+  onFlightsChanged,
 }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Optional transfer flights (LeadOptionalFlight rows — separate from the
+  // itinerary-day bookings above, which come from flight-service instead).
+  const [optionalFlights, setOptionalFlights] = useState([]);
+
   // Flight modal state
   const [showFlightModal, setShowFlightModal] = useState(false);
   const [flightModalDay, setFlightModalDay] = useState(null);
-  const [flightModalType, setFlightModalType] = useState('itinerary'); // 'itinerary' | 'optional'
+  const [flightModalType, setFlightModalType] = useState('itinerary'); // 'itinerary' | 'to-start' | 'return-home'
   const [flightModalPrefill, setFlightModalPrefill] = useState({});
   const [expanded, setExpanded] = useState(true);
 
@@ -47,8 +55,21 @@ export default function LeadFlightBookingsSection({
     }
   };
 
+  const fetchOptionalFlights = async () => {
+    if (!leadId) return;
+    try {
+      const res = await leadAPI.getFlights(leadId);
+      setOptionalFlights(res.data || []);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load transfer flights');
+    }
+  };
+
   useEffect(() => {
-    if (leadId) fetchBookings();
+    if (leadId) {
+      fetchBookings();
+      fetchOptionalFlights();
+    }
   }, [leadId]);
 
   const handleCancelBooking = async (bookingId, reason) => {
@@ -61,7 +82,12 @@ export default function LeadFlightBookingsSection({
     }
   };
 
-  const handleFlightTemplate = (prefs) => {
+  const flightModalTypeToOptionalFlightType = {
+    'to-start': OPTIONAL_FLIGHT_TYPE.TO_START,
+    'return-home': OPTIONAL_FLIGHT_TYPE.RETURN_HOME,
+  };
+
+  const handleFlightTemplate = async (prefs) => {
     const dayNumber = flightModalDay;
     if (dayNumber && onUpdateDay) {
       // Itinerary day flight — save preferences into the day's flights[].
@@ -75,6 +101,7 @@ export default function LeadFlightBookingsSection({
         cabinClass: prefs.cabinClass,
         departureTime: prefs.departureTime,
         airlinePreference: prefs.airlinePreference,
+        totalAmount: Number(prefs.estimatedUnitPrice) || 0,
       };
       onUpdateDay(dayNumber, {
         flights: flights.length > 0
@@ -84,20 +111,57 @@ export default function LeadFlightBookingsSection({
               id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
                 ? crypto.randomUUID()
                 : `flight-${Date.now()}`,
-              totalAmount: 0,
             }],
       });
       toast.success(`Flight preferences saved for Day ${dayNumber}`);
-    } else {
-      // Optional transfer flight — preferences stored for reference
-      toast.success('Flight preferences saved');
+      fetchBookings();
+      return;
     }
-    fetchBookings();
+
+    // Optional transfer flight (to-start / return-home) — persisted as a
+    // LeadOptionalFlight row. Backend has no update endpoint for a single
+    // flight, so editing an existing direction deletes the old row first.
+    const flightType = flightModalTypeToOptionalFlightType[flightModalType];
+    if (!flightType || !leadId) return;
+
+    try {
+      const existing = optionalFlights.find(f => f.flightType === flightType);
+      if (existing) {
+        await leadAPI.deleteFlight(leadId, existing.id);
+      }
+      await leadAPI.addFlight(leadId, {
+        flightType,
+        origin: prefs.origin || undefined,
+        destination: prefs.destination || undefined,
+        cabinClass: prefs.cabinClass || undefined,
+        departureTime: prefs.departureTime || undefined,
+        airlinePreference: prefs.airlinePreference || undefined,
+        estimatedUnitPrice: Number(prefs.estimatedUnitPrice) || 0,
+      });
+      toast.success('Flight preferences saved');
+      await fetchOptionalFlights();
+      onFlightsChanged?.();
+    } catch (err) {
+      toast.error(err.message || 'Failed to save flight preferences');
+    }
+  };
+
+  const handleDeleteOptionalFlight = async (flightId) => {
+    if (!leadId) return;
+    try {
+      await leadAPI.deleteFlight(leadId, flightId);
+      toast.success('Flight removed');
+      fetchOptionalFlights();
+      onFlightsChanged?.();
+    } catch (err) {
+      toast.error(err.message || 'Failed to remove flight');
+    }
   };
 
   // Days that have flights selected in the editor
   const flightDays = itineraryDays.filter(d => Array.isArray(d.flights) && d.flights.length > 0);
-  const optionalFlights = bookings.filter(b => b.flightType === 'optional');
+  const toStartFlight = optionalFlights.find(f => f.flightType === OPTIONAL_FLIGHT_TYPE.TO_START);
+  const returnHomeFlight = optionalFlights.find(f => f.flightType === OPTIONAL_FLIGHT_TYPE.RETURN_HOME);
 
   if (loading) {
     return (
@@ -179,7 +243,9 @@ export default function LeadFlightBookingsSection({
                             onClick={() => {
                               setFlightModalDay(day.dayNumber);
                               setFlightModalType('itinerary');
-                              setFlightModalPrefill(firstFlight || { origin: '', destination: '' });
+                              setFlightModalPrefill(firstFlight
+                                ? { ...firstFlight, estimatedUnitPrice: firstFlight.totalAmount }
+                                : { origin: '', destination: '' });
                               setShowFlightModal(true);
                             }}
                             className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
@@ -218,7 +284,9 @@ export default function LeadFlightBookingsSection({
                               onClick={() => {
                                 setFlightModalDay(day.dayNumber);
                                 setFlightModalType('itinerary');
-                                setFlightModalPrefill(firstFlight || { origin: '', destination: '' });
+                                setFlightModalPrefill(firstFlight
+                                ? { ...firstFlight, estimatedUnitPrice: firstFlight.totalAmount }
+                                : { origin: '', destination: '' });
                                 setShowFlightModal(true);
                               }}
                               className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
@@ -246,6 +314,10 @@ export default function LeadFlightBookingsSection({
                           {firstFlight.cabinClass || 'Economy'}
                           {firstFlight.airlinePreference ? ` · ${firstFlight.airlinePreference}` : ''}
                           {firstFlight.departureTime ? ` · ${firstFlight.departureTime}` : ''}
+                          {' · '}
+                          {Number(firstFlight.totalAmount) > 0
+                            ? `$${Number(firstFlight.totalAmount).toFixed(2)} per person`
+                            : <span className="text-amber-600">no cost set — $0 in pricing</span>}
                         </div>
                       )}
                     </div>
@@ -263,67 +335,69 @@ export default function LeadFlightBookingsSection({
             </div>
           )}
 
-          {/* Optional Flights */}
+          {/* Optional Flights — inline slots: a filled card, or an add-placeholder in its place */}
           <div>
             <div className="text-xs font-semibold text-gray-500 uppercase mb-2 mt-4">Optional Transfer Flights</div>
-            <div className="space-y-2">
-              {optionalFlights.length > 0 && optionalFlights.map(b => (
-                <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700">
-                        {b.segments?.[0]?.origin} → {b.segments?.[b.segments?.length - 1]?.destination}
-                      </span>
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">{b.flightType?.replace('-', ' ')}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${b.status === 'cancelled' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                        {b.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="font-mono font-medium text-gray-900">{b.pnr || '-'}</span>
-                      {b.status !== 'cancelled' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const reason = prompt('Reason for cancellation:');
-                            if (reason !== null) handleCancelBooking(b.id, reason);
-                          }}
-                          className="flex items-center gap-1 text-red-600 hover:text-red-700"
-                        >
-                          <Ban className="w-3 h-3" /> Cancel
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="space-y-3">
+              <div>
+                <h5 className="text-xs font-medium text-gray-600 mb-1.5">To Start</h5>
+                {toStartFlight ? (
+                  <FlightPreferenceCard
+                    prefs={toStartFlight}
+                    onEdit={() => {
+                      setFlightModalDay(null);
+                      setFlightModalType('to-start');
+                      setFlightModalPrefill(toStartFlight);
+                      setShowFlightModal(true);
+                    }}
+                    onRemove={() => handleDeleteOptionalFlight(toStartFlight.id)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFlightModalDay(null);
+                      setFlightModalType('to-start');
+                      setFlightModalPrefill({});
+                      setShowFlightModal(true);
+                    }}
+                    className="w-full py-3 border-2 border-dashed border-sky-300 text-sky-700 rounded-xl hover:bg-sky-50 hover:border-sky-400 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                    Add Flight Preferences to Start
+                  </button>
+                )}
+              </div>
 
-            <div className="flex gap-2 mt-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setFlightModalDay(null);
-                  setFlightModalType('to-start');
-                  setFlightModalPrefill({});
-                  setShowFlightModal(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-xs rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <Settings2 className="w-3.5 h-3.5" /> Add Flight Preferences to Start
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFlightModalDay(null);
-                  setFlightModalType('return-home');
-                  setFlightModalPrefill({});
-                  setShowFlightModal(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-xs rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <Settings2 className="w-3.5 h-3.5" /> Add Return Flight Preferences
-              </button>
+              <div>
+                <h5 className="text-xs font-medium text-gray-600 mb-1.5">Return Home</h5>
+                {returnHomeFlight ? (
+                  <FlightPreferenceCard
+                    prefs={returnHomeFlight}
+                    onEdit={() => {
+                      setFlightModalDay(null);
+                      setFlightModalType('return-home');
+                      setFlightModalPrefill(returnHomeFlight);
+                      setShowFlightModal(true);
+                    }}
+                    onRemove={() => handleDeleteOptionalFlight(returnHomeFlight.id)}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFlightModalDay(null);
+                      setFlightModalType('return-home');
+                      setFlightModalPrefill(getOutboundModalDefaults(toStartFlight, returnHomeFlight));
+                      setShowFlightModal(true);
+                    }}
+                    className="w-full py-3 border-2 border-dashed border-sky-300 text-sky-700 rounded-xl hover:bg-sky-50 hover:border-sky-400 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                    Add Return Flight Preferences
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

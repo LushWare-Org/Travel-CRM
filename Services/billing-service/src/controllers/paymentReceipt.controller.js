@@ -2,6 +2,7 @@ import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { nextReceiptNumber, nextPaymentHistoryNumber } from '../utils/docNumber.js';
+import { emitLeadEvent } from '../services/events.client.js';
 
 const receiptInclude = { paymentHistories: true };
 
@@ -127,6 +128,15 @@ export const verifyPaymentReceipt = asyncHandler(async (req, res) => {
     data: { verified: true, verifiedAt: new Date(), verifiedById: req.user.id },
     include: receiptInclude,
   });
+  try {
+    await emitLeadEvent({
+      type: 'payment.verified',
+      leadId: receipt.leadId,
+      payload: { paymentId: receipt.id, amount: receipt.amount, invoiceId: receipt.invoiceId || null },
+    });
+  } catch (err) {
+    console.error('Failed to notify lead-service of verified payment', err.message);
+  }
   res.json({ success: true, data: receipt });
 });
 

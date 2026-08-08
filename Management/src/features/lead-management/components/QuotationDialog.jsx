@@ -33,7 +33,13 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     package: leadData?.package?._id || leadData?.package || '',
     type: 'standard',
     mode: 'summary',
-    items: [], // Start with empty array - items will be added when package is detected or manually added
+    items: (leadData?.costLines || []).map((l) => ({
+      description: l.description,
+      category: l.category || 'other',
+      quantity: l.quantity || 1,
+      unitPrice: Number(l.quotedUnitPrice ?? l.estimatedUnitPrice ?? 0),
+      notes: l.source === 'MANUAL' ? 'Manual' : null,
+    })),
     taxRate: 0,
     discountType: 'none',
     discountValue: 0,
@@ -2094,4 +2100,3 @@ const QuotationDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 };
 
 export default QuotationDialog;
-

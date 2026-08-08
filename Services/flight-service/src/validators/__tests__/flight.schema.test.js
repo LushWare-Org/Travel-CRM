@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   searchSchema, priceSchema, bookSchema,
   cancelBookingSchema, listBookingsQuerySchema, bookingIdParamSchema,
+  leadIdParamSchema, leadBookSchema,
 } from '../flight.schema.js';
 
 describe('searchSchema', () => {
@@ -129,7 +130,55 @@ describe('bookingIdParamSchema', () => {
     expect(bookingIdParamSchema.safeParse({ id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' }).success).toBe(true);
   });
 
-  it('should reject non-UUID', () => {
+  it('should accept a hand-crafted seed-style ID with non-v4 version/variant nibbles', () => {
+    // e.g. Services/seed-extended.mjs's readable convention — a valid Prisma
+    // primary key, just not something crypto.randomUUID() would ever produce.
+    expect(bookingIdParamSchema.safeParse({ id: 'e0000000-0000-0000-0000-00000000000c' }).success).toBe(true);
+  });
+
+  it('should reject non-UUID-shaped strings', () => {
     expect(bookingIdParamSchema.safeParse({ id: 'b1' }).success).toBe(false);
+  });
+});
+
+describe('leadIdParamSchema', () => {
+  it('should accept a real UUID', () => {
+    expect(leadIdParamSchema.safeParse({ leadId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' }).success).toBe(true);
+  });
+
+  it('should accept a hand-crafted seed-style lead ID', () => {
+    expect(leadIdParamSchema.safeParse({ leadId: 'd0000000-0000-0000-0000-00000000000c' }).success).toBe(true);
+  });
+
+  it('should reject a non-UUID-shaped string', () => {
+    const result = leadIdParamSchema.safeParse({ leadId: 'not-a-real-id' });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject a missing leadId', () => {
+    expect(leadIdParamSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('leadBookSchema — cross-service IDs', () => {
+  const validBook = {
+    offer: { offerId: 'offer-1' },
+    travelers: [{ type: 'adult', firstName: 'Jane', lastName: 'Doe' }],
+    contact: { email: 'jane@example.com' },
+  };
+
+  it('accepts seed-style leadId/packageId/customizedPackageId', () => {
+    const result = leadBookSchema.safeParse({
+      ...validBook,
+      leadId: 'd0000000-0000-0000-0000-00000000000c',
+      packageId: 'b0000000-0000-0000-0000-000000000001',
+      customizedPackageId: 'b0000000-0000-0000-0000-000000000002',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a garbage leadId', () => {
+    const result = leadBookSchema.safeParse({ ...validBook, leadId: 'nope' });
+    expect(result.success).toBe(false);
   });
 });

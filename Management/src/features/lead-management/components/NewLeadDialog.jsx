@@ -3,19 +3,19 @@ import {
   X, Plus, Loader2, Calendar, Copy, User, Mail, Phone,
   MapPin, Plane, Users, Globe, Package, MessageSquare,
   ChevronDown, ChevronUp, Sparkles, Save, ArrowRightLeft,
-  Settings2, Pencil,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { leadAPI, packageAPI, manualItineraryAPI } from '../../../services/api';
+import { OPTIONAL_FLIGHT_TYPE } from '@travel-crm/constants';
+import { leadAPI, packageAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import LocationAutocomplete from './LocationAutocomplete';
 import AirportAutocomplete from '../../../components/AirportAutocomplete';
 import CountrySelect from '../../../components/CountrySelect';
-import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
-import { createDefaultDay } from '../../itinerary/types/index.js';
-import { FlightSelectionModal } from '../../shared';
+import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
+import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
+import PricingSection from './PricingSection';
 
 // ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
 
@@ -60,62 +60,20 @@ function SectionHeader({ icon: Icon, title, subtitle, section, gradient, expande
   );
 }
 
-function FlightPreferenceCard({ prefs, onEdit, onRemove }) {
-  if (!prefs) return null;
-  return (
-    <div className="bg-blue-50 rounded-xl border border-blue-200 p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <Settings2 className="w-4 h-4 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-gray-900">
-              {prefs.origin || '?'} → {prefs.destination || '?'}
-            </div>
-            <div className="text-xs text-gray-500">
-              {prefs.cabinClass || 'Economy'}{prefs.airlinePreference ? ` · ${prefs.airlinePreference}` : ''}{prefs.departureTime ? ` · ${prefs.departureTime}` : ''}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-            title="Edit preferences"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-xs text-red-600 hover:text-red-700 font-medium px-2"
-          >
-            Remove
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   const { user } = useAuth();
   const isSalesRep = user?.role === 'salesRep';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
-  const [showManualItinerary, setShowManualItinerary] = useState(false);
-  const [itineraryDays, setItineraryDays] = useState([]);
   const [showTransferFlightModal, setShowTransferFlightModal] = useState(false);
   const [transferFlightType, setTransferFlightType] = useState('inbound'); // 'inbound' | 'outbound'
+  const [itineraryDays, setItineraryDays] = useState([]);
   const [expandedSections, setExpandedSections] = useState({
     personal: true,
     travel: true,
     package: true,
     remarks: false,
-    itinerary: false,
     transfers: false,
   });
   const [formData, setFormData] = useState({
@@ -161,7 +119,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
         packagesList = packagesList.filter(pkg =>
-          pkg.isActive !== false && pkg.status === 'published'
+          pkg.isActive !== false
         );
         setPackages(packagesList);
       } else {
@@ -215,29 +173,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       const assignedTo = isSalesRep && user?._id ? user._id : (formData.assignedTo || undefined);
       const salesRepName = isSalesRep && user?.name ? user.name : (formData.salesRep || undefined);
 
-      // Build optional transfer flights array from flight preferences
-      const optionalFlights = [];
-      if (formData.inboundFlightPrefs) {
-        optionalFlights.push({
-          origin: formData.inboundFlightPrefs.origin,
-          destination: formData.inboundFlightPrefs.destination,
-          flightType: 'to-start',
-          cabinClass: formData.inboundFlightPrefs.cabinClass,
-          departureTime: formData.inboundFlightPrefs.departureTime,
-          airlinePreference: formData.inboundFlightPrefs.airlinePreference,
-        });
-      }
-      if (formData.outboundFlightPrefs) {
-        optionalFlights.push({
-          origin: formData.outboundFlightPrefs.origin,
-          destination: formData.outboundFlightPrefs.destination,
-          flightType: 'return-home',
-          cabinClass: formData.outboundFlightPrefs.cabinClass,
-          departureTime: formData.outboundFlightPrefs.departureTime,
-          airlinePreference: formData.outboundFlightPrefs.airlinePreference,
-        });
-      }
-
       const leadData = {
         name: formData.name?.trim() || undefined,
         email: formData.email?.trim() || undefined,
@@ -251,31 +186,42 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         source: "manual",
         travelDate: formData.travelDate || undefined,
         endDate: formData.endDate || undefined,
-        package: formData.package || undefined,
+        packageId: formData.package || undefined,
         packageName: formData.packageName || undefined,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
-        optionalFlights: optionalFlights.length > 0 ? optionalFlights : undefined,
         remarks: formData.remarks.filter((r) => r.text.trim() !== "").map(r => ({
           text: r.text.trim(),
           date: r.date || new Date().toISOString().split("T")[0]
         })),
-        status: "new",
         lifecycleStatus,
       };
 
       const response = await leadAPI.createLead(leadData);
       const leadId = response.data?._id || response.data?.id;
 
-      if (showManualItinerary && itineraryDays.length > 0) {
-        try {
-          await manualItineraryAPI.createOrUpdate(leadId, itineraryDays);
-        } catch (itineraryError) {
-          console.error('Error saving manual itinerary:', itineraryError);
-          toast.error('Lead created but itinerary save failed');
+      toast.success('Lead created successfully');
+
+      if (leadId) {
+        const flightSaves = [];
+        if (formData.inboundFlightPrefs) {
+          flightSaves.push(leadAPI.addFlight(leadId, {
+            flightType: OPTIONAL_FLIGHT_TYPE.TO_START,
+            ...formData.inboundFlightPrefs,
+          }));
+        }
+        if (formData.outboundFlightPrefs) {
+          flightSaves.push(leadAPI.addFlight(leadId, {
+            flightType: OPTIONAL_FLIGHT_TYPE.RETURN_HOME,
+            ...formData.outboundFlightPrefs,
+          }));
+        }
+        if (flightSaves.length > 0) {
+          const results = await Promise.allSettled(flightSaves);
+          if (results.some(r => r.status === 'rejected')) {
+            toast.error('Lead created, but some flight preferences failed to save');
+          }
         }
       }
-
-      toast.success('Lead created successfully');
 
       setFormData({
         name: "",
@@ -297,7 +243,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         remarks: [{ text: "", date: "" }],
       });
       setItineraryDays([]);
-      setShowManualItinerary(false);
 
       onSuccess?.();
       onClose();
@@ -528,31 +473,24 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                       setFormData({
                         ...formData,
                         package: packageId,
-                        packageName: selectedPackage?.name || '',
+                        packageName: selectedPackage?.title || selectedPackage?.name || '',
                         destination: selectedPackage?.destination || formData.destination
                       });
 
-                      // Load package itinerary into the manual itinerary editor
+                      // Load the blueprint days for the live pricing preview
                       if (packageId && selectedPackage) {
                         try {
                           const response = await packageAPI.getById(packageId);
                           if (response.success || response.status === 'success') {
                             const pkg = response.data?.data || response.data;
-                            let days = [];
-                            if (pkg?.itinerary?.days) {
-                              days = pkg.itinerary.days;
-                            } else if (Array.isArray(pkg?.days)) {
-                              days = pkg.days;
-                            }
-                            if (days.length > 0) {
-                              setItineraryDays(days);
-                              setShowManualItinerary(true);
-                              setExpandedSections(prev => ({ ...prev, itinerary: true }));
-                            }
+                            setItineraryDays(Array.isArray(pkg?.itineraryDays) ? pkg.itineraryDays : []);
                           }
                         } catch (err) {
                           console.error('Error loading package itinerary:', err);
+                          setItineraryDays([]);
                         }
+                      } else {
+                        setItineraryDays([]);
                       }
                     }}
                     disabled={loadingPackages}
@@ -562,7 +500,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     {packages && packages.length > 0 ? (
                       packages.map((pkg) => (
                         <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
-                          {pkg.name || 'Unnamed Package'}
+                          {pkg.title || pkg.name || 'Unnamed Package'}
                         </option>
                       ))
                     ) : (
@@ -652,70 +590,6 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
             )}
           </div>
 
-          {/* Manual Itinerary Section */}
-          <div className="space-y-4">
-            <SectionHeader
-              expanded={expandedSections.itinerary}
-              onToggle={toggleSection}
-              icon={Calendar}
-              title="Manual Itinerary"
-              subtitle="Optional: Create a custom itinerary"
-              section="itinerary"
-              gradient="from-indigo-500 to-violet-600"
-            />
-
-            {expandedSections.itinerary && (
-              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-sm text-gray-600">
-                    Create a custom day-by-day itinerary for this lead
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowManualItinerary(!showManualItinerary);
-                      if (!showManualItinerary && itineraryDays.length === 0) {
-                        setItineraryDays([createDefaultDay(1)]);
-                      }
-                    }}
-                    className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl hover:from-indigo-600 hover:to-violet-700 transition-all font-medium flex items-center gap-2 shadow-lg shadow-indigo-500/25"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    {showManualItinerary ? 'Hide Editor' : 'Open Editor'}
-                  </button>
-                </div>
-
-                {showManualItinerary && (
-                  <div className="mt-4 p-4 bg-white rounded-xl border border-indigo-200">
-                    <ItineraryEditor
-                      days={itineraryDays}
-                      onDayChange={(dayNumber, dayData) => {
-                        setItineraryDays(prev =>
-                          prev.map(day =>
-                            day.dayNumber === dayNumber ? { ...day, ...dayData } : day
-                          )
-                        );
-                      }}
-                      onAddDay={() => {
-                        const newDayNumber = itineraryDays.length + 1;
-                        setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
-                      }}
-                      onRemoveDay={(dayNumber) => {
-                        const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                        const renumberedDays = filteredDays.map((day, index) => ({
-                          ...day,
-                          dayNumber: index + 1,
-                        }));
-                        setItineraryDays(renumberedDays);
-                      }}
-                      destination={formData.destination}
-                      hideTitleAndDescription={true}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
           {/* Transfer Flights Section */}
           <div className="space-y-4">
             <SectionHeader
@@ -793,7 +667,9 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           isOpen={showTransferFlightModal}
           onClose={() => setShowTransferFlightModal(false)}
           mode="template"
-          initialData={transferFlightType === 'inbound' ? (formData.inboundFlightPrefs || {}) : (formData.outboundFlightPrefs || {})}
+          initialData={transferFlightType === 'inbound'
+            ? (formData.inboundFlightPrefs || {})
+            : getOutboundModalDefaults(formData.inboundFlightPrefs, formData.outboundFlightPrefs)}
           onSelectTemplate={(prefs) => {
             if (transferFlightType === 'inbound') {
               setFormData({ ...formData, inboundFlightPrefs: prefs });
@@ -803,6 +679,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
             setShowTransferFlightModal(false);
           }}
         />
+
+        {/* Pricing preview — live price for the selected package */}
+        {formData.package && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing Preview</h3>
+            <PricingSection
+              days={itineraryDays}
+              travelers={formData.numberOfTravelers || 1}
+            />
+          </div>
+        )}
 
         {/* Footer Actions */}
         <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">

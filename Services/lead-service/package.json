@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@travel-crm/lead-pricing-engine": "file:../shared/lead-pricing-engine",
+    "@travel-crm/pricing-engine": "file:../shared/pricing-engine",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.18.2",

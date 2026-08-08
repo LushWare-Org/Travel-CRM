@@ -93,41 +93,41 @@ enum HotelBookingStatus {
 // ─── Package (core blueprint) ──────────────────────────────────
 
 model Package {
-  id                  String          @id @default(uuid())
-  title               String          @default("") @db.VarChar(255)
-  slug                String?         @unique
-  description         String?         @db.Text
-  destination         String?         @db.VarChar(255)   // denormalized search/filter aid
-  durationDays        Int             @default(1) @map("duration_days")
-  category            PackageCategory @default(FAMILY)
-  coverImage          String?         @db.VarChar(500)   @map("cover_image")
+  id           String          @id @default(uuid())
+  title        String          @default("") @db.VarChar(255)
+  slug         String?         @unique
+  description  String?         @db.Text
+  destination  String?         @db.VarChar(255) // denormalized search/filter aid
+  durationDays Int             @default(1) @map("duration_days")
+  category     PackageCategory @default(FAMILY)
+  coverImage   String?         @map("cover_image") @db.VarChar(500)
 
-  inclusions          Json            @default("[]")      // string[]
-  exclusions          Json            @default("[]")      // string[]
-  termsAndConditions  String?         @db.Text            @map("terms_and_conditions")
+  inclusions         Json    @default("[]") // string[]
+  exclusions         Json    @default("[]") // string[]
+  termsAndConditions String? @map("terms_and_conditions") @db.Text
 
-  basePrice           Decimal         @default(0)         @map("base_price") @db.Decimal(10, 2)
-  defaultMarginType   MarginType      @default(PERCENTAGE) @map("default_margin_type")
-  defaultMarginInput  Decimal         @default(0)         @map("default_margin_input") @db.Decimal(10, 2)
-  currency            String          @default("USD")     @db.VarChar(3)
+  basePrice          Decimal    @default(0) @map("base_price") @db.Decimal(10, 2)
+  defaultMarginType  MarginType @default(PERCENTAGE) @map("default_margin_type")
+  defaultMarginInput Decimal    @default(0) @map("default_margin_input") @db.Decimal(10, 2)
+  currency           String     @default("USD") @db.VarChar(3)
 
-  isActive            Boolean         @default(true)      @map("is_active")
-  isFeatured          Boolean         @default(false)     @map("is_featured")
+  isActive   Boolean @default(true) @map("is_active")
+  isFeatured Boolean @default(false) @map("is_featured")
 
-  rating              Float           @default(0)
-  numReviews          Int             @default(0)         @map("num_reviews")
-  views               Int             @default(0)
-  bookings            Int             @default(0)
+  rating     Float @default(0)
+  numReviews Int   @default(0) @map("num_reviews")
+  views      Int   @default(0)
+  bookings   Int   @default(0)
 
   // Cross-schema ref (no FK across schema boundaries)
-  createdBy           String?                             @map("created_by")   // → users.User.id
+  createdBy String? @map("created_by") // → users.User.id
 
-  images              PackageImage[]
-  itineraryDays       ItineraryDay[]
-  reviews             Review[]
+  images        PackageImage[]
+  itineraryDays ItineraryDay[]
+  reviews       Review[]
 
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([category])
   @@index([destination])
@@ -146,12 +146,12 @@ model Package {
 // ─── Package Image ─────────────────────────────────────────────
 
 model PackageImage {
-  id         String   @id @default(uuid())
+  id         String  @id @default(uuid())
   packageId  String
-  package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  package    Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
   url        String?
-  altText    String?  @db.VarChar(255)  @map("alt_text")
-  orderIndex Int      @default(0)       @map("order_index")
+  altText    String? @map("alt_text") @db.VarChar(255)
+  orderIndex Int     @default(0) @map("order_index")
 
   @@index([packageId])
   @@map("Package_Image")
@@ -161,25 +161,26 @@ model PackageImage {
 // ─── Itinerary Day (daily container) ───────────────────────────
 
 model ItineraryDay {
-  id                String   @id @default(uuid())
-  packageId         String
-  package           Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  dayNumber         Int      @map("day_number")
-  title             String?  @db.VarChar(255)
-  description       String?  @db.Text
+  id          String  @id @default(uuid())
+  packageId   String
+  package     Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  dayNumber   Int     @map("day_number")
+  title       String? @db.VarChar(255)
+  description String? @db.Text
 
   breakfastCount    Int      @default(0) @map("breakfast_count")
   lunchCount        Int      @default(0) @map("lunch_count")
   dinnerCount       Int      @default(0) @map("dinner_count")
   mealPriceOverride Decimal? @map("meal_price_override") @db.Decimal(10, 2)
+  accommodation     Json     @default("{}") // { name?, totalAmount, roomType? } per night
   flights           Json     @default("[]") // editor flight preferences per day
 
-  places            PackageDayPlace[]
-  activities        PackageDayActivity[]
-  transports        PackageDayTransport[]
+  places     PackageDayPlace[]
+  activities PackageDayActivity[]
+  transports PackageDayTransport[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([packageId, dayNumber])
   @@index([packageId])
@@ -190,17 +191,17 @@ model ItineraryDay {
 // ─── Place (master dictionary) ─────────────────────────────────
 
 model Place {
-  id          String     @id @default(uuid())
-  name        String     @unique @db.VarChar(255)
+  id          String    @id @default(uuid())
+  name        String    @unique @db.VarChar(255)
   type        PlaceType
-  defaultCost Decimal?   @map("default_cost") @db.Decimal(10, 2)
+  defaultCost Decimal?  @map("default_cost") @db.Decimal(10, 2)
 
-  dayPlaces   PackageDayPlace[]
-  origins     PackageDayTransport[]  @relation("TransportOrigin")
+  dayPlaces    PackageDayPlace[]
+  origins      PackageDayTransport[] @relation("TransportOrigin")
   destinations PackageDayTransport[] @relation("TransportDestination")
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([type])
   @@schema("crm_packages")
@@ -214,8 +215,8 @@ model PackageDayPlace {
   itineraryDay   ItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
   placeId        String?
   place          Place?       @relation(fields: [placeId], references: [id], onDelete: SetNull)
-  customName     String?      @db.VarChar(255)  @map("custom_name")
-  orderIndex     Int          @default(0)       @map("order_index")
+  customName     String?      @map("custom_name") @db.VarChar(255)
+  orderIndex     Int          @default(0) @map("order_index")
 
   @@unique([itineraryDayId, orderIndex])
   @@index([itineraryDayId])
@@ -227,16 +228,16 @@ model PackageDayPlace {
 // ─── Activity Catalog (master dictionary) ──────────────────────
 
 model ActivityCatalog {
-  id          String              @id @default(uuid())
-  name        String              @unique @db.VarChar(255)
-  description String?             @db.Text
-  defaultCost Decimal             @map("default_cost") @db.Decimal(10, 2)
-  vendorId    String?             @map("vendor_id")  // cross-schema ref → users.User.id
+  id          String  @id @default(uuid())
+  name        String  @unique @db.VarChar(255)
+  description String? @db.Text
+  defaultCost Decimal @map("default_cost") @db.Decimal(10, 2)
+  vendorId    String? @map("vendor_id") // cross-schema ref → users.User.id
 
   dayActivities PackageDayActivity[]
 
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("Activity_Catalog")
   @@schema("crm_packages")
@@ -250,7 +251,7 @@ model PackageDayActivity {
   itineraryDay   ItineraryDay    @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
   activityId     String
   activity       ActivityCatalog @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  orderIndex     Int             @default(0)      @map("order_index")
+  orderIndex     Int             @default(0) @map("order_index")
   costOverride   Decimal?        @map("cost_override") @db.Decimal(10, 2)
 
   @@unique([itineraryDayId, orderIndex])
@@ -284,19 +285,19 @@ model PackageDayTransport {
 // ─── Review (unchanged) ────────────────────────────────────────
 
 model Review {
-  id         String   @id @default(uuid())
+  id         String  @id @default(uuid())
   packageId  String
-  package    Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  authorId   String?  // cross-schema ref → users.User.id (null = guest review)
+  package    Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  authorId   String? // cross-schema ref → users.User.id (null = guest review)
   name       String
   email      String?
-  rating     Int      // 1–5, validated in service layer
-  comment    String   @db.VarChar(1000)
-  isApproved Boolean  @default(true)
-  helpful    Int      @default(0)
+  rating     Int // 1–5, validated in service layer
+  comment    String  @db.VarChar(1000)
+  isApproved Boolean @default(true)
+  helpful    Int     @default(0)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([packageId, createdAt])
   @@schema("crm_packages")
@@ -305,37 +306,37 @@ model Review {
 // ─── HotelBooking (unchanged) ──────────────────────────────────
 
 model HotelBooking {
-  id                String              @id @default(uuid())
-  liteapiBookingId  String?
-  hotelId           String
-  hotelName         String
-  hotelAddress      String?
-  hotelImage        String?
-  checkin           DateTime
-  checkout          DateTime
-  currency          String              @default("USD")
-  totalAmount       Float
-  status            HotelBookingStatus  @default(pending)
-  createdById       String              // agent who booked — cross-schema ref → users.User
-  customerId        String?             // cross-schema ref → users.User
-  guestInfo         Json                // [{ firstName, lastName, title }]
-  roomDetails       Json                // { roomType, boardType, ... }
-  searchSnapshot    Json                // raw offer at booking time
+  id                 String             @id @default(uuid())
+  liteapiBookingId   String?
+  hotelId            String
+  hotelName          String
+  hotelAddress       String?
+  hotelImage         String?
+  checkin            DateTime
+  checkout           DateTime
+  currency           String             @default("USD")
+  totalAmount        Float
+  status             HotelBookingStatus @default(pending)
+  createdById        String // agent who booked — cross-schema ref → users.User
+  customerId         String? // cross-schema ref → users.User
+  guestInfo          Json // [{ firstName, lastName, title }]
+  roomDetails        Json // { roomType, boardType, ... }
+  searchSnapshot     Json // raw offer at booking time
   cancellationReason String?
-  cancelledAt       DateTime?
+  cancelledAt        DateTime?
 
   // Booking reference fields
-  supplierPortalUrl  String?
-  pnrCode            String?
+  supplierPortalUrl String?
+  pnrCode           String?
 
   // Lead / day context — cross-schema UUID refs
   leadId              String?
   packageId           String?
-  customizedPackageId String?   // kept for historical data; no FK
+  customizedPackageId String? // kept for historical data; no FK
   dayNumber           Int?
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([createdById, createdAt])
   @@index([status])

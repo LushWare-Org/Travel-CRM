@@ -1,146 +1,154 @@
 import { describe, it, expect } from 'vitest';
-import {
-  calculateTotalEstimatedCost,
-  calculateQuotedSellingPrice,
-  calculateBalanceDue,
-  calculateTotalActualCost,
-  calculateFinalRealizedProfit,
-  computeFinancials,
-} from '../pricing.service.js';
+import { computePricing, toLineDescriptor } from '../pricing.service.js';
+import { buildAutoCostLines } from '../lead-itinerary.service.js';
 
-describe('calculateTotalEstimatedCost', () => {
-  it('sums all estimated costs (Rule 1)', () => {
-    expect(calculateTotalEstimatedCost({
-      packageBaseCost: 1000, estimatedFlightCost: 500, estimatedHotelCost: 300,
-    })).toBe(1800);
-  });
+const baseLines = [
+  { basis: 'PER_PERSON', estimatedUnit: 100, actualUnit: 90, category: 'activity', description: 'Activity', source: 'AUTO' },
+  { basis: 'PER_VEHICLE', estimatedUnit: 300, quantity: 1, actualUnit: 320, category: 'transportation', description: 'Van', source: 'AUTO' },
+  { basis: 'PER_PERSON', estimatedUnit: 50, category: 'transportation', description: 'Flight', source: 'MANUAL' },
+];
 
-  it('returns 0 for empty input', () => {
-    expect(calculateTotalEstimatedCost()).toBe(0);
-    expect(calculateTotalEstimatedCost({})).toBe(0);
-  });
-
-  it('treats missing fields as 0', () => {
-    expect(calculateTotalEstimatedCost({ packageBaseCost: 500 })).toBe(500);
-  });
-});
-
-describe('calculateQuotedSellingPrice', () => {
-  it('applies PERCENTAGE markup (Rule 2)', () => {
-    expect(calculateQuotedSellingPrice(1000, 'PERCENTAGE', 10)).toBe(1100);
-  });
-
-  it('applies FLAT_FEE markup (Rule 2)', () => {
-    expect(calculateQuotedSellingPrice(1000, 'FLAT_FEE', 200)).toBe(1200);
-  });
-
-  it('defaults to FLAT_FEE when strategy is missing', () => {
-    expect(calculateQuotedSellingPrice(1000, undefined, 200)).toBe(1200);
-  });
-
-  it('returns base price when markupValue is 0', () => {
-    expect(calculateQuotedSellingPrice(1000, 'PERCENTAGE', 0)).toBe(1000);
-  });
-
-  it('handles 100% markup', () => {
-    expect(calculateQuotedSellingPrice(500, 'PERCENTAGE', 100)).toBe(1000);
-  });
-});
-
-describe('calculateBalanceDue', () => {
-  it('computes balance due (Rule 3)', () => {
-    expect(calculateBalanceDue(1100, 300)).toBe(800);
-  });
-
-  it('returns 0 when fully paid', () => {
-    expect(calculateBalanceDue(500, 500)).toBe(0);
-  });
-
-  it('returns 0 when overpaid', () => {
-    expect(calculateBalanceDue(500, 600)).toBe(0);
-  });
-
-  it('returns quotedSellingPrice when no deposit', () => {
-    expect(calculateBalanceDue(1000, 0)).toBe(1000);
-    expect(calculateBalanceDue(1000)).toBe(1000);
-  });
-});
-
-describe('calculateTotalActualCost', () => {
-  it('sums actual costs with package base (Rule 4)', () => {
-    expect(calculateTotalActualCost(
-      { packageBaseCost: 1000 },
-      { actualFlightCost: 600, actualHotelCost: 400 },
-    )).toBe(2000);
-  });
-
-  it('defaults missing actual costs to 0', () => {
-    expect(calculateTotalActualCost(
-      { packageBaseCost: 1000 },
-      { actualFlightCost: 600 },
-    )).toBe(1600);
-  });
-
-  it('returns packageBaseCost when no actuals', () => {
-    expect(calculateTotalActualCost({ packageBaseCost: 1000 }, {})).toBe(1000);
-  });
-});
-
-describe('calculateFinalRealizedProfit', () => {
-  it('computes profit (Rule 5)', () => {
-    expect(calculateFinalRealizedProfit(1500, 1200)).toBe(300);
-  });
-
-  it('computes loss', () => {
-    expect(calculateFinalRealizedProfit(1000, 1200)).toBe(-200);
-  });
-
-  it('returns 0 for break-even', () => {
-    expect(calculateFinalRealizedProfit(1000, 1000)).toBe(0);
-  });
-});
-
-describe('computeFinancials', () => {
-  it('full integration: all fields computed correctly', () => {
-    const result = computeFinancials({
-      estimated: { packageBaseCost: 1000, estimatedFlightCost: 500, estimatedHotelCost: 300 },
-      clientPricing: { markupStrategy: 'PERCENTAGE', markupValue: 10, depositPaid: 300 },
-      actual: { actualFlightCost: 600, actualHotelCost: 400 },
+describe('computePricing', () => {
+  it('computes the full sell-side breakdown with deposit and balance', () => {
+    const result = computePricing({
+      lines: baseLines,
+      travelers: 4,
+      currency: 'USD',
+      marginType: 'PERCENTAGE',
+      marginValue: 10,
+      depositType: 'PERCENTAGE',
+      depositValue: 30,
+      discountType: 'percentage',
+      discountValue: 10,
+      serviceChargeRate: 5,
+      verifiedPaymentTotal: 330.26,
     });
 
-    expect(result.estimated.totalEstimatedCost).toBe(1800);
-    expect(result.clientPricing.quotedSellingPrice).toBeCloseTo(1980, 4);
-    expect(result.clientPricing.balanceDue).toBeCloseTo(1680, 4);
-    expect(result.actual.totalActualCost).toBe(2000);
-    expect(result.actual.finalRealizedProfit).toBeCloseTo(-20, 4);
+    expect(result.estimatedTotal).toBe(900);
+    expect(result.actualTotal).toBe(680);
+    expect(result.sellSubtotal).toBe(990);
+    expect(result.taxAmount).toBe(160.38);
+    expect(result.totalAmount).toBe(1100.88);
+    expect(result.depositAmount).toBe(330.26);
+    expect(result.paidAmount).toBe(330.26);
+    expect(result.balanceDue).toBe(770.62);
+    expect(result.profit).toBe(310);
+  });
+
+  it('computes a FIXED deposit amount from the total', () => {
+    const result = computePricing({
+      lines: [{ basis: 'FIXED', estimatedUnit: 1000, quantity: 1, description: 'Package' }],
+      travelers: 1,
+      taxRate: 0,
+      depositType: 'FIXED',
+      depositValue: 250,
+      verifiedPaymentTotal: 250,
+    });
+    expect(result.depositAmount).toBe(250);
+    expect(result.balanceDue).toBe(750);
+  });
+
+  it('returns zero balance when fully paid', () => {
+    const result = computePricing({
+      lines: [{ basis: 'FIXED', estimatedUnit: 1000, quantity: 1, description: 'Package' }],
+      travelers: 1,
+      taxRate: 0,
+      verifiedPaymentTotal: 1000,
+    });
+    expect(result.paidAmount).toBe(1000);
+    expect(result.balanceDue).toBe(0);
+  });
+
+  it('never produces a negative balance for overpayment', () => {
+    const result = computePricing({
+      lines: [{ basis: 'FIXED', estimatedUnit: 500, quantity: 1, description: 'Package' }],
+      travelers: 1,
+      verifiedPaymentTotal: 700,
+    });
+    expect(result.balanceDue).toBe(0);
+  });
+
+  it('defaults to the global tax constant and USD', () => {
+    const result = computePricing({
+      lines: [{ basis: 'FIXED', estimatedUnit: 100, quantity: 1, description: 'X' }],
+      travelers: 1,
+    });
+    expect(result.currency).toBe('USD');
+    expect(result.taxAmount).toBe(18);
+    expect(result.totalAmount).toBe(118);
   });
 
   it('handles empty input without crashing', () => {
-    const result = computeFinancials({});
-    expect(result.estimated.totalEstimatedCost).toBe(0);
-    expect(result.clientPricing.quotedSellingPrice).toBe(0);
-    expect(result.clientPricing.balanceDue).toBe(0);
-    expect(result.actual.totalActualCost).toBe(0);
-    expect(result.actual.finalRealizedProfit).toBe(0);
+    const result = computePricing({});
+    expect(result.sellSubtotal).toBe(0);
+    expect(result.totalAmount).toBe(0);
+    expect(result.depositAmount).toBe(0);
+    expect(result.balanceDue).toBe(0);
+    expect(result.profit).toBeNull();
   });
+});
 
-  it('handles null input', () => {
-    const result = computeFinancials(null);
-    expect(result.estimated.totalEstimatedCost).toBe(0);
-  });
-
-  it('preserves fractional values', () => {
-    const result = computeFinancials({
-      estimated: { packageBaseCost: 100.50, estimatedFlightCost: 50.25 },
-      clientPricing: { markupStrategy: 'PERCENTAGE', markupValue: 15.5 },
+describe('toLineDescriptor', () => {
+  it('converts Prisma Decimal strings into engine numbers', () => {
+    const row = {
+      category: 'food',
+      description: 'Meals',
+      basis: 'PER_PERSON',
+      quantity: 4,
+      estimatedUnitPrice: '60.00',
+      actualUnitPrice: null,
+      marginType: null,
+      marginValue: null,
+      source: 'AUTO',
+    };
+    expect(toLineDescriptor(row)).toEqual({
+      category: 'food',
+      description: 'Meals',
+      basis: 'PER_PERSON',
+      quantity: 4,
+      estimatedUnit: 60,
+      actualUnit: null,
+      marginType: null,
+      marginValue: null,
+      source: 'AUTO',
     });
-    expect(result.estimated.totalEstimatedCost).toBe(150.75);
-    expect(result.clientPricing.quotedSellingPrice).toBeCloseTo(174.11625, 4);
   });
 
-  it('sets null for actualFlightCost and actualHotelCost in output when not provided', () => {
-    const result = computeFinancials({});
-    expect(result.actual.actualFlightCost).toBeNull();
-    expect(result.actual.actualHotelCost).toBeNull();
+  it('preserves margin override values', () => {
+    const row = {
+      category: 'activity',
+      description: 'Tour',
+      basis: 'PER_PERSON',
+      quantity: 2,
+      estimatedUnitPrice: '50.00',
+      actualUnitPrice: '45.50',
+      marginType: 'FIXED',
+      marginValue: '10.00',
+      source: 'MANUAL',
+    };
+    const desc = toLineDescriptor(row);
+    expect(desc.actualUnit).toBe(45.5);
+    expect(desc.marginType).toBe('FIXED');
+    expect(desc.marginValue).toBe(10);
+  });
+
+  it('maps AUTO cost lines to engine units without zeroing costs', () => {
+    const days = [
+      {
+        breakfastCount: 2,
+        lunchCount: 1,
+        dinnerCount: 1,
+        accommodation: { totalAmount: 100 },
+        activities: [{ defaultCost: 50, costOverride: null }],
+        transports: [{ pricingModel: 'PER_VEHICLE', unitCost: 300 }],
+      },
+    ];
+    const lines = buildAutoCostLines(days).map(toLineDescriptor);
+    const food = lines.find((l) => l.category === 'food');
+    const transport = lines.find((l) => l.category === 'transportation');
+    const accommodation = lines.find((l) => l.category === 'accommodation');
+    expect(food.estimatedUnit).toBe(60);
+    expect(transport.estimatedUnit).toBe(300);
+    expect(accommodation.estimatedUnit).toBe(100);
   });
 });

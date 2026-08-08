@@ -1,35 +1,5 @@
 import { z } from 'zod';
 
-// ── Financials sub-schemas ──────────────────────────────────────
-
-const estimatedSchema = z.object({
-  packageBaseCost: z.number().min(0).default(0),
-  estimatedFlightCost: z.number().min(0).default(0),
-  estimatedHotelCost: z.number().min(0).default(0),
-  totalEstimatedCost: z.number().min(0).optional(),
-}).strict();
-
-const clientPricingSchema = z.object({
-  markupStrategy: z.enum(['PERCENTAGE', 'FLAT_FEE']).optional(),
-  markupValue: z.number().min(0).default(0),
-  quotedSellingPrice: z.number().min(0).optional(),
-  depositPaid: z.number().min(0).default(0),
-  balanceDue: z.number().optional(),
-}).strict();
-
-const actualSchema = z.object({
-  actualFlightCost: z.number().min(0).nullable().optional(),
-  actualHotelCost: z.number().min(0).nullable().optional(),
-  totalActualCost: z.number().min(0).nullable().optional(),
-  finalRealizedProfit: z.number().nullable().optional(),
-}).strict();
-
-const financialsSchema = z.object({
-  estimated: estimatedSchema.optional().default({}),
-  clientPricing: clientPricingSchema.optional().default({}),
-  actual: actualSchema.optional().default({}),
-}).strict();
-
 // ── Lead lifecycle status ───────────────────────────────────────
 
 const lifecycleStatusEnum = z.enum([
@@ -38,57 +8,22 @@ const lifecycleStatusEnum = z.enum([
   'BOOKING_FAILED', 'CANCELLED',
 ]);
 
-// ── Create lead schema ──────────────────────────────────────────
+// ── Pricing settings (LeadPricing fields) ───────────────────────
 
-export const createLeadSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  email: z.string().email().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  whatsapp: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  source: z.string().optional(),
-  platform: z.string().optional(),
-  fromCountry: z.string().optional().nullable(),
-  destinationCountry: z.string().optional().nullable(),
-  destination: z.string().optional().nullable(),
-  travelDate: z.string().optional().nullable(),
-  endDate: z.string().optional().nullable(),
-  packageId: z.string().uuid().optional().nullable(),
-  packageName: z.string().optional().nullable(),
-  numberOfTravelers: z.number().int().min(1).optional(),
-  budget: z.string().optional().nullable(),
-  message: z.string().optional().nullable(),
-  status: z.string().optional(),
-  lifecycleStatus: lifecycleStatusEnum.optional(),
-  financials: financialsSchema.optional(),
-  priority: z.string().optional(),
-  assignedToId: z.string().uuid().optional().nullable(),
-  tags: z.array(z.string()).optional(),
-  lostReason: z.string().optional().nullable(),
-  remarks: z.array(z.object({
-    text: z.string().optional(),
-    date: z.string().datetime().optional(),
-    addedBy: z.string().optional(),
-  })).optional(),
-  statusChangeNotes: z.string().optional().nullable(),
-  optionalFlights: z.array(z.object({
-    origin: z.string().optional(),
-    destination: z.string().optional(),
-    flightType: z.string().optional(),
-    cabinClass: z.string().optional(),
-    departureTime: z.string().optional(),
-    airlinePreference: z.string().optional(),
-    flightBookingId: z.string().optional(),
-    status: z.string().optional(),
-    flightNumber: z.string().optional(),
-    carrier: z.string().optional(),
-    notes: z.string().optional(),
-  }).passthrough()).optional(),
+const pricingSchema = z.object({
+  currency: z.string().length(3).optional(),
+  marginType: z.enum(['PERCENTAGE', 'FIXED']).nullable().optional(),
+  marginValue: z.number().min(0).nullable().optional(),
+  depositType: z.enum(['PERCENTAGE', 'FIXED']).nullable().optional(),
+  depositValue: z.number().min(0).nullable().optional(),
+  discountType: z.enum(['none', 'percentage', 'fixed']).optional(),
+  discountValue: z.number().min(0).optional(),
+  serviceChargeRate: z.number().min(0).optional(),
 }).strict();
 
-// ── Update lead schema ──────────────────────────────────────────
+// ── Shared lead fields ──────────────────────────────────────────
 
-export const updateLeadSchema = z.object({
+const leadFields = {
   name: z.string().min(1).max(200).optional(),
   email: z.string().email().optional().nullable(),
   phone: z.string().optional().nullable(),
@@ -106,25 +41,46 @@ export const updateLeadSchema = z.object({
   numberOfTravelers: z.number().int().min(1).optional(),
   budget: z.string().optional().nullable(),
   message: z.string().optional().nullable(),
-  status: z.string().optional(),
   lifecycleStatus: lifecycleStatusEnum.optional(),
-  financials: financialsSchema.optional(),
   priority: z.string().optional(),
   assignedToId: z.string().uuid().optional().nullable(),
   tags: z.array(z.string()).optional(),
   lostReason: z.string().optional().nullable(),
   statusChangeNotes: z.string().optional().nullable(),
-  optionalFlights: z.array(z.object({
-    origin: z.string().optional(),
-    destination: z.string().optional(),
-    flightType: z.string().optional(),
-    cabinClass: z.string().optional(),
-    departureTime: z.string().optional(),
-    airlinePreference: z.string().optional(),
-    flightBookingId: z.string().optional(),
-    status: z.string().optional(),
-    flightNumber: z.string().optional(),
-    carrier: z.string().optional(),
-    notes: z.string().optional(),
-  }).passthrough()).optional(),
+};
+
+const remarksSchema = z.array(z.object({
+  text: z.string().min(1),
+  date: z.string().optional(), // date-only (YYYY-MM-DD) or full ISO; parsed by the service
+  addedBy: z.string().optional(),
+})).optional();
+
+// ── Schemas ─────────────────────────────────────────────────────
+
+export const createLeadSchema = z.object({
+  ...leadFields,
+  remarks: remarksSchema,
+}).strict();
+
+export const updateLeadSchema = z.object({
+  ...leadFields,
+  remarks: remarksSchema,
+  pricing: pricingSchema.optional(),
+}).strict();
+
+// ── Optional transfer flights (LeadOptionalFlight) ───────────────
+
+export const addOptionalFlightSchema = z.object({
+  flightType: z.enum(['TO_START', 'RETURN_HOME']),
+  origin: z.string().optional().nullable(),
+  destination: z.string().optional().nullable(),
+  date: z.string().optional().nullable(),
+  cabinClass: z.string().optional().nullable(),
+  departureTime: z.string().optional().nullable(),
+  airlinePreference: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  estimatedUnitPrice: z.number().min(0).optional(),
+  actualUnitPrice: z.number().min(0).optional().nullable(),
+  marginType: z.enum(['PERCENTAGE', 'FIXED']).nullable().optional(),
+  marginValue: z.number().min(0).nullable().optional(),
 }).strict();

@@ -1,0 +1,23 @@
+{
+  "name": "@travel-crm/lead-pricing-engine",
+  "version": "1.0.0",
+  "description": "Sell-side pricing engine for leads: per-person scaling, margins, tax, deposit and totals",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@travel-crm/constants": "file:../constants",
+    "@travel-crm/pricing-engine": "file:../pricing-engine"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
+}

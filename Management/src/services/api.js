@@ -249,21 +249,67 @@ export const leadAPI = {
     return api.put(`/leads/${id}`, leadData);
   },
 
-  // Update lead status
+  // Update lifecycle status
   updateLeadStatus: async (id, status) => {
     const api = new ApiService();
-    return api.put(`/leads/${id}`, { status });
+    return api.put(`/leads/${id}`, { lifecycleStatus: status });
+  },
+
+  // Copy the package blueprint into the lead draft (NEW -> DRAFTING)
+  draftLead: async (id) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/draft`);
+  },
+
+  // Snapshot pricing into a versioned billing quotation (-> QUOTED)
+  quoteLead: async (id) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/quote`);
+  },
+
+  // Atomic itinerary + pricing edit (auto-drafts NEW/REVISION leads)
+  updateLeadItinerary: async (id, payload) => {
+    const api = new ApiService();
+    return api.put(`/leads/${id}/itinerary`, payload);
+  },
+
+  // Get pricing row, cost lines and optional flights
+  getPricing: async (id) => {
+    const api = new ApiService();
+    return api.get(`/leads/${id}/pricing`);
   },
 
   // Pricing
-  calculatePricing: async (leadId, financials) => {
+  calculatePricing: async (leadId, payload) => {
     const api = new ApiService();
-    return api.post(`/leads/${leadId}/pricing/calculate`, { financials });
+    return api.post(`/leads/${leadId}/pricing/calculate`, payload);
   },
 
-  applyPricing: async (leadId, financials) => {
+  // Standalone preview for the new-lead dialog (no lead exists yet)
+  previewPricing: async (payload) => {
     const api = new ApiService();
-    return api.post(`/leads/${leadId}/pricing/apply`, { financials });
+    return api.post('/leads/pricing/preview', payload);
+  },
+
+  applyPricing: async (leadId, payload) => {
+    const api = new ApiService();
+    return api.post(`/leads/${leadId}/pricing/apply`, payload);
+  },
+
+  // Optional transfer flights
+  getFlights: async (id) => {
+    const api = new ApiService();
+    return api.get(`/leads/${id}/flights`);
+  },
+
+  addFlight: async (id, flightData) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/flights`, flightData);
+  },
+
+  deleteFlight: async (id, flightId) => {
+    const api = new ApiService();
+    return api.delete(`/leads/${id}/flights/${flightId}`);
   },
 
   // Delete lead

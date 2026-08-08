@@ -1,12 +1,21 @@
-import crypto from 'crypto';
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
-import { validateTransition } from '../services/state-machine.service.js';
-import { computeFinancials } from '../services/pricing.service.js';
+import { createLeadSchema, updateLeadSchema, addOptionalFlightSchema } from '../validators/lead.validator.js';
+import {
+  validateTransition,
+  validateTravelerUpdate,
+  validatePackageUpdate,
+  validateTravelDatesUpdate,
+} from '../services/state-machine.service.js';
+import { computePricing, toLineDescriptor } from '../services/pricing.service.js';
+import { copyPackageToLead, isItineraryPristine, replaceLeadItineraryFromPackage } from '../services/lead-draft.service.js';
+import { handleLeadEvent } from '../services/lead-events.service.js';
+import { applyLeadItinerary, serializeLeadDays } from '../services/lead-itinerary.service.js';
 
-// ─── Auto-assignment helper ────────────────────────────────────────────────────
+const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3006';
+
+// ─── Auto-assignment helper ────────────────────────────────────
 async function autoAssignSalesRep(leadData) {
   const settings = await prisma.settings.findFirst();
   if (!settings || settings.assignmentMode === 'manual') return null;
@@ -23,12 +32,143 @@ async function autoAssignSalesRep(leadData) {
   return null;
 }
 
-// ─── Controllers ───────────────────────────────────────────────────────────────
+// ─── Pricing helpers ───────────────────────────────────────────
+
+/**
+ * Values the state machine gatekeepers need, derived from persisted rows.
+ */
+function gatekeeperInputs(lead, pricing, lines) {
+  const flightActualTotal = (lines || [])
+    .filter((l) => l.flightBookingId)
+    .reduce((sum, l) => sum + (Number(l.actualTotal) || 0), 0);
+  const hotelActualTotal = (lines || [])
+    .filter((l) => l.category === 'accommodation')
+    .reduce((sum, l) => sum + (Number(l.actualTotal) || 0), 0);
+  return {
+    sellSubtotal: Number(pricing?.sellSubtotal) || 0,
+    verifiedPaymentTotal: Number(pricing?.paidAmount) || 0,
+    depositAmount: Number(pricing?.depositAmount) || 0,
+    flightActualTotal,
+    hotelActualTotal,
+  };
+}
+
+async function loadPricingContext(leadId) {
+  return prisma.lead.findUnique({
+    where: { id: leadId },
+    include: {
+      pricing: true,
+      costLines: true,
+      optionalFlights: true,
+      _count: { select: { itineraryDays: true } },
+    },
+  });
+}
+
+/**
+ * Recompute and persist all pricing totals for a lead from its current rows.
+ */
+export async function recomputeLeadPricing(leadId, verifiedPaymentTotal = null) {
+  const lead = await loadPricingContext(leadId);
+  if (!lead) throw new AppError('Lead not found', 404);
+  const pricing = lead.pricing || {};
+  const computed = computePricing({
+    lines: lead.costLines.map(toLineDescriptor),
+    travelers: lead.numberOfTravelers || 1,
+    currency: pricing.currency || 'USD',
+    marginType: pricing.marginType || null,
+    marginValue: Number(pricing.marginValue) || 0,
+    depositType: pricing.depositType || null,
+    depositValue: Number(pricing.depositValue) || 0,
+    discountType: pricing.discountType || 'none',
+    discountValue: Number(pricing.discountValue) || 0,
+    serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
+    verifiedPaymentTotal: (verifiedPaymentTotal ?? Number(pricing.paidAmount)) || 0,
+  });
+  return prisma.leadPricing.update({
+    where: { leadId },
+    data: {
+      estimatedTotal: computed.estimatedTotal,
+      actualTotal: computed.actualTotal,
+      sellSubtotal: computed.sellSubtotal,
+      discountAmount: computed.discountAmount,
+      taxableSubtotal: computed.taxableSubtotal,
+      taxAmount: computed.taxAmount,
+      serviceChargeAmount: computed.serviceChargeAmount,
+      totalAmount: computed.totalAmount,
+      depositAmount: computed.depositAmount,
+      paidAmount: computed.paidAmount,
+      balanceDue: computed.balanceDue,
+      profit: computed.profit,
+    },
+  });
+}
+
+/**
+ * Snapshot the lead's pricing into a versioned billing quotation.
+ */
+export async function snapshotQuotation(leadId) {
+  const lead = await loadPricingContext(leadId);
+  if (!lead) throw new AppError('Lead not found', 404);
+  const pricing = lead.pricing;
+  if (!pricing) throw new AppError('Lead has no pricing yet', 400);
+
+  const computed = computePricing({
+    lines: lead.costLines.map(toLineDescriptor),
+    travelers: lead.numberOfTravelers || 1,
+    currency: pricing.currency || 'USD',
+    marginType: pricing.marginType || null,
+    marginValue: Number(pricing.marginValue) || 0,
+    depositType: pricing.depositType || null,
+    depositValue: Number(pricing.depositValue) || 0,
+    discountType: pricing.discountType || 'none',
+    discountValue: Number(pricing.discountValue) || 0,
+    serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
+    verifiedPaymentTotal: Number(pricing.paidAmount) || 0,
+  });
+
+  const items = computed.lines.map((l) => ({
+    description: l.description,
+    category: l.category,
+    quantity: l.quantity,
+    unitPrice: l.quotedUnitPrice,
+    notes: null,
+  }));
+
+  const res = await fetch(`${BILLING_SERVICE_URL}/api/v1/billing/quotations/from-lead`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-internal-token': process.env.INTERNAL_EVENTS_TOKEN || '',
+    },
+    body: JSON.stringify({
+      leadId: lead.id,
+      packageId: lead.packageId,
+      currency: pricing.currency || 'USD',
+      customer: { name: lead.name, email: lead.email, phone: lead.phone, address: lead.city },
+      items,
+      discountType: pricing.discountType || 'none',
+      discountValue: Number(pricing.discountValue) || 0,
+      serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
+      notes: null,
+      terms: null,
+      paymentTerms: null,
+      includedServices: [],
+      excludedServices: [],
+    }),
+  });
+  if (!res.ok) {
+    throw new AppError('Failed to snapshot quotation in billing-service', 502);
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+// ─── Controllers ───────────────────────────────────────────────
 
 export const createLead = asyncHandler(async (req, res) => {
   const { user } = req;
 
-  // Strip frontend-only fields that aren't in the DB schema or Zod validator
   const {
     package: _pkg, assignedTo: _assignedTo, salesRep: _salesRep,
     customizedPackage: _custPkg, convertedBooking: _booking, createdBy: _createdBy,
@@ -42,16 +182,12 @@ export const createLead = asyncHandler(async (req, res) => {
   }
   const body = { ...parsed.data };
 
-  if (!body.status) body.status = 'new';
-
-  // Sales rep self-assignment
   if (user.role === 'salesRep') {
     body.assignedToId = body.assignedToId || user.id;
     body.assignmentMode = 'manual';
     body.assignedById = user.id;
   }
 
-  // Auto-assign if no explicit assignment provided
   let assignedId = body.assignedToId;
   if (!assignedId && user.role !== 'salesRep') {
     assignedId = await autoAssignSalesRep(body);
@@ -61,8 +197,8 @@ export const createLead = asyncHandler(async (req, res) => {
     }
   }
 
-  const statusForHistory = body.status || 'new';
   const remarksList = body.remarks || [];
+  const lifecycleStatus = body.lifecycleStatus || 'NEW';
 
   const lead = await prisma.lead.create({
     data: {
@@ -83,19 +219,20 @@ export const createLead = asyncHandler(async (req, res) => {
       numberOfTravelers: body.numberOfTravelers,
       budget: body.budget,
       message: body.message,
-      status: statusForHistory,
-      lifecycleStatus: body.lifecycleStatus || 'NEW',
-      financials: body.financials || {},
+      lifecycleStatus,
       priority: body.priority,
       assignedToId: body.assignedToId,
       tags: body.tags || [],
       lostReason: body.lostReason,
-      optionalFlights: body.optionalFlights || [],
       remarks: {
-        create: remarksList.map((r) => ({ text: r.text, date: r.date ? new Date(r.date) : new Date(), addedById: r.addedBy || user.id || null })),
+        create: remarksList.map((r) => ({
+          text: r.text,
+          date: r.date ? new Date(r.date) : new Date(),
+          addedById: r.addedBy || user.id || null,
+        })),
       },
       statusHistory: {
-        create: [{ status: statusForHistory, changedById: user.id, notes: 'Initial status' }],
+        create: [{ status: lifecycleStatus, actor: 'USER', changedById: user.id, notes: 'Initial status' }],
       },
     },
     include: { remarks: true, statusHistory: true },
@@ -110,16 +247,7 @@ export const getLeads = asyncHandler(async (req, res) => {
 
   const where = { AND: [] };
   if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
-
-  if (status) {
-    // Determine if this is a lifecycle status (uppercase) or old status (lowercase)
-    const isLifecycle = status === status.toUpperCase() && status !== status.toLowerCase();
-    if (isLifecycle) {
-      where.AND.push({ lifecycleStatus: status });
-    } else {
-      where.AND.push({ status });
-    }
-  }
+  if (status) where.AND.push({ lifecycleStatus: status });
 
   if (search) {
     where.AND.push({
@@ -136,7 +264,13 @@ export const getLeads = asyncHandler(async (req, res) => {
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const [leads, total] = await Promise.all([
-    prisma.lead.findMany({ where, skip, take: parseInt(limit), orderBy: { [sortBy]: order } }),
+    prisma.lead.findMany({
+      where,
+      skip,
+      take: parseInt(limit),
+      orderBy: { [sortBy]: order },
+      include: { pricing: true },
+    }),
     prisma.lead.count({ where }),
   ]);
 
@@ -146,7 +280,18 @@ export const getLeads = asyncHandler(async (req, res) => {
 export const getLead = asyncHandler(async (req, res) => {
   const lead = await prisma.lead.findUnique({
     where: { id: req.params.id },
-    include: { remarks: { orderBy: { date: 'desc' } }, statusHistory: { orderBy: { changedAt: 'desc' } }, communicationLogs: true },
+    include: {
+      pricing: true,
+      costLines: { orderBy: { orderIndex: 'asc' } },
+      itineraryDays: {
+        orderBy: { dayNumber: 'asc' },
+        include: { places: true, activities: true, transports: true },
+      },
+      optionalFlights: true,
+      remarks: { orderBy: { date: 'desc' } },
+      statusHistory: { orderBy: { changedAt: 'desc' } },
+      communicationLogs: true,
+    },
   });
   if (!lead) throw new AppError(`Lead not found`, 404);
 
@@ -156,18 +301,17 @@ export const getLead = asyncHandler(async (req, res) => {
     throw new AppError('Not authorized to access this lead', 403);
   }
 
-  res.json({ success: true, data: lead });
+  res.json({ success: true, data: { ...lead, itineraryDays: serializeLeadDays(lead) } });
 });
 
 export const updateLead = asyncHandler(async (req, res) => {
-  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
+  const lead = await loadPricingContext(req.params.id);
   if (!lead) throw new AppError('Lead not found', 404);
 
   const { user } = req;
   const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
   if (!canManage && lead.assignedToId !== user.id) throw new AppError('Not authorized to update this lead', 403);
 
-  // Strip frontend-only fields that aren't in the DB schema or Zod validator
   const {
     package: _pkg, assignedTo: _assignedTo, salesRep: _salesRep,
     customizedPackage: _custPkg, convertedBooking: _booking, createdBy: _createdBy,
@@ -181,73 +325,90 @@ export const updateLead = asyncHandler(async (req, res) => {
   }
   const validatedBody = parsed.data;
 
-  // Run state machine validation when lifecycleStatus changes
+  // Traveler count, package and travel dates are locked once quoted — all
+  // three shape the itinerary/pricing the same way, so they share one window.
+  if (validatedBody.numberOfTravelers !== undefined) {
+    validateTravelerUpdate({
+      currentStatus: lead.lifecycleStatus,
+      previousTravelers: lead.numberOfTravelers,
+      nextTravelers: validatedBody.numberOfTravelers,
+    });
+  }
+  if (validatedBody.packageId !== undefined) {
+    validatePackageUpdate({
+      currentStatus: lead.lifecycleStatus,
+      previousPackageId: lead.packageId,
+      nextPackageId: validatedBody.packageId,
+    });
+  }
+  if (validatedBody.travelDate !== undefined || validatedBody.endDate !== undefined) {
+    validateTravelDatesUpdate({
+      currentStatus: lead.lifecycleStatus,
+      previousTravelDate: lead.travelDate,
+      nextTravelDate: validatedBody.travelDate,
+      previousEndDate: lead.endDate,
+      nextEndDate: validatedBody.endDate,
+    });
+  }
+
+  // Package switch: silently refresh the itinerary from the new blueprint
+  // when it's safe to — either the current itinerary is still pristine
+  // (untouched since it was copied from the old package), or there's no
+  // itinerary at all yet (nothing to protect). A customized itinerary is
+  // never overwritten — the lead just points at the new package going forward.
+  const isPackageSwitch = validatedBody.packageId !== undefined && validatedBody.packageId !== lead.packageId;
+  const hasNoItineraryYet = (lead._count?.itineraryDays ?? 0) === 0;
+  const shouldReplaceItinerary = isPackageSwitch && validatedBody.packageId
+    && (isItineraryPristine(lead) || hasNoItineraryYet);
+  if (shouldReplaceItinerary) {
+    await replaceLeadItineraryFromPackage({ leadId: lead.id, packageId: validatedBody.packageId });
+  }
+
+  // State machine + quotation snapshot when lifecycle changes
   let transitionResult = null;
+  let quoteSnapshot = null;
   if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
-    const currentStatus = lead.lifecycleStatus || 'NEW';
-    const mergedFinancials = { ...(lead.financials || {}), ...(validatedBody.financials || {}) };
-    try {
-      transitionResult = validateTransition({
-        currentStatus,
-        nextStatus: validatedBody.lifecycleStatus,
-        financials: mergedFinancials,
-        lostReason: validatedBody.lostReason || lead.lostReason,
-      });
-    } catch (err) {
-      throw new AppError(err.message, 400);
+    transitionResult = validateTransition({
+      currentStatus: lead.lifecycleStatus,
+      nextStatus: validatedBody.lifecycleStatus,
+      pricing: gatekeeperInputs(lead, lead.pricing, lead.costLines),
+      lostReason: validatedBody.lostReason || lead.lostReason,
+    });
+    if (validatedBody.lifecycleStatus === 'QUOTED') {
+      quoteSnapshot = await snapshotQuotation(lead.id);
     }
   }
 
-  // Guardrail: if old status is updated but lifecycleStatus is not, auto-map it
-  const OLD_TO_NEW = {
-    new: 'NEW', contacted: 'NEW', interested: 'DRAFTING',
-    quoted: 'QUOTED', converted: 'APPROVED',
-    lost: 'CLOSED_LOST', not_interested: 'CLOSED_LOST',
-  };
-  if (validatedBody.status && !validatedBody.lifecycleStatus) {
-    const mapped = OLD_TO_NEW[validatedBody.status];
-    if (mapped && mapped !== lead.lifecycleStatus) {
-      validatedBody.lifecycleStatus = mapped;
-    }
-  }
-
-  // Track status change on old status field
   const statusHistoryCreate = [];
-  if (validatedBody.status && validatedBody.status !== lead.status) {
-    statusHistoryCreate.push({ status: validatedBody.status, changedById: user.id, notes: validatedBody.statusChangeNotes || 'Status updated' });
-  }
-  // Track lifecycleStatus change
   if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
-    statusHistoryCreate.push({ status: validatedBody.lifecycleStatus, changedById: user.id, notes: validatedBody.statusChangeNotes || 'Status updated' });
+    statusHistoryCreate.push({
+      status: validatedBody.lifecycleStatus,
+      actor: 'USER',
+      changedById: user.id,
+      notes: validatedBody.statusChangeNotes || 'Status updated',
+    });
   }
 
-  // Auto-recalculate financials on BOOKING_IN_PROGRESS -> CONFIRMED
-  if (transitionResult?.recalculate) {
-    const mergedForRecalc = { ...(lead.financials || {}), ...(validatedBody.financials || {}) };
-    validatedBody.financials = computeFinancials(mergedForRecalc);
-  }
-
-  // Build Prisma-compatible update payload
   const updateData = {};
   const scalarFields = [
     'name', 'email', 'phone', 'whatsapp', 'city', 'source', 'platform',
     'fromCountry', 'destinationCountry', 'destination', 'packageId', 'packageName',
-    'numberOfTravelers', 'budget', 'message', 'status', 'lifecycleStatus',
-    'priority', 'assignedToId', 'tags', 'lostReason', 'optionalFlights',
+    'numberOfTravelers', 'budget', 'message', 'lifecycleStatus',
+    'priority', 'assignedToId', 'tags', 'lostReason',
   ];
   for (const field of scalarFields) {
     if (validatedBody[field] !== undefined) {
       updateData[field] = validatedBody[field];
     }
   }
-  if (validatedBody.financials !== undefined) {
-    updateData.financials = validatedBody.financials;
-  }
   if (validatedBody.travelDate !== undefined) {
     updateData.travelDate = validatedBody.travelDate ? new Date(validatedBody.travelDate) : null;
   }
   if (validatedBody.endDate !== undefined) {
     updateData.endDate = validatedBody.endDate ? new Date(validatedBody.endDate) : null;
+  }
+  if (quoteSnapshot) {
+    updateData.currentQuoteId = quoteSnapshot.id;
   }
 
   const updated = await prisma.lead.update({
@@ -256,8 +417,30 @@ export const updateLead = asyncHandler(async (req, res) => {
       ...updateData,
       ...(statusHistoryCreate.length && { statusHistory: { create: statusHistoryCreate } }),
     },
-    include: { remarks: true, statusHistory: { orderBy: { changedAt: 'desc' } } },
+    include: { pricing: true, remarks: true, statusHistory: { orderBy: { changedAt: 'desc' } } },
   });
+
+  // Persist pricing settings when provided
+  if (validatedBody.pricing && lead.pricing) {
+    await prisma.leadPricing.update({
+      where: { leadId: lead.id },
+      data: {
+        currency: validatedBody.pricing.currency,
+        marginType: validatedBody.pricing.marginType,
+        marginValue: validatedBody.pricing.marginValue,
+        depositType: validatedBody.pricing.depositType,
+        depositValue: validatedBody.pricing.depositValue,
+        discountType: validatedBody.pricing.discountType,
+        discountValue: validatedBody.pricing.discountValue,
+        serviceChargeRate: validatedBody.pricing.serviceChargeRate,
+      },
+    });
+    await recomputeLeadPricing(lead.id);
+  } else if (shouldReplaceItinerary && lead.pricing) {
+    // Cost lines changed even though the client sent no pricing settings —
+    // totals still need to reflect the new package's blueprint.
+    await recomputeLeadPricing(lead.id);
+  }
 
   res.json({ success: true, data: updated });
 });
@@ -267,6 +450,40 @@ export const deleteLead = asyncHandler(async (req, res) => {
   if (!lead) throw new AppError('Lead not found', 404);
   await prisma.lead.delete({ where: { id: req.params.id } });
   res.json({ success: true, data: {} });
+});
+
+export const draftLead = asyncHandler(async (req, res) => {
+  const lead = await prisma.lead.findUnique({
+    where: { id: req.params.id },
+    include: { pricing: true, itineraryDays: true },
+  });
+  if (!lead) throw new AppError('Lead not found', 404);
+  if (!lead.packageId) throw new AppError('Lead has no package selected', 400);
+
+  const transition = validateTransition({
+    currentStatus: lead.lifecycleStatus,
+    nextStatus: 'DRAFTING',
+    pricing: gatekeeperInputs(lead, lead.pricing, lead.costLines || []),
+  });
+
+  await copyPackageToLead({ leadId: lead.id, packageId: lead.packageId });
+
+  const updated = await prisma.lead.update({
+    where: { id: lead.id },
+    data: {
+      lifecycleStatus: transition.nextStatus,
+      statusHistory: {
+        create: [{
+          status: 'DRAFTING',
+          actor: 'USER',
+          changedById: req.user.id,
+          notes: 'Package copied to lead draft',
+        }],
+      },
+    },
+    include: { pricing: true, costLines: true, itineraryDays: true },
+  });
+  res.json({ success: true, data: updated });
 });
 
 export const addRemark = asyncHandler(async (req, res) => {
@@ -323,14 +540,10 @@ export const unassignLead = asyncHandler(async (req, res) => {
 
 export const getLeadsByStatus = asyncHandler(async (req, res) => {
   const status = req.params.status;
-  const isLifecycle = status === status.toUpperCase() && status !== status.toLowerCase();
-  const where = {};
-  if (isLifecycle) {
-    where.lifecycleStatus = status;
-  } else {
-    where.status = status;
-  }
-  const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' } });
+  const leads = await prisma.lead.findMany({
+    where: { lifecycleStatus: status },
+    orderBy: { createdAt: 'desc' },
+  });
   res.json({ success: true, count: leads.length, data: leads });
 });
 
@@ -343,13 +556,9 @@ export const getLeadStats = asyncHandler(async (req, res) => {
   const where = req.user.role === 'salesRep' ? { assignedToId: req.user.id } : {};
   const [byStatus, totals] = await Promise.all([
     prisma.lead.groupBy({ by: ['lifecycleStatus'], _count: true, where }),
-    prisma.lead.aggregate({
-      _count: true,
-      where,
-    }),
+    prisma.lead.aggregate({ _count: true, where }),
   ]);
   const total = totals._count;
-  // Map Prisma groupBy output to frontend-compatible shape
   const mapped = (byStatus || []).map(item => ({
     _id: item.lifecycleStatus,
     count: item._count,
@@ -420,15 +629,177 @@ export const createWebsiteContactLead = asyncHandler(async (req, res) => {
       destinationCountry: destinationCountry?.trim() || null,
       travelDate: travelDate ? new Date(travelDate) : null,
       message: message?.trim() || null,
-      status: 'new',
       lifecycleStatus: 'NEW',
       tags: ['website-contact-form'],
       assignedToId: assignedId || null,
       assignmentMode: assignedId ? 'auto' : 'manual',
       remarks: { create: [{ text: remarkText, date: new Date(), addedById: null }] },
-      statusHistory: { create: [{ status: 'new', changedById: null, notes: 'Created from website contact form' }] },
+      statusHistory: { create: [{ status: 'NEW', actor: 'USER', changedById: null, notes: 'Created from website contact form' }] },
     },
   });
 
   res.status(201).json({ success: true, message: 'Contact form submitted successfully', data: { leadId: lead.id, salesRepId: assignedId || null } });
+});
+
+export const handleInternalEvent = asyncHandler(async (req, res) => {
+  const result = await handleLeadEvent({ event: req.body?.event });
+  res.json({ success: true, data: result });
+});
+
+// ─── Optional transfer flights ─────────────────────────────────
+
+export const listOptionalFlights = asyncHandler(async (req, res) => {
+  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
+  if (!lead) throw new AppError('Lead not found', 404);
+  const flights = await prisma.leadOptionalFlight.findMany({
+    where: { leadId: req.params.id },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json({ success: true, data: flights });
+});
+
+export const addOptionalFlight = asyncHandler(async (req, res) => {
+  const lead = await loadPricingContext(req.params.id);
+  if (!lead) throw new AppError('Lead not found', 404);
+
+  const parsed = addOptionalFlightSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+  const {
+    flightType,
+    origin,
+    destination,
+    date,
+    cabinClass,
+    departureTime,
+    airlinePreference,
+    notes,
+    estimatedUnitPrice = 0,
+    actualUnitPrice,
+    marginType,
+    marginValue,
+  } = parsed.data;
+
+  const quantity = lead.numberOfTravelers || 1;
+  const flight = await prisma.leadOptionalFlight.create({
+    data: {
+      leadId: lead.id,
+      flightType,
+      origin: origin ?? null,
+      destination: destination ?? null,
+      date: date ? new Date(date) : null,
+      cabinClass: cabinClass ?? null,
+      departureTime: departureTime ?? null,
+      airlinePreference: airlinePreference ?? null,
+      notes: notes ?? null,
+      estimatedUnitPrice: Number(estimatedUnitPrice) || 0,
+      actualUnitPrice: actualUnitPrice != null ? Number(actualUnitPrice) : null,
+      quantity,
+      marginType: marginType || null,
+      marginValue: marginValue != null ? Number(marginValue) : null,
+    },
+  });
+
+  await prisma.leadCostLine.create({
+    data: {
+      leadId: lead.id,
+      category: 'transportation',
+      description: `Flight: ${origin || '?'} → ${destination || '?'}`,
+      basis: 'PER_PERSON',
+      quantity,
+      estimatedUnitPrice: Number(estimatedUnitPrice) || 0,
+      actualUnitPrice: actualUnitPrice != null ? Number(actualUnitPrice) : null,
+      marginType: marginType || null,
+      marginValue: marginValue != null ? Number(marginValue) : null,
+      source: 'MANUAL',
+      optionalFlightId: flight.id,
+      orderIndex: (lead.costLines || []).length,
+    },
+  });
+
+  await recomputeLeadPricing(lead.id);
+  res.status(201).json({ success: true, data: flight });
+});
+
+export const deleteOptionalFlight = asyncHandler(async (req, res) => {
+  const { id, flightId } = req.params;
+  const flight = await prisma.leadOptionalFlight.findUnique({ where: { id: flightId } });
+  if (!flight || flight.leadId !== id) throw new AppError('Flight not found', 404);
+
+  await prisma.$transaction([
+    prisma.leadCostLine.deleteMany({ where: { leadId: id, optionalFlightId: flightId } }),
+    prisma.leadOptionalFlight.delete({ where: { id: flightId } }),
+  ]);
+  await recomputeLeadPricing(id);
+  res.json({ success: true, data: {} });
+});
+
+// ─── Quote handoff ─────────────────────────────────────────────
+
+export const quoteLead = asyncHandler(async (req, res) => {
+  const lead = await loadPricingContext(req.params.id);
+  if (!lead) throw new AppError('Lead not found', 404);
+
+  validateTransition({
+    currentStatus: lead.lifecycleStatus,
+    nextStatus: 'QUOTED',
+    pricing: gatekeeperInputs(lead, lead.pricing, lead.costLines),
+  });
+
+  const quotation = await snapshotQuotation(lead.id);
+  const updated = await prisma.lead.update({
+    where: { id: lead.id },
+    data: {
+      lifecycleStatus: 'QUOTED',
+      currentQuoteId: quotation.id,
+      statusHistory: {
+        create: [{
+          status: 'QUOTED',
+          actor: 'USER',
+          changedById: req.user.id,
+          notes: 'Quotation snapshot sent to billing',
+        }],
+      },
+    },
+    include: { pricing: true },
+  });
+  res.json({ success: true, data: updated });
+});
+
+/**
+ * PUT /api/v1/leads/:id/itinerary — atomic lead itinerary + pricing edit.
+ * Auto-copies the package and moves NEW/REVISION leads to DRAFTING.
+ */
+export const updateLeadItinerary = asyncHandler(async (req, res) => {
+  const { days, pricing } = req.body;
+  if (!Array.isArray(days)) throw new AppError('days array is required', 400);
+
+  const result = await applyLeadItinerary({
+    leadId: req.params.id,
+    days,
+    pricingSettings: pricing || {},
+    actorId: req.user.id,
+  });
+
+  const lead = await prisma.lead.findUnique({
+    where: { id: req.params.id },
+    include: {
+      pricing: true,
+      costLines: { orderBy: { orderIndex: 'asc' } },
+      itineraryDays: {
+        orderBy: { dayNumber: 'asc' },
+        include: { places: true, activities: true, transports: true },
+      },
+    },
+  });
+
+  res.json({
+    success: true,
+    data: {
+      ...result,
+      lead: { ...lead, itineraryDays: serializeLeadDays(lead) },
+    },
+  });
 });

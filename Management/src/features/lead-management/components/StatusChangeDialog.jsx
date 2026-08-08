@@ -15,30 +15,25 @@ const ALLOWED_TRANSITIONS = {
   CANCELLED:          [],
 };
 
-function getGatekeeperReason(status, financials = {}) {
-  const cp = financials?.clientPricing || {};
-  const act = financials?.actual || {};
-
-  if (status === 'QUOTED' || status === 'APPROVED') {
-    if (!cp.quotedSellingPrice || cp.quotedSellingPrice <= 0) {
-      return status === 'QUOTED'
-        ? 'Requires quoted selling price > 0'
-        : null;
+function getGatekeeperReason(status, pricing = {}) {
+  if (status === 'QUOTED') {
+    if (!pricing.sellSubtotal || Number(pricing.sellSubtotal) <= 0) {
+      return 'Requires sell subtotal > 0';
     }
   }
 
   if (status === 'APPROVED') {
-    if (!cp.depositPaid || cp.depositPaid <= 0) {
-      return 'Requires deposit paid > 0';
+    if (!pricing.paidAmount || Number(pricing.paidAmount) <= 0) {
+      return 'Requires a verified payment covering the deposit';
+    }
+    if (Number(pricing.paidAmount) < Number(pricing.depositAmount || 0)) {
+      return 'Verified payment must cover the deposit plan';
     }
   }
 
   if (status === 'CONFIRMED') {
-    if (!act.actualFlightCost || act.actualFlightCost <= 0) {
-      return 'Requires actual flight cost > 0';
-    }
-    if (!act.actualHotelCost || act.actualHotelCost <= 0) {
-      return 'Requires actual hotel cost > 0';
+    if (pricing.actualTotal == null || Number(pricing.actualTotal) <= 0) {
+      return 'Requires flight and hotel actuals > 0';
     }
   }
 
@@ -57,9 +52,9 @@ const StatusChangeDialog = ({
 
   if (!isOpen || !lead) return null;
 
-  const currentStatus = lead.lifecycleStatus || lead.status?.toUpperCase() || 'NEW';
+  const currentStatus = lead.lifecycleStatus || 'NEW';
   const allowedStatuses = ALLOWED_TRANSITIONS[currentStatus] || [];
-  const financials = lead.financials || {};
+  const pricing = lead.pricing || {};
 
   const handleChange = (status) => {
     if (status === 'CLOSED_LOST' && !lostReason.trim()) return;
@@ -128,7 +123,7 @@ const StatusChangeDialog = ({
             const isCurrent = currentStatus === status;
             const label = LIFECYCLE_STATUS_LABELS[status] || status;
             const info = LIFECYCLE_STATUS_INFO[status] || '';
-            const gatekeeper = getGatekeeperReason(status, financials);
+            const gatekeeper = getGatekeeperReason(status, pricing);
             const disabled = !!gatekeeper || isCurrent;
 
             return (

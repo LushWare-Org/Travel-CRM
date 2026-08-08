@@ -6,6 +6,14 @@ import { z } from 'zod';
 
 const iataCode = z.string().length(3, 'Must be 3-letter IATA code').regex(/^[A-Z]{3}$/, 'Must be uppercase IATA code');
 
+// Looser than z.string().uuid(): accepts any UUID-shaped string rather than
+// enforcing RFC 4122 v1-5 version/variant nibbles. Seed data hand-crafts
+// readable IDs (e.g. d0000000-0000-0000-0000-00000000000c) that are valid
+// Prisma primary keys — Prisma stores id/foreign-key columns as plain
+// strings with no format constraint — but fail the strict v1-5 check.
+const UUID_SHAPE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const crossServiceId = (message = 'Invalid ID') => z.string().regex(UUID_SHAPE_RE, message);
+
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD');
 
 const cabinClass = z.enum(['Economy', 'Premium Economy', 'Business', 'First']);
@@ -78,26 +86,26 @@ export const listBookingsQuerySchema = z.object({
 
 /** Route params with UUID */
 export const bookingIdParamSchema = z.object({
-  id: z.string().uuid('Invalid booking ID'),
+  id: crossServiceId('Invalid booking ID'),
 });
 
 /** Route params — leadId */
 export const leadIdParamSchema = z.object({
-  leadId: z.string().uuid('Invalid lead ID'),
+  leadId: crossServiceId('Invalid lead ID'),
 });
 
 /** POST /flights/book-for-lead — same as book but with lead context */
 export const leadBookSchema = bookSchema.extend({
-  leadId: z.string().uuid().optional(),
-  packageId: z.string().uuid().optional(),
-  customizedPackageId: z.string().uuid().optional(),
+  leadId: crossServiceId().optional(),
+  packageId: crossServiceId().optional(),
+  customizedPackageId: crossServiceId().optional(),
   dayNumber: z.coerce.number().int().positive().optional(),
   flightType: z.enum(['itinerary', 'optional']).default('itinerary'),
 });
 
 /** PATCH /flights/bookings/:id/link-day */
 export const linkDaySchema = z.object({
-  leadId: z.string().uuid().optional(),
+  leadId: crossServiceId().optional(),
   dayNumber: z.coerce.number().int().positive().optional(),
   flightType: z.enum(['itinerary', 'optional']).optional(),
 });
