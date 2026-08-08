@@ -56,7 +56,12 @@ function gatekeeperInputs(lead, pricing, lines) {
 async function loadPricingContext(leadId) {
   return prisma.lead.findUnique({
     where: { id: leadId },
-    include: { pricing: true, costLines: true, optionalFlights: true },
+    include: {
+      pricing: true,
+      costLines: true,
+      optionalFlights: true,
+      _count: { select: { itineraryDays: true } },
+    },
   });
 }
 
@@ -347,11 +352,14 @@ export const updateLead = asyncHandler(async (req, res) => {
   }
 
   // Package switch: silently refresh the itinerary from the new blueprint
-  // only if the lead's current itinerary is still pristine (untouched since
-  // it was copied from the old package). A customized itinerary is never
-  // overwritten — the lead just points at the new package going forward.
+  // when it's safe to — either the current itinerary is still pristine
+  // (untouched since it was copied from the old package), or there's no
+  // itinerary at all yet (nothing to protect). A customized itinerary is
+  // never overwritten — the lead just points at the new package going forward.
   const isPackageSwitch = validatedBody.packageId !== undefined && validatedBody.packageId !== lead.packageId;
-  const shouldReplaceItinerary = isPackageSwitch && validatedBody.packageId && isItineraryPristine(lead);
+  const hasNoItineraryYet = (lead._count?.itineraryDays ?? 0) === 0;
+  const shouldReplaceItinerary = isPackageSwitch && validatedBody.packageId
+    && (isItineraryPristine(lead) || hasNoItineraryYet);
   if (shouldReplaceItinerary) {
     await replaceLeadItineraryFromPackage({ leadId: lead.id, packageId: validatedBody.packageId });
   }

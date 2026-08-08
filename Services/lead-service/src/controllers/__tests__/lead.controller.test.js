@@ -67,6 +67,7 @@ const leadFixture = (overrides = {}) => ({
   lostReason: null,
   pricing: { id: 'pricing-1', marginType: null, marginValue: 0 },
   costLines: [],
+  _count: { itineraryDays: 1 },
   ...overrides,
 });
 
@@ -124,6 +125,32 @@ describe('updateLead — package switching', () => {
     expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ packageId: PKG_B }),
     }));
+  });
+
+  it('populates the itinerary from the package when the lead has none yet, even without a matching sourcePackageId', async () => {
+    const lead = leadFixture({ packageId: null, sourcePackageId: null, _count: { itineraryDays: 0 } });
+    mockLeadFindUnique.mockResolvedValue(lead);
+    mockIsItineraryPristine.mockReturnValue(false);
+
+    const { req, res, next } = buildReqRes({ body: { packageId: PKG_A } });
+
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockReplaceLeadItineraryFromPackage).toHaveBeenCalledWith({ leadId: 'lead-1', packageId: PKG_A });
+  });
+
+  it('does not populate the itinerary from an empty lead when the packageId is unchanged', async () => {
+    const lead = leadFixture({ packageId: PKG_A, sourcePackageId: null, _count: { itineraryDays: 0 } });
+    mockLeadFindUnique.mockResolvedValue(lead);
+    mockIsItineraryPristine.mockReturnValue(false);
+
+    const { req, res, next } = buildReqRes({ body: { packageId: PKG_A } });
+
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockReplaceLeadItineraryFromPackage).not.toHaveBeenCalled();
   });
 
   it('does not call isItineraryPristine or replace when packageId is unchanged', async () => {
