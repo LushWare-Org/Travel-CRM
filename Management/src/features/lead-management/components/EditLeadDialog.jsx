@@ -276,10 +276,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const isItineraryPristine = () =>
     Boolean(sourcePackageIdRef.current) && sourcePackageIdRef.current === formData.package;
 
+  // Safe to silently populate the itinerary from the new package's blueprint:
+  // either it's untouched since it was copied from the old package (pristine),
+  // or there's no itinerary at all yet — nothing to protect either way. A
+  // customized itinerary is the only case that's left alone.
+  const isItinerarySafeToReplace = () =>
+    isItineraryPristine() || itineraryDays.length === 0;
+
   const handlePackageChange = async (packageId) => {
     if (isLocked) return;
     const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-    const pristineBeforeSwitch = isItineraryPristine();
+    const safeToReplaceBeforeSwitch = isItinerarySafeToReplace();
 
     setFormData(prev => ({
       ...prev,
@@ -296,7 +303,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     try {
       const response = await packageAPI.getById(packageId);
       const pkg = response.data?.data || response.data;
-      if (pristineBeforeSwitch) {
+      if (safeToReplaceBeforeSwitch) {
         // Backend will silently replace the itinerary with this package's
         // blueprint on save — preview that outcome.
         setItineraryDays(toEditorDays(pkg?.itineraryDays || []));

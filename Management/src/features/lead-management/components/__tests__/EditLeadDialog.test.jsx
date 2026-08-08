@@ -401,6 +401,45 @@ describe('EditLeadDialog — package switching (customized itinerary)', () => {
   });
 });
 
+describe('EditLeadDialog — package switching (no itinerary yet)', () => {
+  beforeEach(() => {
+    // No package attached, no itinerary rows at all — nothing to protect,
+    // so selecting a package should populate it immediately, the same as a
+    // pristine switch, even though there's no sourcePackageId to match against.
+    mockGetLead.mockResolvedValue({ data: freshLeadFixture({ sourcePackageId: null, itineraryDays: [] }) });
+  });
+
+  it('loads the selected package blueprint into the itinerary preview', async () => {
+    const user = userEvent.setup();
+    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
+
+    const select = await screen.findByLabelText('Package');
+    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('0'));
+
+    await user.selectOptions(select, PKG_A);
+
+    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_A));
+    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('2'));
+  });
+
+  it('sends the new packageId on save (backend populates the itinerary server-side)', async () => {
+    const user = userEvent.setup();
+    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
+
+    const select = await screen.findByLabelText('Package');
+    await waitFor(() => expect(select).toHaveValue(''));
+    await user.selectOptions(select, PKG_A);
+    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('2'));
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+      packageId: PKG_A,
+      packageName: 'Sri Lanka Explorer',
+    })));
+  });
+});
+
 describe('EditLeadDialog — cancel discards unsaved changes', () => {
   it('calls onClose without saving anything', async () => {
     const user = userEvent.setup();
