@@ -187,6 +187,10 @@ model Lead {
   convertedBookingId String? // → bookings.Booking.id
   currentItineraryId String? // → packages.Itinerary.id (editor ref)
   packageName        String? // denormalised snapshot for display
+  // packageId this lead's itineraryDays/costLines were last generated from,
+  // verbatim (no manual edits since). Null once the itinerary is customized.
+  // Used to decide whether switching packages can safely replace the itinerary.
+  sourcePackageId    String?
   leadDateTime       DateTime @default(now())
   numberOfTravelers  Int?
   budget             String?
