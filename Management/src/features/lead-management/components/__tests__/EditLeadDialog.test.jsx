@@ -63,6 +63,7 @@ vi.mock('../PricingSection', () => ({
       <span data-testid="pricing-discount-type">{String(pricing?.discountType)}</span>
       <span data-testid="pricing-discount-value">{String(pricing?.discountValue)}</span>
       <span data-testid="pricing-days-count">{days?.length ?? 0}</span>
+      <span data-testid="pricing-first-flight-transport-cost">{String(days?.[0]?.transports?.find(t => t.transportMode === 'FLIGHT')?.unitCost ?? '')}</span>
       <button type="button" onClick={() => onSettingsChange({ ...pricing, marginValue: 99 })}>
         Change margin
       </button>
@@ -169,6 +170,64 @@ describe('EditLeadDialog — load behavior', () => {
   it('loads the lead persisted itinerary days into the pricing preview', async () => {
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1'));
+  });
+});
+
+describe('EditLeadDialog — day-linked flight cost reconciliation', () => {
+  it('reconciles a priced day flight into a FLIGHT transport row for the pricing preview', async () => {
+    mockGetLead.mockResolvedValue({
+      data: freshLeadFixture({
+        itineraryDays: [{
+          dayNumber: 1,
+          title: 'Day 1',
+          places: [],
+          activities: [],
+          transports: [],
+          flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB', totalAmount: 150 }],
+        }],
+      }),
+    });
+    renderDialog();
+
+    await waitFor(() => expect(screen.getByTestId('pricing-first-flight-transport-cost')).toHaveTextContent('150'));
+  });
+
+  it('shows no flight transport cost when the day has no flight set', async () => {
+    renderDialog();
+    await screen.findByLabelText('Package');
+    expect(screen.getByTestId('pricing-first-flight-transport-cost')).toHaveTextContent('');
+  });
+
+  it('sends the reconciled transport in the itinerary save payload', async () => {
+    mockGetLead.mockResolvedValue({
+      data: freshLeadFixture({
+        itineraryDays: [{
+          dayNumber: 1,
+          title: 'Day 1',
+          places: [],
+          activities: [],
+          transports: [],
+          flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB', totalAmount: 150 }],
+        }],
+      }),
+    });
+    const user = userEvent.setup();
+    renderDialog();
+
+    await screen.findByLabelText('Package');
+    // Mark the itinerary dirty via the pricing settings change, then save.
+    await user.click(screen.getByRole('button', { name: /change margin/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+      days: expect.arrayContaining([
+        expect.objectContaining({
+          transports: expect.arrayContaining([
+            expect.objectContaining({ transportMode: 'FLIGHT', unitCost: 150 }),
+          ]),
+        }),
+      ]),
+    })));
   });
 });
 

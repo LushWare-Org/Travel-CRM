@@ -12,6 +12,7 @@ import LocationAutocomplete from './LocationAutocomplete';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import DestinationSelector from '../../itinerary/components/DestinationSelector';
 import { createDefaultDay } from '../../itinerary/types/index.js';
+import { reconcileFlightsForSave } from '../../itinerary/utils/flightSync';
 import LeadFlightBookingsSection from './LeadFlightBookingsSection';
 import LeadStatusBadge from './LeadStatusBadge';
 import PricingSection from './PricingSection';
@@ -134,6 +135,16 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const sourcePackageIdRef = useRef(null);
 
   const isLocked = isLeadFieldLocked(lead?.lifecycleStatus);
+
+  // Day-linked flight preferences live in day.flights[] but only day.transports[]
+  // feeds cost lines — reconcile flights into a priced transport row (real price
+  // wins when set, else the existing manual transport cost is preserved) before
+  // this reaches pricing calculation or persistence. Same transform the package
+  // editor already applies at save time (Management/src/features/itinerary/services/apiService.js).
+  const reconciledItineraryDays = itineraryDays.map(day => ({
+    ...day,
+    transports: reconcileFlightsForSave({ flights: day.flights || [], transports: day.transports || [] }),
+  }));
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -321,7 +332,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       if (itineraryDirty) {
         try {
           await leadAPI.updateLeadItinerary(leadId, {
-            days: itineraryDays,
+            days: reconciledItineraryDays,
             pricing: pricingSettings,
           });
         } catch (itineraryError) {
@@ -931,7 +942,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing</h3>
                 <PricingSection
                   leadId={lead._id || lead.id}
-                  days={itineraryDays}
+                  days={reconciledItineraryDays}
                   travelers={formData.numberOfTravelers || 1}
                   pricing={pricingSettings}
                   onSettingsChange={(settings) => {
