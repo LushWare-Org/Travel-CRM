@@ -5,9 +5,11 @@ import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator
 import {
   validateTransition,
   validateTravelerUpdate,
+  validatePackageUpdate,
+  validateTravelDatesUpdate,
 } from '../services/state-machine.service.js';
 import { computePricing, toLineDescriptor } from '../services/pricing.service.js';
-import { copyPackageToLead } from '../services/lead-draft.service.js';
+import { copyPackageToLead, isItineraryPristine, replaceLeadItineraryFromPackage } from '../services/lead-draft.service.js';
 import { handleLeadEvent } from '../services/lead-events.service.js';
 import { applyLeadItinerary, serializeLeadDays } from '../services/lead-itinerary.service.js';
 
@@ -318,13 +320,40 @@ export const updateLead = asyncHandler(async (req, res) => {
   }
   const validatedBody = parsed.data;
 
-  // Traveler count is locked once quoted
+  // Traveler count, package and travel dates are locked once quoted — all
+  // three shape the itinerary/pricing the same way, so they share one window.
   if (validatedBody.numberOfTravelers !== undefined) {
     validateTravelerUpdate({
       currentStatus: lead.lifecycleStatus,
       previousTravelers: lead.numberOfTravelers,
       nextTravelers: validatedBody.numberOfTravelers,
     });
+  }
+  if (validatedBody.packageId !== undefined) {
+    validatePackageUpdate({
+      currentStatus: lead.lifecycleStatus,
+      previousPackageId: lead.packageId,
+      nextPackageId: validatedBody.packageId,
+    });
+  }
+  if (validatedBody.travelDate !== undefined || validatedBody.endDate !== undefined) {
+    validateTravelDatesUpdate({
+      currentStatus: lead.lifecycleStatus,
+      previousTravelDate: lead.travelDate,
+      nextTravelDate: validatedBody.travelDate,
+      previousEndDate: lead.endDate,
+      nextEndDate: validatedBody.endDate,
+    });
+  }
+
+  // Package switch: silently refresh the itinerary from the new blueprint
+  // only if the lead's current itinerary is still pristine (untouched since
+  // it was copied from the old package). A customized itinerary is never
+  // overwritten — the lead just points at the new package going forward.
+  const isPackageSwitch = validatedBody.packageId !== undefined && validatedBody.packageId !== lead.packageId;
+  const shouldReplaceItinerary = isPackageSwitch && validatedBody.packageId && isItineraryPristine(lead);
+  if (shouldReplaceItinerary) {
+    await replaceLeadItineraryFromPackage({ leadId: lead.id, packageId: validatedBody.packageId });
   }
 
   // State machine + quotation snapshot when lifecycle changes
@@ -398,6 +427,10 @@ export const updateLead = asyncHandler(async (req, res) => {
         serviceChargeRate: validatedBody.pricing.serviceChargeRate,
       },
     });
+    await recomputeLeadPricing(lead.id);
+  } else if (shouldReplaceItinerary && lead.pricing) {
+    // Cost lines changed even though the client sent no pricing settings —
+    // totals still need to reflect the new package's blueprint.
     await recomputeLeadPricing(lead.id);
   }
 
