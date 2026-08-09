@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+const MANUAL_ITINERARY_VALUE = '__manual__';
 
 const {
   mockGetLead,
@@ -42,7 +44,12 @@ vi.mock('../LocationAutocomplete', () => ({
 }));
 
 vi.mock('../../../itinerary/components/ItineraryEditor', () => ({
-  default: () => <div data-testid="itinerary-editor" />,
+  default: ({ days, onAddDay }) => (
+    <div data-testid="itinerary-editor">
+      <span data-testid="itinerary-days-count">{days?.length ?? 0}</span>
+      <button type="button" onClick={onAddDay}>Add Day</button>
+    </div>
+  ),
 }));
 
 vi.mock('../../../itinerary/components/DestinationSelector', () => ({
@@ -581,6 +588,88 @@ describe('EditLeadDialog — save behavior', () => {
 
     await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalled());
     expect(mockUpdateLead).not.toHaveBeenCalled();
+  });
+});
+
+describe('EditLeadDialog — manual itinerary option', () => {
+  it('offers "Manual Itinerary (No Package)" as an option in the Package select', async () => {
+    renderDialog();
+    const select = await screen.findByLabelText('Package');
+    expect(within(select).getByRole('option', { name: /manual itinerary \(no package\)/i })).toBeInTheDocument();
+  });
+
+  it('preserves the existing days and marks the form dirty when Manual Itinerary is selected', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const select = await screen.findByLabelText('Package');
+    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1'));
+
+    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
+
+    expect(select).toHaveValue(MANUAL_ITINERARY_VALUE);
+    expect(screen.getByTestId('itinerary-editor')).toBeInTheDocument();
+    expect(screen.getByTestId('itinerary-days-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1');
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalled());
+    expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+      isManualItinerary: true, packageId: null, packageName: null,
+    }));
+  });
+
+  it('seeds a single blank day when Manual Itinerary is selected with no itinerary yet', async () => {
+    mockGetLead.mockResolvedValue({ data: freshLeadFixture({ itineraryDays: [] }) });
+    const user = userEvent.setup();
+    renderDialog();
+
+    const select = await screen.findByLabelText('Package');
+    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('0'));
+
+    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
+
+    expect(screen.getByTestId('itinerary-days-count')).toHaveTextContent('1');
+  });
+
+  it('silently loads the package blueprint when switching from an empty manual draft to a real package', async () => {
+    mockGetLead.mockResolvedValue({ data: freshLeadFixture({ itineraryDays: [] }) });
+    const user = userEvent.setup();
+    renderDialog();
+
+    const select = await screen.findByLabelText('Package');
+    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('0'));
+
+    await user.selectOptions(select, PKG_A);
+
+    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_A));
+    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('2'));
+  });
+
+  it('preserves hand-built manual days when a real package is selected afterward', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const select = await screen.findByLabelText('Package');
+    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
+    expect(screen.getByTestId('itinerary-days-count')).toHaveTextContent('1');
+
+    await user.selectOptions(select, PKG_B);
+
+    expect(select).toHaveValue(PKG_B);
+    // Non-empty manual itinerary is never silently overwritten by a package pick.
+    expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1');
+  });
+
+  it('sends isManualItinerary: false on a plain save with no toggle interaction', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await screen.findByLabelText('Package');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({ isManualItinerary: false })));
   });
 });
 
