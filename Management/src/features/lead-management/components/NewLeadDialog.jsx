@@ -16,6 +16,13 @@ import CountrySelect from '../../../components/CountrySelect';
 import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
 import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
 import PricingSection from './PricingSection';
+import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
+import { createDefaultDay } from '../../itinerary/types/index.js';
+import { reconcileFlightsForSave } from '../../itinerary/utils/flightSync';
+
+// A lead has one package or a manual (from-scratch) itinerary, never both —
+// this sentinel is a third option inside the Package select itself.
+const MANUAL_ITINERARY_VALUE = '__manual__';
 
 // ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
 
@@ -91,6 +98,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     endDate: "",
     package: "",
     packageName: "",
+    isManualItinerary: false,
     // Flight preference objects from template modal
     inboundFlightPrefs: null,
     outboundFlightPrefs: null,
@@ -167,6 +175,45 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     }));
   };
 
+  const handlePackageSelect = async (value) => {
+    if (value === MANUAL_ITINERARY_VALUE) {
+      setFormData(prev => ({
+        ...prev,
+        package: '',
+        packageName: '',
+        isManualItinerary: true,
+      }));
+      setItineraryDays(prev => (prev && prev.length > 0 ? prev : [createDefaultDay(1)]));
+      return;
+    }
+
+    const packageId = value;
+    const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
+    setFormData(prev => ({
+      ...prev,
+      package: packageId,
+      packageName: selectedPackage?.title || selectedPackage?.name || '',
+      destination: selectedPackage?.destination || prev.destination,
+      isManualItinerary: false,
+    }));
+
+    // Load the blueprint days for the live pricing preview
+    if (packageId && selectedPackage) {
+      try {
+        const response = await packageAPI.getById(packageId);
+        if (response.success || response.status === 'success') {
+          const pkg = response.data?.data || response.data;
+          setItineraryDays(Array.isArray(pkg?.itineraryDays) ? pkg.itineraryDays : []);
+        }
+      } catch (err) {
+        console.error('Error loading package itinerary:', err);
+        setItineraryDays([]);
+      }
+    } else {
+      setItineraryDays([]);
+    }
+  };
+
   const handleSubmit = async (lifecycleStatus = 'NEW') => {
     try {
       setIsSubmitting(true);
@@ -188,6 +235,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         endDate: formData.endDate || undefined,
         packageId: formData.package || undefined,
         packageName: formData.packageName || undefined,
+        isManualItinerary: formData.isManualItinerary,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
         remarks: formData.remarks.filter((r) => r.text.trim() !== "").map(r => ({
           text: r.text.trim(),
@@ -221,6 +269,19 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
             toast.error('Lead created, but some flight preferences failed to save');
           }
         }
+
+        if (formData.isManualItinerary && itineraryDays.length > 0) {
+          const reconciledDays = itineraryDays.map(day => ({
+            ...day,
+            transports: reconcileFlightsForSave({ flights: day.flights || [], transports: day.transports || [] }),
+          }));
+          try {
+            await leadAPI.updateLeadItinerary(leadId, { days: reconciledDays, pricing: {} });
+          } catch (itineraryError) {
+            console.error('Error saving custom itinerary:', itineraryError);
+            toast.error('Lead created, but the custom itinerary failed to save');
+          }
+        }
       }
 
       setFormData({
@@ -238,6 +299,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         endDate: "",
         package: "",
         packageName: "",
+        isManualItinerary: false,
         inboundFlightPrefs: null,
         outboundFlightPrefs: null,
         remarks: [{ text: "", date: "" }],
@@ -466,37 +528,14 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
                 <InputField label="Package" icon={Package}>
                   <select
-                    value={formData.package || ''}
-                    onChange={async (e) => {
-                      const packageId = e.target.value;
-                      const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-                      setFormData({
-                        ...formData,
-                        package: packageId,
-                        packageName: selectedPackage?.title || selectedPackage?.name || '',
-                        destination: selectedPackage?.destination || formData.destination
-                      });
-
-                      // Load the blueprint days for the live pricing preview
-                      if (packageId && selectedPackage) {
-                        try {
-                          const response = await packageAPI.getById(packageId);
-                          if (response.success || response.status === 'success') {
-                            const pkg = response.data?.data || response.data;
-                            setItineraryDays(Array.isArray(pkg?.itineraryDays) ? pkg.itineraryDays : []);
-                          }
-                        } catch (err) {
-                          console.error('Error loading package itinerary:', err);
-                          setItineraryDays([]);
-                        }
-                      } else {
-                        setItineraryDays([]);
-                      }
-                    }}
+                    aria-label="Package"
+                    value={formData.isManualItinerary ? MANUAL_ITINERARY_VALUE : (formData.package || '')}
+                    onChange={(e) => handlePackageSelect(e.target.value)}
                     disabled={loadingPackages}
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
+                    <option value={MANUAL_ITINERARY_VALUE}>Manual Itinerary (No Package)</option>
                     {packages && packages.length > 0 ? (
                       packages.map((pkg) => (
                         <option key={pkg._id || pkg.id} value={pkg._id || pkg.id}>
@@ -534,6 +573,42 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     />
                   )}
                 </InputField>
+              </div>
+            )}
+
+            {expandedSections.package && formData.isManualItinerary && (
+              <div className="p-4 bg-white rounded-2xl border border-emerald-200">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  Custom Itinerary
+                  <span className="text-xs font-normal text-gray-400">
+                    ({itineraryDays.length || 0} day{itineraryDays.length === 1 ? '' : 's'})
+                  </span>
+                </h4>
+                <ItineraryEditor
+                  days={itineraryDays}
+                  onDayChange={(dayNumber, dayData) => {
+                    setItineraryDays(prev =>
+                      (prev || []).filter(Boolean).map(day =>
+                        day.dayNumber === dayNumber ? { ...day, ...dayData } : day
+                      )
+                    );
+                  }}
+                  onAddDay={() => {
+                    const newDayNumber = itineraryDays.length + 1;
+                    setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
+                  }}
+                  onRemoveDay={(dayNumber) => {
+                    const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
+                    const renumberedDays = filteredDays.map((day, index) => ({
+                      ...day,
+                      dayNumber: index + 1,
+                    }));
+                    setItineraryDays(renumberedDays);
+                  }}
+                  destination={formData.destination}
+                  hideTitleAndDescription={true}
+                />
               </div>
             )}
           </div>
@@ -680,8 +755,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           }}
         />
 
-        {/* Pricing preview — live price for the selected package */}
-        {formData.package && (
+        {/* Pricing preview — live price for the selected package or manual itinerary */}
+        {(formData.package || formData.isManualItinerary) && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing Preview</h3>
             <PricingSection

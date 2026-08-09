@@ -20,6 +20,10 @@ import { toEditorDays } from '../utils/toEditorDays';
 import { isLeadFieldLocked } from '../utils/leadLocks';
 import { carryPricingSettingsAcrossPackageSwitch } from '../utils/pricingSettings';
 
+// A lead has one package or a manual (from-scratch) itinerary, never both —
+// this sentinel is a third option inside the Package select itself.
+const MANUAL_ITINERARY_VALUE = '__manual__';
+
 // ── Module-level components (prevents remounting on re-render) ──
 
 function EditInputField({ label, required, icon: Icon, locked, children }) {
@@ -92,6 +96,7 @@ const emptyFormData = {
   endDate: "",
   package: "",
   packageName: "",
+  isManualItinerary: false,
   lifecycleStatus: "NEW",
 };
 
@@ -212,6 +217,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       endDate: lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
       package: packageId,
       packageName,
+      isManualItinerary: Boolean(lead.isManualItinerary),
       lifecycleStatus: lead.lifecycleStatus || 'NEW',
     };
     setFormData(nextFormData);
@@ -240,9 +246,14 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       };
       setPricingSettings(nextPricingSettings);
 
+      const isManualItinerary = Boolean(freshLead?.isManualItinerary);
       let nextItineraryDays = [];
       if (Array.isArray(freshLead?.itineraryDays) && freshLead.itineraryDays.length > 0) {
         nextItineraryDays = toEditorDays(freshLead.itineraryDays);
+      } else if (isManualItinerary) {
+        // Manual mode with no persisted days yet — give the rep a blank
+        // starting day instead of leaving the editor empty.
+        nextItineraryDays = [createDefaultDay(1)];
       } else if (packageId && freshLead?.lifecycleStatus === 'NEW') {
         const pkgRes = await packageAPI.getById(packageId);
         const pkg = pkgRes.data?.data || pkgRes.data;
@@ -250,8 +261,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       }
       setItineraryDays(nextItineraryDays);
 
+      const resolvedFormData = { ...nextFormData, isManualItinerary };
+      setFormData(resolvedFormData);
+
       snapshotRef.current = {
-        formData: nextFormData,
+        formData: resolvedFormData,
         remarks: lead.remarks || [],
         pricingSettings: nextPricingSettings,
         itineraryDays: nextItineraryDays,
@@ -287,8 +301,24 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const isItinerarySafeToReplace = () =>
     isItineraryPristine() || itineraryDays.length === 0;
 
-  const handlePackageChange = async (packageId) => {
+  const handlePackageChange = async (value) => {
     if (isLocked) return;
+
+    if (value === MANUAL_ITINERARY_VALUE) {
+      setFormData(prev => ({
+        ...prev,
+        package: '',
+        packageName: '',
+        isManualItinerary: true,
+      }));
+      setPricingSettings(prev => carryPricingSettingsAcrossPackageSwitch(prev));
+      setItineraryDays(prev => (prev && prev.length > 0 ? prev : [createDefaultDay(1)]));
+      setItineraryDirty(true);
+      setShowItineraryEditor(true);
+      return;
+    }
+
+    const packageId = value;
     const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
     const safeToReplaceBeforeSwitch = isItinerarySafeToReplace();
 
@@ -297,6 +327,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       package: packageId,
       packageName: selectedPackage?.title || selectedPackage?.name || '',
       destination: selectedPackage?.destination || prev.destination,
+      isManualItinerary: false,
     }));
     setPricingSettings(prev => carryPricingSettingsAcrossPackageSwitch(prev));
 
@@ -309,7 +340,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       const pkg = response.data?.data || response.data;
       if (safeToReplaceBeforeSwitch) {
         // Backend will silently replace the itinerary with this package's
-        // blueprint on save — preview that outcome.
+        // blueprint on save — preview that outcome. Falls out correctly
+        // coming from manual mode too: sourcePackageIdRef never matches the
+        // empty package it had while manual, so it's only "safe" when there
+        // were zero days yet — a hand-built manual itinerary is preserved.
         setItineraryDays(toEditorDays(pkg?.itineraryDays || []));
         setItineraryDirty(false);
       }
@@ -366,6 +400,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         whatsapp: formData.whatsapp || undefined,
         packageId: formData.package || null,
         packageName: formData.packageName || null,
+        isManualItinerary: formData.isManualItinerary,
         lifecycleStatus: formData.lifecycleStatus || 'NEW',
         remarks: remarks.length > 0 ? remarks : undefined,
         pricing: pricingSettings,
@@ -625,12 +660,13 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     <EditInputField label="Package" icon={Package} locked={isLocked}>
                       <select
                         aria-label="Package"
-                        value={formData.package || ''}
+                        value={formData.isManualItinerary ? MANUAL_ITINERARY_VALUE : (formData.package || '')}
                         onChange={(e) => handlePackageChange(e.target.value)}
                         disabled={loadingPackages || isLocked}
                         className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
+                        <option value={MANUAL_ITINERARY_VALUE}>Manual Itinerary (No Package)</option>
                         {packages.map((pkg) => {
                           const optionId = pkg._id || pkg.id;
                           const label = pkg.title || pkg.name || 'Unnamed Package';
@@ -676,7 +712,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 </div>
 
                 {/* Itinerary editor — collapsed so the dialog stays clean */}
-                {formData.package && (
+                {(formData.package || formData.isManualItinerary) && (
                   <div className="mt-4 bg-white rounded-2xl border border-emerald-200 overflow-hidden">
                     <button
                       type="button"

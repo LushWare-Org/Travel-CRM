@@ -3,9 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockLeadFindUnique,
   mockLeadUpdate,
+  mockLeadCreate,
+  mockSettingsFindFirst,
   mockPricingUpdate,
   mockIsItineraryPristine,
   mockReplaceLeadItineraryFromPackage,
+  mockCopyPackageToLead,
   mockOptionalFlightCreate,
   mockOptionalFlightFindMany,
   mockOptionalFlightFindUnique,
@@ -16,9 +19,12 @@ const {
 } = vi.hoisted(() => ({
   mockLeadFindUnique: vi.fn(),
   mockLeadUpdate: vi.fn(),
+  mockLeadCreate: vi.fn(),
+  mockSettingsFindFirst: vi.fn(),
   mockPricingUpdate: vi.fn(),
   mockIsItineraryPristine: vi.fn(),
   mockReplaceLeadItineraryFromPackage: vi.fn(),
+  mockCopyPackageToLead: vi.fn(),
   mockOptionalFlightCreate: vi.fn(),
   mockOptionalFlightFindMany: vi.fn(),
   mockOptionalFlightFindUnique: vi.fn(),
@@ -30,7 +36,8 @@ const {
 
 vi.mock('../../db/client.js', () => ({
   default: {
-    lead: { findUnique: mockLeadFindUnique, update: mockLeadUpdate },
+    lead: { findUnique: mockLeadFindUnique, update: mockLeadUpdate, create: mockLeadCreate },
+    settings: { findFirst: mockSettingsFindFirst },
     leadPricing: { update: mockPricingUpdate },
     leadOptionalFlight: {
       create: mockOptionalFlightCreate,
@@ -44,12 +51,12 @@ vi.mock('../../db/client.js', () => ({
 }));
 
 vi.mock('../../services/lead-draft.service.js', () => ({
-  copyPackageToLead: vi.fn(),
+  copyPackageToLead: mockCopyPackageToLead,
   isItineraryPristine: mockIsItineraryPristine,
   replaceLeadItineraryFromPackage: mockReplaceLeadItineraryFromPackage,
 }));
 
-import { updateLead, addOptionalFlight, listOptionalFlights, deleteOptionalFlight } from '../lead.controller.js';
+import { updateLead, createLead, draftLead, addOptionalFlight, listOptionalFlights, deleteOptionalFlight } from '../lead.controller.js';
 
 const PKG_A = '11111111-1111-1111-1111-111111111111';
 const PKG_B = '22222222-2222-2222-2222-222222222222';
@@ -216,6 +223,83 @@ describe('updateLead — package switching', () => {
     expect(mockLeadUpdate).not.toHaveBeenCalled();
   });
 
+  it('does not replace the itinerary when the lead is flagged isManualItinerary, even if pristine', async () => {
+    const lead = leadFixture({ isManualItinerary: true });
+    mockLeadFindUnique.mockResolvedValue(lead);
+    mockIsItineraryPristine.mockReturnValue(true);
+
+    const { req, res, next } = buildReqRes({ body: { packageId: PKG_B } });
+
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockReplaceLeadItineraryFromPackage).not.toHaveBeenCalled();
+    // A manual lead never actually gets a package reference — the invariant
+    // guard forces it back to null regardless of what was sent.
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ packageId: null, packageName: null }),
+    }));
+  });
+
+  it('does not replace the itinerary when the lead has no days yet but is flagged isManualItinerary', async () => {
+    const lead = leadFixture({ isManualItinerary: true, _count: { itineraryDays: 0 } });
+    mockLeadFindUnique.mockResolvedValue(lead);
+    mockIsItineraryPristine.mockReturnValue(false);
+
+    const { req, res, next } = buildReqRes({ body: { packageId: PKG_B } });
+
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockReplaceLeadItineraryFromPackage).not.toHaveBeenCalled();
+  });
+
+  it('skips the replace when isManualItinerary is flipped to true in the same request as a package switch', async () => {
+    const lead = leadFixture({ isManualItinerary: false });
+    mockLeadFindUnique.mockResolvedValue(lead);
+    mockIsItineraryPristine.mockReturnValue(true);
+
+    const { req, res, next } = buildReqRes({ body: { packageId: PKG_B, isManualItinerary: true } });
+
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockReplaceLeadItineraryFromPackage).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ packageId: null, packageName: null, isManualItinerary: true }),
+    }));
+  });
+
+  it('still replaces the itinerary when isManualItinerary is explicitly false on a pristine switch', async () => {
+    const lead = leadFixture({ isManualItinerary: true });
+    mockLeadFindUnique.mockResolvedValue(lead);
+    mockIsItineraryPristine.mockReturnValue(true);
+
+    const { req, res, next } = buildReqRes({ body: { packageId: PKG_B, isManualItinerary: false } });
+
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockReplaceLeadItineraryFromPackage).toHaveBeenCalledWith({ leadId: 'lead-1', packageId: PKG_B });
+  });
+
+  it('forces packageId/packageName to null when isManualItinerary is sent true, even alongside a packageId switch', async () => {
+    const lead = leadFixture({ isManualItinerary: false });
+    mockLeadFindUnique.mockResolvedValue(lead);
+    mockIsItineraryPristine.mockReturnValue(true);
+
+    const { req, res, next } = buildReqRes({
+      body: { packageId: PKG_B, packageName: 'New Package', isManualItinerary: true },
+    });
+
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ isManualItinerary: true, packageId: null, packageName: null }),
+    }));
+  });
+
   it('allows package + date changes while DRAFTING', async () => {
     const lead = leadFixture({ lifecycleStatus: 'DRAFTING' });
     mockLeadFindUnique.mockResolvedValue(lead);
@@ -229,6 +313,132 @@ describe('updateLead — package switching', () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+});
+
+describe('createLead — isManualItinerary', () => {
+  beforeEach(() => {
+    mockLeadCreate.mockReset();
+    mockSettingsFindFirst.mockReset().mockResolvedValue(null);
+  });
+
+  it('persists isManualItinerary: true from the request body', async () => {
+    mockLeadCreate.mockResolvedValue(leadFixture({ isManualItinerary: true }));
+
+    const { req, res, next } = buildReqRes({
+      body: { name: 'Jane Doe', isManualItinerary: true },
+    });
+
+    await createLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ isManualItinerary: true }),
+    }));
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it('defaults isManualItinerary to false when omitted', async () => {
+    mockLeadCreate.mockResolvedValue(leadFixture({ isManualItinerary: false }));
+
+    const { req, res, next } = buildReqRes({ body: { name: 'Jane Doe' } });
+
+    await createLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ isManualItinerary: false }),
+    }));
+  });
+
+  it('forces packageId/packageName to null when isManualItinerary is true, even if a packageId was also sent', async () => {
+    mockLeadCreate.mockResolvedValue(leadFixture({ isManualItinerary: true, packageId: null }));
+
+    const { req, res, next } = buildReqRes({
+      body: { name: 'Jane Doe', isManualItinerary: true, packageId: PKG_A, packageName: 'Sri Lanka Explorer' },
+    });
+
+    await createLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ isManualItinerary: true, packageId: null, packageName: null }),
+    }));
+  });
+
+  it('keeps the sent packageId/packageName when isManualItinerary is false', async () => {
+    mockLeadCreate.mockResolvedValue(leadFixture({ isManualItinerary: false, packageId: PKG_A }));
+
+    const { req, res, next } = buildReqRes({
+      body: { name: 'Jane Doe', packageId: PKG_A, packageName: 'Sri Lanka Explorer' },
+    });
+
+    await createLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ packageId: PKG_A, packageName: 'Sri Lanka Explorer' }),
+    }));
+  });
+});
+
+describe('draftLead — isManualItinerary', () => {
+  beforeEach(() => {
+    mockLeadFindUnique.mockReset();
+    mockLeadUpdate.mockReset();
+    mockCopyPackageToLead.mockReset().mockResolvedValue({});
+    mockLeadUpdate.mockResolvedValue(leadFixture({ lifecycleStatus: 'DRAFTING' }));
+  });
+
+  it('copies the package blueprint when the lead is not flagged manual', async () => {
+    const lead = leadFixture({ lifecycleStatus: 'NEW', isManualItinerary: false, costLines: [] });
+    mockLeadFindUnique.mockResolvedValue(lead);
+
+    const { req, res, next } = buildReqRes();
+
+    await draftLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockCopyPackageToLead).toHaveBeenCalledWith({ leadId: 'lead-1', packageId: PKG_A });
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it('skips copying the package blueprint when the lead is flagged manual', async () => {
+    const lead = leadFixture({ lifecycleStatus: 'NEW', isManualItinerary: true, costLines: [] });
+    mockLeadFindUnique.mockResolvedValue(lead);
+
+    const { req, res, next } = buildReqRes();
+
+    await draftLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockCopyPackageToLead).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it('does not throw for a manual lead with no packageId at all', async () => {
+    const lead = leadFixture({ lifecycleStatus: 'NEW', isManualItinerary: true, packageId: null, sourcePackageId: null, costLines: [] });
+    mockLeadFindUnique.mockResolvedValue(lead);
+
+    const { req, res, next } = buildReqRes();
+
+    await draftLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockCopyPackageToLead).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it('still rejects a non-manual lead with no packageId', async () => {
+    const lead = leadFixture({ lifecycleStatus: 'NEW', isManualItinerary: false, packageId: null, sourcePackageId: null, costLines: [] });
+    mockLeadFindUnique.mockResolvedValue(lead);
+
+    const { req, res, next } = buildReqRes();
+
+    await draftLead(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/no package selected/i) }));
+    expect(mockCopyPackageToLead).not.toHaveBeenCalled();
   });
 });
 

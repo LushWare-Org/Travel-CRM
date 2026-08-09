@@ -1,17 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { mockCreateLead, mockAddFlight, mockGetAllPackages, mockGetPackageById } = vi.hoisted(() => ({
+const { mockCreateLead, mockAddFlight, mockUpdateLeadItinerary, mockGetAllPackages, mockGetPackageById } = vi.hoisted(() => ({
   mockCreateLead: vi.fn(),
   mockAddFlight: vi.fn(),
+  mockUpdateLeadItinerary: vi.fn(),
   mockGetAllPackages: vi.fn(),
   mockGetPackageById: vi.fn(),
 }));
 
 vi.mock('../../../../services/api', () => ({
-  leadAPI: { createLead: mockCreateLead, addFlight: mockAddFlight },
+  leadAPI: { createLead: mockCreateLead, addFlight: mockAddFlight, updateLeadItinerary: mockUpdateLeadItinerary },
   packageAPI: { getAll: mockGetAllPackages, getById: mockGetPackageById },
+}));
+
+vi.mock('../../../itinerary/components/ItineraryEditor', () => ({
+  default: ({ days, onAddDay }) => (
+    <div data-testid="itinerary-editor">
+      <span data-testid="itinerary-days-count">{days?.length ?? 0}</span>
+      <button type="button" onClick={onAddDay}>Add Day</button>
+    </div>
+  ),
 }));
 
 vi.mock('../../../../contexts/AuthContext', () => ({
@@ -76,14 +86,16 @@ const packagesFixture = [{ _id: PKG_A, title: 'Sri Lanka Explorer', destination:
 beforeEach(() => {
   mockCreateLead.mockReset();
   mockAddFlight.mockReset();
+  mockUpdateLeadItinerary.mockReset();
   mockGetAllPackages.mockReset();
   mockGetPackageById.mockReset();
   lastFlightModalProps = null;
 
   mockGetAllPackages.mockResolvedValue({ success: true, data: packagesFixture });
-  mockGetPackageById.mockResolvedValue({ success: true, data: { data: { itineraryDays: [] } } });
+  mockGetPackageById.mockResolvedValue({ success: true, data: { data: { itineraryDays: [{ dayNumber: 1, title: 'Blueprint Day 1' }] } } });
   mockCreateLead.mockResolvedValue({ data: { _id: 'new-lead-1' } });
   mockAddFlight.mockResolvedValue({ success: true, data: { id: 'flight-1' } });
+  mockUpdateLeadItinerary.mockResolvedValue({ success: true, data: {} });
 });
 
 function renderDialog(props = {}) {
@@ -218,5 +230,86 @@ describe('NewLeadDialog — persists flight prefs after lead creation', () => {
     await user.click(screen.getByRole('button', { name: /create lead/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+  });
+});
+
+const MANUAL_ITINERARY_VALUE = '__manual__';
+
+describe('NewLeadDialog — manual itinerary option', () => {
+  it('offers "Manual Itinerary (No Package)" as an option in the Package select', async () => {
+    renderDialog();
+    const select = await screen.findByLabelText('Package');
+    expect(within(select).getByRole('option', { name: /manual itinerary \(no package\)/i })).toBeInTheDocument();
+  });
+
+  it('shows a blank-day itinerary editor and clears package fields when Manual Itinerary is selected', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const select = await screen.findByLabelText('Package');
+    await user.selectOptions(select, PKG_A);
+    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_A));
+    expect(screen.queryByTestId('itinerary-editor')).not.toBeInTheDocument();
+
+    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
+
+    expect(select).toHaveValue(MANUAL_ITINERARY_VALUE);
+    expect(screen.getByTestId('itinerary-editor')).toBeInTheDocument();
+    expect(screen.getByTestId('itinerary-days-count')).toHaveTextContent('1');
+  });
+
+  it('reloads the package blueprint when switching from manual back to a real package', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const select = await screen.findByLabelText('Package');
+    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
+    expect(screen.getByTestId('itinerary-editor')).toBeInTheDocument();
+
+    await user.selectOptions(select, PKG_A);
+
+    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_A));
+    await waitFor(() => expect(screen.queryByTestId('itinerary-editor')).not.toBeInTheDocument());
+  });
+
+  it('sends isManualItinerary: true and null packageId on create, and saves the built days via updateLeadItinerary', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(screen.getByPlaceholderText('Enter full name'), 'Jane Doe');
+    await user.type(screen.getByPlaceholderText('Enter phone number'), '+94771234567');
+
+    const select = await screen.findByLabelText('Package');
+    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
+    await user.click(screen.getByRole('button', { name: /add day/i }));
+
+    await user.click(screen.getByRole('button', { name: /create lead/i }));
+
+    await waitFor(() => expect(mockCreateLead).toHaveBeenCalledWith(
+      expect.objectContaining({ isManualItinerary: true, packageId: undefined, packageName: undefined })
+    ));
+    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalledWith(
+      'new-lead-1',
+      expect.objectContaining({ days: expect.arrayContaining([expect.objectContaining({ dayNumber: 1 })]) })
+    ));
+  });
+
+  it('does not call updateLeadItinerary when a real package was selected instead of manual', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(screen.getByPlaceholderText('Enter full name'), 'Jane Doe');
+    await user.type(screen.getByPlaceholderText('Enter phone number'), '+94771234567');
+
+    const select = await screen.findByLabelText('Package');
+    await user.selectOptions(select, PKG_A);
+    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_A));
+
+    await user.click(screen.getByRole('button', { name: /create lead/i }));
+
+    await waitFor(() => expect(mockCreateLead).toHaveBeenCalledWith(
+      expect.objectContaining({ isManualItinerary: false, packageId: PKG_A })
+    ));
+    expect(mockUpdateLeadItinerary).not.toHaveBeenCalled();
   });
 });

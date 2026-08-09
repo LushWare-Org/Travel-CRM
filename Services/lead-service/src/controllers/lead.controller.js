@@ -199,6 +199,7 @@ export const createLead = asyncHandler(async (req, res) => {
 
   const remarksList = body.remarks || [];
   const lifecycleStatus = body.lifecycleStatus || 'NEW';
+  const isManualItinerary = body.isManualItinerary || false;
 
   const lead = await prisma.lead.create({
     data: {
@@ -214,8 +215,10 @@ export const createLead = asyncHandler(async (req, res) => {
       destination: body.destination,
       travelDate: body.travelDate ? new Date(body.travelDate) : null,
       endDate: body.endDate ? new Date(body.endDate) : null,
-      packageId: body.packageId,
-      packageName: body.packageName,
+      // A lead has one package or a manual itinerary, never both.
+      packageId: isManualItinerary ? null : body.packageId,
+      packageName: isManualItinerary ? null : body.packageName,
+      isManualItinerary,
       numberOfTravelers: body.numberOfTravelers,
       budget: body.budget,
       message: body.message,
@@ -358,7 +361,8 @@ export const updateLead = asyncHandler(async (req, res) => {
   // never overwritten — the lead just points at the new package going forward.
   const isPackageSwitch = validatedBody.packageId !== undefined && validatedBody.packageId !== lead.packageId;
   const hasNoItineraryYet = (lead._count?.itineraryDays ?? 0) === 0;
-  const shouldReplaceItinerary = isPackageSwitch && validatedBody.packageId
+  const effectiveIsManual = validatedBody.isManualItinerary ?? lead.isManualItinerary;
+  const shouldReplaceItinerary = isPackageSwitch && validatedBody.packageId && !effectiveIsManual
     && (isItineraryPristine(lead) || hasNoItineraryYet);
   if (shouldReplaceItinerary) {
     await replaceLeadItineraryFromPackage({ leadId: lead.id, packageId: validatedBody.packageId });
@@ -393,13 +397,18 @@ export const updateLead = asyncHandler(async (req, res) => {
   const scalarFields = [
     'name', 'email', 'phone', 'whatsapp', 'city', 'source', 'platform',
     'fromCountry', 'destinationCountry', 'destination', 'packageId', 'packageName',
-    'numberOfTravelers', 'budget', 'message', 'lifecycleStatus',
+    'isManualItinerary', 'numberOfTravelers', 'budget', 'message', 'lifecycleStatus',
     'priority', 'assignedToId', 'tags', 'lostReason',
   ];
   for (const field of scalarFields) {
     if (validatedBody[field] !== undefined) {
       updateData[field] = validatedBody[field];
     }
+  }
+  // A lead has one package or a manual itinerary, never both.
+  if (effectiveIsManual) {
+    updateData.packageId = null;
+    updateData.packageName = null;
   }
   if (validatedBody.travelDate !== undefined) {
     updateData.travelDate = validatedBody.travelDate ? new Date(validatedBody.travelDate) : null;
@@ -458,7 +467,9 @@ export const draftLead = asyncHandler(async (req, res) => {
     include: { pricing: true, itineraryDays: true },
   });
   if (!lead) throw new AppError('Lead not found', 404);
-  if (!lead.packageId) throw new AppError('Lead has no package selected', 400);
+  if (!lead.packageId && !lead.isManualItinerary) {
+    throw new AppError('Lead has no package selected', 400);
+  }
 
   const transition = validateTransition({
     currentStatus: lead.lifecycleStatus,
@@ -466,7 +477,9 @@ export const draftLead = asyncHandler(async (req, res) => {
     pricing: gatekeeperInputs(lead, lead.pricing, lead.costLines || []),
   });
 
-  await copyPackageToLead({ leadId: lead.id, packageId: lead.packageId });
+  if (!lead.isManualItinerary) {
+    await copyPackageToLead({ leadId: lead.id, packageId: lead.packageId });
+  }
 
   const updated = await prisma.lead.update({
     where: { id: lead.id },
@@ -477,7 +490,7 @@ export const draftLead = asyncHandler(async (req, res) => {
           status: 'DRAFTING',
           actor: 'USER',
           changedById: req.user.id,
-          notes: 'Package copied to lead draft',
+          notes: lead.isManualItinerary ? 'Moved to drafting (manual itinerary)' : 'Package copied to lead draft',
         }],
       },
     },
