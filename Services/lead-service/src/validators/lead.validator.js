@@ -38,6 +38,7 @@ const leadFields = {
   endDate: z.string().optional().nullable(),
   packageId: z.string().uuid().optional().nullable(),
   packageName: z.string().optional().nullable(),
+  isManualItinerary: z.boolean().optional(),
   numberOfTravelers: z.number().int().min(1).optional(),
   budget: z.string().optional().nullable(),
   message: z.string().optional().nullable(),

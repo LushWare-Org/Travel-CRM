@@ -39,6 +39,23 @@ describe('createLeadSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts isManualItinerary true', () => {
+    const result = createLeadSchema.safeParse({ isManualItinerary: true });
+    expect(result.success).toBe(true);
+    expect(result.data.isManualItinerary).toBe(true);
+  });
+
+  it('accepts isManualItinerary false', () => {
+    const result = createLeadSchema.safeParse({ isManualItinerary: false });
+    expect(result.success).toBe(true);
+    expect(result.data.isManualItinerary).toBe(false);
+  });
+
+  it('rejects a non-boolean isManualItinerary', () => {
+    const result = createLeadSchema.safeParse({ isManualItinerary: 'yes' });
+    expect(result.success).toBe(false);
+  });
+
   it('accepts each valid lifecycleStatus', () => {
     const valid = ['NEW', 'DRAFTING', 'QUOTED', 'REVISION', 'APPROVED', 'BOOKING_IN_PROGRESS', 'CONFIRMED', 'CLOSED_LOST', 'BOOKING_FAILED', 'CANCELLED'];
     for (const status of valid) {
@@ -106,6 +123,15 @@ describe('updateLeadSchema', () => {
   it('rejects unknown keys (strict)', () => {
     const result = updateLeadSchema.safeParse({ status: 'new' });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts isManualItinerary alongside a packageId switch', () => {
+    const result = updateLeadSchema.safeParse({
+      packageId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      isManualItinerary: true,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data.isManualItinerary).toBe(true);
   });
 });
 
