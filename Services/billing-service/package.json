@@ -16,6 +16,7 @@
     "@prisma/client": "^5.22.0",
     "@travel-crm/lead-pricing-engine": "file:../shared/lead-pricing-engine",
     "@travel-crm/pricing-engine": "file:../shared/pricing-engine",
+    "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -23,7 +24,9 @@
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
     "nodemailer": "^9.0.3",
-    "pdfkit": "^0.15.0"
+    "pdfkit": "^0.15.0",
+    "twilio": "^6.0.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
