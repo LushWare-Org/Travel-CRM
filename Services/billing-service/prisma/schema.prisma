@@ -400,6 +400,8 @@ model Quotation {
   pdfUrl          String?
   sentAt          DateTime?
   emailSent       Boolean   @default(false)
+  whatsappSent    Boolean   @default(false)
+  whatsappSentAt  DateTime?
   viewedAt        DateTime?
   acceptedAt      DateTime?
   rejectedAt      DateTime?
@@ -416,6 +418,7 @@ model Quotation {
   updatedAt DateTime @updatedAt
 
   @@index([leadId, createdAt])
+  @@index([leadId, packageId])
   @@index([status, validUntil])
   @@index([createdAt])
   @@schema("crm_billing")
