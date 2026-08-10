@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, Copy,
   User, MapPin, Plane, Users, Globe, Package, ChevronDown, ChevronUp,
-  Trash2, Check, Lock,
+  Trash2, Check, Lock, RefreshCw, XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadAPI, packageAPI } from '../../../services/api';
@@ -18,11 +18,45 @@ import LeadStatusBadge from './LeadStatusBadge';
 import PricingSection from './PricingSection';
 import { toEditorDays } from '../utils/toEditorDays';
 import { isLeadFieldLocked } from '../utils/leadLocks';
-import { carryPricingSettingsAcrossPackageSwitch } from '../utils/pricingSettings';
 
-// A lead has one package or a manual (from-scratch) itinerary, never both —
-// this sentinel is a third option inside the Package select itself.
+// A lead can hold many packages at once, plus at most one manual
+// (from-scratch) itinerary slot — this sentinel is the "add" picker's third
+// option alongside real packages.
 const MANUAL_ITINERARY_VALUE = '__manual__';
+
+const emptySelectionPricing = {
+  marginType: null,
+  marginValue: 0,
+  depositType: 'PERCENTAGE',
+  depositValue: 30,
+  discountType: 'none',
+  discountValue: 0,
+  serviceChargeRate: 0,
+};
+
+// Maps a /leads/:id/packages selection (server shape, materialized or
+// derived) into the local editor-tab shape.
+function mapSelection(raw) {
+  return {
+    id: raw.id,
+    packageId: raw.packageId || null,
+    isManual: Boolean(raw.isManual),
+    packageName: raw.packageName || null,
+    currentQuoteId: raw.currentQuoteId || null,
+    isMaterialized: Boolean(raw.isMaterialized),
+    itineraryDays: toEditorDays(raw.itineraryDays || []),
+    pricingSettings: {
+      marginType: raw.pricing?.marginType || null,
+      marginValue: raw.pricing?.marginValue ?? 0,
+      depositType: raw.pricing?.depositType || 'PERCENTAGE',
+      depositValue: raw.pricing?.depositValue ?? 30,
+      discountType: raw.pricing?.discountType || 'none',
+      discountValue: raw.pricing?.discountValue ?? 0,
+      serviceChargeRate: raw.pricing?.serviceChargeRate ?? 0,
+    },
+    dirty: false,
+  };
+}
 
 // ── Module-level components (prevents remounting on re-render) ──
 
@@ -94,20 +128,7 @@ const emptyFormData = {
   platform: "",
   travelDate: "",
   endDate: "",
-  package: "",
-  packageName: "",
-  isManualItinerary: false,
   lifecycleStatus: "NEW",
-};
-
-const emptyPricingSettings = {
-  marginType: null,
-  marginValue: 0,
-  depositType: 'PERCENTAGE',
-  depositValue: 30,
-  discountType: 'none',
-  discountValue: 0,
-  serviceChargeRate: 0,
 };
 
 const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
@@ -115,9 +136,13 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [showItineraryEditor, setShowItineraryEditor] = useState(false);
-  const [itineraryDays, setItineraryDays] = useState([]);
-  const [itineraryDirty, setItineraryDirty] = useState(false);
-  const [pricingSettings, setPricingSettings] = useState(emptyPricingSettings);
+  // One entry per attached package (plus the manual slot, if any) — see
+  // mapSelection() for the shape. `dirty` marks a tab whose itinerary/pricing
+  // has been edited locally and needs saving.
+  const [selections, setSelections] = useState([]);
+  const [activeSelectionId, setActiveSelectionId] = useState(null);
+  const [addingPackage, setAddingPackage] = useState(false);
+  const [refreshingSelectionId, setRefreshingSelectionId] = useState(null);
   // Bumped whenever a transfer flight is added/edited/removed — those persist
   // straight to the DB and never touch itineraryDays/pricingSettings, so the
   // live pricing preview has no other way to know it needs to recompute.
@@ -139,18 +164,16 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
   // (the dialog stays mounted across open/close cycles, so React alone won't
   // reset it if the `lead` prop reference happens not to change).
   const snapshotRef = useRef(null);
-  // sourcePackageId of the lead as currently saved on the server — drives
-  // whether a package switch will replace or preserve the itinerary preview.
-  const sourcePackageIdRef = useRef(null);
 
   const isLocked = isLeadFieldLocked(lead?.lifecycleStatus);
+  const activeSelection = selections.find(s => s.id === activeSelectionId) || null;
 
   // Day-linked flight preferences live in day.flights[] but only day.transports[]
   // feeds cost lines — reconcile flights into a priced transport row (real price
   // wins when set, else the existing manual transport cost is preserved) before
   // this reaches pricing calculation or persistence. Same transform the package
   // editor already applies at save time (Management/src/features/itinerary/services/apiService.js).
-  const reconciledItineraryDays = itineraryDays.map(day => ({
+  const reconcileDays = (days) => (days || []).map(day => ({
     ...day,
     transports: reconcileFlightsForSave({ flights: day.flights || [], transports: day.transports || [] }),
   }));
@@ -199,8 +222,6 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     const leadId = lead._id || lead.id;
     const assignedToId = lead.assignedTo?._id || lead.assignedTo || lead.assignedTo?.id || '';
     const salesRepName = lead.salesRep || lead.adviser || '';
-    const packageId = lead.packageId || lead.package?._id || lead.package || '';
-    const packageName = lead.packageName || lead.package?.name || '';
 
     const nextFormData = {
       name: lead.name || '',
@@ -215,66 +236,36 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       platform: lead.platform || '',
       travelDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
       endDate: lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
-      package: packageId,
-      packageName,
-      isManualItinerary: Boolean(lead.isManualItinerary),
       lifecycleStatus: lead.lifecycleStatus || 'NEW',
     };
     setFormData(nextFormData);
     setRemarks(lead.remarks || []);
-    setItineraryDirty(false);
 
     if (!leadId) {
-      snapshotRef.current = { formData: nextFormData, remarks: lead.remarks || [], pricingSettings: emptyPricingSettings, itineraryDays: [] };
+      setSelections([]);
+      setActiveSelectionId(null);
+      snapshotRef.current = { formData: nextFormData, remarks: lead.remarks || [], selections: [] };
       return;
     }
 
     try {
-      const fresh = await leadAPI.getLead(leadId);
-      const freshLead = fresh?.data?.data || fresh?.data || fresh;
-
-      sourcePackageIdRef.current = freshLead?.sourcePackageId ?? null;
-
-      const nextPricingSettings = {
-        marginType: freshLead?.pricing?.marginType || null,
-        marginValue: freshLead?.pricing?.marginValue ?? 0,
-        depositType: freshLead?.pricing?.depositType || 'PERCENTAGE',
-        depositValue: freshLead?.pricing?.depositValue ?? 30,
-        discountType: freshLead?.pricing?.discountType || 'none',
-        discountValue: freshLead?.pricing?.discountValue ?? 0,
-        serviceChargeRate: freshLead?.pricing?.serviceChargeRate ?? 0,
-      };
-      setPricingSettings(nextPricingSettings);
-
-      const isManualItinerary = Boolean(freshLead?.isManualItinerary);
-      let nextItineraryDays = [];
-      if (Array.isArray(freshLead?.itineraryDays) && freshLead.itineraryDays.length > 0) {
-        nextItineraryDays = toEditorDays(freshLead.itineraryDays);
-      } else if (isManualItinerary) {
-        // Manual mode with no persisted days yet — give the rep a blank
-        // starting day instead of leaving the editor empty.
-        nextItineraryDays = [createDefaultDay(1)];
-      } else if (packageId && freshLead?.lifecycleStatus === 'NEW') {
-        const pkgRes = await packageAPI.getById(packageId);
-        const pkg = pkgRes.data?.data || pkgRes.data;
-        nextItineraryDays = toEditorDays(pkg?.itineraryDays || []);
-      }
-      setItineraryDays(nextItineraryDays);
-
-      const resolvedFormData = { ...nextFormData, isManualItinerary };
-      setFormData(resolvedFormData);
+      const selRes = await leadAPI.getPackageSelections(leadId);
+      const rawSelections = selRes?.data?.data || selRes?.data || [];
+      const nextSelections = rawSelections.map(mapSelection);
+      setSelections(nextSelections);
+      setActiveSelectionId(nextSelections[0]?.id ?? null);
 
       snapshotRef.current = {
-        formData: resolvedFormData,
+        formData: nextFormData,
         remarks: lead.remarks || [],
-        pricingSettings: nextPricingSettings,
-        itineraryDays: nextItineraryDays,
-        sourcePackageId: sourcePackageIdRef.current,
+        selections: nextSelections,
+        activeSelectionId: nextSelections[0]?.id ?? null,
       };
     } catch (error) {
-      console.error('Error loading lead itinerary:', error);
-      setItineraryDays([]);
-      snapshotRef.current = { formData: nextFormData, remarks: lead.remarks || [], pricingSettings: emptyPricingSettings, itineraryDays: [] };
+      console.error('Error loading lead package selections:', error);
+      setSelections([]);
+      setActiveSelectionId(null);
+      snapshotRef.current = { formData: nextFormData, remarks: lead.remarks || [], selections: [] };
     }
   };
 
@@ -283,74 +274,85 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
     if (snapshot) {
       setFormData(snapshot.formData);
       setRemarks(snapshot.remarks);
-      setPricingSettings(snapshot.pricingSettings);
-      setItineraryDays(snapshot.itineraryDays);
-      sourcePackageIdRef.current = snapshot.sourcePackageId ?? null;
-      setItineraryDirty(false);
+      setSelections(snapshot.selections || []);
+      setActiveSelectionId(snapshot.activeSelectionId ?? (snapshot.selections?.[0]?.id ?? null));
     }
     onClose();
   };
 
-  const isItineraryPristine = () =>
-    Boolean(sourcePackageIdRef.current) && sourcePackageIdRef.current === formData.package;
+  const updateActiveSelection = (patch) => {
+    setSelections(prev => prev.map(s => (
+      s.id === activeSelectionId ? { ...s, ...patch, dirty: true } : s
+    )));
+  };
 
-  // Safe to silently populate the itinerary from the new package's blueprint:
-  // either it's untouched since it was copied from the old package (pristine),
-  // or there's no itinerary at all yet — nothing to protect either way. A
-  // customized itinerary is the only case that's left alone.
-  const isItinerarySafeToReplace = () =>
-    isItineraryPristine() || itineraryDays.length === 0;
-
-  const handlePackageChange = async (value) => {
-    if (isLocked) return;
-
-    if (value === MANUAL_ITINERARY_VALUE) {
-      setFormData(prev => ({
-        ...prev,
-        package: '',
-        packageName: '',
-        isManualItinerary: true,
-      }));
-      setPricingSettings(prev => carryPricingSettingsAcrossPackageSwitch(prev));
-      setItineraryDays(prev => (prev && prev.length > 0 ? prev : [createDefaultDay(1)]));
-      setItineraryDirty(true);
-      setShowItineraryEditor(true);
-      return;
-    }
-
-    const packageId = value;
-    const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-    const safeToReplaceBeforeSwitch = isItinerarySafeToReplace();
-
-    setFormData(prev => ({
-      ...prev,
-      package: packageId,
-      packageName: selectedPackage?.title || selectedPackage?.name || '',
-      destination: selectedPackage?.destination || prev.destination,
-      isManualItinerary: false,
-    }));
-    setPricingSettings(prev => carryPricingSettingsAcrossPackageSwitch(prev));
-
-    if (!packageId) {
-      return;
-    }
+  const handleAddPackage = async (value) => {
+    if (!lead || !value) return;
+    const leadId = lead._id || lead.id;
+    const isManual = value === MANUAL_ITINERARY_VALUE;
 
     try {
-      const response = await packageAPI.getById(packageId);
-      const pkg = response.data?.data || response.data;
-      if (safeToReplaceBeforeSwitch) {
-        // Backend will silently replace the itinerary with this package's
-        // blueprint on save — preview that outcome. Falls out correctly
-        // coming from manual mode too: sourcePackageIdRef never matches the
-        // empty package it had while manual, so it's only "safe" when there
-        // were zero days yet — a hand-built manual itinerary is preserved.
-        setItineraryDays(toEditorDays(pkg?.itineraryDays || []));
-        setItineraryDirty(false);
-      }
-      // Customized itinerary: keep it exactly as-is, only the package
-      // reference changes. Pricing preview recalculates against it as-is.
+      const createRes = await leadAPI.addPackageSelection(leadId, isManual ? { isManual: true } : { packageId: value });
+      const createdId = (createRes?.data?.data || createRes?.data)?.id;
+      const detailRes = await leadAPI.getPackageSelection(leadId, createdId);
+      const detail = detailRes?.data?.data || detailRes?.data;
+      const newSelection = mapSelection(detail);
+      setSelections(prev => [...prev, newSelection]);
+      setActiveSelectionId(newSelection.id);
+      setAddingPackage(false);
+      setShowItineraryEditor(true);
+      toast.success(isManual ? 'Manual itinerary added' : 'Package added');
     } catch (err) {
-      console.error('Error loading package itinerary preview:', err);
+      toast.error(`Failed to add package: ${err.message}`);
+    }
+  };
+
+  const handleRemoveSelection = async (selection) => {
+    if (!lead || !selection) return;
+    if (!window.confirm(`Remove ${selection.isManual ? 'the manual itinerary' : (selection.packageName || 'this package')} from this lead?`)) {
+      return;
+    }
+    const leadId = lead._id || lead.id;
+    try {
+      await leadAPI.removePackageSelection(leadId, selection.id);
+      setSelections(prev => {
+        const next = prev.filter(s => s.id !== selection.id);
+        if (activeSelectionId === selection.id) {
+          setActiveSelectionId(next[0]?.id ?? null);
+        }
+        return next;
+      });
+      toast.success('Package removed');
+    } catch (err) {
+      toast.error(`Failed to remove package: ${err.message}`);
+    }
+  };
+
+  const handleRefreshSelection = async (selection, force = false) => {
+    if (!lead || !selection) return;
+    const leadId = lead._id || lead.id;
+    setRefreshingSelectionId(selection.id);
+    try {
+      await leadAPI.refreshPackageSelection(leadId, selection.id, force);
+      const detailRes = await leadAPI.getPackageSelection(leadId, selection.id);
+      const detail = detailRes?.data?.data || detailRes?.data;
+      setSelections(prev => prev.map(s => (s.id === selection.id ? mapSelection(detail) : s)));
+      toast.success('Reverted to the original package');
+    } catch (err) {
+      if (err.status === 409 && err.data?.code === 'REFRESH_BLOCKED_QUOTED') {
+        const confirmed = window.confirm(
+          'This package has already been quoted — refreshing will make the saved itinerary no longer match what the customer was quoted. Continue?'
+        );
+        if (confirmed) {
+          setRefreshingSelectionId(null);
+          await handleRefreshSelection(selection, true);
+          return;
+        }
+      } else {
+        toast.error(`Failed to refresh: ${err.message}`);
+      }
+    } finally {
+      setRefreshingSelectionId(null);
     }
   };
 
@@ -370,19 +372,18 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         }
       }
 
-      // Manual itinerary edits persist first so they're marked customized
-      // server-side before any package switch below is evaluated —
-      // otherwise an in-flight edit could be silently overwritten by a
-      // same-save package swap that still reads as "pristine" in the DB.
-      if (itineraryDirty) {
+      // Persist each edited selection's itinerary + pricing before the
+      // general lead update, mirroring the old single-package flow.
+      const dirtySelections = selections.filter(s => s.dirty);
+      for (const selection of dirtySelections) {
         try {
-          await leadAPI.updateLeadItinerary(leadId, {
-            days: reconciledItineraryDays,
-            pricing: pricingSettings,
+          await leadAPI.updatePackageSelectionItinerary(leadId, selection.id, {
+            days: reconcileDays(selection.itineraryDays),
+            pricing: selection.pricingSettings,
           });
         } catch (itineraryError) {
           console.error('Error saving itinerary:', itineraryError);
-          toast.error('Failed to save itinerary changes');
+          toast.error(`Failed to save itinerary for ${selection.packageName || 'the manual itinerary'}`);
           setIsSubmitting(false);
           return;
         }
@@ -398,12 +399,8 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
         travelDate: formData.travelDate || undefined,
         endDate: formData.endDate || undefined,
         whatsapp: formData.whatsapp || undefined,
-        packageId: formData.package || null,
-        packageName: formData.packageName || null,
-        isManualItinerary: formData.isManualItinerary,
         lifecycleStatus: formData.lifecycleStatus || 'NEW',
         remarks: remarks.length > 0 ? remarks : undefined,
-        pricing: pricingSettings,
       };
       if (formData.assignedTo && formData.assignedTo !== '' && formData.assignedTo !== '__name_only') {
         const rep = salesReps.find(r => r.id === formData.assignedTo || r._id === formData.assignedTo);
@@ -562,22 +559,12 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 </EditInputField>
 
                 <EditInputField label="Destination" icon={MapPin}>
-                  {formData.package ? (
-                    <div
-                      aria-label="Destination"
-                      className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl text-gray-600"
-                    >
-                      {formData.destination || 'Not set'}
-                      <span className="block text-xs text-gray-400 mt-0.5">Set by the selected package</span>
-                    </div>
-                  ) : (
-                    <DestinationSelector
-                      value={formData.destination}
-                      onChange={(event) =>
-                        setFormData({ ...formData, destination: event.target.value })
-                      }
-                    />
-                  )}
+                  <DestinationSelector
+                    value={formData.destination}
+                    onChange={(event) =>
+                      setFormData({ ...formData, destination: event.target.value })
+                    }
+                  />
                 </EditInputField>
 
                 <EditInputField label="Travel Date (Start)" icon={Calendar} locked={isLocked}>
@@ -655,31 +642,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
 
             {expandedSections.package && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
-                  <div className="space-y-3">
-                    <EditInputField label="Package" icon={Package} locked={isLocked}>
-                      <select
-                        aria-label="Package"
-                        value={formData.isManualItinerary ? MANUAL_ITINERARY_VALUE : (formData.package || '')}
-                        onChange={(e) => handlePackageChange(e.target.value)}
-                        disabled={loadingPackages || isLocked}
-                        className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
-                        <option value={MANUAL_ITINERARY_VALUE}>Manual Itinerary (No Package)</option>
-                        {packages.map((pkg) => {
-                          const optionId = pkg._id || pkg.id;
-                          const label = pkg.title || pkg.name || 'Unnamed Package';
-                          return (
-                            <option key={optionId} value={optionId}>
-                              {label}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </EditInputField>
-                  </div>
-
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
                   <EditInputField label="Sales Representative" icon={User}>
                     <select
                       value={formData.assignedTo || ''}
@@ -709,10 +672,93 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                       ))}
                     </select>
                   </EditInputField>
+
+                  {/* Package tabs — a lead can hold many packages at once, plus one manual slot */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                      <Package className="w-4 h-4 text-gray-400" />
+                      Packages
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {selections.map((selection) => {
+                        const label = selection.isManual ? 'Manual Itinerary' : (selection.packageName || 'Package');
+                        const isActive = selection.id === activeSelectionId;
+                        return (
+                          <div
+                            key={selection.id}
+                            className={`group flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-xl text-sm font-medium border-2 transition-all ${isActive
+                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
+                                : 'bg-white border-gray-200 text-gray-700 hover:border-emerald-300'
+                              }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => { setActiveSelectionId(selection.id); setShowItineraryEditor(true); }}
+                              className="flex items-center gap-1.5"
+                            >
+                              {label}
+                              {selection.currentQuoteId && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-emerald-100 text-emerald-700'}`}>
+                                  Quoted
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSelection(selection)}
+                              className={`p-0.5 rounded-full ${isActive ? 'hover:bg-white/20' : 'hover:bg-red-100'}`}
+                              title="Remove package"
+                            >
+                              <XCircle className={`w-3.5 h-3.5 ${isActive ? 'text-white/80' : 'text-gray-400 group-hover:text-red-500'}`} />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {!addingPackage ? (
+                        <button
+                          type="button"
+                          onClick={() => setAddingPackage(true)}
+                          disabled={loadingPackages}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border-2 border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Package
+                        </button>
+                      ) : (
+                        <select
+                          aria-label="Add package"
+                          autoFocus
+                          value=""
+                          onChange={(e) => handleAddPackage(e.target.value)}
+                          onBlur={() => setAddingPackage(false)}
+                          disabled={loadingPackages}
+                          className="px-3 py-2 bg-white border-2 border-emerald-300 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="">{loadingPackages ? 'Loading packages...' : 'Select a package…'}</option>
+                          {!selections.some(s => s.isManual) && (
+                            <option value={MANUAL_ITINERARY_VALUE}>Manual Itinerary (No Package)</option>
+                          )}
+                          {packages
+                            .filter((pkg) => !selections.some(s => s.packageId === (pkg._id || pkg.id)))
+                            .map((pkg) => {
+                              const optionId = pkg._id || pkg.id;
+                              const label = pkg.title || pkg.name || 'Unnamed Package';
+                              return (
+                                <option key={optionId} value={optionId}>{label}</option>
+                              );
+                            })}
+                        </select>
+                      )}
+                    </div>
+                    {selections.length === 0 && (
+                      <p className="text-xs text-gray-400 mt-2">No packages attached yet — add one to start building an itinerary and quotation.</p>
+                    )}
+                  </div>
                 </div>
 
-                {/* Itinerary editor — collapsed so the dialog stays clean */}
-                {(formData.package || formData.isManualItinerary) && (
+                {/* Itinerary editor for the active tab — collapsed so the dialog stays clean */}
+                {activeSelection && (
                   <div className="mt-4 bg-white rounded-2xl border border-emerald-200 overflow-hidden">
                     <button
                       type="button"
@@ -721,39 +767,56 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     >
                       <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                         <Calendar className="w-4 h-4 text-emerald-600" />
-                        Itinerary Editor
+                        Itinerary Editor — {activeSelection.isManual ? 'Manual Itinerary' : (activeSelection.packageName || 'Package')}
                         <span className="text-xs font-normal text-gray-400">
-                          ({itineraryDays.length || 0} day{itineraryDays.length === 1 ? '' : 's'})
+                          ({activeSelection.itineraryDays.length || 0} day{activeSelection.itineraryDays.length === 1 ? '' : 's'})
                         </span>
                       </span>
                       {showItineraryEditor ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
                     </button>
 
                     {showItineraryEditor && (
-                      <div className="p-4 border-t border-emerald-100">
+                      <div className="p-4 border-t border-emerald-100 space-y-3">
+                        {!activeSelection.isManual && (
+                          <div className="flex items-center justify-between px-1">
+                            <span className="text-xs text-gray-500">
+                              {activeSelection.isMaterialized
+                                ? 'This itinerary has been customized for this lead.'
+                                : 'Showing the original package itinerary — edit any field to customize it for this lead.'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRefreshSelection(activeSelection)}
+                              disabled={!activeSelection.isMaterialized || refreshingSelectionId === activeSelection.id}
+                              title={activeSelection.isMaterialized ? 'Discard customizations and revert to the original package' : 'Nothing to refresh — this is already the original package'}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {refreshingSelectionId === activeSelection.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              )}
+                              Refresh from original package
+                            </button>
+                          </div>
+                        )}
                         <ItineraryEditor
-                          days={itineraryDays}
+                          days={activeSelection.itineraryDays}
                           onDayChange={(dayNumber, dayData) => {
-                            setItineraryDirty(true);
-                            setItineraryDays(prev =>
-                              (prev || []).filter(Boolean).map(day =>
+                            updateActiveSelection({
+                              itineraryDays: (activeSelection.itineraryDays || []).filter(Boolean).map(day =>
                                 day.dayNumber === dayNumber ? { ...day, ...dayData } : day
-                              )
-                            );
+                              ),
+                            });
                           }}
                           onAddDay={() => {
-                            setItineraryDirty(true);
-                            const newDayNumber = itineraryDays.length + 1;
-                            setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
+                            const newDayNumber = activeSelection.itineraryDays.length + 1;
+                            updateActiveSelection({ itineraryDays: [...activeSelection.itineraryDays, createDefaultDay(newDayNumber)] });
                           }}
                           onRemoveDay={(dayNumber) => {
-                            setItineraryDirty(true);
-                            const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                            const renumberedDays = filteredDays.map((day, index) => ({
-                              ...day,
-                              dayNumber: index + 1,
-                            }));
-                            setItineraryDays(renumberedDays);
+                            const filteredDays = activeSelection.itineraryDays.filter(day => day.dayNumber !== dayNumber);
+                            const renumberedDays = filteredDays.map((day, index) => ({ ...day, dayNumber: index + 1 }));
+                            updateActiveSelection({ itineraryDays: renumberedDays });
                           }}
                           destination={formData.destination}
                           hideTitleAndDescription={true}
@@ -970,36 +1033,45 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                 </button>
               </div>
 
-              <LeadFlightBookingsSection
-                leadId={lead._id || lead.id}
-                leadStatus={lead.lifecycleStatus}
-                itineraryDays={itineraryDays}
-                travelDate={formData.travelDate}
-                onUpdateDay={(dayNumber, updates) => {
-                  setItineraryDirty(true);
-                  setItineraryDays(prev =>
-                    (prev || []).filter(Boolean).map(day =>
-                      day.dayNumber === dayNumber ? { ...day, ...updates } : day
-                    )
-                  );
-                }}
-                onFlightsChanged={() => setPricingRefreshToken(t => t + 1)}
-              />
+              {activeSelection ? (
+                <>
+                  <LeadFlightBookingsSection
+                    leadId={lead._id || lead.id}
+                    selectionId={activeSelection.id}
+                    leadStatus={lead.lifecycleStatus}
+                    itineraryDays={activeSelection.itineraryDays}
+                    travelDate={formData.travelDate}
+                    onUpdateDay={(dayNumber, updates) => {
+                      updateActiveSelection({
+                        itineraryDays: (activeSelection.itineraryDays || []).filter(Boolean).map(day =>
+                          day.dayNumber === dayNumber ? { ...day, ...updates } : day
+                        ),
+                      });
+                    }}
+                    onFlightsChanged={() => setPricingRefreshToken(t => t + 1)}
+                  />
 
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing</h3>
-                <PricingSection
-                  leadId={lead._id || lead.id}
-                  days={reconciledItineraryDays}
-                  travelers={formData.numberOfTravelers || 1}
-                  pricing={pricingSettings}
-                  refreshToken={pricingRefreshToken}
-                  onSettingsChange={(settings) => {
-                    setItineraryDirty(true);
-                    setPricingSettings(settings);
-                  }}
-                />
-              </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      Pricing — {activeSelection.isManual ? 'Manual Itinerary' : (activeSelection.packageName || 'Package')}
+                    </h3>
+                    <PricingSection
+                      leadId={lead._id || lead.id}
+                      selectionId={activeSelection.id}
+                      days={reconcileDays(activeSelection.itineraryDays)}
+                      travelers={formData.numberOfTravelers || 1}
+                      pricing={activeSelection.pricingSettings}
+                      refreshToken={pricingRefreshToken}
+                      onSettingsChange={(settings) => updateActiveSelection({ pricingSettings: settings })}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-6 text-gray-400 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Add a package above to manage its itinerary and pricing</p>
+                </div>
+              )}
             </div>
           )}
         </div>

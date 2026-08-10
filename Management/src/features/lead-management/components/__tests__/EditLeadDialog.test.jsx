@@ -1,35 +1,44 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const MANUAL_ITINERARY_VALUE = '__manual__';
 
 const {
-  mockGetLead,
+  mockGetPackageSelections,
+  mockGetPackageSelection,
+  mockAddPackageSelection,
+  mockRemovePackageSelection,
+  mockUpdatePackageSelectionItinerary,
+  mockRefreshPackageSelection,
   mockUpdateLead,
   mockAssignLead,
-  mockUpdateLeadItinerary,
   mockGetAllPackages,
-  mockGetPackageById,
 } = vi.hoisted(() => ({
-  mockGetLead: vi.fn(),
+  mockGetPackageSelections: vi.fn(),
+  mockGetPackageSelection: vi.fn(),
+  mockAddPackageSelection: vi.fn(),
+  mockRemovePackageSelection: vi.fn(),
+  mockUpdatePackageSelectionItinerary: vi.fn(),
+  mockRefreshPackageSelection: vi.fn(),
   mockUpdateLead: vi.fn(),
   mockAssignLead: vi.fn(),
-  mockUpdateLeadItinerary: vi.fn(),
   mockGetAllPackages: vi.fn(),
-  mockGetPackageById: vi.fn(),
 }));
 
 vi.mock('../../../../services/api', () => ({
   leadAPI: {
-    getLead: mockGetLead,
+    getPackageSelections: mockGetPackageSelections,
+    getPackageSelection: mockGetPackageSelection,
+    addPackageSelection: mockAddPackageSelection,
+    removePackageSelection: mockRemovePackageSelection,
+    updatePackageSelectionItinerary: mockUpdatePackageSelectionItinerary,
+    refreshPackageSelection: mockRefreshPackageSelection,
     updateLead: mockUpdateLead,
     assignLead: mockAssignLead,
-    updateLeadItinerary: mockUpdateLeadItinerary,
   },
   packageAPI: {
     getAll: mockGetAllPackages,
-    getById: mockGetPackageById,
   },
 }));
 
@@ -67,8 +76,9 @@ vi.mock('../LeadFlightBookingsSection', () => ({
 }));
 
 vi.mock('../PricingSection', () => ({
-  default: ({ days, pricing, onSettingsChange, refreshToken }) => (
+  default: ({ selectionId, days, pricing, onSettingsChange, refreshToken }) => (
     <div data-testid="pricing-section">
+      <span data-testid="pricing-selection-id">{String(selectionId)}</span>
       <span data-testid="pricing-margin-type">{String(pricing?.marginType)}</span>
       <span data-testid="pricing-margin-value">{String(pricing?.marginValue)}</span>
       <span data-testid="pricing-discount-type">{String(pricing?.discountType)}</span>
@@ -99,8 +109,6 @@ const leadFixture = (overrides = {}) => ({
   email: 'john@test.com',
   phone: '+94771234567',
   numberOfTravelers: 2,
-  packageId: PKG_A,
-  packageName: 'Sri Lanka Explorer',
   lifecycleStatus: 'DRAFTING',
   travelDate: '2026-01-01',
   endDate: '2026-01-10',
@@ -108,9 +116,13 @@ const leadFixture = (overrides = {}) => ({
   ...overrides,
 });
 
-const freshLeadFixture = (overrides = {}) => ({
-  ...leadFixture(),
-  sourcePackageId: PKG_A,
+const selectionFixture = (overrides = {}) => ({
+  id: 'sel-1',
+  packageId: PKG_A,
+  isManual: false,
+  packageName: 'Sri Lanka Explorer',
+  currentQuoteId: null,
+  isMaterialized: true,
   pricing: {
     marginType: 'PERCENTAGE',
     marginValue: 10,
@@ -124,19 +136,6 @@ const freshLeadFixture = (overrides = {}) => ({
   ...overrides,
 });
 
-const packageBlueprintFixture = (id, overrides = {}) => ({
-  success: true,
-  data: {
-    _id: id,
-    title: id === PKG_A ? 'Sri Lanka Explorer' : 'Maldives Getaway',
-    itineraryDays: [
-      { dayNumber: 1, title: 'Blueprint Day 1', places: [], activities: [], transports: [] },
-      { dayNumber: 2, title: 'Blueprint Day 2', places: [], activities: [], transports: [] },
-    ],
-    ...overrides,
-  },
-});
-
 function renderDialog({ lead = leadFixture(), isOpen = true, onClose = vi.fn(), onSuccess = vi.fn(), salesReps = [] } = {}) {
   const utils = render(
     <EditLeadDialog isOpen={isOpen} onClose={onClose} lead={lead} salesReps={salesReps} onSuccess={onSuccess} />
@@ -145,18 +144,22 @@ function renderDialog({ lead = leadFixture(), isOpen = true, onClose = vi.fn(), 
 }
 
 beforeEach(() => {
-  mockGetLead.mockReset();
+  mockGetPackageSelections.mockReset();
+  mockGetPackageSelection.mockReset();
+  mockAddPackageSelection.mockReset();
+  mockRemovePackageSelection.mockReset();
+  mockUpdatePackageSelectionItinerary.mockReset();
+  mockRefreshPackageSelection.mockReset();
   mockUpdateLead.mockReset();
   mockAssignLead.mockReset();
-  mockUpdateLeadItinerary.mockReset();
   mockGetAllPackages.mockReset();
-  mockGetPackageById.mockReset();
 
   mockGetAllPackages.mockResolvedValue({ success: true, data: packagesFixture });
-  mockGetLead.mockResolvedValue({ data: freshLeadFixture() });
+  mockGetPackageSelections.mockResolvedValue({ success: true, data: [selectionFixture()] });
   mockUpdateLead.mockResolvedValue({ success: true, data: {} });
-  mockUpdateLeadItinerary.mockResolvedValue({ success: true, data: {} });
-  mockGetPackageById.mockImplementation((id) => Promise.resolve(packageBlueprintFixture(id)));
+  mockUpdatePackageSelectionItinerary.mockResolvedValue({ success: true, data: {} });
+  mockAddPackageSelection.mockResolvedValue({ success: true, data: { id: 'sel-2' } });
+  mockRefreshPackageSelection.mockResolvedValue({ success: true, data: {} });
 });
 
 describe('EditLeadDialog — load behavior', () => {
@@ -165,73 +168,67 @@ describe('EditLeadDialog — load behavior', () => {
     expect(await screen.findByText('John Doe')).toBeInTheDocument();
   });
 
-  it('selects the lead current package once packages load', async () => {
+  it('renders a tab for the lead current package once selections load', async () => {
     renderDialog();
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(select).toHaveValue(PKG_A));
+    expect(await screen.findByRole('button', { name: 'Sri Lanka Explorer' })).toBeInTheDocument();
   });
 
-  it('loads saved pricing settings into the pricing preview', async () => {
+  it('loads saved pricing settings for the active tab into the pricing preview', async () => {
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('pricing-margin-type')).toHaveTextContent('PERCENTAGE'));
     expect(screen.getByTestId('pricing-margin-value')).toHaveTextContent('10');
     expect(screen.getByTestId('pricing-discount-type')).toHaveTextContent('percentage');
     expect(screen.getByTestId('pricing-discount-value')).toHaveTextContent('15');
+    expect(screen.getByTestId('pricing-selection-id')).toHaveTextContent('sel-1');
   });
 
-  it('loads the lead persisted itinerary days into the pricing preview', async () => {
+  it('loads the active selection persisted itinerary days into the pricing preview', async () => {
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1'));
+  });
+
+  it('shows a placeholder and no pricing preview when the lead has no packages attached', async () => {
+    mockGetPackageSelections.mockResolvedValue({ success: true, data: [] });
+    renderDialog();
+    expect(await screen.findByText(/add a package above/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('pricing-section')).not.toBeInTheDocument();
   });
 });
 
 describe('EditLeadDialog — day-linked flight cost reconciliation', () => {
   it('reconciles a priced day flight into a FLIGHT transport row for the pricing preview', async () => {
-    mockGetLead.mockResolvedValue({
-      data: freshLeadFixture({
+    mockGetPackageSelections.mockResolvedValue({
+      success: true,
+      data: [selectionFixture({
         itineraryDays: [{
-          dayNumber: 1,
-          title: 'Day 1',
-          places: [],
-          activities: [],
-          transports: [],
+          dayNumber: 1, title: 'Day 1', places: [], activities: [], transports: [],
           flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB', totalAmount: 150 }],
         }],
-      }),
+      })],
     });
     renderDialog();
 
     await waitFor(() => expect(screen.getByTestId('pricing-first-flight-transport-cost')).toHaveTextContent('150'));
   });
 
-  it('shows no flight transport cost when the day has no flight set', async () => {
-    renderDialog();
-    await screen.findByLabelText('Package');
-    expect(screen.getByTestId('pricing-first-flight-transport-cost')).toHaveTextContent('');
-  });
-
   it('sends the reconciled transport in the itinerary save payload', async () => {
-    mockGetLead.mockResolvedValue({
-      data: freshLeadFixture({
+    mockGetPackageSelections.mockResolvedValue({
+      success: true,
+      data: [selectionFixture({
         itineraryDays: [{
-          dayNumber: 1,
-          title: 'Day 1',
-          places: [],
-          activities: [],
-          transports: [],
+          dayNumber: 1, title: 'Day 1', places: [], activities: [], transports: [],
           flights: [{ id: 'f1', origin: 'CMB', destination: 'DXB', totalAmount: 150 }],
         }],
-      }),
+      })],
     });
     const user = userEvent.setup();
     renderDialog();
 
-    await screen.findByLabelText('Package');
-    // Mark the itinerary dirty via the pricing settings change, then save.
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     await user.click(screen.getByRole('button', { name: /change margin/i }));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
-    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+    await waitFor(() => expect(mockUpdatePackageSelectionItinerary).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({
       days: expect.arrayContaining([
         expect.objectContaining({
           transports: expect.arrayContaining([
@@ -246,7 +243,7 @@ describe('EditLeadDialog — day-linked flight cost reconciliation', () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     expect(screen.getByTestId('pricing-refresh-token')).toHaveTextContent('0');
 
     await user.click(screen.getByRole('button', { name: /simulate flight change/i }));
@@ -255,212 +252,141 @@ describe('EditLeadDialog — day-linked flight cost reconciliation', () => {
   });
 });
 
-describe('EditLeadDialog — destination field', () => {
-  it('shows a read-only destination label once a package is attached', async () => {
-    renderDialog({ lead: leadFixture({ packageId: PKG_A, packageName: 'Sri Lanka Explorer', destination: 'Sri Lanka' }) });
-    await screen.findByLabelText('Package');
-    const destination = screen.getByLabelText('Destination');
-    expect(destination.tagName).toBe('DIV');
-    expect(destination).toHaveTextContent('Sri Lanka');
-    expect(destination).toHaveTextContent('Set by the selected package');
-  });
-
-  it('shows the editable destination selector when there is no package', async () => {
-    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
-    await screen.findByLabelText('Package');
-    const destination = screen.getByLabelText('Destination');
-    expect(destination.tagName).toBe('INPUT');
-  });
-
-  it('switches from editable to read-only when a package gets selected', async () => {
-    const user = userEvent.setup();
-    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
-
-    expect(screen.getByLabelText('Destination').tagName).toBe('INPUT');
-
-    const select = await screen.findByLabelText('Package');
-    await user.selectOptions(select, PKG_A);
-
-    await waitFor(() => expect(screen.getByLabelText('Destination').tagName).toBe('DIV'));
-  });
-});
-
 describe('EditLeadDialog — field locking by lifecycle status', () => {
-  it('leaves package, dates and travelers editable while DRAFTING', async () => {
+  it('leaves dates and travelers editable while DRAFTING', async () => {
     renderDialog({ lead: leadFixture({ lifecycleStatus: 'DRAFTING' }) });
-    const select = await screen.findByLabelText('Package');
-    expect(select).not.toBeDisabled();
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     expect(screen.getByLabelText('Travel Date (Start)')).not.toBeDisabled();
     expect(screen.getByLabelText('End Date')).not.toBeDisabled();
     expect(screen.getByLabelText('Number of Travelers')).not.toBeDisabled();
   });
 
-  it('leaves fields editable for a brand new lead', async () => {
-    renderDialog({ lead: leadFixture({ lifecycleStatus: 'NEW' }) });
-    const select = await screen.findByLabelText('Package');
-    expect(select).not.toBeDisabled();
-  });
-
   it.each(['QUOTED', 'REVISION', 'APPROVED', 'BOOKING_IN_PROGRESS', 'CONFIRMED', 'BOOKING_FAILED'])(
-    'locks package, dates and travelers once status is %s',
+    'locks dates and travelers once status is %s',
     async (status) => {
       renderDialog({ lead: leadFixture({ lifecycleStatus: status }) });
-      const select = await screen.findByLabelText('Package');
-      expect(select).toBeDisabled();
+      await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
       expect(screen.getByLabelText('Travel Date (Start)')).toBeDisabled();
       expect(screen.getByLabelText('End Date')).toBeDisabled();
       expect(screen.getByLabelText('Number of Travelers')).toBeDisabled();
     }
   );
 
-  it('shows a lock indicator next to locked fields', async () => {
+  it('still allows adding a new package even when the lead is QUOTED', async () => {
     renderDialog({ lead: leadFixture({ lifecycleStatus: 'QUOTED' }) });
-    await screen.findByLabelText('Package');
-    expect(screen.getAllByText('Locked').length).toBeGreaterThan(0);
-  });
-
-  it('does not show a lock indicator while DRAFTING', async () => {
-    renderDialog({ lead: leadFixture({ lifecycleStatus: 'DRAFTING' }) });
-    await screen.findByLabelText('Package');
-    expect(screen.queryByText('Locked')).not.toBeInTheDocument();
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
+    expect(screen.getByRole('button', { name: /add package/i })).not.toBeDisabled();
   });
 
   it('the name field always stays editable, even when locked', async () => {
     renderDialog({ lead: leadFixture({ lifecycleStatus: 'QUOTED' }) });
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     expect(screen.getByLabelText('Full Name')).not.toBeDisabled();
   });
 });
 
-describe('EditLeadDialog — package switching (pristine itinerary)', () => {
-  it('carries margin over and resets discount when switching to a new package', async () => {
+describe('EditLeadDialog — package tabs', () => {
+  it('adds a new package tab and switches to it', async () => {
+    mockGetPackageSelection.mockResolvedValue({
+      success: true,
+      data: selectionFixture({ id: 'sel-2', packageId: PKG_B, packageName: 'Maldives Getaway', isMaterialized: false, itineraryDays: [], pricing: null }),
+    });
     const user = userEvent.setup();
     renderDialog();
 
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(select).toHaveValue(PKG_A));
-    await waitFor(() => expect(screen.getByTestId('pricing-margin-type')).toHaveTextContent('PERCENTAGE'));
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
+    await user.click(screen.getByRole('button', { name: /add package/i }));
+    await user.selectOptions(screen.getByLabelText('Add package'), PKG_B);
 
-    await user.selectOptions(select, PKG_B);
-
-    await waitFor(() => expect(screen.getByTestId('pricing-discount-type')).toHaveTextContent('none'));
-    expect(screen.getByTestId('pricing-discount-value')).toHaveTextContent('0');
-    // Margin is untouched by the switch.
-    expect(screen.getByTestId('pricing-margin-type')).toHaveTextContent('PERCENTAGE');
-    expect(screen.getByTestId('pricing-margin-value')).toHaveTextContent('10');
+    expect(await screen.findByRole('button', { name: 'Maldives Getaway' })).toBeInTheDocument();
+    expect(mockAddPackageSelection).toHaveBeenCalledWith('lead-1', { packageId: PKG_B });
+    await waitFor(() => expect(screen.getByTestId('pricing-selection-id')).toHaveTextContent('sel-2'));
   });
 
-  it('replaces the itinerary preview with the new package blueprint when pristine', async () => {
+  it('adds a manual itinerary slot', async () => {
+    mockGetPackageSelection.mockResolvedValue({
+      success: true,
+      data: selectionFixture({ id: 'sel-3', packageId: null, isManual: true, packageName: null, isMaterialized: false, itineraryDays: [{ dayNumber: 1, places: [], activities: [], transports: [] }], pricing: null }),
+    });
     const user = userEvent.setup();
     renderDialog();
 
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1'));
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
+    await user.click(screen.getByRole('button', { name: /add package/i }));
+    await user.selectOptions(screen.getByLabelText('Add package'), MANUAL_ITINERARY_VALUE);
 
-    await user.selectOptions(select, PKG_B);
-
-    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_B));
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('2'));
+    expect(await screen.findByRole('button', { name: 'Manual Itinerary' })).toBeInTheDocument();
+    expect(mockAddPackageSelection).toHaveBeenCalledWith('lead-1', { isManual: true });
   });
 
-  it('sends the new packageId and carried pricing settings on save', async () => {
+  it('removes a package tab after confirming', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderDialog();
 
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(select).toHaveValue(PKG_A));
-    await user.selectOptions(select, PKG_B);
-    await waitFor(() => expect(screen.getByTestId('pricing-discount-type')).toHaveTextContent('none'));
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
+    await user.click(screen.getByTitle('Remove package'));
 
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockRemovePackageSelection).toHaveBeenCalledWith('lead-1', 'sel-1'));
+    confirmSpy.mockRestore();
+  });
 
-    await waitFor(() => expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({
-      packageId: PKG_B,
-      packageName: 'Maldives Getaway',
-      pricing: expect.objectContaining({ marginType: 'PERCENTAGE', marginValue: 10, discountType: 'none', discountValue: 0 }),
-    })));
-    // No manual itinerary edit happened — the backend handles the pristine
-    // replacement internally, so the itinerary endpoint is not called.
-    expect(mockUpdateLeadItinerary).not.toHaveBeenCalled();
+  it('does not remove the tab when the confirm dialog is dismissed', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
+    await user.click(screen.getByTitle('Remove package'));
+
+    expect(mockRemovePackageSelection).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });
 
-describe('EditLeadDialog — package switching (customized itinerary)', () => {
-  beforeEach(() => {
-    // sourcePackageId null => itinerary was manually edited, no longer pristine.
-    mockGetLead.mockResolvedValue({ data: freshLeadFixture({ sourcePackageId: null }) });
-  });
+describe('EditLeadDialog — refresh from original package', () => {
+  // The itinerary editor (and its Refresh button) is collapsed by default;
+  // clicking the active package's tab expands it, same as picking a tab
+  // manually would in the running app.
+  async function openItineraryEditor(user) {
+    await user.click(await screen.findByRole('button', { name: 'Sri Lanka Explorer' }));
+  }
 
-  it('keeps the existing itinerary preview instead of pulling the new blueprint', async () => {
+  it('is disabled while the selection is still pristine', async () => {
+    mockGetPackageSelections.mockResolvedValue({ success: true, data: [selectionFixture({ isMaterialized: false })] });
     const user = userEvent.setup();
     renderDialog();
 
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1'));
-
-    await user.selectOptions(select, PKG_B);
-
-    // Still resets discount / carries margin (pricing settings are independent of itinerary state).
-    await waitFor(() => expect(screen.getByTestId('pricing-discount-type')).toHaveTextContent('none'));
-    // But the itinerary days count stays at the original lead itinerary, not the new blueprint's 2 days.
-    expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1');
+    await openItineraryEditor(user);
+    expect(screen.getByRole('button', { name: /refresh from original package/i })).toBeDisabled();
   });
 
-  it('still sends the new packageId on save, without an itinerary payload', async () => {
+  it('refreshes a materialized (edited) selection', async () => {
+    mockGetPackageSelection.mockResolvedValue({ success: true, data: selectionFixture({ isMaterialized: false }) });
     const user = userEvent.setup();
     renderDialog();
 
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(select).toHaveValue(PKG_A));
-    await user.selectOptions(select, PKG_B);
-    await waitFor(() => expect(screen.getByTestId('pricing-discount-type')).toHaveTextContent('none'));
+    await openItineraryEditor(user);
+    await user.click(screen.getByRole('button', { name: /refresh from original package/i }));
 
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
-
-    await waitFor(() => expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({
-      packageId: PKG_B,
-      packageName: 'Maldives Getaway',
-    })));
-    expect(mockUpdateLeadItinerary).not.toHaveBeenCalled();
-  });
-});
-
-describe('EditLeadDialog — package switching (no itinerary yet)', () => {
-  beforeEach(() => {
-    // No package attached, no itinerary rows at all — nothing to protect,
-    // so selecting a package should populate it immediately, the same as a
-    // pristine switch, even though there's no sourcePackageId to match against.
-    mockGetLead.mockResolvedValue({ data: freshLeadFixture({ sourcePackageId: null, itineraryDays: [] }) });
+    await waitFor(() => expect(mockRefreshPackageSelection).toHaveBeenCalledWith('lead-1', 'sel-1', false));
   });
 
-  it('loads the selected package blueprint into the itinerary preview', async () => {
+  it('prompts to confirm and retries with force when the selection has already been quoted', async () => {
+    const blockedError = new Error('already quoted');
+    blockedError.status = 409;
+    blockedError.data = { code: 'REFRESH_BLOCKED_QUOTED' };
+    mockRefreshPackageSelection.mockRejectedValueOnce(blockedError).mockResolvedValueOnce({ success: true, data: {} });
+    mockGetPackageSelection.mockResolvedValue({ success: true, data: selectionFixture({ isMaterialized: false }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
-    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
+    renderDialog();
 
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('0'));
+    await openItineraryEditor(user);
+    await user.click(screen.getByRole('button', { name: /refresh from original package/i }));
 
-    await user.selectOptions(select, PKG_A);
-
-    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_A));
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('2'));
-  });
-
-  it('sends the new packageId on save (backend populates the itinerary server-side)', async () => {
-    const user = userEvent.setup();
-    renderDialog({ lead: leadFixture({ packageId: null, packageName: null }) });
-
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(select).toHaveValue(''));
-    await user.selectOptions(select, PKG_A);
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('2'));
-
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
-
-    await waitFor(() => expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({
-      packageId: PKG_A,
-      packageName: 'Sri Lanka Explorer',
-    })));
+    await waitFor(() => expect(mockRefreshPackageSelection).toHaveBeenCalledWith('lead-1', 'sel-1', true));
+    confirmSpy.mockRestore();
   });
 });
 
@@ -469,7 +395,7 @@ describe('EditLeadDialog — cancel discards unsaved changes', () => {
     const user = userEvent.setup();
     const { onClose } = renderDialog();
 
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     await user.click(screen.getByRole('button', { name: /^cancel$/i }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -493,32 +419,10 @@ describe('EditLeadDialog — cancel discards unsaved changes', () => {
     await user.click(screen.getByRole('button', { name: /^cancel$/i }));
     expect(onClose).toHaveBeenCalled();
 
-    // Simulate the parent closing then reopening with the exact same lead object reference.
     rerender(<EditLeadDialog isOpen={false} onClose={onClose} lead={lead} salesReps={[]} onSuccess={vi.fn()} />);
     rerender(<EditLeadDialog isOpen={true} onClose={onClose} lead={lead} salesReps={[]} onSuccess={vi.fn()} />);
 
     expect(await screen.findByLabelText('Full Name')).toHaveValue('John Doe');
-  });
-
-  it('reverts a package switch after cancel', async () => {
-    const user = userEvent.setup();
-    const lead = leadFixture();
-    const onClose = vi.fn();
-    const { rerender } = render(
-      <EditLeadDialog isOpen={true} onClose={onClose} lead={lead} salesReps={[]} onSuccess={vi.fn()} />
-    );
-
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(select).toHaveValue(PKG_A));
-    await user.selectOptions(select, PKG_B);
-    await waitFor(() => expect(select).toHaveValue(PKG_B));
-
-    await user.click(screen.getByRole('button', { name: /^cancel$/i }));
-
-    rerender(<EditLeadDialog isOpen={false} onClose={onClose} lead={lead} salesReps={[]} onSuccess={vi.fn()} />);
-    rerender(<EditLeadDialog isOpen={true} onClose={onClose} lead={lead} salesReps={[]} onSuccess={vi.fn()} />);
-
-    await waitFor(() => expect(screen.getByLabelText('Package')).toHaveValue(PKG_A));
   });
 });
 
@@ -527,28 +431,30 @@ describe('EditLeadDialog — save behavior', () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(mockUpdateLead).toHaveBeenCalledTimes(1));
-    expect(mockUpdateLeadItinerary).not.toHaveBeenCalled();
+    expect(mockUpdatePackageSelectionItinerary).not.toHaveBeenCalled();
+    // Package identity no longer travels through updateLead — it's managed via /packages.
+    expect(mockUpdateLead.mock.calls[0][1]).not.toHaveProperty('packageId');
+    expect(mockUpdateLead.mock.calls[0][1]).not.toHaveProperty('pricing');
   });
 
-  it('persists a manual pricing edit through updateLeadItinerary before updateLead', async () => {
+  it('persists a dirty selection through updatePackageSelectionItinerary before updateLead', async () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     await user.click(screen.getByRole('button', { name: /change margin/i }));
-
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
-    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+    await waitFor(() => expect(mockUpdatePackageSelectionItinerary).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({
       pricing: expect.objectContaining({ marginValue: 99 }),
     })));
     expect(mockUpdateLead).toHaveBeenCalled();
 
-    const itineraryCallOrder = mockUpdateLeadItinerary.mock.invocationCallOrder[0];
+    const itineraryCallOrder = mockUpdatePackageSelectionItinerary.mock.invocationCallOrder[0];
     const updateLeadCallOrder = mockUpdateLead.mock.invocationCallOrder[0];
     expect(itineraryCallOrder).toBeLessThan(updateLeadCallOrder);
   });
@@ -557,7 +463,7 @@ describe('EditLeadDialog — save behavior', () => {
     const user = userEvent.setup();
     const { onClose, onSuccess } = renderDialog();
 
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
@@ -569,7 +475,7 @@ describe('EditLeadDialog — save behavior', () => {
     const user = userEvent.setup();
     const { onClose, onSuccess } = renderDialog();
 
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(mockUpdateLead).toHaveBeenCalled());
@@ -577,99 +483,17 @@ describe('EditLeadDialog — save behavior', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('does not call updateLead when saving the itinerary fails', async () => {
-    mockUpdateLeadItinerary.mockRejectedValue(new Error('Itinerary save failed'));
+  it('does not call updateLead when saving a dirty selection fails', async () => {
+    mockUpdatePackageSelectionItinerary.mockRejectedValue(new Error('Itinerary save failed'));
     const user = userEvent.setup();
     renderDialog();
 
-    await screen.findByLabelText('Package');
+    await screen.findByRole('button', { name: 'Sri Lanka Explorer' });
     await user.click(screen.getByRole('button', { name: /change margin/i }));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
-    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalled());
+    await waitFor(() => expect(mockUpdatePackageSelectionItinerary).toHaveBeenCalled());
     expect(mockUpdateLead).not.toHaveBeenCalled();
-  });
-});
-
-describe('EditLeadDialog — manual itinerary option', () => {
-  it('offers "Manual Itinerary (No Package)" as an option in the Package select', async () => {
-    renderDialog();
-    const select = await screen.findByLabelText('Package');
-    expect(within(select).getByRole('option', { name: /manual itinerary \(no package\)/i })).toBeInTheDocument();
-  });
-
-  it('preserves the existing days and marks the form dirty when Manual Itinerary is selected', async () => {
-    const user = userEvent.setup();
-    renderDialog();
-
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1'));
-
-    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
-
-    expect(select).toHaveValue(MANUAL_ITINERARY_VALUE);
-    expect(screen.getByTestId('itinerary-editor')).toBeInTheDocument();
-    expect(screen.getByTestId('itinerary-days-count')).toHaveTextContent('1');
-    expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1');
-
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
-
-    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalled());
-    expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({
-      isManualItinerary: true, packageId: null, packageName: null,
-    }));
-  });
-
-  it('seeds a single blank day when Manual Itinerary is selected with no itinerary yet', async () => {
-    mockGetLead.mockResolvedValue({ data: freshLeadFixture({ itineraryDays: [] }) });
-    const user = userEvent.setup();
-    renderDialog();
-
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('0'));
-
-    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
-
-    expect(screen.getByTestId('itinerary-days-count')).toHaveTextContent('1');
-  });
-
-  it('silently loads the package blueprint when switching from an empty manual draft to a real package', async () => {
-    mockGetLead.mockResolvedValue({ data: freshLeadFixture({ itineraryDays: [] }) });
-    const user = userEvent.setup();
-    renderDialog();
-
-    const select = await screen.findByLabelText('Package');
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('0'));
-
-    await user.selectOptions(select, PKG_A);
-
-    await waitFor(() => expect(mockGetPackageById).toHaveBeenCalledWith(PKG_A));
-    await waitFor(() => expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('2'));
-  });
-
-  it('preserves hand-built manual days when a real package is selected afterward', async () => {
-    const user = userEvent.setup();
-    renderDialog();
-
-    const select = await screen.findByLabelText('Package');
-    await user.selectOptions(select, MANUAL_ITINERARY_VALUE);
-    expect(screen.getByTestId('itinerary-days-count')).toHaveTextContent('1');
-
-    await user.selectOptions(select, PKG_B);
-
-    expect(select).toHaveValue(PKG_B);
-    // Non-empty manual itinerary is never silently overwritten by a package pick.
-    expect(screen.getByTestId('pricing-days-count')).toHaveTextContent('1');
-  });
-
-  it('sends isManualItinerary: false on a plain save with no toggle interaction', async () => {
-    const user = userEvent.setup();
-    renderDialog();
-
-    await screen.findByLabelText('Package');
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
-
-    await waitFor(() => expect(mockUpdateLead).toHaveBeenCalledWith('lead-1', expect.objectContaining({ isManualItinerary: false })));
   });
 });
 

@@ -6,11 +6,12 @@ import { leadAPI } from '../../../services/api';
 const money = (n) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
- * Live pricing card for the lead dialog. Preview-only: every change calls the
- * backend engine via /pricing/calculate; nothing persists until the dialog's
- * Save sends { days, pricing } to /leads/:id/itinerary.
+ * Live pricing card for one package selection's tab in the lead dialog.
+ * Preview-only: every change calls the backend engine via
+ * /packages/:selectionId/pricing/calculate; nothing persists until the
+ * dialog saves { days, pricing } to /packages/:selectionId/itinerary.
  */
-export default function PricingSection({ leadId, days = [], travelers = 1, pricing = {}, onSettingsChange, refreshToken = 0 }) {
+export default function PricingSection({ leadId, selectionId, days = [], travelers = 1, pricing = {}, onSettingsChange, refreshToken = 0 }) {
   const initialized = useRef(false);
   const [settings, setSettings] = useState({
     marginType: pricing.marginType || null,
@@ -67,8 +68,8 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
           depositType: settings.depositType,
           depositValue: Number(settings.depositValue) || 0,
         };
-        const res = leadId
-          ? await leadAPI.calculatePricing(leadId, payload)
+        const res = leadId && selectionId
+          ? await leadAPI.calculateSelectionPricing(leadId, selectionId, payload)
           : await leadAPI.previewPricing(payload);
         setComputed(res.data?.data?.financials || res.data?.financials);
       } catch (err) {
@@ -78,7 +79,7 @@ export default function PricingSection({ leadId, days = [], travelers = 1, prici
       }
     }, 350);
     return () => clearTimeout(timer);
-  }, [leadId, days, travelers, settings, refreshToken]);
+  }, [leadId, selectionId, days, travelers, settings, refreshToken]);
 
   const inputCls = "w-full px-2 py-1.5 border border-gray-200 rounded text-sm";
   const labelCls = "text-xs text-gray-500";

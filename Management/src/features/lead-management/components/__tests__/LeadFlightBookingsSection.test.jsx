@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { mockGetByLead, mockCancelBooking, mockGetFlights, mockAddFlight, mockDeleteFlight } = vi.hoisted(() => ({
+const { mockGetByLead, mockCancelBooking, mockGetSelectionFlights, mockAddSelectionFlight, mockDeleteSelectionFlight } = vi.hoisted(() => ({
   mockGetByLead: vi.fn(),
   mockCancelBooking: vi.fn(),
-  mockGetFlights: vi.fn(),
-  mockAddFlight: vi.fn(),
-  mockDeleteFlight: vi.fn(),
+  mockGetSelectionFlights: vi.fn(),
+  mockAddSelectionFlight: vi.fn(),
+  mockDeleteSelectionFlight: vi.fn(),
 }));
 
 vi.mock('../../../../services/flight.service', () => ({
@@ -15,7 +15,7 @@ vi.mock('../../../../services/flight.service', () => ({
 }));
 
 vi.mock('../../../../services/api', () => ({
-  leadAPI: { getFlights: mockGetFlights, addFlight: mockAddFlight, deleteFlight: mockDeleteFlight },
+  leadAPI: { getSelectionFlights: mockGetSelectionFlights, addSelectionFlight: mockAddSelectionFlight, deleteSelectionFlight: mockDeleteSelectionFlight },
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -72,21 +72,22 @@ const toStartFixture = {
 beforeEach(() => {
   mockGetByLead.mockReset();
   mockCancelBooking.mockReset();
-  mockGetFlights.mockReset();
-  mockAddFlight.mockReset();
-  mockDeleteFlight.mockReset();
+  mockGetSelectionFlights.mockReset();
+  mockAddSelectionFlight.mockReset();
+  mockDeleteSelectionFlight.mockReset();
   lastFlightModalProps = null;
 
   mockGetByLead.mockResolvedValue({ data: [] });
-  mockGetFlights.mockResolvedValue({ data: [] });
-  mockAddFlight.mockResolvedValue({ success: true, data: { id: 'new-flight' } });
-  mockDeleteFlight.mockResolvedValue({ success: true, data: {} });
+  mockGetSelectionFlights.mockResolvedValue({ data: [] });
+  mockAddSelectionFlight.mockResolvedValue({ success: true, data: { id: 'new-flight' } });
+  mockDeleteSelectionFlight.mockResolvedValue({ success: true, data: {} });
 });
 
 function renderSection(props = {}) {
   return render(
     <LeadFlightBookingsSection
       leadId="lead-1"
+      selectionId="sel-1"
       leadStatus="DRAFTING"
       itineraryDays={[]}
       travelDate="2026-01-01"
@@ -99,11 +100,11 @@ function renderSection(props = {}) {
 describe('LeadFlightBookingsSection — loading optional flights', () => {
   it('fetches optional flights via leadAPI.getFlights on mount', async () => {
     renderSection();
-    await waitFor(() => expect(mockGetFlights).toHaveBeenCalledWith('lead-1'));
+    await waitFor(() => expect(mockGetSelectionFlights).toHaveBeenCalledWith('lead-1', 'sel-1'));
   });
 
   it('renders a persisted optional flight from leadAPI, not flightAPI', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     renderSection();
     expect(await screen.findByText('CMB → DXB')).toBeInTheDocument();
     expect(screen.getByText('To Start')).toBeInTheDocument();
@@ -118,7 +119,7 @@ describe('LeadFlightBookingsSection — add flight persists correctly', () => {
     await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalledWith('lead-1', expect.objectContaining({
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({
       flightType: 'TO_START',
       origin: 'AAA',
       destination: 'BBB',
@@ -135,30 +136,30 @@ describe('LeadFlightBookingsSection — add flight persists correctly', () => {
     await user.click(await screen.findByRole('button', { name: /add return flight preferences/i }));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalledWith('lead-1', expect.objectContaining({ flightType: 'RETURN_HOME' })));
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({ flightType: 'RETURN_HOME' })));
   });
 
   it('refetches the optional flights list after a successful add', async () => {
     const user = userEvent.setup();
     renderSection();
     await screen.findByRole('button', { name: /add flight preferences to start/i });
-    mockGetFlights.mockClear();
+    mockGetSelectionFlights.mockClear();
 
     await user.click(screen.getByRole('button', { name: /add flight preferences to start/i }));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockGetFlights).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockGetSelectionFlights).toHaveBeenCalledTimes(1));
   });
 
   it('shows an error toast and does not crash when addFlight fails', async () => {
-    mockAddFlight.mockRejectedValue(new Error('Network error'));
+    mockAddSelectionFlight.mockRejectedValue(new Error('Network error'));
     const user = userEvent.setup();
     renderSection();
 
     await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalled());
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalled());
   });
 
   it('sends the entered estimated cost as estimatedUnitPrice', async () => {
@@ -168,7 +169,7 @@ describe('LeadFlightBookingsSection — add flight persists correctly', () => {
     await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalledWith('lead-1', expect.objectContaining({ estimatedUnitPrice: 99 })));
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({ estimatedUnitPrice: 99 })));
   });
 
   it('notifies the parent via onFlightsChanged so the pricing preview knows to recompute', async () => {
@@ -183,7 +184,7 @@ describe('LeadFlightBookingsSection — add flight persists correctly', () => {
   });
 
   it('does not call onFlightsChanged when addFlight fails', async () => {
-    mockAddFlight.mockRejectedValue(new Error('Network error'));
+    mockAddSelectionFlight.mockRejectedValue(new Error('Network error'));
     const onFlightsChanged = vi.fn();
     const user = userEvent.setup();
     renderSection({ onFlightsChanged });
@@ -191,14 +192,14 @@ describe('LeadFlightBookingsSection — add flight persists correctly', () => {
     await user.click(await screen.findByRole('button', { name: /add flight preferences to start/i }));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalled());
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalled());
     expect(onFlightsChanged).not.toHaveBeenCalled();
   });
 });
 
 describe('LeadFlightBookingsSection — inbound to outbound flip default', () => {
   it('prefills the return-flight modal with flipped origin/destination when a to-start flight exists', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
@@ -210,7 +211,7 @@ describe('LeadFlightBookingsSection — inbound to outbound flip default', () =>
   });
 
   it('carries cabinClass and airlinePreference into the flipped default', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
@@ -222,7 +223,7 @@ describe('LeadFlightBookingsSection — inbound to outbound flip default', () =>
   });
 
   it('clears departureTime in the flipped default', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
@@ -244,23 +245,23 @@ describe('LeadFlightBookingsSection — inbound to outbound flip default', () =>
 
 describe('LeadFlightBookingsSection — editing an existing direction', () => {
   it('deletes the old flight before adding the new one, triggered by clicking the card', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
     await user.click(await screen.findByRole('button', { name: /edit flight preferences: cmb to dxb/i }));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalled());
-    expect(mockDeleteFlight).toHaveBeenCalledWith('lead-1', 'flight-to-start');
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalled());
+    expect(mockDeleteSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', 'flight-to-start');
 
-    const deleteOrder = mockDeleteFlight.mock.invocationCallOrder[0];
-    const addOrder = mockAddFlight.mock.invocationCallOrder[0];
+    const deleteOrder = mockDeleteSelectionFlight.mock.invocationCallOrder[0];
+    const addOrder = mockAddSelectionFlight.mock.invocationCallOrder[0];
     expect(deleteOrder).toBeLessThan(addOrder);
   });
 
   it('also opens the edit modal when the pencil icon specifically is clicked', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
@@ -268,11 +269,11 @@ describe('LeadFlightBookingsSection — editing an existing direction', () => {
     await user.click(screen.getByTitle('Edit preferences'));
     await user.click(screen.getByRole('button', { name: /submit flight/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalled());
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalled());
   });
 
   it('prefills the edit modal with the existing flight data', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
@@ -284,32 +285,32 @@ describe('LeadFlightBookingsSection — editing an existing direction', () => {
   });
 
   it('clicking Remove does not also open the edit modal', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
     await screen.findByText('CMB → DXB');
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
 
-    await waitFor(() => expect(mockDeleteFlight).toHaveBeenCalledWith('lead-1', 'flight-to-start'));
-    expect(mockAddFlight).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockDeleteSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', 'flight-to-start'));
+    expect(mockAddSelectionFlight).not.toHaveBeenCalled();
   });
 });
 
 describe('LeadFlightBookingsSection — removing a flight', () => {
   it('calls leadAPI.deleteFlight when Remove is clicked', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const user = userEvent.setup();
     renderSection();
 
     await screen.findByText('CMB → DXB');
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
 
-    await waitFor(() => expect(mockDeleteFlight).toHaveBeenCalledWith('lead-1', 'flight-to-start'));
+    await waitFor(() => expect(mockDeleteSelectionFlight).toHaveBeenCalledWith('lead-1', 'sel-1', 'flight-to-start'));
   });
 
   it('notifies the parent via onFlightsChanged after removing a flight', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     const onFlightsChanged = vi.fn();
     const user = userEvent.setup();
     renderSection({ onFlightsChanged });
@@ -329,7 +330,7 @@ describe('LeadFlightBookingsSection — empty slots', () => {
   });
 
   it('replaces the add-placeholder with a card once a flight exists for that direction', async () => {
-    mockGetFlights.mockResolvedValue({ data: [toStartFixture] });
+    mockGetSelectionFlights.mockResolvedValue({ data: [toStartFixture] });
     renderSection();
 
     await screen.findByText('CMB → DXB');
@@ -354,8 +355,8 @@ describe('LeadFlightBookingsSection — itinerary-day flights are unaffected', (
     await waitFor(() => expect(onUpdateDay).toHaveBeenCalledWith(1, expect.objectContaining({
       flights: expect.arrayContaining([expect.objectContaining({ origin: 'AAA', destination: 'BBB' })]),
     })));
-    expect(mockAddFlight).not.toHaveBeenCalled();
-    expect(mockDeleteFlight).not.toHaveBeenCalled();
+    expect(mockAddSelectionFlight).not.toHaveBeenCalled();
+    expect(mockDeleteSelectionFlight).not.toHaveBeenCalled();
   });
 
   it('writes the entered estimated cost into the day flight as totalAmount', async () => {

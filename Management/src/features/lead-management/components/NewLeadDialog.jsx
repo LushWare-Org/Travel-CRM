@@ -246,19 +246,23 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
       const response = await leadAPI.createLead(leadData);
       const leadId = response.data?._id || response.data?.id;
+      // createLead creates at most one initial package selection (the
+      // package/manual choice made above) — resolve its id for the
+      // selection-scoped follow-up calls below.
+      const selectionId = response.data?.packageSelections?.[0]?.id;
 
       toast.success('Lead created successfully');
 
-      if (leadId) {
+      if (leadId && selectionId) {
         const flightSaves = [];
         if (formData.inboundFlightPrefs) {
-          flightSaves.push(leadAPI.addFlight(leadId, {
+          flightSaves.push(leadAPI.addSelectionFlight(leadId, selectionId, {
             flightType: OPTIONAL_FLIGHT_TYPE.TO_START,
             ...formData.inboundFlightPrefs,
           }));
         }
         if (formData.outboundFlightPrefs) {
-          flightSaves.push(leadAPI.addFlight(leadId, {
+          flightSaves.push(leadAPI.addSelectionFlight(leadId, selectionId, {
             flightType: OPTIONAL_FLIGHT_TYPE.RETURN_HOME,
             ...formData.outboundFlightPrefs,
           }));
@@ -276,7 +280,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
             transports: reconcileFlightsForSave({ flights: day.flights || [], transports: day.transports || [] }),
           }));
           try {
-            await leadAPI.updateLeadItinerary(leadId, { days: reconciledDays, pricing: {} });
+            await leadAPI.updatePackageSelectionItinerary(leadId, selectionId, { days: reconciledDays, pricing: {} });
           } catch (itineraryError) {
             console.error('Error saving custom itinerary:', itineraryError);
             toast.error('Lead created, but the custom itinerary failed to save');

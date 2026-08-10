@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 
-const { mockCalculatePricing, mockPreviewPricing } = vi.hoisted(() => ({
-  mockCalculatePricing: vi.fn(),
+const { mockCalculateSelectionPricing, mockPreviewPricing } = vi.hoisted(() => ({
+  mockCalculateSelectionPricing: vi.fn(),
   mockPreviewPricing: vi.fn(),
 }));
 
 vi.mock('../../../../services/api', () => ({
-  leadAPI: { calculatePricing: mockCalculatePricing, previewPricing: mockPreviewPricing },
+  leadAPI: { calculateSelectionPricing: mockCalculateSelectionPricing, previewPricing: mockPreviewPricing },
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -26,17 +26,17 @@ const financialsFixture = (overrides = {}) => ({
 });
 
 beforeEach(() => {
-  mockCalculatePricing.mockReset();
+  mockCalculateSelectionPricing.mockReset();
   mockPreviewPricing.mockReset();
-  mockCalculatePricing.mockResolvedValue({ data: { financials: financialsFixture() } });
+  mockCalculateSelectionPricing.mockResolvedValue({ data: { financials: financialsFixture() } });
   mockPreviewPricing.mockResolvedValue({ data: { financials: financialsFixture() } });
 });
 
-describe('PricingSection — leadId routing', () => {
-  it('calls calculatePricing when a leadId is present', async () => {
-    render(<PricingSection leadId="lead-1" days={[]} travelers={2} />);
+describe('PricingSection — leadId/selectionId routing', () => {
+  it('calls calculateSelectionPricing when both leadId and selectionId are present', async () => {
+    render(<PricingSection leadId="lead-1" selectionId="sel-1" days={[]} travelers={2} />);
 
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledWith('lead-1', expect.objectContaining({ days: [], travelers: 2 })));
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({ days: [], travelers: 2 })));
     expect(mockPreviewPricing).not.toHaveBeenCalled();
   });
 
@@ -44,67 +44,84 @@ describe('PricingSection — leadId routing', () => {
     render(<PricingSection days={[]} travelers={1} />);
 
     await waitFor(() => expect(mockPreviewPricing).toHaveBeenCalled());
-    expect(mockCalculatePricing).not.toHaveBeenCalled();
+    expect(mockCalculateSelectionPricing).not.toHaveBeenCalled();
+  });
+
+  it('calls previewPricing when leadId is present but selectionId is not (no package attached yet)', async () => {
+    render(<PricingSection leadId="lead-1" days={[]} travelers={1} />);
+
+    await waitFor(() => expect(mockPreviewPricing).toHaveBeenCalled());
+    expect(mockCalculateSelectionPricing).not.toHaveBeenCalled();
   });
 });
 
 describe('PricingSection — recomputes on relevant changes', () => {
   it('recomputes when days changes', async () => {
-    const { rerender } = render(<PricingSection leadId="lead-1" days={[]} travelers={2} />);
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledTimes(1));
-    mockCalculatePricing.mockClear();
+    const { rerender } = render(<PricingSection leadId="lead-1" selectionId="sel-1" days={[]} travelers={2} />);
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledTimes(1));
+    mockCalculateSelectionPricing.mockClear();
 
-    rerender(<PricingSection leadId="lead-1" days={[{ dayNumber: 1 }]} travelers={2} />);
+    rerender(<PricingSection leadId="lead-1" selectionId="sel-1" days={[{ dayNumber: 1 }]} travelers={2} />);
 
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledTimes(1));
   });
 
   it('recomputes when travelers changes', async () => {
-    const { rerender } = render(<PricingSection leadId="lead-1" days={[]} travelers={2} />);
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledTimes(1));
-    mockCalculatePricing.mockClear();
+    const { rerender } = render(<PricingSection leadId="lead-1" selectionId="sel-1" days={[]} travelers={2} />);
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledTimes(1));
+    mockCalculateSelectionPricing.mockClear();
 
-    rerender(<PricingSection leadId="lead-1" days={[]} travelers={3} />);
+    rerender(<PricingSection leadId="lead-1" selectionId="sel-1" days={[]} travelers={3} />);
 
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledWith('lead-1', expect.objectContaining({ travelers: 3 })));
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledWith('lead-1', 'sel-1', expect.objectContaining({ travelers: 3 })));
+  });
+
+  it('recomputes when the active selection tab changes', async () => {
+    const { rerender } = render(<PricingSection leadId="lead-1" selectionId="sel-1" days={[]} travelers={2} />);
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledTimes(1));
+    mockCalculateSelectionPricing.mockClear();
+
+    rerender(<PricingSection leadId="lead-1" selectionId="sel-2" days={[]} travelers={2} />);
+
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledWith('lead-1', 'sel-2', expect.anything()));
   });
 });
 
 describe('PricingSection — refreshToken (transfer flight changes)', () => {
   it('recomputes when refreshToken changes even though days/travelers/settings are unchanged', async () => {
     const days = [];
-    const { rerender } = render(<PricingSection leadId="lead-1" days={days} travelers={2} refreshToken={0} />);
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledTimes(1));
-    mockCalculatePricing.mockClear();
+    const { rerender } = render(<PricingSection leadId="lead-1" selectionId="sel-1" days={days} travelers={2} refreshToken={0} />);
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledTimes(1));
+    mockCalculateSelectionPricing.mockClear();
 
     // Same days reference, same travelers — only refreshToken bumps, as
     // EditLeadDialog does after LeadFlightBookingsSection reports a change.
-    rerender(<PricingSection leadId="lead-1" days={days} travelers={2} refreshToken={1} />);
+    rerender(<PricingSection leadId="lead-1" selectionId="sel-1" days={days} travelers={2} refreshToken={1} />);
 
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledTimes(1));
   });
 
   it('does not recompute on a re-render where nothing — including refreshToken — changed', async () => {
     const days = [];
-    const { rerender } = render(<PricingSection leadId="lead-1" days={days} travelers={2} refreshToken={0} />);
-    await waitFor(() => expect(mockCalculatePricing).toHaveBeenCalledTimes(1));
-    mockCalculatePricing.mockClear();
+    const { rerender } = render(<PricingSection leadId="lead-1" selectionId="sel-1" days={days} travelers={2} refreshToken={0} />);
+    await waitFor(() => expect(mockCalculateSelectionPricing).toHaveBeenCalledTimes(1));
+    mockCalculateSelectionPricing.mockClear();
 
-    rerender(<PricingSection leadId="lead-1" days={days} travelers={2} refreshToken={0} />);
+    rerender(<PricingSection leadId="lead-1" selectionId="sel-1" days={days} travelers={2} refreshToken={0} />);
 
     // Give the (non-existent) debounce a moment, then confirm it never fired.
     await new Promise((resolve) => setTimeout(resolve, 500));
-    expect(mockCalculatePricing).not.toHaveBeenCalled();
+    expect(mockCalculateSelectionPricing).not.toHaveBeenCalled();
   });
 
   it('reflects the updated total after a refreshToken-triggered recompute', async () => {
-    mockCalculatePricing.mockResolvedValueOnce({ data: { financials: financialsFixture({ totalAmount: 1298 }) } });
-    const { rerender } = render(<PricingSection leadId="lead-1" days={[]} travelers={2} refreshToken={0} />);
+    mockCalculateSelectionPricing.mockResolvedValueOnce({ data: { financials: financialsFixture({ totalAmount: 1298 }) } });
+    const { rerender } = render(<PricingSection leadId="lead-1" selectionId="sel-1" days={[]} travelers={2} refreshToken={0} />);
     expect(await screen.findByText('$1,298.00')).toBeInTheDocument();
 
     // A transfer flight was just added server-side — same days, new total.
-    mockCalculatePricing.mockResolvedValueOnce({ data: { financials: financialsFixture({ totalAmount: 1798 }) } });
-    rerender(<PricingSection leadId="lead-1" days={[]} travelers={2} refreshToken={1} />);
+    mockCalculateSelectionPricing.mockResolvedValueOnce({ data: { financials: financialsFixture({ totalAmount: 1798 }) } });
+    rerender(<PricingSection leadId="lead-1" selectionId="sel-1" days={[]} travelers={2} refreshToken={1} />);
 
     expect(await screen.findByText('$1,798.00')).toBeInTheDocument();
   });
