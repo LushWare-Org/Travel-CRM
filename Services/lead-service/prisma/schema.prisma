@@ -183,18 +183,14 @@ model Lead {
   endDate            DateTime?
 
   // Cross-schema UUID refs
-  packageId          String? // → packages.Package.id
   convertedBookingId String? // → bookings.Booking.id
   currentItineraryId String? // → packages.Itinerary.id (editor ref)
-  packageName        String? // denormalised snapshot for display
-  // packageId this lead's itineraryDays/costLines were last generated from,
-  // verbatim (no manual edits since). Null once the itinerary is customized.
-  // Used to decide whether switching packages can safely replace the itinerary.
-  sourcePackageId    String?
-  // Explicit rep choice: itinerary is hand-built instead of package-derived.
-  // Overrides sourcePackageId-based auto-replace logic everywhere — a
-  // package switch or draft-copy must never overwrite a manual itinerary.
-  isManualItinerary  Boolean  @default(false)
+  // The LeadPackageSelection currently driving the lead-level state-machine
+  // gatekeepers (sellSubtotal/deposit/actuals checks) and default UI tab.
+  // Auto-set to a lead's first selection; re-set to whichever selection is
+  // quoted. A lead may have many selections (see LeadPackageSelection) — this
+  // is a soft ref, not a FK, same pattern as the other cross-schema pointers.
+  primarySelectionId String?
   leadDateTime       DateTime @default(now())
   numberOfTravelers  Int?
   budget             String?
@@ -208,9 +204,7 @@ model Lead {
   assignedById   String? // → users.User.id (admin/auto)
   assignmentMode AssignmentMode @default(manual)
 
-  // Quotation handoff (billing-service)
-  currentQuoteId  String? // → billing.Quotation.id
-  quoteAcceptedAt DateTime?
+  packageSelections LeadPackageSelection[]
 
   // Notification preferences
   notifNewLead      Boolean @default(true)
@@ -221,11 +215,6 @@ model Lead {
   followUpDate DateTime?
   lostReason   String?
   tags         String[]
-
-  pricing         LeadPricing?
-  costLines       LeadCostLine[]
-  itineraryDays   LeadItineraryDay[]
-  optionalFlights LeadOptionalFlight[]
 
   remarks           LeadRemark[]
   statusHistory     LeadStatusHistory[]
@@ -244,7 +233,46 @@ model Lead {
   @@index([leadDateTime])
   @@index([assignmentMode])
   @@index([city])
-  @@index([currentQuoteId])
+  @@index([primarySelectionId])
+  @@schema("crm_leads")
+}
+
+// ─── Package selections (per-package itinerary/pricing/quote state) ────────
+//
+// A lead can hold many packages at once (plus at most one manual/no-package
+// slot). Each selection owns its own itinerary/cost-line/pricing/quote
+// pointer. Children are lazily materialized: a pristine selection (no
+// itineraryDays/pricing rows) is derived on read from the live package
+// blueprint; persisted rows only appear once the rep edits the selection or
+// a quotation is sent for it. "Refresh from original package" deletes the
+// persisted rows to revert a selection back to pristine.
+model LeadPackageSelection {
+  id     String @id @default(uuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  packageId   String? // → packages.Package.id; null for the manual slot
+  isManual    Boolean @default(false)
+  packageName String? // denormalised snapshot, refreshed on (re)materialize
+
+  // packageId this selection's persisted rows were last materialized from,
+  // verbatim. Null when pristine (nothing persisted yet) or once edited.
+  sourcePackageId String?
+
+  // Quotation handoff (billing-service), now per selection.
+  currentQuoteId  String? // → billing.Quotation.id
+  quoteAcceptedAt DateTime?
+
+  pricing         LeadPricing?
+  costLines       LeadCostLine[]
+  itineraryDays   LeadItineraryDay[]
+  optionalFlights LeadOptionalFlight[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([leadId, packageId])
+  @@index([leadId])
   @@schema("crm_leads")
 }
 
@@ -308,9 +336,9 @@ model LeadInternalEvent {
 // ─── Pricing (relational) ──────────────────────────────────────
 
 model LeadPricing {
-  id     String @id @default(uuid())
-  leadId String @unique
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  id                     String               @id @default(uuid())
+  leadPackageSelectionId String               @unique
+  leadPackageSelection   LeadPackageSelection @relation(fields: [leadPackageSelectionId], references: [id], onDelete: Cascade)
 
   currency String @default("USD") @db.VarChar(3)
 
@@ -342,9 +370,9 @@ model LeadPricing {
 }
 
 model LeadCostLine {
-  id     String @id @default(uuid())
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  id                     String               @id @default(uuid())
+  leadPackageSelectionId String
+  leadPackageSelection   LeadPackageSelection @relation(fields: [leadPackageSelectionId], references: [id], onDelete: Cascade)
 
   category           CostLineCategory
   description        String
@@ -367,25 +395,25 @@ model LeadCostLine {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([leadId])
+  @@index([leadPackageSelectionId])
   @@schema("crm_leads")
 }
 
 // ─── Copied itinerary (detached package copy) ──────────────────
 
 model LeadItineraryDay {
-  id                String   @id @default(uuid())
-  leadId            String
-  lead              Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  dayNumber         Int
-  title             String?
-  description       String?
-  breakfastCount    Int      @default(0)
-  lunchCount        Int      @default(0)
-  dinnerCount       Int      @default(0)
-  mealPriceOverride Decimal? @db.Decimal(12, 2)
-  accommodation     Json     @default("{}")
-  flights           Json     @default("[]")
+  id                     String               @id @default(uuid())
+  leadPackageSelectionId String
+  leadPackageSelection   LeadPackageSelection @relation(fields: [leadPackageSelectionId], references: [id], onDelete: Cascade)
+  dayNumber              Int
+  title                  String?
+  description            String?
+  breakfastCount         Int                  @default(0)
+  lunchCount             Int                  @default(0)
+  dinnerCount            Int                  @default(0)
+  mealPriceOverride      Decimal?             @db.Decimal(12, 2)
+  accommodation          Json                 @default("{}")
+  flights                Json                 @default("[]")
 
   places     LeadDayPlace[]
   activities LeadDayActivity[]
@@ -394,8 +422,8 @@ model LeadItineraryDay {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([leadId, dayNumber])
-  @@index([leadId])
+  @@unique([leadPackageSelectionId, dayNumber])
+  @@index([leadPackageSelectionId])
   @@schema("crm_leads")
 }
 
@@ -446,29 +474,29 @@ model LeadDayTransport {
 // ─── Optional transfer flights ─────────────────────────────────
 
 model LeadOptionalFlight {
-  id                 String             @id @default(uuid())
-  leadId             String
-  lead               Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  flightType         OptionalFlightType
-  origin             String?
-  destination        String?
-  date               DateTime?
-  cabinClass         String?
-  departureTime      String?
-  airlinePreference  String?
-  notes              String?
-  flightBookingId    String? // → flights.FlightBooking.id
-  status             String             @default("PENDING")
-  estimatedUnitPrice Decimal            @default(0) @db.Decimal(12, 2)
-  actualUnitPrice    Decimal?           @db.Decimal(12, 2)
-  quantity           Int                @default(1)
-  marginType         MarginType?
-  marginValue        Decimal?           @db.Decimal(12, 2)
+  id                     String               @id @default(uuid())
+  leadPackageSelectionId String
+  leadPackageSelection   LeadPackageSelection @relation(fields: [leadPackageSelectionId], references: [id], onDelete: Cascade)
+  flightType             OptionalFlightType
+  origin                 String?
+  destination            String?
+  date                   DateTime?
+  cabinClass             String?
+  departureTime          String?
+  airlinePreference      String?
+  notes                  String?
+  flightBookingId        String? // → flights.FlightBooking.id
+  status                 String               @default("PENDING")
+  estimatedUnitPrice     Decimal              @default(0) @db.Decimal(12, 2)
+  actualUnitPrice        Decimal?             @db.Decimal(12, 2)
+  quantity               Int                  @default(1)
+  marginType             MarginType?
+  marginValue            Decimal?             @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([leadId])
+  @@index([leadPackageSelectionId])
   @@schema("crm_leads")
 }
 
