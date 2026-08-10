@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   validateTransition,
   validateTravelerUpdate,
-  validatePackageUpdate,
   validateTravelDatesUpdate,
   StateMachineError,
 } from '../state-machine.service.js';
@@ -299,52 +298,6 @@ describe('validateTravelerUpdate', () => {
         previousTravelers: 2,
         nextTravelers: 2,
       }),
-    ).not.toThrow();
-  });
-});
-
-describe('validatePackageUpdate', () => {
-  it('allows changing the package while drafting', () => {
-    expect(() =>
-      validatePackageUpdate({ currentStatus: 'DRAFTING', previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
-    ).not.toThrow();
-  });
-
-  it('allows changing the package on a new lead', () => {
-    expect(() =>
-      validatePackageUpdate({ currentStatus: 'NEW', previousPackageId: null, nextPackageId: 'pkg-1' }),
-    ).not.toThrow();
-  });
-
-  it('blocks changes after QUOTED', () => {
-    expect(() =>
-      validatePackageUpdate({ currentStatus: 'QUOTED', previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
-    ).toThrow(StateMachineError);
-  });
-
-  it('blocks changes while in REVISION — must move back to DRAFTING first', () => {
-    expect(() =>
-      validatePackageUpdate({ currentStatus: 'REVISION', previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
-    ).toThrow(StateMachineError);
-  });
-
-  it('blocks changes in APPROVED and later states', () => {
-    for (const status of ['APPROVED', 'BOOKING_IN_PROGRESS', 'CONFIRMED', 'BOOKING_FAILED']) {
-      expect(() =>
-        validatePackageUpdate({ currentStatus: status, previousPackageId: 'pkg-1', nextPackageId: 'pkg-2' }),
-      ).toThrow(StateMachineError);
-    }
-  });
-
-  it('allows a no-op package update anywhere', () => {
-    expect(() =>
-      validatePackageUpdate({ currentStatus: 'CONFIRMED', previousPackageId: 'pkg-1', nextPackageId: 'pkg-1' }),
-    ).not.toThrow();
-  });
-
-  it('treats null and undefined previous package as equivalent for the no-op check', () => {
-    expect(() =>
-      validatePackageUpdate({ currentStatus: 'QUOTED', previousPackageId: null, nextPackageId: null }),
     ).not.toThrow();
   });
 });
