@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@travel-crm/contracts": "file:../shared/contracts",
     "@travel-crm/lead-pricing-engine": "file:../shared/lead-pricing-engine",
     "@travel-crm/pricing-engine": "file:../shared/pricing-engine",
     "cloudinary": "^2.10.0",

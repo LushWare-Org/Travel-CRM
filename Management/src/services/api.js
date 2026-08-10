@@ -1,3 +1,6 @@
+import { apiEnvelope, LeadPackageSelectionSummary, QuotePackageSelectionResult } from "@travel-crm/contracts";
+import { z } from "zod";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "https://api.lushtravelcloud.com/api/v1";
   // import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
@@ -118,6 +121,16 @@ class ApiService {
         throw error;
       }
 
+      if (import.meta.env.DEV && options.responseSchema) {
+        const result = options.responseSchema.safeParse(data);
+        if (!result.success) {
+          // Dev-console tripwire, not a page-crashing assertion — shape
+          // drift between this service and the backend should be loud in
+          // the console during development, not break the app.
+          console.error(`[contract mismatch] ${endpoint}`, result.error.format());
+        }
+      }
+
       return data;
     } catch (error) {
       // Handle network errors (connection refused, etc.)
@@ -142,7 +155,7 @@ class ApiService {
   }
 
   // GET request
-  async get(endpoint, params = {}) {
+  async get(endpoint, params = {}, options = {}) {
     // Handle blob responseType separately
     if (params.responseType === "blob") {
       return this.fetch(endpoint, { responseType: "blob" });
@@ -150,14 +163,15 @@ class ApiService {
 
     const queryString = new URLSearchParams(params).toString();
     const url = queryString ? `${endpoint}?${queryString}` : endpoint;
-    return this.fetch(url);
+    return this.fetch(url, options);
   }
 
   // POST request
-  async post(endpoint, data) {
+  async post(endpoint, data, options = {}) {
     return this.fetch(endpoint, {
       method: "POST",
       body: JSON.stringify(data),
+      ...options,
     });
   }
 
@@ -273,12 +287,16 @@ export const leadAPI = {
 
   getPackageSelections: async (id) => {
     const api = new ApiService();
-    return api.get(`/leads/${id}/packages`);
+    return api.get(`/leads/${id}/packages`, {}, {
+      responseSchema: apiEnvelope(z.array(LeadPackageSelectionSummary)),
+    });
   },
 
   getPackageSelection: async (id, selectionId) => {
     const api = new ApiService();
-    return api.get(`/leads/${id}/packages/${selectionId}`);
+    return api.get(`/leads/${id}/packages/${selectionId}`, {}, {
+      responseSchema: apiEnvelope(LeadPackageSelectionSummary),
+    });
   },
 
   // payload: { packageId } or { isManual: true }
@@ -307,7 +325,9 @@ export const leadAPI = {
   // Snapshot a selection's pricing into a versioned billing quotation
   quotePackageSelection: async (id, selectionId) => {
     const api = new ApiService();
-    return api.post(`/leads/${id}/packages/${selectionId}/quote`);
+    return api.post(`/leads/${id}/packages/${selectionId}/quote`, undefined, {
+      responseSchema: apiEnvelope(QuotePackageSelectionResult),
+    });
   },
 
   getSelectionPricing: async (id, selectionId) => {

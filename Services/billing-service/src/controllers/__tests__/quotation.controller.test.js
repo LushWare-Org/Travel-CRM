@@ -132,8 +132,39 @@ describe('createQuotationFromLead (internal handoff)', () => {
     mockCreateOrVersion.mockResolvedValue({ id: 'quote-1', version: 1 });
   });
 
+  /** A full LeadSnapshotForQuotation-shaped body, matching what lead-service actually sends. */
+  function validSnapshotBody(overrides = {}) {
+    return {
+      leadId: 'lead-1',
+      packageId: 'pkg-1',
+      createdById: null,
+      currency: 'USD',
+      customer: { name: 'Alice', email: 'alice@test.com', phone: '+15551234567', address: 'Colombo' },
+      items: [],
+      discountType: 'none',
+      discountValue: 0,
+      serviceChargeRate: 0,
+      notes: null,
+      terms: null,
+      paymentTerms: null,
+      includedServices: [],
+      excludedServices: [],
+      destination: 'Sri Lanka',
+      packageTitle: 'Island Escape',
+      travelStartDate: null,
+      travelEndDate: null,
+      paxCount: 2,
+      durationNights: 7,
+      durationDays: 8,
+      highlights: [],
+      itineraryDays: [],
+      coverImage: null,
+      ...overrides,
+    };
+  }
+
   it('uses the body createdById when there is no request user (internal call)', async () => {
-    const req = { body: { leadId: 'lead-1', packageId: 'pkg-1', createdById: 'user-9', items: [] } };
+    const req = { body: validSnapshotBody({ createdById: 'user-9' }) };
     const { res, nextErr } = await run(createQuotationFromLead, req);
 
     expect(nextErr).toBeUndefined();
@@ -142,14 +173,30 @@ describe('createQuotationFromLead (internal handoff)', () => {
   });
 
   it('prefers the request user id over the body when one is present', async () => {
-    const req = { user: { id: 'req-user' }, body: { leadId: 'lead-1', createdById: 'user-9', items: [] } };
+    const req = { user: { id: 'req-user' }, body: validSnapshotBody({ createdById: 'user-9' }) };
     await run(createQuotationFromLead, req);
     expect(mockCreateOrVersion).toHaveBeenCalledWith(expect.objectContaining({ createdById: 'req-user' }));
   });
 
   it('400s when neither a request user nor a body createdById is supplied', async () => {
-    const req = { body: { leadId: 'lead-1', items: [] } };
+    const req = { body: validSnapshotBody({ createdById: null }) };
     const { nextErr } = await run(createQuotationFromLead, req);
+    expect(nextErr.statusCode).toBe(400);
+    expect(mockCreateOrVersion).not.toHaveBeenCalled();
+  });
+
+  it('400s when the body fails LeadSnapshotForQuotation validation instead of reaching createOrVersionQuotation', async () => {
+    const req = { body: { currency: 'USD' } }; // missing leadId, customer, items, ...
+    const { nextErr } = await run(createQuotationFromLead, req);
+    expect(nextErr).toBeDefined();
+    expect(nextErr.statusCode).toBe(400);
+    expect(mockCreateOrVersion).not.toHaveBeenCalled();
+  });
+
+  it('400s when items is not an array', async () => {
+    const req = { body: validSnapshotBody({ createdById: 'user-9', items: 'not-an-array' }) };
+    const { nextErr } = await run(createQuotationFromLead, req);
+    expect(nextErr).toBeDefined();
     expect(nextErr.statusCode).toBe(400);
     expect(mockCreateOrVersion).not.toHaveBeenCalled();
   });

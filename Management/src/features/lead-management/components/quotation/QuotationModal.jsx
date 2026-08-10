@@ -90,7 +90,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead }) => {
         setQuoteIds((prev) => ({ ...prev, [activeSelection.id]: quotation.id }));
       }
       if (updatedSelection) {
-        setSelections((prev) => prev.map((s) => (s.id === updatedSelection.id ? { ...s, ...updatedSelection } : s)));
+        setSelections((prev) => prev.map((s) => (s.id === updatedSelection.id ? updatedSelection : s)));
       }
       toast.success('Quotation generated');
       onSuccess?.();
@@ -237,7 +237,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead }) => {
                 <div className="mt-4 border-t border-slate-100 pt-4">
                   {pricing ? (
                     <dl className="space-y-1.5 text-sm">
-                      <Row label="Subtotal" value={formatMoney(pricing.sellSubtotal ?? pricing.subtotal, currency)} />
+                      <Row label="Subtotal" value={formatMoney(pricing.sellSubtotal, currency)} />
                       {Number(pricing.discountAmount) > 0 && (
                         <Row label="Discount" value={`- ${formatMoney(pricing.discountAmount, currency)}`} />
                       )}

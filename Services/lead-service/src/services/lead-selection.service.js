@@ -2,6 +2,9 @@ import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import { fetchPackage, buildDraftData } from './lead-draft.service.js';
 import { computePricing, toLineDescriptor } from './pricing.service.js';
+// zod v4, bundled inside @travel-crm/contracts — never .extend()/.merge() this
+// with a local (zod v3) validator schema, only .parse() it standalone.
+import { LeadSnapshotForQuotation } from '@travel-crm/contracts';
 
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3006';
 
@@ -294,41 +297,43 @@ export async function snapshotSelectionQuotation(selectionId, { createdById = nu
   const durationDays = pkg?.durationDays ?? (itineraryDays.length || null);
   const durationNights = durationDays ? Math.max(durationDays - 1, 0) : null;
 
+  const payload = LeadSnapshotForQuotation.parse({
+    leadId: lead.id,
+    packageId: selection.packageId,
+    // The acting user, threaded from the /quote request. billing has no
+    // request user on this internal (gateway-bypassing) call.
+    createdById,
+    currency: pricing.currency || 'USD',
+    customer: { name: lead.name, email: lead.email, phone: lead.phone, address: lead.city },
+    items,
+    discountType: pricing.discountType || 'none',
+    discountValue: Number(pricing.discountValue) || 0,
+    serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
+    notes: null,
+    terms: null,
+    paymentTerms: null,
+    includedServices,
+    excludedServices,
+    // Trip snapshot for the branded quotation PDF.
+    destination: lead.destination || pkg?.destination || null,
+    packageTitle: selection.packageName || pkg?.title || null,
+    travelStartDate: lead.travelDate || null,
+    travelEndDate: lead.endDate || null,
+    paxCount: lead.numberOfTravelers || null,
+    durationNights,
+    durationDays,
+    highlights,
+    itineraryDays,
+    coverImage: pkg?.coverImage || null,
+  });
+
   const res = await fetchImpl(`${BILLING_SERVICE_URL}/api/v1/billing/quotations/from-lead`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'x-internal-token': process.env.INTERNAL_EVENTS_TOKEN || '',
     },
-    body: JSON.stringify({
-      leadId: lead.id,
-      packageId: selection.packageId,
-      // The acting user, threaded from the /quote request. billing has no
-      // request user on this internal (gateway-bypassing) call.
-      createdById,
-      currency: pricing.currency || 'USD',
-      customer: { name: lead.name, email: lead.email, phone: lead.phone, address: lead.city },
-      items,
-      discountType: pricing.discountType || 'none',
-      discountValue: Number(pricing.discountValue) || 0,
-      serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
-      notes: null,
-      terms: null,
-      paymentTerms: null,
-      includedServices,
-      excludedServices,
-      // Trip snapshot for the branded quotation PDF.
-      destination: lead.destination || pkg?.destination || null,
-      packageTitle: selection.packageName || pkg?.title || null,
-      travelStartDate: lead.travelDate || null,
-      travelEndDate: lead.endDate || null,
-      paxCount: lead.numberOfTravelers || null,
-      durationNights,
-      durationDays,
-      highlights,
-      itineraryDays,
-      coverImage: pkg?.coverImage || null,
-    }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     throw new AppError('Failed to snapshot quotation in billing-service', 502);

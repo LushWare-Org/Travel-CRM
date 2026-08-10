@@ -9,6 +9,7 @@ import { sendQuotationEmail } from '../utils/emailService.js';
 import { sendQuotationWhatsapp } from '../utils/whatsappService.js';
 import { uploadPdfBuffer } from '../utils/cloudinary.js';
 import { sendQuotationSchema } from '../validators/quotation.validator.js';
+import { LeadSnapshotForQuotation } from '@travel-crm/contracts';
 
 const quotationInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -107,13 +108,20 @@ export const updateQuotation = asyncHandler(async (req, res) => {
  * lead's existing quotation. Validates totals against the shared engine.
  */
 export const createQuotationFromLead = asyncHandler(async (req, res) => {
+  const parsedBody = LeadSnapshotForQuotation.safeParse(req.body);
+  if (!parsedBody.success) {
+    const messages = parsedBody.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+  const parsed = parsedBody.data;
+
   // Internal (gateway-bypassing) call: there is usually no request user, so the
   // acting user id arrives in the body. Fall back to req.user for completeness.
-  const createdById = req.user?.id || req.body.createdById;
+  const createdById = req.user?.id || parsed.createdById;
   if (!createdById) throw new AppError('createdById is required', 400);
 
   const quotation = await createOrVersionQuotation({
-    ...req.body,
+    ...parsed,
     createdById,
   });
   res.status(201).json({ success: true, data: quotation });
