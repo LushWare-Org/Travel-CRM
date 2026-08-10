@@ -1,0 +1,142 @@
+name: Microservices CI
+
+on:
+  pull_request:
+    branches: [microservices]
+    paths: &ci-paths
+      - 'Services/shared/contracts/**'
+      - 'Services/lead-service/**'
+      - 'Services/billing-service/**'
+      - 'Management/**'
+      - '.github/workflows/microservices-ci.yml'
+  push:
+    branches: [microservices]
+    paths: *ci-paths
+
+env:
+  NODE_VERSION: '20.x'
+
+jobs:
+  contracts:
+    name: shared/contracts tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: Services/shared/contracts/package-lock.json
+
+      - name: Install
+        working-directory: Services/shared/contracts
+        run: npm ci
+
+      - name: Test
+        working-directory: Services/shared/contracts
+        run: npm test
+
+  lead-service:
+    name: lead-service tests
+    runs-on: ubuntu-latest
+    needs: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            Services/shared/contracts/package-lock.json
+            Services/lead-service/package-lock.json
+
+      # lead-service depends on @travel-crm/contracts via a `file:` link, so
+      # the shared package's own node_modules must exist before `npm ci` here
+      # can resolve it — these are independent npm projects, no workspace.
+      - name: Install shared/contracts
+        working-directory: Services/shared/contracts
+        run: npm ci
+
+      - name: Install lead-service
+        working-directory: Services/lead-service
+        run: npm ci
+
+      - name: Test
+        working-directory: Services/lead-service
+        run: npm test
+
+  billing-service:
+    name: billing-service tests
+    runs-on: ubuntu-latest
+    needs: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            Services/shared/contracts/package-lock.json
+            Services/billing-service/package-lock.json
+
+      - name: Install shared/contracts
+        working-directory: Services/shared/contracts
+        run: npm ci
+
+      - name: Install billing-service
+        working-directory: Services/billing-service
+        run: npm ci
+
+      - name: Test
+        working-directory: Services/billing-service
+        run: npm test
+
+  management:
+    name: Management tests
+    runs-on: ubuntu-latest
+    needs: contracts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            Services/shared/contracts/package-lock.json
+            Management/package-lock.json
+
+      - name: Install shared/contracts
+        working-directory: Services/shared/contracts
+        run: npm ci
+
+      # --legacy-peer-deps works around a pre-existing, unrelated conflict
+      # between this package's vite version and @vitejs/plugin-react's peer
+      # range. Not introduced by this workflow — remove once that's fixed.
+      - name: Install Management
+        working-directory: Management
+        run: npm ci --legacy-peer-deps
+
+      - name: Test
+        working-directory: Management
+        run: npm test
+
+  ci-status:
+    name: Microservices CI Status
+    runs-on: ubuntu-latest
+    needs: [contracts, lead-service, billing-service, management]
+    if: always()
+    steps:
+      - name: Check status
+        run: |
+          if [ "${{ needs.contracts.result }}" != "success" ] || \
+             [ "${{ needs.lead-service.result }}" != "success" ] || \
+             [ "${{ needs.billing-service.result }}" != "success" ] || \
+             [ "${{ needs.management.result }}" != "success" ]; then
+            echo "Microservices CI failed"
+            exit 1
+          fi
+          echo "Microservices CI passed"
