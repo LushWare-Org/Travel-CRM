@@ -118,6 +118,49 @@ describe('createOrVersionQuotation', () => {
     );
   });
 
+  it('looks up the existing quotation by (leadId, packageId), not leadId alone', async () => {
+    mockFindFirst.mockResolvedValue(null);
+    mockNextNumber.mockResolvedValue('QUO-2026-000003');
+    mockCreate.mockResolvedValue({ id: 'quotation-3', version: 1 });
+
+    await createOrVersionQuotation(payload);
+
+    expect(mockFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { leadId: 'lead-1', packageId: 'pkg-1' },
+    }));
+  });
+
+  it('does not collide with a different package quotation on the same lead — creates its own version 1', async () => {
+    // No existing row for (lead-1, pkg-2), even though (lead-1, pkg-1) has one — the
+    // lookup is scoped by both fields, so this must not find/overwrite pkg-1's quotation.
+    mockFindFirst.mockResolvedValue(null);
+    mockNextNumber.mockResolvedValue('QUO-2026-000004');
+    mockCreate.mockResolvedValue({ id: 'quotation-4', version: 1 });
+
+    const result = await createOrVersionQuotation({ ...payload, packageId: 'pkg-2' });
+
+    expect(result.id).toBe('quotation-4');
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ packageId: 'pkg-2', version: 1 }),
+    }));
+  });
+
+  it('two manual (packageId: null) quotations on different leads do not collide', async () => {
+    mockFindFirst.mockResolvedValue(null);
+    mockNextNumber.mockResolvedValue('QUO-2026-000005');
+    mockCreate.mockResolvedValue({ id: 'quotation-5', version: 1 });
+
+    await createOrVersionQuotation({ ...payload, leadId: 'lead-2', packageId: null });
+
+    expect(mockFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { leadId: 'lead-2', packageId: null },
+    }));
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ leadId: 'lead-2', packageId: null }),
+    }));
+  });
+
   it('bumps the version and records revision history when a quotation exists', async () => {
     mockFindFirst.mockResolvedValue({ id: 'quotation-1', version: 2 });
     mockUpdate.mockResolvedValue({ id: 'quotation-1', version: 3 });
@@ -153,5 +196,8 @@ describe('createOrVersionQuotation', () => {
     expect(data.serviceChargeAmount).toBe(80);
     expect(data.totalAmount).toBe(1779.2);
     expect(data.items.create).toHaveLength(2);
+    // taxableSubtotal is a computed intermediate — it must not be persisted
+    // (there is no such Quotation column; Prisma would reject it).
+    expect(data).not.toHaveProperty('taxableSubtotal');
   });
 });
