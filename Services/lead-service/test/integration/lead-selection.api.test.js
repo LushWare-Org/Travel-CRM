@@ -7,6 +7,7 @@ const { mockPrisma } = vi.hoisted(() => {
     findUnique: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
+    count: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -148,6 +149,42 @@ describe('PUT /leads/:id/packages/:selectionId/itinerary — save recomputes quo
     const leadUpdate = mockPrisma.lead.update.mock.calls.find((c) => c[0]?.data?.budget != null);
     expect(leadUpdate).toBeTruthy();
     expect(leadUpdate[0].data.budget).toBe('USD 708');
+  });
+});
+
+describe('POST /leads/:id/packages/:selectionId/quote — presented selection in response', () => {
+  it('returns the presented shape (itineraryDays/isMaterialized), not the bare Prisma row', async () => {
+    const leadRow = {
+      id: LEAD, lifecycleStatus: 'QUOTED', primarySelectionId: SEL,
+      name: 'Jane Doe', email: 'jane@test.com', phone: '555-0100', city: 'Colombo',
+      destination: 'Sri Lanka', travelDate: null, endDate: null, numberOfTravelers: 2,
+    };
+    const selectionRow = {
+      id: SEL, leadId: LEAD, packageId: null, packageName: 'Manual Trip', isManual: true, currentQuoteId: null,
+      pricing: {
+        currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0,
+        marginType: null, marginValue: 0, depositType: null, depositValue: 0, paidAmount: 0,
+      },
+      costLines: [], itineraryDays: [], optionalFlights: [], lead: leadRow,
+    };
+
+    mockPrisma.lead.findUnique.mockResolvedValue(leadRow);
+    mockPrisma.lead.update.mockResolvedValue({ id: LEAD });
+    mockPrisma.leadPackageSelection.findUnique.mockResolvedValue(selectionRow);
+    mockPrisma.leadPackageSelection.update.mockResolvedValue({ id: SEL });
+    mockPrisma.leadItineraryDay.count.mockResolvedValue(1); // materialized — skip materializeSelection
+    mockPrisma.leadPricing.findUnique.mockResolvedValue({ id: 'pr-1' }); // no totalAmount -> budget sync no-ops
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { id: 'quote-1', leadId: LEAD } }) }));
+
+    const res = await request(app)
+      .post(`/api/v1/leads/${LEAD}/packages/${SEL}/quote`)
+      .set(authHeaders());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.selection.isMaterialized).toBe(true);
+    expect(Array.isArray(res.body.data.selection.itineraryDays)).toBe(true);
+    expect(res.body.data.selection.costLines).toBeDefined();
+    expect(res.body.data.quotation.id).toBe('quote-1');
   });
 });
 

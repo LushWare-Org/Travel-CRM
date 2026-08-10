@@ -20,6 +20,7 @@
     "@stripe/react-stripe-js": "^3.6.0",
     "@stripe/stripe-js": "^7.2.0",
     "@travel-crm/constants": "file:../Services/shared/constants",
+    "@travel-crm/contracts": "file:../Services/shared/contracts",
     "@travel-crm/lead-pricing-engine": "file:../Services/shared/lead-pricing-engine",
     "@travel-crm/pricing-engine": "file:../Services/shared/pricing-engine",
     "axios": "^1.8.4",
@@ -49,7 +50,8 @@
     "react-select": "^5.10.2",
     "recharts": "^2.15.3",
     "sweetalert2": "^11.26.3",
-    "wouter": "^3.7.1"
+    "wouter": "^3.7.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",

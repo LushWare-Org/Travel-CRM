@@ -313,7 +313,7 @@ describe('quotePackageSelection', () => {
 
   it('moves the lead to QUOTED on its first quote and points primarySelectionId at the selection', async () => {
     mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', lifecycleStatus: 'DRAFTING' });
-    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', pricing: { sellSubtotal: 500 }, costLines: [] });
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', pricing: { sellSubtotal: 500 }, costLines: [], itineraryDays: [] });
     mockGatekeeperInputs.mockReturnValue({ sellSubtotal: 500 });
     mockSnapshotSelectionQuotation.mockResolvedValue({ id: 'quote-1' });
     mockSelectionUpdate.mockResolvedValue({ id: 'sel-1', currentQuoteId: 'quote-1' });
@@ -332,7 +332,7 @@ describe('quotePackageSelection', () => {
 
   it('quoting a second package on an already-QUOTED lead does not re-trigger the status history entry', async () => {
     mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', lifecycleStatus: 'QUOTED' });
-    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-2', leadId: 'lead-1', pricing: { sellSubtotal: 300 }, costLines: [] });
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-2', leadId: 'lead-1', pricing: { sellSubtotal: 300 }, costLines: [], itineraryDays: [] });
     mockGatekeeperInputs.mockReturnValue({ sellSubtotal: 300 });
     mockSnapshotSelectionQuotation.mockResolvedValue({ id: 'quote-2' });
     mockSelectionUpdate.mockResolvedValue({ id: 'sel-2', currentQuoteId: 'quote-2' });

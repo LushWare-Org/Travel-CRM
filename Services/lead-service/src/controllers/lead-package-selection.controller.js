@@ -197,10 +197,19 @@ export const quotePackageSelection = asyncHandler(async (req, res) => {
 
   const quotation = await snapshotSelectionQuotation(selection.id, { createdById: req.user.id });
 
-  const updatedSelection = await prisma.leadPackageSelection.update({
+  await prisma.leadPackageSelection.update({
     where: { id: selection.id },
     data: { currentQuoteId: quotation.id },
   });
+  // Re-fetch and present the same way listPackageSelections/getPackageSelection
+  // do, so callers always get itineraryDays/costLines/pricing/isMaterialized —
+  // never the bare Prisma row (see @travel-crm/contracts' LeadPackageSelectionSummary
+  // vs LeadPackageSelectionRaw for why these two shapes must not be conflated).
+  const fullSelection = await prisma.leadPackageSelection.findUnique({
+    where: { id: selection.id },
+    include: FULL_SELECTION_INCLUDE,
+  });
+  const updatedSelection = await presentSelection(fullSelection);
 
   const leadUpdateData = { primarySelectionId: selection.id };
   if (lead.lifecycleStatus !== 'QUOTED') {

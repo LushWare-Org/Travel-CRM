@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import PDFDocument from 'pdfkit';
 import BRANDING, { getBankDetails, hasBankDetails } from '../config/branding.js';
+import { QuotationForPdf } from '@travel-crm/contracts';
 
 const T = BRANDING.theme;
 const CONTENT = BRANDING.content;
@@ -63,6 +64,10 @@ const normalizeDays = (v) => {
  * @returns {Promise<Buffer>}
  */
 export function generateQuotationPDF(quotation) {
+  // Fail loud on a shape mismatch instead of silently rendering blank
+  // sections — this is a narrow .passthrough() check on only the fields
+  // this generator actually reads, not a full Quotation schema.
+  QuotationForPdf.parse(quotation);
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({

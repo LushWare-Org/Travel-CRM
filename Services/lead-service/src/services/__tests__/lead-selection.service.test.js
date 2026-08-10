@@ -352,7 +352,7 @@ describe('snapshotSelectionQuotation', () => {
           packageId: 'pkg-1',
           pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
           costLines: [],
-          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', numberOfTravelers: 1 },
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1 },
         }),
       },
     });
@@ -382,7 +382,7 @@ describe('snapshotSelectionQuotation', () => {
           packageId: 'pkg-1',
           pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
           costLines: [],
-          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', numberOfTravelers: 1 },
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1 },
         }),
       },
     });
@@ -410,7 +410,7 @@ describe('snapshotSelectionQuotation', () => {
           packageId: 'pkg-1',
           pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
           costLines: [],
-          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', numberOfTravelers: 1 },
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1 },
         }),
       },
     });

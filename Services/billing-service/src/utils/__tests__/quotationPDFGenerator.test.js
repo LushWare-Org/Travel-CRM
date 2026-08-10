@@ -109,4 +109,16 @@ describe('generateQuotationPDF', () => {
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     expect(countPages(buffer)).toBeGreaterThanOrEqual(1);
   });
+
+  it('throws instead of silently rendering blanks when an itinerary day is malformed', () => {
+    // generateQuotationPDF validates synchronously before returning its Promise,
+    // so the throw happens on the call itself, not as a promise rejection.
+    expect(() =>
+      generateQuotationPDF({
+        ...baseQuotation,
+        // missing locations/meals — a real shape mismatch, not just an empty trip
+        itineraryDays: [{ day: 1, title: 'Day 1' }],
+      }),
+    ).toThrow();
+  });
 });
