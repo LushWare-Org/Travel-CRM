@@ -4,6 +4,14 @@ import { computeQuote } from '../../../shared/lead-pricing-engine/src/index.js';
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+const toDate = (v) => {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const toInt = (v) => (v == null || v === '' ? null : Number.parseInt(v, 10) || null);
+
 const toItemsCreate = (items) =>
   (items || []).map((item, idx) => ({
     description: item.description,
@@ -85,6 +93,20 @@ export async function createOrVersionQuotation({
   includedServices = [],
   excludedServices = [],
   createdById,
+  // Trip snapshot for the branded quotation PDF (all optional).
+  destination = null,
+  packageTitle = null,
+  travelStartDate = null,
+  travelEndDate = null,
+  paxCount = null,
+  durationNights = null,
+  durationDays = null,
+  highlights = [],
+  itineraryDays = null,
+  coverImage = null,
+  advisorName = null,
+  advisorPhone = null,
+  advisorEmail = null,
 }) {
   // `taxableSubtotal` is a computed intermediate, not a Quotation column — omit
   // it from what we persist (spreading it into Prisma is rejected).
@@ -114,6 +136,20 @@ export async function createOrVersionQuotation({
     paymentTerms,
     includedServices,
     excludedServices,
+    // Trip snapshot for the branded PDF.
+    destination,
+    packageTitle,
+    travelStartDate: toDate(travelStartDate),
+    travelEndDate: toDate(travelEndDate),
+    paxCount: toInt(paxCount),
+    durationNights: toInt(durationNights),
+    durationDays: toInt(durationDays),
+    highlights: Array.isArray(highlights) ? highlights : [],
+    itineraryDays: itineraryDays ?? undefined,
+    coverImage,
+    advisorName,
+    advisorPhone,
+    advisorEmail,
   };
 
   if (!existing) {

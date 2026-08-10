@@ -396,6 +396,21 @@ model Quotation {
   includedServices String[]
   excludedServices String[]
 
+  // Trip snapshot for the branded quotation PDF — populated from the lead/package
+  // handoff so the document renders identically on every regeneration.
+  destination     String?
+  packageTitle    String?
+  travelStartDate DateTime?
+  travelEndDate   DateTime?
+  paxCount        Int?
+  durationNights  Int?
+  durationDays    Int?
+  highlights      String[]
+  itineraryDays   Json? // [{ day, title, locations: string[], meals: string[] }]
+  advisorName     String?
+  advisorPhone    String?
+  advisorEmail    String?
+
   coverImage      String? // legacy field kept for compatibility
   pdfUrl          String?
   sentAt          DateTime?

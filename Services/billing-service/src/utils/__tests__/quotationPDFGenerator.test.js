@@ -1,6 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { generateQuotationPDF } from '../quotationPDFGenerator.js';
 
+/** Count page objects in the PDF (`/Type /Page` but not the `/Pages` tree). */
+const countPages = (buffer) => {
+  const s = buffer.toString('latin1');
+  return (s.match(/\/Type\s*\/Page(?![s])/g) || []).length;
+};
+
+const makeDays = (n) =>
+  Array.from({ length: n }, (_, i) => ({
+    day: i + 1,
+    title: `Day ${i + 1} Title`,
+    locations: ['Location A', 'Location B'],
+    meals: ['Breakfast', 'Dinner'],
+  }));
+
 const baseQuotation = {
   id: 'q-1',
   quotationNumber: 'QT-202608-0001',
@@ -52,5 +66,47 @@ describe('generateQuotationPDF', () => {
       terms: null,
     });
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
+  it('produces at least a cover page plus a content page', async () => {
+    const buffer = await generateQuotationPDF(baseQuotation);
+    expect(countPages(buffer)).toBeGreaterThanOrEqual(2);
+  });
+
+  it('grows the page count as itinerary content grows', async () => {
+    const few = await generateQuotationPDF({ ...baseQuotation, itineraryDays: makeDays(1) });
+    const many = await generateQuotationPDF({ ...baseQuotation, itineraryDays: makeDays(20) });
+    expect(countPages(many)).toBeGreaterThan(countPages(few));
+  });
+
+  it('renders the cover from rich trip fields', async () => {
+    const buffer = await generateQuotationPDF({
+      ...baseQuotation,
+      destination: 'Maldives',
+      packageTitle: 'Coco Bodu Hithi Honeymoon Escape',
+      travelStartDate: new Date('2026-05-10'),
+      travelEndDate: new Date('2026-05-15'),
+      paxCount: 2,
+      durationNights: 5,
+      durationDays: 6,
+      highlights: ['Private-pool villas', 'Full-board meals', 'Speedboat transfers'],
+      itineraryDays: makeDays(5),
+    });
+    expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(countPages(buffer)).toBeGreaterThanOrEqual(2);
+  });
+
+  it('degrades gracefully when every optional trip field is absent', async () => {
+    const buffer = await generateQuotationPDF({
+      quotationNumber: 'QT-000',
+      currency: 'USD',
+      mode: 'summary',
+      customerName: 'Minimal',
+      subtotal: 100,
+      totalAmount: 100,
+      items: [],
+    });
+    expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(countPages(buffer)).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1,15 +1,12 @@
+import fs from 'node:fs';
 import PDFDocument from 'pdfkit';
 import BRANDING, { getBankDetails, hasBankDetails } from '../config/branding.js';
 
-const COLORS = {
-  ink: '#0F172A',
-  muted: '#64748B',
-  brand: '#0F766E',
-  line: '#E2E8F0',
-  band: '#F1F5F9',
-};
+const T = BRANDING.theme;
+const CONTENT = BRANDING.content;
 
-const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: '₹', AUD: 'A$', LKR: 'Rs ' };
+// Built-in Helvetica (WinAnsi) has no rupee glyph, so INR uses a text prefix.
+const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: 'INR ', AUD: 'A$', LKR: 'Rs ' };
 
 const formatMoney = (amount, currency = 'USD') => {
   const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
@@ -24,7 +21,7 @@ const formatDate = (date) => {
   return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-/** Group snapshot line items by their category for the summary layout. */
+/** Group snapshot line items by their category for the detailed layout. */
 const groupByCategory = (items = []) => {
   const groups = new Map();
   for (const item of items) {
@@ -39,187 +36,477 @@ const groupByCategory = (items = []) => {
 
 const titleCase = (s) => String(s || '').replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
+const asList = (v) => (Array.isArray(v) ? v.filter(Boolean) : v ? [v] : []);
+
+/** `itineraryDays` is a Json column — tolerate arrays or stringified arrays. */
+const normalizeDays = (v) => {
+  let arr = v;
+  if (typeof v === 'string') {
+    try { arr = JSON.parse(v); } catch { return []; }
+  }
+  return Array.isArray(arr) ? arr : [];
+};
+
 /**
- * Render a quotation snapshot to a PDF Buffer. Honors `quotation.mode`:
- * `summary` (default) shows category subtotals + the final price; `detailed`
- * lists every line item. Renders purely from the snapshot — no live lookups.
+ * Render a quotation snapshot to a branded, multi-page PDF Buffer.
  *
- * @param {object} quotation - a Quotation row with its `items` included
+ * The document flows section by section (cover → highlights → itinerary →
+ * inclusions/exclusions → pricing → payment details → terms → cancellation →
+ * reviews → contact) so the page count grows with the content. Every section
+ * degrades gracefully when its snapshot fields are absent. Renders purely from
+ * the persisted snapshot — no live lookups — so regeneration is deterministic.
+ * Honors `quotation.mode`: `detailed` adds an itemized pricing breakdown.
+ *
+ * @param {object} quotation - a Quotation row with its `items` included.
+ *   Optional `coverImageBuffer` (Buffer) or a local-path `coverImage` renders
+ *   the hero image; remote URLs fall back to a branded placeholder banner.
  * @returns {Promise<Buffer>}
  */
 export function generateQuotationPDF(quotation) {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const doc = new PDFDocument({
+        size: 'A4',
+        margins: { top: 60, left: 50, right: 50, bottom: 92 },
+        bufferPages: true,
+      });
       const chunks = [];
       doc.on('data', (c) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
       const currency = quotation.currency || 'USD';
-      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const left = doc.page.margins.left;
-      const right = doc.page.width - doc.page.margins.right;
+      const PAGE_W = doc.page.width; // 595.28
+      const PAGE_H = doc.page.height; // 841.89
+      const left = doc.page.margins.left; // 50
+      const right = PAGE_W - doc.page.margins.right; // 545.28
+      const contentW = right - left;
+      const FOOTER_H = 80;
+      const footerTop = PAGE_H - FOOTER_H;
+      const bottomLimit = PAGE_H - doc.page.margins.bottom; // content must stop here
 
-      // ── Header band ──
-      doc.rect(0, 0, doc.page.width, 90).fill(COLORS.brand);
-      doc.fillColor('#FFFFFF').fontSize(22).font('Helvetica-Bold')
-        .text(BRANDING.company.name, left, 28);
-      doc.fontSize(10).font('Helvetica')
-        .text(BRANDING.company.tagline, left, 56);
-      doc.fontSize(20).font('Helvetica-Bold')
-        .text('QUOTATION', left, 30, { width: pageWidth, align: 'right' });
-      doc.fontSize(10).font('Helvetica')
-        .text(quotation.quotationNumber || '', left, 58, { width: pageWidth, align: 'right' });
+      // ── flow primitives ──────────────────────────────────────────
+      const ensureSpace = (h) => { if (doc.y + h > bottomLimit) doc.addPage(); };
 
-      doc.fillColor(COLORS.ink);
-      let y = 110;
-
-      // ── Meta row: bill-to + dates ──
-      doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.muted).text('PREPARED FOR', left, y);
-      doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.muted)
-        .text('DETAILS', left + pageWidth / 2, y, { width: pageWidth / 2, align: 'right' });
-      y += 14;
-
-      doc.font('Helvetica').fillColor(COLORS.ink).fontSize(11)
-        .text(quotation.customerName || 'Customer', left, y);
-      const metaRight = [
-        `Issued: ${formatDate(quotation.issueDate)}`,
-        `Valid until: ${formatDate(quotation.validUntil)}`,
-        `Status: ${titleCase(quotation.status || 'draft')}`,
-      ].join('\n');
-      doc.fontSize(9).fillColor(COLORS.muted)
-        .text(metaRight, left + pageWidth / 2, y, { width: pageWidth / 2, align: 'right' });
-
-      y += 14;
-      doc.fontSize(9).fillColor(COLORS.muted);
-      if (quotation.customerEmail) { doc.text(quotation.customerEmail, left, y); y += 12; }
-      if (quotation.customerPhone) { doc.text(quotation.customerPhone, left, y); y += 12; }
-      if (quotation.customerAddress) { doc.text(quotation.customerAddress, left, y); y += 12; }
-
-      y = Math.max(y, 180) + 10;
-      doc.moveTo(left, y).lineTo(right, y).strokeColor(COLORS.line).stroke();
-      y += 16;
-
-      // ── Items ──
-      const detailed = quotation.mode === 'detailed';
-      doc.fontSize(12).font('Helvetica-Bold').fillColor(COLORS.ink)
-        .text(detailed ? 'Itemized Breakdown' : 'Trip Summary', left, y);
-      y += 22;
-
-      const priceColX = right - 110;
-      const drawRow = (label, amount, { bold = false, indent = 0 } = {}) => {
-        if (y > doc.page.height - 160) { doc.addPage(); y = 60; }
-        doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(10)
-          .fillColor(bold ? COLORS.ink : COLORS.muted)
-          .text(label, left + indent, y, { width: priceColX - left - indent - 8 });
-        const rowHeight = doc.heightOfString(label, { width: priceColX - left - indent - 8 });
-        doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fillColor(COLORS.ink)
-          .text(amount, priceColX, y, { width: right - priceColX, align: 'right' });
-        y += Math.max(rowHeight, 14) + 4;
+      const sectionHeader = (title) => {
+        ensureSpace(48);
+        doc.font('Helvetica-Bold').fontSize(14).fillColor(T.brand)
+          .text(String(title).toUpperCase(), left, doc.y, { width: contentW });
+        const ry = doc.y + 4;
+        doc.moveTo(left, ry).lineTo(right, ry).lineWidth(2).strokeColor(T.brand).stroke();
+        doc.lineWidth(1);
+        doc.x = left;
+        doc.y = ry + 14;
       };
 
-      if (detailed) {
-        for (const item of quotation.items || []) {
-          const qty = Number(item.quantity) || 1;
-          const label = qty > 1 ? `${item.description}  (×${qty})` : item.description;
-          drawRow(label, formatMoney(item.totalPrice, currency));
+      // A filled 5-point star (for rating rows) — avoids relying on the ★ glyph.
+      const star = (cx, cy, outer, inner, color) => {
+        const spikes = 5;
+        let rot = (Math.PI / 2) * 3;
+        const step = Math.PI / spikes;
+        doc.moveTo(cx, cy - outer);
+        for (let i = 0; i < spikes; i += 1) {
+          doc.lineTo(cx + Math.cos(rot) * outer, cy + Math.sin(rot) * outer); rot += step;
+          doc.lineTo(cx + Math.cos(rot) * inner, cy + Math.sin(rot) * inner); rot += step;
         }
-      } else {
-        for (const group of groupByCategory(quotation.items)) {
-          drawRow(titleCase(group.category), formatMoney(group.total, currency), { bold: true });
-          for (const item of group.items) {
-            const qty = Number(item.quantity) || 1;
-            const label = qty > 1 ? `${item.description}  (×${qty})` : item.description;
-            drawRow(label, '', { indent: 14 });
+        doc.closePath().fill(color);
+      };
+      const stars = (x, y, n) => { for (let i = 0; i < n; i += 1) star(x + 6 + i * 13, y + 5, 5, 2.2, T.brand); };
+
+      const pillCentered = (text, y) => {
+        doc.font('Helvetica-Bold').fontSize(9);
+        const tw = doc.widthOfString(text);
+        const pw = tw + 24;
+        const ph = 18;
+        const px = left + (contentW - pw) / 2;
+        doc.roundedRect(px, y, pw, ph, 9).fillOpacity(0.18).fill(T.brand).fillOpacity(1);
+        doc.fillColor(T.brandDark).text(text, px, y + 5, { width: pw, align: 'center' });
+        return y + ph;
+      };
+
+      // ── Cover ────────────────────────────────────────────────────
+      const coverPage = () => {
+        const heroH = 330;
+        let drew = false;
+        const imgBuf = quotation.coverImageBuffer;
+        const imgPath = typeof quotation.coverImage === 'string' && !/^https?:/i.test(quotation.coverImage)
+          ? quotation.coverImage : null;
+        try {
+          if (imgBuf) {
+            doc.image(imgBuf, left, 0, { width: contentW, height: heroH, cover: [contentW, heroH] });
+            drew = true;
+          } else if (imgPath && fs.existsSync(imgPath)) {
+            doc.image(imgPath, left, 0, { width: contentW, height: heroH, cover: [contentW, heroH] });
+            drew = true;
           }
+        } catch { drew = false; }
+        if (!drew) {
+          doc.rect(left, 0, contentW, heroH).fill(T.brand);
+          doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(30)
+            .text((quotation.destination || quotation.packageTitle || 'Your Destination').toUpperCase(),
+              left + 20, heroH / 2 - 24, { width: contentW - 40, align: 'center' });
         }
-      }
+        doc.rect(0, heroH, PAGE_W, 2).fill(T.slate200);
 
-      y += 6;
-      doc.moveTo(left, y).lineTo(right, y).strokeColor(COLORS.line).stroke();
-      y += 12;
+        const cardY = heroH + 30;
+        const cardH = 150;
+        doc.roundedRect(left, cardY, contentW, cardH, 12).fillAndStroke(T.white, T.slate200);
+        doc.rect(left, cardY + 10, 6, cardH - 20).fill(T.brand);
 
-      // ── Totals ──
-      drawRow('Subtotal', formatMoney(quotation.subtotal, currency));
-      if (Number(quotation.discountAmount) > 0) {
-        drawRow(`Discount${quotation.discountType === 'percentage' ? ` (${quotation.discountValue}%)` : ''}`,
-          `- ${formatMoney(quotation.discountAmount, currency)}`);
-      }
-      if (Number(quotation.taxAmount) > 0) {
-        drawRow(`Tax (${quotation.taxRate}%)`, formatMoney(quotation.taxAmount, currency));
-      }
-      if (Number(quotation.serviceChargeAmount) > 0) {
-        drawRow(`Service charge (${quotation.serviceChargeRate}%)`, formatMoney(quotation.serviceChargeAmount, currency));
-      }
+        const dest = (quotation.destination || '').toUpperCase();
+        let ty = cardY + 34;
+        if (dest) ty = pillCentered(dest, cardY + 24) + 12;
+        doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(20)
+          .text(quotation.packageTitle || 'Travel Package', left + 24, ty, {
+            width: contentW - 48, align: 'center',
+          });
 
-      // Grand total band
-      if (y > doc.page.height - 160) { doc.addPage(); y = 60; }
-      y += 4;
-      doc.rect(priceColX - 160, y, right - priceColX + 160, 30).fill(COLORS.band);
-      doc.fillColor(COLORS.ink).font('Helvetica-Bold').fontSize(12)
-        .text('Total', priceColX - 150, y + 9);
-      doc.fontSize(13).text(formatMoney(quotation.totalAmount, currency), priceColX - 10, y + 8,
-        { width: right - priceColX + 10, align: 'right' });
-      y += 46;
-
-      // ── Inclusions / exclusions ──
-      const bullets = (title, list) => {
-        if (!list || list.length === 0) return;
-        if (y > doc.page.height - 140) { doc.addPage(); y = 60; }
-        doc.font('Helvetica-Bold').fontSize(10).fillColor(COLORS.ink).text(title, left, y);
-        y += 15;
-        doc.font('Helvetica').fontSize(9).fillColor(COLORS.muted);
-        for (const entry of list) {
-          if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
-          doc.text(`•  ${entry}`, left + 6, y, { width: pageWidth - 12 });
-          y += doc.heightOfString(`•  ${entry}`, { width: pageWidth - 12 }) + 3;
+        doc.x = left;
+        doc.y = cardY + cardH + 26;
+        doc.font('Helvetica-Bold').fontSize(12).fillColor(T.brand).text('TOUR DETAILS:', left, doc.y);
+        doc.moveDown(0.4);
+        const details = [];
+        if (quotation.travelStartDate) {
+          details.push(['Travel Date', `${formatDate(quotation.travelStartDate)}${quotation.travelEndDate ? ` to ${formatDate(quotation.travelEndDate)}` : ''}`]);
         }
-        y += 8;
+        if (quotation.paxCount) details.push(['No. of Pax', `${quotation.paxCount} Person(s)`]);
+        if (quotation.durationNights || quotation.durationDays) {
+          const dur = `${quotation.durationNights ? `${quotation.durationNights} Nights ` : ''}${quotation.durationDays ? `${quotation.durationDays} Days` : ''}`.trim();
+          details.push(['Duration', dur]);
+        }
+        doc.fontSize(10);
+        for (const [k, v] of details) {
+          doc.font('Helvetica-Bold').fillColor(T.ink).text(`${k}: `, left, doc.y, { continued: true })
+            .font('Helvetica').fillColor(T.ink).text(v);
+        }
+        doc.addPage();
       };
-      bullets('Includes', quotation.includedServices);
-      bullets('Excludes', quotation.excludedServices);
 
-      // ── Notes / terms ──
-      const paragraph = (title, text) => {
-        if (!text) return;
-        if (y > doc.page.height - 120) { doc.addPage(); y = 60; }
-        doc.font('Helvetica-Bold').fontSize(10).fillColor(COLORS.ink).text(title, left, y);
-        y += 14;
-        doc.font('Helvetica').fontSize(9).fillColor(COLORS.muted)
-          .text(text, left, y, { width: pageWidth });
-        y += doc.heightOfString(text, { width: pageWidth }) + 10;
+      // ── Package highlights ───────────────────────────────────────
+      const highlightsSection = () => {
+        const hs = asList(quotation.highlights);
+        if (!hs.length) return;
+        sectionHeader('Package Highlights');
+        doc.font('Helvetica').fontSize(9).fillColor(T.ink);
+        for (const h of hs) {
+          ensureSpace(18);
+          doc.text(`•  ${h}`, left + 4, doc.y, { width: contentW - 8 });
+          doc.y += 3;
+        }
+        doc.y += 8;
       };
-      paragraph('Notes', quotation.notes);
-      paragraph('Payment terms', quotation.paymentTerms);
-      paragraph('Terms & conditions', quotation.terms);
 
-      // ── Bank details (only when configured) ──
-      if (hasBankDetails()) {
-        if (y > doc.page.height - 140) { doc.addPage(); y = 60; }
+      // ── Itinerary day cards ──────────────────────────────────────
+      const dayCard = (d, idx) => {
+        ensureSpace(58);
+        const startY = doc.y;
+        const cx = left + 18;
+        const cy = startY + 12;
+        doc.circle(cx, cy, 12).fill(T.brand);
+        doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11)
+          .text(String(d.day ?? idx + 1), cx - 12, cy - 6, { width: 24, align: 'center' });
+
+        const tx = left + 42;
+        doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(11)
+          .text(`Day ${d.day ?? idx + 1}: ${d.title || ''}`.trim(), tx, startY + 1, { width: right - tx });
+        let yy = doc.y + 2;
+        doc.font('Helvetica').fontSize(9).fillColor(T.muted);
+        const locs = asList(d.locations);
+        const meals = asList(d.meals);
+        if (locs.length) { doc.text(`•  Locations: ${locs.join(', ')}`, tx, yy, { width: right - tx }); yy = doc.y; }
+        if (meals.length) { doc.text(`•  Meals: ${meals.join(', ')}`, tx, yy, { width: right - tx }); yy = doc.y; }
+        doc.x = left;
+        doc.y = yy + 10;
+      };
+
+      const itinerarySection = () => {
+        const days = normalizeDays(quotation.itineraryDays);
+        if (!days.length) return;
+        sectionHeader('Travel Itinerary');
+        days.forEach(dayCard);
+      };
+
+      // ── Inclusions / exclusions (two columns) ────────────────────
+      const inclusionsSection = () => {
+        const inc = asList(quotation.includedServices);
+        const exc = asList(quotation.excludedServices);
+        if (!inc.length && !exc.length) return;
+        sectionHeader('Inclusions & Exclusions');
+
+        const colGap = 20;
+        const colW = (contentW - colGap) / 2;
+        const rx = left + colW + colGap;
+        const est = Math.max(inc.length, exc.length) * 13 + 30;
+        ensureSpace(Math.min(est, 260));
+        const startY = doc.y;
+
+        const drawCol = (title, items, x) => {
+          doc.font('Helvetica-Bold').fontSize(11).fillColor(T.brand).text(title, x, startY, { width: colW });
+          let yy = doc.y + 4;
+          doc.font('Helvetica').fontSize(9).fillColor(T.ink);
+          for (const it of (items.length ? items : ['—'])) {
+            doc.text(`•  ${it}`, x, yy, { width: colW });
+            yy = doc.y + 2;
+          }
+          return yy;
+        };
+        const endL = drawCol('INCLUSIONS', inc, left);
+        const endR = drawCol('EXCLUSIONS', exc, rx);
+        doc.x = left;
+        doc.y = Math.max(endL, endR) + 8;
+      };
+
+      // ── Payment & pricing ────────────────────────────────────────
+      const pricingSection = () => {
+        sectionHeader('Payment & Pricing');
+        const detailed = quotation.mode === 'detailed';
+        const priceColX = right - 110;
+        const drawRow = (label, amount, { bold = false, indent = 0 } = {}) => {
+          ensureSpace(18);
+          const yy = doc.y;
+          doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(10)
+            .fillColor(bold ? T.ink : T.muted)
+            .text(label, left + indent, yy, { width: priceColX - left - indent - 8 });
+          const hh = doc.y - yy;
+          doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fillColor(T.ink)
+            .text(amount, priceColX, yy, { width: right - priceColX, align: 'right' });
+          doc.y = yy + Math.max(hh, 14) + 4;
+        };
+
+        if (detailed && (quotation.items || []).length) {
+          for (const g of groupByCategory(quotation.items)) {
+            drawRow(titleCase(g.category), formatMoney(g.total, currency), { bold: true });
+            for (const it of g.items) {
+              const qty = Number(it.quantity) || 1;
+              drawRow(qty > 1 ? `${it.description}  (x${qty})` : it.description, '', { indent: 14 });
+            }
+          }
+          doc.moveTo(left, doc.y).lineTo(right, doc.y).lineWidth(1).strokeColor(T.slate200).stroke();
+          doc.y += 8;
+          drawRow('Subtotal', formatMoney(quotation.subtotal, currency));
+          if (Number(quotation.discountAmount) > 0) {
+            drawRow(`Discount${quotation.discountType === 'percentage' ? ` (${quotation.discountValue}%)` : ''}`,
+              `- ${formatMoney(quotation.discountAmount, currency)}`);
+          }
+          if (Number(quotation.taxAmount) > 0) drawRow(`Tax (${quotation.taxRate}%)`, formatMoney(quotation.taxAmount, currency));
+          if (Number(quotation.serviceChargeAmount) > 0) {
+            drawRow(`Service charge (${quotation.serviceChargeRate}%)`, formatMoney(quotation.serviceChargeAmount, currency));
+          }
+          doc.y += 4;
+        }
+
+        ensureSpace(46);
+        const by = doc.y;
+        doc.roundedRect(left, by, contentW, 34, 6).fillOpacity(0.12).fill(T.brand).fillOpacity(1);
+        doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(12).text('Total Package Cost', left + 14, by + 11);
+        doc.fillColor(T.brandDark).font('Helvetica-Bold').fontSize(16)
+          .text(formatMoney(quotation.totalAmount, currency), left, by + 8, { width: contentW - 14, align: 'right' });
+        doc.x = left;
+        doc.y = by + 34 + 14;
+      };
+
+      // ── Payment details (bank card + UPI + chips) ────────────────
+      const paymentChips = () => {
+        const chips = CONTENT.paymentMethods || [];
+        if (!chips.length) return;
+        ensureSpace(34);
+        let x = left;
+        let rowY = doc.y;
+        const h = 22;
+        const gap = 8;
+        doc.font('Helvetica-Bold').fontSize(8.5);
+        for (const c of chips) {
+          const w = doc.widthOfString(c) + 20;
+          if (x + w > right) { x = left; rowY += h + gap; }
+          doc.roundedRect(x, rowY, w, h, 5).fillOpacity(0.12).fill(T.brand).fillOpacity(1);
+          doc.fillColor(T.brand).text(c, x, rowY + 6.5, { width: w, align: 'center' });
+          x += w + gap;
+        }
+        doc.x = left;
+        doc.y = rowY + h + 12;
+      };
+
+      const paymentDetailsSection = () => {
         const bank = getBankDetails();
-        doc.font('Helvetica-Bold').fontSize(10).fillColor(COLORS.ink).text('Payment Details', left, y);
-        y += 14;
-        const lines = [
-          bank.accountName && `Account Name: ${bank.accountName}`,
-          bank.bankName && `Bank: ${bank.bankName}`,
-          bank.accountNumber && `Account No: ${bank.accountNumber}`,
-          bank.ifscCode && `IFSC: ${bank.ifscCode}`,
-          bank.swiftCode && `SWIFT: ${bank.swiftCode}`,
-          bank.branch && `Branch: ${bank.branch}`,
-          bank.upiId && `UPI: ${bank.upiId}`,
-        ].filter(Boolean);
-        doc.font('Helvetica').fontSize(9).fillColor(COLORS.muted).text(lines.join('\n'), left, y);
-        y += lines.length * 12 + 10;
-      }
+        if (!hasBankDetails() && !bank.upiId) return;
+        sectionHeader('Payment Details');
 
-      // ── Footer ──
-      const footerY = doc.page.height - 60;
-      doc.moveTo(left, footerY).lineTo(right, footerY).strokeColor(COLORS.line).stroke();
-      doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted).text(
-        `${BRANDING.company.name}  ·  ${BRANDING.contact.email}  ·  ${BRANDING.contact.phone}  ·  ${BRANDING.urls.website}`,
-        left, footerY + 8, { width: pageWidth, align: 'center' },
-      );
+        ensureSpace(160);
+        const cardY = doc.y;
+        const cardH = 150;
+        doc.roundedRect(left, cardY, contentW, cardH, 10).fill(T.cream);
+
+        const bx = left + 20;
+        let by = cardY + 18;
+        doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(11).text('Bank Transfer', bx, by);
+        by += 20;
+        const rows = [
+          ['Bank', bank.bankName], ['Account Name', bank.accountName], ['Account No', bank.accountNumber],
+          ['IFSC', bank.ifscCode], ['SWIFT', bank.swiftCode], ['Branch', bank.branch],
+        ].filter(([, v]) => v);
+        doc.fontSize(9);
+        for (const [k, v] of rows) {
+          doc.font('Helvetica').fillColor(T.muted).text(`${k}:`, bx, by, { width: 90 });
+          doc.font('Helvetica-Bold').fillColor(T.ink).text(String(v), bx + 92, by, { width: contentW / 2 - 120 });
+          by += 15;
+        }
+
+        // QR placeholder + UPI id on the right.
+        const qs = 84;
+        const qbx = left + contentW - 20 - qs;
+        doc.font('Helvetica-Bold').fontSize(11).fillColor(T.brand)
+          .text('Scan to pay via UPI', qbx - 60, cardY + 18, { width: qs + 60, align: 'right' });
+        const qby = cardY + 40;
+        doc.roundedRect(qbx, qby, qs, qs, 6).lineWidth(1).strokeColor(T.slate200).stroke();
+        doc.fillColor(T.muted).font('Helvetica').fontSize(8)
+          .text('UPI QR', qbx, qby + qs / 2 - 4, { width: qs, align: 'center' });
+        if (bank.upiId) {
+          doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(9)
+            .text(`UPI: ${bank.upiId}`, qbx - 60, qby + qs + 6, { width: qs + 60, align: 'right' });
+        }
+
+        doc.x = left;
+        doc.y = cardY + cardH + 14;
+        paymentChips();
+      };
+
+      // ── Terms & cancellation ─────────────────────────────────────
+      const paragraph = (title, text, muted = false) => {
+        if (!text) return;
+        ensureSpace(40);
+        if (title) {
+          doc.font('Helvetica-Bold').fontSize(10).fillColor(T.ink).text(title, left, doc.y, { width: contentW });
+          doc.y += 2;
+        }
+        doc.font('Helvetica').fontSize(9).fillColor(muted ? T.muted : T.ink)
+          .text(text, left, doc.y, { width: contentW, align: 'left' });
+        doc.moveDown(0.6);
+      };
+
+      const termsSection = () => {
+        const t = quotation.terms || CONTENT.defaultTerms;
+        if (!t) return;
+        sectionHeader('Terms & Conditions');
+        paragraph('', t);
+        paragraph('Payment Terms', quotation.paymentTerms, true);
+        paragraph('Notes', quotation.notes, true);
+      };
+
+      const cancellationSection = () => {
+        if (!CONTENT.cancellationPolicy) return;
+        sectionHeader('Cancellation Policy');
+        paragraph('', CONTENT.cancellationPolicy);
+      };
+
+      // ── Reviews (static placeholder content) ─────────────────────
+      const reviewsSection = () => {
+        const reviews = CONTENT.reviews || [];
+        if (!reviews.length) return;
+        sectionHeader('Reviews');
+        const colGap = 20;
+        const colW = (contentW - colGap) / 2;
+        for (let i = 0; i < reviews.length; i += 2) {
+          const pair = reviews.slice(i, i + 2);
+          ensureSpace(66);
+          const rowY = doc.y;
+          let rowMax = rowY;
+          pair.forEach((rv, j) => {
+            const x = left + j * (colW + colGap);
+            const accent = T.accents[(i + j) % T.accents.length];
+            doc.circle(x + 12, rowY + 12, 12).fill(accent);
+            doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11)
+              .text((rv.name || '?')[0].toUpperCase(), x, rowY + 6, { width: 24, align: 'center' });
+            doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(10)
+              .text(rv.name || '', x + 32, rowY + 1, { width: colW - 32 });
+            stars(x + 32, doc.y + 1, rv.rating || 5);
+            doc.fillColor(T.muted).font('Helvetica').fontSize(9)
+              .text(rv.text || '', x + 32, doc.y + 12, { width: colW - 32 });
+            rowMax = Math.max(rowMax, doc.y);
+          });
+          doc.x = left;
+          doc.y = rowMax + 14;
+        }
+      };
+
+      // ── Contact & signatory ──────────────────────────────────────
+      const centered = (text, font, size, color) => {
+        doc.font(font).fontSize(size).fillColor(color).text(text, left, doc.y, { width: contentW, align: 'center' });
+      };
+
+      const contactSection = () => {
+        sectionHeader('Contact Us');
+        centered('Our team is always here to help. For any queries regarding your trip, contact us:',
+          'Helvetica', 10, T.ink);
+        doc.moveDown(0.6);
+        centered(`Call: ${BRANDING.contact.phone}`, 'Helvetica-Bold', 13, T.brand);
+        doc.moveDown(0.3);
+        centered(`Email: ${BRANDING.contact.email}`, 'Helvetica', 10, T.ink);
+        centered(`Web: ${BRANDING.urls.website}`, 'Helvetica', 10, T.brand);
+
+        const { advisorName, advisorPhone, advisorEmail } = quotation;
+        if (advisorName || advisorPhone || advisorEmail) {
+          doc.moveDown(0.4);
+          if (advisorName) centered(`Assigned Advisor: ${advisorName}`, 'Helvetica-Bold', 10, T.ink);
+          const line = [advisorPhone && `Mobile: ${advisorPhone}`, advisorEmail && `Email: ${advisorEmail}`]
+            .filter(Boolean).join('   |   ');
+          if (line) centered(line, 'Helvetica', 9, T.muted);
+        }
+
+        doc.moveDown(0.8);
+        centered('Your Trust, Our Responsibility', 'Helvetica-Bold', 12, T.brand);
+
+        ensureSpace(72);
+        const sy = doc.y + 26;
+        doc.moveTo(right - 160, sy).lineTo(right, sy).lineWidth(1).strokeColor(T.slate200).stroke();
+        doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(10)
+          .text('Authorized Signatory', right - 160, sy + 5, { width: 160, align: 'center' });
+        doc.font('Helvetica').fontSize(9).fillColor(T.muted)
+          .text(CONTENT.signatoryName, right - 160, sy + 19, { width: 160, align: 'center' });
+        doc.x = left;
+        doc.y = sy + 44;
+
+        const year = new Date().getFullYear();
+        ensureSpace(16);
+        centered(`© ${year} ${BRANDING.company.name}. All rights reserved.`, 'Helvetica', 8, T.muted);
+      };
+
+      // ── Per-page chrome: footer band, page numbers, logo ─────────
+      const drawLogo = () => {
+        const logo = BRANDING.urls.logo;
+        if (logo && !/^https?:/i.test(logo) && fs.existsSync(logo)) {
+          try { doc.image(logo, left, 28, { height: 16 }); return; } catch { /* fall through */ }
+        }
+        doc.font('Helvetica-Bold').fontSize(12).fillColor(T.brand).text(BRANDING.company.name, left, 28, { width: 240 });
+      };
+
+      const finalizeChrome = () => {
+        const range = doc.bufferedPageRange();
+        for (let i = 0; i < range.count; i += 1) {
+          doc.switchToPage(range.start + i);
+          // The footer sits below the page's bottom margin; drop the margin so
+          // pdfkit doesn't auto-add a blank page when we write text down here.
+          doc.page.margins.bottom = 0;
+          doc.rect(0, footerTop, PAGE_W, FOOTER_H).fill(T.brand);
+          doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(10)
+            .text(CONTENT.ratingTagline, left, footerTop + 30, { width: contentW, align: 'center', lineBreak: false });
+          doc.font('Helvetica').fontSize(8).fillColor('#FFFFFF')
+            .text(`Page ${i + 1} of ${range.count}`, left, footerTop + 50, { width: contentW, align: 'center', lineBreak: false });
+          if (i > 0) drawLogo();
+        }
+      };
+
+      // ── Compose ──────────────────────────────────────────────────
+      coverPage();
+      highlightsSection();
+      itinerarySection();
+      inclusionsSection();
+      pricingSection();
+      paymentDetailsSection();
+      termsSection();
+      cancellationSection();
+      reviewsSection();
+      contactSection();
+      finalizeChrome();
 
       doc.end();
     } catch (err) {
