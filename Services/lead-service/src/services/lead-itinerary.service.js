@@ -171,35 +171,45 @@ export function serializeLeadDays(lead) {
 }
 
 /**
- * Atomic lead itinerary edit: replace days, regenerate AUTO cost lines (keep
- * MANUAL overrides), recompute pricing and move NEW/REVISION leads to
- * DRAFTING. Locked once the lead is quoted or later.
+ * Atomic selection itinerary edit: replace days, regenerate AUTO cost lines
+ * (keep MANUAL overrides), recompute pricing and move NEW/REVISION leads to
+ * DRAFTING. Locked lead-wide once the lead is quoted or later. This full
+ * delete+recreate write is also what materializes a previously-pristine
+ * selection — a genuinely new edit and "first materialization" are the same
+ * operation here.
  */
-export async function applyLeadItinerary({
+export async function applyLeadSelectionItinerary({
   leadId,
+  selectionId,
   days = [],
   pricingSettings = {},
   actorId = null,
   fetchImpl = fetch,
   prismaClient = prisma,
 }) {
-  const lead = await prismaClient.lead.findUnique({
-    where: { id: leadId },
-    include: { pricing: true, costLines: true, itineraryDays: true },
-  });
+  const lead = await prismaClient.lead.findUnique({ where: { id: leadId } });
   if (!lead) throw new AppError('Lead not found', 404);
 
   if (EDIT_BLOCKED_STATUSES.includes(lead.lifecycleStatus)) {
     throw new AppError('Itinerary edits are locked after QUOTED; move back to DRAFTING first', 400);
   }
 
-  // Ensure a pricing row exists; NEW leads inherit currency/margin from the package.
-  let pricing = lead.pricing;
+  const selection = await prismaClient.leadPackageSelection.findUnique({
+    where: { id: selectionId },
+    include: { pricing: true, costLines: true, itineraryDays: true },
+  });
+  if (!selection || selection.leadId !== leadId) {
+    throw new AppError('Package selection not found', 404);
+  }
+
+  // Ensure a pricing row exists; a fresh real-package selection inherits
+  // currency/margin from the package blueprint.
+  let pricing = selection.pricing;
   if (!pricing) {
     let defaults = { currency: 'USD', marginType: null, marginValue: null };
-    if (lead.packageId) {
+    if (selection.packageId) {
       try {
-        const pkg = await fetchPackage(lead.packageId, fetchImpl);
+        const pkg = await fetchPackage(selection.packageId, fetchImpl);
         defaults = {
           currency: pkg.currency || 'USD',
           marginType: pkg.defaultMarginType || null,
@@ -210,7 +220,7 @@ export async function applyLeadItinerary({
       }
     }
     pricing = await prismaClient.leadPricing.create({
-      data: { leadId: lead.id, ...defaults },
+      data: { leadPackageSelectionId: selection.id, ...defaults },
     });
   }
 
@@ -223,44 +233,46 @@ export async function applyLeadItinerary({
   const autoLines = buildAutoCostLines(days);
 
   await prismaClient.$transaction([
-    prismaClient.leadItineraryDay.deleteMany({ where: { leadId: lead.id } }),
-    prismaClient.leadCostLine.deleteMany({ where: { leadId: lead.id, source: 'AUTO' } }),
+    prismaClient.leadItineraryDay.deleteMany({ where: { leadPackageSelectionId: selection.id } }),
+    prismaClient.leadCostLine.deleteMany({ where: { leadPackageSelectionId: selection.id, source: 'AUTO' } }),
   ]);
 
-  await prismaClient.lead.update({
-    where: { id: lead.id },
+  await prismaClient.leadPackageSelection.update({
+    where: { id: selection.id },
     data: {
       ...(daysCreate.length ? { itineraryDays: { create: daysCreate } } : {}),
       costLines: { create: autoLines },
-      // A manual itinerary edit means the itinerary no longer matches any
-      // package's blueprint verbatim — switching packages later must not
-      // silently overwrite it.
+      // A manual edit means this selection no longer matches its package's
+      // blueprint verbatim — "refresh from original package" is what
+      // reverts this, nothing else should silently overwrite it.
       sourcePackageId: null,
-      ...(nextStatus !== lead.lifecycleStatus
-        ? {
-            lifecycleStatus: nextStatus,
-            statusHistory: {
-              create: [{
-                status: nextStatus,
-                actor: 'USER',
-                changedById: actorId,
-                notes: 'Itinerary edited — moved to drafting',
-              }],
-            },
-          }
-        : {}),
     },
   });
 
+  if (nextStatus !== lead.lifecycleStatus) {
+    await prismaClient.lead.update({
+      where: { id: lead.id },
+      data: {
+        lifecycleStatus: nextStatus,
+        primarySelectionId: lead.primarySelectionId ?? selection.id,
+        statusHistory: {
+          create: [{
+            status: nextStatus,
+            actor: 'USER',
+            changedById: actorId,
+            notes: 'Itinerary edited — moved to drafting',
+          }],
+        },
+      },
+    });
+  }
+
   // Persist pricing settings + recomputed totals.
   const settings = { ...pricing, ...pricingSettings };
-  const fresh = await prismaClient.lead.findUnique({
-    where: { id: leadId },
-    include: { costLines: true },
-  });
+  const freshLines = await prismaClient.leadCostLine.findMany({ where: { leadPackageSelectionId: selection.id } });
   const computed = computePricing({
-    lines: (fresh.costLines || []).map(toLineDescriptor),
-    travelers: fresh.numberOfTravelers || 1,
+    lines: freshLines.map(toLineDescriptor),
+    travelers: lead.numberOfTravelers || 1,
     currency: settings.currency || 'USD',
     marginType: settings.marginType || null,
     marginValue: Number(settings.marginValue) || 0,
@@ -272,7 +284,7 @@ export async function applyLeadItinerary({
     verifiedPaymentTotal: Number(settings.paidAmount) || 0,
   });
   await prismaClient.leadPricing.update({
-    where: { leadId },
+    where: { leadPackageSelectionId: selection.id },
     data: {
       currency: settings.currency || 'USD',
       marginType: settings.marginType ?? pricing.marginType ?? null,
@@ -297,5 +309,5 @@ export async function applyLeadItinerary({
     },
   });
 
-  return { leadId, lifecycleStatus: nextStatus };
+  return { leadId, selectionId: selection.id, lifecycleStatus: nextStatus };
 }

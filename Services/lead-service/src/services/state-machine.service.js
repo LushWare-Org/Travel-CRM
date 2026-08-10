@@ -129,16 +129,6 @@ export function validateTravelerUpdate({ currentStatus, previousTravelers, nextT
 }
 
 /**
- * Package selection drives the itinerary blueprint, so it locks in step with
- * travelers — same rationale, same unlock path (move back to DRAFTING).
- */
-export function validatePackageUpdate({ currentStatus, previousPackageId, nextPackageId }) {
-  if (nextPackageId === undefined) return;
-  if ((previousPackageId || null) === (nextPackageId || null)) return;
-  assertFieldEditable(currentStatus, 'package', 'GATEKEEPER_PACKAGE_LOCKED');
-}
-
-/**
  * Travel dates shape the itinerary/pricing the same way package selection
  * does, so they share the traveler-lock window.
  */

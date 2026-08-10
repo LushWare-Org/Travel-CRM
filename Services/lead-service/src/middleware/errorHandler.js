@@ -4,6 +4,7 @@ export default (err, req, res, next) => {
     success: false,
     status: err.status || 'error',
     message: err.message,
+    ...(err.code && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
