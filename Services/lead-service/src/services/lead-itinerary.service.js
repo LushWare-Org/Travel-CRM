@@ -83,6 +83,7 @@ export function buildAutoCostLines(days) {
       breakfastCount: d.breakfastCount || 0,
       lunchCount: d.lunchCount || 0,
       dinnerCount: d.dinnerCount || 0,
+      mealPriceOverride: d.mealPriceOverride ?? null,
       accommodation: d.accommodation || {},
     })),
     activities: (days || []).flatMap((d) =>

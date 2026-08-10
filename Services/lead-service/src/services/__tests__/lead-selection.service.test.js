@@ -8,6 +8,7 @@ import {
   refreshSelection,
   recomputeSelectionPricing,
   snapshotSelectionQuotation,
+  syncLeadBudgetFromSelection,
 } from '../lead-selection.service.js';
 import AppError from '../../utils/appError.js';
 
@@ -95,6 +96,34 @@ describe('deriveSelectionView', () => {
     expect(view.days).toHaveLength(1);
     expect(view.costLines.length).toBeGreaterThan(0);
     expect(fetchImpl).toHaveBeenCalledWith(expect.stringContaining('/packages/pkg-1'));
+  });
+
+  it('carries catalog place/activity names through the load round-trip (derive → editor)', async () => {
+    // package-service nests resolved names under `place`/`activity` — the shape
+    // that regressed locations/activities loading blank in the lead editor.
+    const nestedBlueprint = {
+      id: 'pkg-9', title: 'Nested', currency: 'USD',
+      itineraryDays: [{
+        dayNumber: 1, title: 'Day 1', breakfastCount: 1, lunchCount: 0, dinnerCount: 1,
+        accommodation: { totalAmount: 120 },
+        places: [
+          { placeId: 'p1', place: { name: 'Sigiriya Rock' }, customName: null, orderIndex: 0 },
+          { placeId: null, place: null, customName: 'Local Market', orderIndex: 1 },
+        ],
+        activities: [{ activityId: 'a1', activity: { name: 'Temple Tour', defaultCost: 40 }, costOverride: null, orderIndex: 0 }],
+        transports: [],
+      }],
+    };
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: nestedBlueprint }) });
+
+    const view = await deriveSelectionView({ selection: { isManual: false, packageId: 'pkg-9' }, fetchImpl });
+    const editorDays = toEditorDays(view.days);
+
+    expect(editorDays[0].places.map((p) => p.customName)).toEqual(['Sigiriya Rock', 'Local Market']);
+    expect(editorDays[0].activities.map((a) => a.name)).toEqual(['Temple Tour']);
+    expect(editorDays[0].activities[0].defaultCost).toBe(40);
+    // the activity's catalog cost must reach the auto cost lines, not default to 0
+    expect(view.costLines.find((l) => l.category === 'activity')?.estimatedUnitPrice).toBe(40);
   });
 
   it('returns a single blank day and no cost lines for the manual slot', async () => {
@@ -234,6 +263,43 @@ describe('recomputeSelectionPricing', () => {
       leadPackageSelection: { findUnique: vi.fn().mockResolvedValue(null) },
     });
     await expect(recomputeSelectionPricing('ghost', null, prismaClient)).rejects.toThrow(AppError);
+  });
+});
+
+describe('syncLeadBudgetFromSelection', () => {
+  const withPricing = (primarySelectionId, pricing) => mockPrisma({
+    lead: { findUnique: vi.fn().mockResolvedValue({ primarySelectionId }), update: vi.fn() },
+    leadPricing: { findUnique: vi.fn().mockResolvedValue(pricing) },
+  });
+
+  it('writes a formatted budget from the primary selection total', async () => {
+    const prismaClient = withPricing('sel-1', { totalAmount: 4814, currency: 'USD' });
+    await syncLeadBudgetFromSelection('lead-1', 'sel-1', prismaClient);
+    expect(prismaClient.lead.update).toHaveBeenCalledWith({
+      where: { id: 'lead-1' },
+      data: { budget: 'USD 4,814' },
+    });
+  });
+
+  it('adopts the selection when the lead has no primary yet', async () => {
+    const prismaClient = withPricing(null, { totalAmount: 1200, currency: 'INR' });
+    await syncLeadBudgetFromSelection('lead-1', 'sel-9', prismaClient);
+    expect(prismaClient.lead.update).toHaveBeenCalledWith({
+      where: { id: 'lead-1' },
+      data: { budget: 'INR 1,200' },
+    });
+  });
+
+  it('does nothing when the selection is not the lead primary', async () => {
+    const prismaClient = withPricing('other-sel', { totalAmount: 999, currency: 'USD' });
+    await syncLeadBudgetFromSelection('lead-1', 'sel-1', prismaClient);
+    expect(prismaClient.lead.update).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the selection has no pricing/total', async () => {
+    const prismaClient = withPricing('sel-1', null);
+    await syncLeadBudgetFromSelection('lead-1', 'sel-1', prismaClient);
+    expect(prismaClient.lead.update).not.toHaveBeenCalled();
   });
 });
 

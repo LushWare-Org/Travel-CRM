@@ -221,4 +221,23 @@ describe('buildItineraryCostLines', () => {
     expect(activity.estimatedUnit).toBe(60);
     expect(transport).toMatchObject({ basis: 'PER_KM', estimatedUnit: 2.5, quantity: 100 });
   });
+
+  it('honours a per-day mealPriceOverride instead of the default meal rate', () => {
+    const lines = buildItineraryCostLines({
+      days: [{ breakfastCount: 1, lunchCount: 1, dinnerCount: 1, mealPriceOverride: 100 }],
+    });
+    const food = lines.find((l) => l.category === 'food');
+    expect(food.estimatedUnit).toBe(300); // 3 meals × $100, not 3 × the $15 default
+  });
+
+  it('applies each day meal rate independently, falling back to the default', () => {
+    const lines = buildItineraryCostLines({
+      days: [
+        { breakfastCount: 1, lunchCount: 0, dinnerCount: 1, mealPriceOverride: 50 }, // 2 × 50 = 100
+        { breakfastCount: 1, lunchCount: 1, dinnerCount: 1, mealPriceOverride: null }, // 3 × 15 = 45
+      ],
+    });
+    const food = lines.find((l) => l.category === 'food');
+    expect(food.estimatedUnit).toBe(145);
+  });
 });

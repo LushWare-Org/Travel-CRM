@@ -9,7 +9,9 @@
     "db:generate": "npx prisma@5 generate",
     "db:push": "npx prisma@5 db push",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:unit": "vitest run src/",
+    "test:integration": "vitest run test/"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

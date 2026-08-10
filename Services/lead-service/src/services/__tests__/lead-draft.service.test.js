@@ -63,6 +63,23 @@ describe('buildDraftData', () => {
     });
   });
 
+  it('snapshots catalog place/activity names and cost from the nested blueprint shape', () => {
+    // package-service nests the resolved name under `place`/`activity`, not top-level.
+    const data = buildDraftData({
+      id: 'pkg-n', title: 'Nested', currency: 'USD',
+      itineraryDays: [{
+        dayNumber: 1,
+        places: [{ placeId: 'p9', place: { name: 'Sigiriya Rock' }, customName: null, orderIndex: 0 }],
+        activities: [{ activityId: 'a9', activity: { name: 'Temple Tour', defaultCost: 40 }, costOverride: null, orderIndex: 0 }],
+      }],
+    });
+    expect(data.days[0].places.create[0]).toMatchObject({ placeId: 'p9', customName: 'Sigiriya Rock' });
+    expect(data.days[0].activities.create[0]).toMatchObject({ activityId: 'a9', name: 'Temple Tour', defaultCost: 40 });
+    expect(data.costLines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'activity', estimatedUnitPrice: 40 }),
+    ]));
+  });
+
   it('falls back to USD currency and no margin when the package omits them', () => {
     const data = buildDraftData({ id: 'x', title: 'Basic' });
     expect(data.pricing).toEqual({

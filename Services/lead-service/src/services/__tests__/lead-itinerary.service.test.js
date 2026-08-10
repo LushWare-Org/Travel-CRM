@@ -41,6 +41,7 @@ import {
   serializeLeadDays,
   applyLeadSelectionItinerary,
 } from '../lead-itinerary.service.js';
+import { computePricing, toLineDescriptor } from '../pricing.service.js';
 import AppError from '../../utils/appError.js';
 
 const editorDays = [
@@ -138,6 +139,43 @@ describe('buildAutoCostLines', () => {
     }]);
     const activity = lines.find((l) => l.category === 'activity');
     expect(activity.estimatedUnitPrice).toBe(35);
+  });
+
+  it('forwards a per-day mealPriceOverride into the meal cost line', () => {
+    const lines = buildAutoCostLines([{
+      dayNumber: 1,
+      breakfastCount: 1,
+      lunchCount: 1,
+      dinnerCount: 1,
+      mealPriceOverride: 100,
+    }]);
+    const food = lines.find((l) => l.category === 'food');
+    expect(food.estimatedUnitPrice).toBe(300); // 3 meals × $100, not the $15 default
+  });
+});
+
+describe('itinerary-cost edit → recomputed quote (workflow)', () => {
+  const quote = (days, travelers = 2) =>
+    computePricing({ lines: buildAutoCostLines(days).map(toLineDescriptor), travelers });
+
+  it('reflects an edited meal price in the recomputed total', () => {
+    const day = { dayNumber: 1, breakfastCount: 1, lunchCount: 1, dinnerCount: 1 };
+    const withDefault = quote([{ ...day }]);                        // meals at $15
+    const withOverride = quote([{ ...day, mealPriceOverride: 100 }]); // meals at $100
+
+    expect(withOverride.totalAmount).toBeGreaterThan(withDefault.totalAmount);
+    // 3 meals × $100 × 2 pax = $600 cost; must flow into the sell total, not $0.
+    expect(withOverride.sellSubtotal).toBeGreaterThanOrEqual(600);
+  });
+
+  it('does not zero the total when a day carries real accommodation/activity costs', () => {
+    const financials = quote([{
+      dayNumber: 1, breakfastCount: 1, lunchCount: 0, dinnerCount: 1, mealPriceOverride: 50,
+      accommodation: { totalAmount: 200 },
+      activities: ['City Tour'],
+      activityCosts: { 'City Tour': { defaultCost: 0, costOverride: 80 } },
+    }]);
+    expect(financials.totalAmount).toBeGreaterThan(0);
   });
 });
 

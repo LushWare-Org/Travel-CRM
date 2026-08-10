@@ -61,19 +61,25 @@ export function buildItineraryCostLines({
   transports = [],
   mealCostPerPerson,
 } = {}) {
-  const mealCost = mealCostPerPerson ?? DEFAULTS.mealCostPerPerson;
+  const defaultMealCost = mealCostPerPerson ?? DEFAULTS.mealCostPerPerson;
   const lines = [];
 
-  const mealCount = days.reduce(
-    (sum, d) => sum + (d.breakfastCount || 0) + (d.lunchCount || 0) + (d.dinnerCount || 0),
-    0,
-  );
-  if (mealCount > 0) {
+  // Per-person meal estimate. Each day may override the per-meal rate via
+  // `mealPriceOverride`; days without an override use the default rate.
+  const mealEstimate = days.reduce((sum, d) => {
+    const count = (d.breakfastCount || 0) + (d.lunchCount || 0) + (d.dinnerCount || 0);
+    const rate =
+      d.mealPriceOverride != null && d.mealPriceOverride !== ''
+        ? Number(d.mealPriceOverride) || 0
+        : defaultMealCost;
+    return sum + count * rate;
+  }, 0);
+  if (mealEstimate > 0) {
     lines.push({
       category: 'food',
       description: 'Meals',
       basis: 'PER_PERSON',
-      estimatedUnit: mealCount * mealCost,
+      estimatedUnit: mealEstimate,
       source: 'AUTO',
     });
   }
