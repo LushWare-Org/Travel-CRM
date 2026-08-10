@@ -26,7 +26,7 @@ import RemarksDialog from "../features/lead-management/components/RemarksDialog"
 import FilterDialog from "../features/lead-management/components/FilterDialog";
 import SettingsDialog from "../features/lead-management/components/SettingsDialog";
 import StatusChangeDialog from "../features/lead-management/components/StatusChangeDialog";
-import QuotationDialog from "../features/lead-management/components/QuotationDialog";
+import QuotationModal from "../features/lead-management/components/quotation/QuotationModal";
 import InvoiceDialog from "../features/lead-management/components/InvoiceDialog";
 import ReceiptDialog from "../features/lead-management/components/ReceiptDialog";
 import VoucherDialog from "../features/lead-management/components/VoucherDialog";
@@ -90,6 +90,9 @@ const LeadManagement = () => {
   const [statusLead, setStatusLead] = useState(null);
   const [billingLead, setBillingLead] = useState(null);
   const [sectionLead, setSectionLead] = useState(null);
+  // When set, the lead editor was opened from the quotation flow and we return
+  // to the quotation modal once the editor closes.
+  const [resumeQuoteLead, setResumeQuoteLead] = useState(null);
   const [showSectionView, setShowSectionView] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -270,6 +273,25 @@ const LeadManagement = () => {
     fetchLeads();
     if (highlightedLeadId) {
       setSearchParams({});
+    }
+  };
+
+  // Hand off from the quotation modal to the lead editor, remembering to return
+  // to the quotation flow once editing is done.
+  const openLeadEditorFromQuote = (lead) => {
+    setShowQuotationDialog(false);
+    setResumeQuoteLead(lead);
+    setSelectedLead(lead);
+    setShowEditDialog(true);
+  };
+
+  const closeLeadEditor = () => {
+    setShowEditDialog(false);
+    setSelectedLead(null);
+    if (resumeQuoteLead) {
+      setBillingLead(resumeQuoteLead);
+      setShowQuotationDialog(true);
+      setResumeQuoteLead(null);
     }
   };
 
@@ -474,10 +496,7 @@ const LeadManagement = () => {
 
       <EditLeadDialog
         isOpen={showEditDialog}
-        onClose={() => {
-          setShowEditDialog(false);
-          setSelectedLead(null);
-        }}
+        onClose={closeLeadEditor}
         lead={selectedLead}
         salesReps={salesReps}
         onSuccess={handleLeadSuccess}
@@ -535,7 +554,7 @@ const LeadManagement = () => {
       />
 
       {showQuotationDialog && billingLead && (
-        <QuotationDialog
+        <QuotationModal
           isOpen={showQuotationDialog}
           onClose={() => {
             setShowQuotationDialog(false);
@@ -543,6 +562,7 @@ const LeadManagement = () => {
           }}
           lead={billingLead}
           onSuccess={handleLeadSuccess}
+          onEditLead={openLeadEditorFromQuote}
         />
       )}
 

@@ -2,28 +2,35 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   mockLeadFindUnique,
+  mockLeadUpdate,
+  mockSelectionFindUnique,
+  mockSelectionUpdate,
   mockPricingCreate,
   mockPricingUpdate,
   mockDayDeleteMany,
   mockLineDeleteMany,
-  mockLeadUpdate,
+  mockLineFindMany,
   mockTransaction,
 } = vi.hoisted(() => ({
   mockLeadFindUnique: vi.fn(),
+  mockLeadUpdate: vi.fn(),
+  mockSelectionFindUnique: vi.fn(),
+  mockSelectionUpdate: vi.fn(),
   mockPricingCreate: vi.fn(),
   mockPricingUpdate: vi.fn(),
   mockDayDeleteMany: vi.fn(),
   mockLineDeleteMany: vi.fn(),
-  mockLeadUpdate: vi.fn(),
+  mockLineFindMany: vi.fn(),
   mockTransaction: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
   default: {
     lead: { findUnique: mockLeadFindUnique, update: mockLeadUpdate },
+    leadPackageSelection: { findUnique: mockSelectionFindUnique, update: mockSelectionUpdate },
     leadPricing: { create: mockPricingCreate, update: mockPricingUpdate },
     leadItineraryDay: { deleteMany: mockDayDeleteMany },
-    leadCostLine: { deleteMany: mockLineDeleteMany },
+    leadCostLine: { deleteMany: mockLineDeleteMany, findMany: mockLineFindMany },
     $transaction: mockTransaction,
   },
 }));
@@ -32,7 +39,7 @@ import {
   buildDaysCreateData,
   buildAutoCostLines,
   serializeLeadDays,
-  applyLeadItinerary,
+  applyLeadSelectionItinerary,
 } from '../lead-itinerary.service.js';
 import AppError from '../../utils/appError.js';
 
@@ -53,10 +60,17 @@ const editorDays = [
 
 const leadFixture = (overrides = {}) => ({
   id: 'lead-1',
-  packageId: 'pkg-1',
-  packageName: 'Sri Lanka Explorer',
   lifecycleStatus: 'NEW',
   numberOfTravelers: 2,
+  primarySelectionId: null,
+  ...overrides,
+});
+
+const selectionFixture = (overrides = {}) => ({
+  id: 'sel-1',
+  leadId: 'lead-1',
+  packageId: 'pkg-1',
+  isManual: false,
   pricing: null,
   costLines: [],
   itineraryDays: [],
@@ -153,77 +167,108 @@ describe('serializeLeadDays', () => {
   });
 });
 
-describe('applyLeadItinerary', () => {
+describe('applyLeadSelectionItinerary', () => {
   beforeEach(() => {
     mockLeadFindUnique.mockReset();
+    mockLeadUpdate.mockReset();
+    mockSelectionFindUnique.mockReset();
+    mockSelectionUpdate.mockReset();
     mockPricingCreate.mockReset();
     mockPricingUpdate.mockReset();
     mockDayDeleteMany.mockReset();
     mockLineDeleteMany.mockReset();
-    mockLeadUpdate.mockReset();
+    mockLineFindMany.mockReset();
     mockTransaction.mockReset();
     mockTransaction.mockImplementation(async (ops) => Promise.all(ops));
     mockPricingCreate.mockResolvedValue({ id: 'pr-1', currency: 'USD' });
     mockPricingUpdate.mockResolvedValue({ id: 'pr-1' });
+    mockSelectionUpdate.mockResolvedValue({ id: 'sel-1' });
     mockLeadUpdate.mockResolvedValue({ id: 'lead-1', lifecycleStatus: 'DRAFTING' });
+    mockLineFindMany.mockResolvedValue([]);
   });
 
   it('blocks itinerary edits once the lead is quoted or later', async () => {
     mockLeadFindUnique.mockResolvedValue(leadFixture({ lifecycleStatus: 'QUOTED' }));
     await expect(
-      applyLeadItinerary({ leadId: 'lead-1', days: editorDays }),
+      applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-1', days: editorDays }),
     ).rejects.toThrow(AppError);
-    expect(mockLeadUpdate).not.toHaveBeenCalled();
+    expect(mockSelectionFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('throws when the lead does not exist', async () => {
+    mockLeadFindUnique.mockResolvedValue(null);
+    await expect(applyLeadSelectionItinerary({ leadId: 'ghost', selectionId: 'sel-1', days: [] })).rejects.toThrow(/Lead not found/);
+  });
+
+  it('throws when the selection does not belong to this lead', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture());
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture({ leadId: 'some-other-lead' }));
+    await expect(
+      applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-1', days: editorDays }),
+    ).rejects.toThrow(/Package selection not found/);
   });
 
   it('creates pricing, replaces days, regenerates lines and drafts a NEW lead', async () => {
-    mockLeadFindUnique
-      .mockResolvedValueOnce(leadFixture())
-      .mockResolvedValueOnce(leadFixture({ lifecycleStatus: 'DRAFTING', costLines: [{ id: 'auto-1', category: 'food', basis: 'PER_PERSON', quantity: 1, estimatedUnitPrice: '60.00', actualUnitPrice: null, marginType: null, marginValue: null, source: 'AUTO' }] }));
+    mockLeadFindUnique.mockResolvedValue(leadFixture());
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture());
+    mockLineFindMany.mockResolvedValue([{ id: 'auto-1', category: 'food', basis: 'PER_PERSON', quantity: 1, estimatedUnitPrice: '60.00', actualUnitPrice: null, marginType: null, marginValue: null, source: 'AUTO' }]);
 
-    const result = await applyLeadItinerary({
+    const result = await applyLeadSelectionItinerary({
       leadId: 'lead-1',
+      selectionId: 'sel-1',
       days: editorDays,
       pricingSettings: { marginType: 'PERCENTAGE', marginValue: 10 },
       actorId: 'user-1',
     });
 
-    expect(mockPricingCreate).toHaveBeenCalled();
-    expect(mockDayDeleteMany).toHaveBeenCalledWith({ where: { leadId: 'lead-1' } });
-    expect(mockLineDeleteMany).toHaveBeenCalledWith({ where: { leadId: 'lead-1', source: 'AUTO' } });
+    expect(mockPricingCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ leadPackageSelectionId: 'sel-1' }) }));
+    expect(mockDayDeleteMany).toHaveBeenCalledWith({ where: { leadPackageSelectionId: 'sel-1' } });
+    expect(mockLineDeleteMany).toHaveBeenCalledWith({ where: { leadPackageSelectionId: 'sel-1', source: 'AUTO' } });
+    expect(mockSelectionUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'sel-1' },
+      data: expect.objectContaining({ sourcePackageId: null }),
+    }));
     expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'lead-1' },
       data: expect.objectContaining({
         lifecycleStatus: 'DRAFTING',
+        primarySelectionId: 'sel-1',
         statusHistory: { create: expect.arrayContaining([expect.objectContaining({ status: 'DRAFTING' })]) },
       }),
     }));
-    expect(mockPricingUpdate).toHaveBeenCalled();
-    expect(result.lifecycleStatus).toBe('DRAFTING');
+    expect(mockPricingUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { leadPackageSelectionId: 'sel-1' } }));
+    expect(result).toEqual({ leadId: 'lead-1', selectionId: 'sel-1', lifecycleStatus: 'DRAFTING' });
   });
 
-  it('keeps a DRAFTING lead in DRAFTING', async () => {
-    mockLeadFindUnique
-      .mockResolvedValueOnce(leadFixture({ lifecycleStatus: 'DRAFTING', pricing: { id: 'pr-1', currency: 'USD' } }))
-      .mockResolvedValueOnce(leadFixture({ lifecycleStatus: 'DRAFTING', pricing: { id: 'pr-1' }, costLines: [] }));
+  it('keeps a DRAFTING lead in DRAFTING without a lead-level update', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ lifecycleStatus: 'DRAFTING' }));
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture({ pricing: { id: 'pr-1', currency: 'USD' } }));
 
-    const result = await applyLeadItinerary({ leadId: 'lead-1', days: editorDays });
+    const result = await applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-1', days: editorDays });
     expect(result.lifecycleStatus).toBe('DRAFTING');
-    const updateCall = mockLeadUpdate.mock.calls[0][0];
-    expect(updateCall.data.lifecycleStatus).toBeUndefined();
+    expect(mockLeadUpdate).not.toHaveBeenCalled();
   });
 
   it('moves a REVISION lead back to DRAFTING', async () => {
-    mockLeadFindUnique
-      .mockResolvedValueOnce(leadFixture({ lifecycleStatus: 'REVISION', pricing: { id: 'pr-1', currency: 'USD' } }))
-      .mockResolvedValueOnce(leadFixture({ lifecycleStatus: 'REVISION', pricing: { id: 'pr-1' }, costLines: [] }));
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ lifecycleStatus: 'REVISION' }));
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture({ pricing: { id: 'pr-1', currency: 'USD' } }));
 
-    const result = await applyLeadItinerary({ leadId: 'lead-1', days: editorDays });
+    const result = await applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-1', days: editorDays });
     expect(result.lifecycleStatus).toBe('DRAFTING');
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ lifecycleStatus: 'DRAFTING' }),
+    }));
   });
 
-  it('throws when the lead does not exist', async () => {
-    mockLeadFindUnique.mockResolvedValue(null);
-    await expect(applyLeadItinerary({ leadId: 'ghost', days: [] })).rejects.toThrow(/Lead not found/);
+  it('only touches the target selection — a second selection on the same lead is left alone', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ lifecycleStatus: 'DRAFTING', primarySelectionId: 'sel-1' }));
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture({ id: 'sel-2', pricing: { id: 'pr-2', currency: 'USD' } }));
+
+    await applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-2', days: editorDays });
+
+    expect(mockDayDeleteMany).toHaveBeenCalledWith({ where: { leadPackageSelectionId: 'sel-2' } });
+    expect(mockLineDeleteMany).toHaveBeenCalledWith({ where: { leadPackageSelectionId: 'sel-2', source: 'AUTO' } });
+    expect(mockDayDeleteMany).not.toHaveBeenCalledWith({ where: { leadPackageSelectionId: 'sel-1' } });
+    expect(mockLineDeleteMany).not.toHaveBeenCalledWith({ where: { leadPackageSelectionId: 'sel-1', source: 'AUTO' } });
   });
 });

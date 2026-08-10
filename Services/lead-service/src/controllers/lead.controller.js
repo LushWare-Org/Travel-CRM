@@ -1,19 +1,15 @@
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { createLeadSchema, updateLeadSchema, addOptionalFlightSchema } from '../validators/lead.validator.js';
+import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
 import {
   validateTransition,
   validateTravelerUpdate,
-  validatePackageUpdate,
   validateTravelDatesUpdate,
 } from '../services/state-machine.service.js';
-import { computePricing, toLineDescriptor } from '../services/pricing.service.js';
-import { copyPackageToLead, isItineraryPristine, replaceLeadItineraryFromPackage } from '../services/lead-draft.service.js';
+import { gatekeeperInputs, loadPrimarySelection } from '../services/gatekeeper.service.js';
 import { handleLeadEvent } from '../services/lead-events.service.js';
-import { applyLeadItinerary, serializeLeadDays } from '../services/lead-itinerary.service.js';
-
-const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3006';
+import { serializeLeadDays } from '../services/lead-itinerary.service.js';
 
 // ─── Auto-assignment helper ────────────────────────────────────
 async function autoAssignSalesRep(leadData) {
@@ -30,138 +26,6 @@ async function autoAssignSalesRep(leadData) {
     return salesRepId;
   }
   return null;
-}
-
-// ─── Pricing helpers ───────────────────────────────────────────
-
-/**
- * Values the state machine gatekeepers need, derived from persisted rows.
- */
-function gatekeeperInputs(lead, pricing, lines) {
-  const flightActualTotal = (lines || [])
-    .filter((l) => l.flightBookingId)
-    .reduce((sum, l) => sum + (Number(l.actualTotal) || 0), 0);
-  const hotelActualTotal = (lines || [])
-    .filter((l) => l.category === 'accommodation')
-    .reduce((sum, l) => sum + (Number(l.actualTotal) || 0), 0);
-  return {
-    sellSubtotal: Number(pricing?.sellSubtotal) || 0,
-    verifiedPaymentTotal: Number(pricing?.paidAmount) || 0,
-    depositAmount: Number(pricing?.depositAmount) || 0,
-    flightActualTotal,
-    hotelActualTotal,
-  };
-}
-
-async function loadPricingContext(leadId) {
-  return prisma.lead.findUnique({
-    where: { id: leadId },
-    include: {
-      pricing: true,
-      costLines: true,
-      optionalFlights: true,
-      _count: { select: { itineraryDays: true } },
-    },
-  });
-}
-
-/**
- * Recompute and persist all pricing totals for a lead from its current rows.
- */
-export async function recomputeLeadPricing(leadId, verifiedPaymentTotal = null) {
-  const lead = await loadPricingContext(leadId);
-  if (!lead) throw new AppError('Lead not found', 404);
-  const pricing = lead.pricing || {};
-  const computed = computePricing({
-    lines: lead.costLines.map(toLineDescriptor),
-    travelers: lead.numberOfTravelers || 1,
-    currency: pricing.currency || 'USD',
-    marginType: pricing.marginType || null,
-    marginValue: Number(pricing.marginValue) || 0,
-    depositType: pricing.depositType || null,
-    depositValue: Number(pricing.depositValue) || 0,
-    discountType: pricing.discountType || 'none',
-    discountValue: Number(pricing.discountValue) || 0,
-    serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
-    verifiedPaymentTotal: (verifiedPaymentTotal ?? Number(pricing.paidAmount)) || 0,
-  });
-  return prisma.leadPricing.update({
-    where: { leadId },
-    data: {
-      estimatedTotal: computed.estimatedTotal,
-      actualTotal: computed.actualTotal,
-      sellSubtotal: computed.sellSubtotal,
-      discountAmount: computed.discountAmount,
-      taxableSubtotal: computed.taxableSubtotal,
-      taxAmount: computed.taxAmount,
-      serviceChargeAmount: computed.serviceChargeAmount,
-      totalAmount: computed.totalAmount,
-      depositAmount: computed.depositAmount,
-      paidAmount: computed.paidAmount,
-      balanceDue: computed.balanceDue,
-      profit: computed.profit,
-    },
-  });
-}
-
-/**
- * Snapshot the lead's pricing into a versioned billing quotation.
- */
-export async function snapshotQuotation(leadId) {
-  const lead = await loadPricingContext(leadId);
-  if (!lead) throw new AppError('Lead not found', 404);
-  const pricing = lead.pricing;
-  if (!pricing) throw new AppError('Lead has no pricing yet', 400);
-
-  const computed = computePricing({
-    lines: lead.costLines.map(toLineDescriptor),
-    travelers: lead.numberOfTravelers || 1,
-    currency: pricing.currency || 'USD',
-    marginType: pricing.marginType || null,
-    marginValue: Number(pricing.marginValue) || 0,
-    depositType: pricing.depositType || null,
-    depositValue: Number(pricing.depositValue) || 0,
-    discountType: pricing.discountType || 'none',
-    discountValue: Number(pricing.discountValue) || 0,
-    serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
-    verifiedPaymentTotal: Number(pricing.paidAmount) || 0,
-  });
-
-  const items = computed.lines.map((l) => ({
-    description: l.description,
-    category: l.category,
-    quantity: l.quantity,
-    unitPrice: l.quotedUnitPrice,
-    notes: null,
-  }));
-
-  const res = await fetch(`${BILLING_SERVICE_URL}/api/v1/billing/quotations/from-lead`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-internal-token': process.env.INTERNAL_EVENTS_TOKEN || '',
-    },
-    body: JSON.stringify({
-      leadId: lead.id,
-      packageId: lead.packageId,
-      currency: pricing.currency || 'USD',
-      customer: { name: lead.name, email: lead.email, phone: lead.phone, address: lead.city },
-      items,
-      discountType: pricing.discountType || 'none',
-      discountValue: Number(pricing.discountValue) || 0,
-      serviceChargeRate: Number(pricing.serviceChargeRate) || 0,
-      notes: null,
-      terms: null,
-      paymentTerms: null,
-      includedServices: [],
-      excludedServices: [],
-    }),
-  });
-  if (!res.ok) {
-    throw new AppError('Failed to snapshot quotation in billing-service', 502);
-  }
-  const json = await res.json();
-  return json.data;
 }
 
 // ─── Controllers ───────────────────────────────────────────────
@@ -201,44 +65,63 @@ export const createLead = asyncHandler(async (req, res) => {
   const lifecycleStatus = body.lifecycleStatus || 'NEW';
   const isManualItinerary = body.isManualItinerary || false;
 
-  const lead = await prisma.lead.create({
-    data: {
-      name: body.name,
-      email: body.email,
-      phone: body.phone,
-      whatsapp: body.whatsapp,
-      city: body.city,
-      source: body.source,
-      platform: body.platform,
-      fromCountry: body.fromCountry,
-      destinationCountry: body.destinationCountry,
-      destination: body.destination,
-      travelDate: body.travelDate ? new Date(body.travelDate) : null,
-      endDate: body.endDate ? new Date(body.endDate) : null,
-      // A lead has one package or a manual itinerary, never both.
-      packageId: isManualItinerary ? null : body.packageId,
-      packageName: isManualItinerary ? null : body.packageName,
-      isManualItinerary,
-      numberOfTravelers: body.numberOfTravelers,
-      budget: body.budget,
-      message: body.message,
-      lifecycleStatus,
-      priority: body.priority,
-      assignedToId: body.assignedToId,
-      tags: body.tags || [],
-      lostReason: body.lostReason,
-      remarks: {
-        create: remarksList.map((r) => ({
-          text: r.text,
-          date: r.date ? new Date(r.date) : new Date(),
-          addedById: r.addedBy || user.id || null,
-        })),
+  // A lead is created with at most one initial package selection — either
+  // is optional (a bare contact-form-style lead may have neither yet).
+  const initialSelection = isManualItinerary
+    ? { isManual: true, packageId: null, packageName: null }
+    : body.packageId
+      ? { isManual: false, packageId: body.packageId, packageName: body.packageName || null }
+      : null;
+
+  const lead = await prisma.$transaction(async (tx) => {
+    const created = await tx.lead.create({
+      data: {
+        name: body.name,
+        email: body.email,
+        phone: body.phone,
+        whatsapp: body.whatsapp,
+        city: body.city,
+        source: body.source,
+        platform: body.platform,
+        fromCountry: body.fromCountry,
+        destinationCountry: body.destinationCountry,
+        destination: body.destination,
+        travelDate: body.travelDate ? new Date(body.travelDate) : null,
+        endDate: body.endDate ? new Date(body.endDate) : null,
+        numberOfTravelers: body.numberOfTravelers,
+        budget: body.budget,
+        message: body.message,
+        lifecycleStatus,
+        priority: body.priority,
+        assignedToId: body.assignedToId,
+        tags: body.tags || [],
+        lostReason: body.lostReason,
+        remarks: {
+          create: remarksList.map((r) => ({
+            text: r.text,
+            date: r.date ? new Date(r.date) : new Date(),
+            addedById: r.addedBy || user.id || null,
+          })),
+        },
+        statusHistory: {
+          create: [{ status: lifecycleStatus, actor: 'USER', changedById: user.id, notes: 'Initial status' }],
+        },
+        ...(initialSelection ? { packageSelections: { create: [initialSelection] } } : {}),
       },
-      statusHistory: {
-        create: [{ status: lifecycleStatus, actor: 'USER', changedById: user.id, notes: 'Initial status' }],
-      },
-    },
-    include: { remarks: true, statusHistory: true },
+      include: { remarks: true, statusHistory: true, packageSelections: true },
+    });
+
+    if (created.packageSelections.length) {
+      await tx.lead.update({
+        where: { id: created.id },
+        data: { primarySelectionId: created.packageSelections[0].id },
+      });
+    }
+
+    return tx.lead.findUnique({
+      where: { id: created.id },
+      include: { remarks: true, statusHistory: true, packageSelections: true },
+    });
   });
 
   res.status(201).json({ success: true, data: lead });
@@ -272,7 +155,7 @@ export const getLeads = asyncHandler(async (req, res) => {
       skip,
       take: parseInt(limit),
       orderBy: { [sortBy]: order },
-      include: { pricing: true },
+      include: { packageSelections: { orderBy: { createdAt: 'asc' }, take: 1, include: { pricing: true } } },
     }),
     prisma.lead.count({ where }),
   ]);
@@ -284,13 +167,18 @@ export const getLead = asyncHandler(async (req, res) => {
   const lead = await prisma.lead.findUnique({
     where: { id: req.params.id },
     include: {
-      pricing: true,
-      costLines: { orderBy: { orderIndex: 'asc' } },
-      itineraryDays: {
-        orderBy: { dayNumber: 'asc' },
-        include: { places: true, activities: true, transports: true },
+      packageSelections: {
+        orderBy: { createdAt: 'asc' },
+        include: {
+          pricing: true,
+          costLines: { orderBy: { orderIndex: 'asc' } },
+          itineraryDays: {
+            orderBy: { dayNumber: 'asc' },
+            include: { places: true, activities: true, transports: true },
+          },
+          optionalFlights: true,
+        },
       },
-      optionalFlights: true,
       remarks: { orderBy: { date: 'desc' } },
       statusHistory: { orderBy: { changedAt: 'desc' } },
       communicationLogs: true,
@@ -304,11 +192,17 @@ export const getLead = asyncHandler(async (req, res) => {
     throw new AppError('Not authorized to access this lead', 403);
   }
 
-  res.json({ success: true, data: { ...lead, itineraryDays: serializeLeadDays(lead) } });
+  const packageSelections = lead.packageSelections.map((selection) => ({
+    ...selection,
+    itineraryDays: serializeLeadDays(selection),
+    isMaterialized: selection.itineraryDays.length > 0 || Boolean(selection.pricing),
+  }));
+
+  res.json({ success: true, data: { ...lead, packageSelections } });
 });
 
 export const updateLead = asyncHandler(async (req, res) => {
-  const lead = await loadPricingContext(req.params.id);
+  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
   if (!lead) throw new AppError('Lead not found', 404);
 
   const { user } = req;
@@ -328,20 +222,14 @@ export const updateLead = asyncHandler(async (req, res) => {
   }
   const validatedBody = parsed.data;
 
-  // Traveler count, package and travel dates are locked once quoted — all
-  // three shape the itinerary/pricing the same way, so they share one window.
+  // Traveler count and travel dates are locked once quoted — both shape the
+  // itinerary/pricing the same way, so they share one window. Package
+  // identity itself no longer changes via this endpoint (see /:id/packages).
   if (validatedBody.numberOfTravelers !== undefined) {
     validateTravelerUpdate({
       currentStatus: lead.lifecycleStatus,
       previousTravelers: lead.numberOfTravelers,
       nextTravelers: validatedBody.numberOfTravelers,
-    });
-  }
-  if (validatedBody.packageId !== undefined) {
-    validatePackageUpdate({
-      currentStatus: lead.lifecycleStatus,
-      previousPackageId: lead.packageId,
-      nextPackageId: validatedBody.packageId,
     });
   }
   if (validatedBody.travelDate !== undefined || validatedBody.endDate !== undefined) {
@@ -354,37 +242,21 @@ export const updateLead = asyncHandler(async (req, res) => {
     });
   }
 
-  // Package switch: silently refresh the itinerary from the new blueprint
-  // when it's safe to — either the current itinerary is still pristine
-  // (untouched since it was copied from the old package), or there's no
-  // itinerary at all yet (nothing to protect). A customized itinerary is
-  // never overwritten — the lead just points at the new package going forward.
-  const isPackageSwitch = validatedBody.packageId !== undefined && validatedBody.packageId !== lead.packageId;
-  const hasNoItineraryYet = (lead._count?.itineraryDays ?? 0) === 0;
-  const effectiveIsManual = validatedBody.isManualItinerary ?? lead.isManualItinerary;
-  const shouldReplaceItinerary = isPackageSwitch && validatedBody.packageId && !effectiveIsManual
-    && (isItineraryPristine(lead) || hasNoItineraryYet);
-  if (shouldReplaceItinerary) {
-    await replaceLeadItineraryFromPackage({ leadId: lead.id, packageId: validatedBody.packageId });
-  }
-
-  // State machine + quotation snapshot when lifecycle changes
-  let transitionResult = null;
-  let quoteSnapshot = null;
-  if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
-    transitionResult = validateTransition({
-      currentStatus: lead.lifecycleStatus,
-      nextStatus: validatedBody.lifecycleStatus,
-      pricing: gatekeeperInputs(lead, lead.pricing, lead.costLines),
-      lostReason: validatedBody.lostReason || lead.lostReason,
-    });
-    if (validatedBody.lifecycleStatus === 'QUOTED') {
-      quoteSnapshot = await snapshotQuotation(lead.id);
-    }
-  }
-
+  // Lifecycle transitions (except QUOTED — that's only reachable through a
+  // specific selection's quote endpoint, since quoting now targets one
+  // package at a time).
   const statusHistoryCreate = [];
   if (validatedBody.lifecycleStatus && validatedBody.lifecycleStatus !== lead.lifecycleStatus) {
+    if (validatedBody.lifecycleStatus === 'QUOTED') {
+      throw new AppError('Use POST /:id/packages/:selectionId/quote to quote a specific package', 400);
+    }
+    const primarySelection = await loadPrimarySelection(lead);
+    validateTransition({
+      currentStatus: lead.lifecycleStatus,
+      nextStatus: validatedBody.lifecycleStatus,
+      pricing: gatekeeperInputs(primarySelection?.pricing, primarySelection?.costLines),
+      lostReason: validatedBody.lostReason || lead.lostReason,
+    });
     statusHistoryCreate.push({
       status: validatedBody.lifecycleStatus,
       actor: 'USER',
@@ -396,8 +268,8 @@ export const updateLead = asyncHandler(async (req, res) => {
   const updateData = {};
   const scalarFields = [
     'name', 'email', 'phone', 'whatsapp', 'city', 'source', 'platform',
-    'fromCountry', 'destinationCountry', 'destination', 'packageId', 'packageName',
-    'isManualItinerary', 'numberOfTravelers', 'budget', 'message', 'lifecycleStatus',
+    'fromCountry', 'destinationCountry', 'destination',
+    'numberOfTravelers', 'budget', 'message', 'lifecycleStatus',
     'priority', 'assignedToId', 'tags', 'lostReason',
   ];
   for (const field of scalarFields) {
@@ -405,19 +277,11 @@ export const updateLead = asyncHandler(async (req, res) => {
       updateData[field] = validatedBody[field];
     }
   }
-  // A lead has one package or a manual itinerary, never both.
-  if (effectiveIsManual) {
-    updateData.packageId = null;
-    updateData.packageName = null;
-  }
   if (validatedBody.travelDate !== undefined) {
     updateData.travelDate = validatedBody.travelDate ? new Date(validatedBody.travelDate) : null;
   }
   if (validatedBody.endDate !== undefined) {
     updateData.endDate = validatedBody.endDate ? new Date(validatedBody.endDate) : null;
-  }
-  if (quoteSnapshot) {
-    updateData.currentQuoteId = quoteSnapshot.id;
   }
 
   const updated = await prisma.lead.update({
@@ -426,30 +290,8 @@ export const updateLead = asyncHandler(async (req, res) => {
       ...updateData,
       ...(statusHistoryCreate.length && { statusHistory: { create: statusHistoryCreate } }),
     },
-    include: { pricing: true, remarks: true, statusHistory: { orderBy: { changedAt: 'desc' } } },
+    include: { remarks: true, statusHistory: { orderBy: { changedAt: 'desc' } } },
   });
-
-  // Persist pricing settings when provided
-  if (validatedBody.pricing && lead.pricing) {
-    await prisma.leadPricing.update({
-      where: { leadId: lead.id },
-      data: {
-        currency: validatedBody.pricing.currency,
-        marginType: validatedBody.pricing.marginType,
-        marginValue: validatedBody.pricing.marginValue,
-        depositType: validatedBody.pricing.depositType,
-        depositValue: validatedBody.pricing.depositValue,
-        discountType: validatedBody.pricing.discountType,
-        discountValue: validatedBody.pricing.discountValue,
-        serviceChargeRate: validatedBody.pricing.serviceChargeRate,
-      },
-    });
-    await recomputeLeadPricing(lead.id);
-  } else if (shouldReplaceItinerary && lead.pricing) {
-    // Cost lines changed even though the client sent no pricing settings —
-    // totals still need to reflect the new package's blueprint.
-    await recomputeLeadPricing(lead.id);
-  }
 
   res.json({ success: true, data: updated });
 });
@@ -462,24 +304,20 @@ export const deleteLead = asyncHandler(async (req, res) => {
 });
 
 export const draftLead = asyncHandler(async (req, res) => {
-  const lead = await prisma.lead.findUnique({
-    where: { id: req.params.id },
-    include: { pricing: true, itineraryDays: true },
-  });
+  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
   if (!lead) throw new AppError('Lead not found', 404);
-  if (!lead.packageId && !lead.isManualItinerary) {
+
+  const selectionCount = await prisma.leadPackageSelection.count({ where: { leadId: lead.id } });
+  if (selectionCount === 0) {
     throw new AppError('Lead has no package selected', 400);
   }
 
+  const primarySelection = await loadPrimarySelection(lead);
   const transition = validateTransition({
     currentStatus: lead.lifecycleStatus,
     nextStatus: 'DRAFTING',
-    pricing: gatekeeperInputs(lead, lead.pricing, lead.costLines || []),
+    pricing: gatekeeperInputs(primarySelection?.pricing, primarySelection?.costLines),
   });
-
-  if (!lead.isManualItinerary) {
-    await copyPackageToLead({ leadId: lead.id, packageId: lead.packageId });
-  }
 
   const updated = await prisma.lead.update({
     where: { id: lead.id },
@@ -490,11 +328,11 @@ export const draftLead = asyncHandler(async (req, res) => {
           status: 'DRAFTING',
           actor: 'USER',
           changedById: req.user.id,
-          notes: lead.isManualItinerary ? 'Moved to drafting (manual itinerary)' : 'Package copied to lead draft',
+          notes: 'Moved to drafting',
         }],
       },
     },
-    include: { pricing: true, costLines: true, itineraryDays: true },
+    include: { packageSelections: true },
   });
   res.json({ success: true, data: updated });
 });
@@ -598,23 +436,6 @@ export const searchLeads = asyncHandler(async (req, res) => {
   res.json({ success: true, count: leads.length, data: leads });
 });
 
-export const setLeadItinerary = asyncHandler(async (req, res) => {
-  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
-  if (!lead) throw new AppError('Lead not found', 404);
-
-  const updated = await prisma.lead.update({
-    where: { id: req.params.id },
-    data: { currentItineraryId: req.body.itineraryId },
-  });
-  res.json({ success: true, data: updated });
-});
-
-export const getLeadItinerary = asyncHandler(async (req, res) => {
-  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
-  if (!lead) throw new AppError('Lead not found', 404);
-  res.json({ success: true, data: { currentItineraryId: lead.currentItineraryId } });
-});
-
 export const downloadLeadItineraryPDF = asyncHandler(async (req, res) => {
   res.status(501).json({ success: false, message: 'PDF export available via package-service for itinerary data' });
 });
@@ -657,162 +478,4 @@ export const createWebsiteContactLead = asyncHandler(async (req, res) => {
 export const handleInternalEvent = asyncHandler(async (req, res) => {
   const result = await handleLeadEvent({ event: req.body?.event });
   res.json({ success: true, data: result });
-});
-
-// ─── Optional transfer flights ─────────────────────────────────
-
-export const listOptionalFlights = asyncHandler(async (req, res) => {
-  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
-  if (!lead) throw new AppError('Lead not found', 404);
-  const flights = await prisma.leadOptionalFlight.findMany({
-    where: { leadId: req.params.id },
-    orderBy: { createdAt: 'asc' },
-  });
-  res.json({ success: true, data: flights });
-});
-
-export const addOptionalFlight = asyncHandler(async (req, res) => {
-  const lead = await loadPricingContext(req.params.id);
-  if (!lead) throw new AppError('Lead not found', 404);
-
-  const parsed = addOptionalFlightSchema.safeParse(req.body);
-  if (!parsed.success) {
-    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
-    throw new AppError(messages, 400);
-  }
-  const {
-    flightType,
-    origin,
-    destination,
-    date,
-    cabinClass,
-    departureTime,
-    airlinePreference,
-    notes,
-    estimatedUnitPrice = 0,
-    actualUnitPrice,
-    marginType,
-    marginValue,
-  } = parsed.data;
-
-  const quantity = lead.numberOfTravelers || 1;
-  const flight = await prisma.leadOptionalFlight.create({
-    data: {
-      leadId: lead.id,
-      flightType,
-      origin: origin ?? null,
-      destination: destination ?? null,
-      date: date ? new Date(date) : null,
-      cabinClass: cabinClass ?? null,
-      departureTime: departureTime ?? null,
-      airlinePreference: airlinePreference ?? null,
-      notes: notes ?? null,
-      estimatedUnitPrice: Number(estimatedUnitPrice) || 0,
-      actualUnitPrice: actualUnitPrice != null ? Number(actualUnitPrice) : null,
-      quantity,
-      marginType: marginType || null,
-      marginValue: marginValue != null ? Number(marginValue) : null,
-    },
-  });
-
-  await prisma.leadCostLine.create({
-    data: {
-      leadId: lead.id,
-      category: 'transportation',
-      description: `Flight: ${origin || '?'} → ${destination || '?'}`,
-      basis: 'PER_PERSON',
-      quantity,
-      estimatedUnitPrice: Number(estimatedUnitPrice) || 0,
-      actualUnitPrice: actualUnitPrice != null ? Number(actualUnitPrice) : null,
-      marginType: marginType || null,
-      marginValue: marginValue != null ? Number(marginValue) : null,
-      source: 'MANUAL',
-      optionalFlightId: flight.id,
-      orderIndex: (lead.costLines || []).length,
-    },
-  });
-
-  await recomputeLeadPricing(lead.id);
-  res.status(201).json({ success: true, data: flight });
-});
-
-export const deleteOptionalFlight = asyncHandler(async (req, res) => {
-  const { id, flightId } = req.params;
-  const flight = await prisma.leadOptionalFlight.findUnique({ where: { id: flightId } });
-  if (!flight || flight.leadId !== id) throw new AppError('Flight not found', 404);
-
-  await prisma.$transaction([
-    prisma.leadCostLine.deleteMany({ where: { leadId: id, optionalFlightId: flightId } }),
-    prisma.leadOptionalFlight.delete({ where: { id: flightId } }),
-  ]);
-  await recomputeLeadPricing(id);
-  res.json({ success: true, data: {} });
-});
-
-// ─── Quote handoff ─────────────────────────────────────────────
-
-export const quoteLead = asyncHandler(async (req, res) => {
-  const lead = await loadPricingContext(req.params.id);
-  if (!lead) throw new AppError('Lead not found', 404);
-
-  validateTransition({
-    currentStatus: lead.lifecycleStatus,
-    nextStatus: 'QUOTED',
-    pricing: gatekeeperInputs(lead, lead.pricing, lead.costLines),
-  });
-
-  const quotation = await snapshotQuotation(lead.id);
-  const updated = await prisma.lead.update({
-    where: { id: lead.id },
-    data: {
-      lifecycleStatus: 'QUOTED',
-      currentQuoteId: quotation.id,
-      statusHistory: {
-        create: [{
-          status: 'QUOTED',
-          actor: 'USER',
-          changedById: req.user.id,
-          notes: 'Quotation snapshot sent to billing',
-        }],
-      },
-    },
-    include: { pricing: true },
-  });
-  res.json({ success: true, data: updated });
-});
-
-/**
- * PUT /api/v1/leads/:id/itinerary — atomic lead itinerary + pricing edit.
- * Auto-copies the package and moves NEW/REVISION leads to DRAFTING.
- */
-export const updateLeadItinerary = asyncHandler(async (req, res) => {
-  const { days, pricing } = req.body;
-  if (!Array.isArray(days)) throw new AppError('days array is required', 400);
-
-  const result = await applyLeadItinerary({
-    leadId: req.params.id,
-    days,
-    pricingSettings: pricing || {},
-    actorId: req.user.id,
-  });
-
-  const lead = await prisma.lead.findUnique({
-    where: { id: req.params.id },
-    include: {
-      pricing: true,
-      costLines: { orderBy: { orderIndex: 'asc' } },
-      itineraryDays: {
-        orderBy: { dayNumber: 'asc' },
-        include: { places: true, activities: true, transports: true },
-      },
-    },
-  });
-
-  res.json({
-    success: true,
-    data: {
-      ...result,
-      lead: { ...lead, itineraryDays: serializeLeadDays(lead) },
-    },
-  });
 });

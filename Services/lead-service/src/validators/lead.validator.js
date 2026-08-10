@@ -8,20 +8,8 @@ const lifecycleStatusEnum = z.enum([
   'BOOKING_FAILED', 'CANCELLED',
 ]);
 
-// ── Pricing settings (LeadPricing fields) ───────────────────────
-
-const pricingSchema = z.object({
-  currency: z.string().length(3).optional(),
-  marginType: z.enum(['PERCENTAGE', 'FIXED']).nullable().optional(),
-  marginValue: z.number().min(0).nullable().optional(),
-  depositType: z.enum(['PERCENTAGE', 'FIXED']).nullable().optional(),
-  depositValue: z.number().min(0).nullable().optional(),
-  discountType: z.enum(['none', 'percentage', 'fixed']).optional(),
-  discountValue: z.number().min(0).optional(),
-  serviceChargeRate: z.number().min(0).optional(),
-}).strict();
-
-// ── Shared lead fields ──────────────────────────────────────────
+// ── Shared lead fields (contact/travel/assignment — package/itinerary/
+// pricing state lives on LeadPackageSelection, not on the Lead itself) ─────
 
 const leadFields = {
   name: z.string().min(1).max(200).optional(),
@@ -36,9 +24,6 @@ const leadFields = {
   destination: z.string().optional().nullable(),
   travelDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
-  packageId: z.string().uuid().optional().nullable(),
-  packageName: z.string().optional().nullable(),
-  isManualItinerary: z.boolean().optional(),
   numberOfTravelers: z.number().int().min(1).optional(),
   budget: z.string().optional().nullable(),
   message: z.string().optional().nullable(),
@@ -61,13 +46,27 @@ const remarksSchema = z.array(z.object({
 export const createLeadSchema = z.object({
   ...leadFields,
   remarks: remarksSchema,
+  // A lead is created with at most one initial package selection — both
+  // optional (a bare contact-form-style lead may have neither yet).
+  packageId: z.string().uuid().optional().nullable(),
+  packageName: z.string().optional().nullable(),
+  isManualItinerary: z.boolean().optional(),
 }).strict();
 
 export const updateLeadSchema = z.object({
   ...leadFields,
   remarks: remarksSchema,
-  pricing: pricingSchema.optional(),
 }).strict();
+
+// ── Per-package selections (LeadPackageSelection) ────────────────
+
+export const createPackageSelectionSchema = z.object({
+  packageId: z.string().uuid().optional(),
+  isManual: z.boolean().optional(),
+}).strict().refine(
+  (v) => Boolean(v.packageId) !== Boolean(v.isManual),
+  { message: 'Exactly one of packageId or isManual is required' },
+);
 
 // ── Optional transfer flights (LeadOptionalFlight) ───────────────
 

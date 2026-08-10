@@ -4,6 +4,11 @@ import AppError from '../utils/appError.js';
 import { nextQuotationNumber, nextInvoiceNumber } from '../utils/docNumber.js';
 import { quotationTotals, createOrVersionQuotation } from '../services/quotation.service.js';
 import { emitLeadEvent } from '../services/events.client.js';
+import { generateQuotationPDF } from '../utils/quotationPDFGenerator.js';
+import { sendQuotationEmail } from '../utils/emailService.js';
+import { sendQuotationWhatsapp } from '../utils/whatsappService.js';
+import { uploadPdfBuffer } from '../utils/cloudinary.js';
+import { sendQuotationSchema } from '../validators/quotation.validator.js';
 
 const quotationInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -42,12 +47,13 @@ export const createQuotation = asyncHandler(async (req, res) => {
   const { items = [], images = [], ...body } = req.body;
   const quotationNumber = await nextQuotationNumber();
 
-  const totals = quotationTotals(items, {
+  const { taxableSubtotal, ...totals } = quotationTotals(items, {
     taxRate: body.taxRate,
     serviceChargeRate: body.serviceChargeRate,
     discountType: body.discountType,
     discountValue: body.discountValue,
   });
+  void taxableSubtotal; // computed intermediate, not a persisted column
 
   const quotation = await prisma.quotation.create({
     data: {
@@ -76,12 +82,13 @@ export const updateQuotation = asyncHandler(async (req, res) => {
   const data = { ...body, lastModifiedById: req.user.id, version: { increment: 1 } };
 
   if (items) {
-    const totals = quotationTotals(items, {
+    const { taxableSubtotal, ...totals } = quotationTotals(items, {
       taxRate: body.taxRate ?? existing.taxRate,
       serviceChargeRate: body.serviceChargeRate ?? existing.serviceChargeRate,
       discountType: body.discountType ?? existing.discountType,
       discountValue: body.discountValue ?? existing.discountValue,
     });
+    void taxableSubtotal; // computed intermediate, not a persisted column
     Object.assign(data, totals);
     await prisma.quotationItem.deleteMany({ where: { quotationId: req.params.id } });
     data.items = { create: items.map((item, idx) => ({ ...item, totalPrice: item.unitPrice * item.quantity, order: idx })) };
@@ -100,9 +107,14 @@ export const updateQuotation = asyncHandler(async (req, res) => {
  * lead's existing quotation. Validates totals against the shared engine.
  */
 export const createQuotationFromLead = asyncHandler(async (req, res) => {
+  // Internal (gateway-bypassing) call: there is usually no request user, so the
+  // acting user id arrives in the body. Fall back to req.user for completeness.
+  const createdById = req.user?.id || req.body.createdById;
+  if (!createdById) throw new AppError('createdById is required', 400);
+
   const quotation = await createOrVersionQuotation({
     ...req.body,
-    createdById: req.user.id,
+    createdById,
   });
   res.status(201).json({ success: true, data: quotation });
 });
@@ -114,12 +126,47 @@ export const deleteQuotation = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Quotation deleted' });
 });
 
+/**
+ * POST /quotations/:id/send — generate the PDF and deliver it over the chosen
+ * channel (email attachment, or WhatsApp with the PDF hosted on Cloudinary as
+ * media). Delivery utilities fail soft when their credentials are absent so a
+ * misconfigured environment yields a clear 400, never a crash.
+ */
 export const sendQuotation = asyncHandler(async (req, res) => {
-  const quotation = await prisma.quotation.update({
-    where: { id: req.params.id },
-    data: { status: 'sent', sentAt: new Date(), emailSent: true },
-  });
-  res.json({ success: true, message: 'Quotation sent', data: quotation });
+  const { channel, email, phone } = sendQuotationSchema.parse(req.body || {});
+
+  const quotation = await prisma.quotation.findUnique({ where: { id: req.params.id }, include: quotationInclude });
+  if (!quotation) throw new AppError('Quotation not found', 404);
+
+  const pdf = await generateQuotationPDF(quotation);
+  const now = new Date();
+
+  try {
+    if (channel === 'whatsapp') {
+      const recipient = phone || quotation.customerPhone;
+      if (!recipient) throw new AppError('No phone number available for this quotation', 400);
+      const mediaUrl = await uploadPdfBuffer(pdf, `quotation-${quotation.quotationNumber}`);
+      await sendQuotationWhatsapp({ quotation, phone: recipient, mediaUrl });
+      const updated = await prisma.quotation.update({
+        where: { id: quotation.id },
+        data: { status: 'sent', sentAt: now, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
+      });
+      return res.json({ success: true, message: 'Quotation sent via WhatsApp', data: updated });
+    }
+
+    const recipient = email || quotation.customerEmail;
+    if (!recipient) throw new AppError('No email address available for this quotation', 400);
+    await sendQuotationEmail({ quotation, recipientEmail: recipient, pdfBuffer: pdf });
+    const updated = await prisma.quotation.update({
+      where: { id: quotation.id },
+      data: { status: 'sent', sentAt: now, emailSent: true },
+    });
+    return res.json({ success: true, message: 'Quotation sent via email', data: updated });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    // Configuration / delivery failures surface as a clean 400, not a 500.
+    throw new AppError(err.message || 'Failed to send quotation', 400);
+  }
 });
 
 export const markQuotationViewed = asyncHandler(async (req, res) => {
@@ -139,7 +186,7 @@ export const acceptQuotation = asyncHandler(async (req, res) => {
     await emitLeadEvent({
       type: 'quotation.accepted',
       leadId: quotation.leadId,
-      payload: { quoteId: quotation.id, version: quotation.version },
+      payload: { quoteId: quotation.id, version: quotation.version, packageId: quotation.packageId },
     });
   } catch (err) {
     console.error('Failed to notify lead-service of acceptance', err.message);
@@ -156,7 +203,7 @@ export const rejectQuotation = asyncHandler(async (req, res) => {
     await emitLeadEvent({
       type: 'quotation.rejected',
       leadId: quotation.leadId,
-      payload: { quoteId: quotation.id, reason: req.body.reason || null },
+      payload: { quoteId: quotation.id, reason: req.body.reason || null, packageId: quotation.packageId },
     });
   } catch (err) {
     console.error('Failed to notify lead-service of rejection', err.message);
@@ -222,5 +269,10 @@ export const getQuotationStats = asyncHandler(async (req, res) => {
 export const downloadQuotationPDF = asyncHandler(async (req, res) => {
   const quotation = await prisma.quotation.findUnique({ where: { id: req.params.id }, include: quotationInclude });
   if (!quotation) throw new AppError('Quotation not found', 404);
-  res.json({ success: true, message: 'PDF generation not yet implemented', data: quotation });
+
+  const pdf = await generateQuotationPDF(quotation);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="quotation-${quotation.quotationNumber}.pdf"`);
+  res.setHeader('Content-Length', pdf.length);
+  res.send(pdf);
 });

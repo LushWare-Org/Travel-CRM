@@ -125,7 +125,9 @@ const LeadSectionView = ({ lead, onClose }) => {
     setSendingDoc({ id: docId, type });
     try {
       if (type === "quotation") {
-        await quotationAPI.send(docId);
+        // Documents view is the verification surface — default to emailing the
+        // lead's address; the full channel picker lives in the quotation modal.
+        await quotationAPI.send(docId, { channel: "email", ...(lead.email ? { email: lead.email } : {}) });
         toast.success("Quotation sent successfully");
       } else if (type === "invoice") {
         await invoiceAPI.send(docId);

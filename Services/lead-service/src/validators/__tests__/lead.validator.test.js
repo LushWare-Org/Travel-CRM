@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createLeadSchema, updateLeadSchema, addOptionalFlightSchema } from '../lead.validator.js';
+import { createLeadSchema, updateLeadSchema, createPackageSelectionSchema, addOptionalFlightSchema } from '../lead.validator.js';
 
 describe('createLeadSchema', () => {
   it('accepts valid full payload', () => {
@@ -97,41 +97,49 @@ describe('updateLeadSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts pricing settings', () => {
-    const result = updateLeadSchema.safeParse({
-      pricing: {
-        currency: 'USD',
-        marginType: 'PERCENTAGE',
-        marginValue: 10,
-        depositType: 'FIXED',
-        depositValue: 250,
-        discountType: 'percentage',
-        discountValue: 5,
-        serviceChargeRate: 2,
-      },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects invalid pricing settings', () => {
-    const result = updateLeadSchema.safeParse({
-      pricing: { marginType: 'BOGUS' },
-    });
-    expect(result.success).toBe(false);
-  });
-
   it('rejects unknown keys (strict)', () => {
     const result = updateLeadSchema.safeParse({ status: 'new' });
     expect(result.success).toBe(false);
   });
 
-  it('accepts isManualItinerary alongside a packageId switch', () => {
-    const result = updateLeadSchema.safeParse({
-      packageId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      isManualItinerary: true,
-    });
+  it('rejects packageId — package identity now changes via /:id/packages, not this endpoint', () => {
+    const result = updateLeadSchema.safeParse({ packageId: '3fa85f64-5717-4562-b3fc-2c963f66afa6' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects pricing — pricing now lives per selection, not on the lead', () => {
+    const result = updateLeadSchema.safeParse({ pricing: { currency: 'USD' } });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('createPackageSelectionSchema', () => {
+  it('accepts a real packageId', () => {
+    const result = createPackageSelectionSchema.safeParse({ packageId: '3fa85f64-5717-4562-b3fc-2c963f66afa6' });
     expect(result.success).toBe(true);
-    expect(result.data.isManualItinerary).toBe(true);
+  });
+
+  it('accepts isManual: true', () => {
+    const result = createPackageSelectionSchema.safeParse({ isManual: true });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects neither packageId nor isManual', () => {
+    const result = createPackageSelectionSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects both packageId and isManual together', () => {
+    const result = createPackageSelectionSchema.safeParse({
+      packageId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      isManual: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an invalid uuid packageId', () => {
+    const result = createPackageSelectionSchema.safeParse({ packageId: 'not-a-uuid' });
+    expect(result.success).toBe(false);
   });
 });
 

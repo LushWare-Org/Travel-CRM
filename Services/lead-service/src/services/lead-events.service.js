@@ -1,24 +1,51 @@
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
 /**
- * Pure transition logic for a billing event against a lead. Returns the
- * Prisma update payload, or null when the event is a no-op.
+ * Finds the selection a billing event targets: the one matching the event's
+ * packageId (or the manual slot, for a falsy packageId), falling back to the
+ * lead's primary selection for events emitted before packageId was added to
+ * the webhook payload, or that otherwise don't carry one.
  */
-export function applyEventToLead({ lead, event }) {
+export async function findSelectionForEvent(lead, packageId, prismaClient = prisma) {
+  const where = packageId ? { leadId: lead.id, packageId } : { leadId: lead.id, isManual: true };
+  const bySpecific = await prismaClient.leadPackageSelection.findFirst({ where, include: { pricing: true } });
+  if (bySpecific) return bySpecific;
+
+  if (lead.primarySelectionId) {
+    return prismaClient.leadPackageSelection.findUnique({
+      where: { id: lead.primarySelectionId },
+      include: { pricing: true },
+    });
+  }
+  return null;
+}
+
+/**
+ * Pure transition logic for a billing event against a lead/selection.
+ * Returns `{ target: 'lead' | 'selection', data, leadData?, statusChanged }`,
+ * or null when the event is a no-op.
+ */
+export function applyEventToLead({ lead, selection, event }) {
   const { type, payload = {}, occurredAt } = event;
   const now = occurredAt ? new Date(occurredAt) : new Date();
 
   switch (type) {
     case 'quotation.accepted': {
-      if (lead.quoteAcceptedAt) return null;
-      return { data: { quoteAcceptedAt: now }, statusChanged: false };
+      if (!selection || selection.quoteAcceptedAt) return null;
+      return { target: 'selection', data: { quoteAcceptedAt: now }, statusChanged: false };
     }
 
+    // The lead's overall funnel stage, not per-selection — a rejected/
+    // expired quote sends the whole deal back to REVISION regardless of
+    // which package it was for.
     case 'quotation.rejected':
     case 'quotation.expired': {
       if (lead.lifecycleStatus !== 'QUOTED') return null;
       return {
+        target: 'lead',
         data: {
           lifecycleStatus: 'REVISION',
           statusHistory: {
@@ -35,32 +62,37 @@ export function applyEventToLead({ lead, event }) {
     }
 
     case 'payment.verified': {
+      if (!selection) return null;
       const amount = Number(payload.amount) || 0;
-      const pricing = lead.pricing || {};
-      const paidAmount = Math.round(((Number(pricing.paidAmount) || 0) + amount) * 100) / 100;
+      const pricing = selection.pricing || {};
+      const paidAmount = round2((Number(pricing.paidAmount) || 0) + amount);
       const totalAmount = Number(pricing.totalAmount) || 0;
-      const balanceDue = Math.max(0, Math.round((totalAmount - paidAmount) * 100) / 100);
+      const balanceDue = Math.max(0, round2(totalAmount - paidAmount));
       const depositAmount = Number(pricing.depositAmount) || 0;
       const canApprove =
         ['QUOTED', 'REVISION'].includes(lead.lifecycleStatus) &&
         paidAmount > 0 &&
         paidAmount >= depositAmount;
 
-      const data = {
-        pricing: { update: { paidAmount, balanceDue } },
+      const result = {
+        target: 'selection',
+        data: { pricing: { update: { paidAmount, balanceDue } } },
+        statusChanged: canApprove,
       };
       if (canApprove) {
-        data.lifecycleStatus = 'APPROVED';
-        data.statusHistory = {
-          create: [{
-            status: 'APPROVED',
-            actor: 'SYSTEM',
-            changedById: null,
-            notes: 'Verified payment covers the deposit',
-          }],
+        result.leadData = {
+          lifecycleStatus: 'APPROVED',
+          statusHistory: {
+            create: [{
+              status: 'APPROVED',
+              actor: 'SYSTEM',
+              changedById: null,
+              notes: 'Verified payment covers the deposit',
+            }],
+          },
         };
       }
-      return { data, statusChanged: canApprove };
+      return result;
     }
 
     default:
@@ -80,16 +112,24 @@ export async function handleLeadEvent({ event, prismaClient = prisma }) {
   const existing = await prismaClient.leadInternalEvent.findUnique({ where: { eventId: event.id } });
   if (existing) return { duplicate: true };
 
-  const lead = await prismaClient.lead.findUnique({
-    where: { id: event.leadId },
-    include: { pricing: true },
-  });
+  const lead = await prismaClient.lead.findUnique({ where: { id: event.leadId } });
   if (!lead) throw new AppError('Lead not found', 404);
 
-  const result = applyEventToLead({ lead, event });
+  const selection = await findSelectionForEvent(lead, event.payload?.packageId, prismaClient);
+
+  const result = applyEventToLead({ lead, selection, event });
   if (!result) return { processed: true, changed: false };
 
-  await prismaClient.lead.update({ where: { id: event.leadId }, data: result.data });
+  if (result.target === 'selection') {
+    if (!selection) return { processed: true, changed: false };
+    await prismaClient.leadPackageSelection.update({ where: { id: selection.id }, data: result.data });
+    if (result.leadData) {
+      await prismaClient.lead.update({ where: { id: event.leadId }, data: result.leadData });
+    }
+  } else {
+    await prismaClient.lead.update({ where: { id: event.leadId }, data: result.data });
+  }
+
   await prismaClient.leadInternalEvent.create({
     data: {
       eventId: event.id,

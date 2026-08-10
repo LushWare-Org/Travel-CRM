@@ -2,16 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { mockCreateLead, mockAddFlight, mockUpdateLeadItinerary, mockGetAllPackages, mockGetPackageById } = vi.hoisted(() => ({
+const { mockCreateLead, mockAddSelectionFlight, mockUpdatePackageSelectionItinerary, mockGetAllPackages, mockGetPackageById } = vi.hoisted(() => ({
   mockCreateLead: vi.fn(),
-  mockAddFlight: vi.fn(),
-  mockUpdateLeadItinerary: vi.fn(),
+  mockAddSelectionFlight: vi.fn(),
+  mockUpdatePackageSelectionItinerary: vi.fn(),
   mockGetAllPackages: vi.fn(),
   mockGetPackageById: vi.fn(),
 }));
 
 vi.mock('../../../../services/api', () => ({
-  leadAPI: { createLead: mockCreateLead, addFlight: mockAddFlight, updateLeadItinerary: mockUpdateLeadItinerary },
+  leadAPI: { createLead: mockCreateLead, addSelectionFlight: mockAddSelectionFlight, updatePackageSelectionItinerary: mockUpdatePackageSelectionItinerary },
   packageAPI: { getAll: mockGetAllPackages, getById: mockGetPackageById },
 }));
 
@@ -85,17 +85,19 @@ const packagesFixture = [{ _id: PKG_A, title: 'Sri Lanka Explorer', destination:
 
 beforeEach(() => {
   mockCreateLead.mockReset();
-  mockAddFlight.mockReset();
-  mockUpdateLeadItinerary.mockReset();
+  mockAddSelectionFlight.mockReset();
+  mockUpdatePackageSelectionItinerary.mockReset();
   mockGetAllPackages.mockReset();
   mockGetPackageById.mockReset();
   lastFlightModalProps = null;
 
   mockGetAllPackages.mockResolvedValue({ success: true, data: packagesFixture });
   mockGetPackageById.mockResolvedValue({ success: true, data: { data: { itineraryDays: [{ dayNumber: 1, title: 'Blueprint Day 1' }] } } });
-  mockCreateLead.mockResolvedValue({ data: { _id: 'new-lead-1' } });
-  mockAddFlight.mockResolvedValue({ success: true, data: { id: 'flight-1' } });
-  mockUpdateLeadItinerary.mockResolvedValue({ success: true, data: {} });
+  // createLead also creates the initial package/manual selection in the same
+  // request — its id is what the follow-up flight/itinerary calls target.
+  mockCreateLead.mockResolvedValue({ data: { _id: 'new-lead-1', packageSelections: [{ id: 'sel-1' }] } });
+  mockAddSelectionFlight.mockResolvedValue({ success: true, data: { id: 'flight-1' } });
+  mockUpdatePackageSelectionItinerary.mockResolvedValue({ success: true, data: {} });
 });
 
 function renderDialog(props = {}) {
@@ -185,7 +187,7 @@ describe('NewLeadDialog — persists flight prefs after lead creation', () => {
     await user.click(screen.getByRole('button', { name: /create lead/i }));
 
     await waitFor(() => expect(mockCreateLead).toHaveBeenCalled());
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalledWith('new-lead-1', expect.objectContaining({
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledWith('new-lead-1', 'sel-1', expect.objectContaining({
       flightType: 'TO_START',
       origin: 'AAA',
       destination: 'BBB',
@@ -202,7 +204,7 @@ describe('NewLeadDialog — persists flight prefs after lead creation', () => {
 
     await user.click(screen.getByRole('button', { name: /create lead/i }));
 
-    await waitFor(() => expect(mockAddFlight).toHaveBeenCalledWith('new-lead-1', expect.objectContaining({
+    await waitFor(() => expect(mockAddSelectionFlight).toHaveBeenCalledWith('new-lead-1', 'sel-1', expect.objectContaining({
       flightType: 'RETURN_HOME',
     })));
   });
@@ -214,11 +216,11 @@ describe('NewLeadDialog — persists flight prefs after lead creation', () => {
     await user.click(screen.getByRole('button', { name: /create lead/i }));
 
     await waitFor(() => expect(mockCreateLead).toHaveBeenCalled());
-    expect(mockAddFlight).not.toHaveBeenCalled();
+    expect(mockAddSelectionFlight).not.toHaveBeenCalled();
   });
 
   it('still succeeds the lead creation even if a flight save fails', async () => {
-    mockAddFlight.mockRejectedValue(new Error('flight save failed'));
+    mockAddSelectionFlight.mockRejectedValue(new Error('flight save failed'));
     const user = userEvent.setup();
     const onSuccess = vi.fn();
     renderDialog({ onSuccess });
@@ -288,8 +290,9 @@ describe('NewLeadDialog — manual itinerary option', () => {
     await waitFor(() => expect(mockCreateLead).toHaveBeenCalledWith(
       expect.objectContaining({ isManualItinerary: true, packageId: undefined, packageName: undefined })
     ));
-    await waitFor(() => expect(mockUpdateLeadItinerary).toHaveBeenCalledWith(
+    await waitFor(() => expect(mockUpdatePackageSelectionItinerary).toHaveBeenCalledWith(
       'new-lead-1',
+      'sel-1',
       expect.objectContaining({ days: expect.arrayContaining([expect.objectContaining({ dayNumber: 1 })]) })
     ));
   });
@@ -310,6 +313,6 @@ describe('NewLeadDialog — manual itinerary option', () => {
     await waitFor(() => expect(mockCreateLead).toHaveBeenCalledWith(
       expect.objectContaining({ isManualItinerary: false, packageId: PKG_A })
     ));
-    expect(mockUpdateLeadItinerary).not.toHaveBeenCalled();
+    expect(mockUpdatePackageSelectionItinerary).not.toHaveBeenCalled();
   });
 });

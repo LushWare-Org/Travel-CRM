@@ -20,6 +20,7 @@ function fmtMoney(amount, currency) {
 
 export default function LeadFlightBookingsSection({
   leadId,
+  selectionId,
   leadStatus,
   itineraryDays = [],
   travelDate,
@@ -56,9 +57,9 @@ export default function LeadFlightBookingsSection({
   };
 
   const fetchOptionalFlights = async () => {
-    if (!leadId) return;
+    if (!leadId || !selectionId) return;
     try {
-      const res = await leadAPI.getFlights(leadId);
+      const res = await leadAPI.getSelectionFlights(leadId, selectionId);
       setOptionalFlights(res.data || []);
     } catch (err) {
       toast.error(err.message || 'Failed to load transfer flights');
@@ -70,7 +71,8 @@ export default function LeadFlightBookingsSection({
       fetchBookings();
       fetchOptionalFlights();
     }
-  }, [leadId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadId, selectionId]);
 
   const handleCancelBooking = async (bookingId, reason) => {
     try {
@@ -122,14 +124,14 @@ export default function LeadFlightBookingsSection({
     // LeadOptionalFlight row. Backend has no update endpoint for a single
     // flight, so editing an existing direction deletes the old row first.
     const flightType = flightModalTypeToOptionalFlightType[flightModalType];
-    if (!flightType || !leadId) return;
+    if (!flightType || !leadId || !selectionId) return;
 
     try {
       const existing = optionalFlights.find(f => f.flightType === flightType);
       if (existing) {
-        await leadAPI.deleteFlight(leadId, existing.id);
+        await leadAPI.deleteSelectionFlight(leadId, selectionId, existing.id);
       }
-      await leadAPI.addFlight(leadId, {
+      await leadAPI.addSelectionFlight(leadId, selectionId, {
         flightType,
         origin: prefs.origin || undefined,
         destination: prefs.destination || undefined,
@@ -147,9 +149,9 @@ export default function LeadFlightBookingsSection({
   };
 
   const handleDeleteOptionalFlight = async (flightId) => {
-    if (!leadId) return;
+    if (!leadId || !selectionId) return;
     try {
-      await leadAPI.deleteFlight(leadId, flightId);
+      await leadAPI.deleteSelectionFlight(leadId, selectionId, flightId);
       toast.success('Flight removed');
       fetchOptionalFlights();
       onFlightsChanged?.();

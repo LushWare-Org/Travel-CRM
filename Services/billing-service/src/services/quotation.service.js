@@ -62,8 +62,11 @@ export function quotationTotals(
 }
 
 /**
- * One versioned quotation per lead. Creates version 1 on first snapshot;
- * later snapshots bump the version, record revision history and replace items.
+ * One versioned quotation per (lead, package) pair — a lead can hold several
+ * packages at once, each independently quotable. Creates version 1 on first
+ * snapshot for that pair; later snapshots of the same pair bump the version,
+ * record revision history and replace items. `packageId: null` (the manual-
+ * itinerary slot) is its own distinct pair per lead.
  */
 export async function createOrVersionQuotation({
   leadId,
@@ -83,9 +86,12 @@ export async function createOrVersionQuotation({
   excludedServices = [],
   createdById,
 }) {
-  const totals = quotationTotals(items, { taxRate, discountType, discountValue, serviceChargeRate });
+  // `taxableSubtotal` is a computed intermediate, not a Quotation column — omit
+  // it from what we persist (spreading it into Prisma is rejected).
+  const { taxableSubtotal, ...totals } = quotationTotals(items, { taxRate, discountType, discountValue, serviceChargeRate });
+  void taxableSubtotal;
   const existing = await prisma.quotation.findFirst({
-    where: { leadId },
+    where: { leadId, packageId },
     orderBy: { version: 'desc' },
   });
 

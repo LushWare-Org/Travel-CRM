@@ -261,55 +261,84 @@ export const leadAPI = {
     return api.post(`/leads/${id}/draft`);
   },
 
-  // Snapshot pricing into a versioned billing quotation (-> QUOTED)
-  quoteLead: async (id) => {
-    const api = new ApiService();
-    return api.post(`/leads/${id}/quote`);
-  },
-
-  // Atomic itinerary + pricing edit (auto-drafts NEW/REVISION leads)
-  updateLeadItinerary: async (id, payload) => {
-    const api = new ApiService();
-    return api.put(`/leads/${id}/itinerary`, payload);
-  },
-
-  // Get pricing row, cost lines and optional flights
-  getPricing: async (id) => {
-    const api = new ApiService();
-    return api.get(`/leads/${id}/pricing`);
-  },
-
-  // Pricing
-  calculatePricing: async (leadId, payload) => {
-    const api = new ApiService();
-    return api.post(`/leads/${leadId}/pricing/calculate`, payload);
-  },
-
-  // Standalone preview for the new-lead dialog (no lead exists yet)
+  // Standalone preview for the new-lead dialog (no lead/selection exists yet)
   previewPricing: async (payload) => {
     const api = new ApiService();
     return api.post('/leads/pricing/preview', payload);
   },
 
-  applyPricing: async (leadId, payload) => {
+  // ── Per-package selections ──────────────────────────────────────
+  // A lead can hold many packages (plus one manual slot) at once; each owns
+  // its own itinerary/cost-lines/pricing/quote state.
+
+  getPackageSelections: async (id) => {
     const api = new ApiService();
-    return api.post(`/leads/${leadId}/pricing/apply`, payload);
+    return api.get(`/leads/${id}/packages`);
   },
 
-  // Optional transfer flights
-  getFlights: async (id) => {
+  getPackageSelection: async (id, selectionId) => {
     const api = new ApiService();
-    return api.get(`/leads/${id}/flights`);
+    return api.get(`/leads/${id}/packages/${selectionId}`);
   },
 
-  addFlight: async (id, flightData) => {
+  // payload: { packageId } or { isManual: true }
+  addPackageSelection: async (id, payload) => {
     const api = new ApiService();
-    return api.post(`/leads/${id}/flights`, flightData);
+    return api.post(`/leads/${id}/packages`, payload);
   },
 
-  deleteFlight: async (id, flightId) => {
+  removePackageSelection: async (id, selectionId) => {
     const api = new ApiService();
-    return api.delete(`/leads/${id}/flights/${flightId}`);
+    return api.delete(`/leads/${id}/packages/${selectionId}`);
+  },
+
+  // Atomic itinerary + pricing edit for one selection (auto-drafts NEW/REVISION leads)
+  updatePackageSelectionItinerary: async (id, selectionId, payload) => {
+    const api = new ApiService();
+    return api.put(`/leads/${id}/packages/${selectionId}/itinerary`, payload);
+  },
+
+  // Discards a selection's edited itinerary/pricing, reverting it to the live package
+  refreshPackageSelection: async (id, selectionId, force = false) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/packages/${selectionId}/refresh`, { force });
+  },
+
+  // Snapshot a selection's pricing into a versioned billing quotation
+  quotePackageSelection: async (id, selectionId) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/packages/${selectionId}/quote`);
+  },
+
+  getSelectionPricing: async (id, selectionId) => {
+    const api = new ApiService();
+    return api.get(`/leads/${id}/packages/${selectionId}/pricing`);
+  },
+
+  calculateSelectionPricing: async (id, selectionId, payload) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/packages/${selectionId}/pricing/calculate`, payload);
+  },
+
+  applySelectionPricing: async (id, selectionId, payload) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/packages/${selectionId}/pricing/apply`, payload);
+  },
+
+  // Optional transfer flights, scoped to one selection
+  getSelectionFlights: async (id, selectionId) => {
+    const api = new ApiService();
+    return api.get(`/leads/${id}/packages/${selectionId}/flights`);
+  },
+
+  addSelectionFlight: async (id, selectionId, flightData) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/packages/${selectionId}/flights`, flightData);
+  },
+
+  deleteSelectionFlight: async (id, selectionId, flightId) => {
+    const api = new ApiService();
+    return api.delete(`/leads/${id}/packages/${selectionId}/flights/${flightId}`);
   },
 
   // Delete lead

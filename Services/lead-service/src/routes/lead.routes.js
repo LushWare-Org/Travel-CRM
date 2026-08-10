@@ -4,16 +4,17 @@ import {
   createLead, getLeads, getLead, updateLead, deleteLead,
   addRemark, getLeadRemarks, assignLead, unassignLead,
   getLeadsByStatus, getMyLeads, getLeadStats, searchLeads,
-  setLeadItinerary, getLeadItinerary, downloadLeadItineraryPDF,
+  downloadLeadItineraryPDF,
   createWebsiteContactLead,
-  handleInternalEvent, draftLead, quoteLead,
-  listOptionalFlights, addOptionalFlight, deleteOptionalFlight,
-  updateLeadItinerary,
+  handleInternalEvent, draftLead,
 } from '../controllers/lead.controller.js';
 import {
-  getLeadPricing, calculatePricing, applyPricing,
-  previewPricing,
-} from '../controllers/pricing.controller.js';
+  listPackageSelections, getPackageSelection, createPackageSelection, deletePackageSelection,
+  updateSelectionItinerary, refreshPackageSelection, quotePackageSelection,
+  getSelectionPricing, calculateSelectionPricing, applySelectionPricing,
+  listSelectionFlights, addSelectionFlight, deleteSelectionFlight,
+} from '../controllers/lead-package-selection.controller.js';
+import { previewPricing } from '../controllers/pricing.controller.js';
 
 const router = express.Router();
 router.use(extractUser);
@@ -40,18 +41,28 @@ router.get('/stats', authorize('admin', 'salesRep'), getLeadStats);
 router.get('/status/:status', authorize('admin', 'salesRep'), getLeadsByStatus);
 router.route('/:id').get(authorize('admin', 'salesRep'), getLead).put(authorize('admin', 'salesRep'), updateLead).delete(authorize('admin'), deleteLead);
 router.post('/:id/draft', authorize('admin', 'salesRep'), draftLead);
-router.post('/:id/quote', authorize('admin', 'salesRep'), quoteLead);
-router.put('/:id/itinerary', authorize('admin', 'salesRep'), updateLeadItinerary);
 router.route('/:id/remarks').post(authorize('admin', 'salesRep'), addRemark).get(authorize('admin', 'salesRep'), getLeadRemarks);
 router.patch('/:id/assign', authorize('admin'), assignLead);
 router.patch('/:id/unassign', authorize('admin'), unassignLead);
-router.route('/:id/itinerary').get(authorize('admin', 'salesRep'), getLeadItinerary).put(authorize('admin', 'salesRep'), setLeadItinerary);
 router.get('/:id/itinerary/pdf', authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
-router.route('/:id/flights').get(authorize('admin', 'salesRep'), listOptionalFlights).post(authorize('admin', 'salesRep'), addOptionalFlight);
-router.delete('/:id/flights/:flightId', authorize('admin', 'salesRep'), deleteOptionalFlight);
-router.get('/:id/pricing', authorize('admin', 'salesRep'), getLeadPricing);
-router.post('/:id/pricing/calculate', authorize('admin', 'salesRep'), calculatePricing);
-router.post('/:id/pricing/apply', authorize('admin', 'salesRep'), applyPricing);
-router.put('/:id/pricing', authorize('admin', 'salesRep'), applyPricing);
+
+// Per-package selections — a lead can hold many packages (plus one manual
+// slot) at once; each owns its own itinerary/cost-lines/pricing/quote state.
+router.route('/:id/packages')
+  .get(authorize('admin', 'salesRep'), listPackageSelections)
+  .post(authorize('admin', 'salesRep'), createPackageSelection);
+router.route('/:id/packages/:selectionId')
+  .get(authorize('admin', 'salesRep'), getPackageSelection)
+  .delete(authorize('admin', 'salesRep'), deletePackageSelection);
+router.put('/:id/packages/:selectionId/itinerary', authorize('admin', 'salesRep'), updateSelectionItinerary);
+router.post('/:id/packages/:selectionId/refresh', authorize('admin', 'salesRep'), refreshPackageSelection);
+router.post('/:id/packages/:selectionId/quote', authorize('admin', 'salesRep'), quotePackageSelection);
+router.get('/:id/packages/:selectionId/pricing', authorize('admin', 'salesRep'), getSelectionPricing);
+router.post('/:id/packages/:selectionId/pricing/calculate', authorize('admin', 'salesRep'), calculateSelectionPricing);
+router.post('/:id/packages/:selectionId/pricing/apply', authorize('admin', 'salesRep'), applySelectionPricing);
+router.route('/:id/packages/:selectionId/flights')
+  .get(authorize('admin', 'salesRep'), listSelectionFlights)
+  .post(authorize('admin', 'salesRep'), addSelectionFlight);
+router.delete('/:id/packages/:selectionId/flights/:flightId', authorize('admin', 'salesRep'), deleteSelectionFlight);
 
 export default router;
