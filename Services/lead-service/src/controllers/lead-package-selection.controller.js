@@ -13,6 +13,7 @@ import {
   refreshSelection,
   recomputeSelectionPricing,
   snapshotSelectionQuotation,
+  syncLeadBudgetFromSelection,
 } from '../services/lead-selection.service.js';
 import {
   applyLeadSelectionItinerary,
@@ -156,6 +157,7 @@ export const updateSelectionItinerary = asyncHandler(async (req, res) => {
     pricingSettings: pricing || {},
     actorId: req.user.id,
   });
+  await syncLeadBudgetFromSelection(req.params.id, req.params.selectionId, prisma);
 
   const selection = await prisma.leadPackageSelection.findUnique({
     where: { id: req.params.selectionId },
@@ -207,9 +209,14 @@ export const quotePackageSelection = asyncHandler(async (req, res) => {
       create: [{ status: 'QUOTED', actor: 'USER', changedById: req.user.id, notes: 'Quotation snapshot sent to billing' }],
     };
   }
-  const updatedLead = await prisma.lead.update({
+  await prisma.lead.update({
     where: { id: lead.id },
     data: leadUpdateData,
+  });
+  // This selection is now the primary — reflect its total on the lead budget.
+  await syncLeadBudgetFromSelection(lead.id, selection.id, prisma);
+  const updatedLead = await prisma.lead.findUnique({
+    where: { id: lead.id },
     include: { statusHistory: { orderBy: { changedAt: 'desc' } } },
   });
 
@@ -264,7 +271,10 @@ export const applySelectionPricing = asyncHandler(async (req, res) => {
       description: line.description || '',
       basis: line.basis || 'FIXED',
       quantity: Number(line.quantity) || 1,
-      estimatedUnitPrice: Number(line.estimatedUnitPrice) || 0,
+      // The engine derives the quote from estimatedUnitPrice; accept the common
+      // alternate keys so a client that posts the cost under `unitPrice`/`cost`
+      // doesn't silently zero the line (0 is still respected when explicit).
+      estimatedUnitPrice: Number(line.estimatedUnitPrice ?? line.unitPrice ?? line.cost) || 0,
       actualUnitPrice: line.actualUnitPrice != null ? Number(line.actualUnitPrice) : null,
       marginType: line.marginType || null,
       marginValue: line.marginValue != null ? Number(line.marginValue) : null,
@@ -297,6 +307,7 @@ export const applySelectionPricing = asyncHandler(async (req, res) => {
   }
 
   const pricing = await recomputeSelectionPricing(selection.id, verifiedPaymentTotal);
+  await syncLeadBudgetFromSelection(req.params.id, selection.id, prisma);
   res.json({ success: true, data: { pricing } });
 });
 
@@ -376,6 +387,7 @@ export const addSelectionFlight = asyncHandler(async (req, res) => {
   });
 
   await recomputeSelectionPricing(selection.id);
+  await syncLeadBudgetFromSelection(req.params.id, selection.id, prisma);
   res.status(201).json({ success: true, data: flight });
 });
 
@@ -390,5 +402,6 @@ export const deleteSelectionFlight = asyncHandler(async (req, res) => {
     prisma.leadOptionalFlight.delete({ where: { id: flightId } }),
   ]);
   await recomputeSelectionPricing(selection.id);
+  await syncLeadBudgetFromSelection(id, selection.id, prisma);
   res.json({ success: true, data: {} });
 });

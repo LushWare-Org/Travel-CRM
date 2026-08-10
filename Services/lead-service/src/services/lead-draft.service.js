@@ -34,20 +34,27 @@ export function buildDraftData(packageData) {
     accommodation: day.accommodation ?? {},
     flights: day.flights ?? [],
     places: {
+      // Snapshot the resolved catalog name so locations survive without a
+      // package-service lookup on read (blueprint places carry it on `place`).
       create: (day.places || []).map((p, i) => ({
         placeId: p.placeId ?? null,
-        customName: p.customName ?? null,
+        customName: p.customName ?? p.place?.name ?? null,
         orderIndex: p.orderIndex ?? i,
       })),
     },
     activities: {
-      create: (day.activities || []).map((a, i) => ({
-        activityId: a.activityId ?? null,
-        name: a.name ?? null,
-        defaultCost: a.defaultCost != null ? Number(a.defaultCost) : null,
-        costOverride: a.costOverride != null ? Number(a.costOverride) : null,
-        orderIndex: a.orderIndex ?? i,
-      })),
+      // Likewise snapshot the catalog activity name + default cost, which the
+      // blueprint nests under `activity`.
+      create: (day.activities || []).map((a, i) => {
+        const defaultCost = a.defaultCost ?? a.activity?.defaultCost;
+        return {
+          activityId: a.activityId ?? null,
+          name: a.name ?? a.activity?.name ?? null,
+          defaultCost: defaultCost != null ? Number(defaultCost) : null,
+          costOverride: a.costOverride != null ? Number(a.costOverride) : null,
+          orderIndex: a.orderIndex ?? i,
+        };
+      }),
     },
     transports: {
       create: (day.transports || []).map((t, i) => ({
@@ -67,6 +74,7 @@ export function buildDraftData(packageData) {
       breakfastCount: d.breakfastCount,
       lunchCount: d.lunchCount,
       dinnerCount: d.dinnerCount,
+      mealPriceOverride: d.mealPriceOverride ?? null,
       accommodation: d.accommodation,
     })),
     activities: days.flatMap((d) => d.activities.create),

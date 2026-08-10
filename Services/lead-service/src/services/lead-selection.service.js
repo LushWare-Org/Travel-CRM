@@ -152,6 +152,27 @@ export async function refreshSelection({ selectionId, force = false, prismaClien
 }
 
 /**
+ * Mirror a selection's computed total onto the lead's free-text `budget` so the
+ * lead summary reflects the currently-quoted package. Only syncs from the lead's
+ * primary selection (adopting this one as primary when the lead has none yet).
+ * Best-effort: a no-op when there's no pricing/total.
+ */
+export async function syncLeadBudgetFromSelection(leadId, selectionId, prismaClient = prisma) {
+  const [lead, pricing] = await Promise.all([
+    prismaClient.lead.findUnique({ where: { id: leadId }, select: { primarySelectionId: true } }),
+    prismaClient.leadPricing.findUnique({ where: { leadPackageSelectionId: selectionId } }),
+  ]);
+  if (!lead || !pricing) return;
+  const isPrimary = !lead.primarySelectionId || lead.primarySelectionId === selectionId;
+  if (!isPrimary) return;
+  const total = Number(pricing.totalAmount) || 0;
+  if (total <= 0) return;
+  const currency = pricing.currency || 'USD';
+  const budget = `${currency} ${total.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  await prismaClient.lead.update({ where: { id: leadId }, data: { budget } });
+}
+
+/**
  * Recompute and persist all pricing totals for a selection from its current
  * cost lines. Mirrors the lead-wide version this replaced, scoped down.
  */
@@ -234,19 +255,44 @@ export async function snapshotSelectionQuotation(selectionId, { createdById = nu
     notes: null,
   }));
 
-  // Enrich the quotation with the package's inclusions/exclusions so the PDF and
-  // email carry real content. A package-fetch failure must not block quoting.
+  // Enrich the quotation with the package's inclusions/exclusions plus the trip
+  // details the branded PDF renders (title, destination, itinerary, hero image).
+  // A package-fetch failure must not block quoting.
   let includedServices = [];
   let excludedServices = [];
+  let pkg = null;
   if (selection.packageId) {
     try {
-      const pkg = await fetchPackage(selection.packageId, fetchImpl);
+      pkg = await fetchPackage(selection.packageId, fetchImpl);
       if (Array.isArray(pkg?.inclusions)) includedServices = pkg.inclusions.filter(Boolean);
       if (Array.isArray(pkg?.exclusions)) excludedServices = pkg.exclusions.filter(Boolean);
     } catch {
-      // Leave inclusions/exclusions empty rather than failing the snapshot.
+      // Leave enrichment empty rather than failing the snapshot.
     }
   }
+
+  // Day-by-day itinerary for the PDF, built from the package blueprint (fully
+  // resolved place names + meal counts). Empty when the package has no days.
+  const itineraryDays = (pkg?.itineraryDays || []).map((day, idx) => ({
+    day: day.dayNumber ?? idx + 1,
+    title: day.title || `Day ${day.dayNumber ?? idx + 1}`,
+    locations: (day.places || []).map((p) => p.place?.name || p.customName).filter(Boolean),
+    meals: [
+      day.breakfastCount > 0 && 'Breakfast',
+      day.lunchCount > 0 && 'Lunch',
+      day.dinnerCount > 0 && 'Dinner',
+    ].filter(Boolean),
+  }));
+
+  // Marketing highlights: split the package description into a few bullets.
+  const highlights = String(pkg?.description || '')
+    .split(/\r?\n|(?<=\.)\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
+  const durationDays = pkg?.durationDays ?? (itineraryDays.length || null);
+  const durationNights = durationDays ? Math.max(durationDays - 1, 0) : null;
 
   const res = await fetchImpl(`${BILLING_SERVICE_URL}/api/v1/billing/quotations/from-lead`, {
     method: 'POST',
@@ -271,6 +317,17 @@ export async function snapshotSelectionQuotation(selectionId, { createdById = nu
       paymentTerms: null,
       includedServices,
       excludedServices,
+      // Trip snapshot for the branded quotation PDF.
+      destination: lead.destination || pkg?.destination || null,
+      packageTitle: selection.packageName || pkg?.title || null,
+      travelStartDate: lead.travelDate || null,
+      travelEndDate: lead.endDate || null,
+      paxCount: lead.numberOfTravelers || null,
+      durationNights,
+      durationDays,
+      highlights,
+      itineraryDays,
+      coverImage: pkg?.coverImage || null,
     }),
   });
   if (!res.ok) {

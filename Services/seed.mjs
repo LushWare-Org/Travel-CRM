@@ -400,18 +400,16 @@ async function seedPackages() {
 async function seedLeads() {
   console.log('  → crm_leads');
 
-  await leads.leadStatusOption.createMany({
-    data: [
-      { statusName: 'new', displayName: 'New', color: '#3B82F6', icon: 'star', order: 1, isActive: true, isDefault: true },
-      { statusName: 'contacted', displayName: 'Contacted', color: '#8B5CF6', icon: 'phone', order: 2, isActive: true },
-      { statusName: 'interested', displayName: 'Interested', color: '#F59E0B', icon: 'heart', order: 3, isActive: true },
-      { statusName: 'quoted', displayName: 'Quoted', color: '#06B6D4', icon: 'document', order: 4, isActive: true },
-      { statusName: 'converted', displayName: 'Converted', color: '#10B981', icon: 'check', order: 5, isActive: true },
-      { statusName: 'lost', displayName: 'Lost', color: '#EF4444', icon: 'x', order: 6, isActive: true },
-      { statusName: 'not-interested', displayName: 'Not Interested', color: '#6B7280', icon: 'ban', order: 7, isActive: true },
-    ],
-    skipDuplicates: true,
-  });
+  // Lead status is the `lifecycleStatus` enum now — the LeadStatusOption table
+  // was removed in the 2026-08-02 schema rebuild, so there's nothing to seed.
+
+  // Package choice moved off the Lead onto LeadPackageSelection rows; explicit
+  // ids let us point each lead's primarySelectionId at its selection.
+  const SEL = {
+    lead1: 'e1000000-0000-0000-0000-000000000001',
+    lead2: 'e1000000-0000-0000-0000-000000000002',
+    lead3: 'e1000000-0000-0000-0000-000000000003',
+  };
 
   await leads.settings.createMany({
     data: [
@@ -445,18 +443,16 @@ async function seedLeads() {
       destination: 'Maldives',
       travelDate: new Date('2025-02-14'),
       endDate: new Date('2025-02-17'),
-      packageId: ID.pkg2,
-      packageName: 'Maldives Luxury Escape',
       numberOfTravelers: 2,
       budget: 'USD 7000',
       message: 'Planning honeymoon trip for February. Looking for luxury overwater villa.',
-      status: 'converted',
+      lifecycleStatus: 'CONFIRMED',
       priority: 'high',
       assignedToId: ID.salesRep1,
       assignedById: ID.admin,
       assignmentMode: 'auto',
-      quoteSent: true,
-      quoteAmount: 7000,
+      primarySelectionId: SEL.lead1,
+      packageSelections: { create: [{ id: SEL.lead1, packageId: ID.pkg2, packageName: 'Maldives Luxury Escape', isManual: false }] },
       convertedBookingId: ID.booking1,
       tags: ['HONEYMOON', 'luxury', 'high-value'],
       notifNewLead: true,
@@ -503,18 +499,16 @@ async function seedLeads() {
       destination: 'Sri Lanka',
       travelDate: new Date('2025-03-15'),
       endDate: new Date('2025-03-19'),
-      packageId: ID.pkg1,
-      packageName: 'Sri Lanka Heritage Explorer',
       numberOfTravelers: 4,
       budget: 'USD 5000',
       message: 'Family of 4 (2 adults, 2 kids aged 8 and 12). Interested in Sri Lanka Heritage package.',
-      status: 'quoted',
+      lifecycleStatus: 'QUOTED',
       priority: 'medium',
       assignedToId: ID.salesRep2,
       assignedById: ID.admin,
       assignmentMode: 'auto',
-      quoteSent: true,
-      quoteAmount: 4800,
+      primarySelectionId: SEL.lead2,
+      packageSelections: { create: [{ id: SEL.lead2, packageId: ID.pkg1, packageName: 'Sri Lanka Heritage Explorer', isManual: false }] },
       followUpDate: new Date('2025-01-10'),
       tags: ['FAMILY', 'kids', 'heritage'],
       remarks: {
@@ -553,13 +547,13 @@ async function seedLeads() {
       destinationCountry: 'Thailand',
       destination: 'Thailand',
       travelDate: new Date('2025-04-01'),
-      packageId: ID.pkg3,
-      packageName: 'Thailand Family Adventure',
       numberOfTravelers: 3,
       budget: 'USD 5500',
-      status: 'new',
+      lifecycleStatus: 'NEW',
       priority: 'low',
       assignedToId: ID.salesRep1,
+      primarySelectionId: SEL.lead3,
+      packageSelections: { create: [{ id: SEL.lead3, packageId: ID.pkg3, packageName: 'Thailand Family Adventure', isManual: false }] },
       tags: ['group', 'beach'],
       remarks: { create: [] },
       statusHistory: {
@@ -708,11 +702,35 @@ async function seedBilling() {
     },
   });
 
+  // Trip snapshot enriching the branded quotation PDF (mirrors pkg1's itinerary).
+  const quotation1Trip = {
+    destination: 'Sri Lanka',
+    packageTitle: 'Sri Lanka Heritage Explorer',
+    travelStartDate: new Date('2025-01-10'),
+    travelEndDate: new Date('2025-01-13'),
+    paxCount: 4,
+    durationNights: 3,
+    durationDays: 4,
+    highlights: [
+      'UNESCO heritage sites including Sigiriya Rock Fortress',
+      'Temple of the Tooth & Kandy tea estates',
+      'Relaxing beach day at Bentota',
+      'Private guided tours with daily breakfast',
+    ],
+    itineraryDays: [
+      { day: 1, title: 'Arrival in Colombo', locations: ['Colombo'], meals: ['Dinner'] },
+      { day: 2, title: 'Sigiriya Rock Fortress', locations: ['Sigiriya'], meals: ['Breakfast', 'Lunch', 'Dinner'] },
+      { day: 3, title: 'Kandy & Tea Estates', locations: ['Kandy'], meals: ['Breakfast', 'Dinner'] },
+      { day: 4, title: 'Beach Day at Bentota', locations: ['Bentota'], meals: ['Breakfast', 'Lunch', 'Dinner'] },
+    ],
+  };
+
   // Quotation 1
   await bill.quotation.upsert({
     where: { id: ID.quotation1 },
-    update: {},
+    update: quotation1Trip,
     create: {
+      ...quotation1Trip,
       id: ID.quotation1,
       quotationNumber: 'QT-202412-00001',
       leadId: ID.lead2,

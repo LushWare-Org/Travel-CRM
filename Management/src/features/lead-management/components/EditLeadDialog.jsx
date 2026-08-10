@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, Copy,
   User, MapPin, Plane, Users, Globe, Package, ChevronDown, ChevronUp,
-  Trash2, Check, Lock, RefreshCw, XCircle,
+  Trash2, Check, Lock, RefreshCw, XCircle, Wallet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadAPI, packageAPI } from '../../../services/api';
@@ -607,6 +607,18 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="e.g., 2"
                   />
+                </EditInputField>
+
+                <EditInputField label="Budget" icon={Wallet}>
+                  <input
+                    type="text"
+                    readOnly
+                    aria-label="Budget"
+                    value={lead?.budget || '—'}
+                    title="Auto-filled from the primary package's quoted total"
+                    className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl text-gray-600 cursor-not-allowed focus:outline-none"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">Auto-filled from the primary package total</p>
                 </EditInputField>
 
                 <EditInputField label="Platform / Source" icon={Globe}>

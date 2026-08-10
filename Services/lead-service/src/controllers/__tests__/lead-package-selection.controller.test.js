@@ -27,6 +27,7 @@ const {
   mockRefreshSelection,
   mockRecomputeSelectionPricing,
   mockSnapshotSelectionQuotation,
+  mockSyncLeadBudgetFromSelection,
   mockApplyLeadSelectionItinerary,
   mockSerializeLeadDays,
   mockBuildAutoCostLines,
@@ -59,6 +60,7 @@ const {
   mockRefreshSelection: vi.fn(),
   mockRecomputeSelectionPricing: vi.fn(),
   mockSnapshotSelectionQuotation: vi.fn(),
+  mockSyncLeadBudgetFromSelection: vi.fn(),
   mockApplyLeadSelectionItinerary: vi.fn(),
   mockSerializeLeadDays: vi.fn(),
   mockBuildAutoCostLines: vi.fn(),
@@ -94,6 +96,7 @@ vi.mock('../../services/lead-selection.service.js', () => ({
   refreshSelection: mockRefreshSelection,
   recomputeSelectionPricing: mockRecomputeSelectionPricing,
   snapshotSelectionQuotation: mockSnapshotSelectionQuotation,
+  syncLeadBudgetFromSelection: mockSyncLeadBudgetFromSelection,
 }));
 
 vi.mock('../../services/lead-itinerary.service.js', () => ({
