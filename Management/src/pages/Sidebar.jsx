@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Menu, X, Home, Users, MapPin, DollarSign, User, LogOut,
-  BarChart3, Briefcase, ChevronRight, Sparkles, Plane, Hotel, Settings
+  BarChart3, Briefcase, ChevronRight, ChevronLeft, Sparkles, Plane, Hotel, Settings
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
@@ -166,12 +166,13 @@ const Sidebar = () => {
   const toggleMobile = useCallback(() => setMobileOpen(prev => !prev), []);
 
   const sidebarContent = (isExpanded) => (
-    <div
-      className={`${isExpanded ? "w-72" : "w-20"} h-full transition-all duration-300 flex flex-col relative overflow-hidden`}
-      style={{
-        background: 'linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%)',
-      }}
-    >
+    <div className={`${isExpanded ? "w-72" : "w-20"} h-full relative flex-shrink-0 transition-all duration-300`}>
+      <div
+        className="h-full w-full flex flex-col relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%)',
+        }}
+      >
       {/* Decorative Elements */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-sky-200/30 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
       <div className="absolute bottom-20 left-0 w-24 h-24 bg-blue-200/40 rounded-full -translate-x-1/2 blur-xl" />
@@ -250,6 +251,7 @@ const Sidebar = () => {
               }}
               onMouseEnter={() => setHoveredItem(index)}
               onMouseLeave={() => setHoveredItem(null)}
+              title={item.label}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left group relative overflow-hidden ${active
                 ? 'text-white shadow-lg'
                 : 'text-sky-700 hover:bg-white/60'
@@ -331,6 +333,7 @@ const Sidebar = () => {
         <button
           onClick={handleLogout}
           disabled={isLoggingOut}
+          title={isLoggingOut ? "Signing out..." : "Sign Out"}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium ${isLoggingOut
             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
             : 'bg-red-50 text-red-600 hover:bg-red-100 hover:shadow-md'
@@ -344,23 +347,25 @@ const Sidebar = () => {
             <span className="text-sm">{isLoggingOut ? "Signing out..." : "Sign Out"}</span>
           )}
         </button>
-
-        {!isMobile && (
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-full flex items-center justify-center gap-2 bg-white/70 backdrop-blur-sm px-4 py-2.5 rounded-xl hover:bg-white transition-all duration-200 text-sky-600 hover:text-sky-700 border border-sky-100"
-          >
-            {sidebarOpen ? (
-              <>
-                <X className="w-4 h-4" />
-                <span className="text-xs font-medium">Collapse</span>
-              </>
-            ) : (
-              <Menu className="w-5 h-5" />
-            )}
-          </button>
-        )}
       </div>
+    </div>
+
+      {/* Collapse/expand toggle — straddles the sidebar's right edge, vertically
+          centered, so it stays in the same relative spot whether expanded or
+          collapsed. Single, predictable control for this state (replaces the
+          old bottom-of-sidebar button, which became indistinguishable from
+          nav icons once collapsed). */}
+      {!isMobile && (
+        <button
+          type="button"
+          onClick={() => setSidebarOpen((prev) => !prev)}
+          title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-white border border-sky-200 shadow-md text-sky-600 hover:bg-sky-50 hover:text-sky-700 hover:shadow-lg hover:scale-110 transition-all duration-200"
+        >
+          {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+      )}
     </div>
   );
 
