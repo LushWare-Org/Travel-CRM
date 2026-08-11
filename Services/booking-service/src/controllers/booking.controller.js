@@ -180,7 +180,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
   try {
     assignedToId = await autoAssignSalesRep();
   } catch (e) {
-    console.warn('Auto-assignment failed:', e.message);
+    req.log.warn({ err: e }, 'Auto-assignment failed');
   }
 
   const booking = await prisma.booking.create({
@@ -228,7 +228,7 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
           const { sendLeadAssignmentEmail } = await import('../utils/email.js');
           await sendLeadAssignmentEmail({ salesRep: rep, lead: { id: leadId, name: sanitizedName, email: sanitizedEmail }, assignmentMode: 'auto' });
         } catch (e) {
-          console.error('Failed to send assignment email:', e.message);
+          req.log.error({ err: e }, 'Failed to send assignment email');
         }
       }
     }).catch(() => {});
