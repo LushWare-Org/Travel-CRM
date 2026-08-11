@@ -81,14 +81,15 @@ const LeadManagement = () => {
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showActiveSalesRepsDialog, setShowActiveSalesRepsDialog] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
-  const [showQuotationDialog, setShowQuotationDialog] = useState(false);
-  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
-  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
-  const [showVoucherDialog, setShowVoucherDialog] = useState(false);
-  
+  // Each billing document dialog owns its own lead so opening one for a
+  // different lead can never leak into a dialog that's already open.
+  const [quotationLead, setQuotationLead] = useState(null);
+  const [invoiceLead, setInvoiceLead] = useState(null);
+  const [receiptLead, setReceiptLead] = useState(null);
+  const [voucherLead, setVoucherLead] = useState(null);
+
   const [selectedLead, setSelectedLead] = useState(null);
   const [statusLead, setStatusLead] = useState(null);
-  const [billingLead, setBillingLead] = useState(null);
   const [sectionLead, setSectionLead] = useState(null);
   // When set, the lead editor was opened from the quotation flow and we return
   // to the quotation modal once the editor closes.
@@ -276,10 +277,29 @@ const LeadManagement = () => {
     }
   };
 
+  // Quotation/Invoice/Receipt/Voucher each own their lead state, but share
+  // this same refetch-and-clear-highlight behavior on success.
+  const handleQuotationSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+  const handleInvoiceSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+  const handleReceiptSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+  const handleVoucherSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+
   // Hand off from the quotation modal to the lead editor, remembering to return
   // to the quotation flow once editing is done.
   const openLeadEditorFromQuote = (lead) => {
-    setShowQuotationDialog(false);
+    setQuotationLead(null);
     setResumeQuoteLead(lead);
     setSelectedLead(lead);
     setShowEditDialog(true);
@@ -289,8 +309,7 @@ const LeadManagement = () => {
     setShowEditDialog(false);
     setSelectedLead(null);
     if (resumeQuoteLead) {
-      setBillingLead(resumeQuoteLead);
-      setShowQuotationDialog(true);
+      setQuotationLead(resumeQuoteLead);
       setResumeQuoteLead(null);
     }
   };
@@ -412,22 +431,10 @@ const LeadManagement = () => {
               setStatusLead(lead);
               setShowStatusDialog(true);
             }}
-            onQuotationClick={(lead) => {
-              setBillingLead(lead);
-              setShowQuotationDialog(true);
-            }}
-            onInvoiceClick={(lead) => {
-              setBillingLead(lead);
-              setShowInvoiceDialog(true);
-            }}
-            onReceiptClick={(lead) => {
-              setBillingLead(lead);
-              setShowReceiptDialog(true);
-            }}
-            onVoucherClick={(lead) => {
-              setBillingLead(lead);
-              setShowVoucherDialog(true);
-            }}
+            onQuotationClick={(lead) => setQuotationLead(lead)}
+            onInvoiceClick={(lead) => setInvoiceLead(lead)}
+            onReceiptClick={(lead) => setReceiptLead(lead)}
+            onVoucherClick={(lead) => setVoucherLead(lead)}
             onSectionClick={(lead) => {
               setSectionLead(lead);
               setShowSectionView(true);
@@ -553,52 +560,40 @@ const LeadManagement = () => {
         onStatusChange={handleStatusChange}
       />
 
-      {showQuotationDialog && billingLead && (
+      {quotationLead && (
         <QuotationModal
-          isOpen={showQuotationDialog}
-          onClose={() => {
-            setShowQuotationDialog(false);
-            setBillingLead(null);
-          }}
-          lead={billingLead}
-          onSuccess={handleLeadSuccess}
+          isOpen
+          onClose={() => setQuotationLead(null)}
+          lead={quotationLead}
+          onSuccess={handleQuotationSuccess}
           onEditLead={openLeadEditorFromQuote}
         />
       )}
 
-      {showInvoiceDialog && billingLead && (
+      {invoiceLead && (
         <InvoiceDialog
-          isOpen={showInvoiceDialog}
-          onClose={() => {
-            setShowInvoiceDialog(false);
-            setBillingLead(null);
-          }}
-          lead={billingLead}
-          onSuccess={handleLeadSuccess}
+          isOpen
+          onClose={() => setInvoiceLead(null)}
+          lead={invoiceLead}
+          onSuccess={handleInvoiceSuccess}
         />
       )}
 
-      {showReceiptDialog && billingLead && (
+      {receiptLead && (
         <ReceiptDialog
-          isOpen={showReceiptDialog}
-          onClose={() => {
-            setShowReceiptDialog(false);
-            setBillingLead(null);
-          }}
-          lead={billingLead}
-          onSuccess={handleLeadSuccess}
+          isOpen
+          onClose={() => setReceiptLead(null)}
+          lead={receiptLead}
+          onSuccess={handleReceiptSuccess}
         />
       )}
 
-      {showVoucherDialog && billingLead && (
+      {voucherLead && (
         <VoucherDialog
-          isOpen={showVoucherDialog}
-          onClose={() => {
-            setShowVoucherDialog(false);
-            setBillingLead(null);
-          }}
-          lead={billingLead}
-          onSuccess={handleLeadSuccess}
+          isOpen
+          onClose={() => setVoucherLead(null)}
+          lead={voucherLead}
+          onSuccess={handleVoucherSuccess}
         />
       )}
 
