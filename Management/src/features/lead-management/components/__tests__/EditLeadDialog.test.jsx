@@ -173,6 +173,22 @@ describe('EditLeadDialog — load behavior', () => {
     expect(await screen.findByRole('button', { name: 'Sri Lanka Explorer' })).toBeInTheDocument();
   });
 
+  it('shows the Quoted badge on the package tab when the selection already has a quote', async () => {
+    mockGetPackageSelections.mockResolvedValue({
+      success: true,
+      data: [selectionFixture({ currentQuoteId: 'quote-1' })],
+    });
+    renderDialog();
+    await screen.findByText('Sri Lanka Explorer');
+    expect(screen.getByText('Quoted')).toBeInTheDocument();
+  });
+
+  it('does not show the Quoted badge when the selection has no quote yet', async () => {
+    renderDialog();
+    await screen.findByText('Sri Lanka Explorer');
+    expect(screen.queryByText('Quoted')).not.toBeInTheDocument();
+  });
+
   it('loads saved pricing settings for the active tab into the pricing preview', async () => {
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('pricing-margin-type')).toHaveTextContent('PERCENTAGE'));
