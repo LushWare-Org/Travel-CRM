@@ -1,4 +1,4 @@
-import { apiEnvelope, LeadPackageSelectionSummary, QuotePackageSelectionResult } from "@travel-crm/contracts";
+import { apiEnvelope, LeadPackageSelectionSummary, QuotePackageSelectionResult, QuotationSummary } from "@travel-crm/contracts";
 import { z } from "zod";
 
 const API_BASE_URL =
@@ -121,13 +121,23 @@ class ApiService {
         throw error;
       }
 
-      if (import.meta.env.DEV && options.responseSchema) {
+      if (options.responseSchema) {
         const result = options.responseSchema.safeParse(data);
         if (!result.success) {
-          // Dev-console tripwire, not a page-crashing assertion — shape
-          // drift between this service and the backend should be loud in
-          // the console during development, not break the app.
-          console.error(`[contract mismatch] ${endpoint}`, result.error.format());
+          const message = `[contract mismatch] ${endpoint}: response shape does not match the expected contract`;
+          if (import.meta.env.MODE === "test") {
+            // Vitest sets MODE to 'test' — throw so a shape drift fails the
+            // test/CI run instead of only logging to a console nobody reads.
+            throw new Error(`${message}\n${JSON.stringify(result.error.format(), null, 2)}`);
+          }
+          if (import.meta.env.DEV) {
+            // Dev-console tripwire, not a page-crashing assertion — shape
+            // drift between this service and the backend should be loud in
+            // the console during development, not break the app.
+            console.error(message, result.error.format());
+          }
+          // production: stay silent — a page-crashing assertion in prod is
+          // worse than a missed console warning.
         }
       }
 
@@ -552,7 +562,9 @@ export const analyticsAPI = {
 export const quotationAPI = {
   getAll: async (params = {}) => {
     const api = new ApiService();
-    return api.get("/billing/quotations", params);
+    return api.get("/billing/quotations", params, {
+      responseSchema: apiEnvelope(z.array(QuotationSummary)),
+    });
   },
   create: async (payload) => {
     const api = new ApiService();
@@ -572,7 +584,9 @@ export const quotationAPI = {
   },
   send: async (quotationId, payload = {}) => {
     const api = new ApiService();
-    return api.post(`/billing/quotations/${quotationId}/send`, payload);
+    return api.post(`/billing/quotations/${quotationId}/send`, payload, {
+      responseSchema: apiEnvelope(QuotationSummary),
+    });
   },
   //Ashan
   //downloadpdf
