@@ -333,7 +333,7 @@ class SalesRepService {
 
     if (!data.phone) {
       errors.phone = 'Phone is required';
-    } else if (!/^[\+]?[0-9]{7,15}$/.test(data.phone.replace(/\D/g, '') === '' ? '+' + data.phone : data.phone)) {
+    } else if (!/^[+]?[0-9]{7,15}$/.test(data.phone.replace(/\D/g, '') === '' ? '+' + data.phone : data.phone)) {
       errors.phone = 'Phone number must be between 7-15 digits (can include + prefix)';
     }
 
