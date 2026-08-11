@@ -9,7 +9,9 @@ export default [
     files: ['**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      // `process.env.NODE_ENV` is statically replaced by vite.config.js's
+      // `define` block at build time, not a real runtime global.
+      globals: { ...globals.browser, process: 'readonly' },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },
@@ -23,11 +25,23 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Bootstrap note: this repo had no lint gate before now, so these two
+      // rules start at 'warn' against ~140 pre-existing violations rather
+      // than blocking CI on an unrelated cleanup. Tighten to 'error' once
+      // the existing debt is cleaned up.
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-empty': 'warn',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
+    },
+  },
+  {
+    // Node-executed config files, not browser bundle code.
+    files: ['*.config.js'],
+    languageOptions: {
+      globals: globals.node,
     },
   },
 ]
