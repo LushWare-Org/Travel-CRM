@@ -2,9 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 
 import errorHandler from './middleware/errorHandler.js';
+import { correlationId, requestLogger } from './middleware/requestLogger.js';
 import leadRoutes from './routes/lead.routes.js';
 
 // The Express app, built without starting a server or connecting to the DB so
@@ -14,7 +14,9 @@ app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
+// Request ID + structured logging (replaces morgan)
+app.use(correlationId);
+app.use(requestLogger);
 
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', service: 'lead-service', timestamp: new Date().toISOString() })
