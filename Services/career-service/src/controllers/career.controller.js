@@ -55,14 +55,14 @@ export const applyForPosition = asyncHandler(async (req, res) => {
     to: cleanEmail,
     subject: `Application Received — ${vacancy.position}`,
     html: `<p>Dear ${fullName},</p><p>We received your application for <strong>${vacancy.position}</strong>. We'll review it within 5-7 business days.</p>`,
-  }).catch(console.error);
+  }).catch((err) => req.log.error({ err, email: cleanEmail }, 'Failed to send applicant confirmation email'));
 
   const adminEmails = (process.env.ADMIN_EMAILS || process.env.EMAIL_USER || '').split(',');
   sendEmail({
     to: adminEmails.join(','),
     subject: `New Career Application — ${vacancy.position}`,
     html: `<p><strong>Name:</strong> ${fullName}</p><p><strong>Position:</strong> ${vacancy.position}</p><p><strong>Email:</strong> ${cleanEmail}</p>`,
-  }).catch(console.error);
+  }).catch((err) => req.log.error({ err }, 'Failed to send admin notification email'));
 
   res.status(201).json({ status: 'success', message: 'Application submitted successfully!', data: { application } });
 });
@@ -118,7 +118,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
       to: application.email,
       subject: `Update on Your ${application.position} Application`,
       html: `<p>Dear ${application.fullName},</p><p>${messages[status] || 'Your application status has been updated.'}</p>${feedback ? `<p><strong>Feedback:</strong> ${feedback}</p>` : ''}`,
-    }).catch(console.error);
+    }).catch((err) => req.log.error({ err, email: application.email }, 'Failed to send application status email'));
   }
 
   res.json({ status: 'success', message: 'Application updated', data: { application: updated } });
