@@ -1,10 +1,7 @@
 import fs from 'node:fs';
 import PDFDocument from 'pdfkit';
-import BRANDING, { getBankDetails, hasBankDetails } from '../config/branding.js';
+import { getOrgSettings, toBrandingShape, getBankDetails, hasBankDetails } from '../config/orgSettings.js';
 import { QuotationForPdf } from '@travel-crm/contracts';
-
-const T = BRANDING.theme;
-const CONTENT = BRANDING.content;
 
 // Built-in Helvetica (WinAnsi) has no rupee glyph, so INR uses a text prefix.
 const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: 'INR ', AUD: 'A$', LKR: 'Rs ' };
@@ -63,11 +60,15 @@ const normalizeDays = (v) => {
  *   the hero image; remote URLs fall back to a branded placeholder banner.
  * @returns {Promise<Buffer>}
  */
-export function generateQuotationPDF(quotation) {
+export async function generateQuotationPDF(quotation) {
   // Fail loud on a shape mismatch instead of silently rendering blank
   // sections — this is a narrow .passthrough() check on only the fields
   // this generator actually reads, not a full Quotation schema.
   QuotationForPdf.parse(quotation);
+  const orgSettings = await getOrgSettings();
+  const BRANDING = toBrandingShape(orgSettings);
+  const T = BRANDING.theme;
+  const CONTENT = BRANDING.content;
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -332,8 +333,8 @@ export function generateQuotationPDF(quotation) {
       };
 
       const paymentDetailsSection = () => {
-        const bank = getBankDetails();
-        if (!hasBankDetails() && !bank.upiId) return;
+        const bank = getBankDetails(BRANDING);
+        if (!hasBankDetails(BRANDING) && !bank.upiId) return;
         sectionHeader('Payment Details');
 
         ensureSpace(160);

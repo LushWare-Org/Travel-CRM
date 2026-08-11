@@ -1,5 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generateQuotationPDF } from '../quotationPDFGenerator.js';
+
+// Avoids a real network call to user-service during unit tests — exercises
+// the same fallback shape getOrgSettings() returns when it can't be reached.
+vi.mock('../../config/orgSettings.js', async () => {
+  const actual = await vi.importActual('../../config/orgSettings.js');
+  return {
+    ...actual,
+    getOrgSettings: vi.fn().mockResolvedValue({
+      companyName: 'Travel CRM',
+      themeInk: '#1F2937',
+      themeMuted: '#64748B',
+      themeAccent: '#F5A623',
+      themeAccentDark: '#D98A0B',
+      paymentMethods: ['Bank Transfer', 'UPI'],
+      ratingTagline: 'Rated 4.9',
+      quotationTerms: 'Default terms',
+      cancellationPolicy: 'Default cancellation policy',
+      bankName: 'Test Bank',
+      bankAccountNumber: '12345',
+    }),
+  };
+});
 
 /** Count page objects in the PDF (`/Type /Page` but not the `/Pages` tree). */
 const countPages = (buffer) => {
@@ -110,15 +132,16 @@ describe('generateQuotationPDF', () => {
     expect(countPages(buffer)).toBeGreaterThanOrEqual(1);
   });
 
-  it('throws instead of silently rendering blanks when an itinerary day is malformed', () => {
-    // generateQuotationPDF validates synchronously before returning its Promise,
-    // so the throw happens on the call itself, not as a promise rejection.
-    expect(() =>
+  it('rejects instead of silently rendering blanks when an itinerary day is malformed', async () => {
+    // generateQuotationPDF is async (it awaits org settings before rendering),
+    // so even its up-front validation surfaces as a rejected promise, not a
+    // synchronous throw on the call itself.
+    await expect(
       generateQuotationPDF({
         ...baseQuotation,
         // missing locations/meals — a real shape mismatch, not just an empty trip
         itineraryDays: [{ day: 1, title: 'Day 1' }],
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 });

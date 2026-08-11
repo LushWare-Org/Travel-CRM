@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import BRANDING, { getEmailFrom } from '../config/branding.js';
+import { getOrgSettings, toBrandingShape, getEmailFrom } from '../config/orgSettings.js';
 
 const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: '₹', AUD: 'A$', LKR: 'Rs ' };
 
@@ -24,18 +24,18 @@ function buildTransport() {
 
 export const isEmailConfigured = () => buildTransport() !== null;
 
-function quotationEmailHtml(quotation) {
+function quotationEmailHtml(quotation, branding) {
   const customerName = quotation.customerName || 'Customer';
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#0F172A;">
     <div style="background:linear-gradient(135deg,#0F766E,#14B8A6);padding:28px 32px;border-radius:12px 12px 0 0;">
-      <h1 style="color:#fff;margin:0;font-size:22px;">${BRANDING.company.name}</h1>
-      <p style="color:#E0F2F1;margin:6px 0 0;font-size:13px;">${BRANDING.company.tagline}</p>
+      <h1 style="color:#fff;margin:0;font-size:22px;">${branding.company.name}</h1>
+      <p style="color:#E0F2F1;margin:6px 0 0;font-size:13px;">${branding.company.tagline}</p>
     </div>
     <div style="border:1px solid #E2E8F0;border-top:none;border-radius:0 0 12px 12px;padding:32px;">
       <h2 style="font-size:20px;margin:0 0 8px;">Your Quotation 📋</h2>
       <p style="color:#64748B;line-height:1.6;">Dear ${customerName},</p>
-      <p style="color:#64748B;line-height:1.6;">Thank you for considering ${BRANDING.company.name}. Please find your quotation
+      <p style="color:#64748B;line-height:1.6;">Thank you for considering ${branding.company.name}. Please find your quotation
         <strong>${quotation.quotationNumber || ''}</strong> attached as a PDF. A summary is below.</p>
       <div style="background:#F1F5F9;border-radius:10px;padding:20px;margin:20px 0;">
         <div style="color:#0F766E;font-size:13px;">Total Amount</div>
@@ -43,7 +43,7 @@ function quotationEmailHtml(quotation) {
         <div style="color:#64748B;font-size:13px;margin-top:10px;">Valid until: ${formatDate(quotation.validUntil)}</div>
       </div>
       <p style="color:#64748B;line-height:1.6;">If you have any questions or would like to proceed, simply reply to this email.</p>
-      <p style="color:#94A3B8;font-size:12px;margin-top:24px;">${BRANDING.company.name} · ${BRANDING.contact.email} · ${BRANDING.contact.phone}</p>
+      <p style="color:#94A3B8;font-size:12px;margin-top:24px;">${branding.company.name} · ${branding.contact.email} · ${branding.contact.phone}</p>
     </div>
   </div>`;
 }
@@ -63,15 +63,17 @@ export async function sendQuotationEmail({ quotation, recipientEmail, pdfBuffer 
   }
   if (!recipientEmail) throw new Error('No recipient email provided');
 
+  const branding = toBrandingShape(await getOrgSettings());
+
   const subject = quotation.quotationNumber
-    ? `${BRANDING.company.name} Quotation - ${quotation.quotationNumber}`
-    : `${BRANDING.company.name} Quotation`;
+    ? `${branding.company.name} Quotation - ${quotation.quotationNumber}`
+    : `${branding.company.name} Quotation`;
 
   return transporter.sendMail({
-    from: getEmailFrom(),
+    from: getEmailFrom(branding),
     to: recipientEmail,
     subject,
-    html: quotationEmailHtml(quotation),
+    html: quotationEmailHtml(quotation, branding),
     text: `Dear ${quotation.customerName || 'Customer'},\n\nPlease find your quotation attached.\nTotal: ${formatMoney(quotation.totalAmount, quotation.currency)}\nValid until: ${formatDate(quotation.validUntil)}\n`,
     attachments: pdfBuffer
       ? [{ filename: `quotation-${quotation.quotationNumber || quotation.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
