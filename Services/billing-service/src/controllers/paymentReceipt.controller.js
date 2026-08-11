@@ -135,7 +135,7 @@ export const verifyPaymentReceipt = asyncHandler(async (req, res) => {
       payload: { paymentId: receipt.id, amount: receipt.amount, invoiceId: receipt.invoiceId || null },
     });
   } catch (err) {
-    console.error('Failed to notify lead-service of verified payment', err.message);
+    req.log.error({ err, leadId: receipt.leadId }, 'Failed to notify lead-service of verified payment');
   }
   res.json({ success: true, data: receipt });
 });

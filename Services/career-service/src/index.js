@@ -2,9 +2,10 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 
 import errorHandler from './middleware/errorHandler.js';
+import { correlationId, requestLogger } from './middleware/requestLogger.js';
+import logger from './config/logger.js';
 import careerRoutes from './routes/career.routes.js';
 import vacancyRoutes from './routes/vacancy.routes.js';
 import prisma from './db/client.js';
@@ -16,7 +17,9 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
+// Request ID + structured logging (replaces morgan)
+app.use(correlationId);
+app.use(requestLogger);
 
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', service: 'career-service', timestamp: new Date().toISOString() })
@@ -32,9 +35,9 @@ const PORT = process.env.PORT || 3007;
 const start = async () => {
   await prisma.$connect();
   app.listen(PORT, '0.0.0.0', () =>
-    console.log(`[career-service] Running on http://0.0.0.0:${PORT}`)
+    logger.info({ port: PORT }, 'career-service started')
   );
 };
-start().catch((err) => { console.error(err); process.exit(1); });
+start().catch((err) => { logger.error({ err }, 'career-service startup error'); process.exit(1); });
 
 export default app;

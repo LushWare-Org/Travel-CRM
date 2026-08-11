@@ -3,6 +3,7 @@ import pool from '../db/pool.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { verifyWebhookSignature, getLeadData, mapFacebookLeadToLead } from '../utils/facebook.js';
+import logger from '../config/logger.js';
 
 export const verifyWebhook = asyncHandler(async (req, res) => {
   const mode = req.query['hub.mode'];
@@ -12,7 +13,7 @@ export const verifyWebhook = asyncHandler(async (req, res) => {
   if (!mode || !token) throw new AppError('Missing mode or token', 403);
 
   if (mode === 'subscribe' && token === process.env.FACEBOOK_VERIFY_TOKEN) {
-    console.log('Facebook webhook verified');
+    req.log.info('Facebook webhook verified');
     res.status(200).send(challenge);
   } else {
     throw new AppError('Verification failed', 403);
@@ -38,7 +39,7 @@ export const handleLeadWebhook = asyncHandler(async (req, res) => {
     for (const change of entryItem.changes || []) {
       if (change.value?.leadgen_id) {
         processFacebookLead(change.value.leadgen_id).catch((e) =>
-          console.error('FB lead processing error:', e.message)
+          req.log.error({ err: e }, 'FB lead processing error')
         );
       }
     }
@@ -72,7 +73,7 @@ async function processFacebookLead(leadgenId) {
        VALUES ($1, $2, $3, NOW(), NOW())`,
       [remarkId, existing.id, `Duplicate Facebook lead submission (Lead ID: ${leadgenId})`]
     );
-    console.log(`Duplicate FB lead detected: ${leadData.email || leadData.phone}`);
+    logger.info({ leadgenId, email: leadData.email }, 'Duplicate FB lead detected');
     return;
   }
 
@@ -94,7 +95,7 @@ async function processFacebookLead(leadgenId) {
         );
       }
     } catch (e) {
-      console.warn('Auto-assignment failed:', e.message);
+      logger.warn({ err: e }, 'Auto-assignment failed');
     }
   }
 
@@ -117,5 +118,5 @@ async function processFacebookLead(leadgenId) {
     [histId, leadId]
   );
 
-  console.log(`Created FB lead: ${leadId}`);
+  logger.info({ leadId }, 'Created FB lead');
 }

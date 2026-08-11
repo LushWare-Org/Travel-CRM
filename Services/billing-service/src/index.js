@@ -2,10 +2,11 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import { extractUser } from './middleware/auth.js';
 import errorHandler from './middleware/errorHandler.js';
+import { correlationId, requestLogger } from './middleware/requestLogger.js';
+import logger from './config/logger.js';
 import billingRoutes from './routes/billing.routes.js';
 import invoiceRoutes from './routes/invoice.routes.js';
 import quotationRoutes from './routes/quotation.routes.js';
@@ -20,7 +21,9 @@ const V1 = '/api/v1';
 
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
-app.use(morgan('dev'));
+// Request ID + structured logging (replaces morgan)
+app.use(correlationId);
+app.use(requestLogger);
 app.use(express.json());
 app.use(cookieParser());
 app.use(extractUser);
@@ -40,4 +43,4 @@ app.use(`${V1}/invoices`, invoiceRoutes);
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'billing-service' }));
 app.use(errorHandler);
 
-app.listen(PORT, () => console.log(`Billing service running on port ${PORT}`));
+app.listen(PORT, () => logger.info({ port: PORT }, 'billing-service started'));

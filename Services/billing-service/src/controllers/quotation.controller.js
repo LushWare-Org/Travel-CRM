@@ -197,7 +197,7 @@ export const acceptQuotation = asyncHandler(async (req, res) => {
       payload: { quoteId: quotation.id, version: quotation.version, packageId: quotation.packageId },
     });
   } catch (err) {
-    console.error('Failed to notify lead-service of acceptance', err.message);
+    req.log.error({ err, leadId: quotation.leadId }, 'Failed to notify lead-service of acceptance');
   }
   res.json({ success: true, data: quotation });
 });
@@ -214,7 +214,7 @@ export const rejectQuotation = asyncHandler(async (req, res) => {
       payload: { quoteId: quotation.id, reason: req.body.reason || null, packageId: quotation.packageId },
     });
   } catch (err) {
-    console.error('Failed to notify lead-service of rejection', err.message);
+    req.log.error({ err, leadId: quotation.leadId }, 'Failed to notify lead-service of rejection');
   }
   res.json({ success: true, data: quotation });
 });

@@ -5,12 +5,18 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
-import morgan from 'morgan';
 import jwt from 'jsonwebtoken';
+import { correlationId, requestLogger } from './middleware/requestLogger.js';
+import logger from './config/logger.js';
 
 const app = express();
 
 app.set('trust proxy', 1);
+
+// Request ID + structured logging (replaces morgan). Runs first so every
+// downstream middleware/proxy call has req.requestId and req.log available.
+app.use(correlationId);
+app.use(requestLogger);
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 app.use(helmet());
@@ -32,10 +38,6 @@ app.use(cors({
   credentials: true,
 }));
 app.use(cookieParser());
-
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-}
 
 // ─── Rate limiting ─────────────────────────────────────────────────────────────
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
@@ -142,7 +144,7 @@ const proxy = (target) => createProxyMiddleware({
       delete proxyRes.headers['access-control-allow-headers'];
     },
     error: (err, req, res) => {
-      console.error(`[Gateway] Proxy error → ${target}: ${err.message}`);
+      (req.log || logger).error({ err, target, requestId: req.requestId }, 'Proxy error');
       if (!res.headersSent) {
         res.status(502).json({ success: false, message: 'Service temporarily unavailable' });
       }
@@ -214,7 +216,7 @@ app.use((req, res) =>
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Gateway] Running on http://0.0.0.0:${PORT}`);
+  logger.info({ port: PORT }, 'gateway started');
 });
 
 export default app;
