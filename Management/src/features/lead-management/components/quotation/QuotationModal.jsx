@@ -29,7 +29,7 @@ const selectionLabel = (sel) => (sel.isManual ? MANUAL_LABEL : sel.packageName |
  * delivers it by email or WhatsApp. Detail edits are delegated to the lead
  * editor via `onEditLead`.
  */
-const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead }) => {
+const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialSelectionId }) => {
   const leadId = lead?.id || lead?._id;
 
   const [selections, setSelections] = useState([]);
@@ -52,7 +52,9 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead }) => {
       const list = res?.data || [];
       setSelections(list);
       setQuoteIds(Object.fromEntries(list.filter((s) => s.currentQuoteId).map((s) => [s.id, s.currentQuoteId])));
-      const preferred = list.find((s) => s.id === lead?.primarySelectionId) || list[0];
+      const preferred = list.find((s) => s.id === initialSelectionId)
+        || list.find((s) => s.id === lead?.primarySelectionId)
+        || list[0];
       setActiveId(preferred ? preferred.id : null);
     } catch (err) {
       toast.error(err.message || 'Failed to load packages for this lead');
@@ -60,7 +62,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead }) => {
     } finally {
       setLoading(false);
     }
-  }, [leadId, lead?.primarySelectionId]);
+  }, [leadId, lead?.primarySelectionId, initialSelectionId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -161,7 +163,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead }) => {
               <Package className="mx-auto mb-3 h-8 w-8 text-slate-300" />
               <p>No packages attached to this lead yet.</p>
               <button
-                onClick={() => onEditLead?.(lead)}
+                onClick={() => onEditLead?.(lead, null)}
                 className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
               >
                 <Pencil className="h-4 w-4" /> Add a package
@@ -274,7 +276,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead }) => {
                     <Eye className="h-4 w-4" /> Preview PDF
                   </button>
                   <button
-                    onClick={() => onEditLead?.(lead)}
+                    onClick={() => onEditLead?.(lead, activeSelection?.id ?? null)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                   >
                     <Pencil className="h-4 w-4" /> Edit details

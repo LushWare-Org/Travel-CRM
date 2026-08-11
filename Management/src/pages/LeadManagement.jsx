@@ -94,6 +94,12 @@ const LeadManagement = () => {
   // When set, the lead editor was opened from the quotation flow and we return
   // to the quotation modal once the editor closes.
   const [resumeQuoteLead, setResumeQuoteLead] = useState(null);
+  const [resumeQuoteSelectionId, setResumeQuoteSelectionId] = useState(null);
+  // Which package tab to open the lead editor/quotation modal on, carried
+  // across the quotation <-> lead-editor hand-off so edits land on the same
+  // package the user was viewing instead of defaulting to the first one.
+  const [editorInitialSelectionId, setEditorInitialSelectionId] = useState(null);
+  const [quotationInitialSelectionId, setQuotationInitialSelectionId] = useState(null);
   const [showSectionView, setShowSectionView] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -298,9 +304,11 @@ const LeadManagement = () => {
 
   // Hand off from the quotation modal to the lead editor, remembering to return
   // to the quotation flow once editing is done.
-  const openLeadEditorFromQuote = (lead) => {
+  const openLeadEditorFromQuote = (lead, selectionId) => {
     setQuotationLead(null);
     setResumeQuoteLead(lead);
+    setResumeQuoteSelectionId(selectionId ?? null);
+    setEditorInitialSelectionId(selectionId ?? null);
     setSelectedLead(lead);
     setShowEditDialog(true);
   };
@@ -308,9 +316,12 @@ const LeadManagement = () => {
   const closeLeadEditor = () => {
     setShowEditDialog(false);
     setSelectedLead(null);
+    setEditorInitialSelectionId(null);
     if (resumeQuoteLead) {
+      setQuotationInitialSelectionId(resumeQuoteSelectionId);
       setQuotationLead(resumeQuoteLead);
       setResumeQuoteLead(null);
+      setResumeQuoteSelectionId(null);
     }
   };
 
@@ -507,6 +518,7 @@ const LeadManagement = () => {
         lead={selectedLead}
         salesReps={salesReps}
         onSuccess={handleLeadSuccess}
+        initialSelectionId={editorInitialSelectionId}
       />
 
       <RemarksDialog
@@ -563,10 +575,14 @@ const LeadManagement = () => {
       {quotationLead && (
         <QuotationModal
           isOpen
-          onClose={() => setQuotationLead(null)}
+          onClose={() => {
+            setQuotationLead(null);
+            setQuotationInitialSelectionId(null);
+          }}
           lead={quotationLead}
           onSuccess={handleQuotationSuccess}
           onEditLead={openLeadEditorFromQuote}
+          initialSelectionId={quotationInitialSelectionId}
         />
       )}
 

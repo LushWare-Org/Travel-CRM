@@ -31,6 +31,7 @@ const FULL_SELECTION_INCLUDE = {
     include: { places: true, activities: true, transports: true },
   },
   optionalFlights: true,
+  lead: { select: { numberOfTravelers: true } },
 };
 
 async function loadOwnedSelection(leadId, selectionId, include = {}) {
@@ -48,11 +49,22 @@ async function presentSelection(selection) {
   }
   try {
     const derived = await deriveSelectionView({ selection });
+    // A pristine selection has no persisted LeadPricing row — derived.pricing
+    // is only currency/margin settings. Compute the prospective totals from
+    // its derived cost lines so the UI shows the real price up front instead
+    // of a bare settings object (which renders as $0.00, not "no pricing yet").
+    const computed = computePricing({
+      lines: derived.costLines.map(toLineDescriptor),
+      travelers: selection.lead?.numberOfTravelers || 1,
+      currency: derived.pricing.currency,
+      marginType: derived.pricing.marginType,
+      marginValue: derived.pricing.marginValue,
+    });
     return {
       ...selection,
       itineraryDays: toEditorDays(derived.days),
       costLines: derived.costLines,
-      pricing: derived.pricing,
+      pricing: { ...derived.pricing, ...computed },
       isMaterialized: false,
     };
   } catch {
@@ -244,7 +256,7 @@ export const getSelectionPricing = asyncHandler(async (req, res) => {
 });
 
 export const calculateSelectionPricing = asyncHandler(async (req, res) => {
-  await loadOwnedSelection(req.params.id, req.params.selectionId);
+  const selection = await loadOwnedSelection(req.params.id, req.params.selectionId);
 
   const { lines, days, travelers = 1, ...settings } = req.body;
   if (!Array.isArray(lines) && !Array.isArray(days)) {
@@ -254,12 +266,35 @@ export const calculateSelectionPricing = asyncHandler(async (req, res) => {
   if (Array.isArray(lines)) {
     resolvedLines = lines;
   } else {
-    const autoLines = buildAutoCostLines(days).map(toLineDescriptor);
+    let autoLines = buildAutoCostLines(days);
     const manualLines = await prisma.leadCostLine.findMany({
       where: { leadPackageSelectionId: req.params.selectionId, source: 'MANUAL' },
       orderBy: { orderIndex: 'asc' },
     });
-    resolvedLines = [...autoLines, ...manualLines.map(toLineDescriptor)];
+    // Same flat-priced-package fallback as applyLeadSelectionItinerary — a
+    // package with no day-by-day breakdown has nothing else to preview from.
+    if (autoLines.length === 0 && manualLines.length === 0 && selection.packageId) {
+      try {
+        const blueprint = await fetchPackage(selection.packageId);
+        if (Number(blueprint?.basePrice) > 0) {
+          autoLines = [{
+            category: 'package',
+            description: blueprint.title || 'Package price',
+            basis: 'FIXED',
+            quantity: 1,
+            estimatedUnitPrice: Number(blueprint.basePrice),
+            actualUnitPrice: null,
+            marginType: null,
+            marginValue: null,
+            source: 'AUTO',
+            orderIndex: 0,
+          }];
+        }
+      } catch {
+        // package-service unreachable — preview with whatever lines exist
+      }
+    }
+    resolvedLines = [...autoLines.map(toLineDescriptor), ...manualLines.map(toLineDescriptor)];
   }
   const computed = computePricing({ lines: resolvedLines, travelers, ...settings });
   res.json({ success: true, data: { financials: computed } });

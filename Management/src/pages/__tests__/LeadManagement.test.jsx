@@ -56,22 +56,24 @@ vi.mock('../../features/lead-management/components/LeadTable', () => ({
 }));
 
 vi.mock('../../features/lead-management/components/EditLeadDialog', () => ({
-  default: ({ isOpen, lead, onClose }) =>
+  default: ({ isOpen, lead, onClose, initialSelectionId }) =>
     isOpen ? (
       <div data-testid="edit-lead-dialog">
         <span data-testid="edit-lead-name">{lead?.name}</span>
+        <span data-testid="edit-lead-selection-id">{initialSelectionId ?? ''}</span>
         <button onClick={onClose}>Close Editor</button>
       </div>
     ) : null,
 }));
 
 vi.mock('../../features/lead-management/components/quotation/QuotationModal', () => ({
-  default: ({ lead, onClose, onSuccess, onEditLead }) => (
+  default: ({ lead, onClose, onSuccess, onEditLead, initialSelectionId }) => (
     <div data-testid="quotation-modal">
       <span data-testid="quotation-modal-lead">{lead?.name}</span>
+      <span data-testid="quotation-modal-selection-id">{initialSelectionId ?? ''}</span>
       <button onClick={onClose}>Close Quotation</button>
       <button onClick={onSuccess}>Quotation Success</button>
-      <button onClick={() => onEditLead(lead)}>Edit details</button>
+      <button onClick={() => onEditLead(lead, 'sel-active')}>Edit details</button>
     </div>
   ),
 }));
@@ -170,5 +172,31 @@ describe('LeadManagement — shared billing dialog state', () => {
     await userEvent.click(screen.getByText('Close Editor'));
 
     expect(await screen.findByTestId('quotation-modal-lead')).toHaveTextContent('Alice Traveller');
+  });
+
+  it('carries the active package selection into the lead editor when editing from the quotation flow', async () => {
+    render(<LeadManagement />);
+    await screen.findByText('Quotation:Alice Traveller');
+
+    await userEvent.click(screen.getByText('Quotation:Alice Traveller'));
+    await screen.findByTestId('quotation-modal');
+
+    await userEvent.click(screen.getByText('Edit details'));
+    expect(await screen.findByTestId('edit-lead-selection-id')).toHaveTextContent('sel-active');
+  });
+
+  it('resumes Quotation on the same package selection after editing details', async () => {
+    render(<LeadManagement />);
+    await screen.findByText('Quotation:Alice Traveller');
+
+    await userEvent.click(screen.getByText('Quotation:Alice Traveller'));
+    await screen.findByTestId('quotation-modal');
+
+    await userEvent.click(screen.getByText('Edit details'));
+    await screen.findByTestId('edit-lead-dialog');
+
+    await userEvent.click(screen.getByText('Close Editor'));
+
+    expect(await screen.findByTestId('quotation-modal-selection-id')).toHaveTextContent('sel-active');
   });
 });
