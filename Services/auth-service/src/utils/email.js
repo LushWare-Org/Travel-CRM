@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import logger from '../config/logger.js';
 
 const createTransport = () => nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -27,7 +28,7 @@ export const sendWelcomeEmail = (user) =>
     to: user.email,
     subject: 'Welcome to LushTravel!',
     html: wrap(`<h2>Welcome, ${user.name}!</h2><p>Your account has been created successfully.</p>`),
-  }).catch(console.error);
+  }).catch((err) => logger.error({ err, email: user.email }, 'Failed to send welcome email'));
 
 export const sendEmailVerification = (user, token) => {
   const url = `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-email/${token}`;
@@ -38,7 +39,7 @@ export const sendEmailVerification = (user, token) => {
       <p>Hi ${user.name}, click the link below to verify your email address:</p>
       <a href="${url}" style="display:inline-block;padding:12px 24px;background:#0070f3;color:#fff;text-decoration:none;border-radius:4px;">Verify Email</a>
       <p>Link expires in 24 hours.</p>`),
-  }).catch(console.error);
+  }).catch((err) => logger.error({ err, email: user.email }, 'Failed to send email verification'));
 };
 
 export const sendPasswordReset = (user, token) => {
@@ -50,7 +51,7 @@ export const sendPasswordReset = (user, token) => {
       <p>Hi ${user.name}, you requested a password reset. Click below:</p>
       <a href="${url}" style="display:inline-block;padding:12px 24px;background:#0070f3;color:#fff;text-decoration:none;border-radius:4px;">Reset Password</a>
       <p>Link expires in 1 hour. If you didn't request this, ignore this email.</p>`),
-  }).catch(console.error);
+  }).catch((err) => logger.error({ err, email: user.email }, 'Failed to send password reset email'));
 };
 
 export const sendPasswordChanged = (user) =>
@@ -59,7 +60,7 @@ export const sendPasswordChanged = (user) =>
     subject: 'Your password has been changed',
     html: wrap(`<h2>Password Changed</h2>
       <p>Hi ${user.name}, your password was just changed. If you didn't do this, contact support immediately.</p>`),
-  }).catch(console.error);
+  }).catch((err) => logger.error({ err, email: user.email }, 'Failed to send password-changed notification'));
 
 export const sendOTPEmail = (user, otp) =>
   send({
@@ -78,7 +79,7 @@ export const sendLoginNotification = (user) =>
     html: wrap(`<h2>New Login Detected</h2>
       <p>Hi ${user.name}, a new login was just detected on your account.</p>
       <p>If this wasn't you, please change your password immediately.</p>`),
-  }).catch(console.error);
+  }).catch((err) => logger.error({ err, email: user.email }, 'Failed to send login notification'));
 
 export const sendLeadAssignmentEmail = ({ salesRep, lead, assignedBy, assignmentMode }) =>
   send({
@@ -93,7 +94,7 @@ export const sendLeadAssignmentEmail = ({ salesRep, lead, assignedBy, assignment
         <tr><td><strong>Status:</strong></td><td>${lead.status}</td></tr>
         <tr><td><strong>Assignment:</strong></td><td>${assignmentMode === 'auto' ? 'Auto-assigned' : `By ${assignedBy?.name || 'admin'}`}</td></tr>
       </table>`),
-  }).catch(console.error);
+  }).catch((err) => logger.error({ err, email: salesRep.email }, 'Failed to send lead-assignment email'));
 
 export default {
   sendWelcomeEmail,

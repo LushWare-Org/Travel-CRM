@@ -3,10 +3,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import morgan from 'morgan';
 
 import authRoutes from './routes/auth.routes.js';
 import errorHandler from './middleware/errorHandler.js';
+import { correlationId, requestLogger } from './middleware/requestLogger.js';
+import logger from './config/logger.js';
 
 const app = express();
 
@@ -16,9 +17,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-}
+// Request ID + structured logging (replaces morgan)
+app.use(correlationId);
+app.use(requestLogger);
 
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', service: 'auth-service', timestamp: new Date().toISOString() })
@@ -34,7 +35,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () =>
-  console.log(`[auth-service] Running on http://0.0.0.0:${PORT}`)
+  logger.info({ port: PORT }, 'auth-service started')
 );
 
 export default app;
