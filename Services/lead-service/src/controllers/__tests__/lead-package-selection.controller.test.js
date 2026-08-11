@@ -184,6 +184,31 @@ describe('listPackageSelections', () => {
     expect(data[0].itineraryDays).toEqual([{ dayNumber: 1, derived: true }]);
   });
 
+  it('computes prospective totals for a pristine selection instead of returning bare margin settings', async () => {
+    mockLeadFindUnique.mockResolvedValue({ id: 'lead-1' });
+    mockSelectionFindMany.mockResolvedValue([
+      { id: 'sel-1', isManual: false, packageId: 'pkg-1', pricing: null, itineraryDays: [], costLines: [], lead: { numberOfTravelers: 2 } },
+    ]);
+    mockDeriveSelectionView.mockResolvedValue({
+      packageName: 'Pkg',
+      days: [],
+      costLines: [
+        { category: 'activity', description: 'Tour', basis: 'PER_PERSON', quantity: 1, estimatedUnitPrice: 100, actualUnitPrice: null, marginType: null, marginValue: null, source: 'AUTO' },
+      ],
+      pricing: { currency: 'USD', marginType: null, marginValue: null },
+    });
+    mockToEditorDays.mockReturnValue([]);
+
+    const { req, res, next } = buildReqRes();
+    await listPackageSelections(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    const [{ data }] = res.json.mock.calls[0];
+    // PER_PERSON line scales with the lead's 2 travelers: 100 * 2 = 200 sell
+    // subtotal, plus the default 18% tax → 236 total.
+    expect(data[0].pricing).toEqual(expect.objectContaining({ sellSubtotal: 200, taxAmount: 36, totalAmount: 236, currency: 'USD' }));
+  });
+
   it('degrades gracefully when package-service is unreachable for one selection', async () => {
     mockLeadFindUnique.mockResolvedValue({ id: 'lead-1' });
     mockSelectionFindMany.mockResolvedValue([
@@ -372,6 +397,33 @@ describe('calculateSelectionPricing', () => {
     const { req, res, next } = buildReqRes({ body: { travelers: 2 } });
     await calculateSelectionPricing(req, res, next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/lines or days/i) }));
+  });
+
+  it('previews a flat cost line from basePrice when there are no auto or manual lines to derive from', async () => {
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', packageId: 'pkg-1' });
+    mockBuildAutoCostLines.mockReturnValue([]);
+    mockCostLineFindMany.mockResolvedValue([]);
+    mockFetchPackage.mockResolvedValue({ id: 'pkg-1', title: 'Weekend Getaway', basePrice: 500 });
+
+    const { req, res, next } = buildReqRes({ body: { days: [], travelers: 1 } });
+    await calculateSelectionPricing(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    const [{ data }] = res.json.mock.calls[0];
+    expect(data.financials.sellSubtotal).toBe(500);
+  });
+
+  it('does not fetch the package when auto or manual lines already exist', async () => {
+    mockSelectionFindUnique.mockResolvedValue({ id: 'sel-1', leadId: 'lead-1', packageId: 'pkg-1' });
+    mockBuildAutoCostLines.mockReturnValue([
+      { category: 'food', description: 'Meals', basis: 'PER_PERSON', quantity: 1, estimatedUnitPrice: 60, actualUnitPrice: null, marginType: null, marginValue: null, source: 'AUTO' },
+    ]);
+    mockCostLineFindMany.mockResolvedValue([]);
+
+    const { req, res, next } = buildReqRes({ body: { days: [{ dayNumber: 1 }], travelers: 1 } });
+    await calculateSelectionPricing(req, res, next);
+
+    expect(mockFetchPackage).not.toHaveBeenCalled();
   });
 });
 

@@ -81,6 +81,21 @@ export function buildDraftData(packageData) {
     transports: days.flatMap((d) => d.transports.create),
   });
 
+  // Flat-priced packages (no day-by-day itinerary breakdown) have nothing for
+  // the itinerary-cost-line engine to derive from — fall back to a single
+  // line seeded from the package's own basePrice so the lead's quotation
+  // isn't stuck at 0. Packages with a real itinerary already produce lines
+  // above, so this only fires for the flat-price case.
+  if (engineLines.length === 0 && Number(packageData.basePrice) > 0) {
+    engineLines.push({
+      category: 'package',
+      description: packageData.title || 'Package price',
+      basis: 'FIXED',
+      estimatedUnit: Number(packageData.basePrice),
+      source: 'AUTO',
+    });
+  }
+
   // Persistence shape (Prisma column names), not the engine descriptor shape.
   const costLines = engineLines.map((line, i) => ({
     category: line.category,

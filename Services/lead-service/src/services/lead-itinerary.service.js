@@ -203,23 +203,32 @@ export async function applyLeadSelectionItinerary({
     throw new AppError('Package selection not found', 404);
   }
 
+  // Lazily fetches the package blueprint at most once, for whichever of the
+  // two fallbacks below actually needs it.
+  let pkg;
+  const loadPackage = async () => {
+    if (pkg !== undefined) return pkg;
+    if (!selection.packageId) return (pkg = null);
+    try {
+      pkg = await fetchPackage(selection.packageId, fetchImpl);
+    } catch {
+      pkg = null;
+    }
+    return pkg;
+  };
+
   // Ensure a pricing row exists; a fresh real-package selection inherits
   // currency/margin from the package blueprint.
   let pricing = selection.pricing;
   if (!pricing) {
-    let defaults = { currency: 'USD', marginType: null, marginValue: null };
-    if (selection.packageId) {
-      try {
-        const pkg = await fetchPackage(selection.packageId, fetchImpl);
-        defaults = {
-          currency: pkg.currency || 'USD',
-          marginType: pkg.defaultMarginType || null,
-          marginValue: pkg.defaultMarginInput != null ? Number(pkg.defaultMarginInput) : null,
-        };
-      } catch {
-        // fall back to USD defaults when the blueprint is unreachable
-      }
-    }
+    const blueprint = await loadPackage();
+    const defaults = blueprint
+      ? {
+          currency: blueprint.currency || 'USD',
+          marginType: blueprint.defaultMarginType || null,
+          marginValue: blueprint.defaultMarginInput != null ? Number(blueprint.defaultMarginInput) : null,
+        }
+      : { currency: 'USD', marginType: null, marginValue: null };
     pricing = await prismaClient.leadPricing.create({
       data: { leadPackageSelectionId: selection.id, ...defaults },
     });
@@ -232,6 +241,26 @@ export async function applyLeadSelectionItinerary({
 
   const daysCreate = buildDaysCreateData(days);
   const autoLines = buildAutoCostLines(days);
+  // Flat-priced packages (no day-by-day breakdown) have nothing for
+  // buildAutoCostLines to derive from — fall back to a single line from the
+  // package's basePrice so saving/previewing doesn't freeze the total at 0.
+  if (autoLines.length === 0) {
+    const blueprint = await loadPackage();
+    if (Number(blueprint?.basePrice) > 0) {
+      autoLines.push({
+        category: 'package',
+        description: blueprint.title || 'Package price',
+        basis: 'FIXED',
+        quantity: 1,
+        estimatedUnitPrice: Number(blueprint.basePrice),
+        actualUnitPrice: null,
+        marginType: null,
+        marginValue: null,
+        source: 'AUTO',
+        orderIndex: 0,
+      });
+    }
+  }
 
   await prismaClient.$transaction([
     prismaClient.leadItineraryDay.deleteMany({ where: { leadPackageSelectionId: selection.id } }),

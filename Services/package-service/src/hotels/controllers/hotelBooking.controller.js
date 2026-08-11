@@ -109,7 +109,7 @@ export const cancelBooking = asyncHandler(async (req, res) => {
   if (booking.status === 'cancelled') throw new AppError(BOOKING_ALREADY_CANCELLED, BAD_REQUEST);
 
   if (booking.liteapiBookingId) {
-    try { await getClient(req).cancelBooking(booking.liteapiBookingId, req.body?.reason); } catch (_) {}
+    try { await getClient(req).cancelBooking(booking.liteapiBookingId, req.body?.reason); } catch (_) { /* best-effort: local cancellation proceeds regardless */ }
   }
 
   const updated = await prisma.hotelBooking.update({

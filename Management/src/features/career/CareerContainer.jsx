@@ -7,17 +7,7 @@ import careerService from '../../services/career.service';
 const CareerContainer = () => {
   const { user } = useAuth();
   const token = localStorage.getItem('token');
-
-  if (user?.role !== 'superAdmin') {
-    return (
-      <div className="h-full flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600">Only Super Admin can access Career Management</p>
-        </div>
-      </div>
-    );
-  }
+  const isSuperAdmin = user?.role === 'superAdmin';
 
   const [applications, setApplications] = useState([]);
   const [vacancies, setVacancies] = useState([]);
@@ -47,10 +37,23 @@ const CareerContainer = () => {
   const itemsPerPage = 10;
 
   useEffect(() => {
+    if (!isSuperAdmin) return;
     fetchVacancies();
     fetchApplications();
     fetchStats();
-  }, []);
+     
+  }, [isSuperAdmin]);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600">Only Super Admin can access Career Management</p>
+        </div>
+      </div>
+    );
+  }
 
   const fetchVacancies = async () => {
     try {

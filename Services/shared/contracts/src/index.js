@@ -8,3 +8,4 @@ export {
   LeadPackageSelectionSummary,
   QuotePackageSelectionResult,
 } from './packageSelection.js';
+export { QuotationSummary } from './quotationSummary.js';

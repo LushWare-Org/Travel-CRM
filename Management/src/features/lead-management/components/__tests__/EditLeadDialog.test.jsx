@@ -136,9 +136,18 @@ const selectionFixture = (overrides = {}) => ({
   ...overrides,
 });
 
-function renderDialog({ lead = leadFixture(), isOpen = true, onClose = vi.fn(), onSuccess = vi.fn(), salesReps = [] } = {}) {
+function renderDialog({
+  lead = leadFixture(), isOpen = true, onClose = vi.fn(), onSuccess = vi.fn(), salesReps = [], initialSelectionId,
+} = {}) {
   const utils = render(
-    <EditLeadDialog isOpen={isOpen} onClose={onClose} lead={lead} salesReps={salesReps} onSuccess={onSuccess} />
+    <EditLeadDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      lead={lead}
+      salesReps={salesReps}
+      onSuccess={onSuccess}
+      initialSelectionId={initialSelectionId}
+    />
   );
   return { ...utils, onClose, onSuccess, lead };
 }
@@ -173,6 +182,22 @@ describe('EditLeadDialog — load behavior', () => {
     expect(await screen.findByRole('button', { name: 'Sri Lanka Explorer' })).toBeInTheDocument();
   });
 
+  it('shows the Quoted badge on the package tab when the selection already has a quote', async () => {
+    mockGetPackageSelections.mockResolvedValue({
+      success: true,
+      data: [selectionFixture({ currentQuoteId: 'quote-1' })],
+    });
+    renderDialog();
+    await screen.findByText('Sri Lanka Explorer');
+    expect(screen.getByText('Quoted')).toBeInTheDocument();
+  });
+
+  it('does not show the Quoted badge when the selection has no quote yet', async () => {
+    renderDialog();
+    await screen.findByText('Sri Lanka Explorer');
+    expect(screen.queryByText('Quoted')).not.toBeInTheDocument();
+  });
+
   it('loads saved pricing settings for the active tab into the pricing preview', async () => {
     renderDialog();
     await waitFor(() => expect(screen.getByTestId('pricing-margin-type')).toHaveTextContent('PERCENTAGE'));
@@ -192,6 +217,30 @@ describe('EditLeadDialog — load behavior', () => {
     renderDialog();
     expect(await screen.findByText(/add a package above/i)).toBeInTheDocument();
     expect(screen.queryByTestId('pricing-section')).not.toBeInTheDocument();
+  });
+
+  it('activates the tab matching initialSelectionId instead of defaulting to the first package', async () => {
+    mockGetPackageSelections.mockResolvedValue({
+      success: true,
+      data: [
+        selectionFixture({ id: 'sel-1', packageId: PKG_A, packageName: 'Sri Lanka Explorer' }),
+        selectionFixture({ id: 'sel-2', packageId: PKG_B, packageName: 'Maldives Getaway' }),
+      ],
+    });
+    renderDialog({ initialSelectionId: 'sel-2' });
+    await waitFor(() => expect(screen.getByTestId('pricing-selection-id')).toHaveTextContent('sel-2'));
+  });
+
+  it('falls back to the first selection when initialSelectionId does not match any loaded selection', async () => {
+    mockGetPackageSelections.mockResolvedValue({
+      success: true,
+      data: [
+        selectionFixture({ id: 'sel-1', packageId: PKG_A, packageName: 'Sri Lanka Explorer' }),
+        selectionFixture({ id: 'sel-2', packageId: PKG_B, packageName: 'Maldives Getaway' }),
+      ],
+    });
+    renderDialog({ initialSelectionId: 'sel-does-not-exist' });
+    await waitFor(() => expect(screen.getByTestId('pricing-selection-id')).toHaveTextContent('sel-1'));
   });
 });
 

@@ -33,7 +33,7 @@ beforeAll(() => {
 
 afterAll(async () => {
   for (const id of createdBookingIds) {
-    try { await client.cancelBooking(id); console.log(`[LiteAPI live] Cleaned: ${id}`); } catch (_) {}
+    try { await client.cancelBooking(id); console.log(`[LiteAPI live] Cleaned: ${id}`); } catch (_) { /* best-effort cleanup */ }
   }
 });
 

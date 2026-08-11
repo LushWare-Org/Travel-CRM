@@ -131,7 +131,7 @@ const emptyFormData = {
   lifecycleStatus: "NEW",
 };
 
-const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
+const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSelectionId }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [packages, setPackages] = useState([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
@@ -252,14 +252,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess }) => {
       const selRes = await leadAPI.getPackageSelections(leadId);
       const rawSelections = selRes?.data?.data || selRes?.data || [];
       const nextSelections = rawSelections.map(mapSelection);
+      const preferredSelectionId = nextSelections.some((s) => s.id === initialSelectionId)
+        ? initialSelectionId
+        : nextSelections[0]?.id ?? null;
       setSelections(nextSelections);
-      setActiveSelectionId(nextSelections[0]?.id ?? null);
+      setActiveSelectionId(preferredSelectionId);
 
       snapshotRef.current = {
         formData: nextFormData,
         remarks: lead.remarks || [],
         selections: nextSelections,
-        activeSelectionId: nextSelections[0]?.id ?? null,
+        activeSelectionId: preferredSelectionId,
       };
     } catch (error) {
       console.error('Error loading lead package selections:', error);

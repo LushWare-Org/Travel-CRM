@@ -116,14 +116,28 @@ describe('QuotationModal', () => {
     }));
   });
 
-  it('hands off to the lead editor when Edit details is clicked', async () => {
+  it('passes the active selection id to onEditLead when Edit details is clicked', async () => {
     const onEditLead = vi.fn();
     renderModal({ onEditLead });
     await screen.findByRole('heading', { name: 'Bali Adventure' });
 
     await userEvent.click(screen.getByRole('button', { name: /Edit details/ }));
 
-    expect(onEditLead).toHaveBeenCalledWith(lead);
+    expect(onEditLead).toHaveBeenCalledWith(lead, 'sel-2');
+
+    await userEvent.click(screen.getByRole('button', { name: /Maldives Escape/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Edit details/ }));
+
+    expect(onEditLead).toHaveBeenCalledWith(lead, 'sel-1');
+  });
+
+  it('shows the price for the selection passed via initialSelectionId, not primarySelectionId', async () => {
+    renderModal({ initialSelectionId: 'sel-1' });
+
+    // primarySelectionId points at sel-2 (Bali Adventure), but initialSelectionId
+    // should win, landing on sel-1 (Maldives Escape) instead.
+    expect(await screen.findByRole('heading', { name: 'Maldives Escape' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Bali Adventure' })).not.toBeInTheDocument();
   });
 
   it('opens the PDF preview for a quoted selection', async () => {

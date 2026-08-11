@@ -298,6 +298,52 @@ describe('applyLeadSelectionItinerary', () => {
     }));
   });
 
+  it('falls back to a flat cost line from the package basePrice when there is no itinerary to derive costs from', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture());
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture());
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { id: 'pkg-1', title: 'Weekend Getaway', basePrice: 500, currency: 'USD' } }),
+    });
+
+    await applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-1', days: [], fetchImpl });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1); // cached across both fallback sites, not re-fetched
+    expect(mockSelectionUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        costLines: { create: expect.arrayContaining([
+          expect.objectContaining({ category: 'package', basis: 'FIXED', estimatedUnitPrice: 500, source: 'AUTO' }),
+        ]) },
+      }),
+    }));
+  });
+
+  it('does not add a flat fallback line when itinerary days already produce real cost lines', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture());
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture({ pricing: { id: 'pr-1', currency: 'USD' } }));
+    const fetchImpl = vi.fn();
+
+    await applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-1', days: editorDays, fetchImpl });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const call = mockSelectionUpdate.mock.calls[0][0];
+    expect(call.data.costLines.create.some((l) => l.category === 'package')).toBe(false);
+  });
+
+  it('does not add a flat fallback line for an empty itinerary when the package has no basePrice', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture());
+    mockSelectionFindUnique.mockResolvedValue(selectionFixture());
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { id: 'pkg-1', title: 'Unpriced', basePrice: 0 } }),
+    });
+
+    await applyLeadSelectionItinerary({ leadId: 'lead-1', selectionId: 'sel-1', days: [], fetchImpl });
+
+    const call = mockSelectionUpdate.mock.calls[0][0];
+    expect(call.data.costLines.create).toEqual([]);
+  });
+
   it('only touches the target selection — a second selection on the same lead is left alone', async () => {
     mockLeadFindUnique.mockResolvedValue(leadFixture({ lifecycleStatus: 'DRAFTING', primarySelectionId: 'sel-1' }));
     mockSelectionFindUnique.mockResolvedValue(selectionFixture({ id: 'sel-2', pricing: { id: 'pr-2', currency: 'USD' } }));

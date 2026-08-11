@@ -98,6 +98,35 @@ describe('buildDraftData', () => {
       description: 'Meals',
     }));
   });
+
+  it('falls back to a flat cost line from basePrice when the package has no itinerary days', () => {
+    const data = buildDraftData({
+      id: 'pkg-flat', title: 'Weekend Getaway', currency: 'USD', basePrice: 850,
+      defaultMarginType: 'PERCENTAGE', defaultMarginInput: 15,
+      itineraryDays: [],
+    });
+
+    expect(data.days).toHaveLength(0);
+    expect(data.costLines).toEqual([
+      expect.objectContaining({
+        category: 'package',
+        basis: 'FIXED',
+        estimatedUnitPrice: 850,
+        description: 'Weekend Getaway',
+        source: 'AUTO',
+      }),
+    ]);
+  });
+
+  it('does not add a flat cost line when basePrice is 0 or unset, even with no itinerary', () => {
+    const data = buildDraftData({ id: 'pkg-unpriced', title: 'Unpriced', basePrice: 0, itineraryDays: [] });
+    expect(data.costLines).toEqual([]);
+  });
+
+  it('does not double up costs by adding a flat line when itinerary-derived lines already exist', () => {
+    const data = buildDraftData({ ...packageFixture, basePrice: 9999 });
+    expect(data.costLines.some((l) => l.category === 'package')).toBe(false);
+  });
 });
 
 describe('fetchPackage', () => {
