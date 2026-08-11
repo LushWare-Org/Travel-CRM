@@ -5,6 +5,7 @@ import {
   updateUser, deleteUser, updateAdminPermissions, getAdminPermissions,
   getAvailablePermissions, promoteSuperAdmin, demoteSuperAdmin, getSuperAdminInfo,
   listSuperAdmins, createStaff, getSettings, updateSettings, getInternalOrganizationSettings,
+  getOrganizationBranding,
 } from '../controllers/admin.controller.js';
 
 const router = express.Router();
@@ -20,6 +21,10 @@ router.get('/internal/organization-settings', (req, res, next) => {
   }
   next();
 }, getInternalOrganizationSettings);
+
+// Any logged-in Management user — see getOrganizationBranding for why this
+// isn't behind the admin/superAdmin gate below.
+router.get('/organization-branding', requireAuth, getOrganizationBranding);
 
 router.use(requireAuth, authorize('admin', 'superAdmin'));
 

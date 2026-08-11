@@ -174,3 +174,11 @@ export const getInternalOrganizationSettings = asyncHandler(async (req, res) => 
   const settings = await getOrCreateSingleton();
   res.json({ status: 'success', data: { settings } });
 });
+
+// Any logged-in Management user (not just admin/superAdmin) — the sidebar
+// shows the company name/logo to every role. Narrow, display-only subset:
+// no bank details, no quotation config, nothing an admin edits via /settings.
+export const getOrganizationBranding = asyncHandler(async (req, res) => {
+  const { companyName, companyShortName, tagline, logoUrl } = await getOrCreateSingleton();
+  res.json({ status: 'success', data: { branding: { companyName, companyShortName, tagline, logoUrl } } });
+});

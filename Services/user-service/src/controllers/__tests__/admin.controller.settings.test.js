@@ -16,7 +16,9 @@ vi.mock('../../db/client.js', () => ({
   },
 }));
 
-import { getSettings, updateSettings, getInternalOrganizationSettings } from '../admin.controller.js';
+import {
+  getSettings, updateSettings, getInternalOrganizationSettings, getOrganizationBranding,
+} from '../admin.controller.js';
 
 function buildReqRes({ body = {}, user = { id: 'user-1', role: 'admin' } } = {}) {
   const req = { body, user };
@@ -99,5 +101,48 @@ describe('getInternalOrganizationSettings', () => {
       status: 'success',
       data: { settings: { id: 'org-1', bankAccountNumber: '999999' } },
     });
+  });
+});
+
+describe('getOrganizationBranding', () => {
+  it('returns only the display-safe subset, not bank details or quotation config', async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 'org-1',
+      companyName: 'Lush Travel',
+      companyShortName: 'LT',
+      tagline: 'Journeys, curated',
+      logoUrl: 'https://cdn.test/logo.png',
+      bankAccountNumber: '999999',
+      defaultTaxRate: '7.5',
+    });
+    const { req, res, next } = buildReqRes({ user: { id: 'rep-1', role: 'salesRep' } });
+
+    await getOrganizationBranding(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: {
+        branding: {
+          companyName: 'Lush Travel',
+          companyShortName: 'LT',
+          tagline: 'Journeys, curated',
+          logoUrl: 'https://cdn.test/logo.png',
+        },
+      },
+    });
+  });
+
+  it('does not vary its response by the caller\'s role', async () => {
+    // The role gate for this route lives in admin.routes.js's registration
+    // order (before the requireAuth+authorize block), not in this
+    // controller — it never inspects req.user beyond req.user existing.
+    mockFindFirst.mockResolvedValue({ id: 'org-1', companyName: 'Lush Travel' });
+    const { req, res, next } = buildReqRes({ user: { id: 'rep-1', role: 'salesRep' } });
+
+    await getOrganizationBranding(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: 'success' }));
   });
 });
