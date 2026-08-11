@@ -1,5 +1,5 @@
 import twilio from 'twilio';
-import BRANDING from '../config/branding.js';
+import { getOrgSettings, toBrandingShape } from '../config/orgSettings.js';
 
 const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: '₹', AUD: 'A$', LKR: 'Rs ' };
 
@@ -40,8 +40,10 @@ export async function sendQuotationWhatsapp({ quotation, phone, mediaUrl }) {
   const to = toWhatsappAddress(phone);
   if (!to) throw new Error('No valid WhatsApp phone number provided');
 
+  const branding = toBrandingShape(await getOrgSettings());
+
   const body =
-    `Hi ${quotation.customerName || 'there'}, your ${BRANDING.company.name} quotation ` +
+    `Hi ${quotation.customerName || 'there'}, your ${branding.company.name} quotation ` +
     `${quotation.quotationNumber || ''} is ready.\n` +
     `Total: ${formatMoney(quotation.totalAmount, quotation.currency)}\n` +
     (quotation.validUntil ? `Valid until: ${new Date(quotation.validUntil).toLocaleDateString('en-US')}\n` : '');

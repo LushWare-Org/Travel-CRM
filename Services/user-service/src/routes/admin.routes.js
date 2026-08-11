@@ -4,10 +4,28 @@ import {
   getDashboardStats, getAllUsers, getUserById, updateUserStatus, resetUserPassword,
   updateUser, deleteUser, updateAdminPermissions, getAdminPermissions,
   getAvailablePermissions, promoteSuperAdmin, demoteSuperAdmin, getSuperAdminInfo,
-  listSuperAdmins, createStaff, getSettings, updateSettings,
+  listSuperAdmins, createStaff, getSettings, updateSettings, getInternalOrganizationSettings,
+  getOrganizationBranding,
 } from '../controllers/admin.controller.js';
 
 const router = express.Router();
+
+// Service-to-service (token-authenticated, not user auth) — must be registered
+// before the requireAuth/authorize gate below. Consumed by billing-service for
+// quotation/invoice generation; never reached through the gateway since callers
+// hit user-service's own port directly (see Services/billing-service/src/config/orgSettings.js).
+router.get('/internal/organization-settings', (req, res, next) => {
+  const token = req.headers['x-internal-token'];
+  if (!token || token !== process.env.INTERNAL_SERVICE_KEY) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  next();
+}, getInternalOrganizationSettings);
+
+// Any logged-in Management user — see getOrganizationBranding for why this
+// isn't behind the admin/superAdmin gate below.
+router.get('/organization-branding', requireAuth, getOrganizationBranding);
+
 router.use(requireAuth, authorize('admin', 'superAdmin'));
 
 router.get('/stats', getDashboardStats);

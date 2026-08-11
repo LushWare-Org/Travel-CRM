@@ -486,6 +486,10 @@ export const adminAPI = {
     const api = new ApiService();
     return api.get("/admin/settings");
   },
+  getOrganizationBranding: async () => {
+    const api = new ApiService();
+    return api.get("/admin/organization-branding");
+  },
   updateSettings: async (data) => {
     const api = new ApiService();
     return api.put("/admin/settings", data);

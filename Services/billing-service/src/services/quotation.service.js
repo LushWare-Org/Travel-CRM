@@ -1,5 +1,6 @@
 import prisma from '../db/client.js';
 import { nextQuotationNumber } from '../utils/docNumber.js';
+import { getOrgSettings } from '../config/orgSettings.js';
 import { computeQuote } from '../../../shared/lead-pricing-engine/src/index.js';
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -79,13 +80,13 @@ export function quotationTotals(
 export async function createOrVersionQuotation({
   leadId,
   packageId = null,
-  currency = 'USD',
+  currency,
   customer = {},
   items = [],
-  taxRate = 0,
+  taxRate,
   discountType = 'none',
   discountValue = 0,
-  serviceChargeRate = 0,
+  serviceChargeRate,
   validUntil,
   notes = null,
   terms = null,
@@ -108,6 +109,20 @@ export async function createOrVersionQuotation({
   advisorPhone = null,
   advisorEmail = null,
 }) {
+  // Only reach for org settings when the caller actually omitted a default —
+  // keeps the common case (all four supplied) from paying for a fetch/cache
+  // lookup it doesn't need.
+  if (currency === undefined || taxRate === undefined || serviceChargeRate === undefined || validUntil === undefined) {
+    const org = await getOrgSettings();
+    if (currency === undefined) currency = org.defaultCurrency ?? 'USD';
+    if (taxRate === undefined) taxRate = Number(org.defaultTaxRate) || 0;
+    if (serviceChargeRate === undefined) serviceChargeRate = Number(org.defaultServiceChargeRate) || 0;
+    if (validUntil === undefined) {
+      const days = org.quotationValidityDays ?? 30;
+      validUntil = new Date(Date.now() + days * 86400000);
+    }
+  }
+
   // `taxableSubtotal` is a computed intermediate, not a Quotation column — omit
   // it from what we persist (spreading it into Prisma is rejected).
   const { taxableSubtotal, ...totals } = quotationTotals(items, { taxRate, discountType, discountValue, serviceChargeRate });
@@ -130,7 +145,7 @@ export async function createOrVersionQuotation({
     discountType,
     discountValue: Number(discountValue) || 0,
     serviceChargeRate: Number(serviceChargeRate) || 0,
-    validUntil: validUntil ?? new Date(Date.now() + 30 * 86400000),
+    validUntil,
     notes,
     terms,
     paymentTerms,

@@ -9,3 +9,4 @@ export {
   QuotePackageSelectionResult,
 } from './packageSelection.js';
 export { QuotationSummary } from './quotationSummary.js';
+export { OrganizationSettings, OrganizationSettingsUpdate } from './organizationSettings.js';

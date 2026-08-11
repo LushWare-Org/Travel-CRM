@@ -135,3 +135,61 @@ model VendorProfile {
 
   @@schema("crm_users")
 }
+
+// ─── Organization settings (singleton) ──────────────────────────
+// Single row, enforced in the service layer (see organizationSettings.service.js),
+// same convention as lead-service's Settings model. Replaces the env-var-driven
+// branding.js config previously duplicated in billing-service and Management.
+model OrganizationSettings {
+  id String @id @default(uuid())
+
+  // Company identity
+  companyName      String  @default("Travel CRM")
+  companyShortName String?
+  companyLegalName String?
+  tagline          String?
+  logoUrl          String?
+
+  // Contact
+  contactEmail   String?
+  salesEmail     String?
+  supportEmail   String?
+  contactPhone   String?
+  whatsappNumber String?
+  website        String?
+
+  // Theme (quotation PDF)
+  themeInk        String? @default("#1F2937")
+  themeMuted      String? @default("#64748B")
+  themeAccent     String? @default("#F5A623")
+  themeAccentDark String? @default("#D98A0B")
+
+  // Quotation/document defaults
+  defaultCurrency          String   @default("USD")
+  defaultTaxRate           Decimal? @db.Decimal(5, 2)
+  defaultServiceChargeRate Decimal? @db.Decimal(5, 2)
+  quotationValidityDays    Int      @default(30)
+  quotationTerms           String?  @db.Text
+  cancellationPolicy       String?  @db.Text
+  ratingTagline            String?
+  paymentMethods           String[]
+  docNumberPrefixes        Json? // { quotation, invoice, receipt, payment, creditNote, voucher }
+
+  // Bank / payment details — sensitive, admin-only in every response path
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankIfscCode      String?
+  bankSwiftCode     String?
+  bankBranch        String?
+  bankAccountType   String? @default("Current Account")
+  upiId             String?
+
+  updatedById String? // → users.User.id
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  // Only one row allowed — enforced by getOrCreateSingleton() in service layer
+
+  @@schema("crm_users")
+}
