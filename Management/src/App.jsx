@@ -10,6 +10,7 @@ import HotelSearch from "./pages/HotelSearch";
 import BillingInvoicing from "./pages/BillingInvoicing";
 import UserManagement from "./pages/UserManagement";
 import CareerManagement from "./pages/CareerManagement";
+import OrganizationSettings from "./pages/OrganizationSettings";
 import Login from "./pages/Login";
 import SalesRepLogin from "./pages/SalesRepLogin";
 import SalesRepLoginOTP from "./pages/SalesRepLoginOTP";
@@ -77,6 +78,7 @@ function AppContent() {
                   <Route path="/billing" element={<BillingInvoicing />} />
                   <Route path="/users" element={<UserManagement />} />
                   <Route path="/career" element={<CareerManagement />} />
+                  <Route path="/settings" element={<OrganizationSettings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </div>

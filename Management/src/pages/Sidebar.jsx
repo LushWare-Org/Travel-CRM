@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Menu, X, Home, Users, MapPin, DollarSign, User, LogOut,
-  BarChart3, Briefcase, ChevronRight, Sparkles, Plane, Hotel
+  BarChart3, Briefcase, ChevronRight, Sparkles, Plane, Hotel, Settings
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
@@ -70,7 +70,14 @@ const Sidebar = () => {
       path: "/career",
       requiredPermission: null,
       customCheck: (userRole) => userRole === 'superAdmin'
-    }
+    },
+    {
+      icon: Settings,
+      label: "Organization Settings",
+      path: "/settings",
+      requiredPermission: null,
+      allowedRoles: ["admin", "superAdmin"],
+    },
   ];
 
   // Filter navigation items based on permissions and roles
