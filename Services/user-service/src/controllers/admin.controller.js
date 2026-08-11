@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { OrganizationSettingsUpdate } from '@travel-crm/contracts';
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { getOrCreateSingleton, updateSingleton } from '../services/organizationSettings.service.js';
 
 const safeUser = (u) => { if (!u) return null; const { password, ...r } = u; return r; };
 
@@ -152,10 +154,23 @@ export const demoteSuperAdmin = asyncHandler(async (req, res) => {
 });
 
 export const getSettings = asyncHandler(async (req, res) => {
-  // Settings for user management are kept simple here
-  res.json({ status: 'success', data: { settings: { assignmentMode: 'manual' } } });
+  const settings = await getOrCreateSingleton();
+  res.json({ status: 'success', data: { settings } });
 });
 
 export const updateSettings = asyncHandler(async (req, res) => {
-  res.json({ status: 'success', message: 'Settings updated (see lead-service for assignment settings)', data: {} });
+  const parsed = OrganizationSettingsUpdate.safeParse(req.body);
+  if (!parsed.success) {
+    const messages = parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+  const settings = await updateSingleton(parsed.data, req.user.id);
+  res.json({ status: 'success', message: 'Settings updated', data: { settings } });
+});
+
+// Token-authenticated (see admin.routes.js) — includes bank details, unlike
+// the public-facing surface this data would otherwise need on a customer site.
+export const getInternalOrganizationSettings = asyncHandler(async (req, res) => {
+  const settings = await getOrCreateSingleton();
+  res.json({ status: 'success', data: { settings } });
 });
