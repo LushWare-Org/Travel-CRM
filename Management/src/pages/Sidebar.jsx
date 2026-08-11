@@ -7,7 +7,18 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
 import toast from "react-hot-toast";
-import BRANDING, { getSidebarInfo } from "../config/branding";
+import { getSidebarInfo } from "../config/branding";
+import { adminAPI } from "../services/api";
+
+// Initials for the sidebar icon when no explicit short name is configured —
+// first letter of the first two words (e.g. "Lush Travel" -> "LT"), or the
+// first two letters of a single-word name.
+const deriveInitials = (name) => {
+  const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+  return "";
+};
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -20,6 +31,35 @@ const Sidebar = () => {
   const [hoveredItem, setHoveredItem] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isMobile, setIsMobile] = useState(false);
+  const [orgBranding, setOrgBranding] = useState(null);
+
+  // Org-configured company name/logo for the sidebar header — falls back to
+  // the static config/branding.js defaults while loading or if the fetch fails.
+  useEffect(() => {
+    let cancelled = false;
+    adminAPI.getOrganizationBranding()
+      .then((res) => {
+        if (!cancelled && res.status === 'success' && res.data?.branding) {
+          setOrgBranding(res.data.branding);
+        }
+      })
+      .catch(() => {}); // keep the static fallback
+    return () => { cancelled = true; };
+  }, []);
+
+  const fallbackInfo = getSidebarInfo();
+  const brandInfo = {
+    name: orgBranding?.companyName || fallbackInfo.name,
+    // Prefer an explicit short name; otherwise derive initials from the real
+    // org-configured company name rather than falling through to the static
+    // placeholder default in config/branding.js.
+    shortName:
+      orgBranding?.companyShortName ||
+      (orgBranding?.companyName ? deriveInitials(orgBranding.companyName) : fallbackInfo.shortName),
+    tagline: orgBranding?.tagline || fallbackInfo.tagline,
+    logoUrl: orgBranding?.logoUrl || null,
+  };
+  const canEditOrgSettings = user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'superAdmin';
 
   // Detect mobile viewport
   useEffect(() => {
@@ -139,22 +179,45 @@ const Sidebar = () => {
       {/* Header / Brand */}
       <div className="p-5 border-b border-sky-200/60 backdrop-blur-sm relative z-10">
         <div className="flex items-center gap-3">
-          <div
-            className={`${isExpanded ? 'w-12 h-12' : 'w-10 h-10'} rounded-2xl flex items-center justify-center font-bold text-white shadow-lg transition-all duration-300 flex-shrink-0`}
+          <button
+            type="button"
+            onClick={() => {
+              if (!canEditOrgSettings) return;
+              navigate('/settings');
+              if (isMobile) setMobileOpen(false);
+            }}
+            title={canEditOrgSettings ? 'Organization Settings' : brandInfo.name}
+            className={`${isExpanded ? 'w-12 h-12' : 'w-10 h-10'} rounded-2xl flex items-center justify-center font-bold text-white shadow-lg transition-all duration-300 flex-shrink-0 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:scale-105 hover:shadow-xl' : 'cursor-default'}`}
             style={{
-              background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%)',
+              background: brandInfo.logoUrl ? undefined : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%)',
               boxShadow: '0 8px 24px -4px rgba(14, 165, 233, 0.4)',
             }}
+            disabled={!canEditOrgSettings}
           >
-            <span className={`${isExpanded ? 'text-lg' : 'text-sm'} font-extrabold tracking-tight`}>
-              {getSidebarInfo().shortName.substring(0, 2)}
-            </span>
-          </div>
+            {brandInfo.logoUrl ? (
+              <img src={brandInfo.logoUrl} alt={brandInfo.name} className="w-full h-full object-cover" />
+            ) : (
+              <span className={`${isExpanded ? 'text-lg' : 'text-sm'} font-extrabold tracking-tight`}>
+                {brandInfo.shortName.substring(0, 2)}
+              </span>
+            )}
+          </button>
           {isExpanded && (
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold text-sky-900 truncate">{getSidebarInfo().name}</h1>
-              <p className="text-xs text-sky-600 font-medium truncate">{getSidebarInfo().tagline}</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!canEditOrgSettings) return;
+                navigate('/settings');
+                if (isMobile) setMobileOpen(false);
+              }}
+              disabled={!canEditOrgSettings}
+              className={`flex-1 min-w-0 text-left ${canEditOrgSettings ? 'cursor-pointer group/brand' : 'cursor-default'}`}
+            >
+              <h1 className={`text-lg font-bold text-sky-900 truncate ${canEditOrgSettings ? 'group-hover/brand:text-sky-700' : ''}`}>
+                {brandInfo.name}
+              </h1>
+              <p className="text-xs text-sky-600 font-medium truncate">{brandInfo.tagline}</p>
+            </button>
           )}
           {/* Close button on mobile */}
           {isMobile && isExpanded && (
