@@ -971,13 +971,14 @@ const ItineraryEditor = ({
                 />
               </FieldGroup>
 
-              {/* Row 6: Day Images */}
-              {!hideTitleAndDescription && (
-                <div className="bg-white rounded-xl border border-slate-200 p-4">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
-                    <ImageIcon className="w-4 h-4 text-slate-400" />
-                    Day Images
-                  </label>
+              {/* Row 6: Day Images — intentionally shown regardless of
+                  hideTitleAndDescription (that flag only concerns the
+                  title/description text fields above, not imagery). */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
+                  <ImageIcon className="w-4 h-4 text-slate-400" />
+                  Day Images
+                </label>
 
                   <div className="mb-3">
                     <input
@@ -1037,7 +1038,6 @@ const ItineraryEditor = ({
                     </div>
                   )}
                 </div>
-              )}
 
               {/* Costs & Pricing — last section of the day card */}
               {renderCostsSection(day)}
