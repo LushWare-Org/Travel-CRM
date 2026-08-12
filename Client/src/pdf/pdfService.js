@@ -73,7 +73,7 @@ const loadPackageImages = async (pkg) => {
     }
 
     // Load day-specific images
-    const dayEntries = pkg.days || pkg.itinerary?.days || [];
+    const dayEntries = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
     if (dayEntries && dayEntries.length > 0) {
       for (const day of dayEntries) {
         if (day.images && Array.isArray(day.images) && day.images.length > 0) {
@@ -983,6 +983,12 @@ function legacyBuildPDFDocument(pkg, images) {
   }
 }
 
+// NOTE: cover-page fields below (pkg.name, pkg.price, pkg.terms, pkg.highlights,
+// pkg.maxGroupSize, pkg.duration) still reference the pre-relational package shape;
+// serializePackage() actually returns title/basePrice/sellPrice/termsAndConditions
+// (string)/inclusions/exclusions/durationDays. This degrades gracefully today
+// ("On Request", empty terms section) rather than breaking, so it was left as a
+// known gap out of scope for the itinerary-shape fix — see plan history.
 function buildPDFDocument(pkg, images) {
   try {
     const doc = new jsPDF();
@@ -1109,7 +1115,7 @@ function buildPDFDocument(pkg, images) {
     };
 
     const normalizeDays = () => {
-      const rawDays = pkg.days || pkg.itinerary?.days || [];
+      const rawDays = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
       if (Array.isArray(rawDays)) {
         return rawDays.slice().sort((a, b) => {
           const aDay = a.dayNumber ?? a.day ?? 0;
@@ -1124,6 +1130,25 @@ function buildPDFDocument(pkg, images) {
           const bDay = b.dayNumber ?? b.day ?? 0;
           return aDay - bDay;
         });
+    };
+
+    // Package API (serializePackage) returns day.places/day.activities as relational
+    // objects ({ place: { name }, customName } / { activity: { name } }); older/local
+    // editor state may still carry flat string[] (day.locations/day.activities). Both
+    // are supported here so the PDF renders correctly regardless of the source shape.
+    const getLocationNames = (day) => {
+      if (Array.isArray(day.places) && day.places.length) {
+        return day.places.map((p) => p?.place?.name || p?.customName).filter(Boolean);
+      }
+      const legacy = Array.isArray(day.locations) ? day.locations : (day.location ? [day.location] : []);
+      return legacy.map((l) => String(l).trim()).filter(Boolean);
+    };
+
+    const getActivityNames = (day) => {
+      if (Array.isArray(day.activities) && day.activities.length && day.activities[0] && typeof day.activities[0] === 'object' && 'activity' in day.activities[0]) {
+        return day.activities.map((a) => a?.activity?.name).filter(Boolean);
+      }
+      return (Array.isArray(day.activities) ? day.activities : []).map((a) => String(a).trim()).filter(Boolean);
     };
 
     const getDaySegments = (day) => {
@@ -1159,10 +1184,11 @@ function buildPDFDocument(pkg, images) {
           });
         }
       });
-      if (!segments.length && day.activities && day.activities.length) {
+      const activityNames = getActivityNames(day);
+      if (!segments.length && activityNames.length) {
         segments.push({
           label: 'Highlights',
-          description: day.activities.map((act) => String(act).trim()).join(', '),
+          description: activityNames.join(', '),
         });
       }
       if (!segments.length && day.description) {
@@ -1174,14 +1200,20 @@ function buildPDFDocument(pkg, images) {
       return segments.slice(0, 4);
     };
 
-    const getMealsText = (meals) => {
-      if (!meals) return null;
-      const available = [];
-      if (meals.breakfast) available.push('Breakfast');
-      if (meals.lunch) available.push('Lunch');
-      if (meals.dinner) available.push('Dinner');
-      if (meals.snacks) available.push('Snacks');
-      return available.length ? `Meals: ${available.join(', ')}` : null;
+    const getMealsText = (day) => {
+      if (day?.meals && typeof day.meals === 'object') {
+        const legacy = [];
+        if (day.meals.breakfast) legacy.push('Breakfast');
+        if (day.meals.lunch) legacy.push('Lunch');
+        if (day.meals.dinner) legacy.push('Dinner');
+        if (day.meals.snacks) legacy.push('Snacks');
+        if (legacy.length) return `Meals: ${legacy.join(', ')}`;
+      }
+      const counts = [];
+      if (day?.breakfastCount > 0) counts.push('Breakfast');
+      if (day?.lunchCount > 0) counts.push('Lunch');
+      if (day?.dinnerCount > 0) counts.push('Dinner');
+      return counts.length ? `Meals: ${counts.join(', ')}` : null;
     };
 
     const drawSectionHeading = (title, subtitle) => {
@@ -1395,9 +1427,7 @@ function buildPDFDocument(pkg, images) {
     const drawDayCard = (day, index) => {
       const dayNumber = day.dayNumber ?? day.day ?? index + 1;
       const dayTitle = day.title || `Curated Experience`;
-      const locationText = Array.isArray(day.locations)
-        ? day.locations.map((loc) => String(loc).trim()).filter(Boolean).join(' • ')
-        : day.location || '';
+      const locationText = getLocationNames(day).join(' • ');
 
       const segments = getDaySegments(day).map((segment) => ({
         ...segment,
@@ -1416,9 +1446,18 @@ function buildPDFDocument(pkg, images) {
       } else if (typeof day.accommodation === 'string') {
         supportingNotes.push(`Stay: ${day.accommodation}`);
       }
-      const mealsText = getMealsText(day.meals);
+      const mealsText = getMealsText(day);
       if (mealsText) supportingNotes.push(mealsText);
-      if (day.transport) {
+      // NOTE: day.flights (Json array from serializePackage) is not rendered anywhere
+      // in this generator — pre-existing feature gap, out of scope for this fix.
+      if (Array.isArray(day.transports) && day.transports.length) {
+        const t = day.transports[0];
+        if (t?.transportMode) {
+          const transportText = String(t.transportMode);
+          const label = `${transportText.charAt(0).toUpperCase()}${transportText.slice(1)}`;
+          supportingNotes.push(`Transfers: ${label}${t.pricingModel ? ` (${t.pricingModel})` : ''}`);
+        }
+      } else if (day.transport) {
         const transportText = String(day.transport);
         supportingNotes.push(`Transfers: ${transportText.charAt(0).toUpperCase()}${transportText.slice(1)}`);
       }
