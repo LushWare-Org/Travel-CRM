@@ -174,7 +174,12 @@ export const getLead = asyncHandler(async (req, res) => {
           costLines: { orderBy: { orderIndex: 'asc' } },
           itineraryDays: {
             orderBy: { dayNumber: 'asc' },
-            include: { places: true, activities: true, transports: true },
+            include: {
+              places: true,
+              activities: true,
+              transports: true,
+              images: { orderBy: { orderIndex: 'asc' } },
+            },
           },
           optionalFlights: true,
         },

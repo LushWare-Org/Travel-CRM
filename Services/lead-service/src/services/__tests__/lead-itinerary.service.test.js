@@ -107,6 +107,7 @@ describe('buildDaysCreateData', () => {
     expect(data[0].activities.create[0]).toEqual({
       activityId: null,
       name: 'Temple Tour',
+      description: null,
       defaultCost: 40,
       costOverride: 35,
       orderIndex: 0,
@@ -116,6 +117,46 @@ describe('buildDaysCreateData', () => {
       { placeId: null, customName: 'Kandy', orderIndex: 0 },
       { placeId: null, customName: 'Tea Plantation', orderIndex: 1 },
     ]);
+  });
+
+  it('maps day images (object and plain-string shapes) into nested prisma create payloads', () => {
+    const data = buildDaysCreateData([{
+      dayNumber: 1,
+      images: [
+        { url: 'https://res.cloudinary.com/x/a.jpg', public_id: 'x/a' },
+        'https://res.cloudinary.com/x/b.jpg',
+      ],
+    }]);
+    expect(data[0].images.create).toEqual([
+      { url: 'https://res.cloudinary.com/x/a.jpg', altText: null, orderIndex: 0 },
+      { url: 'https://res.cloudinary.com/x/b.jpg', altText: null, orderIndex: 1 },
+    ]);
+  });
+
+  it('resolves an activity description from the _relational catalog match', () => {
+    const data = buildDaysCreateData([{
+      dayNumber: 1,
+      activities: ['Temple Tour'],
+      locations: [],
+      transports: [],
+      _relational: {
+        activities: [{ name: 'Temple Tour', activityId: 'a1', description: 'A guided tour of the temple.' }],
+      },
+    }]);
+    expect(data[0].activities.create[0]).toMatchObject({
+      name: 'Temple Tour',
+      description: 'A guided tour of the temple.',
+    });
+  });
+
+  it('leaves a freeform activity with no catalog match with a null description', () => {
+    const data = buildDaysCreateData([{
+      dayNumber: 1,
+      activities: ['Made-up Activity'],
+      locations: [],
+      transports: [],
+    }]);
+    expect(data[0].activities.create[0]).toMatchObject({ name: 'Made-up Activity', description: null });
   });
 });
 
@@ -193,15 +234,23 @@ describe('serializeLeadDays', () => {
         accommodation: { totalAmount: 100 },
         flights: [],
         places: [{ id: 'dp1', placeId: 'p1', customName: 'Temple', orderIndex: 0 }],
-        activities: [{ id: 'da1', activityId: null, name: 'Tour', defaultCost: '50.00', costOverride: null, orderIndex: 0 }],
+        activities: [{ id: 'da1', activityId: null, name: 'Tour', description: 'A guided tour.', defaultCost: '50.00', costOverride: null, orderIndex: 0 }],
         transports: [{ id: 'dt1', routeType: 'DAILY_ROUTING', transportMode: 'VAN', pricingModel: 'PER_VEHICLE', unitCost: '300.00', distanceKm: null, origin: null, destination: null }],
+        images: [{ id: 'di1', url: 'https://res.cloudinary.com/x/a.jpg', altText: null, orderIndex: 0 }],
       }],
     };
     const days = serializeLeadDays(lead);
     expect(days[0]).toMatchObject({ dayNumber: 1, breakfastCount: 2 });
     expect(days[0].places[0]).toMatchObject({ placeId: 'p1', customName: 'Temple' });
     expect(days[0].activities[0].defaultCost).toBe(50);
+    expect(days[0].activities[0].description).toBe('A guided tour.');
     expect(days[0].transports[0].unitCost).toBe(300);
+    expect(days[0].images).toEqual([{ id: 'di1', url: 'https://res.cloudinary.com/x/a.jpg', altText: null, orderIndex: 0 }]);
+  });
+
+  it('returns an empty images array when a persisted day has none', () => {
+    const days = serializeLeadDays({ itineraryDays: [{ dayNumber: 1, places: [], activities: [], transports: [] }] });
+    expect(days[0].images).toEqual([]);
   });
 });
 

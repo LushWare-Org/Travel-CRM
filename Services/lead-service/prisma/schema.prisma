@@ -418,6 +418,7 @@ model LeadItineraryDay {
   places     LeadDayPlace[]
   activities LeadDayActivity[]
   transports LeadDayTransport[]
+  images     LeadDayImage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -446,8 +447,22 @@ model LeadDayActivity {
   leadItineraryDay   LeadItineraryDay @relation(fields: [leadItineraryDayId], references: [id], onDelete: Cascade)
   activityId         String? // → packages.ActivityCatalog.id (snapshot ref)
   name               String?
+  description        String? // snapshot of packages.ActivityCatalog.description at selection time
   defaultCost        Decimal?         @db.Decimal(12, 2)
   costOverride       Decimal?         @db.Decimal(12, 2)
+  orderIndex         Int              @default(0)
+
+  @@unique([leadItineraryDayId, orderIndex])
+  @@index([leadItineraryDayId])
+  @@schema("crm_leads")
+}
+
+model LeadDayImage {
+  id                 String           @id @default(uuid())
+  leadItineraryDayId String
+  leadItineraryDay   LeadItineraryDay @relation(fields: [leadItineraryDayId], references: [id], onDelete: Cascade)
+  url                String
+  altText            String?
   orderIndex         Int              @default(0)
 
   @@unique([leadItineraryDayId, orderIndex])
