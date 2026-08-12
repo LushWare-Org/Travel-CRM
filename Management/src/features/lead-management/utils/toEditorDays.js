@@ -24,6 +24,7 @@ export function toEditorDays(days) {
           relational.push({
             activityId: a.activityId ?? null,
             name,
+            description: a.description ?? a.activity?.description ?? null,
             costOverride: a.costOverride ?? null,
             activity: a.activity || null,
           });

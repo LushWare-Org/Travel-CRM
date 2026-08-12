@@ -399,6 +399,101 @@ describe('snapshotSelectionQuotation', () => {
     expect(JSON.parse(billingCall[1].body)).toMatchObject({ includedServices: [], excludedServices: [] });
   });
 
+  it('builds itineraryDays from the lead\'s own itinerary copy, carrying activities and only the first image per day', async () => {
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },
+      leadPricing: { findUnique: vi.fn().mockResolvedValue({ id: 'pr-1' }) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'sel-1',
+          isManual: false,
+          packageId: 'pkg-1',
+          pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
+          costLines: [],
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1 },
+          // The lead's OWN itinerary copy — deliberately different from
+          // packageFixture's blueprint (title/locations) to prove the
+          // snapshot is built from this, not from the re-fetched package.
+          itineraryDays: [{
+            dayNumber: 1,
+            title: 'Arrival in Colombo (lead-customized)',
+            breakfastCount: 1,
+            lunchCount: 0,
+            dinnerCount: 1,
+            places: [{ customName: 'Colombo' }, { customName: 'Galle Face' }],
+            activities: [
+              { name: 'City Tour', description: 'A guided walk through the old fort.', defaultCost: 30, costOverride: 45 },
+              { name: 'Free Time', description: null, defaultCost: null, costOverride: null },
+            ],
+            images: [
+              { url: 'https://res.cloudinary.com/x/day1-a.jpg', orderIndex: 0 },
+              { url: 'https://res.cloudinary.com/x/day1-b.jpg', orderIndex: 1 },
+            ],
+          }],
+        }),
+      },
+    });
+    const fetchImpl = vi.fn().mockImplementation(async (url) =>
+      url.includes('/billing/quotations/from-lead')
+        ? { ok: true, json: async () => ({ success: true, data: { id: 'quote-1' } }) }
+        : { ok: true, json: async () => ({ success: true, data: packageFixture }) },
+    );
+
+    await snapshotSelectionQuotation('sel-1', { fetchImpl, prismaClient });
+
+    const billingCall = fetchImpl.mock.calls.find((c) => c[0].includes('/billing/quotations/from-lead'));
+    const body = JSON.parse(billingCall[1].body);
+    expect(body.itineraryDays).toEqual([{
+      day: 1,
+      title: 'Arrival in Colombo (lead-customized)',
+      locations: ['Colombo', 'Galle Face'],
+      meals: ['Breakfast', 'Dinner'],
+      activities: [
+        { name: 'City Tour', description: 'A guided walk through the old fort.', cost: 45 },
+        { name: 'Free Time', description: null, cost: null },
+      ],
+      // Only the first image (orderIndex 0) is carried into the snapshot.
+      images: ['https://res.cloudinary.com/x/day1-a.jpg'],
+    }]);
+  });
+
+  it('falls back the cover image to the lead\'s own day-1 photo when the package has no cover image', async () => {
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },
+      leadPricing: { findUnique: vi.fn().mockResolvedValue({ id: 'pr-1' }) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'sel-1',
+          isManual: false,
+          packageId: 'pkg-1',
+          pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
+          costLines: [],
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1 },
+          itineraryDays: [{
+            dayNumber: 1,
+            title: 'Day 1',
+            breakfastCount: 0, lunchCount: 0, dinnerCount: 0,
+            places: [],
+            activities: [],
+            images: [{ url: 'https://res.cloudinary.com/x/lead-day1.jpg', orderIndex: 0 }],
+          }],
+        }),
+      },
+    });
+    const fetchImpl = vi.fn().mockImplementation(async (url) =>
+      url.includes('/billing/quotations/from-lead')
+        ? { ok: true, json: async () => ({ success: true, data: { id: 'quote-1' } }) }
+        // Package has no coverImage set.
+        : { ok: true, json: async () => ({ success: true, data: { ...packageFixture, coverImage: null } }) },
+    );
+
+    await snapshotSelectionQuotation('sel-1', { fetchImpl, prismaClient });
+
+    const billingCall = fetchImpl.mock.calls.find((c) => c[0].includes('/billing/quotations/from-lead'));
+    const body = JSON.parse(billingCall[1].body);
+    expect(body.coverImage).toBe('https://res.cloudinary.com/x/lead-day1.jpg');
+  });
+
   it('throws when billing-service rejects the snapshot', async () => {
     const prismaClient = mockPrisma({
       leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },

@@ -50,6 +50,7 @@ export function buildDraftData(packageData) {
         return {
           activityId: a.activityId ?? null,
           name: a.name ?? a.activity?.name ?? null,
+          description: a.description ?? a.activity?.description ?? null,
           defaultCost: defaultCost != null ? Number(defaultCost) : null,
           costOverride: a.costOverride != null ? Number(a.costOverride) : null,
           orderIndex: a.orderIndex ?? i,

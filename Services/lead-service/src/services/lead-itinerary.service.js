@@ -44,6 +44,7 @@ export function buildDaysCreateData(days) {
           return {
             activityId: rel?.activityId ?? null,
             name: a,
+            description: rel?.description ?? rel?.activity?.description ?? null,
             defaultCost: costs.defaultCost ?? rel?.activity?.defaultCost ?? null,
             costOverride: costs.costOverride ?? rel?.costOverride ?? null,
             orderIndex: i,
@@ -52,6 +53,7 @@ export function buildDaysCreateData(days) {
         return {
           activityId: a.activityId ?? null,
           name: a.name ?? a.activity?.name ?? null,
+          description: a.description ?? a.activity?.description ?? null,
           defaultCost: a.defaultCost != null
             ? Number(a.defaultCost)
             : (a.activity?.defaultCost != null ? Number(a.activity.defaultCost) : null),
@@ -69,6 +71,16 @@ export function buildDaysCreateData(days) {
         distanceKm: t.distanceKm != null ? Number(t.distanceKm) : null,
         origin: t.originPlaceId ?? t.origin ?? null,
         destination: t.destinationPlaceId ?? t.destination ?? null,
+      })),
+    },
+    images: {
+      // day.images is produced by Management's uploadItineraryImages() as
+      // [{url, public_id}, ...], but also accept plain URL strings so this
+      // stays robust to either shape.
+      create: (day.images || []).map((img, i) => ({
+        url: typeof img === 'string' ? img : img.url,
+        altText: typeof img === 'object' ? (img.altText ?? null) : null,
+        orderIndex: typeof img === 'object' && img.orderIndex != null ? img.orderIndex : i,
       })),
     },
   }));
@@ -154,6 +166,7 @@ export function serializeLeadDays(lead) {
       activityId: a.activityId,
       activity: null,
       name: a.name,
+      description: a.description ?? null,
       defaultCost: a.defaultCost != null ? Number(a.defaultCost) : null,
       costOverride: a.costOverride != null ? Number(a.costOverride) : null,
       orderIndex: a.orderIndex,
@@ -167,6 +180,12 @@ export function serializeLeadDays(lead) {
       distanceKm: t.distanceKm != null ? Number(t.distanceKm) : null,
       origin: t.origin,
       destination: t.destination,
+    })),
+    images: (day.images || []).map((img) => ({
+      id: img.id,
+      url: img.url,
+      altText: img.altText,
+      orderIndex: img.orderIndex,
     })),
   }));
 }

@@ -74,7 +74,7 @@ const loadPackageImages = async (pkg) => {
     }
 
     // Load day-specific images
-    const dayEntries = pkg.days || pkg.itinerary?.days || [];
+    const dayEntries = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
     if (dayEntries && dayEntries.length > 0) {
       for (const day of dayEntries) {
         if (day.images && Array.isArray(day.images) && day.images.length > 0) {
@@ -973,6 +973,12 @@ function legacyBuildPDFDocument(pkg, images) {
   }
 }
 
+// NOTE: cover-page fields below (pkg.name, pkg.price, pkg.terms, pkg.highlights,
+// pkg.maxGroupSize, pkg.duration) still reference the pre-relational package shape;
+// serializePackage() actually returns title/basePrice/sellPrice/termsAndConditions
+// (string)/inclusions/exclusions/durationDays. This degrades gracefully today
+// ("On Request", empty terms section) rather than breaking, so it was left as a
+// known gap out of scope for the itinerary-shape fix — see plan history.
 function buildPDFDocument(pkg, images) {
   try {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -1048,9 +1054,28 @@ function buildPDFDocument(pkg, images) {
     };
 
     const normalizeDays = () => {
-      const raw = pkg.days || pkg.itinerary?.days || [];
+      const raw = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
       const arr = Array.isArray(raw) ? raw : Object.values(raw).flat();
       return arr.slice().sort((a, b) => (a.dayNumber ?? a.day ?? 0) - (b.dayNumber ?? b.day ?? 0));
+    };
+
+    // Package API (serializePackage) returns day.places/day.activities as relational
+    // objects ({ place: { name }, customName } / { activity: { name } }); older/local
+    // editor state may still carry flat string[] (day.locations/day.activities). Both
+    // are supported here so the PDF renders correctly regardless of the source shape.
+    const getLocationNames = (day) => {
+      if (Array.isArray(day.places) && day.places.length) {
+        return day.places.map((p) => p?.place?.name || p?.customName).filter(Boolean);
+      }
+      const legacy = Array.isArray(day.locations) ? day.locations : (day.location ? [day.location] : []);
+      return legacy.map((l) => String(l).trim()).filter(Boolean);
+    };
+
+    const getActivityNames = (day) => {
+      if (Array.isArray(day.activities) && day.activities.length && day.activities[0] && typeof day.activities[0] === 'object' && 'activity' in day.activities[0]) {
+        return day.activities.map((a) => a?.activity?.name).filter(Boolean);
+      }
+      return (Array.isArray(day.activities) ? day.activities : []).map((a) => String(a).trim()).filter(Boolean);
     };
 
     const getDaySegments = (day) => {
@@ -1066,21 +1091,28 @@ function buildPDFDocument(pkg, images) {
       ['morning', 'afternoon', 'evening', 'night'].forEach((p) => {
         if (day[p]) segs.push({ label: p, description: String(day[p]).trim() });
       });
-      if (!segs.length && day.activities?.length)
-        segs.push({ label: 'Activities', description: day.activities.map((a) => String(a).trim()).join(' · ') });
+      const activityNames = getActivityNames(day);
+      if (!segs.length && activityNames.length)
+        segs.push({ label: 'Activities', description: activityNames.join(' · ') });
       if (!segs.length && day.description)
         segs.push({ label: 'Overview', description: String(day.description).trim() });
       return segs.slice(0, 4);
     };
 
-    const getMealsText = (meals) => {
-      if (!meals) return null;
-      const m = [];
-      if (meals.breakfast) m.push('Breakfast');
-      if (meals.lunch)     m.push('Lunch');
-      if (meals.dinner)    m.push('Dinner');
-      if (meals.snacks)    m.push('Snacks');
-      return m.length ? m.join(' · ') : null;
+    const getMealsText = (day) => {
+      if (day?.meals && typeof day.meals === 'object') {
+        const legacy = [];
+        if (day.meals.breakfast) legacy.push('Breakfast');
+        if (day.meals.lunch)     legacy.push('Lunch');
+        if (day.meals.dinner)    legacy.push('Dinner');
+        if (day.meals.snacks)    legacy.push('Snacks');
+        if (legacy.length) return legacy.join(' · ');
+      }
+      const counts = [];
+      if (day?.breakfastCount > 0) counts.push('Breakfast');
+      if (day?.lunchCount > 0)     counts.push('Lunch');
+      if (day?.dinnerCount > 0)    counts.push('Dinner');
+      return counts.length ? counts.join(' · ') : null;
     };
 
     // ── Structural elements ───────────────────────────────────────
@@ -1208,9 +1240,7 @@ function buildPDFDocument(pkg, images) {
     const drawDayCard = (day, index) => {
       const dayNumber  = day.dayNumber ?? day.day ?? index + 1;
       const dayTitle   = day.title || `Day ${dayNumber} Experience`;
-      const locationText = Array.isArray(day.locations)
-        ? day.locations.map((l) => String(l).trim()).filter(Boolean).join(' · ')
-        : day.location || '';
+      const locationText = getLocationNames(day).join(' · ');
 
       const segments = getDaySegments(day).map((s) => ({
         ...s,
@@ -1221,9 +1251,18 @@ function buildPDFDocument(pkg, images) {
       if (day.accommodation?.name)       footerParts.push(`Stay: ${day.accommodation.name}`);
       else if (typeof day.accommodation === 'string' && day.accommodation)
                                          footerParts.push(`Stay: ${day.accommodation}`);
-      const mealsText = getMealsText(day.meals);
+      const mealsText = getMealsText(day);
       if (mealsText)                     footerParts.push(`Meals: ${mealsText}`);
-      if (day.transport)                 footerParts.push(`Transfer: ${String(day.transport)}`);
+      // NOTE: day.flights (Json array from serializePackage) is not rendered anywhere
+      // in this generator — pre-existing feature gap, out of scope for this fix.
+      if (Array.isArray(day.transports) && day.transports.length) {
+        const t = day.transports[0];
+        if (t?.transportMode) {
+          footerParts.push(`Transfer: ${t.transportMode}${t.pricingModel ? ` (${t.pricingModel})` : ''}`);
+        }
+      } else if (day.transport) {
+        footerParts.push(`Transfer: ${String(day.transport)}`);
+      }
 
       // Text area: leave left strip (28) + right margin padding (8)
       const textAreaW = contentWidth - 30;

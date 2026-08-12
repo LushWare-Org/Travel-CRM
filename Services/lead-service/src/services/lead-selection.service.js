@@ -59,12 +59,15 @@ export function toEditorDays(days) {
       id: null, placeId: p.placeId, place: null, customName: p.customName, orderIndex: p.orderIndex,
     })),
     activities: (day.activities?.create || []).map((a) => ({
-      id: null, activityId: a.activityId, activity: null, name: a.name,
+      id: null, activityId: a.activityId, activity: null, name: a.name, description: a.description ?? null,
       defaultCost: a.defaultCost, costOverride: a.costOverride, orderIndex: a.orderIndex,
     })),
     transports: (day.transports?.create || []).map((t) => ({
       id: null, routeType: t.routeType, transportMode: t.transportMode, pricingModel: t.pricingModel,
       unitCost: t.unitCost, distanceKm: t.distanceKm, origin: t.origin, destination: t.destination,
+    })),
+    images: (day.images?.create || []).map((img) => ({
+      id: null, url: img.url, altText: img.altText ?? null, orderIndex: img.orderIndex,
     })),
   }));
 }
@@ -230,7 +233,15 @@ export async function snapshotSelectionQuotation(selectionId, { createdById = nu
 
   const selection = await prismaClient.leadPackageSelection.findUnique({
     where: { id: selectionId },
-    include: { pricing: true, costLines: true, lead: true },
+    include: {
+      pricing: true,
+      costLines: true,
+      lead: true,
+      itineraryDays: {
+        orderBy: { dayNumber: 'asc' },
+        include: { places: true, activities: true, images: { orderBy: { orderIndex: 'asc' } } },
+      },
+    },
   });
   if (!selection) throw new AppError('Package selection not found', 404);
   const { pricing, lead } = selection;
@@ -274,17 +285,33 @@ export async function snapshotSelectionQuotation(selectionId, { createdById = nu
     }
   }
 
-  // Day-by-day itinerary for the PDF, built from the package blueprint (fully
-  // resolved place names + meal counts). Empty when the package has no days.
-  const itineraryDays = (pkg?.itineraryDays || []).map((day, idx) => ({
+  // Day-by-day itinerary for the PDF, built from the LEAD's own itinerary
+  // copy (selection.itineraryDays) rather than the live package blueprint —
+  // materializeSelection() above guarantees this is populated (either the
+  // rep's own edits, including any day images/activities, or a freeze of the
+  // package blueprint for a still-pristine selection). Using the package
+  // blueprint here previously meant lead-side edits could never reach the
+  // quotation at all.
+  const itineraryDays = (selection.itineraryDays || []).map((day, idx) => ({
     day: day.dayNumber ?? idx + 1,
     title: day.title || `Day ${day.dayNumber ?? idx + 1}`,
-    locations: (day.places || []).map((p) => p.place?.name || p.customName).filter(Boolean),
+    locations: (day.places || []).map((p) => p.customName).filter(Boolean),
     meals: [
       day.breakfastCount > 0 && 'Breakfast',
       day.lunchCount > 0 && 'Lunch',
       day.dinnerCount > 0 && 'Dinner',
     ].filter(Boolean),
+    activities: (day.activities || [])
+      .map((a) => ({
+        name: a.name,
+        description: a.description ?? null,
+        cost: a.costOverride != null ? Number(a.costOverride) : (a.defaultCost != null ? Number(a.defaultCost) : null),
+      }))
+      .filter((a) => a.name),
+    // Multi-image strategy: only the first image (orderIndex 0) per day is
+    // carried into the quotation snapshot — keeps the PDF print-friendly.
+    // Remaining images stay stored/editable in Management but aren't quoted.
+    images: (day.images || []).slice(0, 1).map((i) => i.url),
   }));
 
   // Marketing highlights: split the package description into a few bullets.
@@ -324,7 +351,10 @@ export async function snapshotSelectionQuotation(selectionId, { createdById = nu
     durationDays,
     highlights,
     itineraryDays,
-    coverImage: pkg?.coverImage || null,
+    // Cover-image rule: package's cover image wins if set, else fall back to
+    // the lead's own day-1 photo (the rep's own upload), else none (the PDF
+    // generator degrades to a solid-brand-color banner).
+    coverImage: pkg?.coverImage || itineraryDays[0]?.images?.[0] || null,
   });
 
   const res = await fetchImpl(`${BILLING_SERVICE_URL}/api/v1/billing/quotations/from-lead`, {

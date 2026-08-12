@@ -46,6 +46,26 @@ const normalizeDays = (v) => {
 };
 
 /**
+ * Fetch a remote image URL into a Buffer for pdfkit's doc.image(). Returns
+ * null (never throws) on a missing/non-http URL, a network failure, or a
+ * timeout — every call site degrades to its existing placeholder rather than
+ * failing PDF generation over a broken image link.
+ */
+async function loadRemoteImageBuffer(url, { timeoutMs = 5000 } = {}) {
+  if (!url || typeof url !== 'string' || !/^https?:/i.test(url)) return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Render a quotation snapshot to a branded, multi-page PDF Buffer.
  *
  * The document flows section by section (cover → highlights → itinerary →
@@ -56,8 +76,9 @@ const normalizeDays = (v) => {
  * Honors `quotation.mode`: `detailed` adds an itemized pricing breakdown.
  *
  * @param {object} quotation - a Quotation row with its `items` included.
- *   Optional `coverImageBuffer` (Buffer) or a local-path `coverImage` renders
- *   the hero image; remote URLs fall back to a branded placeholder banner.
+ *   Optional `coverImageBuffer` (Buffer), a local-path `coverImage`, or a
+ *   remote https `coverImage` URL renders the hero image; anything missing
+ *   or unreachable falls back to a branded placeholder banner.
  * @returns {Promise<Buffer>}
  */
 export async function generateQuotationPDF(quotation) {
@@ -69,6 +90,19 @@ export async function generateQuotationPDF(quotation) {
   const BRANDING = toBrandingShape(orgSettings);
   const T = BRANDING.theme;
   const CONTENT = BRANDING.content;
+
+  // Image fetching is async; pdfkit's own build below is fully synchronous,
+  // so every remote image this document needs is resolved to a Buffer up
+  // front. A failed fetch resolves to null and each call site below falls
+  // back to its existing placeholder — never blocks/crashes PDF generation.
+  const days = normalizeDays(quotation.itineraryDays);
+  const [coverImageBuffer, dayImageBuffers] = await Promise.all([
+    quotation.coverImageBuffer
+      ? Promise.resolve(quotation.coverImageBuffer)
+      : loadRemoteImageBuffer(quotation.coverImage),
+    Promise.all(days.map((d) => loadRemoteImageBuffer(asList(d.images)[0]))),
+  ]);
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -119,22 +153,11 @@ export async function generateQuotationPDF(quotation) {
       };
       const stars = (x, y, n) => { for (let i = 0; i < n; i += 1) star(x + 6 + i * 13, y + 5, 5, 2.2, T.brand); };
 
-      const pillCentered = (text, y) => {
-        doc.font('Helvetica-Bold').fontSize(9);
-        const tw = doc.widthOfString(text);
-        const pw = tw + 24;
-        const ph = 18;
-        const px = left + (contentW - pw) / 2;
-        doc.roundedRect(px, y, pw, ph, 9).fillOpacity(0.18).fill(T.brand).fillOpacity(1);
-        doc.fillColor(T.brandDark).text(text, px, y + 5, { width: pw, align: 'center' });
-        return y + ph;
-      };
-
       // ── Cover ────────────────────────────────────────────────────
       const coverPage = () => {
         const heroH = 330;
         let drew = false;
-        const imgBuf = quotation.coverImageBuffer;
+        const imgBuf = coverImageBuffer;
         const imgPath = typeof quotation.coverImage === 'string' && !/^https?:/i.test(quotation.coverImage)
           ? quotation.coverImage : null;
         try {
@@ -159,11 +182,8 @@ export async function generateQuotationPDF(quotation) {
         doc.roundedRect(left, cardY, contentW, cardH, 12).fillAndStroke(T.white, T.slate200);
         doc.rect(left, cardY + 10, 6, cardH - 20).fill(T.brand);
 
-        const dest = (quotation.destination || '').toUpperCase();
-        let ty = cardY + 34;
-        if (dest) ty = pillCentered(dest, cardY + 24) + 12;
         doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(20)
-          .text(quotation.packageTitle || 'Travel Package', left + 24, ty, {
+          .text(quotation.packageTitle || 'Travel Package', left + 24, cardY + 34, {
             width: contentW - 48, align: 'center',
           });
 
@@ -203,30 +223,151 @@ export async function generateQuotationPDF(quotation) {
       };
 
       // ── Itinerary day cards ──────────────────────────────────────
+      // Multi-image rule: only the first (cover) image per day is ever
+      // rendered here — dayImageBuffers[idx] already resolved just that one
+      // URL. Extra images stay stored/editable in Management but are never
+      // shown in the PDF, keeping the document print-friendly. A day with
+      // no image renders as a single-column card, visually unchanged from
+      // before this feature (so old/legacy quotation snapshots still look
+      // reasonable when regenerated).
+      const CARD_PAD = 14;
+      const IMG_W = 130;
+      const IMG_H = 90;
+      const CHIP_H = 18;
+      const CHIP_GAP = 6;
+
+      // Lays chip labels out into wrapped rows within maxWidth without
+      // drawing anything — used both to measure the block's height up front
+      // and (via drawChipRows) to actually render it, so the two stay in
+      // sync. Assumes 'Helvetica-Bold' 8pt is the active font (chip text
+      // size) when called, matching what drawChipRows renders with.
+      const layoutChipRows = (items, maxWidth) => {
+        const rows = [[]];
+        let x = 0;
+        for (const text of items) {
+          const w = doc.widthOfString(text) + 16;
+          if (x + w > maxWidth && rows[rows.length - 1].length > 0) {
+            rows.push([]);
+            x = 0;
+          }
+          rows[rows.length - 1].push({ text, w });
+          x += w + CHIP_GAP;
+        }
+        return rows;
+      };
+      const chipRowsHeight = (rows) => rows.length * (CHIP_H + CHIP_GAP) - CHIP_GAP;
+      const drawChipRows = (rows, x0, y0) => {
+        doc.font('Helvetica-Bold').fontSize(8);
+        let y = y0;
+        for (const row of rows) {
+          let x = x0;
+          for (const { text, w } of row) {
+            doc.roundedRect(x, y, w, CHIP_H, 9).fillOpacity(0.14).fill(T.brand).fillOpacity(1);
+            doc.fillColor(T.brandDark).text(text, x, y + 4.5, { width: w, align: 'center' });
+            x += w + CHIP_GAP;
+          }
+          y += CHIP_H + CHIP_GAP;
+        }
+        return y - CHIP_GAP;
+      };
+
       const dayCard = (d, idx) => {
-        ensureSpace(58);
+        const imgBuf = dayImageBuffers[idx];
+        const hasImage = Boolean(imgBuf);
+        const textX = hasImage ? left + CARD_PAD * 2 + IMG_W : left + CARD_PAD;
+        const textW = hasImage ? contentW - IMG_W - CARD_PAD * 3 : contentW - CARD_PAD * 2;
+        const badgeW = 34; // room reserved for the numbered circle before the title
+        const titleText = `Day ${d.day ?? idx + 1}: ${d.title || ''}`.trim();
+        const locs = asList(d.locations);
+        const meals = asList(d.meals);
+        const acts = (Array.isArray(d.activities) ? d.activities : []).filter((a) => a && a.name);
+        const mealsText = meals.length ? `•  Meals: ${meals.join(', ')}` : null;
+
+        // Dry-measure the text column height (pdfkit's heightOfString needs
+        // the same font/size that will be used to draw) before drawing the
+        // card background, so the background can be sized to fit.
+        doc.font('Helvetica-Bold').fontSize(11);
+        let textH = doc.heightOfString(titleText, { width: textW - badgeW });
+        doc.font('Helvetica-Bold').fontSize(8);
+        const locRows = locs.length ? layoutChipRows(locs, textW) : [];
+        if (locRows.length) {
+          doc.font('Helvetica-Bold').fontSize(9);
+          textH += 10 + doc.heightOfString('LOCATIONS', { width: textW }) + chipRowsHeight(locRows);
+        }
+        doc.font('Helvetica').fontSize(9);
+        if (mealsText) textH += 5 + doc.heightOfString(mealsText, { width: textW });
+        if (acts.length) {
+          doc.font('Helvetica-Bold').fontSize(9);
+          textH += 10 + doc.heightOfString('ACTIVITIES', { width: textW });
+          for (const a of acts) {
+            doc.font('Helvetica-Bold').fontSize(9);
+            let h = doc.heightOfString(a.name, { width: textW - 12 });
+            if (a.description) {
+              doc.font('Helvetica').fontSize(8);
+              h += 2 + doc.heightOfString(a.description, { width: textW - 12 });
+            }
+            textH += h + 6;
+          }
+        }
+
+        const cardH = Math.max(textH, hasImage ? IMG_H : 0) + CARD_PAD * 2;
+        ensureSpace(cardH + 10);
         const startY = doc.y;
-        const cx = left + 18;
-        const cy = startY + 12;
+
+        doc.roundedRect(left, startY, contentW, cardH, 10).fillAndStroke(T.white, T.slate200);
+
+        if (hasImage) {
+          try {
+            doc.image(imgBuf, left + CARD_PAD, startY + CARD_PAD, {
+              width: IMG_W, height: IMG_H, cover: [IMG_W, IMG_H],
+            });
+          } catch { /* corrupt/undecodable buffer — card still renders text-only */ }
+        }
+
+        const cx = textX + 12;
+        const cy = startY + CARD_PAD + 12;
         doc.circle(cx, cy, 12).fill(T.brand);
         doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(11)
           .text(String(d.day ?? idx + 1), cx - 12, cy - 6, { width: 24, align: 'center' });
 
-        const tx = left + 42;
+        const titleX = cx + 22;
         doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(11)
-          .text(`Day ${d.day ?? idx + 1}: ${d.title || ''}`.trim(), tx, startY + 1, { width: right - tx });
-        let yy = doc.y + 2;
+          .text(titleText, titleX, cy - 6, { width: textX + textW - titleX });
+        let yy = Math.max(doc.y, cy + 14) + 5;
+
+        if (locRows.length) {
+          doc.font('Helvetica-Bold').fontSize(9).fillColor(T.brand)
+            .text('LOCATIONS', textX, yy, { width: textW });
+          yy = doc.y + 4;
+          yy = drawChipRows(locRows, textX, yy) + 5;
+        }
         doc.font('Helvetica').fontSize(9).fillColor(T.muted);
-        const locs = asList(d.locations);
-        const meals = asList(d.meals);
-        if (locs.length) { doc.text(`•  Locations: ${locs.join(', ')}`, tx, yy, { width: right - tx }); yy = doc.y; }
-        if (meals.length) { doc.text(`•  Meals: ${meals.join(', ')}`, tx, yy, { width: right - tx }); yy = doc.y; }
+        if (mealsText) { doc.text(mealsText, textX, yy, { width: textW }); yy = doc.y + 5; }
+
+        if (acts.length) {
+          yy += 5;
+          doc.font('Helvetica-Bold').fontSize(9).fillColor(T.brand)
+            .text('ACTIVITIES', textX, yy, { width: textW });
+          yy = doc.y + 4;
+          for (const a of acts) {
+            doc.circle(textX + 3, yy + 5, 2.5).fill(T.brand);
+            const nameX = textX + 12;
+            const nameW = textW - 12;
+            doc.font('Helvetica-Bold').fontSize(9).fillColor(T.ink).text(a.name, nameX, yy, { width: nameW });
+            yy = doc.y + 1;
+            if (a.description) {
+              doc.font('Helvetica').fontSize(8).fillColor(T.muted).text(a.description, nameX, yy, { width: nameW });
+              yy = doc.y + 1;
+            }
+            yy += 6;
+          }
+        }
+
         doc.x = left;
-        doc.y = yy + 10;
+        doc.y = startY + cardH + 10;
       };
 
       const itinerarySection = () => {
-        const days = normalizeDays(quotation.itineraryDays);
         if (!days.length) return;
         sectionHeader('Travel Itinerary');
         days.forEach(dayCard);
