@@ -32,6 +32,7 @@ export const convertToInvoiceSchema = z
     customerGstNumber: z.string().trim().min(1).nullable().optional(),
     destination: z.string().trim().min(1).nullable().optional(),
 
+    notes: z.string().nullable().optional(),
     paymentTerms: z.string().nullable().optional(),
     paymentInstructions: z.string().nullable().optional(),
 

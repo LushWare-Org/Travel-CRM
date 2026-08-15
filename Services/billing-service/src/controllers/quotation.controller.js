@@ -272,7 +272,7 @@ export const convertQuotationToInvoice = asyncHandler(async (req, res) => {
       outstandingAmount: quotation.totalAmount,
 
       dueDate,
-      notes: quotation.notes,
+      notes: overrides.notes ?? quotation.notes,
       terms: quotation.terms,
       paymentTerms: overrides.paymentTerms ?? branding.content.invoiceTerms,
       paymentInstructions: overrides.paymentInstructions ?? branding.content.invoicePaymentInstructions,

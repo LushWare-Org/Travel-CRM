@@ -196,6 +196,18 @@ describe('convertQuotationToInvoice — override precedence (explicit -> quotati
     expect(created.paymentInstructions).toBe('Org default payment instructions.');
   });
 
+  it('falls back to the quotation snapshot for notes when no override is sent', async () => {
+    await run({ params: { id: 'q-1' }, body: {}, user: { id: 'admin-1' } });
+    const created = mockInvoiceCreate.mock.calls[0][0].data;
+    expect(created.notes).toBe('Quotation notes');
+  });
+
+  it('uses an explicit override for notes instead of the quotation snapshot', async () => {
+    await run({ params: { id: 'q-1' }, body: { notes: 'Custom invoice-only note.' }, user: { id: 'admin-1' } });
+    const created = mockInvoiceCreate.mock.calls[0][0].data;
+    expect(created.notes).toBe('Custom invoice-only note.');
+  });
+
   it('uses an explicit override for bank/terms fields instead of org settings', async () => {
     await run({
       params: { id: 'q-1' },
