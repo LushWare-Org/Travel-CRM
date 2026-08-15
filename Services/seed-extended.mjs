@@ -81,6 +81,7 @@ const N = {
   invoice3: 'f0000000-0000-0000-0000-000000000010',
   invoice4: 'f0000000-0000-0000-0000-000000000011',
   invoice5: 'f0000000-0000-0000-0000-000000000012',
+  invoice6: 'f0000000-0000-0000-0000-000000000013',
   quotation2: 'f0000000-0000-0000-0000-000000000020',
   quotation3: 'f0000000-0000-0000-0000-000000000021',
   receipt2: 'f0000000-0000-0000-0000-000000000030',
@@ -470,6 +471,24 @@ async function seedBilling() {
       emailSent: true, sentAt: new Date('2025-01-28'),
       items: { create: [
         { description: 'European Grand Tour — 4 persons (7 nights)', category: 'package', quantity: 4, unitPrice: 4500, totalPrice: 18000, order: 0 },
+      ]},
+    },
+  });
+
+  // Invoice 6 — Priya Sri Lanka (sent, awaiting first payment)
+  await bill.invoice.upsert({
+    where: { id: N.invoice6 }, update: {},
+    create: {
+      id: N.invoice6, invoiceNumber: 'INV-202501-00006', leadId: N.lead6,
+      createdById: E.salesRep1, customerName: 'Priya Nair', customerEmail: 'priya.nair@gmail.com',
+      customerPhone: '+919876012345', customerAddress: 'Bangalore, India', type: 'invoice',
+      subtotal: 2500, taxRate: 0, taxAmount: 0, discountType: 'none', discountValue: 0, discountAmount: 0,
+      totalAmount: 2500, paidAmount: 0, outstandingAmount: 2500,
+      status: 'sent', paymentStatus: 'unpaid',
+      dueDate: new Date('2025-02-28'), issueDate: new Date('2025-01-30'),
+      emailSent: true, sentAt: new Date('2025-01-30'),
+      items: { create: [
+        { description: 'Sri Lanka Heritage Explorer — 2 persons (4 nights)', category: 'package', quantity: 1, unitPrice: 2500, totalPrice: 2500, order: 0 },
       ]},
     },
   });
