@@ -1,8 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import zlib from 'node:zlib';
 import { generateInvoicePDF } from '../invoicePDFGenerator.js';
-import { drawBankDetailsCard } from '../pdfBankDetailsSection.js';
-import * as quotationPDFGeneratorModule from '../quotationPDFGenerator.js';
 
 /**
  * pdfkit deflate-compresses every content stream by default AND (when
@@ -110,7 +108,7 @@ describe('generateInvoicePDF', () => {
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
 
-  it('renders a multi-item, non-zero tax/discount/service-charge invoice without throwing', async () => {
+  it('renders a multi-item, non-zero tax/discount/service-charge invoice as a clean total-only PDF', async () => {
     const buffer = await generateInvoicePDF({
       ...baseInvoice,
       items: [
@@ -127,6 +125,17 @@ describe('generateInvoicePDF', () => {
       paymentTerms: 'Custom term one.\nCustom term two.',
     });
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    const text = extractPdfText(buffer);
+    // Even though the underlying invoice has items/tax/discount/service
+    // charge, none of that breakdown reaches the PDF — only the final total.
+    expect(text).not.toContain('Package');
+    expect(text).not.toContain('Airport Transfer');
+    expect(text).not.toContain('Sub Total');
+    expect(text).not.toContain('Discount');
+    expect(text).not.toContain('Service Charge');
+    expect(text).not.toContain('Tax (');
+    expect(text).toContain('Total Amount');
+    expect(text).toContain('1,278.00');
   });
 
   it('renders proforma/tax-invoice titles without throwing', async () => {
@@ -184,13 +193,64 @@ describe('generateInvoicePDF', () => {
     });
   });
 
-  it('shares the same bank-details drawing function as the quotation generator (no duplicated logic)', async () => {
-    // Both generators import from the same module — this is a structural
-    // assertion that the extraction actually happened, not a duplicate copy.
-    const invoiceGenSource = await import('../invoicePDFGenerator.js');
-    expect(typeof drawBankDetailsCard).toBe('function');
-    expect(invoiceGenSource).toBeDefined();
-    expect(quotationPDFGeneratorModule.generateQuotationPDF).toBeDefined();
+  it('renders bank details as a plain label/value table, not the quotation cream card', async () => {
+    const buffer = await generateInvoicePDF(baseInvoice);
+    const text = extractPdfText(buffer);
+    expect(text).toContain('Account Number');
+    expect(text).toContain('663705600957');
+    expect(text).toContain('IFSC Code');
+    expect(text).toContain('ICIC0006637');
+    expect(text).toContain('UPI ID');
+    expect(text).toContain('harsh8412@icici');
+  });
+
+  describe('total-only summary (no itemized cost breakdown)', () => {
+    it('renders the final total using Indian digit grouping for INR', async () => {
+      const buffer = await generateInvoicePDF(baseInvoice);
+      const text = extractPdfText(buffer);
+      expect(text).toContain('Total Amount');
+      expect(text).toContain('1,43,000.00');
+    });
+
+    it('does not render item descriptions or a Sub Total line', async () => {
+      const buffer = await generateInvoicePDF(baseInvoice);
+      const text = extractPdfText(buffer);
+      expect(text).not.toContain('Travel Services');
+      expect(text).not.toContain('Sub Total');
+      expect(text).not.toContain('S.No');
+      expect(text).not.toContain('Service Description');
+    });
+  });
+
+  describe('logo rendering', () => {
+    beforeEach(() => {
+      vi.stubGlobal('fetch', vi.fn());
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('embeds a fetched https logo without throwing', async () => {
+      // Minimal valid 1x1 PNG — real embedding (not the catch-and-fall-back
+      // path), to exercise doc.image() actually succeeding.
+      const pngBytes = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      );
+      fetch.mockResolvedValue({ ok: true, arrayBuffer: async () => pngBytes.buffer.slice(pngBytes.byteOffset, pngBytes.byteOffset + pngBytes.byteLength) });
+      getOrgSettings.mockResolvedValue({ ...COMPLETE_SETTINGS, logoUrl: 'https://cdn.test/logo.png' });
+      const buffer = await generateInvoicePDF(baseInvoice);
+      expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+
+    it('falls back to the company-name text when the logo fetch fails', async () => {
+      fetch.mockRejectedValue(new Error('network down'));
+      getOrgSettings.mockResolvedValue({ ...COMPLETE_SETTINGS, logoUrl: 'https://cdn.test/missing.png' });
+      const buffer = await generateInvoicePDF(baseInvoice);
+      expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(extractPdfText(buffer)).toContain('Lush Travel');
+    });
   });
 
   it('renders the invoice-own stored bank/terms snapshot, not live org settings (snapshot immutability)', async () => {
