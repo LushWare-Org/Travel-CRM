@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getOrgSettings, _resetCache, toBrandingShape, getBankDetails, hasBankDetails } from '../orgSettings.js';
+import { getOrgSettings, _resetCache, toBrandingShape, getBankDetails, hasBankDetails, hasRequiredOrgFieldsForInvoice } from '../orgSettings.js';
+
+const COMPLETE_SETTINGS = {
+  companyName: 'Lush Travel',
+  companyAddress: '221B Baker Street, London',
+  companyGstNumber: '07BGTPT9665E1ZH',
+  contactPhone: '+44 20 0000 0000',
+  contactEmail: 'hi@lush.test',
+  bankName: 'Test Bank',
+  bankAccountNumber: '12345',
+  invoicePaymentTerms: 'Balance due within 30 days.',
+  invoicePaymentInstructions: 'Please share the UTR after payment.',
+};
 
 function fakeSettingsResponse(overrides = {}) {
   return {
@@ -106,5 +118,67 @@ describe('hasBankDetails', () => {
   it('is false when bank details are absent', () => {
     const branding = toBrandingShape({ companyName: 'X' });
     expect(hasBankDetails(branding)).toBe(false);
+  });
+});
+
+describe('toBrandingShape — invoice fields (companyAddress/companyGstNumber/invoiceTerms)', () => {
+  it('maps the new company address/GST fields onto branding.company', () => {
+    const branding = toBrandingShape(COMPLETE_SETTINGS);
+    expect(branding.company.address).toBe('221B Baker Street, London');
+    expect(branding.company.gstNumber).toBe('07BGTPT9665E1ZH');
+  });
+
+  it('maps invoicePaymentTerms/invoicePaymentInstructions onto branding.content', () => {
+    const branding = toBrandingShape(COMPLETE_SETTINGS);
+    expect(branding.content.invoiceTerms).toBe('Balance due within 30 days.');
+    expect(branding.content.invoicePaymentInstructions).toBe('Please share the UTR after payment.');
+  });
+
+  it('falls back to the built-in default invoice terms when unset', () => {
+    const branding = toBrandingShape({ companyName: 'X' });
+    expect(branding.content.invoiceTerms).toMatch(/non-refundable booking amount/i);
+    expect(branding.content.invoicePaymentInstructions).toMatch(/payment screenshot/i);
+  });
+});
+
+describe('hasRequiredOrgFieldsForInvoice', () => {
+  it('is ok with no missing fields when every required field is configured', () => {
+    const branding = toBrandingShape(COMPLETE_SETTINGS);
+    const result = hasRequiredOrgFieldsForInvoice(branding);
+    expect(result).toEqual({ ok: true, missing: [] });
+  });
+
+  it('reports companyAddress as missing when unset', () => {
+    const branding = toBrandingShape({ ...COMPLETE_SETTINGS, companyAddress: undefined });
+    const result = hasRequiredOrgFieldsForInvoice(branding);
+    expect(result.ok).toBe(false);
+    expect(result.missing).toContain('companyAddress');
+  });
+
+  it('reports bank details as missing when bank name/account number are unset', () => {
+    const branding = toBrandingShape({ ...COMPLETE_SETTINGS, bankName: undefined, bankAccountNumber: undefined });
+    const result = hasRequiredOrgFieldsForInvoice(branding);
+    expect(result.ok).toBe(false);
+    expect(result.missing.some((m) => m.includes('bank details'))).toBe(true);
+  });
+
+  it('is still ok when only contactPhone is set and contactEmail is missing (either satisfies the check)', () => {
+    const branding = toBrandingShape({ ...COMPLETE_SETTINGS, contactEmail: undefined });
+    expect(hasRequiredOrgFieldsForInvoice(branding).ok).toBe(true);
+  });
+
+  it('reports contact info as missing only when both phone and email are unset', () => {
+    const branding = toBrandingShape({ ...COMPLETE_SETTINGS, contactPhone: undefined, contactEmail: undefined });
+    const result = hasRequiredOrgFieldsForInvoice(branding);
+    expect(result.missing).toContain('contactPhone or contactEmail');
+  });
+
+  it('reports every missing field at once for a bare-minimum settings row', () => {
+    const branding = toBrandingShape({ companyName: 'X' });
+    const result = hasRequiredOrgFieldsForInvoice(branding);
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual(
+      expect.arrayContaining(['companyAddress', 'contactPhone or contactEmail', 'bank details (bankName + bankAccountNumber)']),
+    );
   });
 });
