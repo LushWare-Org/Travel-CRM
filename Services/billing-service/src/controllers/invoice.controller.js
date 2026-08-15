@@ -2,6 +2,7 @@ import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { nextInvoiceNumber } from '../utils/docNumber.js';
+import { generateInvoicePDF } from '../utils/invoicePDFGenerator.js';
 
 const invoiceInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -183,5 +184,10 @@ export const getOverdueInvoices = asyncHandler(async (req, res) => {
 export const downloadInvoicePDF = asyncHandler(async (req, res) => {
   const invoice = await prisma.invoice.findUnique({ where: { id: req.params.id }, include: invoiceInclude });
   if (!invoice) throw new AppError('Invoice not found', 404);
-  res.json({ success: true, message: 'PDF generation not yet implemented', data: invoice });
+
+  const pdf = await generateInvoicePDF(invoice);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="invoice-${invoice.invoiceNumber}.pdf"`);
+  res.setHeader('Content-Length', pdf.length);
+  res.send(pdf);
 });
