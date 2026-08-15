@@ -756,6 +756,11 @@ export const voucherAPI = {
     return api.post(`/billing/vouchers/${voucherId}/send`, { email });
   },
 
+  send: async (voucherId, payload = {}) => {
+    const api = new ApiService();
+    return api.post(`/billing/vouchers/${voucherId}/send`, payload);
+  },
+
   downloadPDF: async (voucherId) => {
     const api = new ApiService();
     const response = await api.get(`/billing/vouchers/${voucherId}/pdf`, {
