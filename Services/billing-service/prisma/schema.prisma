@@ -756,6 +756,7 @@ model Voucher {
   locationDates    VoucherLocationDate[]
   mealPlans        VoucherMealPlan[]
   itinerarySummary VoucherItinerarySummary[]
+  flightSegments   VoucherFlightSegment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -804,6 +805,23 @@ model VoucherItinerarySummary {
   accommodationName String?
   accommodationType String?
   order             Int      @default(0)
+
+  @@index([voucherId])
+  @@schema("crm_billing")
+}
+
+model VoucherFlightSegment {
+  id               String    @id @default(uuid())
+  voucherId        String
+  voucher          Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  dayNumber        Int?
+  marketingCarrier String?
+  flightNumber     String?
+  origin           String?
+  destination      String?
+  departureAt      DateTime?
+  arrivalAt        DateTime?
+  order            Int       @default(0)
 
   @@index([voucherId])
   @@schema("crm_billing")

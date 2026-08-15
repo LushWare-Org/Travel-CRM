@@ -93,6 +93,15 @@ class FlightService {
     }
   }
 
+  async getItineraryFlights(leadId) {
+    try {
+      return await this.api.get(`/flights/bookings/by-lead/${leadId}/itinerary-flights`);
+    } catch (error) {
+      console.error('Error fetching itinerary flight segments:', error);
+      throw error;
+    }
+  }
+
   async linkToDay(bookingId, payload) {
     try {
       return await this.api.patch(`/flights/bookings/${bookingId}/link-day`, payload);

@@ -95,11 +95,15 @@ const LeadManagement = () => {
   // to the quotation modal once the editor closes.
   const [resumeQuoteLead, setResumeQuoteLead] = useState(null);
   const [resumeQuoteSelectionId, setResumeQuoteSelectionId] = useState(null);
+  // Same hand-off, for the voucher flow's "Manage flights & itinerary" backlink.
+  const [resumeVoucherLead, setResumeVoucherLead] = useState(null);
+  const [resumeVoucherSelectionId, setResumeVoucherSelectionId] = useState(null);
   // Which package tab to open the lead editor/quotation modal on, carried
   // across the quotation <-> lead-editor hand-off so edits land on the same
   // package the user was viewing instead of defaulting to the first one.
   const [editorInitialSelectionId, setEditorInitialSelectionId] = useState(null);
   const [quotationInitialSelectionId, setQuotationInitialSelectionId] = useState(null);
+  const [voucherInitialSelectionId, setVoucherInitialSelectionId] = useState(null);
   const [showSectionView, setShowSectionView] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -313,6 +317,15 @@ const LeadManagement = () => {
     setShowEditDialog(true);
   };
 
+  const openLeadEditorFromVoucher = (lead, selectionId) => {
+    setVoucherLead(null);
+    setResumeVoucherLead(lead);
+    setResumeVoucherSelectionId(selectionId ?? null);
+    setEditorInitialSelectionId(selectionId ?? null);
+    setSelectedLead(lead);
+    setShowEditDialog(true);
+  };
+
   const closeLeadEditor = () => {
     setShowEditDialog(false);
     setSelectedLead(null);
@@ -322,6 +335,11 @@ const LeadManagement = () => {
       setQuotationLead(resumeQuoteLead);
       setResumeQuoteLead(null);
       setResumeQuoteSelectionId(null);
+    } else if (resumeVoucherLead) {
+      setVoucherInitialSelectionId(resumeVoucherSelectionId);
+      setVoucherLead(resumeVoucherLead);
+      setResumeVoucherLead(null);
+      setResumeVoucherSelectionId(null);
     }
   };
 
@@ -607,9 +625,14 @@ const LeadManagement = () => {
       {voucherLead && (
         <VoucherDialog
           isOpen
-          onClose={() => setVoucherLead(null)}
+          onClose={() => {
+            setVoucherLead(null);
+            setVoucherInitialSelectionId(null);
+          }}
           lead={voucherLead}
           onSuccess={handleVoucherSuccess}
+          onEditLead={openLeadEditorFromVoucher}
+          initialSelectionId={voucherInitialSelectionId}
         />
       )}
 

@@ -98,10 +98,12 @@ vi.mock('../../features/lead-management/components/ReceiptDialog', () => ({
 }));
 
 vi.mock('../../features/lead-management/components/VoucherDialog', () => ({
-  default: ({ lead, onClose }) => (
+  default: ({ lead, onClose, onEditLead, initialSelectionId }) => (
     <div data-testid="voucher-dialog">
       <span data-testid="voucher-dialog-lead">{lead?.name}</span>
+      <span data-testid="voucher-dialog-selection-id">{initialSelectionId ?? ''}</span>
       <button onClick={onClose}>Close Voucher</button>
+      <button onClick={() => onEditLead(lead, 'sel-active')}>Manage flights</button>
     </div>
   ),
 }));
@@ -198,5 +200,22 @@ describe('LeadManagement — shared billing dialog state', () => {
     await userEvent.click(screen.getByText('Close Editor'));
 
     expect(await screen.findByTestId('quotation-modal-selection-id')).toHaveTextContent('sel-active');
+  });
+
+  it('reopens Voucher on the same package selection after editing flights from within the voucher flow', async () => {
+    render(<LeadManagement />);
+    await screen.findByText('Voucher:Alice Traveller');
+
+    await userEvent.click(screen.getByText('Voucher:Alice Traveller'));
+    await screen.findByTestId('voucher-dialog');
+
+    await userEvent.click(screen.getByText('Manage flights'));
+    expect(await screen.findByTestId('edit-lead-selection-id')).toHaveTextContent('sel-active');
+    expect(screen.queryByTestId('voucher-dialog')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByText('Close Editor'));
+
+    expect(await screen.findByTestId('voucher-dialog-lead')).toHaveTextContent('Alice Traveller');
+    expect(await screen.findByTestId('voucher-dialog-selection-id')).toHaveTextContent('sel-active');
   });
 });

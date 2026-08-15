@@ -152,4 +152,35 @@ export async function sendReceiptWhatsapp({ receipt, phone, mediaUrl }) {
   });
 }
 
-export default { isWhatsappConfigured, sendQuotationWhatsapp, sendInvoiceWhatsapp, sendReceiptWhatsapp };
+/**
+ * Send a travel voucher over WhatsApp with the PDF attached as media.
+ * Requires Twilio WhatsApp Business credentials and a publicly reachable
+ * `mediaUrl` (the Cloudinary-hosted PDF).
+ * @throws {Error} when WhatsApp is not configured or the phone is invalid
+ */
+export async function sendVoucherWhatsapp({ voucher, phone, mediaUrl }) {
+  const client = buildClient();
+  if (!client) {
+    throw new Error('WhatsApp is not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM)');
+  }
+  const to = toWhatsappAddress(phone);
+  if (!to) throw new Error('No valid WhatsApp phone number provided');
+
+  const branding = toBrandingShape(await getOrgSettings());
+
+  const body =
+    `Hi ${voucher.customerName || 'there'}, your ${branding.company.name} travel voucher ` +
+    `${voucher.voucherNumber || ''} is ready.\n` +
+    (voucher.travelStartDate
+      ? `Travel dates: ${new Date(voucher.travelStartDate).toLocaleDateString('en-US')} – ${voucher.travelEndDate ? new Date(voucher.travelEndDate).toLocaleDateString('en-US') : ''}\n`
+      : '');
+
+  return client.messages.create({
+    from: resolveFromAddress(),
+    to,
+    body,
+    ...(mediaUrl ? { mediaUrl: [mediaUrl] } : {}),
+  });
+}
+
+export default { isWhatsappConfigured, sendQuotationWhatsapp, sendInvoiceWhatsapp, sendReceiptWhatsapp, sendVoucherWhatsapp };

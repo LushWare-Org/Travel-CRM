@@ -200,5 +200,19 @@ export const hasRequiredOrgFieldsForReceipt = (branding) => {
   return { ok: missing.length === 0, missing };
 };
 
+/**
+ * A voucher is a booking confirmation document, not a financial one — it
+ * renders company identity and contact details but, unlike the invoice, no
+ * bank-transfer instructions, so bank details aren't required here (same
+ * requirement set as the payment receipt).
+ */
+export const hasRequiredOrgFieldsForVoucher = (branding) => {
+  const missing = [];
+  if (!branding.company.name) missing.push('companyName');
+  if (!branding.company.address) missing.push('companyAddress');
+  if (!branding.contact.phone && !branding.contact.email) missing.push('contactPhone or contactEmail');
+  return { ok: missing.length === 0, missing };
+};
+
 export const getEmailFrom = (branding) =>
   process.env.EMAIL_FROM || `${branding.company.name} <${branding.contact.email}>`;
