@@ -147,6 +147,8 @@ model OrganizationSettings {
   companyName      String  @default("Travel CRM")
   companyShortName String?
   companyLegalName String?
+  companyAddress   String? @db.Text
+  companyGstNumber String?
   tagline          String?
   logoUrl          String?
 
@@ -171,6 +173,8 @@ model OrganizationSettings {
   quotationValidityDays    Int      @default(30)
   quotationTerms           String?  @db.Text
   cancellationPolicy       String?  @db.Text
+  invoicePaymentTerms        String? @db.Text
+  invoicePaymentInstructions String? @db.Text
   ratingTagline            String?
   paymentMethods           String[]
   docNumberPrefixes        Json? // { quotation, invoice, receipt, payment, creditNote, voucher }
