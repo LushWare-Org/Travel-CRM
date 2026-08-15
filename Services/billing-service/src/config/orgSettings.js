@@ -18,6 +18,8 @@ const FALLBACK = {
   companyName: process.env.COMPANY_NAME || 'Travel CRM',
   companyShortName: process.env.COMPANY_SHORT_NAME || 'CRM',
   companyLegalName: process.env.COMPANY_LEGAL_NAME || 'Travel CRM Solutions',
+  companyAddress: process.env.COMPANY_ADDRESS || '',
+  companyGstNumber: process.env.COMPANY_GST_NUMBER || '',
   tagline: process.env.COMPANY_TAGLINE || 'Your Travel Partner',
   logoUrl: process.env.COMPANY_LOGO || '',
 
@@ -43,6 +45,13 @@ const FALLBACK = {
   cancellationPolicy: process.env.QUOTATION_CANCELLATION_POLICY ||
     'Cancellation charges apply from the date we receive written notice. Booking amounts may be ' +
     'non-refundable once a package is confirmed. Rooms and flights are subject to availability.',
+  invoicePaymentTerms: process.env.INVOICE_PAYMENT_TERMS ||
+    'A non-refundable booking amount is required to confirm the package. The remaining balance ' +
+    'must be cleared prior to the departure date. All bookings are subject to availability. ' +
+    'Cancellation charges will be applicable as per the cancellation policy. No refund for unused ' +
+    'services or no-show.',
+  invoicePaymentInstructions: process.env.INVOICE_PAYMENT_INSTRUCTIONS ||
+    'Please share the payment screenshot or UTR number after completing the transfer.',
   ratingTagline: process.env.QUOTATION_RATING_TAGLINE || 'Rated 4.9  |  10k+ Travellers  |  30+ Destinations',
   paymentMethods: ['Bank Transfer', 'UPI', 'Visa', 'Mastercard', 'Cards', 'Wallets'],
   docNumberPrefixes: null,
@@ -110,6 +119,8 @@ export function toBrandingShape(settings) {
       shortName: settings.companyShortName,
       tagline: settings.tagline,
       legalName: settings.companyLegalName,
+      address: settings.companyAddress,
+      gstNumber: settings.companyGstNumber,
     },
     contact: {
       email: settings.contactEmail,
@@ -139,6 +150,8 @@ export function toBrandingShape(settings) {
       reviews: STATIC_REVIEWS,
       defaultTerms: settings.quotationTerms || FALLBACK.quotationTerms,
       cancellationPolicy: settings.cancellationPolicy || FALLBACK.cancellationPolicy,
+      invoiceTerms: settings.invoicePaymentTerms || FALLBACK.invoicePaymentTerms,
+      invoicePaymentInstructions: settings.invoicePaymentInstructions || FALLBACK.invoicePaymentInstructions,
     },
     payment: {
       bankName: settings.bankName,
@@ -157,6 +170,22 @@ export const getBankDetails = (branding) => branding.payment;
 
 /** True when at least a bank name + account number are configured. */
 export const hasBankDetails = (branding) => Boolean(branding.payment.bankName && branding.payment.accountNumber);
+
+/**
+ * An invoice is a formal, customer-facing financial document — it must never
+ * render blank/null fields where a real value belongs. Checks the fields the
+ * invoice PDF's "Bill From" and "Payment Instructions" sections depend on and
+ * reports every field that's still missing, so the caller can fail loud with
+ * a specific, actionable error instead of generating an incomplete PDF.
+ */
+export const hasRequiredOrgFieldsForInvoice = (branding) => {
+  const missing = [];
+  if (!branding.company.name) missing.push('companyName');
+  if (!branding.company.address) missing.push('companyAddress');
+  if (!branding.contact.phone && !branding.contact.email) missing.push('contactPhone or contactEmail');
+  if (!hasBankDetails(branding)) missing.push('bank details (bankName + bankAccountNumber)');
+  return { ok: missing.length === 0, missing };
+};
 
 export const getEmailFrom = (branding) =>
   process.env.EMAIL_FROM || `${branding.company.name} <${branding.contact.email}>`;
