@@ -1,215 +1,354 @@
-import { useState, useEffect } from 'react';
-import { X, Save, Eye, Send, MessageCircle, Download, Plus, Trash2, Calendar, MapPin, Hotel, Utensils, FileText, Ticket, ChevronRight, User, Clock, Globe, Plane } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { X, Save, Eye, Download, Plus, Trash2, Calendar, MapPin, Hotel, Utensils, FileText, Ticket, ChevronRight, User, Clock, Globe, Plane, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { voucherAPI, packageAPI, customizedPackageAPI, itineraryAPI, quotationAPI, manualItineraryAPI } from '../../../services/api';
+import { voucherAPI, packageAPI, leadAPI } from '../../../services/api';
+import { flightAPI } from '../../../services/flight.service';
 import PDFPreviewDialog from './PDFPreviewDialog';
-import { getThankYouMessage } from '../../../config/branding';
+import SendDocumentPanel from './shared/SendDocumentPanel';
 import { LOCALE } from '../../../utils/currency.js';
 
-const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
+const buildHotelStaysFromDays = (days, travelStartDate) => {
+  const hotelBookings = [];
+  let currentStay = null;
+  const getDate = (offset) => {
+    if (!travelStartDate) return '';
+    const date = new Date(travelStartDate);
+    date.setDate(date.getDate() + offset);
+    return date.toISOString().split('T')[0];
+  };
+  (days || []).forEach((day) => {
+    const hotelName = day.accommodation?.name;
+    const location = day.places?.[0]?.customName || '';
+    if (hotelName) {
+      if (currentStay && currentStay.hotelName === hotelName) {
+        currentStay.endDayNum = day.dayNumber;
+      } else {
+        if (currentStay) hotelBookings.push(currentStay);
+        currentStay = { location: location || (currentStay ? currentStay.location : ''), hotelName, startDayNum: day.dayNumber, endDayNum: day.dayNumber };
+      }
+    } else if (currentStay) {
+      hotelBookings.push(currentStay);
+      currentStay = null;
+    }
+  });
+  if (currentStay) hotelBookings.push(currentStay);
+  return hotelBookings.map((stay) => ({
+    location: stay.location,
+    hotelName: stay.hotelName,
+    checkIn: getDate(stay.startDayNum - 1),
+    checkOut: getDate(stay.endDayNum),
+  }));
+};
+
+const emptyFormData = (lead) => ({
+  leadId: lead?.id || lead?._id,
+  packageId: '',
+  customizedPackageId: '',
+  customer: { name: lead?.name || '', email: lead?.email || '', phone: lead?.phone || '', address: '' },
+  locationDates: [],
+  travelStartDate: lead?.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
+  travelEndDate: lead?.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
+  mealPlans: [],
+  itinerarySummary: [],
+  flightSegments: [],
+  packageDetails: { name: '', destination: '', duration: 0, category: '', inclusions: [], exclusions: [], highlights: [] },
+  notes: '',
+  terms: [],
+  specialInstructions: '',
+});
+
+const VoucherDialog = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialSelectionId }) => {
+  const leadId = lead?.id || lead?._id;
+
   const [loading, setLoading] = useState(false);
   const [showPDFPreview, setShowPDFPreview] = useState(false);
   const [currentVoucherId, setCurrentVoucherId] = useState(null);
   const [existingVouchers, setExistingVouchers] = useState([]);
-  const [loadingExisting, setLoadingExisting] = useState(false);
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [allVouchers, setAllVouchers] = useState([]);
-  const [loadingAllVouchers, setLoadingAllVouchers] = useState(false);
-  const [selectedVoucherForDownload, setSelectedVoucherForDownload] = useState('');
-  const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [packageData, setPackageData] = useState(null);
-  const [itineraryData, setItineraryData] = useState(null);
   const [loadingPackage, setLoadingPackage] = useState(false);
-  const [allLocations, setAllLocations] = useState([]);
   const [activeSection, setActiveSection] = useState('overview');
 
-  const [formData, setFormData] = useState({
-    lead: lead?._id || lead?.id,
-    package: lead?.package?._id || lead?.package || '',
-    customizedPackage: lead?.customizedPackage?._id || lead?.customizedPackage || '',
-    customer: { name: lead?.name || '', email: lead?.email || '', phone: lead?.phone || '', address: lead?.address || '' },
-    locationDates: [],
-    travelStartDate: '',
-    travelEndDate: '',
-    mealPlans: [],
-    itinerarySummary: [],
-    packageDetails: { name: '', destination: '', duration: 0, category: '', inclusions: [], exclusions: [], highlights: [] },
-    notes: '',
-    terms: [],
-    specialInstructions: '',
-  });
+  const [selections, setSelections] = useState([]);
+  const [activeSelectionId, setActiveSelectionId] = useState(null);
+  const activeSelection = useMemo(
+    () => selections.find((s) => s.id === activeSelectionId) || null,
+    [selections, activeSelectionId],
+  );
 
-  // === ALL LOGIC FUNCTIONS PRESERVED ===
+  const [channel, setChannel] = useState('email');
+  const [sendEmail, setSendEmail] = useState('');
+  const [sendPhone, setSendPhone] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const [formData, setFormData] = useState(emptyFormData(lead));
+
+  const loadSelections = useCallback(async () => {
+    if (!leadId) return;
+    setLoadingPackage(true);
+    try {
+      const res = await leadAPI.getPackageSelections(leadId);
+      const list = res?.data || [];
+      setSelections(list);
+      const mostRecentlyAccepted = [...list]
+        .filter((s) => s.quoteAcceptedAt)
+        .sort((a, b) => new Date(b.quoteAcceptedAt) - new Date(a.quoteAcceptedAt))[0];
+      const preferred = list.find((s) => s.id === initialSelectionId)
+        || mostRecentlyAccepted
+        || list.find((s) => s.id === lead?.primarySelectionId)
+        || list[0];
+      setActiveSelectionId(preferred ? preferred.id : null);
+    } catch (error) {
+      console.error('[Voucher] Failed to load package selections:', error);
+      toast.error('Failed to load packages for this lead');
+      setSelections([]);
+    } finally {
+      setLoadingPackage(false);
+    }
+  }, [leadId, lead?.primarySelectionId, initialSelectionId]);
+
+  const fetchExistingVouchers = useCallback(async () => {
+    if (!leadId) return;
+    try {
+      const response = await voucherAPI.getByLead(leadId);
+      setExistingVouchers(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching existing vouchers:', error);
+    }
+  }, [leadId]);
+
+  const loadFlightSegments = useCallback(async () => {
+    if (!leadId) return;
+    try {
+      const res = await flightAPI.getItineraryFlights(leadId);
+      const bookings = res?.data || [];
+      const flightSegments = bookings.flatMap((booking) =>
+        [...(booking.segments || [])]
+          .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+          .map((seg) => ({
+            dayNumber: booking.dayNumber,
+            marketingCarrier: seg.marketingCarrier || '',
+            flightNumber: seg.flightNumber || '',
+            origin: seg.origin || '',
+            destination: seg.destination || '',
+            departureAt: seg.departureAt || '',
+            arrivalAt: seg.arrivalAt || '',
+          })));
+      setFormData((prev) => ({ ...prev, flightSegments }));
+    } catch (error) {
+      console.error('[Voucher] Failed to load flight segments:', error);
+    }
+  }, [leadId]);
+
+  // Reset the form and reload everything whenever the dialog is (re)opened for a lead.
   useEffect(() => {
     if (isOpen && lead) {
-      setFormData({
-        lead: lead._id || lead.id,
-        package: '',
-        customizedPackage: '',
-        customer: { name: lead.name || '', email: lead.email || '', phone: lead.phone || '', address: lead.address || '' },
-        locationDates: [],
-        travelStartDate: lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '',
-        travelEndDate: lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : '',
-        mealPlans: [],
-        itinerarySummary: [],
-        packageDetails: { name: '', destination: '', duration: 0, category: '', inclusions: [], exclusions: [], highlights: [], images: [], coverImage: null, price: 0 },
-        notes: '',
-        terms: [],
-        specialInstructions: '',
-      });
-      setPackageData(null);
-      setItineraryData(null);
-      setAllLocations([]);
+      setFormData(emptyFormData(lead));
+      setSelections([]);
+      setActiveSelectionId(null);
       setCurrentVoucher(null);
+      setCurrentVoucherId(null);
       setIsEditing(false);
-      setSendEmailAddress(lead?.email || lead?.customer?.email || '');
+      setChannel('email');
+      setSendEmail(lead?.email || '');
+      setSendPhone(lead?.whatsapp || lead?.phone || '');
       fetchExistingVouchers();
-      fetchAllVouchers();
-      loadPackageAndItinerary();
+      loadSelections();
+      loadFlightSegments();
     }
-  }, [isOpen, lead?._id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, leadId]);
 
-  const loadPackageAndItinerary = async () => {
-    if (!lead) return;
-    try {
-      setLoadingPackage(true);
-      let pkg = null;
-      let itineraryId = null;
-
-      if (lead.customizedPackage?._id || lead.customizedPackage) {
-        const packageId = lead.customizedPackage._id || lead.customizedPackage;
-        const response = await customizedPackageAPI.getById(packageId);
-        if (response.success || response.status === 'success') {
-          pkg = response.data || response;
-          setPackageData(pkg);
-          setFormData(prev => ({
-            ...prev,
-            customizedPackage: packageId,
-            packageDetails: { name: pkg.name || '', destination: pkg.destination || '', duration: pkg.duration || 0, category: pkg.category || '', inclusions: pkg.inclusions || [], exclusions: pkg.exclusions || [], highlights: pkg.highlights || [] },
-          }));
-          itineraryId = pkg.itinerary?._id || pkg.itinerary?.id || pkg.itinerary;
-        }
-      } else if (lead.package?._id || lead.package) {
-        const packageId = lead.package._id || lead.package;
-        const response = await packageAPI.getById(packageId);
-        if (response.success || response.status === 'success') {
-          pkg = response.data || response;
-          setPackageData(pkg);
-          setFormData(prev => ({
-            ...prev,
-            package: packageId,
-            packageDetails: { name: pkg.name || '', destination: pkg.destination || '', duration: pkg.duration || 0, category: pkg.category || '', inclusions: pkg.inclusions || [], exclusions: pkg.exclusions || [], highlights: pkg.highlights || [] },
-          }));
-          itineraryId = pkg.itinerary?._id || pkg.itinerary?.id || pkg.itinerary;
-        }
-      } else {
+  // Rebuild package/hotel/meal/itinerary data whenever the active selection changes.
+  useEffect(() => {
+    if (!activeSelection) return;
+    (async () => {
+      let packageDetails = {
+        name: activeSelection.packageName || (activeSelection.isManual ? 'Manual Itinerary' : ''),
+        destination: '',
+        duration: activeSelection.itineraryDays?.length || 0,
+        category: '',
+        inclusions: [],
+        exclusions: [],
+        highlights: [],
+      };
+      if (!activeSelection.isManual && activeSelection.packageId) {
         try {
-          const quotationResponse = await quotationAPI.getByLead(lead._id || lead.id);
-          if (quotationResponse.success || quotationResponse.status === 'success') {
-            const quotations = quotationResponse.data?.quotations || quotationResponse.data || [];
-            let selectedQuotation = quotations.find(q => q.itinerary);
-            if (!selectedQuotation && quotations.length > 0) selectedQuotation = quotations[0];
-            if (selectedQuotation) {
-              itineraryId = selectedQuotation.itinerary?._id || selectedQuotation.itinerary;
-              if (!itineraryId && (lead.itinerary?._id || lead.itinerary)) itineraryId = lead.itinerary._id || lead.itinerary;
-              const quoteImages = selectedQuotation.images?.length > 0 ? selectedQuotation.images.map(img => ({ url: img.url, isCover: img.isCover || false })) : (selectedQuotation.coverImage ? [{ url: selectedQuotation.coverImage, isCover: true }] : []);
-              const coverImg = quoteImages.find(img => img.isCover) || quoteImages[0];
-              setFormData(prev => ({
-                ...prev,
-                packageDetails: { name: selectedQuotation.package?.name || 'Manual Itinerary', destination: lead.destination || 'Custom Destination', duration: 0, category: 'Custom', inclusions: selectedQuotation.includedServices || [], exclusions: selectedQuotation.excludedServices || [], highlights: [], images: quoteImages, coverImage: coverImg ? { url: coverImg.url } : null, price: selectedQuotation.totalAmount || 0 },
-              }));
-            }
-          }
-        } catch (error) { console.error('[Voucher] Error loading manual itinerary:', error); }
+          const res = await packageAPI.getById(activeSelection.packageId);
+          const pkg = res?.data || res;
+          packageDetails = {
+            name: pkg.title || packageDetails.name,
+            destination: pkg.destination || '',
+            duration: pkg.durationDays || activeSelection.itineraryDays?.length || 0,
+            category: pkg.category || '',
+            inclusions: Array.isArray(pkg.inclusions) ? pkg.inclusions : [],
+            exclusions: Array.isArray(pkg.exclusions) ? pkg.exclusions : [],
+            highlights: [],
+            price: Number(pkg.basePrice) || 0,
+            coverImage: pkg.coverImage ? { url: pkg.coverImage } : null,
+          };
+        } catch (error) {
+          console.error('[Voucher] Failed to load package details:', error);
+        }
       }
 
-      if (itineraryId) {
-        try {
-          let itineraryResponse;
-          if (!lead.package && !lead.customizedPackage) {
-            itineraryResponse = await manualItineraryAPI.getByLead(lead._id || lead.id);
-          } else {
-            const itineraryIdString = typeof itineraryId === 'object' ? (itineraryId._id || itineraryId.id || null) : itineraryId;
-            if (!itineraryIdString) return;
-            itineraryResponse = await itineraryAPI.getById(itineraryIdString);
-          }
-          if (itineraryResponse.success || itineraryResponse.status === 'success') {
-            const itinerary = itineraryResponse.data || itineraryResponse;
-            setItineraryData(itinerary);
-            if (!lead.package && !lead.customizedPackage && itinerary.days?.length) {
-              setFormData(prev => ({ ...prev, packageDetails: { ...prev.packageDetails, duration: itinerary.days.length } }));
-            }
-            const locationsSet = new Set();
-            itinerary.days?.forEach(day => { day.locations?.forEach(loc => { if (loc) locationsSet.add(loc); }); });
-            setAllLocations(Array.from(locationsSet));
-            if (itinerary.days?.length > 0) {
-              const hotelBookings = [];
-              let currentStay = null;
-              const travelStartDate = lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : '';
-              const getDate = (offset) => { if (!travelStartDate) return ''; const date = new Date(travelStartDate); date.setDate(date.getDate() + offset); return date.toISOString().split('T')[0]; };
-              itinerary.days.forEach((day) => {
-                const hotelName = day.accommodation?.name;
-                const location = day.locations?.length > 0 ? day.locations[0] : '';
-                if (hotelName) {
-                  if (currentStay && currentStay.hotelName === hotelName) { currentStay.endDayNum = day.dayNumber; }
-                  else { if (currentStay) hotelBookings.push(currentStay); currentStay = { location: location || (currentStay ? currentStay.location : ''), hotelName, startDayNum: day.dayNumber, endDayNum: day.dayNumber }; }
-                } else if (currentStay) { hotelBookings.push(currentStay); currentStay = null; }
-              });
-              if (currentStay) hotelBookings.push(currentStay);
-              const newLocationDates = hotelBookings.map(stay => ({ location: stay.location, hotelName: stay.hotelName, checkIn: getDate(stay.startDayNum - 1), checkOut: getDate(stay.endDayNum) }));
-              if (newLocationDates.length === 0 && Array.from(locationsSet).length > 0) Array.from(locationsSet).forEach(loc => { newLocationDates.push({ location: loc, hotelName: '', checkIn: '', checkOut: '' }); });
-              setFormData(prev => ({ ...prev, locationDates: newLocationDates.length > 0 ? newLocationDates : prev.locationDates }));
-            } else if (Array.from(locationsSet).length > 0) {
-              setFormData(prev => { if (prev.locationDates.length === 0) return { ...prev, locationDates: Array.from(locationsSet).map(location => ({ location, hotelName: '', checkIn: '', checkOut: '' })) }; return prev; });
-            }
-            setFormData(prev => ({
-              ...prev,
-              mealPlans: itinerary.days?.map(day => ({ dayNumber: day.dayNumber, dayTitle: day.title || '', breakfast: day.meals?.breakfast || false, lunch: day.meals?.lunch || false, dinner: day.meals?.dinner || false })) || [],
-              itinerarySummary: itinerary.days?.map(day => ({ dayNumber: day.dayNumber, title: day.title || '', locations: day.locations || [], activities: day.activities || [], accommodation: { name: day.accommodation?.name || '', type: day.accommodation?.type || '' } })) || [],
-            }));
-          }
-        } catch (error) { console.error('Error loading itinerary:', error); }
-      }
-    } catch (error) { console.error('Error loading package:', error); toast.error('Failed to load package data'); }
-    finally { setLoadingPackage(false); }
-  };
-
-  const fetchExistingVouchers = async () => {
-    if (!lead?._id && !lead?.id) return;
-    try { setLoadingExisting(true); const response = await voucherAPI.getByLead(lead._id || lead.id); if (response.success || response.status === 'success') { const vouchersData = response.data?.vouchers || response.data?.data || response.data || []; setExistingVouchers(Array.isArray(vouchersData) ? vouchersData : []); } } catch (error) { console.error('Error fetching existing vouchers:', error); } finally { setLoadingExisting(false); }
-  };
-
-  const fetchAllVouchers = async () => {
-    try { setLoadingAllVouchers(true); const response = await voucherAPI.getAll({ limit: 1000, page: 1 }); if (response.success || response.status === 'success') setAllVouchers(Array.isArray(response.data) ? response.data : []); } catch (error) { console.error('Error fetching all vouchers:', error); } finally { setLoadingAllVouchers(false); }
-  };
+      const days = activeSelection.itineraryDays || [];
+      setFormData((prev) => ({
+        ...prev,
+        packageId: activeSelection.isManual ? '' : (activeSelection.packageId || ''),
+        customizedPackageId: '',
+        packageDetails,
+        mealPlans: days.map((day) => ({
+          dayNumber: day.dayNumber,
+          dayTitle: day.title || '',
+          breakfast: (day.breakfastCount || 0) > 0,
+          lunch: (day.lunchCount || 0) > 0,
+          dinner: (day.dinnerCount || 0) > 0,
+        })),
+        itinerarySummary: days.map((day) => ({
+          dayNumber: day.dayNumber,
+          title: day.title || '',
+          locations: (day.places || []).map((p) => p.customName).filter(Boolean),
+          activities: (day.activities || []).map((a) => a.name).filter(Boolean),
+          accommodationName: day.accommodation?.name || '',
+          accommodationType: day.accommodation?.type || '',
+        })),
+        locationDates: buildHotelStaysFromDays(days, prev.travelStartDate),
+      }));
+    })();
+  }, [activeSelection]);
 
   const handleLocationDateChange = (index, field, value) => { setFormData(prev => { const newLocationDates = [...prev.locationDates]; newLocationDates[index] = { ...newLocationDates[index], [field]: value }; return { ...prev, locationDates: newLocationDates }; }); };
   const addLocationDate = () => { setFormData(prev => ({ ...prev, locationDates: [...prev.locationDates, { location: '', hotelName: '', checkIn: '', checkOut: '' }] })); };
   const removeLocationDate = (index) => { setFormData(prev => ({ ...prev, locationDates: prev.locationDates.filter((_, i) => i !== index) })); };
 
+  const handleFlightSegmentChange = (index, field, value) => { setFormData(prev => { const segments = [...prev.flightSegments]; segments[index] = { ...segments[index], [field]: value }; return { ...prev, flightSegments: segments }; }); };
+  const addFlightSegment = () => { setFormData(prev => ({ ...prev, flightSegments: [...prev.flightSegments, { dayNumber: '', marketingCarrier: '', flightNumber: '', origin: '', destination: '', departureAt: '', arrivalAt: '' }] })); };
+  const removeFlightSegment = (index) => { setFormData(prev => ({ ...prev, flightSegments: prev.flightSegments.filter((_, i) => i !== index) })); };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.customer.name.trim() || !formData.customer.email.trim()) {
+      toast.error('Customer name and email are required');
+      return;
+    }
     try {
       setLoading(true);
-      const cleanedFormData = { ...formData, package: formData.package?.trim() ? formData.package : undefined, customizedPackage: formData.customizedPackage?.trim() ? formData.customizedPackage : undefined, itinerarySummary: formData.itinerarySummary?.map(day => ({ dayNumber: day.dayNumber, title: day.title || '', locations: day.locations || [], activities: day.activities || [], accommodation: day.accommodation && typeof day.accommodation === 'object' ? { name: day.accommodation.name || '', type: day.accommodation.type || '' } : { name: '', type: '' } })) || [], travelStartDate: formData.travelStartDate?.trim() ? formData.travelStartDate : null, travelEndDate: formData.travelEndDate?.trim() ? formData.travelEndDate : null, locationDates: formData.locationDates?.filter(ld => ld.location?.trim()) || [] };
-      if (!cleanedFormData.package && !cleanedFormData.customizedPackage) { if (!formData.mealPlans?.length) delete cleanedFormData.mealPlans; if (cleanedFormData.packageDetails) { if (!cleanedFormData.packageDetails.inclusions?.length) delete cleanedFormData.packageDetails.inclusions; if (!cleanedFormData.packageDetails.exclusions?.length) delete cleanedFormData.packageDetails.exclusions; } }
+      const cleanedFormData = {
+        leadId,
+        packageId: formData.packageId?.trim() || undefined,
+        customizedPackageId: formData.customizedPackageId?.trim() || undefined,
+        customerName: formData.customer.name,
+        customerEmail: formData.customer.email,
+        customerPhone: formData.customer.phone || undefined,
+        customerAddress: formData.customer.address || undefined,
+        packageDetails: formData.packageDetails,
+        travelStartDate: formData.travelStartDate?.trim() ? formData.travelStartDate : null,
+        travelEndDate: formData.travelEndDate?.trim() ? formData.travelEndDate : null,
+        notes: formData.notes,
+        terms: formData.terms,
+        specialInstructions: formData.specialInstructions,
+        locationDates: formData.locationDates?.filter(ld => ld.location?.trim() || ld.hotelName?.trim()) || [],
+        mealPlans: formData.mealPlans || [],
+        itinerarySummary: (formData.itinerarySummary || []).map(day => ({
+          dayNumber: day.dayNumber,
+          title: day.title || '',
+          locations: day.locations || [],
+          activities: day.activities || [],
+          accommodationName: day.accommodationName || '',
+          accommodationType: day.accommodationType || '',
+        })),
+        flightSegments: (formData.flightSegments || []).filter(f => f.marketingCarrier?.trim() || f.flightNumber?.trim()),
+      };
+
       let response;
       if (isEditing && currentVoucherId) response = await voucherAPI.update(currentVoucherId, cleanedFormData);
       else response = await voucherAPI.create(cleanedFormData);
-      if (response.success || response.status === 'success') { const newVoucherId = response.data?._id || response.data?.id; setCurrentVoucherId(newVoucherId); toast.success(isEditing ? 'Voucher updated successfully' : 'Voucher created successfully'); if (onSuccess) onSuccess(); fetchExistingVouchers(); setIsEditing(true); }
-      else toast.error(response.message || 'Failed to save voucher');
-    } catch (error) { toast.error(error.message || 'Failed to save voucher'); } finally { setLoading(false); }
+
+      const newVoucherId = response.data?.id;
+      setCurrentVoucherId(newVoucherId);
+      setCurrentVoucher(response.data);
+      toast.success(isEditing ? 'Voucher updated successfully' : 'Voucher created successfully');
+      if (onSuccess) onSuccess();
+      fetchExistingVouchers();
+      setIsEditing(true);
+    } catch (error) {
+      toast.error(error.message || 'Failed to save voucher');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDownloadPDF = async (voucherId = null) => { const idToDownload = voucherId || currentVoucherId || selectedVoucherForDownload; if (!idToDownload) { toast.error('Please select a voucher to download'); return; } try { await voucherAPI.downloadPDF(idToDownload); toast.success('Voucher PDF downloaded'); } catch (error) { toast.error('Failed to download voucher PDF'); } };
-  const handlePreviewPDF = async () => { if (!currentVoucherId) { toast.error('Please save the voucher first'); return; } setShowPDFPreview(true); };
-  const handleSendEmail = async () => { if (!currentVoucherId) { toast.error('Please save the voucher first'); return; } if (!sendEmailAddress.trim()) { toast.error('Please enter an email address'); return; } try { setSendingEmail(true); const response = await voucherAPI.sendEmail(currentVoucherId, sendEmailAddress); if (response.success || response.status === 'success') toast.success('Voucher sent via email successfully'); else toast.error(response.message || 'Failed to send email'); } catch (error) { toast.error(error.message || 'Failed to send email'); } finally { setSendingEmail(false); } };
-  const handleSendWhatsApp = () => { if (!lead?.whatsapp && !lead?.phone) { toast.error('WhatsApp number not available'); return; } const whatsappNumber = lead.whatsapp || lead.phone; const message = encodeURIComponent(`Hello ${lead.name},\n\nYour travel voucher has been prepared. Please check your email for details.\n\nVoucher Number: ${formData.voucherNumber || 'Pending'}\n\n${getThankYouMessage()}`); window.open(`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${message}`, '_blank'); };
+  const handleDownloadPDF = async (voucherId = null) => {
+    const idToDownload = voucherId || currentVoucherId;
+    if (!idToDownload) { toast.error('Please save the voucher first'); return; }
+    try {
+      await voucherAPI.downloadPDF(idToDownload);
+      toast.success('Voucher PDF downloaded');
+    } catch (error) {
+      toast.error('Failed to download voucher PDF');
+    }
+  };
+
+  const handlePreviewPDF = async () => {
+    if (!currentVoucherId) { toast.error('Please save the voucher first'); return; }
+    setShowPDFPreview(true);
+  };
+
+  const handleSend = async () => {
+    if (!currentVoucherId) { toast.error('Please save the voucher first'); return; }
+    const recipient = channel === 'email' ? sendEmail.trim() : sendPhone.trim();
+    if (!recipient) {
+      toast.error(channel === 'email' ? 'Enter a recipient email' : 'Enter a WhatsApp number');
+      return;
+    }
+    setSending(true);
+    try {
+      const payload = channel === 'email' ? { channel, email: recipient } : { channel, phone: recipient };
+      const response = await voucherAPI.send(currentVoucherId, payload);
+      if (response.data) setCurrentVoucher(response.data);
+      toast.success(channel === 'email' ? 'Voucher emailed' : 'Voucher sent via WhatsApp');
+      onSuccess?.();
+    } catch (error) {
+      toast.error(error.message || 'Failed to send voucher');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const loadExistingVoucher = async (voucherId) => {
-    try { const response = await voucherAPI.getById(voucherId); if (response.success || response.status === 'success') { const voucher = response.data || response; setCurrentVoucher(voucher); setCurrentVoucherId(voucherId); setIsEditing(true); setFormData({ lead: voucher.lead?._id || voucher.lead || lead._id || lead.id, package: voucher.package?._id || voucher.package || '', customizedPackage: voucher.customizedPackage?._id || voucher.customizedPackage || '', customer: voucher.customer || { name: lead.name || '', email: lead.email || '', phone: lead.phone || '', address: lead.address || '' }, locationDates: voucher.locationDates || [], travelStartDate: voucher.travelStartDate ? new Date(voucher.travelStartDate).toISOString().split('T')[0] : '', travelEndDate: voucher.travelEndDate ? new Date(voucher.travelEndDate).toISOString().split('T')[0] : '', mealPlans: voucher.mealPlans || [], itinerarySummary: voucher.itinerarySummary || [], packageDetails: voucher.packageDetails || formData.packageDetails, notes: voucher.notes || '', terms: voucher.terms || [], specialInstructions: voucher.specialInstructions || '' }); setSendEmailAddress(voucher.customer?.email || lead?.email || ''); } } catch (error) { toast.error('Failed to load voucher'); }
+    try {
+      const response = await voucherAPI.getById(voucherId);
+      const voucher = response.data || response;
+      setCurrentVoucher(voucher);
+      setCurrentVoucherId(voucherId);
+      setIsEditing(true);
+      setFormData({
+        leadId: voucher.leadId || leadId,
+        packageId: voucher.packageId || '',
+        customizedPackageId: voucher.customizedPackageId || '',
+        customer: {
+          name: voucher.customerName || lead?.name || '',
+          email: voucher.customerEmail || lead?.email || '',
+          phone: voucher.customerPhone || lead?.phone || '',
+          address: voucher.customerAddress || '',
+        },
+        locationDates: voucher.locationDates || [],
+        travelStartDate: voucher.travelStartDate ? new Date(voucher.travelStartDate).toISOString().split('T')[0] : '',
+        travelEndDate: voucher.travelEndDate ? new Date(voucher.travelEndDate).toISOString().split('T')[0] : '',
+        mealPlans: voucher.mealPlans || [],
+        itinerarySummary: voucher.itinerarySummary || [],
+        flightSegments: voucher.flightSegments || [],
+        packageDetails: voucher.packageDetails || emptyFormData(lead).packageDetails,
+        notes: voucher.notes || '',
+        terms: voucher.terms || [],
+        specialInstructions: voucher.specialInstructions || '',
+      });
+      setSendEmail(voucher.customerEmail || lead?.email || '');
+      setSendPhone(voucher.customerPhone || lead?.whatsapp || lead?.phone || '');
+    } catch (error) {
+      toast.error('Failed to load voucher');
+    }
   };
 
   if (!isOpen) return null;
@@ -220,6 +359,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     { id: 'hotels', label: 'Hotels', icon: Hotel },
     { id: 'meals', label: 'Meals', icon: Utensils },
     { id: 'itinerary', label: 'Itinerary', icon: MapPin },
+    { id: 'flights', label: 'Flights', icon: Plane },
     { id: 'notes', label: 'Notes', icon: FileText },
   ];
 
@@ -279,6 +419,24 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             ))}
           </nav>
 
+          {/* Package selector (only when the lead has more than one) */}
+          {selections.length > 1 && (
+            <div className="p-4 border-t border-white/10">
+              <p className="text-xs text-emerald-200 mb-2">Package</p>
+              <select
+                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-white/30"
+                value={activeSelectionId || ''}
+                onChange={(e) => setActiveSelectionId(e.target.value)}
+              >
+                {selections.map((s) => (
+                  <option key={s.id} value={s.id} className="text-gray-900">
+                    {s.isManual ? 'Manual Itinerary' : (s.packageName || 'Package')}{s.quoteAcceptedAt ? ' (accepted)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Existing Vouchers */}
           {existingVouchers.length > 0 && (
             <div className="p-4 border-t border-white/10">
@@ -290,8 +448,8 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
               >
                 <option value="" className="text-gray-900">+ New Voucher</option>
                 {existingVouchers.map((v) => (
-                  <option key={v._id || v.id} value={v._id || v.id} className="text-gray-900">
-                    {v.voucherNumber || v._id?.slice(-6)}
+                  <option key={v.id} value={v.id} className="text-gray-900">
+                    {v.voucherNumber || v.id?.slice(-6)}
                   </option>
                 ))}
               </select>
@@ -345,6 +503,29 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                         <div><p className="text-emerald-100 text-xs">Duration</p><p className="font-semibold">{formData.packageDetails.duration || 0} Days</p></div>
                         <div><p className="text-emerald-100 text-xs">Category</p><p className="font-semibold">{formData.packageDetails.category || '—'}</p></div>
                         <div><p className="text-emerald-100 text-xs">Hotels</p><p className="font-semibold">{formData.locationDates.length} Properties</p></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer details */}
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <h4 className="font-bold text-gray-900 mb-4">Customer Details</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Name</label>
+                        <input type="text" value={formData.customer.name} onChange={(e) => setFormData(prev => ({ ...prev, customer: { ...prev.customer, name: e.target.value } }))} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Email</label>
+                        <input type="email" value={formData.customer.email} onChange={(e) => setFormData(prev => ({ ...prev, customer: { ...prev.customer, email: e.target.value } }))} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Phone</label>
+                        <input type="tel" value={formData.customer.phone} onChange={(e) => setFormData(prev => ({ ...prev, customer: { ...prev.customer, phone: e.target.value } }))} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Address</label>
+                        <input type="text" value={formData.customer.address} onChange={(e) => setFormData(prev => ({ ...prev, customer: { ...prev.customer, address: e.target.value } }))} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
                       </div>
                     </div>
                   </div>
@@ -405,9 +586,14 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                       <h3 className="text-xl font-bold text-gray-900">Hotel Accommodations</h3>
                       <p className="text-sm text-gray-500">{formData.locationDates.length} properties added</p>
                     </div>
-                    <button type="button" onClick={addLocationDate} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 font-medium">
-                      <Plus className="w-5 h-5" /> Add Hotel
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => onEditLead?.(lead, activeSelectionId)} className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium text-sm">
+                        <Pencil className="w-4 h-4" /> Manage in itinerary editor
+                      </button>
+                      <button type="button" onClick={addLocationDate} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 font-medium">
+                        <Plus className="w-5 h-5" /> Add Hotel
+                      </button>
+                    </div>
                   </div>
                   {formData.locationDates.length === 0 ? (
                     <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-gray-200">
@@ -500,11 +686,83 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                               <h4 className="font-semibold text-gray-900">{day.title || `Day ${day.dayNumber}`}</h4>
                               {day.locations?.length > 0 && (<p className="text-sm text-gray-500 mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {day.locations.join(' → ')}</p>)}
-                              {day.accommodation?.name && (<p className="text-xs text-emerald-600 mt-2 flex items-center gap-1"><Hotel className="w-3 h-3" /> {day.accommodation.name}</p>)}
+                              {day.accommodationName && (<p className="text-xs text-emerald-600 mt-2 flex items-center gap-1"><Hotel className="w-3 h-3" /> {day.accommodationName}</p>)}
                             </div>
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* FLIGHTS Section */}
+              {activeSection === 'flights' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Flight Segments</h3>
+                      <p className="text-sm text-gray-500">{formData.flightSegments.length} segments added</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => onEditLead?.(lead, activeSelectionId)} className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium text-sm">
+                        <Pencil className="w-4 h-4" /> Manage flights & itinerary
+                      </button>
+                      <button type="button" onClick={addFlightSegment} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 font-medium">
+                        <Plus className="w-5 h-5" /> Add Flight
+                      </button>
+                    </div>
+                  </div>
+                  {formData.flightSegments.length === 0 ? (
+                    <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-gray-200">
+                      <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500 font-medium">No flight segments added yet</p>
+                      <p className="text-gray-400 text-sm mt-1">Segments booked for this lead's itinerary load automatically, or add one manually</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {formData.flightSegments.map((seg, index) => (
+                        <div key={index} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                          <div className="bg-gradient-to-r from-sky-50 to-blue-50 px-5 py-3 flex justify-between items-center border-b border-sky-100">
+                            <div className="flex items-center gap-3">
+                              <span className="w-8 h-8 bg-sky-500 text-white rounded-lg flex items-center justify-center font-bold text-sm">{index + 1}</span>
+                              <span className="font-semibold text-gray-800">{seg.marketingCarrier || ''} {seg.flightNumber || 'Flight'}</span>
+                            </div>
+                            <button type="button" onClick={() => removeFlightSegment(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Day</label>
+                              <input type="number" min="1" value={seg.dayNumber ?? ''} onChange={(e) => handleFlightSegmentChange(index, 'dayNumber', e.target.value ? Number(e.target.value) : '')} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Carrier</label>
+                              <input type="text" value={seg.marketingCarrier || ''} onChange={(e) => handleFlightSegmentChange(index, 'marketingCarrier', e.target.value)} placeholder="e.g. UL" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Flight No.</label>
+                              <input type="text" value={seg.flightNumber || ''} onChange={(e) => handleFlightSegmentChange(index, 'flightNumber', e.target.value)} placeholder="e.g. UL103" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div />
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Origin</label>
+                              <input type="text" value={seg.origin || ''} onChange={(e) => handleFlightSegmentChange(index, 'origin', e.target.value)} placeholder="e.g. CMB" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Destination</label>
+                              <input type="text" value={seg.destination || ''} onChange={(e) => handleFlightSegmentChange(index, 'destination', e.target.value)} placeholder="e.g. MLE" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Departs</label>
+                              <input type="datetime-local" value={seg.departureAt ? new Date(seg.departureAt).toISOString().slice(0, 16) : ''} onChange={(e) => handleFlightSegmentChange(index, 'departureAt', e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Arrives</label>
+                              <input type="datetime-local" value={seg.arrivalAt ? new Date(seg.arrivalAt).toISOString().slice(0, 16) : ''} onChange={(e) => handleFlightSegmentChange(index, 'arrivalAt', e.target.value)} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -522,13 +780,16 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                     <textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} rows="3" className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl resize-none focus:ring-2 focus:ring-emerald-500 text-gray-700" placeholder="Internal notes (not visible on voucher)..." />
                   </div>
                   {currentVoucherId && (
-                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
-                      <h4 className="font-bold text-gray-900 mb-4">📤 Send Voucher</h4>
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <button type="button" onClick={handleSendEmail} disabled={sendingEmail} className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"><Send className="w-4 h-4" />{sendingEmail ? 'Sending...' : 'Email'}</button>
-                        <button type="button" onClick={handleSendWhatsApp} className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium flex items-center gap-2"><MessageCircle className="w-4 h-4" />WhatsApp</button>
-                      </div>
-                    </div>
+                    <SendDocumentPanel
+                      channel={channel}
+                      onChannelChange={setChannel}
+                      email={sendEmail}
+                      onEmailChange={setSendEmail}
+                      phone={sendPhone}
+                      onPhoneChange={setSendPhone}
+                      onSend={handleSend}
+                      sending={sending}
+                    />
                   )}
                 </div>
               )}
