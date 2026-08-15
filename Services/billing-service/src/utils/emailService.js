@@ -198,4 +198,64 @@ export async function sendReceiptEmail({ receipt, recipientEmail, pdfBuffer }) {
   });
 }
 
-export default { isEmailConfigured, sendQuotationEmail, sendInvoiceEmail, sendReceiptEmail };
+function voucherEmailHtml(voucher, branding) {
+  const customerName = voucher.customerName || 'Customer';
+  const datesLine = voucher.travelStartDate
+    ? `<div style="color:#64748B;font-size:13px;margin-top:10px;">Travel dates: ${formatDate(voucher.travelStartDate)} – ${formatDate(voucher.travelEndDate)}</div>`
+    : '';
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#0F172A;">
+    <div style="background:linear-gradient(135deg,#0F766E,#14B8A6);padding:28px 32px;border-radius:12px 12px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">${branding.company.name}</h1>
+      <p style="color:#E0F2F1;margin:6px 0 0;font-size:13px;">${branding.company.tagline}</p>
+    </div>
+    <div style="border:1px solid #E2E8F0;border-top:none;border-radius:0 0 12px 12px;padding:32px;">
+      <h2 style="font-size:20px;margin:0 0 8px;">Your Travel Voucher ✈️</h2>
+      <p style="color:#64748B;line-height:1.6;">Dear ${customerName},</p>
+      <p style="color:#64748B;line-height:1.6;">Thank you for booking with ${branding.company.name}. Please find your travel voucher
+        <strong>${voucher.voucherNumber || ''}</strong> attached as a PDF.</p>
+      <div style="background:#F1F5F9;border-radius:10px;padding:20px;margin:20px 0;">
+        <div style="color:#0F766E;font-size:13px;">Voucher Number</div>
+        <div style="font-size:22px;font-weight:700;">${voucher.voucherNumber || ''}</div>
+        ${datesLine}
+      </div>
+      <p style="color:#64748B;line-height:1.6;">If you have any questions about your trip, simply reply to this email.</p>
+      <p style="color:#94A3B8;font-size:12px;margin-top:24px;">${branding.company.name} · ${branding.contact.email} · ${branding.contact.phone}</p>
+    </div>
+  </div>`;
+}
+
+/**
+ * Send a travel voucher email with the PDF attached.
+ * @param {object} params
+ * @param {object} params.voucher - the voucher snapshot
+ * @param {string} params.recipientEmail
+ * @param {Buffer} params.pdfBuffer
+ * @throws {Error} when SMTP is not configured
+ */
+export async function sendVoucherEmail({ voucher, recipientEmail, pdfBuffer }) {
+  const transporter = buildTransport();
+  if (!transporter) {
+    throw new Error('Email is not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD)');
+  }
+  if (!recipientEmail) throw new Error('No recipient email provided');
+
+  const branding = toBrandingShape(await getOrgSettings());
+
+  const subject = voucher.voucherNumber
+    ? `${branding.company.name} Travel Voucher - ${voucher.voucherNumber}`
+    : `${branding.company.name} Travel Voucher`;
+
+  return transporter.sendMail({
+    from: getEmailFrom(branding),
+    to: recipientEmail,
+    subject,
+    html: voucherEmailHtml(voucher, branding),
+    text: `Dear ${voucher.customerName || 'Customer'},\n\nPlease find your travel voucher attached.\nVoucher: ${voucher.voucherNumber || ''}\n`,
+    attachments: pdfBuffer
+      ? [{ filename: `voucher-${voucher.voucherNumber || voucher.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
+      : [],
+  });
+}
+
+export default { isEmailConfigured, sendQuotationEmail, sendInvoiceEmail, sendReceiptEmail, sendVoucherEmail };
