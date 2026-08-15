@@ -112,6 +112,8 @@ describe('getOrganizationBranding', () => {
       companyShortName: 'LT',
       tagline: 'Journeys, curated',
       logoUrl: 'https://cdn.test/logo.png',
+      invoicePaymentTerms: 'A non-refundable deposit is required.',
+      invoicePaymentInstructions: 'Share the payment screenshot after transfer.',
       bankAccountNumber: '999999',
       defaultTaxRate: '7.5',
     });
@@ -128,6 +130,8 @@ describe('getOrganizationBranding', () => {
           companyShortName: 'LT',
           tagline: 'Journeys, curated',
           logoUrl: 'https://cdn.test/logo.png',
+          invoicePaymentTerms: 'A non-refundable deposit is required.',
+          invoicePaymentInstructions: 'Share the payment screenshot after transfer.',
         },
       },
     });
