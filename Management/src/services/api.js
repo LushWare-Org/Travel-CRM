@@ -582,6 +582,10 @@ export const quotationAPI = {
     const api = new ApiService();
     return api.get("/billing/quotations/lead/" + leadId);
   },
+  convertToInvoice: async (quotationId, payload = {}) => {
+    const api = new ApiService();
+    return api.post(`/billing/quotations/${quotationId}/convert`, payload);
+  },
   update: async (quotationId, payload) => {
     const api = new ApiService();
     return api.put(`/billing/quotations/${quotationId}`, payload);

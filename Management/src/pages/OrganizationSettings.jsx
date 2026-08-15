@@ -4,11 +4,11 @@ import toast from 'react-hot-toast';
 import { adminAPI, uploadAPI } from '../services/api';
 
 const EMPTY_FORM = {
-  companyName: '', companyShortName: '', companyLegalName: '', tagline: '', logoUrl: '',
+  companyName: '', companyShortName: '', companyLegalName: '', companyAddress: '', companyGstNumber: '', tagline: '', logoUrl: '',
   contactEmail: '', salesEmail: '', supportEmail: '', contactPhone: '', whatsappNumber: '', website: '',
   themeInk: '', themeMuted: '', themeAccent: '', themeAccentDark: '',
   defaultCurrency: '', defaultTaxRate: '', defaultServiceChargeRate: '', quotationValidityDays: '',
-  quotationTerms: '', cancellationPolicy: '', ratingTagline: '',
+  quotationTerms: '', cancellationPolicy: '', invoicePaymentTerms: '', invoicePaymentInstructions: '', ratingTagline: '',
   paymentMethods: '',
   docPrefixQuotation: '', docPrefixInvoice: '', docPrefixReceipt: '',
   docPrefixPayment: '', docPrefixCreditNote: '', docPrefixVoucher: '',
@@ -17,10 +17,10 @@ const EMPTY_FORM = {
 };
 
 const NULLABLE_FIELDS = [
-  'companyShortName', 'companyLegalName', 'tagline', 'logoUrl',
+  'companyShortName', 'companyLegalName', 'companyAddress', 'companyGstNumber', 'tagline', 'logoUrl',
   'contactEmail', 'salesEmail', 'supportEmail', 'contactPhone', 'whatsappNumber', 'website',
   'themeInk', 'themeMuted', 'themeAccent', 'themeAccentDark',
-  'quotationTerms', 'cancellationPolicy', 'ratingTagline',
+  'quotationTerms', 'cancellationPolicy', 'invoicePaymentTerms', 'invoicePaymentInstructions', 'ratingTagline',
   'bankName', 'bankAccountName', 'bankAccountNumber', 'bankIfscCode',
   'bankSwiftCode', 'bankBranch', 'bankAccountType', 'upiId',
 ];
@@ -29,6 +29,8 @@ const settingsToForm = (settings) => ({
   companyName: settings.companyName ?? '',
   companyShortName: settings.companyShortName ?? '',
   companyLegalName: settings.companyLegalName ?? '',
+  companyAddress: settings.companyAddress ?? '',
+  companyGstNumber: settings.companyGstNumber ?? '',
   tagline: settings.tagline ?? '',
   logoUrl: settings.logoUrl ?? '',
   contactEmail: settings.contactEmail ?? '',
@@ -47,6 +49,8 @@ const settingsToForm = (settings) => ({
   quotationValidityDays: settings.quotationValidityDays ?? '',
   quotationTerms: settings.quotationTerms ?? '',
   cancellationPolicy: settings.cancellationPolicy ?? '',
+  invoicePaymentTerms: settings.invoicePaymentTerms ?? '',
+  invoicePaymentInstructions: settings.invoicePaymentInstructions ?? '',
   ratingTagline: settings.ratingTagline ?? '',
   paymentMethods: (settings.paymentMethods || []).join(', '),
   docPrefixQuotation: settings.docNumberPrefixes?.quotation ?? '',
@@ -102,7 +106,7 @@ function Field({ label, helperText, ...props }) {
   );
 }
 
-function TextAreaField({ label, ...props }) {
+function TextAreaField({ label, helperText, ...props }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
@@ -111,6 +115,7 @@ function TextAreaField({ label, ...props }) {
         rows={4}
         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
       />
+      {helperText && <p className="text-xs text-gray-500 mt-1">{helperText}</p>}
     </div>
   );
 }
@@ -229,6 +234,8 @@ const OrganizationSettings = () => {
           <Field label="Short Name" value={form.companyShortName} onChange={set('companyShortName')} />
           <Field label="Legal Name" value={form.companyLegalName} onChange={set('companyLegalName')} />
           <Field label="Tagline" value={form.tagline} onChange={set('tagline')} />
+          <Field label="GST Number" value={form.companyGstNumber} onChange={set('companyGstNumber')} helperText="Shown on invoice PDFs as the 'Bill From' GST No" />
+          <Field label="Address" value={form.companyAddress} onChange={set('companyAddress')} helperText="Shown on invoice PDFs as the 'Bill From' address" />
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo</label>
             <div className="flex items-center gap-3">
@@ -293,6 +300,15 @@ const OrganizationSettings = () => {
           <Field label="SWIFT Code" value={form.bankSwiftCode} onChange={set('bankSwiftCode')} />
           <Field label="Branch" value={form.bankBranch} onChange={set('bankBranch')} />
           <Field label="UPI ID" value={form.upiId} onChange={set('upiId')} />
+        </Section>
+
+        <Section title="Invoice Defaults" description="Default Payment Terms and Payment Instructions bullets shown on invoice PDFs — overridable per invoice when it's created">
+          <div className="sm:col-span-2">
+            <TextAreaField label="Payment Terms" value={form.invoicePaymentTerms} onChange={set('invoicePaymentTerms')} helperText="One bullet per line" />
+          </div>
+          <div className="sm:col-span-2">
+            <TextAreaField label="Payment Instructions" value={form.invoicePaymentInstructions} onChange={set('invoicePaymentInstructions')} helperText="One bullet per line, shown below the bank details" />
+          </div>
         </Section>
       </div>
     </div>
