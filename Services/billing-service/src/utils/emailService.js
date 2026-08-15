@@ -138,4 +138,64 @@ export async function sendInvoiceEmail({ invoice, recipientEmail, pdfBuffer }) {
   });
 }
 
-export default { isEmailConfigured, sendQuotationEmail, sendInvoiceEmail };
+function receiptEmailHtml(receipt, branding) {
+  const customerName = receipt.customerName || 'Customer';
+  const invoiceLine = receipt.invoice?.invoiceNumber
+    ? `<div style="color:#64748B;font-size:13px;margin-top:10px;">Against invoice: ${receipt.invoice.invoiceNumber}</div>`
+    : '';
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#0F172A;">
+    <div style="background:linear-gradient(135deg,#0F766E,#14B8A6);padding:28px 32px;border-radius:12px 12px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">${branding.company.name}</h1>
+      <p style="color:#E0F2F1;margin:6px 0 0;font-size:13px;">${branding.company.tagline}</p>
+    </div>
+    <div style="border:1px solid #E2E8F0;border-top:none;border-radius:0 0 12px 12px;padding:32px;">
+      <h2 style="font-size:20px;margin:0 0 8px;">Your Payment Receipt ✅</h2>
+      <p style="color:#64748B;line-height:1.6;">Dear ${customerName},</p>
+      <p style="color:#64748B;line-height:1.6;">Thank you for your payment to ${branding.company.name}. Please find your receipt
+        <strong>${receipt.receiptNumber || ''}</strong> attached as a PDF. A summary is below.</p>
+      <div style="background:#F1F5F9;border-radius:10px;padding:20px;margin:20px 0;">
+        <div style="color:#0F766E;font-size:13px;">Amount Received</div>
+        <div style="font-size:28px;font-weight:700;">${formatMoney(receipt.amount, receipt.currency)}</div>
+        ${invoiceLine}
+      </div>
+      <p style="color:#64748B;line-height:1.6;">If you have any questions about this payment, simply reply to this email.</p>
+      <p style="color:#94A3B8;font-size:12px;margin-top:24px;">${branding.company.name} · ${branding.contact.email} · ${branding.contact.phone}</p>
+    </div>
+  </div>`;
+}
+
+/**
+ * Send a payment receipt email with the PDF attached.
+ * @param {object} params
+ * @param {object} params.receipt - the payment receipt snapshot
+ * @param {string} params.recipientEmail
+ * @param {Buffer} params.pdfBuffer
+ * @throws {Error} when SMTP is not configured
+ */
+export async function sendReceiptEmail({ receipt, recipientEmail, pdfBuffer }) {
+  const transporter = buildTransport();
+  if (!transporter) {
+    throw new Error('Email is not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD)');
+  }
+  if (!recipientEmail) throw new Error('No recipient email provided');
+
+  const branding = toBrandingShape(await getOrgSettings());
+
+  const subject = receipt.receiptNumber
+    ? `${branding.company.name} Payment Receipt - ${receipt.receiptNumber}`
+    : `${branding.company.name} Payment Receipt`;
+
+  return transporter.sendMail({
+    from: getEmailFrom(branding),
+    to: recipientEmail,
+    subject,
+    html: receiptEmailHtml(receipt, branding),
+    text: `Dear ${receipt.customerName || 'Customer'},\n\nPlease find your payment receipt attached.\nAmount received: ${formatMoney(receipt.amount, receipt.currency)}\n`,
+    attachments: pdfBuffer
+      ? [{ filename: `receipt-${receipt.receiptNumber || receipt.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
+      : [],
+  });
+}
+
+export default { isEmailConfigured, sendQuotationEmail, sendInvoiceEmail, sendReceiptEmail };

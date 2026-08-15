@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  X, FileText, Download, Loader2, Mail, MessageCircle, Eye, Send,
+  X, FileText, Download, Loader2, Eye,
   Receipt, ScrollText, StickyNote, CheckCircle2, MapPin, Calendar, Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { invoiceAPI, quotationAPI, adminAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { formatCurrency, LOCALE } from '../../../utils/currency.js';
-import { Row, ChannelTab } from './shared/BillingPrimitives';
+import { Row } from './shared/BillingPrimitives';
 import EditableBulletSection from './shared/EditableBulletSection';
+import SendDocumentPanel from './shared/SendDocumentPanel';
 
 const EMPTY_CUSTOMER_OVERRIDES = { customerName: '', customerEmail: '', customerPhone: '', customerAddress: '', customerGstNumber: '', destination: '' };
 const emptyFormData = () => ({
@@ -531,26 +532,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   ) : (
                     <>
                       {/* Delivery */}
-                      <div className="rounded-xl border border-slate-200 p-5">
-                        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Send via</p>
-                        <div className="mb-3 inline-flex rounded-lg border border-slate-200 p-1">
-                          <ChannelTab active={channel === 'email'} onClick={() => setChannel('email')} icon={Mail} label="Email" />
-                          <ChannelTab active={channel === 'whatsapp'} onClick={() => setChannel('whatsapp')} icon={MessageCircle} label="WhatsApp" />
-                        </div>
-                        {channel === 'email' ? (
-                          <input type="email" value={sendEmail} onChange={(e) => setSendEmail(e.target.value)} placeholder="recipient@email.com" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500" />
-                        ) : (
-                          <input type="tel" value={sendPhone} onChange={(e) => setSendPhone(e.target.value)} placeholder="+1 555 123 4567" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500" />
-                        )}
-                        <button
-                          onClick={handleSend}
-                          disabled={sending}
-                          className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                        >
-                          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                          {sending ? 'Sending…' : `Send via ${channel === 'email' ? 'Email' : 'WhatsApp'}`}
-                        </button>
-                      </div>
+                      <SendDocumentPanel
+                        channel={channel}
+                        onChannelChange={setChannel}
+                        email={sendEmail}
+                        onEmailChange={setSendEmail}
+                        phone={sendPhone}
+                        onPhoneChange={setSendPhone}
+                        onSend={handleSend}
+                        sending={sending}
+                      />
 
                       <button
                         onClick={() => setShowPDFPreview(true)}

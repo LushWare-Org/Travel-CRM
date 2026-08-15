@@ -542,9 +542,11 @@ model PaymentReceipt {
   reconciled   Boolean   @default(false)
   reconciledAt DateTime?
 
-  pdfUrl    String?
-  sentAt    DateTime?
-  emailSent Boolean   @default(false)
+  pdfUrl         String?
+  sentAt         DateTime?
+  emailSent      Boolean   @default(false)
+  whatsappSent   Boolean   @default(false)
+  whatsappSentAt DateTime?
 
   cancelledAt        DateTime?
   cancellationReason String?
