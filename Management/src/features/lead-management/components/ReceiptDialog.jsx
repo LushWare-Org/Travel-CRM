@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Save, CreditCard, Eye, Send, MessageCircle, Receipt, Calendar, FileText, Wallet } from 'lucide-react';
+import { X, Save, CreditCard, Eye, Receipt, Calendar, FileText, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
-import { getThankYouMessage } from '../../../config/branding';
+import SendDocumentPanel from './shared/SendDocumentPanel';
 import { formatCurrency, getCurrencySymbol, CURRENCY_CODE } from '../../../utils/currency.js';
 
 const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
@@ -17,12 +17,14 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [channel, setChannel] = useState('email');
   const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
-  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendPhone, setSendPhone] = useState(lead?.whatsapp || lead?.phone || '');
+  const [sending, setSending] = useState(false);
 
   const [formData, setFormData] = useState({
-    lead: lead?._id || lead?.id,
-    invoice: '',
+    leadId: lead?._id || lead?.id,
+    invoiceId: '',
     amount: 0,
     currency: CURRENCY_CODE,
     paymentMethod: 'cash',
@@ -49,8 +51,8 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   useEffect(() => {
     if (isOpen && lead) {
       setFormData({
-        lead: lead._id || lead.id,
-        invoice: '',
+        leadId: lead._id || lead.id,
+        invoiceId: '',
         amount: 0,
         currency: CURRENCY_CODE,
         paymentMethod: 'cash',
@@ -74,7 +76,9 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         },
       });
       setSelectedInvoice(null);
+      setChannel('email');
       setSendEmailAddress(lead?.email || lead?.customer?.email || '');
+      setSendPhone(lead?.whatsapp || lead?.phone || '');
       setCurrentReceiptId(null);
       setCurrentReceipt(null);
       setIsEditing(false);
@@ -124,48 +128,27 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     }
   };
 
-  const handleSendWhatsApp = (receiptId) => {
-    if (!lead?.whatsapp) {
-      toast.error('WhatsApp number not available for this lead');
-      return;
-    }
-    const whatsappNumber = lead.whatsapp.replace(/[^0-9]/g, '');
-    if (!whatsappNumber) {
-      toast.error('Invalid WhatsApp number');
-      return;
-    }
-    const receiptNumber = currentReceipt?.receiptNumber || `#${receiptId?.slice(-6)}` || 'Receipt';
-    const amount = currentReceipt?.amount || formData.amount || 0;
-    const message = encodeURIComponent(
-      `Hello ${lead.name || 'there'},\n\n` +
-      `Your payment receipt ${receiptNumber} for ${amount.toFixed(2)} is ready. ` +
-      `Please contact us for the detailed receipt document.\n\n` +
-      getThankYouMessage()
-    );
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
-  };
-
-  const handleSendReceiptEmail = async () => {
+  const handleSend = async () => {
     const targetId = currentReceiptId || currentReceipt?._id || currentReceipt?.id || null;
     if (!targetId) {
-      toast.error('Please save the receipt before sending the email');
+      toast.error('Please save the receipt before sending it');
       return;
     }
-    const trimmedEmail = sendEmailAddress.trim();
-    if (!trimmedEmail) {
-      toast.error('Please provide a recipient email address');
+    const recipient = channel === 'email' ? sendEmailAddress.trim() : sendPhone.trim();
+    if (!recipient) {
+      toast.error(channel === 'email' ? 'Please provide a recipient email address' : 'Please provide a recipient WhatsApp number');
       return;
     }
     try {
-      setSendingEmail(true);
-      await receiptAPI.send(targetId, { email: trimmedEmail });
-      toast.success('Receipt emailed successfully');
+      setSending(true);
+      const payload = channel === 'email' ? { channel, email: recipient } : { channel, phone: recipient };
+      await receiptAPI.send(targetId, payload);
+      toast.success(channel === 'email' ? 'Receipt emailed successfully' : 'Receipt sent via WhatsApp');
       await fetchExistingReceipts();
     } catch (error) {
-      toast.error(error.message || 'Failed to send receipt email');
+      toast.error(error.message || 'Failed to send receipt');
     } finally {
-      setSendingEmail(false);
+      setSending(false);
     }
   };
 
@@ -175,7 +158,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const handleInvoiceSelect = async (invoiceId) => {
-    setFormData({ ...formData, invoice: invoiceId });
+    setFormData({ ...formData, invoiceId });
     if (invoiceId) {
       const invoice = invoices.find(inv => (inv._id || inv.id) === invoiceId);
       setSelectedInvoice(invoice);
@@ -183,7 +166,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         const outstanding = invoice.outstandingAmount || invoice.totalAmount - (invoice.paidAmount || 0);
         setFormData(prev => ({
           ...prev,
-          invoice: invoiceId,
+          invoiceId,
           amount: outstanding,
         }));
       }
@@ -207,7 +190,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.invoice) {
+    if (!formData.invoiceId) {
       toast.error('Please select an invoice');
       return;
     }
@@ -264,13 +247,13 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         await fetchInvoices();
         await fetchExistingReceipts();
 
-        if (formData.invoice) {
-          const updatedInvoice = invoices.find(inv => (inv._id || inv.id) === formData.invoice);
+        if (formData.invoiceId) {
+          const updatedInvoice = invoices.find(inv => (inv._id || inv.id) === formData.invoiceId);
           if (updatedInvoice) {
             setSelectedInvoice(updatedInvoice);
             const newOutstanding = updatedInvoice.outstandingAmount ?? (updatedInvoice.totalAmount - (updatedInvoice.paidAmount || 0));
             if (newOutstanding <= 0) {
-              setFormData(prev => ({ ...prev, invoice: '', amount: 0 }));
+              setFormData(prev => ({ ...prev, invoiceId: '', amount: 0 }));
               setSelectedInvoice(null);
               toast.success('Invoice is now fully paid and settled!');
             } else {
@@ -355,7 +338,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <h3 className="font-semibold text-gray-900">Select Invoice</h3>
               </div>
               <select
-                value={formData.invoice}
+                value={formData.invoiceId}
                 onChange={(e) => handleInvoiceSelect(e.target.value)}
                 disabled={loadingInvoices}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all text-gray-900"
@@ -655,38 +638,16 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
 
             {/* Communication */}
             {currentReceiptId && (
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Send Receipt</h4>
-                <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-                  <div className="flex-1">
-                    <input
-                      type="email"
-                      value={sendEmailAddress}
-                      onChange={(e) => setSendEmailAddress(e.target.value)}
-                      placeholder="customer@example.com"
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSendReceiptEmail}
-                    disabled={sendingEmail || !sendEmailAddress.trim()}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                  >
-                    <Send className="w-4 h-4" />
-                    {sendingEmail ? 'Sending...' : 'Email'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSendWhatsApp(currentReceiptId)}
-                    disabled={!lead?.whatsapp}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    WhatsApp
-                  </button>
-                </div>
-              </div>
+              <SendDocumentPanel
+                channel={channel}
+                onChannelChange={setChannel}
+                email={sendEmailAddress}
+                onEmailChange={setSendEmailAddress}
+                phone={sendPhone}
+                onPhoneChange={setSendPhone}
+                onSend={handleSend}
+                sending={sending}
+              />
             )}
 
             {/* Payment Preview */}
@@ -736,7 +697,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }) => {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || !formData.invoice || !formData.amount}
+              disabled={loading || !formData.invoiceId || !formData.amount}
               className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
             >
               <Save className="w-4 h-4" />
