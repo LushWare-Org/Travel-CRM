@@ -316,6 +316,8 @@ model Invoice {
   pdfUrl             String?
   sentAt             DateTime?
   emailSent          Boolean   @default(false)
+  whatsappSent       Boolean   @default(false)
+  whatsappSentAt     DateTime?
   viewedAt           DateTime?
   remindersSent      Int       @default(0)
   lastReminderSent   DateTime?

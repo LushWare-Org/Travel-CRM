@@ -81,4 +81,61 @@ export async function sendQuotationEmail({ quotation, recipientEmail, pdfBuffer 
   });
 }
 
-export default { isEmailConfigured, sendQuotationEmail };
+function invoiceEmailHtml(invoice, branding) {
+  const customerName = invoice.customerName || 'Customer';
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#0F172A;">
+    <div style="background:linear-gradient(135deg,#0F766E,#14B8A6);padding:28px 32px;border-radius:12px 12px 0 0;">
+      <h1 style="color:#fff;margin:0;font-size:22px;">${branding.company.name}</h1>
+      <p style="color:#E0F2F1;margin:6px 0 0;font-size:13px;">${branding.company.tagline}</p>
+    </div>
+    <div style="border:1px solid #E2E8F0;border-top:none;border-radius:0 0 12px 12px;padding:32px;">
+      <h2 style="font-size:20px;margin:0 0 8px;">Your Invoice 🧾</h2>
+      <p style="color:#64748B;line-height:1.6;">Dear ${customerName},</p>
+      <p style="color:#64748B;line-height:1.6;">Thank you for booking with ${branding.company.name}. Please find your invoice
+        <strong>${invoice.invoiceNumber || ''}</strong> attached as a PDF. A summary is below.</p>
+      <div style="background:#F1F5F9;border-radius:10px;padding:20px;margin:20px 0;">
+        <div style="color:#0F766E;font-size:13px;">Total Amount</div>
+        <div style="font-size:28px;font-weight:700;">${formatMoney(invoice.totalAmount, invoice.currency)}</div>
+        <div style="color:#64748B;font-size:13px;margin-top:10px;">Due date: ${formatDate(invoice.dueDate)}</div>
+      </div>
+      <p style="color:#64748B;line-height:1.6;">If you have any questions about this invoice, simply reply to this email.</p>
+      <p style="color:#94A3B8;font-size:12px;margin-top:24px;">${branding.company.name} · ${branding.contact.email} · ${branding.contact.phone}</p>
+    </div>
+  </div>`;
+}
+
+/**
+ * Send an invoice email with the PDF attached.
+ * @param {object} params
+ * @param {object} params.invoice - the invoice snapshot
+ * @param {string} params.recipientEmail
+ * @param {Buffer} params.pdfBuffer
+ * @throws {Error} when SMTP is not configured
+ */
+export async function sendInvoiceEmail({ invoice, recipientEmail, pdfBuffer }) {
+  const transporter = buildTransport();
+  if (!transporter) {
+    throw new Error('Email is not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD)');
+  }
+  if (!recipientEmail) throw new Error('No recipient email provided');
+
+  const branding = toBrandingShape(await getOrgSettings());
+
+  const subject = invoice.invoiceNumber
+    ? `${branding.company.name} Invoice - ${invoice.invoiceNumber}`
+    : `${branding.company.name} Invoice`;
+
+  return transporter.sendMail({
+    from: getEmailFrom(branding),
+    to: recipientEmail,
+    subject,
+    html: invoiceEmailHtml(invoice, branding),
+    text: `Dear ${invoice.customerName || 'Customer'},\n\nPlease find your invoice attached.\nTotal: ${formatMoney(invoice.totalAmount, invoice.currency)}\nDue date: ${formatDate(invoice.dueDate)}\n`,
+    attachments: pdfBuffer
+      ? [{ filename: `invoice-${invoice.invoiceNumber || invoice.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
+      : [],
+  });
+}
+
+export default { isEmailConfigured, sendQuotationEmail, sendInvoiceEmail };
