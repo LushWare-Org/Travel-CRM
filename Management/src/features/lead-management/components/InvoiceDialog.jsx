@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Calculator, Eye, Download, Send, MessageCircle, FileText, Calendar, Package, Receipt, CreditCard, Percent, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { X, Plus, Trash2, Save, Calculator, Eye, Download, Send, MessageCircle, FileText, Calendar, Package, Receipt, CreditCard, Percent, ChevronDown, ChevronUp, Sparkles, User, ScrollText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { invoiceAPI, quotationAPI, packageAPI, customizedPackageAPI, manualItineraryAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { getThankYouMessage } from '../../../config/branding';
 import { formatCurrency, getCurrencySymbol, CURRENCY_CODE, LOCALE } from '../../../utils/currency.js';
+
+const EMPTY_CUSTOMER_OVERRIDES = { customerName: '', customerEmail: '', customerPhone: '', customerAddress: '', customerGstNumber: '', destination: '' };
 
 const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -18,8 +20,16 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [detectedPackage, setDetectedPackage] = useState(null);
   const [detectedPackageType, setDetectedPackageType] = useState(null);
-  const [expandedSections, setExpandedSections] = useState({ items: true, discount: false, communication: false });
+  const [expandedSections, setExpandedSections] = useState({ items: true, discount: false, communication: false, customer: false, paymentTerms: false });
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+
+  // Set once a quotation is picked for a *new* invoice — drives the
+  // read-only totals/customer-override UI. Pricing here is never recomputed
+  // client-side: it's shown verbatim from the quotation and the server
+  // (convertQuotationToInvoice) copies it verbatim too.
+  const [quotationSnapshot, setQuotationSnapshot] = useState(null);
+  const [customerOverrideEnabled, setCustomerOverrideEnabled] = useState(false);
+  const [customerOverrides, setCustomerOverrides] = useState(EMPTY_CUSTOMER_OVERRIDES);
 
   const [formData, setFormData] = useState({
     lead: lead?._id || lead?.id, quotation: '', package: '', type: 'invoice',
@@ -27,10 +37,15 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
     taxRate: 0, discountType: 'none', discountValue: 0,
     issueDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    bookingId: '',
     notes: '', terms: '', paymentTerms: '', paymentInstructions: '',
   });
   const [quotationMode, setQuotationMode] = useState('summary');
   const isDetailedMode = quotationMode === 'detailed';
+  // True only for a brand-new invoice being created straight from a
+  // quotation — editing an existing invoice keeps using the classic
+  // items/discount form below, untouched.
+  const usingQuotationFlow = Boolean(formData.quotation) && Boolean(quotationSnapshot) && !isEditing;
   const [sendEmailAddress, setSendEmailAddress] = useState(lead?.email || lead?.customer?.email || '');
   const [sendingEmail, setSendingEmail] = useState(false);
 
@@ -106,7 +121,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
         if (invoicesArray.length > 0) {
           const latestInvoice = invoicesArray[0]; setCurrentInvoice(latestInvoice); setIsEditing(true);
           const deduplicateItems = (items) => { if (!items?.length) return [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }]; const uniqueMap = new Map(); const uniqueItems = []; items.forEach(item => { const normalizedDesc = (item.description || '').trim().toLowerCase(); if (!normalizedDesc) return; if (!uniqueMap.has(normalizedDesc)) { uniqueMap.set(normalizedDesc, true); uniqueItems.push({ description: item.description || '', category: item.category || 'other', quantity: item.quantity || 1, unitPrice: item.unitPrice || 0, totalPrice: item.totalPrice || 0, taxRate: item.taxRate || 0, notes: item.notes || '' }); } }); return uniqueItems.length > 0 ? uniqueItems : [{ description: '', category: 'other', quantity: 1, unitPrice: 0, totalPrice: 0, taxRate: 0, notes: '' }]; };
-          setFormData({ lead: lead._id || lead.id, quotation: latestInvoice.quotation?._id || latestInvoice.quotation || '', package: latestInvoice.package?._id || latestInvoice.package || '', type: latestInvoice.type || 'invoice', items: deduplicateItems(latestInvoice.items), taxRate: latestInvoice.taxRate || 0, discountType: latestInvoice.discountType || 'none', discountValue: latestInvoice.discountValue || 0, issueDate: latestInvoice.issueDate ? new Date(latestInvoice.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0], dueDate: latestInvoice.dueDate ? new Date(latestInvoice.dueDate).toISOString().split('T')[0] : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: latestInvoice.notes || '', terms: latestInvoice.terms || '', paymentTerms: latestInvoice.paymentTerms || '', paymentInstructions: latestInvoice.paymentInstructions || '' });
+          setFormData({ lead: lead._id || lead.id, quotation: latestInvoice.quotation?._id || latestInvoice.quotation || '', package: latestInvoice.package?._id || latestInvoice.package || '', type: latestInvoice.type || 'invoice', items: deduplicateItems(latestInvoice.items), taxRate: latestInvoice.taxRate || 0, discountType: latestInvoice.discountType || 'none', discountValue: latestInvoice.discountValue || 0, issueDate: latestInvoice.issueDate ? new Date(latestInvoice.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0], dueDate: latestInvoice.dueDate ? new Date(latestInvoice.dueDate).toISOString().split('T')[0] : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], bookingId: latestInvoice.bookingId || '', notes: latestInvoice.notes || '', terms: latestInvoice.terms || '', paymentTerms: latestInvoice.paymentTerms || '', paymentInstructions: latestInvoice.paymentInstructions || '' });
           setQuotationMode((latestInvoice.quotation?.mode) || 'summary');
           setSendEmailAddress(latestInvoice.customer?.email || latestInvoice.lead?.email || lead?.email || '');
           setCurrentInvoiceId(latestInvoice._id || latestInvoice.id);
@@ -120,14 +135,46 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const handleSendInvoiceEmail = async () => { const targetId = currentInvoiceId || currentInvoice?._id || currentInvoice?.id; if (!targetId) { toast.error('Please save the invoice first'); return; } const trimmedEmail = sendEmailAddress.trim(); if (!trimmedEmail) { toast.error('Please provide a recipient email'); return; } try { setSendingEmail(true); await invoiceAPI.send(targetId, { email: trimmedEmail }); toast.success('Invoice emailed successfully'); await fetchExistingInvoices(); } catch (error) { toast.error(error.message || 'Failed to send invoice email'); } finally { setSendingEmail(false); } };
   const handlePreviewPDF = (invoiceId) => { setCurrentInvoiceId(invoiceId); setShowPDFPreview(true); };
 
+  // For a brand-new invoice, this only stores the quotation's snapshot for
+  // read-only display + as the override baseline — it deliberately does NOT
+  // copy items/taxRate/discount into editable formData: the invoice is
+  // created via quotationAPI.convertToInvoice, which copies pricing on the
+  // server, verbatim, from the quotation itself. When editing an existing
+  // invoice instead (isEditing), it keeps the previous behavior of loading
+  // the quotation's items into the editable form, since that path still
+  // goes through invoiceAPI.update.
   const loadQuotationData = async (quotationId) => {
-    if (!quotationId) return;
+    if (!quotationId) { setQuotationSnapshot(null); return; }
     try {
       const response = await quotationAPI.getById(quotationId);
       if (response.success || response.status === 'success' || response.data) {
         const quote = response.data || response; const quoteMode = quote.mode || 'summary'; setQuotationMode(quoteMode);
-        const deduplicateItems = (items) => { if (!items?.length) return []; const uniqueMap = new Map(); const uniqueItems = []; items.forEach(item => { const normalizedDesc = (item.description || '').trim().toLowerCase(); if (!normalizedDesc) return; if (!uniqueMap.has(normalizedDesc)) { uniqueMap.set(normalizedDesc, true); uniqueItems.push({ description: item.description || '', category: item.category || 'other', quantity: item.quantity || 1, unitPrice: item.unitPrice || 0, totalPrice: item.totalPrice || 0, taxRate: item.taxRate || 0, notes: item.notes || '', isManual: item.isManual !== undefined ? item.isManual : (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package') }); } }); return uniqueItems; };
-        setFormData(prev => ({ ...prev, quotation: quotationId, items: deduplicateItems(quote.items), taxRate: quote.taxRate !== undefined ? quote.taxRate : prev.taxRate, discountType: quote.discountType || prev.discountType, discountValue: quote.discountValue !== undefined ? quote.discountValue : prev.discountValue, notes: quote.notes !== undefined ? quote.notes : prev.notes, terms: quote.terms !== undefined ? quote.terms : prev.terms, paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms }));
+
+        const snapshot = {
+          packageTitle: quote.packageTitle, quotationNumber: quote.quotationNumber,
+          customerName: quote.customerName || '', customerEmail: quote.customerEmail || '',
+          customerPhone: quote.customerPhone || '', customerAddress: quote.customerAddress || '',
+          customerGstNumber: quote.customerGstNumber || '', destination: quote.destination || '',
+          subtotal: quote.subtotal || 0, discountAmount: quote.discountAmount || 0,
+          taxAmount: quote.taxAmount || 0, taxRate: quote.taxRate || 0,
+          serviceChargeAmount: quote.serviceChargeAmount || 0, serviceChargeRate: quote.serviceChargeRate || 0,
+          totalAmount: quote.totalAmount || 0, items: quote.items || [],
+        };
+        setQuotationSnapshot(snapshot);
+        setCustomerOverrideEnabled(false);
+        setCustomerOverrides({
+          customerName: snapshot.customerName, customerEmail: snapshot.customerEmail,
+          customerPhone: snapshot.customerPhone, customerAddress: snapshot.customerAddress,
+          customerGstNumber: snapshot.customerGstNumber, destination: snapshot.destination,
+        });
+
+        if (isEditing) {
+          // Legacy edit path: keep populating the editable item/discount form.
+          const deduplicateItems = (items) => { if (!items?.length) return []; const uniqueMap = new Map(); const uniqueItems = []; items.forEach(item => { const normalizedDesc = (item.description || '').trim().toLowerCase(); if (!normalizedDesc) return; if (!uniqueMap.has(normalizedDesc)) { uniqueMap.set(normalizedDesc, true); uniqueItems.push({ description: item.description || '', category: item.category || 'other', quantity: item.quantity || 1, unitPrice: item.unitPrice || 0, totalPrice: item.totalPrice || 0, taxRate: item.taxRate || 0, notes: item.notes || '', isManual: item.isManual !== undefined ? item.isManual : (quoteMode === 'summary' && item.category === 'other' && item.category !== 'package') }); } }); return uniqueItems; };
+          setFormData(prev => ({ ...prev, quotation: quotationId, items: deduplicateItems(quote.items), taxRate: quote.taxRate !== undefined ? quote.taxRate : prev.taxRate, discountType: quote.discountType || prev.discountType, discountValue: quote.discountValue !== undefined ? quote.discountValue : prev.discountValue, notes: quote.notes !== undefined ? quote.notes : prev.notes, terms: quote.terms !== undefined ? quote.terms : prev.terms, paymentTerms: quote.paymentTerms !== undefined ? quote.paymentTerms : prev.paymentTerms }));
+        } else {
+          setFormData(prev => ({ ...prev, quotation: quotationId }));
+        }
         toast.success('Quotation data loaded');
       }
     } catch (error) { toast.error('Failed to load quotation data'); }
@@ -138,10 +185,77 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
   const removeItem = (index) => { if (formData.items.length > 1) setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) }); else toast.error('At least one item is required'); };
 
   const calculateTotals = () => {
+    if (usingQuotationFlow) {
+      return { subtotal: quotationSnapshot.subtotal, discountAmount: quotationSnapshot.discountAmount, taxAmount: quotationSnapshot.taxAmount, serviceChargeAmount: quotationSnapshot.serviceChargeAmount, totalAmount: quotationSnapshot.totalAmount };
+    }
     const itemsToCalculate = isDetailedMode ? formData.items.filter(item => item.category !== 'package') : formData.items.filter(item => item.category === 'package' || item.isManual === true);
     const subtotal = itemsToCalculate.reduce((sum, item) => { const itemTotal = item.totalPrice !== undefined && item.totalPrice !== null ? item.totalPrice : (item.quantity || 0) * (item.unitPrice || 0); return sum + itemTotal; }, 0);
     let discountAmount = 0; if (formData.discountType === 'percentage') discountAmount = (subtotal * (formData.discountValue || 0)) / 100; else if (formData.discountType === 'fixed') discountAmount = formData.discountValue || 0;
     const taxableAmount = subtotal - discountAmount; const taxAmount = (taxableAmount * (formData.taxRate || 0)) / 100; return { subtotal, discountAmount, taxAmount, totalAmount: taxableAmount + taxAmount };
+  };
+
+  const toggleCustomerOverride = () => {
+    setCustomerOverrideEnabled(prev => {
+      const next = !prev;
+      if (!next && quotationSnapshot) {
+        setCustomerOverrides({
+          customerName: quotationSnapshot.customerName, customerEmail: quotationSnapshot.customerEmail,
+          customerPhone: quotationSnapshot.customerPhone, customerAddress: quotationSnapshot.customerAddress,
+          customerGstNumber: quotationSnapshot.customerGstNumber, destination: quotationSnapshot.destination,
+        });
+      }
+      return next;
+    });
+  };
+
+  const showOrgSettingsErrorToast = (message) => {
+    if (/organization settings/i.test(message)) {
+      toast.error((t) => (
+        <div className="text-sm">
+          <p className="mb-1.5">{message}</p>
+          <a href="/settings" className="text-indigo-600 underline font-semibold" onClick={() => toast.dismiss(t.id)}>
+            Open Organization Settings →
+          </a>
+        </div>
+      ), { duration: 9000 });
+    } else {
+      toast.error(message);
+    }
+  };
+
+  // Creates a new invoice from the selected quotation via
+  // quotationAPI.convertToInvoice — pricing is never sent from the client,
+  // only the fields the admin explicitly opted to override.
+  const handleCreateFromQuotation = async () => {
+    if (!formData.quotation) { toast.error('Please select a quotation'); return; }
+    const overrides = {};
+    if (formData.dueDate) overrides.dueDate = new Date(formData.dueDate).toISOString();
+    if (formData.bookingId?.trim()) overrides.bookingId = formData.bookingId.trim();
+    if (customerOverrideEnabled) {
+      for (const field of ['customerName', 'customerEmail', 'customerPhone', 'customerAddress', 'customerGstNumber', 'destination']) {
+        const value = customerOverrides[field]?.trim();
+        if (value) overrides[field] = value;
+      }
+    }
+    if (formData.paymentTerms?.trim()) overrides.paymentTerms = formData.paymentTerms.trim();
+    if (formData.paymentInstructions?.trim()) overrides.paymentInstructions = formData.paymentInstructions.trim();
+
+    try {
+      setLoading(true);
+      const response = await quotationAPI.convertToInvoice(formData.quotation, overrides);
+      if (response.success || response.status === 'success') {
+        const newId = response.data?._id || response.data?.id;
+        toast.success('Invoice created from quotation');
+        setCurrentInvoiceId(newId);
+        setShowPDFPreview(true);
+      } else {
+        showOrgSettingsErrorToast(response.message || 'Failed to create invoice');
+      }
+    } catch (error) {
+      showOrgSettingsErrorToast(error.message || 'Failed to create invoice');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (status = 'draft') => {
@@ -158,6 +272,8 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
       else toast.error(response.message || 'Failed to save invoice');
     } catch (error) { toast.error(error.message || 'Failed to save invoice'); } finally { setLoading(false); }
   };
+
+  const handlePrimarySubmit = () => { if (usingQuotationFlow) handleCreateFromQuotation(); else handleSubmit(); };
 
   const totals = calculateTotals();
   if (!isOpen) return null;
@@ -188,6 +304,9 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   {detectedPackageType && (
                     <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs text-white">{detectedPackageType === 'customized' ? '✨ Custom' : detectedPackageType === 'manual' ? '📋 Manual' : '📦 Package'}</span>
                   )}
+                  {usingQuotationFlow && (
+                    <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs text-white">From {quotationSnapshot.quotationNumber}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -211,130 +330,227 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <input type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none" />
               </div>
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Booking Id</p>
+                <input type="text" value={formData.bookingId} onChange={(e) => setFormData({ ...formData, bookingId: e.target.value })} placeholder="Optional" className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none placeholder:font-normal placeholder:text-gray-300" />
+              </div>
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Mode</p>
                 <p className="text-sm font-semibold text-indigo-600">{getModeLabel(quotationMode)}</p>
               </div>
             </div>
 
-            {/* Quotation Selector */}
-            {quotations.length > 0 && (
+            {/* Quotation Selector — only offered when creating a brand-new invoice */}
+            {!isEditing && quotations.length > 0 && (
               <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <label className="text-sm font-semibold text-gray-700 mb-3 block">Import from Quotation</label>
+                <label className="text-sm font-semibold text-gray-700 mb-3 block">Select Quotation</label>
                 <div className="flex gap-3">
-                  <select value={formData.quotation} onChange={(e) => { setFormData({ ...formData, quotation: e.target.value }); if (e.target.value) loadQuotationData(e.target.value); else setQuotationMode('summary'); }} className="flex-1 px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" disabled={loadingQuotations}>
+                  <select value={formData.quotation} onChange={(e) => { setFormData({ ...formData, quotation: e.target.value }); if (e.target.value) loadQuotationData(e.target.value); else { setQuotationSnapshot(null); setQuotationMode('summary'); } }} className="flex-1 px-4 py-3 bg-gray-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" disabled={loadingQuotations}>
                     <option value="">{loadingQuotations ? 'Loading...' : '— Select Quotation —'}</option>
-                    {quotations.map(q => (<option key={q._id || q.id} value={q._id || q.id}>{q.quotationNumber || q._id} • {formatCurrency(q.totalAmount || 0, { minimumFractionDigits: 2 })}</option>))}
+                    {quotations.map(q => (<option key={q._id || q.id} value={q._id || q.id}>{q.packageTitle || 'Package'} — {q.quotationNumber || q._id}</option>))}
                   </select>
                   {formData.quotation && (<button type="button" onClick={() => handleDownloadQuotationPDF(formData.quotation)} className="px-4 py-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"><Download className="w-4 h-4 text-gray-600" /></button>)}
                 </div>
               </div>
             )}
 
-            {/* Items Section - Collapsible */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <button type="button" onClick={() => toggleSection('items')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center"><FileText className="w-5 h-5 text-indigo-600" /></div>
-                  <div className="text-left">
-                    <p className="font-semibold text-gray-900">Invoice Items</p>
-                    <p className="text-xs text-gray-500">{formData.items.length} items</p>
+            {usingQuotationFlow ? (
+              <>
+                {/* Read-only totals, taken verbatim from the quotation — an
+                    invoice never re-derives tax/discount, it just carries
+                    what the quotation already agreed. */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="px-5 py-4 flex items-center gap-3 border-b border-gray-100">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center"><FileText className="w-5 h-5 text-indigo-600" /></div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Quotation Items & Total</p>
+                      <p className="text-xs text-gray-500">Read-only — matches the quotation exactly</p>
+                    </div>
+                  </div>
+                  <div className="px-5 pb-5 pt-4 space-y-2">
+                    {(quotationSnapshot.items || []).map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                        <span className="text-gray-700">{item.description}</span>
+                        <span className="font-medium text-gray-900">{formatCurrency(item.totalPrice || 0, { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                {expandedSections.items ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-              </button>
-              {expandedSections.items && (
-                <div className="px-5 pb-5 border-t border-gray-100">
-                  {!isDetailedMode ? (
-                    <div className="mt-4 space-y-4">
-                      {/* Package Price - Large Input */}
-                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-100">
-                        <label className="text-sm font-semibold text-gray-700 mb-3 block">Package Total Amount</label>
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{getCurrencySymbol()}</span>
-                          <input type="number" value={(() => { const pkg = formData.items.find(i => i.category === 'package'); return pkg ? (pkg.totalPrice || pkg.unitPrice || 0) : 0; })()} onChange={(e) => { const price = parseFloat(e.target.value) || 0; setFormData(prev => { const pkgIdx = prev.items.findIndex(i => i.category === 'package'); if (pkgIdx >= 0) { const items = [...prev.items]; items[pkgIdx] = { ...items[pkgIdx], totalPrice: price, unitPrice: price, quantity: 1 }; return { ...prev, items }; } else { return { ...prev, items: [{ description: 'Package Total', category: 'package', quantity: 1, unitPrice: price, totalPrice: price, notes: '' }, ...prev.items] }; } }); }} className="flex-1 text-3xl font-bold text-gray-900 bg-transparent border-0 focus:outline-none" placeholder="0.00" />
-                        </div>
+
+                {/* Customer Details — read-only from the quotation snapshot
+                    by default, with an explicit toggle to override for this
+                    invoice only. */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <button type="button" onClick={() => toggleSection('customer')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center"><User className="w-5 h-5 text-blue-600" /></div>
+                      <div className="text-left">
+                        <p className="font-semibold text-gray-900">Customer Details</p>
+                        <p className="text-xs text-gray-500">{customerOverrideEnabled ? 'Overridden for this invoice' : 'From quotation'}</p>
                       </div>
-                      {/* Extra Items */}
-                      {formData.items.filter(i => i.category !== 'package' && i.isManual).length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-sm font-semibold text-gray-600">Additional Items</p>
-                          {formData.items.map((item, originalIndex) => {
-                            if (item.category === 'package' || !item.isManual) return null;
+                    </div>
+                    {expandedSections.customer ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+                  {expandedSections.customer && (
+                    <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+                      <button type="button" onClick={toggleCustomerOverride} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 mb-3">
+                        {customerOverrideEnabled ? '↺ Use quotation details' : '✎ Override for this invoice'}
+                      </button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          ['customerName', 'Name'], ['customerEmail', 'Email'], ['customerPhone', 'Phone'],
+                          ['customerAddress', 'Address'], ['customerGstNumber', 'GST Number'], ['destination', 'Place of Supply'],
+                        ].map(([field, label]) => (
+                          <div key={field}>
+                            <label className="text-xs font-medium text-gray-500 mb-1.5 block">{label}</label>
+                            {customerOverrideEnabled ? (
+                              <input type="text" value={customerOverrides[field]} onChange={(e) => setCustomerOverrides(prev => ({ ...prev, [field]: e.target.value }))} className="w-full px-3 py-2.5 bg-gray-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500" />
+                            ) : (
+                              <p className="px-3 py-2.5 text-sm text-gray-700 bg-gray-50 rounded-xl">{quotationSnapshot[field] || '—'}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment Terms & Instructions — blank uses the org-level
+                    default (resolved server-side); typing here overrides it
+                    for this invoice only. */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <button type="button" onClick={() => toggleSection('paymentTerms')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center"><ScrollText className="w-5 h-5 text-amber-600" /></div>
+                      <div className="text-left">
+                        <p className="font-semibold text-gray-900">Payment Terms & Instructions</p>
+                        <p className="text-xs text-gray-500">{formData.paymentTerms || formData.paymentInstructions ? 'Overridden for this invoice' : 'Using organization default'}</p>
+                      </div>
+                    </div>
+                    {expandedSections.paymentTerms ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+                  {expandedSections.paymentTerms && (
+                    <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 mb-2 block">Payment Terms (one bullet per line)</label>
+                        <textarea value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} rows="4" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Leave blank to use the organization default" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 mb-2 block">Payment Instructions (one bullet per line)</label>
+                        <textarea value={formData.paymentInstructions} onChange={(e) => setFormData({ ...formData, paymentInstructions: e.target.value })} rows="4" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Leave blank to use the organization default" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Items Section - Collapsible */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <button type="button" onClick={() => toggleSection('items')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center"><FileText className="w-5 h-5 text-indigo-600" /></div>
+                      <div className="text-left">
+                        <p className="font-semibold text-gray-900">Invoice Items</p>
+                        <p className="text-xs text-gray-500">{formData.items.length} items</p>
+                      </div>
+                    </div>
+                    {expandedSections.items ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+                  {expandedSections.items && (
+                    <div className="px-5 pb-5 border-t border-gray-100">
+                      {!isDetailedMode ? (
+                        <div className="mt-4 space-y-4">
+                          {/* Package Price - Large Input */}
+                          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-100">
+                            <label className="text-sm font-semibold text-gray-700 mb-3 block">Package Total Amount</label>
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl">{getCurrencySymbol()}</span>
+                              <input type="number" value={(() => { const pkg = formData.items.find(i => i.category === 'package'); return pkg ? (pkg.totalPrice || pkg.unitPrice || 0) : 0; })()} onChange={(e) => { const price = parseFloat(e.target.value) || 0; setFormData(prev => { const pkgIdx = prev.items.findIndex(i => i.category === 'package'); if (pkgIdx >= 0) { const items = [...prev.items]; items[pkgIdx] = { ...items[pkgIdx], totalPrice: price, unitPrice: price, quantity: 1 }; return { ...prev, items }; } else { return { ...prev, items: [{ description: 'Package Total', category: 'package', quantity: 1, unitPrice: price, totalPrice: price, notes: '' }, ...prev.items] }; } }); }} className="flex-1 text-3xl font-bold text-gray-900 bg-transparent border-0 focus:outline-none" placeholder="0.00" />
+                            </div>
+                          </div>
+                          {/* Extra Items */}
+                          {formData.items.filter(i => i.category !== 'package' && i.isManual).length > 0 && (
+                            <div className="space-y-2">
+                              <p className="text-sm font-semibold text-gray-600">Additional Items</p>
+                              {formData.items.map((item, originalIndex) => {
+                                if (item.category === 'package' || !item.isManual) return null;
+                                return (
+                                  <div key={originalIndex} className="flex gap-3 items-center">
+                                    <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} placeholder="Description" className="flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 border-0" />
+                                    <div className="flex items-center bg-gray-50 rounded-xl px-3"><span className="text-gray-400 text-sm">{getCurrencySymbol()}</span><input type="number" value={item.totalPrice || 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-24 py-3 bg-transparent text-right text-sm font-medium focus:outline-none" /></div>
+                                    <button type="button" onClick={() => removeItem(originalIndex)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-4 h-4" /></button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <button type="button" onClick={addItem} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm"><Plus className="w-4 h-4" />Add Item</button>
+                        </div>
+                      ) : (
+                        <div className="mt-4 space-y-3">
+                          {formData.items.filter(i => i.category !== 'package').map((item, idx) => {
+                            const originalIndex = formData.items.indexOf(item);
                             return (
-                              <div key={originalIndex} className="flex gap-3 items-center">
-                                <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} placeholder="Description" className="flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 border-0" />
-                                <div className="flex items-center bg-gray-50 rounded-xl px-3"><span className="text-gray-400 text-sm">{getCurrencySymbol()}</span><input type="number" value={item.totalPrice || 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-24 py-3 bg-transparent text-right text-sm font-medium focus:outline-none" /></div>
-                                <button type="button" onClick={() => removeItem(originalIndex)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-4 h-4" /></button>
+                              <div key={originalIndex} className="flex gap-3 items-center bg-gray-50 rounded-xl p-3">
+                                <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} className="flex-1 px-3 py-2 bg-white rounded-lg text-sm border border-gray-200 focus:ring-2 focus:ring-indigo-500" placeholder="Item description" />
+                                <div className="flex items-center bg-white rounded-lg px-3 border border-gray-200"><span className="text-gray-400 text-xs">{getCurrencySymbol()}</span><input type="number" value={item.totalPrice ?? 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-20 py-2 bg-transparent text-right text-sm focus:outline-none" /></div>
+                                <button type="button" onClick={() => removeItem(originalIndex)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                               </div>
                             );
                           })}
+                          <button type="button" onClick={addItem} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm"><Plus className="w-4 h-4" />Add Item</button>
                         </div>
                       )}
-                      <button type="button" onClick={addItem} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm"><Plus className="w-4 h-4" />Add Item</button>
-                    </div>
-                  ) : (
-                    <div className="mt-4 space-y-3">
-                      {formData.items.filter(i => i.category !== 'package').map((item, idx) => {
-                        const originalIndex = formData.items.indexOf(item);
-                        return (
-                          <div key={originalIndex} className="flex gap-3 items-center bg-gray-50 rounded-xl p-3">
-                            <input type="text" value={item.description || ''} onChange={(e) => handleItemChange(originalIndex, 'description', e.target.value)} className="flex-1 px-3 py-2 bg-white rounded-lg text-sm border border-gray-200 focus:ring-2 focus:ring-indigo-500" placeholder="Item description" />
-                            <div className="flex items-center bg-white rounded-lg px-3 border border-gray-200"><span className="text-gray-400 text-xs">{getCurrencySymbol()}</span><input type="number" value={item.totalPrice ?? 0} onChange={(e) => { const val = parseFloat(e.target.value) || 0; const items = [...formData.items]; items[originalIndex] = { ...items[originalIndex], totalPrice: val, unitPrice: val, quantity: 1 }; setFormData({ ...formData, items }); }} className="w-20 py-2 bg-transparent text-right text-sm focus:outline-none" /></div>
-                            <button type="button" onClick={() => removeItem(originalIndex)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                          </div>
-                        );
-                      })}
-                      <button type="button" onClick={addItem} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm"><Plus className="w-4 h-4" />Add Item</button>
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Discount & Tax Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <button type="button" onClick={() => toggleSection('discount')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center"><Percent className="w-5 h-5 text-green-600" /></div>
-                  <div className="text-left"><p className="font-semibold text-gray-900">Discount & Tax</p><p className="text-xs text-gray-500">{formData.taxRate > 0 ? `${formData.taxRate}% tax` : 'No tax'}{formData.discountType !== 'none' ? `, ${formData.discountValue}${formData.discountType === 'percentage' ? '%' : ' flat'} discount` : ''}</p></div>
-                </div>
-                {expandedSections.discount ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-              </button>
-              {expandedSections.discount && (
-                <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 mb-2 block">Tax Rate (%)</label>
-                    <input type="number" value={formData.taxRate} onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0" placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 mb-2 block">Discount Type</label>
-                    <select value={formData.discountType} onChange={(e) => setFormData({ ...formData, discountType: e.target.value, discountValue: 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0">
-                      <option value="none">None</option>
-                      <option value="percentage">Percentage</option>
-                      <option value="fixed">Fixed Amount</option>
-                    </select>
-                  </div>
-                  {formData.discountType !== 'none' && (
-                    <div>
-                      <label className="text-xs font-medium text-gray-500 mb-2 block">Discount Value</label>
-                      <input type="number" value={formData.discountValue} onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0" placeholder="0" />
+                {/* Discount & Tax Section */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <button type="button" onClick={() => toggleSection('discount')} className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center"><Percent className="w-5 h-5 text-green-600" /></div>
+                      <div className="text-left"><p className="font-semibold text-gray-900">Discount & Tax</p><p className="text-xs text-gray-500">{formData.taxRate > 0 ? `${formData.taxRate}% tax` : 'No tax'}{formData.discountType !== 'none' ? `, ${formData.discountValue}${formData.discountType === 'percentage' ? '%' : ' flat'} discount` : ''}</p></div>
+                    </div>
+                    {expandedSections.discount ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                  </button>
+                  {expandedSections.discount && (
+                    <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 mb-2 block">Tax Rate (%)</label>
+                        <input type="number" value={formData.taxRate} onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0" placeholder="0" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 mb-2 block">Discount Type</label>
+                        <select value={formData.discountType} onChange={(e) => setFormData({ ...formData, discountType: e.target.value, discountValue: 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0">
+                          <option value="none">None</option>
+                          <option value="percentage">Percentage</option>
+                          <option value="fixed">Fixed Amount</option>
+                        </select>
+                      </div>
+                      {formData.discountType !== 'none' && (
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 mb-2 block">Discount Value</label>
+                          <input type="number" value={formData.discountValue} onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-green-500 border-0" placeholder="0" />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Notes */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <label className="text-sm font-semibold text-gray-700 mb-3 block">Payment Terms</label>
-                <textarea value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} rows="3" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Payment terms..." />
-              </div>
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <label className="text-sm font-semibold text-gray-700 mb-3 block">Notes</label>
-                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows="3" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Additional notes..." />
-              </div>
-            </div>
+                {/* Notes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <label className="text-sm font-semibold text-gray-700 mb-3 block">Payment Terms</label>
+                    <textarea value={formData.paymentTerms} onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })} rows="3" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Payment terms..." />
+                  </div>
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <label className="text-sm font-semibold text-gray-700 mb-3 block">Notes</label>
+                    <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows="3" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500 border-0" placeholder="Additional notes..." />
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Communication */}
             {currentInvoiceId && (
@@ -373,8 +589,14 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 )}
                 {totals.taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Tax ({formData.taxRate}%)</span>
+                    <span className="text-gray-400">Tax {!usingQuotationFlow && `(${formData.taxRate}%)`}</span>
                     <span>{formatCurrency(totals.taxAmount, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {totals.serviceChargeAmount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Service Charge</span>
+                    <span>{formatCurrency(totals.serviceChargeAmount, { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
@@ -412,7 +634,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                   <Eye className="w-4 h-4" />Preview PDF
                 </button>
               )}
-              <button onClick={() => handleSubmit()} disabled={loading} className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-xl font-bold transition-all disabled:opacity-50 shadow-lg">
+              <button onClick={handlePrimarySubmit} disabled={loading} className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-xl font-bold transition-all disabled:opacity-50 shadow-lg">
                 {loading ? 'Saving...' : isEditing ? 'Update Invoice' : 'Create Invoice'}
               </button>
               <button type="button" onClick={onClose} className="w-full px-4 py-3 text-gray-400 hover:text-white transition-colors text-sm">Cancel</button>
@@ -439,7 +661,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 )}
                 {totals.taxAmount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Tax ({formData.taxRate}%)</span>
+                    <span className="text-gray-400">Tax {!usingQuotationFlow && `(${formData.taxRate}%)`}</span>
                     <span>{formatCurrency(totals.taxAmount, { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
@@ -486,7 +708,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }) => {
                 <p className="text-lg font-bold truncate">{formatCurrency(totals.totalAmount, { minimumFractionDigits: 2 })}</p>
               </div>
             </button>
-            <button onClick={() => handleSubmit()} disabled={loading} className="shrink-0 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 active:from-indigo-600 active:to-purple-700 rounded-xl font-bold text-sm transition-all disabled:opacity-50 shadow-lg">
+            <button onClick={handlePrimarySubmit} disabled={loading} className="shrink-0 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 active:from-indigo-600 active:to-purple-700 rounded-xl font-bold text-sm transition-all disabled:opacity-50 shadow-lg">
               <Save className="w-4 h-4" />
               {loading ? '...' : isEditing ? 'Update' : 'Create'}
             </button>
