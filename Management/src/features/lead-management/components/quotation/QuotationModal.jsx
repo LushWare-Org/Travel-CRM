@@ -6,6 +6,7 @@ import {
 import toast from 'react-hot-toast';
 import { leadAPI, quotationAPI } from '../../../../services/api';
 import PDFPreviewDialog from '../PDFPreviewDialog';
+import { Row, ChannelTab } from '../shared/BillingPrimitives';
 
 const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: '₹', AUD: 'A$', LKR: 'Rs ' };
 const MANUAL_LABEL = 'Manual Itinerary';
@@ -340,23 +341,5 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
     </div>
   );
 };
-
-const Row = ({ label, value }) => (
-  <div className="flex items-center justify-between text-slate-600">
-    <span>{label}</span>
-    <span className="font-medium text-slate-800">{value}</span>
-  </div>
-);
-
-const ChannelTab = ({ active, onClick, icon: Icon, label }) => (
-  <button
-    onClick={onClick}
-    className={`inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition ${
-      active ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-slate-50'
-    }`}
-  >
-    <Icon className="h-4 w-4" /> {label}
-  </button>
-);
 
 export default QuotationModal;

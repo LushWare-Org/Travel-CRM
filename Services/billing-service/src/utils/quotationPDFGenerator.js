@@ -2,22 +2,9 @@ import fs from 'node:fs';
 import PDFDocument from 'pdfkit';
 import { getOrgSettings, toBrandingShape, getBankDetails, hasBankDetails } from '../config/orgSettings.js';
 import { QuotationForPdf } from '@travel-crm/contracts';
-
-// Built-in Helvetica (WinAnsi) has no rupee glyph, so INR uses a text prefix.
-const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: 'INR ', AUD: 'A$', LKR: 'Rs ' };
-
-const formatMoney = (amount, currency = 'USD') => {
-  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `;
-  const value = (Number(amount) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${symbol}${value}`;
-};
-
-const formatDate = (date) => {
-  if (!date) return '—';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-};
+import { formatMoney, formatDate } from './pdfFormatters.js';
+import { drawBankDetailsCard } from './pdfBankDetailsSection.js';
+import { loadRemoteImageBuffer } from './pdfImageLoader.js';
 
 /** Group snapshot line items by their category for the detailed layout. */
 const groupByCategory = (items = []) => {
@@ -44,26 +31,6 @@ const normalizeDays = (v) => {
   }
   return Array.isArray(arr) ? arr : [];
 };
-
-/**
- * Fetch a remote image URL into a Buffer for pdfkit's doc.image(). Returns
- * null (never throws) on a missing/non-http URL, a network failure, or a
- * timeout — every call site degrades to its existing placeholder rather than
- * failing PDF generation over a broken image link.
- */
-async function loadRemoteImageBuffer(url, { timeoutMs = 5000 } = {}) {
-  if (!url || typeof url !== 'string' || !/^https?:/i.test(url)) return null;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer());
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Render a quotation snapshot to a branded, multi-page PDF Buffer.
@@ -477,43 +444,7 @@ export async function generateQuotationPDF(quotation) {
         const bank = getBankDetails(BRANDING);
         if (!hasBankDetails(BRANDING) && !bank.upiId) return;
         sectionHeader('Payment Details');
-
-        ensureSpace(160);
-        const cardY = doc.y;
-        const cardH = 150;
-        doc.roundedRect(left, cardY, contentW, cardH, 10).fill(T.cream);
-
-        const bx = left + 20;
-        let by = cardY + 18;
-        doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(11).text('Bank Transfer', bx, by);
-        by += 20;
-        const rows = [
-          ['Bank', bank.bankName], ['Account Name', bank.accountName], ['Account No', bank.accountNumber],
-          ['IFSC', bank.ifscCode], ['SWIFT', bank.swiftCode], ['Branch', bank.branch],
-        ].filter(([, v]) => v);
-        doc.fontSize(9);
-        for (const [k, v] of rows) {
-          doc.font('Helvetica').fillColor(T.muted).text(`${k}:`, bx, by, { width: 90 });
-          doc.font('Helvetica-Bold').fillColor(T.ink).text(String(v), bx + 92, by, { width: contentW / 2 - 120 });
-          by += 15;
-        }
-
-        // QR placeholder + UPI id on the right.
-        const qs = 84;
-        const qbx = left + contentW - 20 - qs;
-        doc.font('Helvetica-Bold').fontSize(11).fillColor(T.brand)
-          .text('Scan to pay via UPI', qbx - 60, cardY + 18, { width: qs + 60, align: 'right' });
-        const qby = cardY + 40;
-        doc.roundedRect(qbx, qby, qs, qs, 6).lineWidth(1).strokeColor(T.slate200).stroke();
-        doc.fillColor(T.muted).font('Helvetica').fontSize(8)
-          .text('UPI QR', qbx, qby + qs / 2 - 4, { width: qs, align: 'center' });
-        if (bank.upiId) {
-          doc.fillColor(T.ink).font('Helvetica-Bold').fontSize(9)
-            .text(`UPI: ${bank.upiId}`, qbx - 60, qby + qs + 6, { width: qs + 60, align: 'right' });
-        }
-
-        doc.x = left;
-        doc.y = cardY + cardH + 14;
+        drawBankDetailsCard(doc, { left, contentW, T, ensureSpace }, bank);
         paymentChips();
       };
 

@@ -3,6 +3,7 @@ export { apiEnvelope } from './envelope.js';
 export { ItineraryDay } from './itineraryDay.js';
 export { LeadSnapshotForQuotation } from './leadSnapshot.js';
 export { QuotationForPdf } from './quotationPdf.js';
+export { InvoiceForPdf } from './invoicePdf.js';
 export {
   LeadPackageSelectionRaw,
   LeadPackageSelectionSummary,

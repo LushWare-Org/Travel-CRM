@@ -260,6 +260,7 @@ enum VoucherStatus {
 model Invoice {
   id            String @id @default(uuid())
   invoiceNumber String @unique
+  currency      String @default("USD") @db.VarChar(3)
 
   // Cross-schema UUID refs
   leadId           String // → leads.Lead.id
@@ -275,6 +276,7 @@ model Invoice {
   customerPhone     String?
   customerAddress   String?
   customerGstNumber String?
+  destination       String? // place of supply, snapshot from Quotation.destination
 
   type InvoiceType @default(invoice)
 
@@ -309,10 +311,13 @@ model Invoice {
   bankIfscCode      String?
   bankSwiftCode     String?
   bankBranch        String?
+  bankUpiId         String?
 
   pdfUrl             String?
   sentAt             DateTime?
   emailSent          Boolean   @default(false)
+  whatsappSent       Boolean   @default(false)
+  whatsappSentAt     DateTime?
   viewedAt           DateTime?
   remindersSent      Int       @default(0)
   lastReminderSent   DateTime?

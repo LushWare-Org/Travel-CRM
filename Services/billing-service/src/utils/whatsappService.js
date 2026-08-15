@@ -58,4 +58,36 @@ export async function sendQuotationWhatsapp({ quotation, phone, mediaUrl }) {
   });
 }
 
-export default { isWhatsappConfigured, sendQuotationWhatsapp };
+/**
+ * Send an invoice over WhatsApp with the PDF attached as media.
+ * Requires Twilio WhatsApp Business credentials and a publicly reachable
+ * `mediaUrl` (the Cloudinary-hosted PDF).
+ * @throws {Error} when WhatsApp is not configured or the phone is invalid
+ */
+export async function sendInvoiceWhatsapp({ invoice, phone, mediaUrl }) {
+  const client = buildClient();
+  if (!client) {
+    throw new Error('WhatsApp is not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM)');
+  }
+  const to = toWhatsappAddress(phone);
+  if (!to) throw new Error('No valid WhatsApp phone number provided');
+
+  const branding = toBrandingShape(await getOrgSettings());
+
+  const body =
+    `Hi ${invoice.customerName || 'there'}, your ${branding.company.name} invoice ` +
+    `${invoice.invoiceNumber || ''} is ready.\n` +
+    `Total: ${formatMoney(invoice.totalAmount, invoice.currency)}\n` +
+    (invoice.dueDate ? `Due date: ${new Date(invoice.dueDate).toLocaleDateString('en-US')}\n` : '');
+
+  return client.messages.create({
+    from: process.env.TWILIO_WHATSAPP_FROM.startsWith('whatsapp:')
+      ? process.env.TWILIO_WHATSAPP_FROM
+      : `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`,
+    to,
+    body,
+    ...(mediaUrl ? { mediaUrl: [mediaUrl] } : {}),
+  });
+}
+
+export default { isWhatsappConfigured, sendQuotationWhatsapp, sendInvoiceWhatsapp };

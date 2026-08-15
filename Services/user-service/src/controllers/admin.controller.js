@@ -176,9 +176,14 @@ export const getInternalOrganizationSettings = asyncHandler(async (req, res) => 
 });
 
 // Any logged-in Management user (not just admin/superAdmin) — the sidebar
-// shows the company name/logo to every role. Narrow, display-only subset:
-// no bank details, no quotation config, nothing an admin edits via /settings.
+// shows the company name/logo to every role, and salesRep needs the invoice
+// payment terms/instructions defaults to prefill the invoice dialog. Narrow,
+// display-only subset: no bank details, no quotation config, nothing an
+// admin edits via /settings that isn't also mailed straight to customers.
 export const getOrganizationBranding = asyncHandler(async (req, res) => {
-  const { companyName, companyShortName, tagline, logoUrl } = await getOrCreateSingleton();
-  res.json({ status: 'success', data: { branding: { companyName, companyShortName, tagline, logoUrl } } });
+  const { companyName, companyShortName, tagline, logoUrl, invoicePaymentTerms, invoicePaymentInstructions } = await getOrCreateSingleton();
+  res.json({
+    status: 'success',
+    data: { branding: { companyName, companyShortName, tagline, logoUrl, invoicePaymentTerms, invoicePaymentInstructions } },
+  });
 });
