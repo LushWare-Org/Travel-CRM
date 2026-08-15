@@ -86,7 +86,9 @@ describe('createVoucher', () => {
   it('persists flight segments alongside location dates, meal plans, and itinerary summary', async () => {
     await run(createVoucher, {
       body: {
+        leadId: 'lead-1',
         customerName: 'Alice',
+        customerEmail: 'alice@test.com',
         locationDates: [{ location: 'Male', hotelName: 'Coco Bodu Hithi' }],
         mealPlans: [{ dayNumber: 1, breakfast: true, lunch: true, dinner: true }],
         itinerarySummary: [{ dayNumber: 1, title: 'Arrival' }],
@@ -102,9 +104,39 @@ describe('createVoucher', () => {
   });
 
   it('creates an empty flightSegments relation when none are supplied', async () => {
-    await run(createVoucher, { body: { customerName: 'Alice' } });
+    await run(createVoucher, { body: { leadId: 'lead-1', customerName: 'Alice', customerEmail: 'alice@test.com' } });
     expect(mockVoucherCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ flightSegments: { create: [] } }),
+    }));
+  });
+});
+
+describe('createVoucher validation', () => {
+  it('rejects a payload missing leadId', async () => {
+    const { nextErr } = await run(createVoucher, { body: { customerName: 'Alice', customerEmail: 'alice@test.com' } });
+    expect(nextErr).toBeDefined();
+    expect(mockVoucherCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid customerEmail', async () => {
+    const { nextErr } = await run(createVoucher, {
+      body: { leadId: 'lead-1', customerName: 'Alice', customerEmail: 'not-an-email' },
+    });
+    expect(nextErr).toBeDefined();
+    expect(mockVoucherCreate).not.toHaveBeenCalled();
+  });
+
+  it('strips unknown top-level fields instead of forwarding them to Prisma', async () => {
+    await run(createVoucher, {
+      body: {
+        leadId: 'lead-1',
+        customerName: 'Alice',
+        customerEmail: 'alice@test.com',
+        customer: { name: 'Alice' },
+      },
+    });
+    expect(mockVoucherCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.not.objectContaining({ customer: expect.anything() }),
     }));
   });
 });
@@ -136,6 +168,19 @@ describe('updateVoucher', () => {
     mockVoucherFindUnique.mockResolvedValue(null);
     const { nextErr } = await run(updateVoucher, { params: { id: 'missing' }, body: {} });
     expect(nextErr.statusCode).toBe(404);
+  });
+});
+
+describe('updateVoucher validation', () => {
+  it('rejects an invalid status value', async () => {
+    const { nextErr } = await run(updateVoucher, { params: { id: 'vch-1' }, body: { status: 'archived' } });
+    expect(nextErr).toBeDefined();
+    expect(mockVoucherUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not default an omitted flightSegments field to [] and wipe the relation', async () => {
+    await run(updateVoucher, { params: { id: 'vch-1' }, body: { notes: 'updated' } });
+    expect(mockFlightSegmentDeleteMany).not.toHaveBeenCalled();
   });
 });
 

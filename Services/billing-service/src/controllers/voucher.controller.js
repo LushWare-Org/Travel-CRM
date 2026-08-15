@@ -6,7 +6,7 @@ import { generateVoucherPDF } from '../utils/voucherPDFGenerator.js';
 import { sendVoucherEmail } from '../utils/emailService.js';
 import { sendVoucherWhatsapp } from '../utils/whatsappService.js';
 import { uploadPdfBuffer } from '../utils/cloudinary.js';
-import { sendVoucherSchema } from '../validators/voucher.validator.js';
+import { sendVoucherSchema, createVoucherSchema, updateVoucherSchema } from '../validators/voucher.validator.js';
 
 const voucherInclude = {
   locationDates: { orderBy: { order: 'asc' } },
@@ -40,7 +40,7 @@ export const getVouchersByLeadId = asyncHandler(async (req, res) => {
 export const createVoucher = asyncHandler(async (req, res) => {
   const {
     locationDates = [], mealPlans = [], itinerarySummary = [], flightSegments = [], ...body
-  } = req.body;
+  } = createVoucherSchema.parse(req.body);
   const voucherNumber = await nextVoucherNumber();
 
   const voucher = await prisma.voucher.create({
@@ -64,10 +64,8 @@ export const updateVoucher = asyncHandler(async (req, res) => {
   if (existing.status === 'cancelled') throw new AppError('Cannot update a cancelled voucher', 400);
 
   const {
-    locationDates, mealPlans, itinerarySummary, flightSegments,
-    lead: _lead, createdBy: _cb, lastModifiedBy: _lmb,
-    ...body
-  } = req.body;
+    locationDates, mealPlans, itinerarySummary, flightSegments, ...body
+  } = updateVoucherSchema.parse(req.body);
   const data = { ...body, lastModifiedById: req.user.id };
 
   if (locationDates) {
