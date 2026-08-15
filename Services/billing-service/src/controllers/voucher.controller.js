@@ -2,11 +2,17 @@ import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { nextVoucherNumber } from '../utils/docNumber.js';
+import { generateVoucherPDF } from '../utils/voucherPDFGenerator.js';
+import { sendVoucherEmail } from '../utils/emailService.js';
+import { sendVoucherWhatsapp } from '../utils/whatsappService.js';
+import { uploadPdfBuffer } from '../utils/cloudinary.js';
+import { sendVoucherSchema } from '../validators/voucher.validator.js';
 
 const voucherInclude = {
   locationDates: { orderBy: { order: 'asc' } },
   mealPlans: { orderBy: { dayNumber: 'asc' } },
   itinerarySummary: { orderBy: { order: 'asc' } },
+  flightSegments: { orderBy: [{ dayNumber: 'asc' }, { order: 'asc' }] },
 };
 
 export const getAllVouchers = asyncHandler(async (req, res) => {
@@ -32,7 +38,9 @@ export const getVouchersByLeadId = asyncHandler(async (req, res) => {
 });
 
 export const createVoucher = asyncHandler(async (req, res) => {
-  const { locationDates = [], mealPlans = [], itinerarySummary = [], ...body } = req.body;
+  const {
+    locationDates = [], mealPlans = [], itinerarySummary = [], flightSegments = [], ...body
+  } = req.body;
   const voucherNumber = await nextVoucherNumber();
 
   const voucher = await prisma.voucher.create({
@@ -43,6 +51,7 @@ export const createVoucher = asyncHandler(async (req, res) => {
       locationDates: { create: locationDates.map((l, idx) => ({ ...l, order: idx })) },
       mealPlans: { create: mealPlans },
       itinerarySummary: { create: itinerarySummary.map((s, idx) => ({ ...s, order: idx })) },
+      flightSegments: { create: flightSegments.map((f, idx) => ({ ...f, order: idx })) },
     },
     include: voucherInclude,
   });
@@ -55,7 +64,7 @@ export const updateVoucher = asyncHandler(async (req, res) => {
   if (existing.status === 'cancelled') throw new AppError('Cannot update a cancelled voucher', 400);
 
   const {
-    locationDates, mealPlans, itinerarySummary,
+    locationDates, mealPlans, itinerarySummary, flightSegments,
     lead: _lead, createdBy: _cb, lastModifiedBy: _lmb,
     ...body
   } = req.body;
@@ -73,6 +82,10 @@ export const updateVoucher = asyncHandler(async (req, res) => {
     await prisma.voucherItinerarySummary.deleteMany({ where: { voucherId: req.params.id } });
     data.itinerarySummary = { create: itinerarySummary.map((s, idx) => ({ ...s, order: idx })) };
   }
+  if (flightSegments) {
+    await prisma.voucherFlightSegment.deleteMany({ where: { voucherId: req.params.id } });
+    data.flightSegments = { create: flightSegments.map((f, idx) => ({ ...f, order: idx })) };
+  }
 
   const voucher = await prisma.voucher.update({ where: { id: req.params.id }, data, include: voucherInclude });
   res.json({ success: true, data: voucher });
@@ -85,9 +98,44 @@ export const deleteVoucher = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Voucher deleted' });
 });
 
-export const sendVoucherEmail = asyncHandler(async (req, res) => {
-  await prisma.voucher.update({ where: { id: req.params.id }, data: { status: 'sent', emailSent: true, emailSentAt: new Date() } });
-  res.json({ success: true, message: 'Voucher sent' });
+export const sendVoucher = asyncHandler(async (req, res) => {
+  const { channel, email, phone } = sendVoucherSchema.parse(req.body || {});
+
+  const voucher = await prisma.voucher.findUnique({ where: { id: req.params.id }, include: voucherInclude });
+  if (!voucher) throw new AppError('Voucher not found', 404);
+
+  const pdf = await generateVoucherPDF(voucher);
+  const now = new Date();
+  const statusUpdate = voucher.status === 'draft' ? { status: 'sent' } : {};
+
+  try {
+    if (channel === 'whatsapp') {
+      const recipient = phone || voucher.customerPhone;
+      if (!recipient) throw new AppError('No phone number available for this voucher', 400);
+      const mediaUrl = await uploadPdfBuffer(pdf, `voucher-${voucher.voucherNumber}`);
+      await sendVoucherWhatsapp({ voucher, phone: recipient, mediaUrl });
+      const updated = await prisma.voucher.update({
+        where: { id: voucher.id },
+        data: { ...statusUpdate, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
+        include: voucherInclude,
+      });
+      return res.json({ success: true, message: 'Voucher sent via WhatsApp', data: updated });
+    }
+
+    const recipient = email || voucher.customerEmail;
+    if (!recipient) throw new AppError('No email address available for this voucher', 400);
+    await sendVoucherEmail({ voucher, recipientEmail: recipient, pdfBuffer: pdf });
+    const updated = await prisma.voucher.update({
+      where: { id: voucher.id },
+      data: { ...statusUpdate, emailSent: true, emailSentAt: now },
+      include: voucherInclude,
+    });
+    return res.json({ success: true, message: 'Voucher sent via email', data: updated });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    // Configuration / delivery failures surface as a clean 400, not a 500.
+    throw new AppError(err.message || 'Failed to send voucher', 400);
+  }
 });
 
 export const markVoucherViewed = asyncHandler(async (req, res) => {
@@ -103,5 +151,10 @@ export const confirmVoucher = asyncHandler(async (req, res) => {
 export const downloadVoucherPDF = asyncHandler(async (req, res) => {
   const voucher = await prisma.voucher.findUnique({ where: { id: req.params.id }, include: voucherInclude });
   if (!voucher) throw new AppError('Voucher not found', 404);
-  res.json({ success: true, message: 'PDF generation not yet implemented', data: voucher });
+
+  const pdf = await generateVoucherPDF(voucher);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="voucher-${voucher.voucherNumber}.pdf"`);
+  res.setHeader('Content-Length', pdf.length);
+  res.send(pdf);
 });
