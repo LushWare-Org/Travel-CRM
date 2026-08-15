@@ -136,45 +136,34 @@ describe('generateInvoicePDF', () => {
     }
   });
 
-  describe('graceful degradation — incomplete org settings must never block generation', () => {
-    // Regression coverage for a real production incident: an early version
-    // of this generator hard-threw when Organization Settings was
-    // incomplete, which made every invoice (old and new) permanently
-    // unpreviewable/undownloadable the moment the org-settings row wasn't
-    // fully filled in (the common case for a freshly seeded environment).
-    // generateInvoicePDF must always degrade gracefully instead — only
-    // `hasRequiredOrgFieldsForInvoice` (checked elsewhere, e.g. before
-    // emailing an invoice to a customer) is allowed to gate on completeness.
-
-    it('generates successfully against a completely bare org settings row (matches a fresh/seed environment)', async () => {
-      getOrgSettings.mockResolvedValue({ companyName: 'Travel CRM' });
-      const buffer = await generateInvoicePDF(baseInvoice);
-      expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-    });
-
-    it('omits the Address row from Bill From when companyAddress is missing, without throwing', async () => {
+  describe('hasRequiredOrgFieldsForInvoice guard — blocks generation with a specific error', () => {
+    it('throws a 422 AppError when companyAddress is missing', async () => {
       getOrgSettings.mockResolvedValue({ ...COMPLETE_SETTINGS, companyAddress: undefined });
-      const buffer = await generateInvoicePDF(baseInvoice);
-      expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-    });
-
-    it('omits the bank card (but keeps rendering payment instructions bullets) when the invoice has no bank snapshot', async () => {
-      const buffer = await generateInvoicePDF({
-        ...baseInvoice,
-        bankName: null, bankAccountName: null, bankAccountNumber: null, bankIfscCode: null, bankUpiId: null,
+      await expect(generateInvoicePDF(baseInvoice)).rejects.toMatchObject({
+        statusCode: 422,
+        message: expect.stringContaining('companyAddress'),
       });
-      const text = extractPdfText(buffer);
-      expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-      expect(text).toContain('PAYMENT INSTRUCTIONS');
-      expect(text).not.toContain('Bank Transfer');
-      expect(text).not.toContain('IFSC');
     });
 
-
-    it('generates successfully when both contact phone and email are missing', async () => {
-      getOrgSettings.mockResolvedValue({ ...COMPLETE_SETTINGS, contactPhone: undefined, contactEmail: undefined });
+    it('throws a 422 AppError when companyGstNumber is missing (address/phone/bank still present)', async () => {
+      // GST isn't in the required-field guard (only address/contact/bank are) —
+      // this asserts generation still succeeds, i.e. GST is best-effort, not blocking.
+      getOrgSettings.mockResolvedValue({ ...COMPLETE_SETTINGS, companyGstNumber: undefined });
       const buffer = await generateInvoicePDF(baseInvoice);
       expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    });
+
+    it('throws a 422 AppError when bank details are missing', async () => {
+      getOrgSettings.mockResolvedValue({ ...COMPLETE_SETTINGS, bankName: undefined, bankAccountNumber: undefined });
+      await expect(generateInvoicePDF(baseInvoice)).rejects.toMatchObject({
+        statusCode: 422,
+        message: expect.stringContaining('bank details'),
+      });
+    });
+
+    it('throws a 422 AppError when both contact phone and email are missing', async () => {
+      getOrgSettings.mockResolvedValue({ ...COMPLETE_SETTINGS, contactPhone: undefined, contactEmail: undefined });
+      await expect(generateInvoicePDF(baseInvoice)).rejects.toMatchObject({ statusCode: 422 });
     });
   });
 

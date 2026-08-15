@@ -1,9 +1,10 @@
 import PDFDocument from 'pdfkit';
-import { getOrgSettings, toBrandingShape } from '../config/orgSettings.js';
+import { getOrgSettings, toBrandingShape, hasRequiredOrgFieldsForInvoice } from '../config/orgSettings.js';
 import { InvoiceForPdf } from '@travel-crm/contracts';
 import { formatMoney, formatDate } from './pdfFormatters.js';
 import { drawBankDetailsCard } from './pdfBankDetailsSection.js';
 import { numberToWords } from './numberToWords.js';
+import AppError from './appError.js';
 
 const TITLES = { invoice: 'INVOICE', proforma: 'PROFORMA', 'tax-invoice': 'TAX INVOICE' };
 
@@ -17,12 +18,8 @@ const asBullets = (text) => String(text || '').split('\n').map((s) => s.trim()).
  * snapshot fields already resolved at creation time — see
  * convertQuotationToInvoice) plus live org branding for the "Bill From"
  * block, so regeneration is deterministic except for company identity
- * edits. Every section degrades gracefully when its fields are absent
- * (company address/GST rows, the bank card) — this must never hard-fail
- * just because Organization Settings hasn't been fully filled in yet, or
- * every existing invoice becomes unpreviewable/undownloadable. Use
- * `hasRequiredOrgFieldsForInvoice` separately wherever *sending* an invoice
- * to a customer should be gated on complete org settings.
+ * edits. Fails loud via `hasRequiredOrgFieldsForInvoice` rather than ever
+ * emitting a customer-facing PDF with blank company/bank fields.
  *
  * @param {object} invoice - an Invoice row with its `items` included.
  * @returns {Promise<Buffer>}
@@ -37,6 +34,15 @@ export async function generateInvoicePDF(invoice) {
   const BRANDING = toBrandingShape(orgSettings);
   const T = BRANDING.theme;
   const CONTENT = BRANDING.content;
+
+  const { ok, missing } = hasRequiredOrgFieldsForInvoice(BRANDING);
+  if (!ok) {
+    throw new AppError(
+      `Cannot generate invoice: organization settings are incomplete (missing: ${missing.join(', ')}). ` +
+        'Complete Organization Settings before generating invoices.',
+      422,
+    );
+  }
 
   return new Promise((resolve, reject) => {
     try {
@@ -198,9 +204,6 @@ export async function generateInvoicePDF(invoice) {
       doc.y += 24;
 
       // ── Payment Instructions (bank card + bullets) ────────────────
-      // Degrades gracefully, same as the quotation generator's payment
-      // section: an invoice with no bank snapshot and no instructions text
-      // simply omits this section rather than rendering an empty card.
       const bank = {
         bankName: invoice.bankName,
         accountName: invoice.bankAccountName,
@@ -210,25 +213,20 @@ export async function generateInvoicePDF(invoice) {
         branch: invoice.bankBranch,
         upiId: invoice.bankUpiId,
       };
-      const hasAnyBankInfo = Boolean(bank.bankName || bank.accountNumber || bank.upiId);
-      const paymentBullets = asBullets(invoice.paymentInstructions || CONTENT.invoicePaymentInstructions);
+      sectionHeader('Payment Instructions');
+      doc.font('Helvetica').fontSize(9).fillColor(T.ink)
+        .text('Kindly make the payment using the below details:', left, doc.y, { width: contentW });
+      doc.y += 12;
+      drawBankDetailsCard(doc, { left, contentW, T, ensureSpace }, bank);
 
-      if (hasAnyBankInfo || paymentBullets.length) {
-        sectionHeader('Payment Instructions');
-        if (hasAnyBankInfo) {
-          doc.font('Helvetica').fontSize(9).fillColor(T.ink)
-            .text('Kindly make the payment using the below details:', left, doc.y, { width: contentW });
-          doc.y += 12;
-          drawBankDetailsCard(doc, { left, contentW, T, ensureSpace }, bank);
-        }
-        doc.font('Helvetica').fontSize(9).fillColor(T.ink);
-        for (const b of paymentBullets) {
-          ensureSpace(16);
-          doc.text(`•  ${b}`, left, doc.y, { width: contentW });
-          doc.y += 3;
-        }
-        doc.y += 16;
+      const paymentBullets = asBullets(invoice.paymentInstructions || CONTENT.invoicePaymentInstructions);
+      doc.font('Helvetica').fontSize(9).fillColor(T.ink);
+      for (const b of paymentBullets) {
+        ensureSpace(16);
+        doc.text(`•  ${b}`, left, doc.y, { width: contentW });
+        doc.y += 3;
       }
+      doc.y += 16;
 
       // ── Payment Terms ──────────────────────────────────────────────
       const termsBullets = asBullets(invoice.paymentTerms || CONTENT.invoiceTerms);
