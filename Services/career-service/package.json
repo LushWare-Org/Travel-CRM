@@ -7,7 +7,10 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "db:generate": "npx prisma@5 generate",
-    "db:push": "npx prisma@5 db push"
+    "db:push": "npx prisma@5 db push",
+    "db:migrate": "npx prisma@5 migrate dev",
+    "db:migrate:deploy": "npx prisma@5 migrate deploy",
+    "db:migrate:status": "npx prisma@5 migrate status"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
