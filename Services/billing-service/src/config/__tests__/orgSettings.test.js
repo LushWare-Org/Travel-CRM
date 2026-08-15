@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getOrgSettings, _resetCache, toBrandingShape, getBankDetails, hasBankDetails, hasRequiredOrgFieldsForInvoice } from '../orgSettings.js';
+import { getOrgSettings, _resetCache, toBrandingShape, getBankDetails, hasBankDetails, hasRequiredOrgFieldsForInvoice, hasRequiredOrgFieldsForVoucher } from '../orgSettings.js';
 
 const COMPLETE_SETTINGS = {
   companyName: 'Lush Travel',
@@ -180,5 +180,30 @@ describe('hasRequiredOrgFieldsForInvoice', () => {
     expect(result.missing).toEqual(
       expect.arrayContaining(['companyAddress', 'contactPhone or contactEmail', 'bank details (bankName + bankAccountNumber)']),
     );
+  });
+});
+
+describe('hasRequiredOrgFieldsForVoucher', () => {
+  it('is ok with no missing fields when every required field is configured', () => {
+    const branding = toBrandingShape(COMPLETE_SETTINGS);
+    expect(hasRequiredOrgFieldsForVoucher(branding)).toEqual({ ok: true, missing: [] });
+  });
+
+  it('reports companyAddress as missing when unset', () => {
+    const branding = toBrandingShape({ ...COMPLETE_SETTINGS, companyAddress: undefined });
+    const result = hasRequiredOrgFieldsForVoucher(branding);
+    expect(result.ok).toBe(false);
+    expect(result.missing).toContain('companyAddress');
+  });
+
+  it('does not require bank details (a voucher is not a financial document, unlike an invoice)', () => {
+    const branding = toBrandingShape({ ...COMPLETE_SETTINGS, bankName: undefined, bankAccountNumber: undefined });
+    expect(hasRequiredOrgFieldsForVoucher(branding).ok).toBe(true);
+  });
+
+  it('reports contact info as missing only when both phone and email are unset', () => {
+    const branding = toBrandingShape({ ...COMPLETE_SETTINGS, contactPhone: undefined, contactEmail: undefined });
+    const result = hasRequiredOrgFieldsForVoucher(branding);
+    expect(result.missing).toContain('contactPhone or contactEmail');
   });
 });
