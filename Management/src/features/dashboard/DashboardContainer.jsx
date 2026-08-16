@@ -377,7 +377,7 @@ const SalesRepDashboard = ({ data }) => {
           { label: 'Leads Assigned', value: performance.leadsAssigned || 0, color: 'from-blue-400 to-blue-600' },
           { label: 'Converted', value: performance.converted || 0, color: 'from-emerald-400 to-emerald-600' },
           { label: 'Pending', value: performance.pending || 0, color: 'from-amber-400 to-amber-600' },
-          { label: 'Conversion Rate', value: performance.conversionRate || '0%', color: 'from-violet-400 to-violet-600' },
+          { label: 'Conversion Rate', value: `${performance.conversionRate || 0}%`, color: 'from-violet-400 to-violet-600' },
         ].map((item, idx) => (
           <div key={idx} className="bg-white rounded-xl p-4 shadow-sm">
             <div className={`w-8 h-1 rounded-full bg-gradient-to-r ${item.color} mb-3`} />
@@ -451,22 +451,34 @@ const DashboardContainer = () => {
   const userStats = userData?.stats || {};
   const packageStats = packageData?.stats || {};
 
+  // Real period-over-period deltas from the trend series (same approach as
+  // BillingAnalytics's calculateTrend/getLastTwoValues) — no fabricated %s.
+  // Omits the badge entirely when there aren't at least 2 buckets to compare.
+  const trendBadge = (series, key) => {
+    if (!Array.isArray(series) || series.length < 2) return null;
+    const previous = Number(series[series.length - 2]?.[key]) || 0;
+    const current = Number(series[series.length - 1]?.[key]) || 0;
+    if (previous === 0) return null;
+    const pct = ((current - previous) / previous) * 100;
+    return `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`;
+  };
+
   const metrics = [
-    { title: 'Total Leads', value: leadStats.totalLeads || '0', trend: '+12%', description: 'All leads in pipeline', icon: Activity, colorScheme: 'blue' },
-    { title: 'Active Packages', value: packageStats.totalItineraries || '0', trend: '+5%', description: 'Available packages', icon: Briefcase, colorScheme: 'emerald' },
+    { title: 'Total Leads', value: leadStats.totalLeads || '0', trend: trendBadge(leadData?.trend, 'new'), description: 'All leads in pipeline', icon: Activity, colorScheme: 'blue' },
+    { title: 'Active Packages', value: packageStats.totalItineraries || '0', trend: null, description: 'Available packages', icon: Briefcase, colorScheme: 'emerald' },
   ];
 
   if (billingData) {
     metrics.push(
-      { title: 'Monthly Revenue', value: formatCompact(billingStats.totalRevenue), trend: '+23%', description: 'Paid invoices', icon: DollarSign, colorScheme: 'violet' },
-      { title: 'Outstanding', value: formatCompact(billingStats.totalOutstanding), trend: '-15%', description: 'Pending payments', icon: Eye, colorScheme: 'amber' },
+      { title: 'Monthly Revenue', value: formatCompact(billingStats.totalRevenue), trend: trendBadge(billingData?.revenueTrend, 'revenue'), description: 'Paid invoices', icon: DollarSign, colorScheme: 'violet' },
+      { title: 'Outstanding', value: formatCompact(billingStats.totalOutstanding), trend: trendBadge(billingData?.outstandingTrend, 'outstanding'), description: 'Pending payments', icon: Eye, colorScheme: 'amber' },
     );
   }
 
   if (userData && !isSalesRep) {
     metrics.push(
-      { title: 'Total Users', value: userStats.totalUsers || '0', trend: '+8%', description: 'Registered users', icon: Users, colorScheme: 'indigo' },
-      { title: 'Active Users', value: userStats.activeUsers || '0', trend: '+12%', description: 'Active this period', icon: TrendingUp, colorScheme: 'cyan' },
+      { title: 'Total Users', value: userStats.totalUsers || '0', trend: trendBadge(userData?.trendData, 'totalNewUsers'), description: 'Registered users', icon: Users, colorScheme: 'indigo' },
+      { title: 'Active Users', value: userStats.activeUsers || '0', trend: trendBadge(userData?.trendData, 'activeUsers'), description: 'Active this period', icon: TrendingUp, colorScheme: 'cyan' },
     );
   }
 

@@ -1,5 +1,14 @@
 import AppError from '../utils/appError.js';
 
+const parsePermissions = (header) => {
+  try {
+    const parsed = JSON.parse(header || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 export const extractUser = (req, res, next) => {
   const userId = req.headers['x-user-id'];
   if (userId) {
@@ -8,7 +17,7 @@ export const extractUser = (req, res, next) => {
       role: req.headers['x-user-role'],
       email: req.headers['x-user-email'],
       name: req.headers['x-user-name'],
-      permissions: JSON.parse(req.headers['x-user-permissions'] || '[]'),
+      permissions: parsePermissions(req.headers['x-user-permissions']),
       isSuperAdmin: req.headers['x-user-is-super-admin'] === 'true',
     };
   }

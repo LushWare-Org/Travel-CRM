@@ -5,9 +5,7 @@
 
 import html2canvas from 'html2canvas';
 import axios from 'axios';
-
-// API base URL - adjust if needed
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
+import { API_BASE_URL } from '../../../services/api.js';
 
 /**
  * Capture all visible charts from the current page
@@ -17,7 +15,7 @@ async function captureAllCharts() {
   const charts = [];
   
   // Target ChartContainer divs to capture full chart with legends
-  const chartContainers = document.querySelectorAll('.bg-white.rounded-lg.border');
+  const chartContainers = document.querySelectorAll('.bg-white.rounded-2xl.border');
   
   let foundCharts = new Set();
   

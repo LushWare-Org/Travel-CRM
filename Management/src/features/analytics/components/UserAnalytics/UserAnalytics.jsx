@@ -14,8 +14,6 @@ import AnalyticsService from "../../../../services/analytics.service";
 import {
   getUserGrowthByTimeRange,
   getAggregatedUserStats,
-  getSalesRepStats,
-  salesRepPerformanceData,
   userTypeDistributionData,
 } from "../../utils/userAnalyticsData";
 
@@ -29,6 +27,8 @@ const UserAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
+  const [salesRepPerformance, setSalesRepPerformance] = useState([]);
+  const [salesRepLoading, setSalesRepLoading] = useState(true);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -46,6 +46,22 @@ const UserAnalytics = () => {
       }
     };
     fetchAnalytics();
+  }, [timeRange]);
+
+  useEffect(() => {
+    const fetchSalesRepPerformance = async () => {
+      try {
+        setSalesRepLoading(true);
+        const data = await AnalyticsService.getAllSalesRepsPerformance(timeRange);
+        setSalesRepPerformance(data || []);
+      } catch (err) {
+        console.error('Error fetching sales rep performance:', err);
+        setSalesRepPerformance([]);
+      } finally {
+        setSalesRepLoading(false);
+      }
+    };
+    fetchSalesRepPerformance();
   }, [timeRange]);
 
   const currentUserGrowthData = useMemo(() => {
@@ -106,7 +122,7 @@ const UserAnalytics = () => {
   const getXAxisKey = () => {
     switch (timeRange) {
       case "weekly": return "week";
-      case "yearly": return "year";
+      case "annual": return "year";
       default: return "month";
     }
   };
@@ -114,7 +130,7 @@ const UserAnalytics = () => {
   const getTimeRangeLabel = () => {
     switch (timeRange) {
       case "weekly": return "Last 12 weeks";
-      case "yearly": return "Last 5 years";
+      case "annual": return "Last 12 months";
       default: return "Last 6 months";
     }
   };
@@ -217,12 +233,22 @@ const UserAnalytics = () => {
           title="Sales Rep Performance"
           description="Sales and conversion by representative"
         >
-          <BarChartComponent
-            data={salesRepPerformanceData}
-            bars={salesRepBars}
-            xAxisKey="rep"
-            height={280}
-          />
+          {salesRepLoading ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <div className="animate-spin w-8 h-8 border-4 border-violet-200 border-t-violet-600 rounded-full" />
+            </div>
+          ) : salesRepPerformance.length > 0 ? (
+            <BarChartComponent
+              data={salesRepPerformance}
+              bars={salesRepBars}
+              xAxisKey="rep"
+              height={280}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-[280px] text-slate-400">
+              No sales rep data available
+            </div>
+          )}
         </ChartContainer>
 
         <ChartContainer
