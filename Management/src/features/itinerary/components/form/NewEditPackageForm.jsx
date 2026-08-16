@@ -65,6 +65,9 @@ const NewEditPackageForm = ({
   onImageRemove,
   images,
   isUploadingImages,
+  deletingImageIndexes = [],
+  coverImage = null,
+  onSetCover = null,
   hideLeadManagementButtons = false,
   onlyItineraryEditable = false,
 }) => {
@@ -262,6 +265,9 @@ const NewEditPackageForm = ({
             onImageUpload={onImageUpload}
             onImageRemove={onImageRemove}
             isUploading={isUploadingImages}
+            deletingIndexes={deletingImageIndexes}
+            coverUrl={coverImage}
+            onSetCover={onSetCover}
           />
         </StableSectionCard>
       )}

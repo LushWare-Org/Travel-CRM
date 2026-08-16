@@ -14,8 +14,15 @@ const decimal = () => z.coerce.number();
 
 const imageSchema = z.object({
   url: z.string().min(1, 'Image URL is required'),
+  publicId: z.string().max(255).optional().nullable(),
   altText: z.string().optional(),
   orderIndex: z.number().int().min(0).optional(),
+});
+
+const dayImageSchema = z.object({
+  url: z.string().min(1, 'Image URL is required'),
+  publicId: z.string().max(255).optional().nullable(),
+  altText: z.string().optional(),
 });
 
 // ─── Day sub-schemas ───────────────────────────────────────────
@@ -72,6 +79,7 @@ const itineraryDay = z.object({
   places: z.array(dayPlace).optional().default([]),
   activities: z.array(dayActivity).optional().default([]),
   transports: z.array(dayTransport).optional().default([]),
+  images: z.array(dayImageSchema).optional().default([]),
 });
 
 // ─── Package schemas ───────────────────────────────────────────
@@ -123,6 +131,19 @@ export const updatePackageSchema = z.object({
 
 export const packageIdParamSchema = z.object({
   id: z.string().min(1, 'Invalid package ID'),
+});
+
+export const packageImageParamSchema = z.object({
+  packageId: z.string().min(1, 'Invalid package ID'),
+  imageId: z.string().min(1, 'Invalid image ID'),
+});
+
+export const packageCoverParamSchema = z.object({
+  packageId: z.string().min(1, 'Invalid package ID'),
+});
+
+export const setPackageCoverSchema = z.object({
+  imageId: z.string().min(1, 'imageId is required'),
 });
 
 export const listPackagesQuerySchema = z.object({

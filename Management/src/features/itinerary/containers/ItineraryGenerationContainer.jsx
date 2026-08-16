@@ -94,7 +94,7 @@ const ItineraryGenerationContainer = () => {
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(SAMPLE_PACKAGES);
   const { formData: newFormData, setFormData: setNewFormData } = useItineraryForm(createDefaultPackage());
-  const { images, setImages, handleUpload: handleImageUploadHook, removeImage } = useImageUpload();
+  const { images, setImages, handleUpload: handleImageUploadHook, removeImage, deletingIndexes } = useImageUpload();
 
   // Filter packages
   let filteredPackages = filterPackages(packages, searchTerm);
@@ -247,7 +247,7 @@ const ItineraryGenerationContainer = () => {
           activities: apiDay.activities || [],
           transports: apiDay.transports || [],
         },
-        images: [],
+        images: apiDay.images || [],
         notes: '',
       }));
 
@@ -276,7 +276,6 @@ const ItineraryGenerationContainer = () => {
         return;
       }
 
-      const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
       const validationErrors = [];
 
       if (formData.name && formData.name.trim().length > 100) validationErrors.push('Package Name must not exceed 100 characters');
@@ -312,7 +311,9 @@ const ItineraryGenerationContainer = () => {
         basePrice: formData.basePrice ?? formData.price ?? 0,
         durationDays: formData.durationDays || formData.duration || 1,
         days: cleanDays,
-        images: (validImages.length > 0 ? validImages : (formData.images || [])).map(img => ({ url: img.url, altText: img.altText })),
+        images: images
+          .filter(img => !img.isTemp && img.url)
+          .map(img => ({ url: img.url, publicId: img.publicId || img.public_id, altText: img.altText })),
       };
 
       delete sanitizedData._id;
@@ -350,7 +351,6 @@ const ItineraryGenerationContainer = () => {
         return;
       }
 
-      const validImages = images.filter(img => !img.isTemp && img.url && img.public_id);
       const validationErrors = [];
 
       if (formData.name && formData.name.trim().length > 100) validationErrors.push('Package Name must not exceed 100 characters');
@@ -393,7 +393,9 @@ const ItineraryGenerationContainer = () => {
         basePrice: formData.basePrice ?? formData.price ?? 0,
         durationDays: formData.durationDays || formData.duration || 1,
         days: cleanDays,
-        images: (validImages.length > 0 ? validImages : (formData.images || [])).map(img => ({ url: img.url, altText: img.altText })),
+        images: images
+          .filter(img => !img.isTemp && img.url)
+          .map(img => ({ url: img.url, publicId: img.publicId || img.public_id, altText: img.altText })),
       };
 
       delete sanitizedData._id;
@@ -553,7 +555,24 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleImageRemove = (index) => {
-    removeImage(index);
+    const packageId = showEditPackageDialog ? (editPackageData?.id || editPackageData?._id) : null;
+    removeImage(index, { packageId });
+  };
+
+  const handleSetCover = async (imageId) => {
+    const packageId = editPackageData?.id || editPackageData?._id;
+    if (!packageId) return;
+
+    try {
+      const response = await ApiService.setPackageCover(packageId, imageId);
+      if (response.success) {
+        setEditPackageData((prev) => (prev ? { ...prev, coverImage: response.data.coverImage } : prev));
+        setPackages((prev) => prev.map((p) => (p.id === packageId ? { ...p, coverImage: response.data.coverImage } : p)));
+      }
+    } catch (error) {
+      console.error('Failed to set cover image:', error);
+      Swal.fire('Error', error.message || 'Failed to set cover image', 'error');
+    }
   };
 
   const handlePageChange = (newPage) => {
@@ -578,6 +597,7 @@ const ItineraryGenerationContainer = () => {
     const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
     const status = pkg.isActive ? 'published' : 'draft';
     const statusLabel = pkg.isActive ? 'Published' : 'Draft';
+    const coverUrl = pkg.coverImage || (pkg.images?.[0] ? (typeof pkg.images[0] === 'string' ? pkg.images[0] : pkg.images[0].url) : null);
 
     return (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all group">
@@ -585,9 +605,9 @@ const ItineraryGenerationContainer = () => {
         <div
           className="h-44 relative overflow-hidden flex items-center justify-center"
           style={
-            pkg.images && pkg.images.length > 0
+            coverUrl
               ? {
-                backgroundImage: `url(${typeof pkg.images[0] === 'string' ? pkg.images[0] : pkg.images[0].url})`,
+                backgroundImage: `url(${coverUrl})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
               }
@@ -595,7 +615,7 @@ const ItineraryGenerationContainer = () => {
           }
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-          {!(pkg.images && pkg.images.length > 0) && (
+          {!coverUrl && (
             <ImageIcon className="w-12 h-12 text-white/50" />
           )}
 
@@ -934,6 +954,7 @@ const ItineraryGenerationContainer = () => {
           onImageRemove={handleImageRemove}
           images={images}
           isUploadingImages={isUploadingImages}
+          deletingImageIndexes={deletingIndexes}
         />
       </PackageFormModal>
 
@@ -953,6 +974,9 @@ const ItineraryGenerationContainer = () => {
             onImageRemove={handleImageRemove}
             images={images}
             isUploadingImages={isUploadingImages}
+            deletingImageIndexes={deletingIndexes}
+            coverImage={editPackageData.coverImage}
+            onSetCover={handleSetCover}
           />
         )}
       </PackageFormModal>

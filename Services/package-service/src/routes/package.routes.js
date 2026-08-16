@@ -1,8 +1,16 @@
 import { Router } from 'express';
 import { requireAuth, authorize } from '../middleware/auth.js';
 import { validateBody, validateParams } from '../middleware/validate.js';
-import { createPackageSchema, updatePackageSchema, packageIdParamSchema } from '../validators/package.schema.js';
+import {
+  createPackageSchema,
+  updatePackageSchema,
+  packageIdParamSchema,
+  packageImageParamSchema,
+  packageCoverParamSchema,
+  setPackageCoverSchema,
+} from '../validators/package.schema.js';
 import * as packageController from '../controllers/package.controller.js';
+import * as packageImageController from '../controllers/packageImage.controller.js';
 import {
   generateAIPackage,
   generateContentFromTitle,
@@ -47,5 +55,9 @@ router.get('/:id/ai-pdf',               requireAuth,                            
 // ── Misc per-package updates ──────────────────────────────────────────────────
 router.post('/:id/increment-bookings', requireAuth, validateParams(packageIdParamSchema), packageController.incrementBookings);
 router.post('/:id/update-rating',      requireAuth, validateParams(packageIdParamSchema), packageController.updatePackageRating);
+
+// ── Per-package image management ───────────────────────────────────────────────
+router.delete('/:packageId/images/:imageId', requireAuth, authorize('admin', 'staff'), validateParams(packageImageParamSchema), packageImageController.deletePackageImage);
+router.put('/:packageId/cover',               requireAuth, authorize('admin', 'staff'), validateParams(packageCoverParamSchema), validateBody(setPackageCoverSchema), packageImageController.setPackageCover);
 
 export default router;

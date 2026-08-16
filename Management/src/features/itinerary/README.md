@@ -106,8 +106,13 @@ Located in `utils/constants.js`:
 - `STATUS_COLORS` - Status badge colors
 - `CATEGORY_OPTIONS` - Available categories
 - `REGION_OPTIONS` - Available regions
-- `IMAGE_UPLOAD_API_KEY` - imgbb API key
 - `VALIDATION_MESSAGES` - User messages
+
+### Image uploads
+Images upload through `services/cloudinaryService.js`, which POSTs to
+`package-service`'s `/upload/*` endpoints (Cloudinary credentials live
+server-side only). The frontend just needs the logged-in user's JWT — no
+client-side upload key is required.
 
 ### Sample Data
 Located in `containers/sampleData.js`:

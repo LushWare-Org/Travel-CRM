@@ -4,13 +4,16 @@
  * Handles image selection and display with Cloudinary upload
  */
 
-import { Trash2, Upload, Image as ImageIcon, Cloud, Check, Loader2, X } from 'lucide-react';
+import { Trash2, Upload, Image as ImageIcon, Cloud, Check, Loader2, X, Star } from 'lucide-react';
 
 const ImageUpload = ({
   images,
   onImageUpload,
   onImageRemove,
   isUploading = false,
+  deletingIndexes = [],
+  coverUrl = null,
+  onSetCover = null,
 }) => {
   return (
     <div className="space-y-4">
@@ -72,47 +75,71 @@ const ImageUpload = ({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {images.map((img, idx) => {
               const imageUrl = typeof img === 'string' ? img : img.url;
-              const publicId = typeof img === 'object' ? img.public_id : null;
+              const publicId = typeof img === 'object' ? (img.publicId || img.public_id) : null;
               const isTemp = typeof img === 'object' && img.isTemp;
+              const isDeleting = deletingIndexes.includes(idx);
+              const isCover = !!coverUrl && imageUrl === coverUrl;
+              const canSetCover = !!onSetCover && !isTemp && typeof img === 'object' && !!img.id;
 
               return (
                 <div key={publicId || idx} className="relative group">
                   <div className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${isTemp
                       ? 'border-violet-300 ring-2 ring-violet-100'
-                      : 'border-slate-200 hover:border-violet-400 hover:shadow-lg'
+                      : isCover
+                        ? 'border-amber-400 ring-2 ring-amber-100'
+                        : 'border-slate-200 hover:border-violet-400 hover:shadow-lg'
                     }`}>
                     <img
                       src={imageUrl}
                       alt={`Package Image ${idx + 1}`}
-                      className={`w-full h-full object-cover ${isTemp ? 'opacity-60' : ''}`}
+                      className={`w-full h-full object-cover ${isTemp || isDeleting ? 'opacity-60' : ''}`}
                       onError={(e) => {
                         e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
                       }}
                     />
 
-                    {/* Loading overlay for temp images */}
-                    {isTemp && (
+                    {/* Loading overlay for temp images / in-flight deletes */}
+                    {(isTemp || isDeleting) && (
                       <div className="absolute inset-0 bg-violet-900/30 flex items-center justify-center">
                         <Loader2 className="w-6 h-6 text-white animate-spin" />
                       </div>
                     )}
                   </div>
 
+                  {/* Set as cover button */}
+                  {canSetCover && (
+                    <button
+                      onClick={() => onSetCover(img.id)}
+                      disabled={isCover}
+                      className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center shadow-lg transition-colors ${isCover
+                          ? 'bg-amber-400 text-white'
+                          : 'bg-white text-slate-400 opacity-0 group-hover:opacity-100 hover:text-amber-500'
+                        }`}
+                      type="button"
+                      aria-label={isCover ? 'Cover image' : 'Set as cover image'}
+                      title={isCover ? 'Cover image' : 'Set as cover image'}
+                    >
+                      <Star size={14} fill={isCover ? 'currentColor' : 'none'} />
+                    </button>
+                  )}
+
                   {/* Remove button */}
                   <button
                     onClick={() => onImageRemove(idx)}
-                    className="absolute -top-2 -right-2 w-7 h-7 bg-rose-500 text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-colors shadow-lg opacity-0 group-hover:opacity-100"
+                    disabled={isDeleting}
+                    className="absolute -top-2 -right-2 w-7 h-7 bg-rose-500 text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-colors shadow-lg opacity-0 group-hover:opacity-100 disabled:opacity-60"
                     type="button"
                     aria-label="Remove image"
                     title="Remove image"
                   >
-                    <X size={14} />
+                    {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
                   </button>
 
                   {/* Image number badge */}
                   <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-lg">
                     {!isTemp && <Check className="w-3 h-3 text-emerald-400" />}
                     <span>{idx + 1}</span>
+                    {isCover && <span className="text-amber-300 font-medium ml-1">Cover</span>}
                   </div>
                 </div>
               );

@@ -1,14 +1,6 @@
-import { v2 as cloudinary } from 'cloudinary';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
-
-const configureCloudinary = () => {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-};
+import cloudinary, { configureCloudinary } from '../utils/cloudinary.js';
 
 const uploadToCloudinary = async (filePath, folder, options = {}) => {
   configureCloudinary();
@@ -62,8 +54,7 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
 });
 
 export const deleteImage = asyncHandler(async (req, res) => {
-  const { publicId } = req.query;
-  if (!publicId) throw new AppError('publicId is required', 400);
+  const { publicId } = req.params;
   configureCloudinary();
   await cloudinary.uploader.destroy(publicId);
   res.json({ success: true, message: 'Image deleted' });
@@ -71,7 +62,6 @@ export const deleteImage = asyncHandler(async (req, res) => {
 
 export const deleteMultipleImages = asyncHandler(async (req, res) => {
   const { publicIds } = req.body;
-  if (!publicIds?.length) throw new AppError('publicIds array is required', 400);
   configureCloudinary();
   await Promise.all(publicIds.map((id) => cloudinary.uploader.destroy(id)));
   res.json({ success: true, message: `${publicIds.length} images deleted` });
@@ -79,7 +69,6 @@ export const deleteMultipleImages = asyncHandler(async (req, res) => {
 
 export const getOptimizedUrl = asyncHandler(async (req, res) => {
   const { publicId, width, height, quality = 'auto', format = 'auto' } = req.query;
-  if (!publicId) throw new AppError('publicId is required', 400);
   configureCloudinary();
   const url = cloudinary.url(publicId, {
     transformation: [

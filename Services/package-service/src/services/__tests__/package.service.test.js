@@ -48,7 +48,7 @@ const mockPkg = {
   views: 100,
   bookings: 5,
   createdBy: 'user-1',
-  images: [{ id: 'img-1', url: 'https://example.com/a.jpg', altText: 'View', orderIndex: 0 }],
+  images: [{ id: 'img-1', url: 'https://example.com/a.jpg', publicId: 'travel-crm/packages/a', altText: 'View', orderIndex: 0 }],
   itineraryDays: [
     {
       dayNumber: 1,
@@ -58,6 +58,7 @@ const mockPkg = {
       lunchCount: 0,
       dinnerCount: 1,
       mealPriceOverride: null,
+      images: [{ url: 'https://example.com/day1.jpg', publicId: 'travel-crm/itineraries/day1' }],
       places: [{ id: 'dp-1', placeId: 'place-1', place: { id: 'place-1', name: 'City', type: 'CITY' }, customName: null, orderIndex: 0 }],
       activities: [{ id: 'da-1', activityId: 'act-1', activity: { id: 'act-1', name: 'Tour', description: 'City tour', defaultCost: 50 }, costOverride: null, orderIndex: 0 }],
       transports: [{ id: 'dt-1', routeType: 'DAILY_ROUTING', transportMode: 'CAR', pricingModel: 'PER_VEHICLE', unitCost: 80, distanceKm: null, originPlaceId: null, destinationPlaceId: null }],
@@ -88,7 +89,19 @@ describe('serializePackage', () => {
       { id: 'flight-1', origin: 'CMB', destination: 'DXB', cabinClass: 'Economy', airlinePreference: 'Emirates', totalAmount: 0 },
     ]);
     expect(result.images).toHaveLength(1);
+    expect(result.images[0].publicId).toBe('travel-crm/packages/a');
+    expect(result.itineraryDays[0].images).toEqual([
+      { url: 'https://example.com/day1.jpg', publicId: 'travel-crm/itineraries/day1' },
+    ]);
     expect(result.reviews).toHaveLength(1);
+  });
+
+  it('defaults itinerary day images to an empty array when absent', () => {
+    const result = serializePackage({
+      ...mockPkg,
+      itineraryDays: [{ ...mockPkg.itineraryDays[0], images: undefined }],
+    });
+    expect(result.itineraryDays[0].images).toEqual([]);
   });
 
   it('handles plain number basePrice and marginInput', () => {
@@ -207,6 +220,42 @@ describe('buildCreateData', () => {
     expect(day.flights).toEqual([{ id: 'flight-1', origin: 'CMB', destination: 'DXB', totalAmount: 0 }]);
   });
 
+  it('includes publicId in created image rows', () => {
+    const data = buildCreateData({
+      title: 'Pkg',
+      durationDays: 1,
+      category: 'FAMILY',
+      itineraryDays: [],
+      images: [{ url: 'a.jpg', publicId: 'travel-crm/packages/a', orderIndex: 0 }],
+    }, 'user-1');
+    expect(data.images.create[0]).toEqual({ url: 'a.jpg', publicId: 'travel-crm/packages/a', altText: undefined, orderIndex: 0 });
+  });
+
+  it('passes through day images into the nested day create data', () => {
+    const data = buildCreateData({
+      title: 'Pkg',
+      durationDays: 1,
+      category: 'FAMILY',
+      itineraryDays: [{
+        dayNumber: 1,
+        images: [{ url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' }],
+      }],
+    }, 'user-1');
+    expect(data.itineraryDays.create[0].images).toEqual([
+      { url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' },
+    ]);
+  });
+
+  it('defaults day images to an empty array when omitted', () => {
+    const data = buildCreateData({
+      title: 'Pkg',
+      durationDays: 1,
+      category: 'FAMILY',
+      itineraryDays: [{ dayNumber: 1 }],
+    }, 'user-1');
+    expect(data.itineraryDays.create[0].images).toEqual([]);
+  });
+
   it('uses customName when placeId is missing', () => {
     const data = buildCreateData({
       title: 'Pkg',
@@ -244,6 +293,11 @@ describe('buildUpdateData', () => {
     const data = buildUpdateData({ images: [{ url: 'new.jpg', orderIndex: 0 }] });
     expect(data.images).toHaveProperty('deleteMany', {});
     expect(data.images.create).toHaveLength(1);
+  });
+
+  it('includes publicId when rebuilding images', () => {
+    const data = buildUpdateData({ images: [{ url: 'new.jpg', publicId: 'travel-crm/packages/new', orderIndex: 0 }] });
+    expect(data.images.create[0].publicId).toBe('travel-crm/packages/new');
   });
 
   it('rebuilds itinerary days with deleteMany + create', () => {

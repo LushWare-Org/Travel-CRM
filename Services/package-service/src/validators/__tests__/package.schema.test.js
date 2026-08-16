@@ -3,6 +3,9 @@ import {
   createPackageSchema,
   updatePackageSchema,
   packageIdParamSchema,
+  packageImageParamSchema,
+  packageCoverParamSchema,
+  setPackageCoverSchema,
   listPackagesQuerySchema,
   createPlaceSchema,
   createActivitySchema,
@@ -335,5 +338,66 @@ describe('transport validation', () => {
     };
     const result = createPackageSchema.safeParse(pkg);
     expect(result.success).toBe(true);
+  });
+});
+
+describe('image publicId + day images', () => {
+  it('accepts a package image with a publicId', () => {
+    const pkg = { ...validPackage, images: [{ url: 'a.jpg', publicId: 'travel-crm/packages/a' }] };
+    const result = createPackageSchema.safeParse(pkg);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an itinerary day with images', () => {
+    const pkg = {
+      ...validPackage,
+      itineraryDays: [{
+        ...validPackage.itineraryDays[0],
+        images: [{ url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' }],
+      }],
+    };
+    const result = createPackageSchema.safeParse(pkg);
+    expect(result.success).toBe(true);
+    expect(result.data.itineraryDays[0].images).toEqual([
+      { url: 'day1.jpg', publicId: 'travel-crm/itineraries/day1' },
+    ]);
+  });
+
+  it('defaults itinerary day images to an empty array', () => {
+    const result = createPackageSchema.safeParse(validPackage);
+    expect(result.success).toBe(true);
+    expect(result.data.itineraryDays[0].images).toEqual([]);
+  });
+
+  it('rejects a day image with no url', () => {
+    const pkg = {
+      ...validPackage,
+      itineraryDays: [{ ...validPackage.itineraryDays[0], images: [{ publicId: 'x' }] }],
+    };
+    const result = createPackageSchema.safeParse(pkg);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('packageImageParamSchema', () => {
+  it('accepts packageId and imageId', () => {
+    const result = packageImageParamSchema.safeParse({ packageId: 'pkg-1', imageId: 'img-1' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing imageId', () => {
+    const result = packageImageParamSchema.safeParse({ packageId: 'pkg-1', imageId: '' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('packageCoverParamSchema / setPackageCoverSchema', () => {
+  it('accepts a valid packageId param', () => {
+    expect(packageCoverParamSchema.safeParse({ packageId: 'pkg-1' }).success).toBe(true);
+  });
+
+  it('requires imageId in the body', () => {
+    expect(setPackageCoverSchema.safeParse({}).success).toBe(false);
+    expect(setPackageCoverSchema.safeParse({ imageId: 'img-1' }).success).toBe(true);
   });
 });

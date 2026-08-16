@@ -150,6 +150,7 @@ model PackageImage {
   packageId  String
   package    Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
   url        String?
+  publicId   String? @map("public_id") @db.VarChar(255) // Cloudinary asset id, for delete cleanup
   altText    String? @map("alt_text") @db.VarChar(255)
   orderIndex Int     @default(0) @map("order_index")
 
@@ -174,6 +175,7 @@ model ItineraryDay {
   mealPriceOverride Decimal? @map("meal_price_override") @db.Decimal(10, 2)
   accommodation     Json     @default("{}") // { name?, totalAmount, roomType? } per night
   flights           Json     @default("[]") // editor flight preferences per day
+  images            Json     @default("[]") // [{ url, publicId, altText? }] uploaded in the day editor
 
   places     PackageDayPlace[]
   activities PackageDayActivity[]
