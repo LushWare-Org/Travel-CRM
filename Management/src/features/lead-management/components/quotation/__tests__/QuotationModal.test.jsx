@@ -4,18 +4,24 @@ import userEvent from '@testing-library/user-event';
 
 const {
   mockGetPackageSelections, mockQuotePackageSelection, mockSend,
+  mockUpdatePackageSelection, mockGetPackageById, mockSwalFire,
 } = vi.hoisted(() => ({
   mockGetPackageSelections: vi.fn(),
   mockQuotePackageSelection: vi.fn(),
   mockSend: vi.fn(),
+  mockUpdatePackageSelection: vi.fn(),
+  mockGetPackageById: vi.fn(),
+  mockSwalFire: vi.fn(),
 }));
 
 vi.mock('../../../../../services/api', () => ({
   leadAPI: {
     getPackageSelections: mockGetPackageSelections,
     quotePackageSelection: mockQuotePackageSelection,
+    updatePackageSelection: mockUpdatePackageSelection,
   },
   quotationAPI: { send: mockSend },
+  packageAPI: { getById: mockGetPackageById },
 }));
 
 vi.mock('../../PDFPreviewDialog', () => ({
@@ -24,6 +30,10 @@ vi.mock('../../PDFPreviewDialog', () => ({
 
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('sweetalert2', () => ({
+  default: { fire: mockSwalFire },
 }));
 
 import QuotationModal from '../QuotationModal';
@@ -60,6 +70,13 @@ beforeEach(() => {
     data: { quotation: { id: 'quote-new' }, selection: { id: 'sel-1', currentQuoteId: 'quote-new' } },
   });
   mockSend.mockResolvedValue({ success: true });
+  mockGetPackageById.mockImplementation(async (id) => ({
+    data: { id, destination: id === 'pkg-1' ? 'Maldives' : 'Bali' },
+  }));
+  mockUpdatePackageSelection.mockImplementation(async (leadId, selectionId, payload) => ({
+    data: { id: selectionId, destinationOverride: payload.destinationOverride },
+  }));
+  mockSwalFire.mockResolvedValue({ isConfirmed: true });
 });
 
 describe('QuotationModal', () => {
@@ -147,5 +164,43 @@ describe('QuotationModal', () => {
     await userEvent.click(screen.getByRole('button', { name: /Preview PDF/ }));
 
     expect(await screen.findByTestId('pdf-preview')).toHaveTextContent('/billing/quotations/quote-existing/pdf');
+  });
+
+  it('defaults the destination field to the active package\'s own destination', async () => {
+    renderModal();
+    await screen.findByRole('heading', { name: 'Bali Adventure' });
+
+    await waitFor(() => expect(screen.getByLabelText('Quote destination')).toHaveValue('Bali'));
+  });
+
+  it('confirms before saving a destination that overrides the package\'s own', async () => {
+    renderModal();
+    await screen.findByRole('heading', { name: 'Bali Adventure' });
+    await waitFor(() => expect(screen.getByLabelText('Quote destination')).toHaveValue('Bali'));
+
+    const input = screen.getByLabelText('Quote destination');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Bali & Lombok');
+    await userEvent.click(screen.getByRole('button', { name: /Save/ }));
+
+    await waitFor(() => expect(mockSwalFire).toHaveBeenCalled());
+    await waitFor(() => expect(mockUpdatePackageSelection).toHaveBeenCalledWith(
+      'lead-1', 'sel-2', { destinationOverride: 'Bali & Lombok' },
+    ));
+  });
+
+  it('does not save the destination override when the confirmation is cancelled', async () => {
+    mockSwalFire.mockResolvedValueOnce({ isConfirmed: false });
+    renderModal();
+    await screen.findByRole('heading', { name: 'Bali Adventure' });
+    await waitFor(() => expect(screen.getByLabelText('Quote destination')).toHaveValue('Bali'));
+
+    const input = screen.getByLabelText('Quote destination');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Somewhere else');
+    await userEvent.click(screen.getByRole('button', { name: /Save/ }));
+
+    await waitFor(() => expect(mockSwalFire).toHaveBeenCalled());
+    expect(mockUpdatePackageSelection).not.toHaveBeenCalled();
   });
 });

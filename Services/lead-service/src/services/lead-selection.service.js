@@ -341,13 +341,15 @@ export async function snapshotSelectionQuotation(selectionId, { createdById = nu
     paymentTerms: null,
     includedServices,
     excludedServices,
-    // Trip snapshot for the branded quotation PDF. Package wins over the
-    // lead's own destination (same precedence as coverImage below) — by the
-    // time a quotation is built a specific package has been selected, so its
-    // destination is authoritative. lead.destination is often just the
-    // customer's original inquiry-stage note (e.g. "Multiple options" for a
-    // still-deciding lead) and would otherwise leak into the PDF verbatim.
-    destination: pkg?.destination || lead.destination || null,
+    // Trip snapshot for the branded quotation PDF. A rep's explicit
+    // destinationOverride wins first, then the selected package's own
+    // destination (same precedence as coverImage below) — by the time a
+    // quotation is built a specific package has been selected, so its
+    // destination is authoritative. lead.destination is the last resort:
+    // it's often just the customer's original inquiry-stage note (e.g.
+    // "Multiple options" for a still-deciding lead) and would otherwise
+    // leak into the PDF verbatim.
+    destination: selection.destinationOverride || pkg?.destination || lead.destination || null,
     packageTitle: selection.packageName || pkg?.title || null,
     travelStartDate: lead.travelDate || null,
     travelEndDate: lead.endDate || null,

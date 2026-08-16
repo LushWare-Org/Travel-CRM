@@ -526,6 +526,35 @@ describe('snapshotSelectionQuotation', () => {
     expect(body.destination).toBe('Sigiriya, Sri Lanka');
   });
 
+  it('uses the selection\'s destinationOverride over the package\'s own destination', async () => {
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },
+      leadPricing: { findUnique: vi.fn().mockResolvedValue({ id: 'pr-1' }) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'sel-1',
+          isManual: false,
+          packageId: 'pkg-1',
+          destinationOverride: 'Bali & Lombok (multi-city extension)',
+          pricing: { currency: 'USD', discountType: 'none', discountValue: 0, serviceChargeRate: 0, paidAmount: 0 },
+          costLines: [],
+          lead: { id: 'lead-1', name: 'Jane', email: 'jane@test.com', phone: null, city: null, numberOfTravelers: 1, destination: 'Multiple options' },
+        }),
+      },
+    });
+    const fetchImpl = vi.fn().mockImplementation(async (url) =>
+      url.includes('/billing/quotations/from-lead')
+        ? { ok: true, json: async () => ({ success: true, data: { id: 'quote-1' } }) }
+        : { ok: true, json: async () => ({ success: true, data: { ...packageFixture, destination: 'Bali' } }) },
+    );
+
+    await snapshotSelectionQuotation('sel-1', { fetchImpl, prismaClient });
+
+    const billingCall = fetchImpl.mock.calls.find((c) => c[0].includes('/billing/quotations/from-lead'));
+    const body = JSON.parse(billingCall[1].body);
+    expect(body.destination).toBe('Bali & Lombok (multi-city extension)');
+  });
+
   it('falls back to the lead\'s destination when there is no selected package', async () => {
     const prismaClient = mockPrisma({
       leadItineraryDay: { count: vi.fn().mockResolvedValue(1) },

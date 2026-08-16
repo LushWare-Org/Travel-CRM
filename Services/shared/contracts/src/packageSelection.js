@@ -14,6 +14,7 @@ export const LeadPackageSelectionRaw = z
     packageId: z.string().nullable(),
     isManual: z.boolean(),
     packageName: z.string().nullable(),
+    destinationOverride: z.string().nullable().optional(),
     currentQuoteId: z.string().nullable(),
   })
   .passthrough();

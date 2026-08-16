@@ -255,6 +255,12 @@ model LeadPackageSelection {
   isManual    Boolean @default(false)
   packageName String? // denormalised snapshot, refreshed on (re)materialize
 
+  // Rep-entered override for the quotation's destination text, set with
+  // explicit confirmation in Management when it differs from the selected
+  // package's own destination. Wins over both the package's and the lead's
+  // own (often just an inquiry-stage placeholder) destination.
+  destinationOverride String?
+
   // packageId this selection's persisted rows were last materialized from,
   // verbatim. Null when pristine (nothing persisted yet) or once edited.
   sourcePackageId String?

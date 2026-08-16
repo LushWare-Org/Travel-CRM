@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X, FileText, Package, Loader2, RefreshCw, Mail, MessageCircle,
-  Eye, Send, Pencil, CheckCircle2, MapPin, Users, Calendar,
+  Eye, Send, Pencil, CheckCircle2, MapPin, Users, Calendar, Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { leadAPI, quotationAPI } from '../../../../services/api';
+import Swal from 'sweetalert2';
+import { leadAPI, quotationAPI, packageAPI } from '../../../../services/api';
 import PDFPreviewDialog from '../PDFPreviewDialog';
 import { Row, ChannelTab } from '../shared/BillingPrimitives';
 
@@ -45,6 +46,13 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
   const [phone, setPhone] = useState('');
   const [previewQuoteId, setPreviewQuoteId] = useState(null);
 
+  // The selected package's own destination — locked in at package creation,
+  // so it's the authoritative source unless a rep explicitly overrides it
+  // below (with confirmation, since that's a deliberate deviation).
+  const [activePackage, setActivePackage] = useState(null);
+  const [destinationDraft, setDestinationDraft] = useState('');
+  const [savingDestination, setSavingDestination] = useState(false);
+
   const loadSelections = useCallback(async () => {
     if (!leadId) return;
     setLoading(true);
@@ -81,6 +89,71 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
   const activeQuoteId = activeId ? quoteIds[activeId] : null;
   const pricing = activeSelection?.pricing || null;
   const currency = pricing?.currency || 'USD';
+
+  useEffect(() => {
+    if (!activeSelection?.packageId) {
+      setActivePackage(null);
+      return;
+    }
+    let cancelled = false;
+    packageAPI.getById(activeSelection.packageId)
+      .then((res) => { if (!cancelled) setActivePackage(res?.data || null); })
+      .catch(() => { if (!cancelled) setActivePackage(null); });
+    return () => { cancelled = true; };
+  }, [activeSelection?.packageId]);
+
+  // Same precedence as the backend's quotation snapshot: rep override wins,
+  // then the package's own (locked-in-at-creation) destination, then the
+  // lead's own inquiry-stage destination as a last resort.
+  const packageDestination = activePackage?.destination || null;
+  const resolvedDestination = activeSelection?.destinationOverride || packageDestination || lead.destination || '';
+
+  useEffect(() => {
+    setDestinationDraft(resolvedDestination);
+  }, [activeSelection?.id, resolvedDestination]);
+
+  const destinationDirty = destinationDraft.trim() !== resolvedDestination.trim();
+
+  const handleSaveDestination = async () => {
+    if (!activeSelection) return;
+    const trimmed = destinationDraft.trim();
+    const packageDest = (packageDestination || '').trim();
+    const isRealOverride = Boolean(packageDest) && Boolean(trimmed) && trimmed !== packageDest;
+
+    const commit = async () => {
+      setSavingDestination(true);
+      try {
+        const res = await leadAPI.updatePackageSelection(leadId, activeSelection.id, {
+          destinationOverride: trimmed || null,
+        });
+        const updated = res?.data;
+        setSelections((prev) => prev.map((s) => (
+          s.id === activeSelection.id
+            ? { ...s, destinationOverride: updated?.destinationOverride ?? (trimmed || null) }
+            : s
+        )));
+        toast.success('Destination updated');
+      } catch (err) {
+        toast.error(err.message || 'Failed to update destination');
+      } finally {
+        setSavingDestination(false);
+      }
+    };
+
+    if (isRealOverride) {
+      const result = await Swal.fire({
+        title: 'Override the package destination?',
+        html: `This quote will show <strong>${trimmed}</strong> instead of the package's own destination (<strong>${packageDest}</strong>).`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, override',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#0f766e',
+      });
+      if (!result.isConfirmed) return;
+    }
+    await commit();
+  };
 
   const handleGenerate = async () => {
     if (!activeSelection) return;
@@ -128,7 +201,6 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
 
   const generating = generatingId === activeId;
   const tripMeta = [
-    lead.destination && { icon: MapPin, text: lead.destination },
     lead.numberOfTravelers && { icon: Users, text: `${lead.numberOfTravelers} traveller${lead.numberOfTravelers > 1 ? 's' : ''}` },
     (formatDate(lead.travelDate) || formatDate(lead.endDate)) && {
       icon: Calendar,
@@ -215,6 +287,30 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Quoted
                     </span>
+                  )}
+                </div>
+
+                {/* Destination — defaults to the package's own (locked-in-at-creation)
+                    destination; editing it away from that requires confirmation. */}
+                <div className="mt-3 flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <input
+                    type="text"
+                    value={destinationDraft}
+                    onChange={(e) => setDestinationDraft(e.target.value)}
+                    placeholder="No destination set"
+                    aria-label="Quote destination"
+                    className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  />
+                  {destinationDirty && (
+                    <button
+                      onClick={handleSaveDestination}
+                      disabled={savingDestination}
+                      className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+                    >
+                      {savingDestination ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Save
+                    </button>
                   )}
                 </div>
 

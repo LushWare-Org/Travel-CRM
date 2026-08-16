@@ -68,6 +68,17 @@ describe('createPackageSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects missing destination', () => {
+    const { destination, ...rest } = validPackage;
+    const result = createPackageSchema.safeParse(rest);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty destination', () => {
+    const result = createPackageSchema.safeParse({ ...validPackage, destination: '' });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects missing durationDays', () => {
     const { durationDays, ...rest } = validPackage;
     const result = createPackageSchema.safeParse(rest);
