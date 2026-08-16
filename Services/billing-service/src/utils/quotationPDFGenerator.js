@@ -145,7 +145,7 @@ export async function generateQuotationPDF(quotation) {
         doc.rect(0, heroH, PAGE_W, 2).fill(T.slate200);
 
         const cardY = heroH + 30;
-        const cardH = 150;
+        const cardH = 172;
         doc.roundedRect(left, cardY, contentW, cardH, 12).fillAndStroke(T.white, T.slate200);
         doc.rect(left, cardY + 10, 6, cardH - 20).fill(T.brand);
 
@@ -153,6 +153,12 @@ export async function generateQuotationPDF(quotation) {
           .text(quotation.packageTitle || 'Travel Package', left + 24, cardY + 34, {
             width: contentW - 48, align: 'center',
           });
+
+        if (quotation.destination) {
+          doc.moveDown(0.3);
+          doc.font('Helvetica').fontSize(12).fillColor(T.muted)
+            .text(quotation.destination, left + 24, doc.y, { width: contentW - 48, align: 'center' });
+        }
 
         doc.x = left;
         doc.y = cardY + cardH + 26;
