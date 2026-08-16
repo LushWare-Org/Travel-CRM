@@ -39,17 +39,6 @@ const PieChartComponent = ({
 
   const shouldRenderLegend = legendProps !== false;
 
-  // Custom label renderer - positioned outside
-  const renderCustomLabel = ({ cx, cy, midAngle, outerRadius, percent, name }) => {
-    if (percent < 0.05) return null; // Skip small segments
-    const RADIAN = Math.PI / 180;
-    const radius = outerRadius + 20;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-    return null; // We use external legend instead
-  };
-
   return (
     <div className="flex items-center justify-center gap-6 h-full">
       {/* Chart */}

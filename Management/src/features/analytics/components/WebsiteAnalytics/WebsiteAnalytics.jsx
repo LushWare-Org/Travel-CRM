@@ -40,6 +40,21 @@ const WebsiteAnalytics = () => {
     fetchAnalyticsData();
   }, [timeRange]);
 
+  const data = analyticsData || {
+    stats: {
+      totalSearches: 0,
+      totalBookings: 0,
+      uniqueDestinations: 0,
+      uniqueActivities: 0,
+      conversionRate: 0,
+    },
+    trend: [],
+    topDestinations: [],
+    accommodationTypes: [],
+    durationPreferences: [],
+    priceRanges: [],
+  };
+
   const handleExportPDF = async () => {
     try {
       setExporting(true);
@@ -60,21 +75,6 @@ const WebsiteAnalytics = () => {
     } finally {
       setExporting(false);
     }
-  };
-
-  const data = analyticsData || {
-    stats: {
-      totalSearches: 0,
-      totalBookings: 0,
-      uniqueDestinations: 0,
-      uniqueActivities: 0,
-      conversionRate: 0,
-    },
-    trend: [],
-    topDestinations: [],
-    accommodationTypes: [],
-    durationPreferences: [],
-    priceRanges: [],
   };
 
   const searchLines = [

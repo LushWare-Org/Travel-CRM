@@ -50,6 +50,13 @@ const PackageAnalytics = () => {
     fetchAnalyticsData();
   }, [timeRange]);
 
+  const data = analyticsData || {
+    stats: { totalItineraries: 0, totalInquiries: 0, totalConversions: 0 },
+    trend: [],
+    mostInquired: [],
+    destinationPerformance: [],
+  };
+
   const handleExportPDF = async () => {
     try {
       setExporting(true);
@@ -69,13 +76,6 @@ const PackageAnalytics = () => {
     } finally {
       setExporting(false);
     }
-  };
-
-  const data = analyticsData || {
-    stats: { totalItineraries: 0, totalInquiries: 0, totalConversions: 0 },
-    trend: [],
-    mostInquired: [],
-    destinationPerformance: [],
   };
 
   const conversionRate = data.stats.totalInquiries > 0

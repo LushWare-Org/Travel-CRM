@@ -39,14 +39,6 @@ export const yearlyUserGrowthData = [
 ];
 
 // ============= SALES REP DATA =============
-export const salesRepPerformanceData = [
-  { rep: "John Smith", sales: 28, revenue: 45000, conversion: 22 },
-  { rep: "Sarah Johnson", sales: 32, revenue: 52000, conversion: 25 },
-  { rep: "Mike Wilson", sales: 24, revenue: 38000, conversion: 18 },
-  { rep: "Emma Davis", sales: 26, revenue: 42000, conversion: 20 },
-  { rep: "James Brown", sales: 18, revenue: 28000, conversion: 15 },
-];
-
 export const revenueByRepData = [
   { rep: "Sarah Johnson", revenue: 52000 },
   { rep: "John Smith", revenue: 45000 },
@@ -129,26 +121,3 @@ export const getAggregatedUserStats = (timeRange) => {
   };
 };
 
-/**
- * Get sales rep stats by time range
- * @param {string} timeRange - 'weekly', 'monthly', or 'yearly'
- * @returns {object} Sales rep statistics
- */
-export const getSalesRepStats = (timeRange) => {
-  // For now, sales rep data is constant regardless of time range
-  // In a real scenario, this would be filtered by date range
-  const totalSales = salesRepPerformanceData.reduce((sum, rep) => sum + rep.sales, 0);
-  const totalRevenue = salesRepPerformanceData.reduce((sum, rep) => sum + rep.revenue, 0);
-  const avgConversion = (salesRepPerformanceData.reduce((sum, rep) => sum + rep.conversion, 0) / salesRepPerformanceData.length).toFixed(1);
-  const avgRevenuePerRep = Math.round(totalRevenue / salesRepPerformanceData.length);
-  const topPerformer = salesRepPerformanceData.reduce((max, rep) => rep.sales > max.sales ? rep : max);
-
-  return {
-    totalSales,
-    totalRevenue,
-    avgConversion,
-    avgRevenuePerRep,
-    topPerformer: topPerformer.rep,
-    topPerformerRevenue: topPerformer.revenue,
-  };
-};
