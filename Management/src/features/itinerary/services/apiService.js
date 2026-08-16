@@ -93,6 +93,7 @@ class ApiService {
       isFeatured: packageData.isFeatured ?? false,
       images: (packageData.images || []).map((img) => ({
         url: img.url || img,
+        publicId: img.publicId || img.public_id,
         altText: img.altText || img.alt_text,
       })),
       itineraryDays: buildItineraryDaysPayload(rawDays),
@@ -147,6 +148,17 @@ class ApiService {
 
   static async deletePackage(id) {
     return makeRequest(`/packages/${id}`, { method: 'DELETE' });
+  }
+
+  static async deletePackageImage(packageId, imageId) {
+    return makeRequest(`/packages/${packageId}/images/${imageId}`, { method: 'DELETE' });
+  }
+
+  static async setPackageCover(packageId, imageId) {
+    return makeRequest(`/packages/${packageId}/cover`, {
+      method: 'PUT',
+      body: JSON.stringify({ imageId }),
+    });
   }
 
   // Server-generated package PDF (Services/package-service's packagePDFGenerator.js).
@@ -276,6 +288,13 @@ function buildItineraryDaysPayload(days) {
       mealPriceOverride: day.mealPriceOverride ?? null,
       accommodation: day.accommodation ?? null,
       flights,
+      images: Array.isArray(day.images)
+        ? day.images.map((img) => ({
+            url: img.url || img,
+            publicId: img.publicId || img.public_id,
+            altText: img.altText || img.alt_text,
+          }))
+        : [],
       places: dayPlaces.map((p, i) => {
         if (typeof p === 'string') return { customName: p, orderIndex: i };
         return {
