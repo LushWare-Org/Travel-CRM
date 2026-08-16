@@ -218,7 +218,7 @@ export function buildUpdateData(body) {
 
 // ── Day data builder ───────────────────────────────────────────
 
-function buildItineraryDaysData(days) {
+export function buildItineraryDaysData(days) {
   return days.map((day) => ({
     dayNumber: day.dayNumber,
     title: day.title,
@@ -303,33 +303,49 @@ export async function resolveActivityCatalogIds(days) {
   const costById = new Map();
   const infoByName = new Map(); // name → { id, cost }
 
-  const resolvedDays = await Promise.all((days || []).map(async (day) => {
-    const activities = await Promise.all((day.activities || []).map(async (a) => {
+  // Collect each name-only activity once (first-seen defaultCost) and every
+  // referenced activityId once, up front — then resolve each exactly one
+  // time. Resolving inline per day×activity (the previous approach) ran a
+  // findUnique-then-create for every occurrence concurrently, so two days
+  // that both used the same not-yet-catalogued name raced each other into
+  // Activity_Catalog's unique(name) constraint (P2002) on a real multi-day
+  // itinerary where activity names repeat across days.
+  const defaultCostByName = new Map();
+  const activityIds = new Set();
+  for (const day of days || []) {
+    for (const a of day.activities || []) {
       if (a.activityId) {
-        if (!costById.has(a.activityId)) {
-          const row = await prisma.activityCatalog.findUnique({ where: { id: a.activityId } });
-          costById.set(a.activityId, row ? Number(row.defaultCost) : 0);
-        }
-        return a;
+        activityIds.add(a.activityId);
+      } else if (a.name && !defaultCostByName.has(a.name)) {
+        defaultCostByName.set(a.name, a.defaultCost ?? 0);
       }
-      if (!a.name) return a;
+    }
+  }
 
-      let info = infoByName.get(a.name);
-      if (!info) {
-        const existing = await prisma.activityCatalog.findUnique({ where: { name: a.name } });
-        if (existing) {
-          info = { id: existing.id, cost: Number(existing.defaultCost) };
-        } else {
-          const created = await prisma.activityCatalog.create({
-            data: { name: a.name, defaultCost: a.defaultCost ?? 0 },
-          });
-          info = { id: created.id, cost: Number(created.defaultCost) };
-        }
-        infoByName.set(a.name, info);
-      }
-      return { ...a, activityId: info.id };
-    }));
-    return { ...day, activities };
+  await Promise.all([...activityIds].map(async (id) => {
+    const row = await prisma.activityCatalog.findUnique({ where: { id } });
+    costById.set(id, row ? Number(row.defaultCost) : 0);
+  }));
+
+  await Promise.all([...defaultCostByName.keys()].map(async (name) => {
+    const existing = await prisma.activityCatalog.findUnique({ where: { name } });
+    if (existing) {
+      infoByName.set(name, { id: existing.id, cost: Number(existing.defaultCost) });
+    } else {
+      const created = await prisma.activityCatalog.create({
+        data: { name, defaultCost: defaultCostByName.get(name) },
+      });
+      infoByName.set(name, { id: created.id, cost: Number(created.defaultCost) });
+    }
+  }));
+
+  const resolvedDays = (days || []).map((day) => ({
+    ...day,
+    activities: (day.activities || []).map((a) => {
+      if (a.activityId) return a;
+      if (!a.name) return a;
+      return { ...a, activityId: infoByName.get(a.name).id };
+    }),
   }));
 
   return {
