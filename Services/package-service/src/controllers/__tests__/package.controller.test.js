@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Keep the real service exports but stub the pricing computation so the test
 // focuses on request flattening and the response contract.
@@ -31,10 +31,38 @@ vi.mock('../../../../shared/pricing-engine/src/index.js', () => ({
   }),
 }));
 
-import { calculatePrice } from '../package.controller.js';
+import { calculatePrice, getAIStatus } from '../package.controller.js';
 import { recomputeBasePrice } from '../../services/package.service.js';
 
 const makeRes = () => ({ json: vi.fn() });
+
+describe('getAIStatus', () => {
+  const ORIGINAL_ENV = process.env;
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('reports configured/valid for a real-world key that does not start with "AI"', async () => {
+    // Regression: a naive key.startsWith('AI') format check previously
+    // misreported real, working keys (observed in practice) as invalid.
+    process.env = { ...ORIGINAL_ENV, GEMINI_API_KEY: 'AQ.fake-test-key-does-not-start-with-AI-0000000000' };
+    const res = makeRes();
+
+    await getAIStatus({}, res);
+
+    expect(res.json).toHaveBeenCalledWith({ success: true, configured: true, keyFormat: 'valid' });
+  });
+
+  it('reports not configured when no key is set', async () => {
+    process.env = { ...ORIGINAL_ENV, GEMINI_API_KEY: '' };
+    const res = makeRes();
+
+    await getAIStatus({}, res);
+
+    expect(res.json).toHaveBeenCalledWith({ success: true, configured: false, keyFormat: 'missing' });
+  });
+});
 
 describe('calculatePrice', () => {
   beforeEach(() => {
