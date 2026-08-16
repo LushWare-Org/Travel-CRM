@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "test": "vitest run",
+    "test": "vitest run --exclude '**/analytics.live.smoke.test.js'",
     "test:watch": "vitest",
     "test:unit": "vitest run src/",
-    "test:integration": "vitest run test/",
-    "test:coverage": "vitest run --coverage"
+    "test:integration": "vitest run test/ --exclude '**/analytics.live.smoke.test.js'",
+    "test:live": "vitest run test/integration/analytics.live.smoke.test.js",
+    "test:coverage": "vitest run --coverage --exclude '**/analytics.live.smoke.test.js'"
   },
   "dependencies": {
     "cookie-parser": "^1.4.6",

@@ -183,7 +183,7 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
   const { start, end, truncUnit } = resolveTimeRange(req.query.timeRange);
 
   const [totalResult, aggResult, perPackageResult, destinationResult, trendResult] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FILTER (WHERE "isActive" = true) AS total FROM crm_packages."Package"`),
+    pool.query(`SELECT COUNT(*) FILTER (WHERE "is_active" = true) AS total FROM crm_packages."Package"`),
     pool.query(
       `SELECT
         COUNT(DISTINCT lps."leadId") AS total_inquiries,
@@ -412,13 +412,13 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
       [start, end]
     ),
     pool.query(
-      `SELECT p."durationDays", p."basePrice", COUNT(DISTINCT lps."leadId") AS searches,
+      `SELECT p."duration_days" AS "durationDays", p."base_price" AS "basePrice", COUNT(DISTINCT lps."leadId") AS searches,
         COUNT(DISTINCT lps."leadId") FILTER (WHERE l."lifecycleStatus" = 'CONFIRMED') AS bookings
        FROM crm_leads."LeadPackageSelection" lps
        JOIN crm_leads."Lead" l ON l.id = lps."leadId" AND ${sourceFilter}
        JOIN crm_packages."Package" p ON p.id = lps."packageId"
        WHERE l."createdAt" BETWEEN $1 AND $2
-       GROUP BY p.id, p."durationDays", p."basePrice"`,
+       GROUP BY p.id, p."duration_days", p."base_price"`,
       [start, end]
     ),
   ]);

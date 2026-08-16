@@ -14,7 +14,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "lifecycleStatus" = 'NEW') AS new_leads, COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED') AS converted FROM crm_leads."Lead"`),
     pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "bookingStatus" = 'confirmed') AS confirmed, COUNT(*) FILTER (WHERE "bookingStatus" = 'pending') AS pending FROM crm_bookings."Booking"`),
     pool.query(`SELECT SUM("totalAmount") AS total_revenue, SUM("paidAmount") AS collected FROM crm_billing."Invoice" WHERE status != 'cancelled'`),
-    pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "isActive" = true) AS published FROM crm_packages."Package"`),
+    pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "is_active" = true) AS published FROM crm_packages."Package"`),
     pool.query(`SELECT id, name, email, "lifecycleStatus"::text AS status, source::text, "createdAt" FROM crm_leads."Lead" ORDER BY "createdAt" DESC LIMIT 5`),
     pool.query(`SELECT b.id, b."numberOfTravelers", b."bookingStatus"::text, b."totalAmount", b."createdAt", p.title AS "packageName" FROM crm_bookings."Booking" b LEFT JOIN crm_packages."Package" p ON p.id = b."packageId" ORDER BY b."createdAt" DESC LIMIT 5`),
     pool.query(`SELECT "lifecycleStatus"::text AS status, COUNT(*) AS count FROM crm_leads."Lead" GROUP BY "lifecycleStatus"`),
