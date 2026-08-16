@@ -4,21 +4,54 @@
  */
 
 import { useState, useCallback } from 'react';
-import { uploadPackageImages } from '../../../services/cloudinaryService';
+import { uploadPackageImages, deleteImage as deleteCloudinaryImage } from '../../../services/cloudinaryService';
+import ApiService from '../services/apiService';
 import Swal from 'sweetalert2';
 import { VALIDATION_MESSAGES } from '../utils/constants';
 
 export const useImageUpload = () => {
   const [images, setImages] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletingIndexes, setDeletingIndexes] = useState([]);
 
   const addImage = useCallback((url) => {
     setImages((prev) => [...prev, url]);
   }, []);
 
-  const removeImage = useCallback((index) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  // Deletes the image at `index`. Persisted images (loaded from the DB, so
+  // they carry an `id`) are removed via the package-image API — which also
+  // cleans up the Cloudinary asset server-side — before local state changes,
+  // so a delete that fails leaves the gallery untouched instead of silently
+  // reappearing on the next reload. Unsaved/just-uploaded images (no `id`,
+  // but a Cloudinary `publicId`) are removed directly from Cloudinary so they
+  // don't leak if the user removes them before saving the package.
+  const removeImage = useCallback(async (index, { packageId } = {}) => {
+    const image = images[index];
+    if (!image) return;
+
+    if (image.isTemp) {
+      setImages((prev) => prev.filter((_, i) => i !== index));
+      return;
+    }
+
+    const imageId = image.id;
+    const publicId = image.publicId || image.public_id;
+
+    setDeletingIndexes((prev) => [...prev, index]);
+    try {
+      if (imageId && packageId) {
+        await ApiService.deletePackageImage(packageId, imageId);
+      } else if (publicId) {
+        await deleteCloudinaryImage(publicId);
+      }
+      setImages((prev) => prev.filter((_, i) => i !== index));
+    } catch (error) {
+      console.error('Image delete error:', error);
+      Swal.fire('Error', error.message || 'Failed to delete image', 'error');
+    } finally {
+      setDeletingIndexes((prev) => prev.filter((i) => i !== index));
+    }
+  }, [images]);
 
   const handleUpload = useCallback(
     async (files) => {
@@ -82,5 +115,6 @@ export const useImageUpload = () => {
     handleUpload,
     clearImages,
     isUploading,
+    deletingIndexes,
   };
 };
