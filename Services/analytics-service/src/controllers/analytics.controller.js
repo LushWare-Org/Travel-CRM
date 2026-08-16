@@ -59,7 +59,7 @@ export const getLeadAnalyticsOverview = asyncHandler(async (req, res) => {
         COUNT(*) AS leads,
         ROUND(COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED')::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS conversion
        FROM crm_leads."Lead" WHERE "createdAt" BETWEEN $1 AND $2
-       GROUP BY destination ORDER BY leads DESC LIMIT 10`,
+       GROUP BY 1 ORDER BY leads DESC LIMIT 10`,
       [start, end]
     ),
     pool.query(`SELECT budget FROM crm_leads."Lead" WHERE "createdAt" BETWEEN $1 AND $2`, [start, end]),
@@ -211,7 +211,7 @@ export const getPackageAnalyticsOverview = asyncHandler(async (req, res) => {
        FROM crm_packages."Package" p
        LEFT JOIN crm_leads."LeadPackageSelection" lps ON lps."packageId" = p.id
        LEFT JOIN crm_leads."Lead" l ON l.id = lps."leadId" AND l."createdAt" BETWEEN $1 AND $2
-       GROUP BY destination
+       GROUP BY 1
        ORDER BY inquiries DESC LIMIT 10`,
       [start, end]
     ),
@@ -378,7 +378,10 @@ export const getAllSalesRepsPerformance = asyncHandler(async (req, res) => {
 export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
   const { start, end, truncUnit } = resolveTimeRange(req.query.timeRange);
   // "Website" leads = inquiries that came in through the public site.
-  const sourceFilter = `(source = 'website' OR platform = 'Website_Form')`;
+  // Note: LeadPlatform's Postgres enum label is "Website Form" (with a
+  // space) per its @map in schema.prisma — Website_Form is only the
+  // Prisma-side JS identifier, not a valid value of the DB enum type.
+  const sourceFilter = `(source = 'website' OR platform = 'Website Form')`;
 
   const [statsResult, activityResult, trendResult, destinationResult, packagePerfResult] = await Promise.all([
     pool.query(
@@ -405,7 +408,7 @@ export const getWebsiteAnalyticsOverview = asyncHandler(async (req, res) => {
         COUNT(*) AS searches,
         COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED') AS conversions
        FROM crm_leads."Lead" WHERE ${sourceFilter} AND "createdAt" BETWEEN $1 AND $2
-       GROUP BY destination ORDER BY searches DESC LIMIT 10`,
+       GROUP BY 1 ORDER BY searches DESC LIMIT 10`,
       [start, end]
     ),
     pool.query(
