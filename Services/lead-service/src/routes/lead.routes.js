@@ -9,7 +9,7 @@ import {
   handleInternalEvent, draftLead,
 } from '../controllers/lead.controller.js';
 import {
-  listPackageSelections, getPackageSelection, createPackageSelection, deletePackageSelection,
+  listPackageSelections, getPackageSelection, createPackageSelection, updatePackageSelection, deletePackageSelection,
   updateSelectionItinerary, refreshPackageSelection, quotePackageSelection,
   getSelectionPricing, calculateSelectionPricing, applySelectionPricing,
   listSelectionFlights, addSelectionFlight, deleteSelectionFlight,
@@ -53,6 +53,7 @@ router.route('/:id/packages')
   .post(authorize('admin', 'salesRep'), createPackageSelection);
 router.route('/:id/packages/:selectionId')
   .get(authorize('admin', 'salesRep'), getPackageSelection)
+  .patch(authorize('admin', 'salesRep'), updatePackageSelection)
   .delete(authorize('admin', 'salesRep'), deletePackageSelection);
 router.put('/:id/packages/:selectionId/itinerary', authorize('admin', 'salesRep'), updateSelectionItinerary);
 router.post('/:id/packages/:selectionId/refresh', authorize('admin', 'salesRep'), refreshPackageSelection);

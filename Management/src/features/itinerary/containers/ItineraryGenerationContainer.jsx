@@ -28,7 +28,6 @@ import {
 import Pagination from '../../user-management/components/Common/Pagination';
 
 // Services
-import { createPackagePdfBlob } from '../services/pdfService';
 import { uploadPackageImages } from '../../../services/cloudinaryService';
 import ApiService from '../services/apiService';
 
@@ -422,11 +421,15 @@ const ItineraryGenerationContainer = () => {
 
   const handleDownloadPackage = async (pkg) => {
     try {
+      const packageId = pkg._id || pkg.id;
       setPdfPreviewData({ isOpen: true, blob: null, fileName: '', packageData: pkg });
       setIsGeneratingPdf(true);
 
-      const { blob, fileName, packageData } = await createPackagePdfBlob(pkg, { fetchLatest: true });
-      setPdfPreviewData({ isOpen: true, blob, fileName, packageData });
+      // Server-generated (Services/package-service) rather than built client-side —
+      // matches how quotation PDFs are already produced by billing-service.
+      const blob = await ApiService.getPackagePdfBlob(packageId);
+      const fileName = `${(pkg.title || pkg.name || 'Package').replace(/[^a-z0-9]/gi, '_')}_Itinerary.pdf`;
+      setPdfPreviewData({ isOpen: true, blob, fileName, packageData: pkg });
     } catch (error) {
       console.error('Error generating package PDF:', error);
       setPdfPreviewData({ isOpen: false, blob: null, fileName: '', packageData: null });

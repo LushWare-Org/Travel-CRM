@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createLeadSchema, updateLeadSchema, createPackageSelectionSchema, addOptionalFlightSchema } from '../lead.validator.js';
+import { createLeadSchema, updateLeadSchema, createPackageSelectionSchema, updatePackageSelectionSchema, addOptionalFlightSchema } from '../lead.validator.js';
 
 describe('createLeadSchema', () => {
   it('accepts valid full payload', () => {
@@ -139,6 +139,33 @@ describe('createPackageSelectionSchema', () => {
 
   it('rejects an invalid uuid packageId', () => {
     const result = createPackageSelectionSchema.safeParse({ packageId: 'not-a-uuid' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('updatePackageSelectionSchema', () => {
+  it('accepts a non-empty destinationOverride', () => {
+    const result = updatePackageSelectionSchema.safeParse({ destinationOverride: 'Sigiriya, Sri Lanka' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts null to clear the override', () => {
+    const result = updatePackageSelectionSchema.safeParse({ destinationOverride: null });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an empty payload (no-op update)', () => {
+    const result = updatePackageSelectionSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an empty string destinationOverride', () => {
+    const result = updatePackageSelectionSchema.safeParse({ destinationOverride: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unknown fields', () => {
+    const result = updatePackageSelectionSchema.safeParse({ packageName: 'Sneaky rename' });
     expect(result.success).toBe(false);
   });
 });

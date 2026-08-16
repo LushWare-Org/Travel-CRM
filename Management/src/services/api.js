@@ -320,6 +320,12 @@ export const leadAPI = {
     return api.delete(`/leads/${id}/packages/${selectionId}`);
   },
 
+  // payload: { destinationOverride } — string to set, null to clear it
+  updatePackageSelection: async (id, selectionId, payload) => {
+    const api = new ApiService();
+    return api.patch(`/leads/${id}/packages/${selectionId}`, payload);
+  },
+
   // Atomic itinerary + pricing edit for one selection (auto-drafts NEW/REVISION leads)
   updatePackageSelectionItinerary: async (id, selectionId, payload) => {
     const api = new ApiService();

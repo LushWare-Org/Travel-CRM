@@ -149,6 +149,21 @@ class ApiService {
     return makeRequest(`/packages/${id}`, { method: 'DELETE' });
   }
 
+  // Server-generated package PDF (Services/package-service's packagePDFGenerator.js).
+  // Not routed through makeRequest() since that always parses the response as JSON.
+  static async getPackagePdfBlob(id) {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/packages/${id}/ai-pdf`, {
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+    });
+    if (!response.ok) {
+      const error = new Error('Failed to generate package PDF');
+      error.status = response.status;
+      throw error;
+    }
+    return response.blob();
+  }
+
   static async getFeaturedPackages(limit = 6) {
     return makeRequest(`/packages/featured/all?limit=${limit}`);
   }

@@ -80,7 +80,10 @@ export const createPackageSchema = z.object({
   title: z.string().min(1).max(255),
   slug: z.string().max(255).optional(),
   description: z.string().max(5000).optional(),
-  destination: z.string().max(255).optional(),
+  // Locked in at creation — the authoritative destination for this package.
+  // A lead's own (often placeholder, pre-decision) destination must never
+  // be able to stand in for a real one once a package exists.
+  destination: z.string().min(1, 'Destination is required').max(255),
   durationDays: z.number().int().positive(),
   category: packageCategory,
   coverImage: z.string().max(500).optional(),

@@ -68,6 +68,13 @@ export const createPackageSelectionSchema = z.object({
   { message: 'Exactly one of packageId or isManual is required' },
 );
 
+// Scalar fields a rep can edit directly on an existing selection. Currently
+// just the destination override — a null clears it back to the package's
+// (or lead's) own destination.
+export const updatePackageSelectionSchema = z.object({
+  destinationOverride: z.string().min(1).max(255).nullable().optional(),
+}).strict();
+
 // ── Optional transfer flights (LeadOptionalFlight) ───────────────
 
 export const addOptionalFlightSchema = z.object({

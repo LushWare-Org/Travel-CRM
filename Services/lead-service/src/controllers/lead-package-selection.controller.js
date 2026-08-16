@@ -1,7 +1,7 @@
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { createPackageSelectionSchema, addOptionalFlightSchema } from '../validators/lead.validator.js';
+import { createPackageSelectionSchema, updatePackageSelectionSchema, addOptionalFlightSchema } from '../validators/lead.validator.js';
 import { validateTransition } from '../services/state-machine.service.js';
 import { gatekeeperInputs } from '../services/gatekeeper.service.js';
 import { fetchPackage } from '../services/lead-draft.service.js';
@@ -142,6 +142,22 @@ export const createPackageSelection = asyncHandler(async (req, res) => {
     success: true,
     data: { ...selection, itineraryDays: [], costLines: [], optionalFlights: [], pricing: null, isMaterialized: false },
   });
+});
+
+export const updatePackageSelection = asyncHandler(async (req, res) => {
+  const selection = await loadOwnedSelection(req.params.id, req.params.selectionId);
+
+  const parsed = updatePackageSelectionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const messages = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    throw new AppError(messages, 400);
+  }
+
+  const updated = await prisma.leadPackageSelection.update({
+    where: { id: selection.id },
+    data: parsed.data,
+  });
+  res.json({ success: true, data: updated });
 });
 
 export const deletePackageSelection = asyncHandler(async (req, res) => {
