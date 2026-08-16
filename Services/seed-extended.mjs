@@ -187,21 +187,30 @@ async function seedPackages() {
     skipDuplicates: true,
   });
 
-  // Package images for all packages
+  // Package images for all packages. Fixed ids so re-running this script
+  // (documented as safe to run multiple times) actually dedupes via
+  // skipDuplicates instead of piling up a fresh row per run — previously
+  // these had no id, so every rerun minted new random UUIDs and quietly
+  // duplicated every image, which is exactly the "gallery shows way more
+  // images than were ever uploaded" bug this whole change fixes. pkg1's two
+  // images carry a publicId (as a real Cloudinary-backed upload would),
+  // exercising the delete-cleanup path end-to-end in seeded data; the rest
+  // are historic/legacy rows with no publicId, exercising the "skip
+  // Cloudinary cleanup" degrade path.
   const imgs = [
-    { packageId: E.pkg1, url: 'https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=800', orderIndex: 0 },
-    { packageId: E.pkg1, url: 'https://picsum.photos/seed/srilanka2/800/500', orderIndex: 1 },
-    { packageId: E.pkg2, url: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800', orderIndex: 0 },
-    { packageId: E.pkg2, url: 'https://picsum.photos/seed/maldives2/800/500', orderIndex: 1 },
-    { packageId: E.pkg3, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', orderIndex: 0 },
-    { packageId: N.pkg4, url: 'https://picsum.photos/seed/dubai/800/500', orderIndex: 0 },
-    { packageId: N.pkg4, url: 'https://picsum.photos/seed/dubai2/800/500', orderIndex: 1 },
-    { packageId: N.pkg5, url: 'https://picsum.photos/seed/bali/800/500', orderIndex: 0 },
-    { packageId: N.pkg5, url: 'https://picsum.photos/seed/bali2/800/500', orderIndex: 1 },
-    { packageId: N.pkg6, url: 'https://picsum.photos/seed/europe/800/500', orderIndex: 0 },
-    { packageId: N.pkg6, url: 'https://picsum.photos/seed/europe2/800/500', orderIndex: 1 },
-    { packageId: N.pkg7, url: 'https://picsum.photos/seed/japan/800/500', orderIndex: 0 },
-    { packageId: N.pkg7, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', orderIndex: 1 },
+    { id: 'c9000000-0000-0000-0000-000000000001', packageId: E.pkg1, url: 'https://images.unsplash.com/photo-1568797629192-789acf8e4df3?w=800', publicId: 'travel-crm/packages/seed-srilanka-1', orderIndex: 0 },
+    { id: 'c9000000-0000-0000-0000-000000000002', packageId: E.pkg1, url: 'https://picsum.photos/seed/srilanka2/800/500', publicId: 'travel-crm/packages/seed-srilanka-2', orderIndex: 1 },
+    { id: 'c9000000-0000-0000-0000-000000000003', packageId: E.pkg2, url: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800', orderIndex: 0 },
+    { id: 'c9000000-0000-0000-0000-000000000004', packageId: E.pkg2, url: 'https://picsum.photos/seed/maldives2/800/500', orderIndex: 1 },
+    { id: 'c9000000-0000-0000-0000-000000000005', packageId: E.pkg3, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', orderIndex: 0 },
+    { id: 'c9000000-0000-0000-0000-000000000006', packageId: N.pkg4, url: 'https://picsum.photos/seed/dubai/800/500', orderIndex: 0 },
+    { id: 'c9000000-0000-0000-0000-000000000007', packageId: N.pkg4, url: 'https://picsum.photos/seed/dubai2/800/500', orderIndex: 1 },
+    { id: 'c9000000-0000-0000-0000-000000000008', packageId: N.pkg5, url: 'https://picsum.photos/seed/bali/800/500', orderIndex: 0 },
+    { id: 'c9000000-0000-0000-0000-000000000009', packageId: N.pkg5, url: 'https://picsum.photos/seed/bali2/800/500', orderIndex: 1 },
+    { id: 'c9000000-0000-0000-0000-00000000000a', packageId: N.pkg6, url: 'https://picsum.photos/seed/europe/800/500', orderIndex: 0 },
+    { id: 'c9000000-0000-0000-0000-00000000000b', packageId: N.pkg6, url: 'https://picsum.photos/seed/europe2/800/500', orderIndex: 1 },
+    { id: 'c9000000-0000-0000-0000-00000000000c', packageId: N.pkg7, url: 'https://picsum.photos/seed/japan/800/500', orderIndex: 0 },
+    { id: 'c9000000-0000-0000-0000-00000000000d', packageId: N.pkg7, url: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800', orderIndex: 1 },
   ];
   await pkg.packageImage.createMany({ data: imgs, skipDuplicates: true });
 
