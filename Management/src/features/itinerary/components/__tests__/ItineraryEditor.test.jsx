@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../../services/cloudinaryService', () => ({
   uploadItineraryImages: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock('../../../shared', () => ({
 }));
 
 import ItineraryEditor from '../ItineraryEditor';
+import { uploadItineraryImages } from '../../../../services/cloudinaryService';
 
 const baseDay = {
   dayNumber: 1,
@@ -100,5 +102,59 @@ describe('ItineraryEditor — Day Images visibility', () => {
       />,
     );
     expect(screen.getByAltText('Day 1 Image 1')).toHaveAttribute('src', 'https://res.cloudinary.com/x/a.jpg');
+  });
+
+  it('hands the trimmed images array to onDayChange when a day image is removed', async () => {
+    const onDayChange = vi.fn();
+    const day = {
+      ...baseDay,
+      images: [
+        { url: 'https://res.cloudinary.com/x/a.jpg', publicId: 'day1/a' },
+        { url: 'https://res.cloudinary.com/x/b.jpg', publicId: 'day1/b' },
+      ],
+    };
+    render(
+      <ItineraryEditor
+        days={[day]}
+        onDayChange={onDayChange}
+        onAddDay={noop}
+        onRemoveDay={noop}
+        hideTitleAndDescription
+      />,
+    );
+
+    const removeButtons = screen.getAllByTitle('Remove image');
+    await userEvent.click(removeButtons[0]);
+
+    expect(onDayChange).toHaveBeenCalledWith(1, {
+      images: [{ url: 'https://res.cloudinary.com/x/b.jpg', publicId: 'day1/b' }],
+    });
+  });
+
+  it('appends newly uploaded images to the existing day images on upload', async () => {
+    const onDayChange = vi.fn();
+    uploadItineraryImages.mockResolvedValue([{ url: 'https://res.cloudinary.com/x/new.jpg', publicId: 'day1/new' }]);
+    const day = { ...baseDay, images: [{ url: 'https://res.cloudinary.com/x/a.jpg', publicId: 'day1/a' }] };
+
+    render(
+      <ItineraryEditor
+        days={[day]}
+        onDayChange={onDayChange}
+        onAddDay={noop}
+        onRemoveDay={noop}
+        hideTitleAndDescription
+      />,
+    );
+
+    const file = new File(['x'], 'new.jpg', { type: 'image/jpeg' });
+    const input = document.querySelector('input[type="file"][accept*="image"]');
+    await userEvent.upload(input, file);
+
+    await waitFor(() => expect(onDayChange).toHaveBeenCalledWith(1, {
+      images: [
+        { url: 'https://res.cloudinary.com/x/a.jpg', publicId: 'day1/a' },
+        { url: 'https://res.cloudinary.com/x/new.jpg', publicId: 'day1/new' },
+      ],
+    }));
   });
 });
