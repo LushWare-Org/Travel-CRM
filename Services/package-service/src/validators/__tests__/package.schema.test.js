@@ -9,6 +9,8 @@ import {
   listPackagesQuerySchema,
   createPlaceSchema,
   createActivitySchema,
+  generateAIPackageSchema,
+  generateFromTitleSchema,
 } from '../package.schema.js';
 
 const UUID_1 = 'b0000000-0000-4000-8000-000000000001';
@@ -399,5 +401,46 @@ describe('packageCoverParamSchema / setPackageCoverSchema', () => {
   it('requires imageId in the body', () => {
     expect(setPackageCoverSchema.safeParse({}).success).toBe(false);
     expect(setPackageCoverSchema.safeParse({ imageId: 'img-1' }).success).toBe(true);
+  });
+});
+
+describe('generateAIPackageSchema', () => {
+  it('accepts the payload the Management AI dialog actually sends', () => {
+    const result = generateAIPackageSchema.safeParse({
+      destination: 'Bali',
+      packageType: 'Deluxe',
+      category: 'family',
+      duration: 5,
+      description: 'Include water sports, prefer beachside hotels',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing destination', () => {
+    expect(generateAIPackageSchema.safeParse({ duration: 5 }).success).toBe(false);
+  });
+
+  it('rejects duration above the sanity cap', () => {
+    expect(generateAIPackageSchema.safeParse({ destination: 'Bali', duration: 365 }).success).toBe(false);
+  });
+
+  it('rejects a zero or negative duration', () => {
+    expect(generateAIPackageSchema.safeParse({ destination: 'Bali', duration: 0 }).success).toBe(false);
+  });
+
+  it('coerces a numeric-string duration, matching how it arrives over JSON from the form', () => {
+    const result = generateAIPackageSchema.safeParse({ destination: 'Bali', duration: '5' });
+    expect(result.success).toBe(true);
+    expect(result.data.duration).toBe(5);
+  });
+});
+
+describe('generateFromTitleSchema', () => {
+  it('accepts a title-only payload', () => {
+    expect(generateFromTitleSchema.safeParse({ title: 'Kandy Getaway' }).success).toBe(true);
+  });
+
+  it('rejects an empty title', () => {
+    expect(generateFromTitleSchema.safeParse({ title: '' }).success).toBe(false);
   });
 });

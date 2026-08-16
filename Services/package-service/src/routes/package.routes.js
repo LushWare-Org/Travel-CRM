@@ -8,6 +8,8 @@ import {
   packageImageParamSchema,
   packageCoverParamSchema,
   setPackageCoverSchema,
+  generateAIPackageSchema,
+  generateFromTitleSchema,
 } from '../validators/package.schema.js';
 import * as packageController from '../controllers/package.controller.js';
 import * as packageImageController from '../controllers/packageImage.controller.js';
@@ -36,8 +38,8 @@ router.get('/', packageController.getPackages);
 router.get('/:id', validateParams(packageIdParamSchema), packageController.getPackageById);
 
 // ── AI: full-package generation ───────────────────────────────────────────────
-router.post('/generate-ai',         requireAuth, authorize('admin', 'staff'), generateAIPackage);
-router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), generateContentFromTitle);
+router.post('/generate-ai',         requireAuth, authorize('admin', 'staff'), validateBody(generateAIPackageSchema),  generateAIPackage);
+router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), validateBody(generateFromTitleSchema), generateContentFromTitle);
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 router.post('/calculate-price', requireAuth, packageController.calculatePrice);

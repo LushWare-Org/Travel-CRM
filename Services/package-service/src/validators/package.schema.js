@@ -160,6 +160,30 @@ export const listPackagesQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
+// ─── AI generation ─────────────────────────────────────────────
+// Loosely typed on purpose: these feed a prompt, not the DB, so category/
+// packageType accept the display-label strings the Management UI sends
+// (e.g. 'honeymoon', 'Deluxe') rather than the strict Package enums —
+// aiPackage.controller.js maps them to real enum values after generation.
+
+export const generateAIPackageSchema = z.object({
+  destination: z.string().min(1, 'Destination is required').max(255),
+  duration: z.coerce.number().int().min(1).max(30),
+  category: z.string().max(50).optional(),
+  packageType: z.string().max(50).optional(),
+  budget: z.string().max(100).optional(),
+  travelers: z.coerce.number().int().min(1).max(50).optional(),
+  preferences: z.string().max(1000).optional(),
+  description: z.string().max(1000).optional(),
+});
+
+export const generateFromTitleSchema = z.object({
+  title: z.string().min(1).max(255),
+  destination: z.string().max(255).optional(),
+  duration: z.coerce.number().int().min(1).max(30).optional(),
+  category: z.string().max(50).optional(),
+});
+
 // ─── Place / Activity sub-schemas ─────────────────────────────
 
 export const createPlaceSchema = z.object({
