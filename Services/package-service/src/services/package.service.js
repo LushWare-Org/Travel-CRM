@@ -33,6 +33,7 @@ export function serializePackage(pkg) {
     dinnerCount: day.dinnerCount,
     mealPriceOverride: day.mealPriceOverride ? Number(day.mealPriceOverride) : null,
     accommodation: day.accommodation || {},
+    images: day.images || [],
     places: (day.places || []).map((dp) => ({
       id: dp.id,
       placeId: dp.placeId,
@@ -90,6 +91,7 @@ export function serializePackage(pkg) {
     images: (pkg.images || []).map((img) => ({
       id: img.id,
       url: img.url,
+      publicId: img.publicId,
       altText: img.altText,
       orderIndex: img.orderIndex,
     })),
@@ -163,6 +165,7 @@ export function buildCreateData(body, userId) {
     images: {
       create: (body.images || []).map((img, i) => ({
         url: img.url,
+        publicId: img.publicId,
         altText: img.altText,
         orderIndex: img.orderIndex ?? i,
       })),
@@ -196,6 +199,7 @@ export function buildUpdateData(body) {
       deleteMany: {},
       create: (body.images || []).map((img, i) => ({
         url: img.url,
+        publicId: img.publicId,
         altText: img.altText,
         orderIndex: img.orderIndex ?? i,
       })),
@@ -223,6 +227,7 @@ function buildItineraryDaysData(days) {
     lunchCount: day.lunchCount ?? 0,
     dinnerCount: day.dinnerCount ?? 0,
     mealPriceOverride: day.mealPriceOverride ?? null,
+    images: day.images ?? [],
     places: {
       create: (day.places || []).map((p, i) => ({
         placeId: p.placeId || undefined,
