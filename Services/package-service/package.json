@@ -14,11 +14,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:ci": "vitest run --exclude '**/hotels.live.workflow.test.js' --exclude '**/hotels.liteapi.live.test.js'",
+    "test:ci": "vitest run --exclude '**/hotels.live.workflow.test.js' --exclude '**/hotels.liteapi.live.test.js' --exclude '**/aiPackage.generateAI.live.test.js'",
     "lint": "eslint ."
   },
   "dependencies": {
-    "@google/generative-ai": "^0.15.0",
+    "@google/genai": "^1.30.0",
     "@prisma/client": "^5.22.0",
     "@travel-crm/constants": "file:../shared/constants",
     "axios": "^1.19.0",
