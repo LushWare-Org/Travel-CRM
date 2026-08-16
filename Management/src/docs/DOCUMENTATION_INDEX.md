@@ -247,7 +247,9 @@ A: In `utils/helpers.js` and individual components
 A: Update form components in `components/form/`
 
 **Q: Where's the API key?**
-A: In `utils/constants.js` > IMAGE_UPLOAD_API_KEY
+A: There isn't a client-side one. Image uploads go through `package-service`'s
+`/upload/*` endpoints, which hold the Cloudinary credentials server-side; the
+frontend only needs the logged-in user's JWT (see `services/cloudinaryService.js`).
 
 ## 📝 Documentation History
 
