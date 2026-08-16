@@ -229,7 +229,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
               className="px-5 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-2 font-medium shadow-lg shadow-violet-500/25"
               title={
                 aiConfigured === false
-                  ? "AI not configured. Add GEMINI_API_KEY to Server/.env and restart server."
+                  ? "AI not configured. Add GEMINI_API_KEY to Services/package-service/.env and restart the service."
                   : "Generate description, highlights, inclusions, and exclusions using AI"
               }
             >
