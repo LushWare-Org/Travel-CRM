@@ -3,18 +3,18 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const {
-  mockGetAllLeads, mockGetLeadStats, mockGetSalesReps, mockGetSettings, mockGetStoredUser,
+  mockGetAllLeads, mockGetLeadStats, mockGetSalesReps, mockGetAssignmentSettings, mockGetStoredUser,
 } = vi.hoisted(() => ({
   mockGetAllLeads: vi.fn(),
   mockGetLeadStats: vi.fn(),
   mockGetSalesReps: vi.fn(),
-  mockGetSettings: vi.fn(),
+  mockGetAssignmentSettings: vi.fn(),
   mockGetStoredUser: vi.fn(),
 }));
 
 vi.mock('../../services/api', () => ({
-  leadAPI: { getAllLeads: mockGetAllLeads, getLeadStats: mockGetLeadStats },
-  adminAPI: { getSalesReps: mockGetSalesReps, getSettings: mockGetSettings },
+  leadAPI: { getAllLeads: mockGetAllLeads, getLeadStats: mockGetLeadStats, getAssignmentSettings: mockGetAssignmentSettings },
+  adminAPI: { getSalesReps: mockGetSalesReps },
   authAPI: { getStoredUser: mockGetStoredUser },
 }));
 
@@ -122,7 +122,7 @@ beforeEach(() => {
   });
   mockGetLeadStats.mockResolvedValue({ success: true, summary: { total: 2 }, data: [] });
   mockGetSalesReps.mockResolvedValue({ success: true, data: [] });
-  mockGetSettings.mockResolvedValue({ success: true, data: {} });
+  mockGetAssignmentSettings.mockResolvedValue({ success: true, data: {} });
   mockGetStoredUser.mockReturnValue(null);
 });
 

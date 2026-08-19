@@ -525,6 +525,7 @@ model LeadOptionalFlight {
 
 model Settings {
   id                    String             @id @default(uuid())
+  singletonKey          Int                @unique @default(1)
   assignmentMode        AssignmentMode     @default(manual)
   autoStrategy          AssignmentStrategy @default(round_robin)
   enabledSalesRepIds    String[] // → users.User.id[]
@@ -536,7 +537,8 @@ model Settings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  // Only one row allowed — enforced by getSingleton() in service layer
+  // singletonKey is a fixed sentinel (always 1) — the @unique constraint is
+  // what actually enforces "only one row" now; upsert on it everywhere.
 
   @@schema("crm_leads")
 }

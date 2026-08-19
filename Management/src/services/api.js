@@ -400,6 +400,16 @@ export const leadAPI = {
     return api.get("/leads/stats");
   },
 
+  // Lead auto-assignment settings (admin only)
+  getAssignmentSettings: async () => {
+    const api = new ApiService();
+    return api.get("/leads/settings");
+  },
+  updateAssignmentSettings: async (data) => {
+    const api = new ApiService();
+    return api.put("/leads/settings", data);
+  },
+
   // Add remark
   addRemark: async (id, remarkData) => {
     const api = new ApiService();
