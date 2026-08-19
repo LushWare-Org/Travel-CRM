@@ -3,12 +3,27 @@ import crypto from 'crypto';
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { idParamSchema, formatZodError } from '../validators/common.js';
+import {
+  createUserSchema, updateUserSchema, updateCurrentUserProfileSchema,
+  updateUserPasswordSchema, assignUserRoleSchema, listUsersQuerySchema,
+} from '../validators/user.validator.js';
+import { z } from 'zod';
+import { USER_ROLES } from '../validators/common.js';
+
+const roleParamSchema = z.object({ role: z.enum(USER_ROLES) });
 
 const safeUser = (u) => {
   if (!u) return null;
   const { password, ...rest } = u;
   return rest;
 };
+
+function parseOrThrow(schema, value) {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new AppError(formatZodError(parsed.error), 400);
+  return parsed.data;
+}
 
 export const getCurrentUserProfile = asyncHandler(async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user.id }, include: { vendorProfile: true } });
@@ -17,7 +32,7 @@ export const getCurrentUserProfile = asyncHandler(async (req, res) => {
 });
 
 export const updateCurrentUserProfile = asyncHandler(async (req, res) => {
-  const { name, phone } = req.body;
+  const { name, phone } = parseOrThrow(updateCurrentUserProfileSchema, req.body);
   const user = await prisma.user.update({
     where: { id: req.user.id },
     data: { ...(name && { name }), ...(phone !== undefined && { phone }) },
@@ -26,7 +41,7 @@ export const updateCurrentUserProfile = asyncHandler(async (req, res) => {
 });
 
 export const getAllUsers = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, role, search, isActive } = req.query;
+  const { page = 1, limit = 10, role, search, isActive } = parseOrThrow(listUsersQuerySchema, req.query);
   const where = {};
   if (role) where.role = role;
   if (isActive !== undefined) where.isActive = isActive === 'true';
@@ -36,27 +51,27 @@ export const getAllUsers = asyncHandler(async (req, res) => {
       { email: { contains: search, mode: 'insensitive' } },
     ];
   }
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const skip = (page - 1) * limit;
   const [users, total] = await Promise.all([
-    prisma.user.findMany({ where, skip, take: parseInt(limit), orderBy: { createdAt: 'desc' }, include: { vendorProfile: true } }),
+    prisma.user.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' }, include: { vendorProfile: true } }),
     prisma.user.count({ where }),
   ]);
   res.json({
     status: 'success',
     data: users.map(safeUser),
-    pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / limit) },
+    pagination: { total, page, limit, pages: Math.ceil(total / limit) },
   });
 });
 
 export const getUser = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.params.id }, include: { vendorProfile: true } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const user = await prisma.user.findUnique({ where: { id }, include: { vendorProfile: true } });
   if (!user) throw new AppError('User not found', 404);
   res.json({ status: 'success', data: { user: safeUser(user) } });
 });
 
 export const createUser = asyncHandler(async (req, res) => {
-  const { name, email, phone, role, password } = req.body;
-  if (!name || !email || !role) throw new AppError('Name, email, and role are required', 400);
+  const { name, email, phone, role, password } = parseOrThrow(createUserSchema, req.body);
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new AppError('User with this email already exists', 400);
@@ -67,7 +82,7 @@ export const createUser = asyncHandler(async (req, res) => {
   const user = await prisma.user.create({
     data: {
       name,
-      email: email.toLowerCase().trim(),
+      email,
       phone: phone || null,
       password: hashedPassword,
       role,
@@ -85,9 +100,10 @@ export const createUser = asyncHandler(async (req, res) => {
 });
 
 export const updateUser = asyncHandler(async (req, res) => {
-  const { name, phone, role, isActive, permissions } = req.body;
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { name, phone, role, isActive, permissions } = parseOrThrow(updateUserSchema, req.body);
   const user = await prisma.user.update({
-    where: { id: req.params.id },
+    where: { id },
     data: {
       ...(name && { name }),
       ...(phone !== undefined && { phone }),
@@ -100,36 +116,38 @@ export const updateUser = asyncHandler(async (req, res) => {
 });
 
 export const updateUserPassword = asyncHandler(async (req, res) => {
-  const { password } = req.body;
-  if (!password) throw new AppError('Password is required', 400);
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { password } = parseOrThrow(updateUserPasswordSchema, req.body);
   const hashed = await bcrypt.hash(password, 12);
   const user = await prisma.user.update({
-    where: { id: req.params.id },
+    where: { id },
     data: { password: hashed, passwordChangedAt: new Date(), mustChangePassword: false, isTempPassword: false },
   });
   res.json({ status: 'success', message: 'Password updated', data: { user: safeUser(user) } });
 });
 
 export const deleteUser = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError('User not found', 404);
   if (!user.canBeDeleted) throw new AppError('This user cannot be deleted', 403);
-  await prisma.user.delete({ where: { id: req.params.id } });
+  await prisma.user.delete({ where: { id } });
   res.json({ status: 'success', message: 'User deleted', data: {} });
 });
 
 export const toggleUserStatus = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError('User not found', 404);
   const updated = await prisma.user.update({
-    where: { id: req.params.id },
+    where: { id },
     data: { isActive: !user.isActive },
   });
   res.json({ status: 'success', message: `User ${updated.isActive ? 'activated' : 'deactivated'}`, data: { user: safeUser(updated) } });
 });
 
 export const getUsersByRole = asyncHandler(async (req, res) => {
-  const { role } = req.params;
+  const { role } = parseOrThrow(roleParamSchema, req.params);
   const users = await prisma.user.findMany({
     where: { role },
     orderBy: { name: 'asc' },
@@ -138,9 +156,9 @@ export const getUsersByRole = asyncHandler(async (req, res) => {
 });
 
 export const assignUserRole = asyncHandler(async (req, res) => {
-  const { role } = req.body;
-  if (!role) throw new AppError('Role is required', 400);
-  const user = await prisma.user.update({ where: { id: req.params.id }, data: { role } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { role } = parseOrThrow(assignUserRoleSchema, req.body);
+  const user = await prisma.user.update({ where: { id }, data: { role } });
   res.json({ status: 'success', message: 'Role updated', data: { user: safeUser(user) } });
 });
 
