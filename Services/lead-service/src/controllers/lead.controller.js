@@ -12,9 +12,17 @@ import { handleLeadEvent } from '../services/lead-events.service.js';
 import { serializeLeadDays } from '../services/lead-itinerary.service.js';
 
 // ─── Auto-assignment helper ────────────────────────────────────
-async function autoAssignSalesRep(leadData) {
-  const settings = await prisma.settings.findFirst();
-  if (!settings || settings.assignmentMode === 'manual') return null;
+// Must run inside the same transaction as the lead create it feeds, so the
+// settings read + roundRobinIndex increment are atomic with each other under
+// concurrent lead creation (otherwise two concurrent calls can read the same
+// index and skip/duplicate a rep's turn).
+async function autoAssignSalesRep(tx, leadData) {
+  const settings = await tx.settings.upsert({
+    where: { singletonKey: 1 },
+    update: {},
+    create: { singletonKey: 1 },
+  });
+  if (settings.assignmentMode === 'manual') return null;
 
   const enabledIds = settings.enabledSalesRepIds || [];
   if (!enabledIds.length) return null;
@@ -22,7 +30,7 @@ async function autoAssignSalesRep(leadData) {
   if (settings.autoStrategy === 'round_robin') {
     const idx = settings.roundRobinIndex % enabledIds.length;
     const salesRepId = enabledIds[idx];
-    await prisma.settings.updateMany({ data: { roundRobinIndex: idx + 1 } });
+    await tx.settings.update({ where: { id: settings.id }, data: { roundRobinIndex: { increment: 1 } } });
     return salesRepId;
   }
   return null;
@@ -52,15 +60,6 @@ export const createLead = asyncHandler(async (req, res) => {
     body.assignedById = user.id;
   }
 
-  let assignedId = body.assignedToId;
-  if (!assignedId && user.role !== 'salesRep') {
-    assignedId = await autoAssignSalesRep(body);
-    if (assignedId) {
-      body.assignedToId = assignedId;
-      body.assignmentMode = 'auto';
-    }
-  }
-
   const remarksList = body.remarks || [];
   const lifecycleStatus = body.lifecycleStatus || 'NEW';
   const isManualItinerary = body.isManualItinerary || false;
@@ -74,6 +73,13 @@ export const createLead = asyncHandler(async (req, res) => {
       : null;
 
   const lead = await prisma.$transaction(async (tx) => {
+    let assignedId = body.assignedToId;
+    let assignmentMode = body.assignmentMode;
+    if (!assignedId && user.role !== 'salesRep') {
+      assignedId = await autoAssignSalesRep(tx, body);
+      if (assignedId) assignmentMode = 'auto';
+    }
+
     const created = await tx.lead.create({
       data: {
         name: body.name,
@@ -93,7 +99,8 @@ export const createLead = asyncHandler(async (req, res) => {
         message: body.message,
         lifecycleStatus,
         priority: body.priority,
-        assignedToId: body.assignedToId,
+        assignedToId: assignedId,
+        ...(assignmentMode ? { assignmentMode } : {}),
         tags: body.tags || [],
         lostReason: body.lostReason,
         remarks: {
@@ -371,6 +378,10 @@ export const getLeadRemarks = asyncHandler(async (req, res) => {
 });
 
 export const assignLead = asyncHandler(async (req, res) => {
+  const { user } = req;
+  const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
+  if (!canManage) throw new AppError('Not authorized to assign this lead', 403);
+
   const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
   if (!lead) throw new AppError('Lead not found', 404);
 
@@ -387,17 +398,28 @@ export const assignLead = asyncHandler(async (req, res) => {
 });
 
 export const unassignLead = asyncHandler(async (req, res) => {
+  const { user } = req;
+  const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
+  if (!canManage) throw new AppError('Not authorized to unassign this lead', 403);
+
+  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
+  if (!lead) throw new AppError('Lead not found', 404);
+
   const updated = await prisma.lead.update({
     where: { id: req.params.id },
-    data: { assignedToId: null, assignedById: req.user.id },
+    data: { assignedToId: null, assignedById: req.user.id, assignmentMode: 'manual' },
   });
   res.json({ success: true, data: updated });
 });
 
 export const getLeadsByStatus = asyncHandler(async (req, res) => {
+  const { user } = req;
   const status = req.params.status;
+  const where = { AND: [{ lifecycleStatus: status }] };
+  if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
+
   const leads = await prisma.lead.findMany({
-    where: { lifecycleStatus: status },
+    where,
     orderBy: { createdAt: 'desc' },
   });
   res.json({ success: true, count: leads.length, data: leads });
@@ -423,21 +445,26 @@ export const getLeadStats = asyncHandler(async (req, res) => {
 });
 
 export const searchLeads = asyncHandler(async (req, res) => {
+  const { user } = req;
   const { query } = req.query;
   if (!query) throw new AppError('Search query is required', 400);
 
-  const leads = await prisma.lead.findMany({
-    where: {
-      OR: [
-        { name: { contains: query, mode: 'insensitive' } },
-        { email: { contains: query, mode: 'insensitive' } },
-        { phone: { contains: query, mode: 'insensitive' } },
-        { destination: { contains: query, mode: 'insensitive' } },
-        { city: { contains: query, mode: 'insensitive' } },
-      ],
-    },
-    take: 20,
-  });
+  const where = {
+    AND: [
+      {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { email: { contains: query, mode: 'insensitive' } },
+          { phone: { contains: query, mode: 'insensitive' } },
+          { destination: { contains: query, mode: 'insensitive' } },
+          { city: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+    ],
+  };
+  if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
+
+  const leads = await prisma.lead.findMany({ where, take: 20 });
   res.json({ success: true, count: leads.length, data: leads });
 });
 
@@ -455,27 +482,29 @@ export const createWebsiteContactLead = asyncHandler(async (req, res) => {
   const sanitizedEmail = String(email).trim().toLowerCase();
   const remarkText = [`Contact Form: ${subject.trim()}`, message?.trim() ? `Message: ${message.trim()}` : '', locations?.trim() ? `Locations: ${locations.trim()}` : ''].filter(Boolean).join(' | ');
 
-  let assignedId = await autoAssignSalesRep({});
-
-  const lead = await prisma.lead.create({
-    data: {
-      name: name.trim(),
-      email: sanitizedEmail,
-      phone: phone ? String(phone).replace(/\D/g, '') : null,
-      source: 'website',
-      platform: 'Website_Form',
-      destination: destination?.trim() || null,
-      destinationCountry: destinationCountry?.trim() || null,
-      travelDate: travelDate ? new Date(travelDate) : null,
-      message: message?.trim() || null,
-      lifecycleStatus: 'NEW',
-      tags: ['website-contact-form'],
-      assignedToId: assignedId || null,
-      assignmentMode: assignedId ? 'auto' : 'manual',
-      remarks: { create: [{ text: remarkText, date: new Date(), addedById: null }] },
-      statusHistory: { create: [{ status: 'NEW', actor: 'USER', changedById: null, notes: 'Created from website contact form' }] },
-    },
+  const lead = await prisma.$transaction(async (tx) => {
+    const assignedId = await autoAssignSalesRep(tx, {});
+    return tx.lead.create({
+      data: {
+        name: name.trim(),
+        email: sanitizedEmail,
+        phone: phone ? String(phone).replace(/\D/g, '') : null,
+        source: 'website',
+        platform: 'Website_Form',
+        destination: destination?.trim() || null,
+        destinationCountry: destinationCountry?.trim() || null,
+        travelDate: travelDate ? new Date(travelDate) : null,
+        message: message?.trim() || null,
+        lifecycleStatus: 'NEW',
+        tags: ['website-contact-form'],
+        assignedToId: assignedId || null,
+        assignmentMode: assignedId ? 'auto' : 'manual',
+        remarks: { create: [{ text: remarkText, date: new Date(), addedById: null }] },
+        statusHistory: { create: [{ status: 'NEW', actor: 'USER', changedById: null, notes: 'Created from website contact form' }] },
+      },
+    });
   });
+  const assignedId = lead.assignedToId;
 
   res.status(201).json({ success: true, message: 'Contact form submitted successfully', data: { leadId: lead.id, salesRepId: assignedId || null } });
 });
@@ -483,4 +512,60 @@ export const createWebsiteContactLead = asyncHandler(async (req, res) => {
 export const handleInternalEvent = asyncHandler(async (req, res) => {
   const result = await handleLeadEvent({ event: req.body?.event });
   res.json({ success: true, data: result });
+});
+
+// Service-to-service ingestion for Facebook Lead Ads, called by
+// notification-service's webhook handler over HTTP (internal-token auth) —
+// replaces a previous raw-SQL implementation that wrote directly into this
+// service's tables from another service.
+export const handleFacebookLeadEvent = asyncHandler(async (req, res) => {
+  const { leadgenId, name, email, phone, message } = req.body || {};
+  const sanitizedEmail = email ? String(email).trim().toLowerCase() : null;
+  const sanitizedPhone = phone ? String(phone).replace(/\D/g, '') : null;
+
+  if (!sanitizedEmail && !sanitizedPhone) {
+    throw new AppError('Lead must have email or phone', 400);
+  }
+
+  const existing = await prisma.lead.findFirst({
+    where: {
+      OR: [
+        ...(sanitizedEmail ? [{ email: sanitizedEmail }] : []),
+        ...(sanitizedPhone ? [{ phone: sanitizedPhone }] : []),
+      ],
+    },
+  });
+
+  if (existing) {
+    await prisma.leadRemark.create({
+      data: {
+        leadId: existing.id,
+        text: `Duplicate Facebook lead submission (Lead ID: ${leadgenId || 'unknown'})`,
+        date: new Date(),
+        addedById: null,
+      },
+    });
+    return res.json({ success: true, data: { leadId: existing.id, duplicate: true } });
+  }
+
+  const lead = await prisma.$transaction(async (tx) => {
+    const assignedId = await autoAssignSalesRep(tx, {});
+    return tx.lead.create({
+      data: {
+        name: name?.trim() || 'Facebook Lead',
+        email: sanitizedEmail,
+        phone: sanitizedPhone,
+        source: 'social_media',
+        platform: 'Social_Media',
+        message: message?.trim() || null,
+        lifecycleStatus: 'NEW',
+        tags: ['facebook-lead'],
+        assignedToId: assignedId || null,
+        assignmentMode: assignedId ? 'auto' : 'manual',
+        statusHistory: { create: [{ status: 'NEW', actor: 'USER', changedById: null, notes: 'Created from Facebook Lead Ads' }] },
+      },
+    });
+  });
+
+  res.status(201).json({ success: true, data: { leadId: lead.id, salesRepId: lead.assignedToId, duplicate: false } });
 });
