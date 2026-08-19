@@ -262,7 +262,8 @@ class AdminService {
         status: 'success',
         data: {
           users: [...superAdminsData, ...adminsData], // Super admins first
-          pagination: adminsResponse.data?.pagination || { total: adminsData.length + superAdminsData.length }
+          // Pagination sits at the top level of the raw envelope, not nested under `data`.
+          pagination: adminsResponse.pagination || { total: adminsData.length + superAdminsData.length }
         }
       };
     } catch (error) {

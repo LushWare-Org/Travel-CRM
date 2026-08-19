@@ -78,7 +78,8 @@ const AdminManagement = () => {
 
         // Transform backend data to frontend format
         const transformedAdmins = adminsData.map(admin => ({
-          id: admin._id,
+          // user-service (Postgres/Prisma) returns `id`, not the Mongo-style `_id`.
+          id: admin._id || admin.id,
           name: admin.name,
           email: admin.email,
           phone: admin.phone || '',
