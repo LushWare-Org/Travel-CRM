@@ -2,6 +2,10 @@ import pool from '../db/pool.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 export const getDashboardStats = asyncHandler(async (req, res) => {
+  // salesRep sees only their own leads/bookings/revenue; packages are a
+  // shared catalog with no rep attribution and stay company-wide for everyone.
+  const repId = req.user.role === 'salesRep' ? req.user.id : null;
+
   const [
     leadsResult,
     bookingsResult,
@@ -11,13 +15,40 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     recentBookings,
     leadsByStatus,
   ] = await Promise.all([
-    pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "lifecycleStatus" = 'NEW') AS new_leads, COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED') AS converted FROM crm_leads."Lead"`),
-    pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "bookingStatus" = 'confirmed') AS confirmed, COUNT(*) FILTER (WHERE "bookingStatus" = 'pending') AS pending FROM crm_bookings."Booking"`),
-    pool.query(`SELECT SUM("totalAmount") AS total_revenue, SUM("paidAmount") AS collected FROM crm_billing."Invoice" WHERE status != 'cancelled'`),
+    pool.query(
+      `SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "lifecycleStatus" = 'NEW') AS new_leads, COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED') AS converted
+       FROM crm_leads."Lead" WHERE ($1::text IS NULL OR "assignedToId" = $1)`,
+      [repId]
+    ),
+    pool.query(
+      `SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "bookingStatus" = 'confirmed') AS confirmed, COUNT(*) FILTER (WHERE "bookingStatus" = 'pending') AS pending
+       FROM crm_bookings."Booking" WHERE ($1::text IS NULL OR "assignedToId" = $1)`,
+      [repId]
+    ),
+    pool.query(
+      `SELECT SUM(i."totalAmount") AS total_revenue, SUM(i."paidAmount") AS collected
+       FROM crm_billing."Invoice" i
+       JOIN crm_leads."Lead" l ON l.id = i."leadId"
+       WHERE i.status != 'cancelled' AND ($1::text IS NULL OR l."assignedToId" = $1)`,
+      [repId]
+    ),
     pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE "is_active" = true) AS published FROM crm_packages."Package"`),
-    pool.query(`SELECT id, name, email, "lifecycleStatus"::text AS status, source::text, "createdAt" FROM crm_leads."Lead" ORDER BY "createdAt" DESC LIMIT 5`),
-    pool.query(`SELECT b.id, b."numberOfTravelers", b."bookingStatus"::text, b."totalAmount", b."createdAt", p.title AS "packageName" FROM crm_bookings."Booking" b LEFT JOIN crm_packages."Package" p ON p.id = b."packageId" ORDER BY b."createdAt" DESC LIMIT 5`),
-    pool.query(`SELECT "lifecycleStatus"::text AS status, COUNT(*) AS count FROM crm_leads."Lead" GROUP BY "lifecycleStatus"`),
+    pool.query(
+      `SELECT id, name, email, "lifecycleStatus"::text AS status, source::text, "createdAt" FROM crm_leads."Lead"
+       WHERE ($1::text IS NULL OR "assignedToId" = $1) ORDER BY "createdAt" DESC LIMIT 5`,
+      [repId]
+    ),
+    pool.query(
+      `SELECT b.id, b."numberOfTravelers", b."bookingStatus"::text, b."totalAmount", b."createdAt", p.title AS "packageName"
+       FROM crm_bookings."Booking" b LEFT JOIN crm_packages."Package" p ON p.id = b."packageId"
+       WHERE ($1::text IS NULL OR b."assignedToId" = $1) ORDER BY b."createdAt" DESC LIMIT 5`,
+      [repId]
+    ),
+    pool.query(
+      `SELECT "lifecycleStatus"::text AS status, COUNT(*) AS count FROM crm_leads."Lead"
+       WHERE ($1::text IS NULL OR "assignedToId" = $1) GROUP BY "lifecycleStatus"`,
+      [repId]
+    ),
   ]);
 
   res.json({
