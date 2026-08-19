@@ -1,8 +1,7 @@
-import crypto from 'crypto';
-import pool from '../db/pool.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { verifyWebhookSignature, getLeadData, mapFacebookLeadToLead } from '../utils/facebook.js';
+import { submitFacebookLead } from '../services/lead.client.js';
 import logger from '../config/logger.js';
 
 export const verifyWebhook = asyncHandler(async (req, res) => {
@@ -59,64 +58,19 @@ async function processFacebookLead(leadgenId) {
     throw new Error('Lead must have email or phone');
   }
 
-  // Duplicate check
-  const dupCheck = await pool.query(
-    `SELECT id FROM crm_leads."Lead" WHERE (email = $1 AND $1 != '') OR (phone = $2 AND $2 != '') LIMIT 1`,
-    [leadData.email, leadData.phone]
-  );
+  // lead-service owns dedup, creation, and assignment (round-robin honors
+  // Settings.assignmentMode — no separate flag needed here).
+  const result = await submitFacebookLead({
+    leadgenId,
+    name: leadData.name,
+    email: leadData.email,
+    phone: leadData.phone,
+    message: leadData.message,
+  });
 
-  if (dupCheck.rows.length > 0) {
-    const existing = dupCheck.rows[0];
-    const remarkId = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO crm_leads."LeadRemark" (id, "leadId", text, "addedAt", date)
-       VALUES ($1, $2, $3, NOW(), NOW())`,
-      [remarkId, existing.id, `Duplicate Facebook lead submission (Lead ID: ${leadgenId})`]
-    );
+  if (result?.data?.duplicate) {
     logger.info({ leadgenId, email: leadData.email }, 'Duplicate FB lead detected');
-    return;
+  } else {
+    logger.info({ leadId: result?.data?.leadId }, 'Created FB lead');
   }
-
-  // Auto-assign if configured
-  let assignedToId = null;
-  if (process.env.AUTO_ASSIGN_FACEBOOK_LEADS === 'true') {
-    try {
-      const settings = await pool.query(
-        `SELECT id, "enabledSalesRepIds", "roundRobinIndex", "assignmentMode" FROM crm_leads."Settings" LIMIT 1`
-      );
-      const s = settings.rows[0];
-      if (s?.assignmentMode === 'auto' && s.enabledSalesRepIds?.length) {
-        const idx = s.roundRobinIndex % s.enabledSalesRepIds.length;
-        assignedToId = s.enabledSalesRepIds[idx];
-        const nextIdx = (idx + 1) % s.enabledSalesRepIds.length;
-        await pool.query(
-          `UPDATE crm_leads."Settings" SET "roundRobinIndex" = $1, "updatedAt" = NOW() WHERE id = $2`,
-          [nextIdx, s.id]
-        );
-      }
-    } catch (e) {
-      logger.warn({ err: e }, 'Auto-assignment failed');
-    }
-  }
-
-  const leadId = crypto.randomUUID();
-  await pool.query(
-    `INSERT INTO crm_leads."Lead"
-      (id, name, email, phone, source, platform, message, status, tags, "assignedToId", "assignmentMode", "leadDateTime", "createdAt", "updatedAt")
-     VALUES ($1,$2,$3,$4,$5::crm_leads."LeadSource",$6::crm_leads."LeadPlatform",$7,$8::crm_leads."LeadStatus",$9,$10,$11::crm_leads."AssignmentMode",NOW(),NOW(),NOW())`,
-    [
-      leadId, leadData.name, leadData.email, leadData.phone,
-      leadData.source, leadData.platform, leadData.message || null,
-      leadData.status, leadData.tags,
-      assignedToId, assignedToId ? 'auto' : 'manual',
-    ]
-  );
-
-  const histId = crypto.randomUUID();
-  await pool.query(
-    `INSERT INTO crm_leads."LeadStatusHistory" (id, "leadId", status, "changedAt") VALUES ($1,$2,'new',NOW())`,
-    [histId, leadId]
-  );
-
-  logger.info({ leadId }, 'Created FB lead');
 }
