@@ -61,6 +61,12 @@ const sendTokenResponse = async (user, statusCode, res, message = 'Success') => 
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+// Dev-only escape hatch: salesRep OTP is intentionally not bypassable in
+// production (see docs/OTP_LOGIN_FIX.md) — this only skips it when both the
+// environment is non-production AND it's explicitly opted into, so nothing
+// changes unless SKIP_OTP=true is set on purpose in a dev/test .env.
+const otpBypassEnabled = () => process.env.NODE_ENV !== 'production' && process.env.SKIP_OTP === 'true';
+
 const generateTempToken = (userId) =>
   jwt.sign({ userId, tempAuth: true }, process.env.JWT_SECRET, { expiresIn: '15m' });
 
@@ -131,8 +137,8 @@ export const login = asyncHandler(async (req, res) => {
     });
   }
 
-  // Sales reps require OTP
-  if (user.role === 'salesRep') {
+  // Sales reps require OTP (bypassable only via SKIP_OTP in non-production envs)
+  if (user.role === 'salesRep' && !otpBypassEnabled()) {
     const otp = generateOTP();
     await prisma.otp.deleteMany({ where: { userId: user.id, type: 'login', isUsed: false } });
     await prisma.otp.create({
@@ -173,7 +179,7 @@ export const loginStep1 = asyncHandler(async (req, res) => {
 
   if (!user.isActive) throw new AppError('Account deactivated', 403);
 
-  if (user.role !== 'salesRep') {
+  if (user.role !== 'salesRep' || otpBypassEnabled()) {
     return sendTokenResponse(user, 200, res, 'Login successful');
   }
 
