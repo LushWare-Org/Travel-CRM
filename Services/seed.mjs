@@ -232,7 +232,8 @@ async function seedPackages() {
   });
 
   // ── Packages ───────────────────────────────────────────────
-  await pkg.package.createMany({
+  await pkg.package.
+  createMany({
     data: [
       {
         id: ID.pkg1,
@@ -431,19 +432,19 @@ async function seedLeads() {
     lead3: 'e1000000-0000-0000-0000-000000000003',
   };
 
-  await leads.settings.createMany({
-    data: [
-      {
-        assignmentMode: 'auto',
-        autoStrategy: 'round_robin',
-        enabledSalesRepIds: [ID.salesRep1, ID.salesRep2],
-        roundRobinIndex: 0,
-        maxOpenLeadsPerRep: 50,
-        skipInactive: true,
-        updatedById: ID.superAdmin,
-      },
-    ],
-    skipDuplicates: true,
+  await leads.settings.upsert({
+    where: { singletonKey: 1 },
+    update: {},
+    create: {
+      singletonKey: 1,
+      assignmentMode: 'auto',
+      autoStrategy: 'round_robin',
+      enabledSalesRepIds: [ID.salesRep1, ID.salesRep2],
+      roundRobinIndex: 0,
+      maxOpenLeadsPerRep: 50,
+      skipInactive: true,
+      updatedById: ID.superAdmin,
+    },
   });
 
   const lead1 = await leads.lead.upsert({

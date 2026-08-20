@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Settings, RotateCcw, BarChart3, Check, Users, Eye } from 'lucide-react';
-import { adminAPI } from '../../../services/api';
+import { adminAPI, leadAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
 
 const SettingsDialog = ({
@@ -56,7 +56,7 @@ const SettingsDialog = ({
         requireActiveLogin48h: localSettings.requireActiveLogin,
       };
 
-      const response = await adminAPI.updateSettings(backendPayload);
+      const response = await leadAPI.updateAssignmentSettings(backendPayload);
       if (response.success) {
         setAssignmentSettings(localSettings);
         toast.success('Settings saved successfully');

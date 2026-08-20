@@ -261,7 +261,7 @@ const LeadManagement = () => {
   const fetchAssignmentSettings = async () => {
     // ... existing logic ...
     try {
-      const response = await adminAPI.getSettings();
+      const response = await leadAPI.getAssignmentSettings();
       if (response.success && response.data) {
         const data = response.data;
         setAssignmentSettings({

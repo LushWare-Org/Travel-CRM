@@ -21,6 +21,7 @@ const mockRes = () => {
 };
 
 const rows = (r) => ({ rows: r });
+const adminReq = (overrides = {}) => ({ query: {}, user: { id: 'admin-1', role: 'admin' }, ...overrides });
 
 describe('getLeadAnalyticsOverview', () => {
   beforeEach(() => mockPool.query.mockReset());
@@ -35,7 +36,7 @@ describe('getLeadAnalyticsOverview', () => {
       .mockResolvedValueOnce(rows([{ destination: 'Bali', leads: '4', conversion: '50.0' }]))
       .mockResolvedValueOnce(rows([{ budget: '$7,500' }, { budget: 'flexible' }]));
 
-    const req = { query: { timeRange: 'monthly' } };
+    const req = adminReq({ query: { timeRange: 'monthly' } });
     const res = mockRes();
 
     await getLeadAnalyticsOverview(req, res, vi.fn());
@@ -63,10 +64,44 @@ describe('getLeadAnalyticsOverview', () => {
       .mockResolvedValueOnce(rows([]));
 
     const res = mockRes();
-    await getLeadAnalyticsOverview({ query: {} }, res, vi.fn());
+    await getLeadAnalyticsOverview(adminReq(), res, vi.fn());
 
     expect(res.json.mock.calls[0][0].data.stats.totalLeads).toBe(0);
     expect(res.json.mock.calls[0][0].data.priceRangeDistribution).toEqual([]);
+  });
+
+  it('passes the caller\'s id as the ownership filter param when role is salesRep', async () => {
+    mockPool.query
+      .mockResolvedValueOnce(rows([{ total: '0', new: '0', contacted: '0', interested: '0', quoted: '0', converted: '0' }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));
+
+    const req = { query: {}, user: { id: 'rep-7', role: 'salesRep' } };
+    await getLeadAnalyticsOverview(req, mockRes(), vi.fn());
+
+    expect(mockPool.query.mock.calls[0][1]).toEqual(expect.arrayContaining(['rep-7']));
+    // trend query has truncUnit ahead of repId — repId is still the last param
+    const trendParams = mockPool.query.mock.calls[1][1];
+    expect(trendParams[trendParams.length - 1]).toBe('rep-7');
+  });
+
+  it('passes null for admin, returning company-wide data', async () => {
+    mockPool.query
+      .mockResolvedValueOnce(rows([{ total: '0', new: '0', contacted: '0', interested: '0', quoted: '0', converted: '0' }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));
+
+    await getLeadAnalyticsOverview(adminReq(), mockRes(), vi.fn());
+
+    expect(mockPool.query.mock.calls[0][1]).toEqual(expect.arrayContaining([null]));
   });
 });
 
@@ -82,12 +117,27 @@ describe('getBillingAnalyticsOverview', () => {
       .mockResolvedValueOnce(rows([{ name: 'invoice', invoices: '5', revenue: '5000' }]));
 
     const res = mockRes();
-    await getBillingAnalyticsOverview({ query: {} }, res, vi.fn());
+    await getBillingAnalyticsOverview(adminReq(), res, vi.fn());
 
     const data = res.json.mock.calls[0][0].data;
     expect(data.stats).toEqual({ totalRevenue: 5000, totalOutstanding: 1200, totalPotentialRevenue: 3000, pendingInvoices: 4 });
     expect(data.paymentStatusDistribution[0]).toEqual({ name: 'Paid', status: 'paid', totalAmount: 5000 });
     expect(data.invoiceCategoryBreakdown[0].name).toBe('Invoice');
+  });
+
+  it('passes the caller\'s id as the ownership filter param (via the Invoice→Lead join) when role is salesRep', async () => {
+    mockPool.query
+      .mockResolvedValueOnce(rows([{ collected: '0', outstanding: '0', pipeline: '0', pending_invoices: '0' }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));
+
+    const req = { query: {}, user: { id: 'rep-9', role: 'salesRep' } };
+    await getBillingAnalyticsOverview(req, mockRes(), vi.fn());
+
+    expect(mockPool.query.mock.calls[0][1]).toEqual(expect.arrayContaining(['rep-9']));
+    expect(mockPool.query.mock.calls[0][0]).toMatch(/JOIN crm_leads\."Lead"/);
   });
 
   it('uses the first bucket\'s own revenue as its target so there is no fabricated growth', async () => {
@@ -99,7 +149,7 @@ describe('getBillingAnalyticsOverview', () => {
       .mockResolvedValueOnce(rows([]));
 
     const res = mockRes();
-    await getBillingAnalyticsOverview({ query: {} }, res, vi.fn());
+    await getBillingAnalyticsOverview(adminReq(), res, vi.fn());
 
     const trend = res.json.mock.calls[0][0].data.revenueTrend;
     expect(trend[0]).toMatchObject({ revenue: 1000, target: 1000 });

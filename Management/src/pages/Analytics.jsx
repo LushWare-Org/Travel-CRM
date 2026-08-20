@@ -10,6 +10,12 @@ import {
   Users, DollarSign, Globe, BarChart3, Briefcase,
   TrendingUp, ChevronDown, Layers, ArrowRight
 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+
+// Package, Website, and User analytics are admin-only on the backend
+// (company-wide data with no per-rep ownership) — hide them from salesRep
+// instead of showing a tab that 403s.
+const ADMIN_ONLY_TAB_IDS = ["itineraries", "website", "users"];
 
 /**
  * Analytics Main Page - Responsive Design
@@ -17,9 +23,10 @@ import {
  * Mobile: Horizontal scrollable tabs with full-width content
  */
 const Analytics = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("leads");
 
-  const tabs = [
+  const allTabs = [
     {
       id: "leads",
       label: "Lead Analytics",
@@ -72,7 +79,11 @@ const Analytics = () => {
     },
   ];
 
-  const activeTabData = tabs.find(t => t.id === activeTab);
+  const tabs = user?.role === "salesRep"
+    ? allTabs.filter((tab) => !ADMIN_ONLY_TAB_IDS.includes(tab.id))
+    : allTabs;
+
+  const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
   const ActiveComponent = activeTabData?.component;
 
   return (

@@ -76,7 +76,14 @@ function AppContent() {
                   <Route path="/flights" element={<FlightSearch />} />
                   <Route path="/hotels" element={<HotelSearch />} />
                   <Route path="/billing" element={<BillingInvoicing />} />
-                  <Route path="/users" element={<UserManagement />} />
+                  <Route
+                    path="/users"
+                    element={
+                      <ProtectedRoute requiredRoles={["admin", "superAdmin"]}>
+                        <UserManagement />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/career" element={<CareerManagement />} />
                   <Route path="/settings" element={<OrganizationSettings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />

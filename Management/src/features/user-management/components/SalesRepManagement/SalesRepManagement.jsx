@@ -14,6 +14,7 @@ import { filterUsers, paginateArray } from '../../utils/helpers';
 import SalesRepTable from './SalesRepTable';
 import salesRepService from '../../../../services/salesRep.service';
 import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
+import { unwrapList } from '../../../../services/apiResponse';
 
 const SalesRepManagement = () => {
   const isInitialMount = useRef(true);
@@ -125,15 +126,10 @@ const SalesRepManagement = () => {
       
       const response = await salesRepService.getAllSalesReps(params);
 
-      // Handle different response structures
-      let repsData = [];
-      if (response.status === 'success' && response.data) {
-        repsData = response.data.salesReps || [];
-      } else if (Array.isArray(response.data)) {
-        repsData = response.data;
-      } else if (Array.isArray(response)) {
-        repsData = response;
-      }
+      // user-service returns a flat array in `data` and pagination at the
+      // top level — check that shape first, since it's what the backend
+      // actually sends (the `data.salesReps` shape was never real).
+      const { items: repsData, pagination: rawPagination } = unwrapList(response);
 
       // Transform the data to match the expected format
       const transformedReps = repsData.map(rep => {
@@ -168,13 +164,9 @@ const SalesRepManagement = () => {
       });
       
       setSalesReps(transformedReps);
-      
+
       // Handle pagination
-      if (response.data && response.data.pagination) {
-        setTotalPages(response.data.pagination.totalPages || 1);
-      } else {
-        setTotalPages(1);
-      }
+      setTotalPages(rawPagination?.pages || 1);
     } catch (err) {
       const errorMsg = err.userMessage || err.message || 'Failed to load sales representatives';
       setError(errorMsg);

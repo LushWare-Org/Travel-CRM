@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import websiteUserService from '../../../services/websiteUser.service';
+import { unwrapList } from '../../../services/apiResponse';
 
 /**
  * Custom hook for managing website users
@@ -46,13 +47,24 @@ export const useWebsiteUsers = () => {
 
       const response = await websiteUserService.getAllUsers(cleanParams);
 
-      if (response.status === 'success' && response.data?.users) {
-        // Transform API data to frontend format
-        const transformedUsers = response.data.users.map(user =>
+      if (response.status === 'success') {
+        // user-service returns a flat array in `data` and pagination at the
+        // top level — not nested under `data.users`/`data.pagination`.
+        const { items, pagination: rawPagination } = unwrapList(response);
+        const transformedUsers = items.map(user =>
           websiteUserService.transformUserData(user)
         );
         setUsers(transformedUsers);
-        setPagination(response.data.pagination);
+        if (rawPagination) {
+          setPagination({
+            currentPage: rawPagination.page,
+            totalPages: rawPagination.pages,
+            totalUsers: rawPagination.total,
+            usersPerPage: rawPagination.limit,
+            hasNextPage: rawPagination.page < rawPagination.pages,
+            hasPrevPage: rawPagination.page > 1,
+          });
+        }
       } else {
         throw new Error('Invalid response format');
       }

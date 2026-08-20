@@ -101,7 +101,11 @@ const VendorManagement = () => {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
         search: searchTerm || undefined,
-        vendorStatus: filterStatus !== 'all' ? filterStatus : undefined,
+        // The "Active Status" filter's values are all/active/inactive — that's
+        // isActive, not the vendorStatus verification enum (pending_verification/
+        // verified/suspended/rejected). This was previously mis-sent as
+        // vendorStatus, which the backend now validates strictly and would 400 on.
+        isActive: filterStatus !== 'all' ? filterStatus === 'active' : undefined,
         serviceType: filterType !== 'all' ? filterType : undefined,
         sort: '-createdAt'
       };
@@ -301,7 +305,7 @@ const VendorManagement = () => {
         bankDetails: formData.bankDetails
       };
 
-      const response = await vendorService.updateVendor(selectedVendor._id, updateData);
+      const response = await vendorService.updateVendor(selectedVendor._id || selectedVendor.id, updateData);
       
       if (response.status === 'success') {
         setSelectedVendor(null);
@@ -341,7 +345,7 @@ const VendorManagement = () => {
     try {
       setActionLoading(true);
       // The backend will send the invitation email
-      const response = await vendorService.resetVendorPassword(vendorToResendInvite._id);
+      const response = await vendorService.resetVendorPassword(vendorToResendInvite._id || vendorToResendInvite.id);
       
       if (response.status === 'success') {
         setSuccessMessage(`✅ Invitation resent to ${vendorToResendInvite.email}`);
@@ -369,7 +373,7 @@ const VendorManagement = () => {
 
     try {
       setActionLoading(true);
-      const response = await vendorService.resetVendorPassword(vendorToResetPassword._id);
+      const response = await vendorService.resetVendorPassword(vendorToResetPassword._id || vendorToResetPassword.id);
       
       if (response.status === 'success') {
         setSuccessMessage(`✅ Password reset link sent to ${vendorToResetPassword.email}`);
@@ -397,7 +401,7 @@ const VendorManagement = () => {
 
     try {
       setActionLoading(true);
-      const response = await vendorService.deleteVendor(vendorToDelete._id);
+      const response = await vendorService.deleteVendor(vendorToDelete._id || vendorToDelete.id);
       
       if (response.status === 'success') {
         setShowDeleteConfirm(false);

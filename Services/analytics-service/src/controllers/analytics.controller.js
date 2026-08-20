@@ -23,46 +23,62 @@ const FUNNEL_STATS_SQL = `
 
 export const getLeadAnalyticsOverview = asyncHandler(async (req, res) => {
   const { start, end, truncUnit } = resolveTimeRange(req.query.timeRange);
+  // salesRep only ever sees their own leads across every chart on this page;
+  // admin/superAdmin see company-wide data ($N::text IS NULL short-circuits).
+  const repId = req.user.role === 'salesRep' ? req.user.id : null;
 
   const [statsResult, trendResult, statusResult, categoryResult, countryResult, destinationResult, budgetResult] = await Promise.all([
-    pool.query(`SELECT ${FUNNEL_STATS_SQL} FROM crm_leads."Lead" WHERE "createdAt" BETWEEN $1 AND $2`, [start, end]),
+    pool.query(
+      `SELECT ${FUNNEL_STATS_SQL} FROM crm_leads."Lead"
+       WHERE "createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR "assignedToId" = $3)`,
+      [start, end, repId]
+    ),
     pool.query(
       `SELECT DATE_TRUNC($3, "createdAt") AS bucket,
         COUNT(*) FILTER (WHERE "lifecycleStatus" = 'NEW') AS new,
         COUNT(*) FILTER (WHERE "lifecycleStatus" != 'NEW') AS contacted,
         COUNT(*) FILTER (WHERE "lifecycleStatus" IN ('QUOTED','REVISION','APPROVED')) AS interested,
         COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED') AS converted
-       FROM crm_leads."Lead" WHERE "createdAt" BETWEEN $1 AND $2
+       FROM crm_leads."Lead"
+       WHERE "createdAt" BETWEEN $1 AND $2 AND ($4::text IS NULL OR "assignedToId" = $4)
        GROUP BY bucket ORDER BY bucket ASC`,
-      [start, end, truncUnit]
+      [start, end, truncUnit, repId]
     ),
     pool.query(
       `SELECT "lifecycleStatus"::text AS name, COUNT(*) AS value FROM crm_leads."Lead"
-       WHERE "createdAt" BETWEEN $1 AND $2 GROUP BY "lifecycleStatus" ORDER BY value DESC`,
-      [start, end]
+       WHERE "createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR "assignedToId" = $3)
+       GROUP BY "lifecycleStatus" ORDER BY value DESC`,
+      [start, end, repId]
     ),
     pool.query(
       `SELECT platform::text AS name, COUNT(*) AS value FROM crm_leads."Lead"
-       WHERE "createdAt" BETWEEN $1 AND $2 GROUP BY platform ORDER BY value DESC`,
-      [start, end]
+       WHERE "createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR "assignedToId" = $3)
+       GROUP BY platform ORDER BY value DESC`,
+      [start, end, repId]
     ),
     pool.query(
       `SELECT COALESCE("fromCountry", 'Unknown') AS country,
         COUNT(*) AS leads,
         ROUND(COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED')::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS conversion
-       FROM crm_leads."Lead" WHERE "createdAt" BETWEEN $1 AND $2
+       FROM crm_leads."Lead"
+       WHERE "createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR "assignedToId" = $3)
        GROUP BY country ORDER BY leads DESC LIMIT 10`,
-      [start, end]
+      [start, end, repId]
     ),
     pool.query(
       `SELECT COALESCE(destination, "destinationCountry", 'Unknown') AS destination,
         COUNT(*) AS leads,
         ROUND(COUNT(*) FILTER (WHERE "lifecycleStatus" = 'CONFIRMED')::numeric / NULLIF(COUNT(*), 0) * 100, 1) AS conversion
-       FROM crm_leads."Lead" WHERE "createdAt" BETWEEN $1 AND $2
+       FROM crm_leads."Lead"
+       WHERE "createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR "assignedToId" = $3)
        GROUP BY 1 ORDER BY leads DESC LIMIT 10`,
-      [start, end]
+      [start, end, repId]
     ),
-    pool.query(`SELECT budget FROM crm_leads."Lead" WHERE "createdAt" BETWEEN $1 AND $2`, [start, end]),
+    pool.query(
+      `SELECT budget FROM crm_leads."Lead"
+       WHERE "createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR "assignedToId" = $3)`,
+      [start, end, repId]
+    ),
   ]);
 
   const s = statsResult.rows[0];
@@ -101,40 +117,55 @@ export const getLeadAnalyticsOverview = asyncHandler(async (req, res) => {
 
 export const getBillingAnalyticsOverview = asyncHandler(async (req, res) => {
   const { start, end, truncUnit } = resolveTimeRange(req.query.timeRange);
+  // Invoice has no direct rep column — join to its Lead to scope by the
+  // assigned salesRep, same as getLeadAnalyticsOverview.
+  const repId = req.user.role === 'salesRep' ? req.user.id : null;
 
   const [statsResult, revenueTrend, outstandingTrend, statusResult, typeResult] = await Promise.all([
     pool.query(
       `SELECT
-        COALESCE(SUM("paidAmount") FILTER (WHERE status != 'cancelled'), 0) AS collected,
-        COALESCE(SUM("outstandingAmount") FILTER (WHERE status NOT IN ('cancelled','draft')), 0) AS outstanding,
-        COALESCE(SUM("totalAmount") FILTER (WHERE status = 'draft'), 0) AS pipeline,
-        COUNT(*) FILTER (WHERE status IN ('sent','viewed','overdue','partial')) AS pending_invoices
-       FROM crm_billing."Invoice" WHERE "createdAt" BETWEEN $1 AND $2`,
-      [start, end]
+        COALESCE(SUM(i."paidAmount") FILTER (WHERE i.status != 'cancelled'), 0) AS collected,
+        COALESCE(SUM(i."outstandingAmount") FILTER (WHERE i.status NOT IN ('cancelled','draft')), 0) AS outstanding,
+        COALESCE(SUM(i."totalAmount") FILTER (WHERE i.status = 'draft'), 0) AS pipeline,
+        COUNT(*) FILTER (WHERE i.status IN ('sent','viewed','overdue','partial')) AS pending_invoices
+       FROM crm_billing."Invoice" i
+       JOIN crm_leads."Lead" l ON l.id = i."leadId"
+       WHERE i."createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR l."assignedToId" = $3)`,
+      [start, end, repId]
     ),
     pool.query(
-      `SELECT DATE_TRUNC($3, "createdAt") AS bucket, COALESCE(SUM("paidAmount"), 0) AS revenue
-       FROM crm_billing."Invoice" WHERE "createdAt" BETWEEN $1 AND $2 AND status != 'cancelled'
+      `SELECT DATE_TRUNC($3, i."createdAt") AS bucket, COALESCE(SUM(i."paidAmount"), 0) AS revenue
+       FROM crm_billing."Invoice" i
+       JOIN crm_leads."Lead" l ON l.id = i."leadId"
+       WHERE i."createdAt" BETWEEN $1 AND $2 AND i.status != 'cancelled' AND ($4::text IS NULL OR l."assignedToId" = $4)
        GROUP BY bucket ORDER BY bucket ASC`,
-      [start, end, truncUnit]
+      [start, end, truncUnit, repId]
     ),
     pool.query(
-      `SELECT DATE_TRUNC($3, "createdAt") AS bucket,
-        COALESCE(SUM("outstandingAmount") FILTER (WHERE status NOT IN ('cancelled','draft')), 0) AS outstanding,
-        COALESCE(SUM("totalAmount") FILTER (WHERE status = 'draft'), 0) AS potential_revenue
-       FROM crm_billing."Invoice" WHERE "createdAt" BETWEEN $1 AND $2
+      `SELECT DATE_TRUNC($3, i."createdAt") AS bucket,
+        COALESCE(SUM(i."outstandingAmount") FILTER (WHERE i.status NOT IN ('cancelled','draft')), 0) AS outstanding,
+        COALESCE(SUM(i."totalAmount") FILTER (WHERE i.status = 'draft'), 0) AS potential_revenue
+       FROM crm_billing."Invoice" i
+       JOIN crm_leads."Lead" l ON l.id = i."leadId"
+       WHERE i."createdAt" BETWEEN $1 AND $2 AND ($4::text IS NULL OR l."assignedToId" = $4)
        GROUP BY bucket ORDER BY bucket ASC`,
-      [start, end, truncUnit]
+      [start, end, truncUnit, repId]
     ),
     pool.query(
-      `SELECT status::text AS status, COUNT(*) AS count, COALESCE(SUM("totalAmount"), 0) AS total
-       FROM crm_billing."Invoice" WHERE "createdAt" BETWEEN $1 AND $2 GROUP BY status`,
-      [start, end]
+      `SELECT i.status::text AS status, COUNT(*) AS count, COALESCE(SUM(i."totalAmount"), 0) AS total
+       FROM crm_billing."Invoice" i
+       JOIN crm_leads."Lead" l ON l.id = i."leadId"
+       WHERE i."createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR l."assignedToId" = $3)
+       GROUP BY i.status`,
+      [start, end, repId]
     ),
     pool.query(
-      `SELECT type::text AS name, COUNT(*) AS invoices, COALESCE(SUM("totalAmount"), 0) AS revenue
-       FROM crm_billing."Invoice" WHERE "createdAt" BETWEEN $1 AND $2 GROUP BY type ORDER BY revenue DESC`,
-      [start, end]
+      `SELECT i.type::text AS name, COUNT(*) AS invoices, COALESCE(SUM(i."totalAmount"), 0) AS revenue
+       FROM crm_billing."Invoice" i
+       JOIN crm_leads."Lead" l ON l.id = i."leadId"
+       WHERE i."createdAt" BETWEEN $1 AND $2 AND ($3::text IS NULL OR l."assignedToId" = $3)
+       GROUP BY i.type ORDER BY revenue DESC`,
+      [start, end, repId]
     ),
   ]);
 

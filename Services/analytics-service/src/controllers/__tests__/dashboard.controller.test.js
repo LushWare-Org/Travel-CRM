@@ -13,6 +13,7 @@ const mockRes = () => {
 };
 
 const rows = (r) => ({ rows: r });
+const adminReq = (overrides = {}) => ({ user: { id: 'admin-1', role: 'admin' }, ...overrides });
 
 describe('getDashboardStats', () => {
   beforeEach(() => mockPool.query.mockReset());
@@ -28,7 +29,7 @@ describe('getDashboardStats', () => {
       .mockResolvedValueOnce(rows([{ status: 'NEW', count: '3' }]));
 
     const res = mockRes();
-    await getDashboardStats({}, res, vi.fn());
+    await getDashboardStats(adminReq(), res, vi.fn());
 
     const data = res.json.mock.calls[0][0].data;
     expect(data.leads).toEqual({ total: 10, new: 3, converted: 2 });
@@ -57,8 +58,43 @@ describe('getDashboardStats', () => {
       .mockResolvedValueOnce(rows([]));
 
     const res = mockRes();
-    await getDashboardStats({}, res, vi.fn());
+    await getDashboardStats(adminReq(), res, vi.fn());
 
     expect(res.json.mock.calls[0][0].data.revenue).toEqual({ total: 0, collected: 0 });
+  });
+
+  it('scopes leads, bookings, and revenue to the caller when role is salesRep', async () => {
+    mockPool.query
+      .mockResolvedValueOnce(rows([{ total: '0', new_leads: '0', converted: '0' }]))
+      .mockResolvedValueOnce(rows([{ total: '0', confirmed: '0', pending: '0' }]))
+      .mockResolvedValueOnce(rows([{ total_revenue: '0', collected: '0' }]))
+      .mockResolvedValueOnce(rows([{ total: '0', published: '0' }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));
+
+    const res = mockRes();
+    await getDashboardStats({ user: { id: 'rep-3', role: 'salesRep' } }, res, vi.fn());
+
+    expect(mockPool.query.mock.calls[0][1]).toEqual(['rep-3']); // leads
+    expect(mockPool.query.mock.calls[1][1]).toEqual(['rep-3']); // bookings
+    expect(mockPool.query.mock.calls[2][1]).toEqual(['rep-3']); // revenue (via Invoice→Lead join)
+  });
+
+  it('returns company-wide packages regardless of role', async () => {
+    mockPool.query
+      .mockResolvedValueOnce(rows([{ total: '0', new_leads: '0', converted: '0' }]))
+      .mockResolvedValueOnce(rows([{ total: '0', confirmed: '0', pending: '0' }]))
+      .mockResolvedValueOnce(rows([{ total_revenue: '0', collected: '0' }]))
+      .mockResolvedValueOnce(rows([{ total: '9', published: '7' }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));
+
+    const res = mockRes();
+    await getDashboardStats({ user: { id: 'rep-3', role: 'salesRep' } }, res, vi.fn());
+
+    expect(mockPool.query.mock.calls[3][1]).toBeUndefined(); // packages query takes no params
+    expect(res.json.mock.calls[0][0].data.packages).toEqual({ total: 9, published: 7 });
   });
 });

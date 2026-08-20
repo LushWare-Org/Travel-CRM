@@ -5,13 +5,19 @@ import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { getOrCreateSingleton, updateSingleton } from '../services/organizationSettings.service.js';
+import { idParamSchema, formatZodError, AVAILABLE_PERMISSIONS } from '../validators/common.js';
+import {
+  createStaffSchema, updateUserSchema, updateUserStatusSchema, updateAdminPermissionsSchema,
+  listUsersQuerySchema, promoteSuperAdminSchema, demoteSuperAdminSchema,
+} from '../validators/admin.validator.js';
 
 const safeUser = (u) => { if (!u) return null; const { password, ...r } = u; return r; };
 
-const AVAILABLE_PERMISSIONS = [
-  'manage_users', 'manage_sales_reps', 'manage_vendors', 'manage_admins',
-  'view_reports', 'manage_billing', 'view_billing', 'manage_leads', 'manage_packages',
-];
+function parseOrThrow(schema, value) {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new AppError(formatZodError(parsed.error), 400);
+  return parsed.data;
+}
 
 export const getDashboardStats = asyncHandler(async (req, res) => {
   const [total, byRole, active, recentUsers] = await Promise.all([
@@ -24,7 +30,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 });
 
 export const getAllUsers = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, role, search, isActive } = req.query;
+  const { page = 1, limit = 10, role, search, isActive } = parseOrThrow(listUsersQuerySchema, req.query);
   const where = {};
   if (role) where.role = role;
   if (isActive !== undefined) where.isActive = isActive === 'true';
@@ -32,23 +38,23 @@ export const getAllUsers = asyncHandler(async (req, res) => {
     { name: { contains: search, mode: 'insensitive' } },
     { email: { contains: search, mode: 'insensitive' } },
   ];
-  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const skip = (page - 1) * limit;
   const [users, total] = await Promise.all([
-    prisma.user.findMany({ where, skip, take: parseInt(limit), orderBy: { createdAt: 'desc' } }),
+    prisma.user.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),
     prisma.user.count({ where }),
   ]);
-  res.json({ status: 'success', data: users.map(safeUser), pagination: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / parseInt(limit)) } });
+  res.json({ status: 'success', data: users.map(safeUser), pagination: { total, page, limit, pages: Math.ceil(total / limit) } });
 });
 
 export const getUserById = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.params.id }, include: { vendorProfile: true } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const user = await prisma.user.findUnique({ where: { id }, include: { vendorProfile: true } });
   if (!user) throw new AppError('User not found', 404);
   res.json({ status: 'success', data: { user: safeUser(user) } });
 });
 
 export const createStaff = asyncHandler(async (req, res) => {
-  const { name, email, phone, role, permissions = [] } = req.body;
-  if (!name || !email || !role) throw new AppError('Name, email, and role are required', 400);
+  const { name, email, phone, role, permissions = [] } = parseOrThrow(createStaffSchema, req.body);
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new AppError('User with this email already exists', 400);
@@ -58,7 +64,7 @@ export const createStaff = asyncHandler(async (req, res) => {
 
   const user = await prisma.user.create({
     data: {
-      name, email: email.toLowerCase().trim(), phone: phone || null,
+      name, email, phone: phone || null,
       password: hashedPassword, role,
       permissions: permissions.filter((p) => AVAILABLE_PERMISSIONS.includes(p)),
       createdById: req.user.id,
@@ -70,9 +76,10 @@ export const createStaff = asyncHandler(async (req, res) => {
 });
 
 export const updateUser = asyncHandler(async (req, res) => {
-  const { name, phone, role, isActive, permissions } = req.body;
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { name, phone, role, isActive, permissions } = parseOrThrow(updateUserSchema, req.body);
   const user = await prisma.user.update({
-    where: { id: req.params.id },
+    where: { id },
     data: {
       ...(name && { name }), ...(phone !== undefined && { phone }),
       ...(role && { role }), ...(isActive !== undefined && { isActive }),
@@ -83,40 +90,45 @@ export const updateUser = asyncHandler(async (req, res) => {
 });
 
 export const deleteUser = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError('User not found', 404);
   if (!user.canBeDeleted) throw new AppError('This user cannot be deleted', 403);
-  await prisma.user.delete({ where: { id: req.params.id } });
+  await prisma.user.delete({ where: { id } });
   res.json({ status: 'success', data: {} });
 });
 
 export const updateUserStatus = asyncHandler(async (req, res) => {
-  const { isActive } = req.body;
-  const user = await prisma.user.update({ where: { id: req.params.id }, data: { isActive } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { isActive } = parseOrThrow(updateUserStatusSchema, req.body);
+  const user = await prisma.user.update({ where: { id }, data: { isActive } });
   res.json({ status: 'success', data: { user: safeUser(user) } });
 });
 
 export const resetUserPassword = asyncHandler(async (req, res) => {
+  const { id } = parseOrThrow(idParamSchema, req.params);
   const tempPassword = crypto.randomBytes(8).toString('hex');
   const hashed = await bcrypt.hash(tempPassword, 12);
   await prisma.user.update({
-    where: { id: req.params.id },
+    where: { id },
     data: { password: hashed, isTempPassword: true, mustChangePassword: true },
   });
   res.json({ status: 'success', message: 'Password reset', data: { tempPassword } });
 });
 
 export const getAdminPermissions = asyncHandler(async (req, res) => {
-  const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: { permissions: true, role: true } });
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const user = await prisma.user.findUnique({ where: { id }, select: { permissions: true, role: true } });
   if (!user) throw new AppError('User not found', 404);
   res.json({ status: 'success', data: { permissions: user.permissions, role: user.role } });
 });
 
 export const updateAdminPermissions = asyncHandler(async (req, res) => {
-  const { permissions } = req.body;
+  const { id } = parseOrThrow(idParamSchema, req.params);
+  const { permissions } = parseOrThrow(updateAdminPermissionsSchema, req.body);
   const user = await prisma.user.update({
-    where: { id: req.params.id },
-    data: { permissions: (permissions || []).filter((p) => AVAILABLE_PERMISSIONS.includes(p)) },
+    where: { id },
+    data: { permissions },
   });
   res.json({ status: 'success', data: { user: safeUser(user) } });
 });
@@ -136,7 +148,7 @@ export const listSuperAdmins = asyncHandler(async (req, res) => {
 });
 
 export const promoteSuperAdmin = asyncHandler(async (req, res) => {
-  const { userId } = req.body;
+  const { userId } = parseOrThrow(promoteSuperAdminSchema, req.body);
   const user = await prisma.user.update({
     where: { id: userId },
     data: { role: 'superAdmin', isSuperAdmin: true },
@@ -145,7 +157,7 @@ export const promoteSuperAdmin = asyncHandler(async (req, res) => {
 });
 
 export const demoteSuperAdmin = asyncHandler(async (req, res) => {
-  const { userId } = req.body;
+  const { userId } = parseOrThrow(demoteSuperAdminSchema, req.body);
   const user = await prisma.user.update({
     where: { id: userId },
     data: { role: 'admin', isSuperAdmin: false },
