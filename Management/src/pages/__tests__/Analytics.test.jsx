@@ -11,6 +11,7 @@ vi.mock('../../features/analytics/components', () => ({
   UserAnalytics: () => <div>User Analytics Content</div>,
   PackageAnalytics: () => <div>Package Analytics Content</div>,
   WebsiteAnalytics: () => <div>Website Analytics Content</div>,
+  MyPerformanceAnalytics: () => <div>My Performance Content</div>,
 }));
 
 import Analytics from '../Analytics.jsx';
@@ -40,5 +41,19 @@ describe('Analytics — tab visibility by role', () => {
     expect(screen.getByText('Package Analytics')).toBeInTheDocument();
     expect(screen.getByText('Website Analytics')).toBeInTheDocument();
     expect(screen.getByText('User Analytics')).toBeInTheDocument();
+  });
+
+  it('shows the My Performance tab for a salesRep user but not the admin-only tabs', () => {
+    mockUseAuth.mockReturnValue({ user: { role: 'salesRep' } });
+    render(<Analytics />);
+
+    expect(screen.getAllByText('My Performance').length).toBeGreaterThan(0);
+  });
+
+  it('hides the My Performance tab for an admin user', () => {
+    mockUseAuth.mockReturnValue({ user: { role: 'admin' } });
+    render(<Analytics />);
+
+    expect(screen.queryByText('My Performance')).not.toBeInTheDocument();
   });
 });
