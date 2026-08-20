@@ -125,8 +125,8 @@ const Sidebar = () => {
     if (item.customCheck) {
       return item.customCheck(user?.role, user?.isSuperAdmin, (perm) => permission.hasPermission(perm));
     }
-    if (item.allowedRoles && item.allowedRoles.includes(user?.role)) {
-      return true;
+    if (item.allowedRoles) {
+      return item.allowedRoles.includes(user?.role);
     }
     if (!item.requiredPermission && !item.requiresAnyPermission) {
       return true;
