@@ -46,8 +46,11 @@ const PackageCard = ({
   // Check if user is a salesRep (read-only access)
   const isSalesRep = user?.role === 'salesRep';
   
-  // Check if user can edit packages (superAdmin or admin with manage_packages)
-  const canEditPackages = user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_packages'));
+  // Check if user can edit packages (superAdmin, or admin/salesRep with manage_packages)
+  const canEditPackages =
+    user?.role === 'superAdmin' ||
+    (user?.role === 'admin' && hasPermission('manage_packages')) ||
+    (user?.role === 'salesRep' && hasPermission('manage_packages'));
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all flex flex-col group">
@@ -175,8 +178,8 @@ const PackageCard = ({
             </button>
           )}
           
-          {/* Delete button - visible to superAdmin or admin with manage_packages permission */}
-          {(user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_packages'))) && (
+          {/* Delete button - visible to superAdmin, or admin/salesRep with manage_packages permission */}
+          {canEditPackages && (
             <button
               onClick={() => onDelete(pkg._id || pkg.id)}
               className="flex-1 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium flex items-center justify-center gap-1 text-sm"
