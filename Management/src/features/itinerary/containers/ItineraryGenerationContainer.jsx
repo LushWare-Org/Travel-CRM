@@ -89,7 +89,10 @@ const ItineraryGenerationContainer = () => {
   });
 
   const isSalesRep = user?.role === 'salesRep';
-  const canEditPackages = user?.role === 'superAdmin' || (user?.role === 'admin' && hasPermission('manage_packages'));
+  const canEditPackages =
+    user?.role === 'superAdmin' ||
+    (user?.role === 'admin' && hasPermission('manage_packages')) ||
+    (user?.role === 'salesRep' && hasPermission('manage_packages'));
 
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(SAMPLE_PACKAGES);
@@ -154,7 +157,7 @@ const ItineraryGenerationContainer = () => {
 
   // Handlers
   const handleNewPackageDialogOpen = () => {
-    if (isSalesRep) {
+    if (isSalesRep && !hasPermission('manage_packages')) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
       return;
     }
@@ -164,6 +167,8 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleAIPackageDialogOpen = () => {
+    // Intentionally still blocked for ALL salesRep regardless of manage_packages —
+    // backend /packages/generate-ai remains admin/staff-only (package.routes.js).
     if (isSalesRep) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to create packages.', 'info');
       return;
@@ -208,7 +213,7 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleEditPackage = async (pkg) => {
-    if (isSalesRep) {
+    if (isSalesRep && !hasPermission('manage_packages')) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to edit packages.', 'info');
       return;
     }
@@ -477,7 +482,7 @@ const ItineraryGenerationContainer = () => {
   };
 
   const handleDuplicatePackage = (pkg) => {
-    if (isSalesRep) {
+    if (isSalesRep && !hasPermission('manage_packages')) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to duplicate packages.', 'info');
       return;
     }
@@ -769,7 +774,7 @@ const ItineraryGenerationContainer = () => {
           </div>
 
           {/* Action Buttons */}
-          {!isSalesRep && (
+          {(!isSalesRep || canEditPackages) && (
             <div className="p-4 space-y-2 border-b border-slate-200/60">
               <button
                 onClick={handleNewPackageDialogOpen}
@@ -778,13 +783,15 @@ const ItineraryGenerationContainer = () => {
                 <Plus className="w-5 h-5" />
                 New Package
               </button>
-              <button
-                onClick={handleAIPackageDialogOpen}
-                className="w-full px-4 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all"
-              >
-                <Sparkles className="w-5 h-5" />
-                AI Generate
-              </button>
+              {!isSalesRep && (
+                <button
+                  onClick={handleAIPackageDialogOpen}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  AI Generate
+                </button>
+              )}
             </div>
           )}
 
@@ -872,7 +879,7 @@ const ItineraryGenerationContainer = () => {
             </div>
 
             {/* Mobile Action Buttons */}
-            {!isSalesRep && (
+            {(!isSalesRep || canEditPackages) && (
               <div className="flex md:hidden gap-2 mb-4">
                 <button
                   onClick={handleNewPackageDialogOpen}
@@ -881,13 +888,15 @@ const ItineraryGenerationContainer = () => {
                   <Plus className="w-4 h-4" />
                   New Package
                 </button>
-                <button
-                  onClick={handleAIPackageDialogOpen}
-                  className="flex-1 px-3 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm shadow-sm"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  AI Generate
-                </button>
+                {!isSalesRep && (
+                  <button
+                    onClick={handleAIPackageDialogOpen}
+                    className="flex-1 px-3 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm shadow-sm"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI Generate
+                  </button>
+                )}
               </div>
             )}
 

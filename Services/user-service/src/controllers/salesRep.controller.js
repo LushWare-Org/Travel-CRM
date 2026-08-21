@@ -52,6 +52,7 @@ export const createSalesRep = asyncHandler(async (req, res) => {
       password: hashed, role: 'salesRep',
       createdById: req.user.id,
       isTempPassword: true, mustChangePassword: true,
+      permissions: ['view_reports', 'manage_packages'],
     },
   });
   res.status(201).json({ status: 'success', data: { salesRep: safeUser(rep), tempPassword } });

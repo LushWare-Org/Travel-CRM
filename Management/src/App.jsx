@@ -85,7 +85,14 @@ function AppContent() {
                     }
                   />
                   <Route path="/career" element={<CareerManagement />} />
-                  <Route path="/settings" element={<OrganizationSettings />} />
+                  <Route
+                    path="/settings"
+                    element={
+                      <ProtectedRoute requiredRoles={["admin", "superAdmin"]}>
+                        <OrganizationSettings />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </div>

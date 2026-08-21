@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, authorize } from '../middleware/auth.js';
+import { requireAuth, authorize, requirePackagePermissionForSalesRep } from '../middleware/auth.js';
 import { validateBody, validateParams } from '../middleware/validate.js';
 import {
   createPackageSchema,
@@ -45,9 +45,9 @@ router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), va
 router.post('/calculate-price', requireAuth, packageController.calculatePrice);
 
 // ── Package CRUD ──────────────────────────────────────────────────────────────
-router.post('/',      requireAuth, authorize('admin', 'staff'), validateBody(createPackageSchema), packageController.createPackage);
-router.put('/:id',    requireAuth, authorize('admin', 'staff'), validateParams(packageIdParamSchema), validateBody(updatePackageSchema), packageController.updatePackage);
-router.delete('/:id', requireAuth, authorize('admin'),          validateParams(packageIdParamSchema), packageController.deletePackage);
+router.post('/',      requireAuth, authorize('admin', 'staff', 'salesRep'), requirePackagePermissionForSalesRep, validateBody(createPackageSchema), packageController.createPackage);
+router.put('/:id',    requireAuth, authorize('admin', 'staff', 'salesRep'), requirePackagePermissionForSalesRep, validateParams(packageIdParamSchema), validateBody(updatePackageSchema), packageController.updatePackage);
+router.delete('/:id', requireAuth, authorize('admin', 'salesRep'),          requirePackagePermissionForSalesRep, validateParams(packageIdParamSchema), packageController.deletePackage);
 
 // ── Per-package AI operations (two-segment paths — no conflict with /:id) ─────
 router.post('/:id/generate-ai-content', requireAuth, authorize('admin', 'staff'), generateAndSaveAIContent);

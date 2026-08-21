@@ -13,8 +13,17 @@ import { STATUS_COLORS } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import SalesRepTable from './SalesRepTable';
 import salesRepService from '../../../../services/salesRep.service';
+import adminService from '../../../../services/admin.service';
 import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 import { unwrapList } from '../../../../services/apiResponse';
+
+// Deliberately scoped to just this one permission for now — extend this array
+// (and the checkbox block in the edit dialog below) if more salesRep-toggleable
+// permissions are needed later; the update call already supports an arbitrary
+// permission set.
+const SALESREP_TOGGLEABLE_PERMISSIONS = [
+  { id: 'manage_packages', label: 'Can create/edit/delete packages', category: 'Travel' },
+];
 
 const SalesRepManagement = () => {
   const isInitialMount = useRef(true);
@@ -49,7 +58,8 @@ const SalesRepManagement = () => {
     phone: '',
     phoneCountry: 'IN',
     commissionRate: 10,
-    targetLeads: 50
+    targetLeads: 50,
+    permissions: []
   });
 
   const ITEMS_PER_PAGE = 10;
@@ -152,6 +162,7 @@ const SalesRepManagement = () => {
           status: status,
           accountStatus: rep.mustChangePassword ? 'pending_password_reset' : (rep.isEmailVerified ? 'verified' : 'pending_first_login'),
           commissionRate: rep.commissionRate || 10,
+          permissions: rep.permissions || [],
           leadsAssigned: rep.leadsAssigned || 0,
           leadsConverted: rep.leadsConverted || 0,
           createdAt: rep.createdAt,
@@ -230,7 +241,8 @@ const SalesRepManagement = () => {
       phone: phoneNumber,
       phoneCountry: phoneCountry,
       commissionRate: rep.commissionRate,
-      targetLeads: 50
+      targetLeads: 50,
+      permissions: rep.permissions || []
     });
     setShowEditRepDialog(true);
   };
@@ -245,9 +257,19 @@ const SalesRepManagement = () => {
       phone: '',
       phoneCountry: 'IN',
       commissionRate: 10,
-      targetLeads: 50
+      targetLeads: 50,
+      permissions: []
     });
     setSelectedRep(null);
+  };
+
+  const togglePermission = (permissionId) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: prev.permissions.includes(permissionId)
+        ? prev.permissions.filter(p => p !== permissionId)
+        : [...prev.permissions, permissionId]
+    }));
   };
 
   /**
@@ -348,6 +370,7 @@ const SalesRepManagement = () => {
       };
 
       const response = await salesRepService.updateSalesRep(selectedRep.id, payload);
+      await adminService.updateAdminPermissions(selectedRep.id, formData.permissions || []);
 
       if (response.data) {
         toast.success('Sales representative updated successfully');
@@ -752,6 +775,30 @@ const SalesRepManagement = () => {
                 max="100"
               />
             </FormGroup>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="text-sm font-semibold text-gray-900 mb-3">Permissions</p>
+            <div className="space-y-2">
+              {SALESREP_TOGGLEABLE_PERMISSIONS.map(perm => (
+                <label
+                  key={perm.id}
+                  className="flex items-center gap-2 text-sm p-2 rounded transition-colors cursor-pointer hover:bg-white"
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.permissions.includes(perm.id)}
+                    onChange={() => togglePermission(perm.id)}
+                    disabled={isSubmitting}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <div>
+                    <span className="text-gray-900">{perm.label}</span>
+                    <span className="ml-2 text-xs text-gray-500">({perm.category})</span>
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       </UserFormDialog>

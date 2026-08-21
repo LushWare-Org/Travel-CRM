@@ -5,10 +5,11 @@ import {
   UserAnalytics,
   PackageAnalytics,
   WebsiteAnalytics,
+  MyPerformanceAnalytics,
 } from "../features/analytics/components";
 import {
   Users, DollarSign, Globe, BarChart3, Briefcase,
-  TrendingUp, ChevronDown, Layers, ArrowRight
+  TrendingUp, ChevronDown, Layers, ArrowRight, Zap
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -16,6 +17,11 @@ import { useAuth } from "../contexts/AuthContext";
 // (company-wide data with no per-rep ownership) — hide them from salesRep
 // instead of showing a tab that 403s.
 const ADMIN_ONLY_TAB_IDS = ["itineraries", "website", "users"];
+
+// "My Performance" is scoped to req.user.id server-side — meaningless for an
+// admin account (which already has the org-wide salesrep-comparison view), so
+// keep it salesRep-only rather than showing it to everyone.
+const SALESREP_ONLY_TAB_IDS = ["my-performance"];
 
 /**
  * Analytics Main Page - Responsive Design
@@ -77,11 +83,22 @@ const Analytics = () => {
       bgColor: "bg-cyan-50",
       borderColor: "border-cyan-200"
     },
+    {
+      id: "my-performance",
+      label: "My Performance",
+      shortLabel: "My Stats",
+      icon: Zap,
+      component: MyPerformanceAnalytics,
+      color: "#f59e0b",
+      bgColor: "bg-amber-50",
+      borderColor: "border-amber-200"
+    },
   ];
 
-  const tabs = user?.role === "salesRep"
-    ? allTabs.filter((tab) => !ADMIN_ONLY_TAB_IDS.includes(tab.id))
-    : allTabs;
+  const tabs = allTabs.filter((tab) => {
+    if (user?.role === "salesRep") return !ADMIN_ONLY_TAB_IDS.includes(tab.id);
+    return !SALESREP_ONLY_TAB_IDS.includes(tab.id);
+  });
 
   const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
   const ActiveComponent = activeTabData?.component;
