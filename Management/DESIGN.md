@@ -278,6 +278,7 @@ Radius is driven by one CSS variable (`--radius: 0.5rem` in `src/index.css`) tha
 
 ### Badge
 - **`badge`** (`src/components/ui/badge.tsx`): `default` (primary-filled), `secondary`, `destructive`, `outline` variants via `badgeVariants` (`cva`). This is the shadcn-generic version - the actual status pills used across the app (Confirmed/Pending payment/Overdue/Draft, per the Signal Console preview) should compose this with `success`/`warning`/`destructive`/`muted` tokens directly, not the generic variant names, when a feature migration reaches for it.
+- **Categorical (non-state) badges** - e.g. `features/career`'s per-position tag, where a badge exists to visually distinguish *which one of several* rather than *what state* - rotate through `chart-1`..`chart-5` instead (`bg-chart-N/10 text-chart-N`, established in Phase 3.2). Reuses the system's one sanctioned multi-hue palette instead of introducing ad hoc stock Tailwind colors; keep this rotation to genuinely categorical tags, not state.
 
 ### Card
 - **`card`** family (`src/components/ui/card.tsx`): `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardAction`/`CardContent`/`CardFooter`. `bg-card text-card-foreground`, `rounded-xl` container - the base every `StatCard` and panel composes on top of (Phase 2.2 builds `StatCard` on this, not from scratch).
