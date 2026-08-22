@@ -3,7 +3,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { nextQuotationNumber, nextInvoiceNumber } from '../utils/docNumber.js';
 import { quotationTotals, createOrVersionQuotation } from '../services/quotation.service.js';
-import { emitLeadEvent } from '../services/events.client.js';
+import { emitLeadEvent, logLeadCommunication } from '../services/events.client.js';
 import { generateQuotationPDF } from '../utils/quotationPDFGenerator.js';
 import { sendQuotationEmail } from '../utils/emailService.js';
 import { sendQuotationWhatsapp } from '../utils/whatsappService.js';
@@ -160,6 +160,13 @@ export const sendQuotation = asyncHandler(async (req, res) => {
         where: { id: quotation.id },
         data: { status: 'sent', sentAt: now, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
       });
+      try {
+        await logLeadCommunication({
+          leadId: quotation.leadId, type: 'whatsapp', notes: `WhatsApp: Quotation ${quotation.quotationNumber} sent`,
+        });
+      } catch (err) {
+        req.log.error({ err, leadId: quotation.leadId }, 'Failed to log WhatsApp send on lead timeline');
+      }
       return res.json({ success: true, message: 'Quotation sent via WhatsApp', data: updated });
     }
 

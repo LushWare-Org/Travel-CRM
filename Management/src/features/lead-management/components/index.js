@@ -1,6 +1,7 @@
 export { default as NewLeadDialog } from './NewLeadDialog';
 export { default as EditLeadDialog } from './EditLeadDialog';
 export { default as RemarksDialog } from './RemarksDialog';
+export { default as WhatsAppHistoryDialog } from './WhatsAppHistoryDialog';
 export { default as FilterDialog } from './FilterDialog';
 export { default as SettingsDialog } from './SettingsDialog';
 export { default as ItineraryDialog } from './ItineraryDialog';

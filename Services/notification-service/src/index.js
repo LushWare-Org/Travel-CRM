@@ -18,7 +18,14 @@ app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
 app.use(correlationId);
 app.use(requestLogger);
 
-app.use(`${V1}/webhooks`, express.json(), webhookRoutes);
+// `verify` stashes the raw bytes on req.rawBody so webhook handlers can check
+// Meta's X-Hub-Signature-256 against what was actually signed, not a
+// re-serialized JSON.stringify(req.body) (which can silently mismatch).
+app.use(
+  `${V1}/webhooks`,
+  express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }),
+  webhookRoutes
+);
 // Higher limit than the default 100kb — internal/email accepts base64-encoded PDF attachments.
 app.use(`${V1}/notifications`, express.json({ limit: '15mb' }), notificationRoutes);
 

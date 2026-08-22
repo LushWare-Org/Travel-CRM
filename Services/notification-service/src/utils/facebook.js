@@ -1,13 +1,6 @@
-import crypto from 'crypto';
+import { verifyWebhookSignature } from './webhookSignature.js';
 
-export function verifyWebhookSignature(signature, rawBody, appSecret) {
-  if (!signature) return false;
-  const hash = crypto
-    .createHmac('sha256', appSecret)
-    .update(rawBody)
-    .digest('hex');
-  return `sha256=${hash}` === signature;
-}
+export { verifyWebhookSignature };
 
 export async function getLeadData(leadgenId, accessToken) {
   const url = `https://graph.facebook.com/v18.0/${leadgenId}?access_token=${accessToken}`;

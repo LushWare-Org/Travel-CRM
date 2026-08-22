@@ -7,6 +7,7 @@ import { sendInvoiceEmail } from '../utils/emailService.js';
 import { sendInvoiceWhatsapp } from '../utils/whatsappService.js';
 import { uploadPdfBuffer } from '../utils/cloudinary.js';
 import { sendInvoiceSchema } from '../validators/invoice.validator.js';
+import { logLeadCommunication } from '../services/events.client.js';
 
 const invoiceInclude = {
   items: { orderBy: { order: 'asc' } },
@@ -159,6 +160,13 @@ export const sendInvoice = asyncHandler(async (req, res) => {
         where: { id: invoice.id },
         data: { status: 'sent', sentAt: now, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
       });
+      try {
+        await logLeadCommunication({
+          leadId: invoice.leadId, type: 'whatsapp', notes: `WhatsApp: Invoice ${invoice.invoiceNumber} sent`,
+        });
+      } catch (err) {
+        req.log.error({ err, leadId: invoice.leadId }, 'Failed to log WhatsApp send on lead timeline');
+      }
       return res.json({ success: true, message: 'Invoice sent via WhatsApp', data: updated });
     }
 

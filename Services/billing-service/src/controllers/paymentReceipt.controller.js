@@ -2,7 +2,7 @@ import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
 import { nextReceiptNumber, nextPaymentHistoryNumber } from '../utils/docNumber.js';
-import { emitLeadEvent } from '../services/events.client.js';
+import { emitLeadEvent, logLeadCommunication } from '../services/events.client.js';
 import { generatePaymentReceiptPDF } from '../utils/paymentReceiptPDFGenerator.js';
 import { sendReceiptEmail } from '../utils/emailService.js';
 import { sendReceiptWhatsapp } from '../utils/whatsappService.js';
@@ -221,6 +221,13 @@ export const sendPaymentReceipt = asyncHandler(async (req, res) => {
         where: { id: receipt.id },
         data: { sentAt: now, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
       });
+      try {
+        await logLeadCommunication({
+          leadId: receipt.leadId, type: 'whatsapp', notes: `WhatsApp: Payment receipt ${receipt.receiptNumber} sent`,
+        });
+      } catch (err) {
+        req.log.error({ err, leadId: receipt.leadId }, 'Failed to log WhatsApp send on lead timeline');
+      }
       return res.json({ success: true, message: 'Payment receipt sent via WhatsApp', data: updated });
     }
 

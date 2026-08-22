@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getNotifications, markAsRead, sendEmail } from '../controllers/notification.controller.js';
+import { getNotifications, markAsRead, sendEmail, sendWhatsapp } from '../controllers/notification.controller.js';
 
 const router = Router();
 
@@ -15,5 +15,6 @@ const internalTokenAuth = (req, res, next) => {
   next();
 };
 router.post('/internal/email', internalTokenAuth, sendEmail);
+router.post('/internal/whatsapp', internalTokenAuth, sendWhatsapp);
 
 export default router;

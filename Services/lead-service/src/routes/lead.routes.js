@@ -8,6 +8,7 @@ import {
   createWebsiteContactLead,
   handleInternalEvent, draftLead,
   handleFacebookLeadEvent,
+  logCommunication, sendWhatsappReply,
 } from '../controllers/lead.controller.js';
 import {
   listPackageSelections, getPackageSelection, createPackageSelection, updatePackageSelection, deletePackageSelection,
@@ -34,6 +35,7 @@ const internalTokenAuth = (req, res, next) => {
 };
 router.post('/internal/events', internalTokenAuth, handleInternalEvent);
 router.post('/internal/facebook-lead', internalTokenAuth, handleFacebookLeadEvent);
+router.post('/internal/communication-logs', internalTokenAuth, logCommunication);
 
 // Protected
 router.use(requireAuth);
@@ -52,6 +54,7 @@ router.route('/:id/remarks').post(authorize('admin', 'salesRep'), addRemark).get
 router.patch('/:id/assign', authorize('admin', 'salesRep'), assignLead);
 router.patch('/:id/unassign', authorize('admin', 'salesRep'), unassignLead);
 router.get('/:id/itinerary/pdf', authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
+router.post('/:id/whatsapp-reply', authorize('admin', 'salesRep'), sendWhatsappReply);
 
 // Per-package selections — a lead can hold many packages (plus one manual
 // slot) at once; each owns its own itinerary/cost-lines/pricing/quote state.

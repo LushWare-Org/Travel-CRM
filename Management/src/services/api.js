@@ -279,6 +279,13 @@ export const leadAPI = {
     return api.put(`/leads/${id}`, { lifecycleStatus: status });
   },
 
+  // Send a free-form WhatsApp reply to the lead (only valid within Meta's
+  // 24h session window — the caller/UI is responsible for that check).
+  sendWhatsappReply: async (id, text) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/whatsapp-reply`, { text });
+  },
+
   // Copy the package blueprint into the lead draft (NEW -> DRAFTING)
   draftLead: async (id) => {
     const api = new ApiService();
