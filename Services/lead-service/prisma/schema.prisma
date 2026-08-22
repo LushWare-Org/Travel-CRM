@@ -98,6 +98,7 @@ enum CommunicationLogType {
   email
   meeting
   message
+  whatsapp
   other
 
   @@schema("crm_leads")

@@ -75,6 +75,28 @@ export const updatePackageSelectionSchema = z.object({
   destinationOverride: z.string().min(1).max(255).nullable().optional(),
 }).strict();
 
+// ── Communication log (service-to-service ingestion + agent replies) ────
+
+const communicationLogTypeEnum = z.enum(['call', 'email', 'meeting', 'message', 'whatsapp', 'other']);
+
+// Body for POST /internal/communication-logs. Callers identify the lead
+// either directly (leadId, e.g. billing-service reporting a doc it just
+// sent) or by phone (e.g. notification-service's WhatsApp webhook, which
+// only ever has the customer's phone number) — at least one is required.
+export const logCommunicationSchema = z.object({
+  leadId: z.string().trim().min(1).optional(),
+  phone: z.string().trim().min(1).optional(),
+  type: communicationLogTypeEnum,
+  notes: z.string().trim().min(1).max(2000),
+  occurredAt: z.string().optional(),
+}).strict().refine((v) => Boolean(v.leadId) || Boolean(v.phone), {
+  message: 'Either leadId or phone is required',
+});
+
+export const whatsappReplySchema = z.object({
+  text: z.string().trim().min(1).max(4096),
+}).strict();
+
 // ── Optional transfer flights (LeadOptionalFlight) ───────────────
 
 export const addOptionalFlightSchema = z.object({

@@ -13,6 +13,8 @@ const {
   mockTransaction,
   mockGatekeeperInputs,
   mockLoadPrimarySelection,
+  mockLeadCommunicationLogCreate,
+  mockSendWhatsappText,
 } = vi.hoisted(() => ({
   mockLeadFindUnique: vi.fn(),
   mockLeadFindFirst: vi.fn(),
@@ -26,6 +28,8 @@ const {
   mockTransaction: vi.fn(),
   mockGatekeeperInputs: vi.fn(),
   mockLoadPrimarySelection: vi.fn(),
+  mockLeadCommunicationLogCreate: vi.fn(),
+  mockSendWhatsappText: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
@@ -35,6 +39,7 @@ vi.mock('../../db/client.js', () => ({
       update: mockLeadUpdate, create: mockLeadCreate,
     },
     leadRemark: { create: mockLeadRemarkCreate },
+    leadCommunicationLog: { create: mockLeadCommunicationLogCreate },
     settings: { upsert: mockSettingsUpsert, update: mockSettingsUpdate },
     leadPackageSelection: { count: mockSelectionCount },
     $transaction: mockTransaction,
@@ -46,9 +51,14 @@ vi.mock('../../services/gatekeeper.service.js', () => ({
   loadPrimarySelection: mockLoadPrimarySelection,
 }));
 
+vi.mock('../../services/notification.client.js', () => ({
+  sendWhatsappText: mockSendWhatsappText,
+}));
+
 import {
   updateLead, createLead, draftLead, assignLead, unassignLead,
   getLeadsByStatus, searchLeads, handleFacebookLeadEvent,
+  logCommunication, sendWhatsappReply,
 } from '../lead.controller.js';
 
 const PKG_A = '11111111-1111-1111-1111-111111111111';
@@ -468,5 +478,128 @@ describe('handleFacebookLeadEvent', () => {
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
     expect(mockLeadFindFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe('logCommunication — WhatsApp/billing timeline ingestion', () => {
+  beforeEach(() => {
+    mockLeadFindFirst.mockReset();
+    mockLeadCommunicationLogCreate.mockReset();
+  });
+
+  it('logs directly against leadId when provided, skipping the phone lookup', async () => {
+    mockLeadCommunicationLogCreate.mockResolvedValue({ id: 'log-1' });
+
+    const req = { body: { leadId: 'lead-1', type: 'whatsapp', notes: 'Quotation Q-1 sent' } };
+    const res = { json: vi.fn() };
+    await logCommunication(req, res, vi.fn());
+
+    expect(mockLeadFindFirst).not.toHaveBeenCalled();
+    expect(mockLeadCommunicationLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ leadId: 'lead-1', type: 'whatsapp', notes: 'Quotation Q-1 sent' }),
+    });
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { matched: true, leadId: 'lead-1' } });
+  });
+
+  it('resolves a lead by normalized phone digits when leadId is not given', async () => {
+    mockLeadFindFirst.mockResolvedValue({ id: 'lead-2' });
+    mockLeadCommunicationLogCreate.mockResolvedValue({ id: 'log-2' });
+
+    const req = { body: { phone: '+1 (555) 123-4567', type: 'whatsapp', notes: 'WhatsApp (customer): hi' } };
+    const res = { json: vi.fn() };
+    await logCommunication(req, res, vi.fn());
+
+    expect(mockLeadFindFirst).toHaveBeenCalledWith({
+      where: { OR: [{ phone: '15551234567' }, { whatsapp: '15551234567' }] },
+    });
+    expect(mockLeadCommunicationLogCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ leadId: 'lead-2' }),
+    }));
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { matched: true, leadId: 'lead-2' } });
+  });
+
+  it('responds matched:false without erroring when no lead matches the phone number', async () => {
+    mockLeadFindFirst.mockResolvedValue(null);
+
+    const req = { body: { phone: '15559999999', type: 'whatsapp', notes: 'WhatsApp (customer): hi' } };
+    const res = { json: vi.fn() };
+    await logCommunication(req, res, vi.fn());
+
+    expect(mockLeadCommunicationLogCreate).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { matched: false } });
+  });
+
+  it('rejects a payload with neither leadId nor phone', async () => {
+    const req = { body: { type: 'whatsapp', notes: 'orphan note' } };
+    const res = { json: vi.fn() };
+    const next = vi.fn();
+    await logCommunication(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ZodError' }));
+    expect(mockLeadCommunicationLogCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe('sendWhatsappReply — agent free-form reply', () => {
+  beforeEach(() => {
+    mockLeadFindUnique.mockReset();
+    mockLeadCommunicationLogCreate.mockReset();
+    mockSendWhatsappText.mockReset();
+  });
+
+  it('sends via notification-service and logs an outbound entry on success', async () => {
+    mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', whatsapp: '15551234567', phone: null, assignedToId: 'user-1' });
+    mockSendWhatsappText.mockResolvedValue({ success: true });
+    mockLeadCommunicationLogCreate.mockResolvedValue({ id: 'log-3', notes: 'WhatsApp (agent): On it!' });
+
+    const { req, res } = buildReqRes({ body: { text: 'On it!' } });
+    await sendWhatsappReply(req, res, vi.fn());
+
+    expect(mockSendWhatsappText).toHaveBeenCalledWith({ to: '15551234567', body: 'On it!' });
+    expect(mockLeadCommunicationLogCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ leadId: 'lead-1', type: 'whatsapp', byId: 'user-1' }),
+    }));
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'log-3', notes: 'WhatsApp (agent): On it!' } });
+  });
+
+  it('falls back to phone when whatsapp is not set on the lead', async () => {
+    mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', whatsapp: null, phone: '15557654321', assignedToId: 'user-1' });
+    mockSendWhatsappText.mockResolvedValue({ success: true });
+    mockLeadCommunicationLogCreate.mockResolvedValue({ id: 'log-4' });
+
+    const { req, res } = buildReqRes({ body: { text: 'On it!' } });
+    await sendWhatsappReply(req, res, vi.fn());
+
+    expect(mockSendWhatsappText).toHaveBeenCalledWith({ to: '15557654321', body: 'On it!' });
+  });
+
+  it('rejects when the lead has no phone number on file', async () => {
+    mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', whatsapp: null, phone: null, assignedToId: 'user-1' });
+
+    const { req, res, next } = buildReqRes({ body: { text: 'On it!' } });
+    await sendWhatsappReply(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(mockSendWhatsappText).not.toHaveBeenCalled();
+  });
+
+  it("rejects a salesRep replying on a lead assigned to someone else", async () => {
+    mockLeadFindUnique.mockResolvedValue({ id: 'lead-1', whatsapp: '15551234567', assignedToId: 'other-user' });
+    const salesRep = { id: 'user-2', role: 'salesRep', isSuperAdmin: false, permissions: [] };
+
+    const { req, res, next } = buildReqRes({ body: { text: 'On it!' }, user: salesRep });
+    await sendWhatsappReply(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+    expect(mockSendWhatsappText).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the lead does not exist', async () => {
+    mockLeadFindUnique.mockResolvedValue(null);
+
+    const { req, res, next } = buildReqRes({ body: { text: 'On it!' } });
+    await sendWhatsappReply(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
   });
 });

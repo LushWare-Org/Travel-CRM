@@ -1,7 +1,8 @@
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { createLeadSchema, updateLeadSchema } from '../validators/lead.validator.js';
+import { createLeadSchema, updateLeadSchema, logCommunicationSchema, whatsappReplySchema } from '../validators/lead.validator.js';
+import { sendWhatsappText } from '../services/notification.client.js';
 import {
   validateTransition,
   validateTravelerUpdate,
@@ -568,4 +569,61 @@ export const handleFacebookLeadEvent = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({ success: true, data: { leadId: lead.id, salesRepId: lead.assignedToId, duplicate: false } });
+});
+
+// Service-to-service ingestion for the lead's communications timeline —
+// called by notification-service's WhatsApp webhook (only has a phone
+// number, no leadId) and by billing-service after a successful WhatsApp
+// document send (already knows leadId). Never fails the caller for an
+// unrecognized phone number — that's expected for numbers that aren't a
+// lead yet, not an error condition.
+export const logCommunication = asyncHandler(async (req, res) => {
+  const { leadId, phone, type, notes, occurredAt } = logCommunicationSchema.parse(req.body || {});
+
+  let resolvedLeadId = leadId || null;
+  if (!resolvedLeadId && phone) {
+    const sanitizedPhone = String(phone).replace(/\D/g, '');
+    const lead = await prisma.lead.findFirst({
+      where: { OR: [{ phone: sanitizedPhone }, { whatsapp: sanitizedPhone }] },
+    });
+    resolvedLeadId = lead?.id || null;
+  }
+
+  if (!resolvedLeadId) {
+    return res.json({ success: true, data: { matched: false } });
+  }
+
+  await prisma.leadCommunicationLog.create({
+    data: { leadId: resolvedLeadId, type, notes, date: occurredAt ? new Date(occurredAt) : new Date(), byId: null },
+  });
+
+  res.json({ success: true, data: { matched: true, leadId: resolvedLeadId } });
+});
+
+// User-facing (JWT) entry point for an agent's free-form WhatsApp reply —
+// only valid within Meta's 24h session window (enforced by Meta itself on
+// the send; the Management UI also gates this against the lead's last
+// inbound message before showing the reply box).
+export const sendWhatsappReply = asyncHandler(async (req, res) => {
+  const { text } = whatsappReplySchema.parse(req.body || {});
+
+  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
+  if (!lead) throw new AppError('Lead not found', 404);
+
+  const { user } = req;
+  const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
+  if (!canManage && user.role === 'salesRep' && lead.assignedToId !== user.id) {
+    throw new AppError('Not authorized to message this lead', 403);
+  }
+
+  const phone = lead.whatsapp || lead.phone;
+  if (!phone) throw new AppError('This lead has no phone number on file', 400);
+
+  await sendWhatsappText({ to: phone, body: text });
+
+  const log = await prisma.leadCommunicationLog.create({
+    data: { leadId: lead.id, type: 'whatsapp', notes: `WhatsApp (agent): ${text}`, date: new Date(), byId: user.id },
+  });
+
+  res.json({ success: true, data: log });
 });
