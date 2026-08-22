@@ -1,5 +1,6 @@
-import nodemailer from 'nodemailer';
 import { getOrgSettings, toBrandingShape, getEmailFrom } from '../config/orgSettings.js';
+import { sendEmail as sendViaNotificationService } from '../services/email.client.js';
+import { wrapBillingEmail } from './emailWrap.js';
 
 const CURRENCY_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', INR: '₹', AUD: 'A$', LKR: 'Rs ' };
 
@@ -10,19 +11,8 @@ const formatMoney = (amount, currency = 'USD') => {
 
 const formatDate = (date) => (date ? new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 
-/** Nodemailer transport built from env. Returns null when SMTP is not configured. */
-function buildTransport() {
-  const { EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD } = process.env;
-  if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASSWORD) return null;
-  return nodemailer.createTransport({
-    host: EMAIL_HOST,
-    port: parseInt(EMAIL_PORT, 10) || 587,
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: { user: EMAIL_USER, pass: EMAIL_PASSWORD },
-  });
-}
-
-export const isEmailConfigured = () => buildTransport() !== null;
+const toAttachment = (filename, pdfBuffer) =>
+  pdfBuffer ? [{ filename, contentType: 'application/pdf', contentBase64: pdfBuffer.toString('base64') }] : [];
 
 function quotationEmailHtml(quotation, branding) {
   const customerName = quotation.customerName || 'Customer';
@@ -54,13 +44,9 @@ function quotationEmailHtml(quotation, branding) {
  * @param {object} params.quotation - the quotation snapshot
  * @param {string} params.recipientEmail
  * @param {Buffer} params.pdfBuffer
- * @throws {Error} when SMTP is not configured
+ * @throws {Error} when recipientEmail is missing, or notification-service rejects the send
  */
 export async function sendQuotationEmail({ quotation, recipientEmail, pdfBuffer }) {
-  const transporter = buildTransport();
-  if (!transporter) {
-    throw new Error('Email is not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD)');
-  }
   if (!recipientEmail) throw new Error('No recipient email provided');
 
   const branding = toBrandingShape(await getOrgSettings());
@@ -69,15 +55,19 @@ export async function sendQuotationEmail({ quotation, recipientEmail, pdfBuffer 
     ? `${branding.company.name} Quotation - ${quotation.quotationNumber}`
     : `${branding.company.name} Quotation`;
 
-  return transporter.sendMail({
+  return sendViaNotificationService({
     from: getEmailFrom(branding),
     to: recipientEmail,
     subject,
-    html: quotationEmailHtml(quotation, branding),
+    html: wrapBillingEmail({
+      branding,
+      title: subject,
+      preheader: `Your ${branding.company.name} quotation${quotation.quotationNumber ? ` ${quotation.quotationNumber}` : ''} is ready.`,
+      innerHtml: quotationEmailHtml(quotation, branding),
+    }),
     text: `Dear ${quotation.customerName || 'Customer'},\n\nPlease find your quotation attached.\nTotal: ${formatMoney(quotation.totalAmount, quotation.currency)}\nValid until: ${formatDate(quotation.validUntil)}\n`,
-    attachments: pdfBuffer
-      ? [{ filename: `quotation-${quotation.quotationNumber || quotation.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
-      : [],
+    attachments: toAttachment(`quotation-${quotation.quotationNumber || quotation.id}.pdf`, pdfBuffer),
+    meta: { sourceService: 'billing-service', kind: 'quotation' },
   });
 }
 
@@ -111,13 +101,9 @@ function invoiceEmailHtml(invoice, branding) {
  * @param {object} params.invoice - the invoice snapshot
  * @param {string} params.recipientEmail
  * @param {Buffer} params.pdfBuffer
- * @throws {Error} when SMTP is not configured
+ * @throws {Error} when recipientEmail is missing, or notification-service rejects the send
  */
 export async function sendInvoiceEmail({ invoice, recipientEmail, pdfBuffer }) {
-  const transporter = buildTransport();
-  if (!transporter) {
-    throw new Error('Email is not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD)');
-  }
   if (!recipientEmail) throw new Error('No recipient email provided');
 
   const branding = toBrandingShape(await getOrgSettings());
@@ -126,15 +112,19 @@ export async function sendInvoiceEmail({ invoice, recipientEmail, pdfBuffer }) {
     ? `${branding.company.name} Invoice - ${invoice.invoiceNumber}`
     : `${branding.company.name} Invoice`;
 
-  return transporter.sendMail({
+  return sendViaNotificationService({
     from: getEmailFrom(branding),
     to: recipientEmail,
     subject,
-    html: invoiceEmailHtml(invoice, branding),
+    html: wrapBillingEmail({
+      branding,
+      title: subject,
+      preheader: `Your ${branding.company.name} invoice${invoice.invoiceNumber ? ` ${invoice.invoiceNumber}` : ''} is ready.`,
+      innerHtml: invoiceEmailHtml(invoice, branding),
+    }),
     text: `Dear ${invoice.customerName || 'Customer'},\n\nPlease find your invoice attached.\nTotal: ${formatMoney(invoice.totalAmount, invoice.currency)}\nDue date: ${formatDate(invoice.dueDate)}\n`,
-    attachments: pdfBuffer
-      ? [{ filename: `invoice-${invoice.invoiceNumber || invoice.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
-      : [],
+    attachments: toAttachment(`invoice-${invoice.invoiceNumber || invoice.id}.pdf`, pdfBuffer),
+    meta: { sourceService: 'billing-service', kind: 'invoice' },
   });
 }
 
@@ -171,13 +161,9 @@ function receiptEmailHtml(receipt, branding) {
  * @param {object} params.receipt - the payment receipt snapshot
  * @param {string} params.recipientEmail
  * @param {Buffer} params.pdfBuffer
- * @throws {Error} when SMTP is not configured
+ * @throws {Error} when recipientEmail is missing, or notification-service rejects the send
  */
 export async function sendReceiptEmail({ receipt, recipientEmail, pdfBuffer }) {
-  const transporter = buildTransport();
-  if (!transporter) {
-    throw new Error('Email is not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD)');
-  }
   if (!recipientEmail) throw new Error('No recipient email provided');
 
   const branding = toBrandingShape(await getOrgSettings());
@@ -186,15 +172,19 @@ export async function sendReceiptEmail({ receipt, recipientEmail, pdfBuffer }) {
     ? `${branding.company.name} Payment Receipt - ${receipt.receiptNumber}`
     : `${branding.company.name} Payment Receipt`;
 
-  return transporter.sendMail({
+  return sendViaNotificationService({
     from: getEmailFrom(branding),
     to: recipientEmail,
     subject,
-    html: receiptEmailHtml(receipt, branding),
+    html: wrapBillingEmail({
+      branding,
+      title: subject,
+      preheader: `Your ${branding.company.name} payment receipt${receipt.receiptNumber ? ` ${receipt.receiptNumber}` : ''} is ready.`,
+      innerHtml: receiptEmailHtml(receipt, branding),
+    }),
     text: `Dear ${receipt.customerName || 'Customer'},\n\nPlease find your payment receipt attached.\nAmount received: ${formatMoney(receipt.amount, receipt.currency)}\n`,
-    attachments: pdfBuffer
-      ? [{ filename: `receipt-${receipt.receiptNumber || receipt.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
-      : [],
+    attachments: toAttachment(`receipt-${receipt.receiptNumber || receipt.id}.pdf`, pdfBuffer),
+    meta: { sourceService: 'billing-service', kind: 'receipt' },
   });
 }
 
@@ -231,13 +221,9 @@ function voucherEmailHtml(voucher, branding) {
  * @param {object} params.voucher - the voucher snapshot
  * @param {string} params.recipientEmail
  * @param {Buffer} params.pdfBuffer
- * @throws {Error} when SMTP is not configured
+ * @throws {Error} when recipientEmail is missing, or notification-service rejects the send
  */
 export async function sendVoucherEmail({ voucher, recipientEmail, pdfBuffer }) {
-  const transporter = buildTransport();
-  if (!transporter) {
-    throw new Error('Email is not configured (set EMAIL_HOST, EMAIL_USER, EMAIL_PASSWORD)');
-  }
   if (!recipientEmail) throw new Error('No recipient email provided');
 
   const branding = toBrandingShape(await getOrgSettings());
@@ -246,16 +232,20 @@ export async function sendVoucherEmail({ voucher, recipientEmail, pdfBuffer }) {
     ? `${branding.company.name} Travel Voucher - ${voucher.voucherNumber}`
     : `${branding.company.name} Travel Voucher`;
 
-  return transporter.sendMail({
+  return sendViaNotificationService({
     from: getEmailFrom(branding),
     to: recipientEmail,
     subject,
-    html: voucherEmailHtml(voucher, branding),
+    html: wrapBillingEmail({
+      branding,
+      title: subject,
+      preheader: `Your ${branding.company.name} travel voucher${voucher.voucherNumber ? ` ${voucher.voucherNumber}` : ''} is ready.`,
+      innerHtml: voucherEmailHtml(voucher, branding),
+    }),
     text: `Dear ${voucher.customerName || 'Customer'},\n\nPlease find your travel voucher attached.\nVoucher: ${voucher.voucherNumber || ''}\n`,
-    attachments: pdfBuffer
-      ? [{ filename: `voucher-${voucher.voucherNumber || voucher.id}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }]
-      : [],
+    attachments: toAttachment(`voucher-${voucher.voucherNumber || voucher.id}.pdf`, pdfBuffer),
+    meta: { sourceService: 'billing-service', kind: 'voucher' },
   });
 }
 
-export default { isEmailConfigured, sendQuotationEmail, sendInvoiceEmail, sendReceiptEmail, sendVoucherEmail };
+export default { sendQuotationEmail, sendInvoiceEmail, sendReceiptEmail, sendVoucherEmail };
