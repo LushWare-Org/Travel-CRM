@@ -226,7 +226,11 @@ export const createWebsiteBooking = asyncHandler(async (req, res) => {
       if (rep?.email) {
         try {
           const { sendLeadAssignmentEmail } = await import('../utils/email.js');
-          await sendLeadAssignmentEmail({ salesRep: rep, lead: { id: leadId, name: sanitizedName, email: sanitizedEmail }, assignmentMode: 'auto' });
+          await sendLeadAssignmentEmail({
+            salesRep: rep,
+            lead: { id: leadId, name: sanitizedName, email: sanitizedEmail, phone: normalizedPhone, destination: pkg.destination },
+            assignmentMode: 'auto',
+          });
         } catch (e) {
           req.log.error({ err: e }, 'Failed to send assignment email');
         }
