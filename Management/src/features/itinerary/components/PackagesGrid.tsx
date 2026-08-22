@@ -5,6 +5,15 @@
 
 import PackageCard from './PackageCard';
 
+interface PackagesGridProps {
+  packages: any[];
+  onView: (pkg: any) => void;
+  onEdit: (pkg: any) => void;
+  onDownload: (pkg: any) => void;
+  onDelete: (pkg: any) => void;
+  onDuplicate: (pkg: any) => void;
+}
+
 const PackagesGrid = ({
   packages,
   onView,
@@ -12,12 +21,12 @@ const PackagesGrid = ({
   onDownload,
   onDelete,
   onDuplicate,
-}) => {
+}: PackagesGridProps) => {
   if (packages.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600 text-lg">No packages found</p>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-foreground text-lg">No packages found</p>
+        <p className="text-muted-foreground text-sm mt-1">
           Create your first package to get started
         </p>
       </div>
