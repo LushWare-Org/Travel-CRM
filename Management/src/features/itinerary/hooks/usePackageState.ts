@@ -3,12 +3,11 @@
  */
 
 import { useState } from 'react';
-import { createDefaultPackage } from '../types';
 
-export const usePackageState = (initialPackages = []) => {
-  const [packages, setPackages] = useState(initialPackages);
+export const usePackageState = (initialPackages: any[] = []) => {
+  const [packages, setPackages] = useState<any[]>(initialPackages);
 
-  const addPackage = (packageData) => {
+  const addPackage = (packageData: any) => {
     setPackages((prev) => [
       ...prev,
       {
@@ -18,7 +17,7 @@ export const usePackageState = (initialPackages = []) => {
     ]);
   };
 
-  const updatePackage = (id, updatedData) => {
+  const updatePackage = (id: string | number, updatedData: any) => {
     setPackages((prev) =>
       prev.map((pkg) => {
         // Check both _id (MongoDB) and id (local) fields
@@ -34,14 +33,14 @@ export const usePackageState = (initialPackages = []) => {
     );
   };
 
-  const deletePackage = (id) => {
+  const deletePackage = (id: string | number) => {
     setPackages((prev) => prev.filter((pkg) => {
       const pkgId = pkg._id || pkg.id;
       return pkgId !== id;
     }));
   };
 
-  const getPackageById = (id) => {
+  const getPackageById = (id: string | number) => {
     return packages.find((pkg) => {
       const pkgId = pkg._id || pkg.id;
       return pkgId === id;

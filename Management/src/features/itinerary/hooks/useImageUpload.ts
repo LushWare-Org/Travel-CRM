@@ -10,11 +10,11 @@ import Swal from 'sweetalert2';
 import { VALIDATION_MESSAGES } from '../utils/constants';
 
 export const useImageUpload = () => {
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [deletingIndexes, setDeletingIndexes] = useState([]);
+  const [deletingIndexes, setDeletingIndexes] = useState<number[]>([]);
 
-  const addImage = useCallback((url) => {
+  const addImage = useCallback((url: any) => {
     setImages((prev) => [...prev, url]);
   }, []);
 
@@ -25,7 +25,7 @@ export const useImageUpload = () => {
   // reappearing on the next reload. Unsaved/just-uploaded images (no `id`,
   // but a Cloudinary `publicId`) are removed directly from Cloudinary so they
   // don't leak if the user removes them before saving the package.
-  const removeImage = useCallback(async (index, { packageId } = {}) => {
+  const removeImage = useCallback(async (index: number, { packageId }: { packageId?: string } = {}) => {
     const image = images[index];
     if (!image) return;
 
@@ -47,14 +47,14 @@ export const useImageUpload = () => {
       setImages((prev) => prev.filter((_, i) => i !== index));
     } catch (error) {
       console.error('Image delete error:', error);
-      Swal.fire('Error', error.message || 'Failed to delete image', 'error');
+      Swal.fire('Error', (error as Error).message || 'Failed to delete image', 'error');
     } finally {
       setDeletingIndexes((prev) => prev.filter((i) => i !== index));
     }
   }, [images]);
 
   const handleUpload = useCallback(
-    async (files) => {
+    async (files: FileList | File[] | null | undefined) => {
       if (!files || files.length === 0) return;
 
       const fileArray = Array.from(files);
@@ -66,7 +66,7 @@ export const useImageUpload = () => {
 
       try {
         // Upload all images to Cloudinary
-        const uploadedUrls = await uploadPackageImages(files, (progress) => {
+        const uploadedUrls = await uploadPackageImages(files, (progress: { current: number; total: number }) => {
           console.log(`Upload progress: ${progress.current}/${progress.total}`);
         });
 
@@ -90,10 +90,10 @@ export const useImageUpload = () => {
         // Remove temporary URLs on error
         setImages((prev) => prev.filter(url => !tempUrls.includes(url)));
         tempUrls.forEach(url => URL.revokeObjectURL(url));
-        
+
         Swal.fire(
           'Error',
-          error.message || VALIDATION_MESSAGES.IMAGE_UPLOAD_FAILED,
+          (error as Error).message || VALIDATION_MESSAGES.IMAGE_UPLOAD_FAILED,
           'error'
         );
       } finally {
