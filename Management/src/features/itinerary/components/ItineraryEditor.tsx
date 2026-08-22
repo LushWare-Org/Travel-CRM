@@ -212,6 +212,14 @@ const MEALS = [
   { key: 'dinner', label: 'Dinner', icon: Moon },
 ] as const;
 
+const ACCOMMODATION_TYPE_LABELS: Record<string, string> = {
+  hotel: 'Hotel',
+  resort: 'Resort',
+  guesthouse: 'Guesthouse',
+  homestay: 'Homestay',
+  camp: 'Camp',
+};
+
 const ItineraryEditor = ({
   days = [],
   onDayChange,
@@ -938,7 +946,9 @@ const ItineraryEditor = ({
                         onValueChange={(value) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, type: String(value) } })}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Type" />
+                          <SelectValue placeholder="Type">
+                            {(value: string) => ACCOMMODATION_TYPE_LABELS[value] ?? value}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="hotel">Hotel</SelectItem>

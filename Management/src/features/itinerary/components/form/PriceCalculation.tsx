@@ -217,7 +217,7 @@ const PriceCalculation = ({ formData, onFormChange, duration }: PriceCalculation
             onValueChange={(value) => onFormChange({ ...formData, defaultMarginType: String(value) })}
           >
             <SelectTrigger className="w-16">
-              <SelectValue />
+              <SelectValue>{(v: string) => (v === 'FIXED' ? getCurrencySymbol() : '%')}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="PERCENTAGE">%</SelectItem>
