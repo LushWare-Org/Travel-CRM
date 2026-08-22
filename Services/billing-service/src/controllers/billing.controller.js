@@ -130,16 +130,19 @@ export const getTopCustomers = asyncHandler(async (req, res) => {
   const { limit = 10 } = req.query;
   const rows = await prisma.$queryRaw`
     SELECT "customerName", "customerEmail",
-           COUNT(*) AS invoiceCount,
-           SUM("totalAmount") AS totalBilled,
-           SUM("paidAmount") AS totalPaid
+           COUNT(*) AS "invoiceCount",
+           SUM("totalAmount") AS "totalBilled",
+           SUM("paidAmount") AS "totalPaid"
     FROM crm_billing."Invoice"
     WHERE status != 'cancelled'
     GROUP BY "customerName", "customerEmail"
     ORDER BY "totalBilled" DESC
     LIMIT ${Number(limit)}
   `;
-  res.json({ success: true, data: rows });
+  // COUNT(*) comes back as a BigInt via $queryRaw — JSON.stringify can't
+  // serialize that natively, so coerce it before responding.
+  const data = rows.map((r) => ({ ...r, invoiceCount: Number(r.invoiceCount) }));
+  res.json({ success: true, data });
 });
 
 export const exportBillingData = asyncHandler(async (req, res) => {
