@@ -89,7 +89,9 @@ Each service has its own `package.json` — there is no root workspace. Commands
 ## Testing
 
 - **Every new feature or bugfix requires tests.** Do not skip this.
-- **No browser-automation E2E tests** (no Playwright, Selenium, or Cypress). Focus on unit tests and API integration tests.
+- **Browser E2E (Playwright) is used, scoped to `Management/` only.** Client stays unit/integration-tested only — no Playwright there. Management E2E lives in `Management/e2e/`, runs via `npm run test:e2e` (`playwright test`), and covers RBAC/auth plus the core lead → quotation → invoice → payment → voucher workflow — keep it narrow (critical journeys, not exhaustive coverage); push edge cases down to unit/component tests.
+- **Backend cross-service API E2E is used**, in `Services/e2e-tests/`, driving real HTTP calls through the Gateway (`:3000`) against a fully running local microservices stack — real JWTs from real `/auth/login` calls, no mocked Prisma/pg, no injected `x-user-*` headers. Run with `cd Services/e2e-tests && npm test`. Requires the full stack up (`cd Services && npm run dev`) and must never point at a production URL or database — see the safety guard in that suite's `global-setup.js`. Every record the suite creates must be tagged with a per-run marker and cleaned up in global teardown.
+- Both suites are a deliberate, narrow exception to "unit tests + API integration tests" as the default — do not add Playwright to `Client/`, and weigh any new backend E2E flow against the test pyramid (E2E ≈ 10% of the suite; most coverage stays at the existing per-service integration-test layer).
 - Test names describe **outcomes, not actions**: "returns err NOT_FOUND when user does not exist" not "test getUser"
 - **Assert specific values**, not just types: `expect(result.value.email).toBe('alice@test.com')` not `expect(result).toBeDefined()`
 - **One concept per test** — if a test name needs "and", split it

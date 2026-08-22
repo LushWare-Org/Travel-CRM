@@ -26,9 +26,9 @@ const MANUAL_ITINERARY_VALUE = '__manual__';
 
 // ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
 
-function InputField({ label, required, icon: Icon, children }) {
+function InputField({ label, required, icon: Icon, children, testId }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid={testId}>
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
         {Icon && <Icon className="w-4 h-4 text-gray-400" />}
         {label}
@@ -229,7 +229,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         whatsapp: formData.whatsapp || undefined,
         salesRep: salesRepName,
         assignedTo: assignedTo,
-        platform: formData.platform || "Manual Entry",
+        platform: formData.platform || "Manual_Entry",
         source: "manual",
         travelDate: formData.travelDate || undefined,
         endDate: formData.endDate || undefined,
@@ -370,7 +370,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
             {expandedSections.personal && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                <InputField label="Full Name" required icon={User}>
+                <InputField label="Full Name" required icon={User} testId="new-lead-name">
                   <input
                     type="text"
                     value={formData.name}
@@ -390,7 +390,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                   />
                 </InputField>
 
-                <InputField label="Contact Number" required icon={Phone}>
+                <InputField label="Contact Number" required icon={Phone} testId="new-lead-phone">
                   <PhoneInput
                     international
                     defaultCountry="LK"
@@ -504,12 +504,12 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                   >
                     <option value="">Select Source</option>
-                    <option value="Website Form">🌐 Website Form</option>
-                    <option value="Social Media">📱 Social Media</option>
-                    <option value="Phone Call">📞 Phone Call</option>
+                    <option value="Website_Form">🌐 Website Form</option>
+                    <option value="Social_Media">📱 Social Media</option>
+                    <option value="Phone_Call">📞 Phone Call</option>
                     <option value="Referral">🤝 Referral</option>
                     <option value="Email">📧 Email</option>
-                    <option value="Walk-in">🚶 Walk-in</option>
+                    <option value="Walk_in">🚶 Walk-in</option>
                   </select>
                 </InputField>
               </div>
@@ -530,7 +530,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
             {expandedSections.package && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
-                <InputField label="Package" icon={Package}>
+                <InputField label="Package" icon={Package} testId="new-lead-package">
                   <select
                     aria-label="Package"
                     value={formData.isManualItinerary ? MANUAL_ITINERARY_VALUE : (formData.package || '')}
