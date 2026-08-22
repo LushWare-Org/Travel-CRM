@@ -297,7 +297,14 @@ Radius is driven by one CSS variable (`--radius: 0.5rem` in `src/index.css`) tha
 ### Popover
 - **`popover`** family (`src/components/ui/popover.tsx`): `Popover`/`PopoverTrigger`/`PopoverContent`/`PopoverHeader`/`PopoverTitle`/`PopoverDescription`.
 
-*(Form/`FormField` wrapper and the `StatCard`/`DataTable` composites are still open - Phase 2.2-2.4.)*
+### StatCard
+- **`stat-card`** (`src/components/shared/StatCard.tsx`): the consolidated replacement for the two prior duplicate implementations (`features/analytics/components/Common/StatCard.jsx` and `features/user-management/components/Common/StatsCard.jsx` - deleted when their respective feature migrates, Phase 4/5). Superset props: `icon, label, value, unit, subtitle, trend, trendDirection, color, loading`. Built on `Card`/`CardContent`. `value` always renders in `font-mono tabular-nums` per the system's core "monospace for anything tabular" rule. `trend` color is **never** the card's own `color` prop - it's always `success` (up) or `destructive` (down), because trend direction is state, not branding. `color` (icon tile background) is one of `primary | success | warning | destructive | muted`, each a soft `bg-{token}/10 text-{token}` fill - never a raw hex or a Tailwind stock color, unlike both predecessors' local `colorConfig` objects.
+
+### DataTable
+- **`data-table`** (`src/components/shared/DataTable.tsx`): a typed wrapper over the raw `table.tsx` primitives with the three conventions the raw primitive doesn't provide on its own - a loading state (skeleton rows), an empty state (centered message row, customizable per usage), and numeric-column formatting (`text-right font-mono tabular-nums` when `column.numeric` is set). Sortable columns render a clickable header with a `ChevronUp`/`ChevronDown`/`ChevronsUpDown` indicator and call `onSort(key)` - the table itself holds no sort state, callers own that (matches how `lead-management`/`analytics`/`user-management` already fetch pre-sorted pages from their APIs rather than sorting client-side).
+
+### Form / FormField
+- **`form`** (`src/components/ui/form.tsx`): binds `react-hook-form` to the shadcn `Field`/`FieldLabel`/`FieldError` primitives (which ship un-opinionated about any form library). `Form` is `FormProvider` renamed for readability at call sites; `FormField` wraps RHF's `Controller`; `FormFieldItem` is the actual per-field wrapper components reach for - it takes `label`/`error`/`children`, renders `Field` with `data-invalid` wired from RHF's `fieldState.error`, and passes errors straight into `FieldError`. Pairs with `@hookform/resolvers`' `zodResolver` - `zod` schemas (already a project dependency, previously under-used) become the single source of truth for both the TypeScript type and the runtime validation shown in the UI. Verified end-to-end (not just typechecked) by `src/components/ui/__tests__/form.test.tsx`: a real `useForm` + `zodResolver` + submit cycle, asserting the actual validation message text and that `onSubmit` only fires on valid data.
 
 ## Do's and Don'ts
 
