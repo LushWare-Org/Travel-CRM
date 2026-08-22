@@ -20,7 +20,7 @@ import {
   computeMargin,
   DEFAULTS,
 } from '@travel-crm/pricing-engine';
-import ApiService from '../../services/apiService.js';
+import ApiService from '../../services/apiService';
 import { formatCurrency, getCurrencySymbol } from '../../../../utils/currency.js';
 import {
   getMealCounts,
@@ -29,8 +29,17 @@ import {
   getAccommodationTotal,
   getTransportRowCost,
 } from '../../utils/helpers';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const mealLineText = (day) => {
+interface PriceCalculationProps {
+  formData: any;
+  onFormChange: (data: any) => void;
+  duration: number;
+}
+
+const mealLineText = (day: any) => {
   const parts = [];
   if (day.breakfastCount > 0) parts.push(`${day.breakfastCount} breakfast${day.breakfastCount > 1 ? 's' : ''}`);
   if (day.lunchCount > 0) parts.push(`${day.lunchCount} lunch${day.lunchCount > 1 ? 'es' : ''}`);
@@ -38,24 +47,24 @@ const mealLineText = (day) => {
   return parts.length > 0 ? parts.join(', ') : 'No meals';
 };
 
-const ReceiptLine = ({ label, value, muted = false }) => (
+const ReceiptLine = ({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) => (
   <div className="flex items-center justify-between gap-3 text-sm py-1">
-    <span className={`${muted ? 'text-slate-400' : 'text-slate-600'}`}>{label}</span>
-    <span className={`font-medium tabular-nums ${muted ? 'text-slate-400' : 'text-slate-800'}`}>{value}</span>
+    <span className={muted ? 'text-muted-foreground/70' : 'text-muted-foreground'}>{label}</span>
+    <span className={`font-mono font-medium tabular-nums ${muted ? 'text-muted-foreground/70' : 'text-foreground'}`}>{value}</span>
   </div>
 );
 
-const SectionTitle = ({ children }) => (
-  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 mb-1.5 mt-4 first:mt-0">
+const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+  <p className="text-xs font-bold uppercase tracking-[0.14em] text-success mb-1.5 mt-4 first:mt-0">
     {children}
   </p>
 );
 
 const Divider = () => (
-  <div className="my-3 border-t-2 border-dashed border-slate-200" />
+  <div className="my-3 border-t-2 border-dashed border-border" />
 );
 
-const PriceCalculation = ({ formData, onFormChange, duration }) => {
+const PriceCalculation = ({ formData, onFormChange, duration }: PriceCalculationProps) => {
   const itineraryDays = useMemo(
     () => (Array.isArray(formData.days) ? formData.days.filter(Boolean) : []),
     [formData.days]
@@ -65,37 +74,45 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
   const marginType = formData.defaultMarginType || 'PERCENTAGE';
   const marginValue = Number(formData.defaultMarginInput) || 0;
 
-  const [serverResult, setServerResult] = useState(null);
-  const [serverPackageCost, setServerPackageCost] = useState(null);
+  const [serverResult, setServerResult] = useState<any>(null);
+  const [serverPackageCost, setServerPackageCost] = useState<number | null>(null);
   const [verifying, setVerifying] = useState(false);
   const verifySeq = useRef(0);
 
   // ── Live breakdown (recomputed on every form state change) ──────────────
   const pricing = useMemo(() => {
-    const mealDays = itineraryDays.map((day) => ({
+    const mealDays = itineraryDays.map((day: any) => ({
       ...getMealCounts(day),
       dayNumber: day.dayNumber,
     }));
-    const activityRows = itineraryDays.flatMap((day) =>
-      getDayActivities(day).map((a) => ({ ...a, dayNumber: day.dayNumber }))
+    const activityRows = itineraryDays.flatMap((day: any) =>
+      getDayActivities(day).map((a: any) => ({ ...a, dayNumber: day.dayNumber }))
     );
-    const transportRows = itineraryDays.flatMap((day) =>
-      getDayTransports(day).map((t) => ({ ...t, dayNumber: day.dayNumber }))
+    const transportRows = itineraryDays.flatMap((day: any) =>
+      getDayTransports(day).map((t: any) => ({ ...t, dayNumber: day.dayNumber }))
     );
     const accommodationRows = itineraryDays
-      .filter((day) => getAccommodationTotal(day) > 0)
-      .map((day) => ({
+      .filter((day: any) => getAccommodationTotal(day) > 0)
+      .map((day: any) => ({
         dayNumber: day.dayNumber,
         name: day.accommodation?.name || 'Accommodation',
         totalAmount: getAccommodationTotal(day),
         currency: day.accommodation?.currency || 'USD',
       }));
-    const accommodationTotal = accommodationRows.reduce((sum, row) => sum + row.totalAmount, 0);
+    const accommodationTotal = accommodationRows.reduce((sum: number, row: any) => sum + row.totalAmount, 0);
 
     const engine = calculateBasePrice({
       days: mealDays,
       activities: activityRows,
       transports: transportRows,
+      // Deliberately not passed here - accommodationTotal is added to
+      // packageCost separately below (see accommodationTotal usage). The
+      // engine's own JS default is also `[]`; passed explicitly only to
+      // satisfy its @param JSDoc type (see calculateBasePrice's JSDoc in
+      // Services/shared/pricing-engine/src/index.js - `accommodation` has a
+      // `= []` default but lacks the `[optional]` bracket other params use,
+      // so TS infers it as required despite the runtime default).
+      accommodation: [],
       groupSize: effectiveGroupSize,
     });
 
@@ -155,12 +172,7 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
     serverPackageCost == null &&
     Math.abs(serverPackageCostNumber - pricing.packageCost) > 0.01;
 
-  const handleMarginChange = (e) => {
-    const { name, value } = e.target;
-    onFormChange({ ...formData, [name]: value });
-  };
-
-  const handleMarginNumberChange = (e) => {
+  const handleMarginNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     onFormChange({
       ...formData,
@@ -179,13 +191,13 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
   if (itineraryDays.length === 0) {
     return (
       <div className="space-y-4">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">
-          <Calculator className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-400 font-medium">Add itinerary days to see pricing</p>
+        <div className="rounded-lg border border-border bg-muted p-8 text-center">
+          <Calculator className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground font-medium">Add itinerary days to see pricing</p>
         </div>
-        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4">
-          <span className="text-sm font-semibold text-slate-700">Sell Price</span>
-          <span className="text-xl font-bold text-slate-800 tabular-nums">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-5 py-4">
+          <span className="text-sm font-semibold text-foreground">Sell Price</span>
+          <span className="text-xl font-bold font-mono tabular-nums text-foreground">
             {formatCurrency(0, { minimumFractionDigits: 2 })}
           </span>
         </div>
@@ -196,32 +208,35 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
   return (
     <div className="space-y-4">
       {/* Margin controls */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <TrendingUp className="w-4 h-4 text-slate-400" />
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border border-border bg-muted px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <TrendingUp className="w-4 h-4" />
           Margin
-          <select
-            name="defaultMarginType"
+          <Select
             value={marginType}
-            onChange={handleMarginChange}
-            className="px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            onValueChange={(value) => onFormChange({ ...formData, defaultMarginType: String(value) })}
           >
-            <option value="PERCENTAGE">%</option>
-            <option value="FIXED">{getCurrencySymbol()}</option>
-          </select>
-          <input
+            <SelectTrigger className="w-16">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PERCENTAGE">%</SelectItem>
+              <SelectItem value="FIXED">{getCurrencySymbol()}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
             type="number" name="defaultMarginInput" min="0" step="0.01"
             value={formData.defaultMarginInput ?? 20}
             onChange={handleMarginNumberChange}
             onWheel={(e) => e.currentTarget.blur()}
-            className="w-20 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            className="w-20 text-center"
           />
-          <span className="text-sm font-semibold text-emerald-700 tabular-nums">
+          <span className="text-sm font-semibold font-mono tabular-nums text-success">
             {formatCurrency(effectiveMargin.marginAmount, { minimumFractionDigits: 2 })}
           </span>
-        </label>
+        </div>
         {verifying && (
-          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-slate-400">
+          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader className="w-3.5 h-3.5 animate-spin" />
             Verifying with server…
           </span>
@@ -229,13 +244,13 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
       </div>
 
       {/* ── Receipt ─────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-5 py-4 bg-slate-900 flex items-center justify-between">
+      <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+        <div className="px-5 py-4 bg-foreground flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Calculator className="w-5 h-5 text-emerald-400" />
+            <Calculator className="w-5 h-5 text-success" />
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.16em] text-white">Price Breakdown</p>
-              <p className="text-[11px] text-slate-400">Computed live from itinerary costs · {duration} day{duration === 1 ? '' : 's'}</p>
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-background">Price Breakdown</p>
+              <p className="text-xs text-background/60">Computed live from itinerary costs · {duration} day{duration === 1 ? '' : 's'}</p>
             </div>
           </div>
         </div>
@@ -244,22 +259,22 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
           {/* Meals */}
           <SectionTitle>Meals</SectionTitle>
           {pricing.mealDays
-            .filter((day) => day.breakfastCount + day.lunchCount + day.dinnerCount > 0)
-            .map((day) => (
+            .filter((day: any) => day.breakfastCount + day.lunchCount + day.dinnerCount > 0)
+            .map((day: any) => (
               <ReceiptLine
                 key={`meal-${day.dayNumber}`}
                 label={`Day ${day.dayNumber}  ${mealLineText(day)}`}
                 value={formatCurrency(calculateMealCostForDay(day))}
               />
             ))}
-          {pricing.mealDays.every((day) => day.breakfastCount + day.lunchCount + day.dinnerCount === 0) && (
+          {pricing.mealDays.every((day: any) => day.breakfastCount + day.lunchCount + day.dinnerCount === 0) && (
             <ReceiptLine label="No meal counts configured" value={formatCurrency(0)} muted />
           )}
           <ReceiptLine label="Meals subtotal" value={formatCurrency(pricing.engine.breakdown.meals.total)} muted />
 
           {/* Activities */}
           <SectionTitle>Activities</SectionTitle>
-          {pricing.activityRows.map((activity) => {
+          {pricing.activityRows.map((activity: any) => {
             const unit = activity.costOverride ?? activity.defaultCost ?? 0;
             return (
               <ReceiptLine
@@ -276,7 +291,7 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
 
           {/* Transport */}
           <SectionTitle>Transport</SectionTitle>
-          {pricing.transportRows.map((transport, index) => {
+          {pricing.transportRows.map((transport: any, index: number) => {
             const cost = getTransportRowCost(transport, effectiveGroupSize);
             const model = transport.pricingModel || 'PER_VEHICLE';
             const modeLabel = transport.transportMode || 'Transport';
@@ -299,7 +314,7 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
 
           {/* Accommodation */}
           <SectionTitle>Accommodation</SectionTitle>
-          {pricing.accommodationRows.map((row) => (
+          {pricing.accommodationRows.map((row: any) => (
             <ReceiptLine
               key={`acc-${row.dayNumber}`}
               label={`${row.name} (Day ${row.dayNumber})`}
@@ -315,8 +330,8 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
 
           {/* Package cost */}
           <div className="flex items-center justify-between py-1">
-            <span className="text-sm font-bold text-slate-800">PACKAGE COST</span>
-            <span className="text-lg font-bold text-slate-900 tabular-nums">
+            <span className="text-sm font-bold text-foreground">PACKAGE COST</span>
+            <span className="text-lg font-bold font-mono tabular-nums text-foreground">
               {formatCurrency(effectivePackageCost)}
             </span>
           </div>
@@ -325,8 +340,8 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
 
           {/* Sell price */}
           <div className="flex items-center justify-between py-1">
-            <span className="text-sm font-bold text-slate-800">SELL PRICE</span>
-            <span className="text-2xl font-extrabold text-emerald-700 tabular-nums">
+            <span className="text-sm font-bold text-foreground">SELL PRICE</span>
+            <span className="text-2xl font-extrabold font-mono tabular-nums text-success">
               {formatCurrency(effectiveMargin.sellPrice)}
             </span>
           </div>
@@ -334,28 +349,30 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
       </div>
 
       {!hasAnyCosts && (
-        <p className="text-xs text-slate-400 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           Add meal counts, activity costs, and transport details in the itinerary below
         </p>
       )}
 
       {/* Server verification divergence */}
       {diverged && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-wrap items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-          <p className="text-sm text-amber-800 flex-1 min-w-[220px]">
+        <div className="rounded-lg border border-warning/20 bg-warning/5 p-4 flex flex-wrap items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0" />
+          <p className="text-sm text-warning flex-1 min-w-[220px]">
             Server recalculated Package Cost at{' '}
             <strong>{formatCurrency(serverPackageCostNumber, { minimumFractionDigits: 2 })}</strong>{' '}
             (frontend shows {formatCurrency(pricing.packageCost, { minimumFractionDigits: 2 })}).
             Costs may have changed since you opened this form.
           </p>
-          <button
+          <Button
             type="button"
             onClick={() => setServerPackageCost(serverPackageCostNumber)}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+            variant="outline"
+            size="sm"
+            className="border-warning/30 text-warning hover:bg-warning/10"
           >
             Use server value
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -363,7 +380,7 @@ const PriceCalculation = ({ formData, onFormChange, duration }) => {
 };
 
 /** Per-day meal subtotal using the same formula as the shared engine. */
-function calculateMealCostForDay(day) {
+function calculateMealCostForDay(day: any) {
   const costPerMeal = day.mealPriceOverride ?? DEFAULTS.mealCostPerPerson;
   return (day.breakfastCount + day.lunchCount + day.dinnerCount) * costPerMeal;
 }

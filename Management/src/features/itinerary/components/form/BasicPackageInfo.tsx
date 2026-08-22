@@ -1,21 +1,45 @@
 /**
- * Basic Package Info Form Component - Redesigned
- * Modern card-based layout with premium styling
+ * Basic Package Info Form Component
  * Handles package title, description, category, destination, inclusions, and exclusions
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Sparkles, MapPin, Tag, FileText, CheckCircle, XCircle, Star, AlertTriangle } from 'lucide-react';
+import { Sparkles, MapPin, Tag, FileText, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { CATEGORY_OPTIONS } from '../../utils/constants';
 import DestinationSelector from '../DestinationSelector';
 import packageAIApi from '../../../../services/packageAIApi';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
+interface BasicPackageInfoProps {
+  formData: any;
+  onChange: (data: any) => void;
+  packageId?: string | null;
+}
+
+// Input Card Component
+const InputCard = ({ label, required, icon: Icon, children, hint, className = '' }: {
+  label: string; required?: boolean; icon?: any; children: React.ReactNode; hint?: string; className?: string;
+}) => (
+  <div className={`bg-card rounded-lg border border-border p-4 hover:border-ring/30 transition-colors ${className}`}>
+    <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-3">
+      {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
+      {label}
+      {required && <span className="text-destructive text-xs">*</span>}
+    </label>
+    {children}
+    {hint && <p className="text-xs text-muted-foreground mt-2">{hint}</p>}
+  </div>
+);
+
+const BasicPackageInfo = ({ formData, onChange }: BasicPackageInfoProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoGenerateEnabled, setAutoGenerateEnabled] = useState(false);
-  const [aiConfigured, setAiConfigured] = useState(null);
-  const debounceTimerRef = useRef(null);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check AI status on mount
   useEffect(() => {
@@ -44,16 +68,16 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
     checkAIStatus();
   }, []);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     onChange({ ...formData, [name]: value });
   };
 
-  const handleArrayFieldChange = (name, value) => {
+  const handleArrayFieldChange = (name: string, value: string) => {
     onChange({ ...formData, [name]: value });
   };
 
-  const handleArrayFieldBlur = (name, value) => {
+  const handleArrayFieldBlur = (name: string, value: string) => {
     const arrayValue = value
       .split(',')
       .map((item) => item.trim())
@@ -61,7 +85,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
     onChange({ ...formData, [name]: arrayValue });
   };
 
-  const getArrayFieldValue = (fieldName) => {
+  const getArrayFieldValue = (fieldName: string) => {
     const value = formData[fieldName];
     if (Array.isArray(value)) {
       return value.join(', ');
@@ -69,7 +93,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
     return value || '';
   };
 
-  const generateAIContent = async (title) => {
+  const generateAIContent = async (title: string) => {
     if (!title || title.trim() === '') {
       return;
     }
@@ -107,7 +131,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
           toast.error(response.message || 'Failed to generate AI content');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating AI content:', error);
       console.error('Error details:', {
         status: error.status,
@@ -166,19 +190,6 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
     await generateAIContent(formData.title);
   };
 
-  // Input Card Component
-  const InputCard = ({ label, required, icon: Icon, children, hint, className = '' }) => (
-    <div className={`bg-white rounded-xl border border-slate-200 p-4 hover:border-slate-300 transition-colors ${className}`}>
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-3">
-        {Icon && <Icon className="w-4 h-4 text-slate-400" />}
-        {label}
-        {required && <span className="text-rose-500 text-xs">*</span>}
-      </label>
-      {children}
-      {hint && <p className="text-xs text-slate-400 mt-2">{hint}</p>}
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       {/* Two Column Grid for Destination and Name */}
@@ -188,45 +199,46 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
           <DestinationSelector
             name="destination"
             value={formData.destination || ''}
-            onChange={handleChange}
+            onChange={handleChange as any}
           />
         </InputCard>
 
         {/* Category */}
         <InputCard label="Category" required icon={Tag}>
-          <select
-            name="category"
-            value={formData.category || ''}
-            onChange={handleChange}
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
-          >
-            <option value="">Select Category</option>
-            {CATEGORY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <Select value={formData.category || undefined} onValueChange={(value) => onChange({ ...formData, category: String(value) })}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select Category">
+                {(value: string) => CATEGORY_OPTIONS.find((o) => o.value === value)?.label ?? value}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </InputCard>
       </div>
 
       {/* Package Name with AI Button */}
       <InputCard label="Package Name" required icon={FileText}>
         <div className="flex items-stretch gap-3">
-          <input
+          <Input
             type="text"
             name="title"
             value={formData.title || ''}
             onChange={handleChange}
             placeholder="e.g., 7-Day Sri Lanka Adventure"
-            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+            className="flex-1"
           />
           {formData.title && formData.title.trim().length >= 3 && (
-            <button
+            <Button
               type="button"
               onClick={handleAIGenerate}
               disabled={isGenerating || aiConfigured === false}
-              className="px-5 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl hover:from-violet-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-2 font-medium shadow-lg shadow-violet-500/25"
+              variant="outline"
               title={
                 aiConfigured === false
                   ? "AI not configured. Add GEMINI_API_KEY to Services/package-service/.env and restart the service."
@@ -235,7 +247,7 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
             >
               <Sparkles className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
               {isGenerating ? 'Generating...' : 'AI Generate'}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -243,27 +255,27 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
         {formData.title && formData.title.trim().length >= 3 && (
           <>
             {aiConfigured === false && (
-              <div className="mt-4 bg-rose-50 rounded-xl border border-rose-200 p-4">
+              <div className="mt-4 bg-destructive/5 rounded-lg border border-destructive/20 p-4">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-rose-500 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                   <div className="space-y-2">
-                    <p className="font-semibold text-rose-700 text-sm">AI Generation Not Available</p>
-                    <p className="text-slate-600 text-xs">
+                    <p className="font-semibold text-destructive text-sm">AI Generation Not Available</p>
+                    <p className="text-muted-foreground text-xs">
                       Your API key doesn't have access to Gemini models. All models return 404 (not found).
                     </p>
-                    <div className="pt-2 border-t border-rose-200 mt-2 space-y-1">
-                      <p className="text-xs text-slate-600">
+                    <div className="pt-2 border-t border-destructive/20 mt-2 space-y-1">
+                      <p className="text-xs text-muted-foreground">
                         <strong>Quick Fix:</strong> Get a NEW API key from{' '}
                         <a
                           href="https://makersuite.google.com/app/apikey"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 underline font-medium"
+                          className="text-primary underline font-medium"
                         >
                           AI Studio (makersuite.google.com)
                         </a>
                       </p>
-                      <p className="text-xs text-slate-500 italic">
+                      <p className="text-xs text-muted-foreground italic">
                         💡 You can still create packages manually — AI generation is optional.
                       </p>
                     </div>
@@ -272,8 +284,8 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
               </div>
             )}
             {aiConfigured === true && (
-              <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+              <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
                 Click "AI Generate" to auto-fill description, highlights, inclusions, and exclusions
               </p>
             )}
@@ -283,13 +295,12 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
 
       {/* Description */}
       <InputCard label="Description" required icon={FileText}>
-        <textarea
+        <Textarea
           name="description"
           placeholder="Describe your travel package..."
           value={formData.description || ''}
           onChange={handleChange}
-          rows="4"
-          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none"
+          rows={4}
         />
       </InputCard>
 
@@ -297,27 +308,25 @@ const BasicPackageInfo = ({ formData, onChange, packageId = null }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Inclusions */}
         <InputCard label="Inclusions" icon={CheckCircle} hint="What's included (comma separated)" className="lg:col-span-1">
-          <textarea
+          <Textarea
             name="inclusions"
             placeholder="Hotel accommodation, All meals, Tour guide..."
             value={getArrayFieldValue('inclusions')}
             onChange={(e) => handleArrayFieldChange('inclusions', e.target.value)}
             onBlur={(e) => handleArrayFieldBlur('inclusions', e.target.value)}
-            rows="4"
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none"
+            rows={4}
           />
         </InputCard>
 
         {/* Exclusions */}
         <InputCard label="Exclusions" icon={XCircle} hint="What's not included (comma separated)" className="lg:col-span-1">
-          <textarea
+          <Textarea
             name="exclusions"
             placeholder="Flight tickets, Personal expenses, Travel insurance..."
             value={getArrayFieldValue('exclusions')}
             onChange={(e) => handleArrayFieldChange('exclusions', e.target.value)}
             onBlur={(e) => handleArrayFieldBlur('exclusions', e.target.value)}
-            rows="4"
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all resize-none"
+            rows={4}
           />
         </InputCard>
       </div>
