@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import FlightPreferenceCard from '../FlightPreferenceCard.jsx';
+import FlightPreferenceCard from '../FlightPreferenceCard.tsx';
 
 const prefs = {
   origin: 'CMB',

@@ -6,19 +6,19 @@ import AIRPORTS from "../data/airports";
  * Airport autocomplete — search by city name, airport name, or IATA code.
  * Keyboard navigable, click-outside-to-close.
  *
- * @param {"popular"|"all"} listMode - default list shown on focus before typing.
- *   "popular" (default) — curated shortlist of major hubs
- *   "all" — every airport in alphabetical order
+ * `listMode` ("popular" | "all") controls the default list shown on focus
+ * before typing: "popular" (default) is a curated shortlist of major hubs,
+ * "all" is every airport in alphabetical order.
  */
 export default function AirportAutocomplete({
   value = "",
   onChange,
   placeholder = "City or airport",
-  label,
-  id,
-  excludeCode,
+  label = undefined,
+  id = undefined,
+  excludeCode = undefined,
   listMode = "popular",
-  prioritizeCountry,
+  prioritizeCountry = undefined,
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
