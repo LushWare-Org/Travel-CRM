@@ -240,6 +240,24 @@ Signal Console is the design system for the Management app - the internal tool s
 - Data tables get `overflow-x: auto` on their own wrapper, never the page body - wide tables (invoices, itineraries) must scroll inside their own container.
 - Stat card grids: `repeat(auto-fit, minmax(190px, 1fr))` - reflows from 4-up to 1-up without a hand-authored breakpoint per screen.
 
+## Control Sizing & Consistency
+
+A named height scale, tied to what the primitives already implement - not a new invention:
+
+| Token | Height | Who renders at it |
+|---|---|---|
+| `{control.default}` | 32px (`h-8`) | Button (default), Input, Select (`size="default"`), Tabs/TabsList (no `size` prop exists today - this is always its height). The tier nearly everything uses with no explicit `size` prop. |
+| `{control.compact}` | 28px (`h-7`) | Button `size="sm"`, Select `size="sm"`. Only for a row that's deliberately compact end to end - never mixed with `{control.default}` neighbors. |
+| `{control.tight}` | 24px (`h-6`) | Button `size="xs"`. Icon-only micro-actions, rare. |
+
+**Every control sharing one row or toolbar renders at the same height tier.** Putting `size="sm"` on one control and leaving a neighbor at the unset default is a bug, not a style choice - it's the literal defect Phase 4.2 shipped with (the trip-type `Tabs`, fixed at `{control.default}`, sitting beside a cabin-class `Select` forced to `size="sm"`/`{control.compact}` in the same row). Since `Tabs` has no compact variant today, any row that includes `Tabs` keeps every other control in that row at `{control.default}` too - don't shrink the rest of the row instead.
+
+**Same conceptual role means the same size everywhere it appears, not just within one screen.** This is Nielsen's "consistency and standards" heuristic applied literally: a segmented toggle/filter is a segmented toggle/filter no matter which feature folder it lives in. Once one screen's version of a control is migrated onto a shared primitive, every other screen's equivalent control should converge on that same primitive and size as it migrates in turn - not invent its own row height. (A trip-type toggle and a status-filter row are the same *kind* of control and must end up the same height, even if they're built in different phases.)
+
+**Migrating a row is not the same as migrating a component.** When a row mixes a new primitive with a still-legacy leaf (`AirportAutocomplete`, `CountrySelect`, `PassengerSelector`, or any bare `<input>`/`<button>`), a visual mismatch between old and new *sections* of the app is an expected, temporary state of incremental migration - that's fine. A height mismatch *inside one row* is a different problem: it reads as broken alignment, not "old vs. new," even before the rest of that row gets modernized. Don't introduce this in new work going forward.
+
+**No text smaller than `{typography.caption}` (12px) for real content.** Arbitrary `text-[11px]`/`text-[10px]`/`text-[9px]` escapes below `text-xs` are never acceptable for anything a user reads - section labels, stat captions, badge counts included. 12px is the floor already implied by the type scale above; if a caption feels cramped, the fix is more space or shorter copy, never a smaller font.
+
 ## Elevation & Depth
 
 | Token | Shadow | Use |
@@ -280,6 +298,9 @@ Radius is driven by one CSS variable (`--radius: 0.5rem` in `src/index.css`) tha
 - **`badge`** (`src/components/ui/badge.tsx`): `default` (primary-filled), `secondary`, `destructive`, `outline` variants via `badgeVariants` (`cva`). This is the shadcn-generic version - the actual status pills used across the app (Confirmed/Pending payment/Overdue/Draft, per the Signal Console preview) should compose this with `success`/`warning`/`destructive`/`muted` tokens directly, not the generic variant names, when a feature migration reaches for it.
 - **Categorical (non-state) badges** - e.g. `features/career`'s per-position tag, where a badge exists to visually distinguish *which one of several* rather than *what state* - rotate through `chart-1`..`chart-5` instead (`bg-chart-N/10 text-chart-N`, established in Phase 3.2). Reuses the system's one sanctioned multi-hue palette instead of introducing ad hoc stock Tailwind colors; keep this rotation to genuinely categorical tags, not state.
 
+### Rating Display
+- **Star rating fill** (`features/shared`'s `StarRating`, used in `HotelSelectionModal`, Phase 4.2): filled stars use `text-warning`/`fill-warning`, not a new amber/gold color. This is a deliberate, narrow reuse of the `warning` token outside its usual "state" meaning - `warning`'s hue is already amber, which matches the universal star-rating convention, and introducing a dedicated rating color would violate "don't invent a new gray/hue" for a single decorative use. Empty stars use `text-muted`. Keep this reuse limited to rating displays; don't reach for `warning` as a general-purpose amber outside state or rating contexts.
+
 ### Card
 - **`card`** family (`src/components/ui/card.tsx`): `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardAction`/`CardContent`/`CardFooter`. `bg-card text-card-foreground`, `rounded-xl` container - the base every `StatCard` and panel composes on top of (Phase 2.2 builds `StatCard` on this, not from scratch).
 
@@ -319,6 +340,7 @@ Radius is driven by one CSS variable (`--radius: 0.5rem` in `src/index.css`) tha
 - Reach for `success`/`warning`/`destructive` for state, never for branding.
 - Give every focusable element the `ring` treatment - it's the accent color's second job, and it's not optional.
 - Keep both themes considered together - a color decided only in light mode isn't finished.
+- Give every control sharing a row or toolbar the same height tier - see Control Sizing & Consistency.
 
 ### Don't
 - Don't introduce a second accent hue. No blue *and* teal, no teal *and* amber-as-brand.
@@ -326,6 +348,7 @@ Radius is driven by one CSS variable (`--radius: 0.5rem` in `src/index.css`) tha
 - Don't reach past `{rounded.lg}` (8px) for ordinary buttons/cards, and don't add `shadow-xl`/`shadow-2xl` - see Elevation & Depth.
 - Don't use Public Sans for tabular data or Archivo for body copy - each face has one job.
 - Don't invent a new gray. `foreground`/`muted-foreground`/`border` cover the ladder - if something needs a fourth gray, that's a sign the hierarchy problem is elsewhere (usually: too many things trying to be visually important at once).
+- Don't mix `size="sm"`/compact controls with default-size neighbors in one row, and don't drop below 12px (a `text-[Npx]` under `text-xs`) for real text.
 
 ## Responsive Behavior
 
@@ -351,6 +374,7 @@ No new breakpoint system is introduced in Phase 1 - Tailwind's default breakpoin
 
 - **Form field validation/error states** are not yet designed - Phase 2 introduces `react-hook-form` + zod resolvers, and error-state styling (input border on invalid, error message typography) should be specified then, not improvised per-form.
 - **Empty states and loading skeletons** have no defined visual language yet - each `StatCard` today improvises its own; the consolidated `StatCard` primitive (Phase 2.2) is where this should be settled once, not per-instance.
+- **Phases 0-4.2 predate the Control Sizing & Consistency section above** and are known to violate it in places (row-level height mismatches, a couple of screens still off the shared size scale for same-role controls, a few sub-12px labels) - not fixed retroactively here by design; tracked as a single sweep in `UI_REWRITE_PROGRESS.md`'s Phase 6.6, scheduled after the remaining migration phases land rather than patched piecemeal mid-migration.
 
 ## Chart Theming (recharts)
 
