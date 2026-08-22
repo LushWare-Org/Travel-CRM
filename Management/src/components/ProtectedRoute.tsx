@@ -1,25 +1,26 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-/**
- * ProtectedRoute component to guard routes that require authentication
- * Can also check for specific roles
- */
-export default function ProtectedRoute({ 
-  children, 
+interface ProtectedRouteProps {
+  children: ReactNode;
+  requiredRoles?: string | string[] | null;
+}
+
+export default function ProtectedRoute({
+  children,
   requiredRoles = null,
-}) {
+}: ProtectedRouteProps) {
   const { isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-background">
         <div className="text-center">
           <div className="mb-4">
             <svg
-              className="animate-spin h-12 w-12 text-blue-600 mx-auto"
+              className="animate-spin h-12 w-12 text-primary mx-auto"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -39,18 +40,16 @@ export default function ProtectedRoute({
               ></path>
             </svg>
           </div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Not authenticated - redirect to login
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check role-based access
   if (requiredRoles && user) {
     const hasAccess = Array.isArray(requiredRoles)
       ? requiredRoles.includes(user.role)
@@ -58,14 +57,16 @@ export default function ProtectedRoute({
 
     if (!hasAccess) {
       return (
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center h-screen bg-background">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Access Denied</h1>
-            <p className="text-gray-600 mb-4">
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight text-foreground mb-2">
+              Access Denied
+            </h1>
+            <p className="text-sm text-muted-foreground mb-4">
               You don't have permission to access this page.
             </p>
-            <p className="text-sm text-gray-500">
-              Your role: <span className="font-semibold">{user.role}</span>
+            <p className="text-xs text-muted-foreground">
+              Your role: <span className="font-semibold text-foreground">{user.role}</span>
             </p>
           </div>
         </div>

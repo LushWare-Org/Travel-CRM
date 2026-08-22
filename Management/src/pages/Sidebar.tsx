@@ -1,0 +1,385 @@
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import type { LucideIcon } from "lucide-react";
+import {
+  Menu, X, Home, Users, MapPin, DollarSign, User, LogOut,
+  BarChart3, Briefcase, ChevronRight, ChevronLeft, Sparkles, Plane, Hotel, Settings
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { usePermission } from "../contexts/PermissionContext";
+import toast from "react-hot-toast";
+import { getSidebarInfo } from "../config/branding";
+import { adminAPI } from "../services/api";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+
+// Initials for the sidebar icon when no explicit short name is configured —
+// first letter of the first two words (e.g. "Lush Travel" -> "LT"), or the
+// first two letters of a single-word name.
+const deriveInitials = (name: string): string => {
+  const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+  return "";
+};
+
+interface OrgBranding {
+  companyName?: string;
+  companyShortName?: string;
+  tagline?: string;
+  logoUrl?: string;
+}
+
+interface NavItem {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+  requiredPermission?: string | null;
+  allowedRoles?: string[];
+  requiresAnyPermission?: string[];
+  customCheck?: (
+    userRole: string | undefined,
+    userIsSuperAdmin: boolean | undefined,
+    hasPermission: (perm: string) => boolean
+  ) => boolean;
+}
+
+const Sidebar = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { logout, user } = useAuth();
+  const permission = usePermission();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isMobile, setIsMobile] = useState(false);
+  const [orgBranding, setOrgBranding] = useState<OrgBranding | null>(null);
+
+  // Org-configured company name/logo for the sidebar header — falls back to
+  // the static config/branding.js defaults while loading or if the fetch fails.
+  useEffect(() => {
+    let cancelled = false;
+    adminAPI.getOrganizationBranding()
+      .then((res: { status: string; data?: { branding?: OrgBranding } }) => {
+        if (!cancelled && res.status === 'success' && res.data?.branding) {
+          setOrgBranding(res.data.branding);
+        }
+      })
+      .catch(() => {}); // keep the static fallback
+    return () => { cancelled = true; };
+  }, []);
+
+  const fallbackInfo = getSidebarInfo();
+  const brandInfo = {
+    name: orgBranding?.companyName || fallbackInfo.name,
+    // Prefer an explicit short name; otherwise derive initials from the real
+    // org-configured company name rather than falling through to the static
+    // placeholder default in config/branding.js.
+    shortName:
+      orgBranding?.companyShortName ||
+      (orgBranding?.companyName ? deriveInitials(orgBranding.companyName) : fallbackInfo.shortName),
+    tagline: orgBranding?.tagline || fallbackInfo.tagline,
+    logoUrl: orgBranding?.logoUrl || null,
+  };
+  const canEditOrgSettings = user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'superAdmin';
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    if (isMobile) setMobileOpen(false);
+  }, [location.pathname, isMobile]);
+
+  // Update time every minute
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const navigationItems: NavItem[] = [
+    { icon: Home, label: "Dashboard", path: "/", requiredPermission: null },
+    { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
+    { icon: Users, label: "Lead Management", path: "/leads", requiredPermission: null, allowedRoles: ["salesRep"], requiresAnyPermission: ["manage_leads"] },
+    {
+      icon: MapPin,
+      label: "Packages",
+      path: "/packages",
+      requiredPermission: null,
+      customCheck: (userRole, userIsSuperAdmin, hasPermission) => {
+        if (userRole === 'superAdmin' && userIsSuperAdmin === true) return true;
+        if (userRole === 'salesRep') return true;
+        if (userRole === 'admin') return hasPermission('manage_packages');
+        return false;
+      }
+    },
+    { icon: Plane, label: "Flights", path: "/flights", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
+    { icon: Hotel, label: "Hotels", path: "/hotels", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
+    { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
+    { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] },
+    {
+      icon: Briefcase,
+      label: "Career",
+      path: "/career",
+      requiredPermission: null,
+      customCheck: (userRole) => userRole === 'superAdmin'
+    },
+    {
+      icon: Settings,
+      label: "Organization Settings",
+      path: "/settings",
+      requiredPermission: null,
+      allowedRoles: ["admin", "superAdmin"],
+    },
+  ];
+
+  // Filter navigation items based on permissions and roles
+  const accessibleItems = navigationItems.filter((item) => {
+    if (item.customCheck) {
+      return item.customCheck(user?.role, user?.isSuperAdmin, (perm: string) => permission.hasPermission(perm));
+    }
+    if (item.allowedRoles) {
+      return item.allowedRoles.includes(user?.role);
+    }
+    if (!item.requiredPermission && !item.requiresAnyPermission) {
+      return true;
+    }
+    if (item.requiredPermission) {
+      return permission.hasPermission(item.requiredPermission);
+    }
+    if (item.requiresAnyPermission) {
+      return item.requiresAnyPermission.some((perm) => permission.hasPermission(perm));
+    }
+    return false;
+  });
+
+  const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast.error("Logout failed");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const formatGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  // Toggle for mobile
+  const toggleMobile = useCallback(() => setMobileOpen(prev => !prev), []);
+
+  const sidebarContent = (isExpanded: boolean) => (
+    <div className={`${isExpanded ? "w-72" : "w-20"} h-full relative flex-shrink-0 transition-all duration-300`}>
+      <div className="h-full w-full flex flex-col relative overflow-hidden bg-sidebar border-r border-sidebar-border">
+
+        {/* Header / Brand */}
+        <div className="p-5 border-b border-sidebar-border relative z-10">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (!canEditOrgSettings) return;
+                navigate('/settings');
+                if (isMobile) setMobileOpen(false);
+              }}
+              title={canEditOrgSettings ? 'Organization Settings' : brandInfo.name}
+              className={`${isExpanded ? 'w-11 h-11' : 'w-10 h-10'} rounded-lg flex items-center justify-center font-bold text-sidebar-primary-foreground bg-sidebar-primary transition-colors duration-200 flex-shrink-0 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:bg-sidebar-primary/90' : 'cursor-default'}`}
+              disabled={!canEditOrgSettings}
+            >
+              {brandInfo.logoUrl ? (
+                <img src={brandInfo.logoUrl} alt={brandInfo.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className={`${isExpanded ? 'text-base' : 'text-sm'} font-heading font-extrabold tracking-tight`}>
+                  {brandInfo.shortName.substring(0, 2)}
+                </span>
+              )}
+            </button>
+            {isExpanded && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canEditOrgSettings) return;
+                  navigate('/settings');
+                  if (isMobile) setMobileOpen(false);
+                }}
+                disabled={!canEditOrgSettings}
+                className={`flex-1 min-w-0 text-left ${canEditOrgSettings ? 'cursor-pointer group/brand' : 'cursor-default'}`}
+              >
+                <h1 className={`font-heading text-base font-bold text-sidebar-foreground truncate ${canEditOrgSettings ? 'group-hover/brand:text-sidebar-primary' : ''}`}>
+                  {brandInfo.name}
+                </h1>
+                <p className="text-xs text-muted-foreground truncate">{brandInfo.tagline}</p>
+              </button>
+            )}
+            {/* Close button on mobile */}
+            {isMobile && isExpanded && (
+              <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg hover:bg-sidebar-accent text-muted-foreground ml-auto">
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto relative z-10">
+          <div className={`${isExpanded ? 'px-3' : 'px-1'} mb-4`}>
+            {isExpanded && (
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Main Menu</p>
+            )}
+          </div>
+
+          {accessibleItems.map((item, index) => {
+            const active = isActive(item.path);
+            const hovered = hoveredItem === index;
+
+            return (
+              <button
+                key={item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) setMobileOpen(false);
+                  else setSidebarOpen(false);
+                }}
+                onMouseEnter={() => setHoveredItem(index)}
+                onMouseLeave={() => setHoveredItem(null)}
+                title={item.label}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-150 text-left group relative overflow-hidden ${active
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                  }`}
+              >
+                <item.icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`} />
+
+                {isExpanded && (
+                  <>
+                    <span className={`text-sm font-medium flex-1 ${active ? 'text-sidebar-primary-foreground' : ''}`}>
+                      {item.label}
+                    </span>
+                    <ChevronRight className={`w-4 h-4 transition-all duration-200 ${active ? 'text-sidebar-primary-foreground/70 opacity-100' : 'text-muted-foreground opacity-0 group-hover:opacity-100'
+                      } ${hovered ? 'translate-x-1' : ''}`} />
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* User Profile Section */}
+        {isExpanded && user && (
+          <div className="p-4 border-t border-sidebar-border relative z-10">
+            <div className="rounded-lg p-3 bg-sidebar-accent">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sidebar-primary-foreground bg-sidebar-primary font-semibold flex-shrink-0">
+                  {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">{formatGreeting()}</p>
+                  <p className="text-sm font-semibold text-sidebar-foreground truncate">{user.name}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-1.5">
+                {user.role === 'superAdmin' && <Sparkles className="w-3.5 h-3.5 text-sidebar-primary" />}
+                <Badge variant="secondary">
+                  {user.role === 'superAdmin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'Sales Rep'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer Actions */}
+        <div className="p-4 space-y-2 relative z-10">
+          <Button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            variant="destructive"
+            title={isLoggingOut ? "Signing out..." : "Sign Out"}
+            className="w-full justify-start gap-3 px-4 h-10"
+          >
+            <LogOut className="w-4 h-4" />
+            {isExpanded && <span>{isLoggingOut ? "Signing out..." : "Sign Out"}</span>}
+          </Button>
+        </div>
+      </div>
+
+      {/* Collapse/expand toggle — straddles the sidebar's right edge, vertically
+          centered, so it stays in the same relative spot whether expanded or
+          collapsed. Single, predictable control for this state (replaces the
+          old bottom-of-sidebar button, which became indistinguishable from
+          nav icons once collapsed). */}
+      {!isMobile && (
+        <button
+          type="button"
+          onClick={() => setSidebarOpen((prev) => !prev)}
+          title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-card border border-border shadow-card text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors duration-150"
+        >
+          {sidebarOpen ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </button>
+      )}
+    </div>
+  );
+
+  // Mobile: render hamburger button + overlay drawer
+  if (isMobile) {
+    return (
+      <>
+        {/* Mobile Hamburger Button - Fixed top-left */}
+        {!mobileOpen && (
+          <button
+            onClick={toggleMobile}
+            className="fixed top-3 left-3 z-50 p-2.5 rounded-lg bg-card shadow-card border border-border text-muted-foreground hover:text-primary transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Overlay */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
+        {/* Sidebar Drawer */}
+        <div
+          className={`fixed top-0 left-0 h-full z-50 transform transition-transform duration-300 ease-in-out ${
+            mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          {sidebarContent(true)}
+        </div>
+      </>
+    );
+  }
+
+  // Desktop: render inline sidebar
+  return sidebarContent(sidebarOpen);
+};
+
+export default Sidebar;

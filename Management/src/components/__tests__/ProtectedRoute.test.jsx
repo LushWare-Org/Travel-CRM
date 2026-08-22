@@ -6,7 +6,7 @@ const { mockUseAuth } = vi.hoisted(() => ({ mockUseAuth: vi.fn() }));
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: mockUseAuth }));
 
-import ProtectedRoute from '../ProtectedRoute.jsx';
+import ProtectedRoute from '../ProtectedRoute.tsx';
 
 // Rendered under a real <Routes> (with a /login destination), matching how
 // ProtectedRoute is actually used in App.jsx — otherwise a redirecting
