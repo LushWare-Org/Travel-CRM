@@ -7,6 +7,7 @@ import { sendVoucherEmail } from '../utils/emailService.js';
 import { sendVoucherWhatsapp } from '../utils/whatsappService.js';
 import { uploadPdfBuffer } from '../utils/cloudinary.js';
 import { sendVoucherSchema, createVoucherSchema, updateVoucherSchema } from '../validators/voucher.validator.js';
+import { logLeadCommunication } from '../services/events.client.js';
 
 const voucherInclude = {
   locationDates: { orderBy: { order: 'asc' } },
@@ -117,6 +118,13 @@ export const sendVoucher = asyncHandler(async (req, res) => {
         data: { ...statusUpdate, whatsappSent: true, whatsappSentAt: now, pdfUrl: mediaUrl },
         include: voucherInclude,
       });
+      try {
+        await logLeadCommunication({
+          leadId: voucher.leadId, type: 'whatsapp', notes: `WhatsApp: Voucher ${voucher.voucherNumber} sent`,
+        });
+      } catch (err) {
+        req.log.error({ err, leadId: voucher.leadId }, 'Failed to log WhatsApp send on lead timeline');
+      }
       return res.json({ success: true, message: 'Voucher sent via WhatsApp', data: updated });
     }
 

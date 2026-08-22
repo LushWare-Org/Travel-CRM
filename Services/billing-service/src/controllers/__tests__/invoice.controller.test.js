@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockFindUnique, mockUpdate, mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload } = vi.hoisted(() => ({
+const { mockFindUnique, mockUpdate, mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload, mockLogLeadCommunication } = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
   mockUpdate: vi.fn(),
   mockGeneratePDF: vi.fn(),
   mockSendEmail: vi.fn(),
   mockSendWhatsapp: vi.fn(),
   mockUpload: vi.fn(),
+  mockLogLeadCommunication: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
@@ -16,6 +17,7 @@ vi.mock('../../utils/invoicePDFGenerator.js', () => ({ generateInvoicePDF: mockG
 vi.mock('../../utils/emailService.js', () => ({ sendInvoiceEmail: mockSendEmail }));
 vi.mock('../../utils/whatsappService.js', () => ({ sendInvoiceWhatsapp: mockSendWhatsapp }));
 vi.mock('../../utils/cloudinary.js', () => ({ uploadPdfBuffer: mockUpload }));
+vi.mock('../../services/events.client.js', () => ({ logLeadCommunication: mockLogLeadCommunication }));
 
 import { downloadInvoicePDF, sendInvoice } from '../invoice.controller.js';
 import AppError from '../../utils/appError.js';
@@ -36,6 +38,7 @@ function mockRes() {
 
 async function run(handler, req) {
   const res = mockRes();
+  req.log = req.log || { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
   let nextErr;
   await handler(req, res, (err) => { nextErr = err; });
   return { res, nextErr };
@@ -49,6 +52,7 @@ beforeEach(() => {
   mockSendEmail.mockResolvedValue({ messageId: 'm-1' });
   mockSendWhatsapp.mockResolvedValue({ sid: 'SM1' });
   mockUpload.mockResolvedValue('https://cdn.example.com/invoices/inv.pdf');
+  mockLogLeadCommunication.mockResolvedValue({ matched: true });
 });
 
 describe('downloadInvoicePDF', () => {
@@ -111,7 +115,17 @@ describe('sendInvoice', () => {
     expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'sent', whatsappSent: true, pdfUrl: 'https://cdn.example.com/invoices/inv.pdf' }),
     }));
+    expect(mockLogLeadCommunication).toHaveBeenCalledWith(expect.objectContaining({ type: 'whatsapp' }));
     expect(res.json).toHaveBeenCalled();
+  });
+
+  it('still marks the invoice sent when logging to the lead timeline fails', async () => {
+    mockLogLeadCommunication.mockRejectedValue(new Error('lead-service unreachable'));
+
+    const { res, nextErr } = await run(sendInvoice, { params: { id: 'inv-1' }, body: { channel: 'whatsapp' } });
+
+    expect(nextErr).toBeUndefined();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   });
 
   it('returns a 400 (not a crash) when the channel is not configured', async () => {

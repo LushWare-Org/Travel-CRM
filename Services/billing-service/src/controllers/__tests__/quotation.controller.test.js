@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockFindUnique, mockUpdate,
   mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload,
-  mockCreateOrVersion,
+  mockCreateOrVersion, mockLogLeadCommunication,
 } = vi.hoisted(() => ({
   mockFindUnique: vi.fn(),
   mockUpdate: vi.fn(),
@@ -12,6 +12,7 @@ const {
   mockSendWhatsapp: vi.fn(),
   mockUpload: vi.fn(),
   mockCreateOrVersion: vi.fn(),
+  mockLogLeadCommunication: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
@@ -21,7 +22,7 @@ vi.mock('../../utils/quotationPDFGenerator.js', () => ({ generateQuotationPDF: m
 vi.mock('../../utils/emailService.js', () => ({ sendQuotationEmail: mockSendEmail }));
 vi.mock('../../utils/whatsappService.js', () => ({ sendQuotationWhatsapp: mockSendWhatsapp }));
 vi.mock('../../utils/cloudinary.js', () => ({ uploadPdfBuffer: mockUpload }));
-vi.mock('../../services/events.client.js', () => ({ emitLeadEvent: vi.fn() }));
+vi.mock('../../services/events.client.js', () => ({ emitLeadEvent: vi.fn(), logLeadCommunication: mockLogLeadCommunication }));
 vi.mock('../../services/quotation.service.js', () => ({
   createOrVersionQuotation: mockCreateOrVersion,
   quotationTotals: vi.fn(),
@@ -46,6 +47,7 @@ function mockRes() {
 /** Invoke the asyncHandler-wrapped controller and surface any error it forwards to next. */
 async function run(handler, req) {
   const res = mockRes();
+  req.log = req.log || { error: vi.fn(), info: vi.fn(), warn: vi.fn() };
   let nextErr;
   await handler(req, res, (err) => { nextErr = err; });
   return { res, nextErr };
@@ -59,6 +61,7 @@ beforeEach(() => {
   mockSendEmail.mockResolvedValue({ messageId: 'm-1' });
   mockSendWhatsapp.mockResolvedValue({ sid: 'SM1' });
   mockUpload.mockResolvedValue('https://cdn.example.com/quotations/q.pdf');
+  mockLogLeadCommunication.mockResolvedValue({ matched: true });
 });
 
 describe('sendQuotation', () => {

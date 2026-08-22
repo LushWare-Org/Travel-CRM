@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockVoucherFindUnique, mockVoucherUpdate, mockVoucherCreate, mockVoucherDelete,
   mockLocationDateDeleteMany, mockMealPlanDeleteMany, mockItinerarySummaryDeleteMany, mockFlightSegmentDeleteMany,
-  mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload,
+  mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload, mockLogLeadCommunication,
 } = vi.hoisted(() => ({
   mockVoucherFindUnique: vi.fn(),
   mockVoucherUpdate: vi.fn(),
@@ -17,6 +17,7 @@ const {
   mockSendEmail: vi.fn(),
   mockSendWhatsapp: vi.fn(),
   mockUpload: vi.fn(),
+  mockLogLeadCommunication: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
@@ -37,6 +38,7 @@ vi.mock('../../utils/cloudinary.js', () => ({ uploadPdfBuffer: mockUpload }));
 vi.mock('../../utils/docNumber.js', () => ({
   nextVoucherNumber: vi.fn().mockResolvedValue('VOU-202608-00001'),
 }));
+vi.mock('../../services/events.client.js', () => ({ logLeadCommunication: mockLogLeadCommunication }));
 
 import {
   createVoucher, updateVoucher, sendVoucher, downloadVoucherPDF,
@@ -80,6 +82,7 @@ beforeEach(() => {
   mockSendEmail.mockResolvedValue({ messageId: 'm-1' });
   mockSendWhatsapp.mockResolvedValue({ sid: 'SM1' });
   mockUpload.mockResolvedValue('https://cdn.example.com/vouchers/vch.pdf');
+  mockLogLeadCommunication.mockResolvedValue({ matched: true });
 });
 
 describe('createVoucher', () => {

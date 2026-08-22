@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockReceiptFindUnique, mockReceiptUpdate, mockReceiptCreate,
   mockInvoiceFindUnique, mockInvoiceUpdate, mockTransaction,
-  mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload,
+  mockGeneratePDF, mockSendEmail, mockSendWhatsapp, mockUpload, mockLogLeadCommunication,
 } = vi.hoisted(() => ({
   mockReceiptFindUnique: vi.fn(),
   mockReceiptUpdate: vi.fn(),
@@ -15,6 +15,7 @@ const {
   mockSendEmail: vi.fn(),
   mockSendWhatsapp: vi.fn(),
   mockUpload: vi.fn(),
+  mockLogLeadCommunication: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
@@ -32,6 +33,7 @@ vi.mock('../../utils/docNumber.js', () => ({
   nextReceiptNumber: vi.fn().mockResolvedValue('REC-202608-00001'),
   nextPaymentHistoryNumber: vi.fn().mockResolvedValue('PAY-202608-00001'),
 }));
+vi.mock('../../services/events.client.js', () => ({ emitLeadEvent: vi.fn(), logLeadCommunication: mockLogLeadCommunication }));
 
 import { createPaymentReceipt, downloadPaymentReceiptPDF, sendPaymentReceipt } from '../paymentReceipt.controller.js';
 import AppError from '../../utils/appError.js';
@@ -89,6 +91,7 @@ beforeEach(() => {
   mockSendEmail.mockResolvedValue({ messageId: 'm-1' });
   mockSendWhatsapp.mockResolvedValue({ sid: 'SM1' });
   mockUpload.mockResolvedValue('https://cdn.example.com/receipts/rec.pdf');
+  mockLogLeadCommunication.mockResolvedValue({ matched: true });
 });
 
 describe('createPaymentReceipt', () => {
