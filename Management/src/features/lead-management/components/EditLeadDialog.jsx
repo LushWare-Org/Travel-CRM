@@ -60,9 +60,9 @@ function mapSelection(raw) {
 
 // ── Module-level components (prevents remounting on re-render) ──
 
-function EditInputField({ label, required, icon: Icon, locked, children }) {
+function EditInputField({ label, required, icon: Icon, locked, children, testId }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid={testId}>
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
         {Icon && <Icon className="w-4 h-4 text-gray-400" />}
         {label}
@@ -476,7 +476,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
 
             {expandedSections.personal && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                <EditInputField label="Full Name" required icon={User}>
+                <EditInputField label="Full Name" required icon={User} testId="edit-lead-name">
                   <input
                     type="text"
                     aria-label="Full Name"
@@ -497,7 +497,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                   />
                 </EditInputField>
 
-                <EditInputField label="Contact Number" required icon={Phone}>
+                <EditInputField label="Contact Number" required icon={Phone} testId="edit-lead-phone">
                   <PhoneInput
                     international
                     defaultCountry="LK"
@@ -631,12 +631,12 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                     className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                   >
                     <option value="">Select Platform</option>
-                    <option value="Website Form">🌐 Website Form</option>
-                    <option value="Social Media">📱 Social Media</option>
-                    <option value="Phone Call">📞 Phone Call</option>
+                    <option value="Website_Form">🌐 Website Form</option>
+                    <option value="Social_Media">📱 Social Media</option>
+                    <option value="Phone_Call">📞 Phone Call</option>
                     <option value="Referral">🤝 Referral</option>
                     <option value="Email">📧 Email</option>
-                    <option value="Walk-in">🚶 Walk-in</option>
+                    <option value="Walk_in">🚶 Walk-in</option>
                   </select>
                 </EditInputField>
               </div>

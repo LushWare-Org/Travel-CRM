@@ -3,6 +3,16 @@ import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { sendApplicantConfirmation, sendAdminApplicationNotice, sendApplicationStatusUpdate } from '../utils/email.js';
 
+// The Prisma `CareerStatus` enum stores "under-review" as its DB value but
+// its JS-facing identifier is `under_review` (see prisma/schema.prisma's
+// `@map("under-review")`) — every other status's identifier already matches
+// its DB value, so this is the only one that needs translating at the
+// persistence boundary. Without this, passing the API's own `validStatuses`
+// value straight to Prisma throws PrismaClientValidationError.
+const toPrismaStatus = (status) => (status === 'under-review' ? 'under_review' : status);
+const toApiStatus = (status) => (status === 'under_review' ? 'under-review' : status);
+const withApiStatus = (record) => (record ? { ...record, status: toApiStatus(record.status) } : record);
+
 export const applyForPosition = asyncHandler(async (req, res) => {
   const { fullName, email, phone, position, coverLetter, agreeTerms, resumeUrl, resumeFileName } = req.body;
 
@@ -64,7 +74,7 @@ export const applyForPosition = asyncHandler(async (req, res) => {
 export const getCareerApplications = asyncHandler(async (req, res) => {
   const { status, position, sortBy = 'createdAt', page = 1, limit = 10 } = req.query;
   const where = {};
-  if (status) where.status = status;
+  if (status) where.status = toPrismaStatus(status);
   if (position) where.position = { contains: position, mode: 'insensitive' };
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -73,13 +83,13 @@ export const getCareerApplications = asyncHandler(async (req, res) => {
     prisma.career.count({ where }),
   ]);
 
-  res.json({ status: 'success', data: { applications, pagination: { total, pages: Math.ceil(total / parseInt(limit)), currentPage: parseInt(page), limit: parseInt(limit) } } });
+  res.json({ status: 'success', data: { applications: applications.map(withApiStatus), pagination: { total, pages: Math.ceil(total / parseInt(limit)), currentPage: parseInt(page), limit: parseInt(limit) } } });
 });
 
 export const getApplicationDetails = asyncHandler(async (req, res) => {
   const application = await prisma.career.findUnique({ where: { id: req.params.id } });
   if (!application) throw new AppError('Application not found', 404);
-  res.json({ status: 'success', data: { application } });
+  res.json({ status: 'success', data: { application: withApiStatus(application) } });
 });
 
 export const updateApplicationStatus = asyncHandler(async (req, res) => {
@@ -93,7 +103,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
   const updated = await prisma.career.update({
     where: { id: req.params.id },
     data: {
-      ...(status && { status }),
+      ...(status && { status: toPrismaStatus(status) }),
       ...(adminNotes && { adminNotes }),
       reviewedById: req.user.id,
       reviewedAt: new Date(),
@@ -111,7 +121,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
     }).catch((err) => req.log.error({ err, email: application.email }, 'Failed to send application status email'));
   }
 
-  res.json({ status: 'success', message: 'Application updated', data: { application: updated } });
+  res.json({ status: 'success', message: 'Application updated', data: { application: withApiStatus(updated) } });
 });
 
 export const getCareerStats = asyncHandler(async (req, res) => {
@@ -119,7 +129,10 @@ export const getCareerStats = asyncHandler(async (req, res) => {
     prisma.career.count(),
     prisma.career.groupBy({ by: ['status'], _count: true }),
   ]);
-  res.json({ status: 'success', data: { total, byStatus } });
+  res.json({
+    status: 'success',
+    data: { total, byStatus: byStatus.map((b) => ({ ...b, status: toApiStatus(b.status) })) },
+  });
 });
 
 export const deleteApplication = asyncHandler(async (req, res) => {
@@ -144,5 +157,5 @@ export const searchApplications = asyncHandler(async (req, res) => {
     },
     take: 20,
   });
-  res.json({ status: 'success', data: { applications } });
+  res.json({ status: 'success', data: { applications: applications.map(withApiStatus) } });
 });

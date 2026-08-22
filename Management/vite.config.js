@@ -12,7 +12,7 @@ export default defineConfig({
     extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json']
   },
   server: {
-    open: true,
+    open: !process.env.CI,
     proxy: {
       "/api": "https://api.lushtravelcloud.com",
     },

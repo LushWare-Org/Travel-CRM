@@ -412,7 +412,7 @@ const LeadManagement = () => {
                 className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                <span className="hidden xs:inline">New Lead</span>
+                <span className="hidden sm:inline">New Lead</span>
               </button>
             </div>
           </div>

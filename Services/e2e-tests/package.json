@@ -1,0 +1,13 @@
+{
+  "name": "@travel-crm/e2e-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5",
+    "vitest": "^2.1.9"
+  }
+}

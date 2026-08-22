@@ -25,6 +25,7 @@ Please describe the tests that you ran to verify your changes:
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] Manual testing performed
+- [ ] Ran `npm run test:e2e` in `Management/` locally — **required** for any change touching Login, Sidebar, or Lead Management (not CI-gated, see `docs/CONTRIBUTING.md`)
 
 **Test Coverage**: `___%` (before) → `___%` (after)
 
