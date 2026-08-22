@@ -276,7 +276,28 @@ Radius is driven by one CSS variable (`--radius: 0.5rem` in `src/index.css`) tha
 - **`button-destructive`** (`variant="destructive"`): `bg-destructive/10 text-destructive` - a soft-fill treatment, not a solid red button, so destructive actions read as "careful" rather than alarming.
 - Sizes: `default`/`sm`/`lg`/`xs` plus icon-only variants - see `button.tsx` for the full `cva` variant map.
 
-*(Card, Dialog/Modal, Table, Badge, Form primitives are scaffolded in Phase 2 - add their entries here as they land, following the pattern above: what it's for, which tokens it composes, what states it has.)*
+### Badge
+- **`badge`** (`src/components/ui/badge.tsx`): `default` (primary-filled), `secondary`, `destructive`, `outline` variants via `badgeVariants` (`cva`). This is the shadcn-generic version - the actual status pills used across the app (Confirmed/Pending payment/Overdue/Draft, per the Signal Console preview) should compose this with `success`/`warning`/`destructive`/`muted` tokens directly, not the generic variant names, when a feature migration reaches for it.
+
+### Card
+- **`card`** family (`src/components/ui/card.tsx`): `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardAction`/`CardContent`/`CardFooter`. `bg-card text-card-foreground`, `rounded-xl` container - the base every `StatCard` and panel composes on top of (Phase 2.2 builds `StatCard` on this, not from scratch).
+
+### Dialog
+- **`dialog`** family (`src/components/ui/dialog.tsx`): `Dialog`/`DialogTrigger`/`DialogPortal`/`DialogClose`/`DialogOverlay`/`DialogContent`/`DialogHeader`/`DialogFooter`. This is the direct replacement for every hand-rolled `fixed inset-0 bg-black/50` + `rounded-2xl bg-white shadow-2xl` modal pattern found across `lead-management` (`QuotationModal`, `InvoiceDialog`, `ReceiptDialog`, `VoucherDialog`, etc.) - when those migrate (Phase 4), they compose this, not their own markup.
+
+### Table
+- **`table`** family (`src/components/ui/table.tsx`): `Table`/`TableHeader`/`TableBody`/`TableFooter`/`TableRow`/`TableHead`/`TableCell`/`TableCaption`. This is the raw primitive only - Phase 2.3's actual `DataTable` wrapper (sort/empty-state/loading conventions, `{typography.data}` + `tabular-nums` on numeric columns) still needs to be built on top of this before `lead-management`/`analytics`/`user-management` migrate.
+
+### Form Inputs
+- **`input`** (`src/components/ui/input.tsx`), **`textarea`** (`src/components/ui/textarea.tsx`), **`select`** family (`src/components/ui/select.tsx`: `Select`/`SelectTrigger`/`SelectContent`/`SelectItem`/`SelectGroup`/`SelectLabel`/`SelectSeparator`/`SelectValue`). Bare primitives - the `react-hook-form` + zod `Form`/`FormField` wrapper (Phase 2.4) still needs to be built to actually use these in a real form without every dialog hand-rolling its own validation/error-display plumbing.
+
+### Tabs
+- **`tabs`** family (`src/components/ui/tabs.tsx`): `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`, `tabsListVariants` (`cva`).
+
+### Popover
+- **`popover`** family (`src/components/ui/popover.tsx`): `Popover`/`PopoverTrigger`/`PopoverContent`/`PopoverHeader`/`PopoverTitle`/`PopoverDescription`.
+
+*(Form/`FormField` wrapper and the `StatCard`/`DataTable` composites are still open - Phase 2.2-2.4.)*
 
 ## Do's and Don'ts
 
