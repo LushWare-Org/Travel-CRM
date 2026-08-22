@@ -1,7 +1,6 @@
 /**
- * Itinerary Editor Component - Redesigned
- * Modern card-based day editor with premium styling
- * Aligned with backend day-based structure
+ * Itinerary Editor Component
+ * Card-based day editor aligned with the backend day-based structure
  */
 
 import {
@@ -39,15 +38,20 @@ import {
 } from '../utils/flightSync';
 import { createDefaultTransportRow } from '@travel-crm/constants';
 import { formatCurrency } from '../../../utils/currency.js';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 // ═══════════════════════════════════════════════════════════════════
 //  Hotel Stay Card — shown when a hotel is selected from the API
 // ═══════════════════════════════════════════════════════════════════
-function HotelStayCard({ accommodation, onSearch, onRemove }) {
+function HotelStayCard({ accommodation, onSearch, onRemove }: { accommodation: any; onSearch: () => void; onRemove: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const acc = accommodation || {};
 
-  function fmtMoney(amount, currency) {
+  function fmtMoney(amount: number | null | undefined, currency?: string | null) {
     if (amount == null) return null;
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(amount);
   }
@@ -55,42 +59,42 @@ function HotelStayCard({ accommodation, onSearch, onRemove }) {
   const priceStr = fmtMoney(acc.totalAmount, acc.currency);
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       <div className="flex flex-col sm:flex-row gap-4 p-4">
         {/* Image */}
-        <div className="w-full sm:w-40 h-32 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+        <div className="w-full sm:w-40 h-32 rounded-lg overflow-hidden bg-muted shrink-0">
           {acc.hotelImage ? (
             <img src={acc.hotelImage} alt={acc.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <Building2 className="w-10 h-10 text-gray-300" />
+              <Building2 className="w-10 h-10 text-muted-foreground" />
             </div>
           )}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <h4 className="text-base font-bold text-gray-900">{acc.name}</h4>
+          <h4 className="text-base font-bold text-foreground">{acc.name}</h4>
 
           {/* Stars */}
           <div className="flex items-center gap-0.5 mt-1">
             {Array.from({ length: 5 }, (_, i) => (
               <Star
                 key={i}
-                className={`w-4 h-4 ${acc.rating != null && i < Math.round(Number(acc.rating)) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`}
+                className={cn('w-4 h-4', acc.rating != null && i < Math.round(Number(acc.rating)) ? 'fill-warning text-warning' : 'text-muted')}
               />
             ))}
             {acc.rating != null && acc.rating > 0 && (
-              <span className="ml-1 text-xs text-gray-500">{Number(acc.rating).toFixed(1)}</span>
+              <span className="ml-1 text-xs text-muted-foreground">{Number(acc.rating).toFixed(1)}</span>
             )}
             {(!acc.rating || acc.rating === 0) && (
-              <span className="ml-1 text-xs text-gray-400">—</span>
+              <span className="ml-1 text-xs text-muted-foreground">—</span>
             )}
           </div>
 
           {/* Address */}
           {acc.address && (
-            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1.5">
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1.5">
               <MapPin className="w-3 h-3 shrink-0" /> {acc.address}
             </p>
           )}
@@ -98,22 +102,22 @@ function HotelStayCard({ accommodation, onSearch, onRemove }) {
           {/* Badges row */}
           <div className="flex flex-wrap gap-1.5 mt-2">
             {acc.roomType && (
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
                 <Bed className="w-3 h-3" /> {acc.roomType}
               </span>
             )}
             {acc.boardType && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
                 {acc.boardType}
               </span>
             )}
             {acc.refundable && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">
                 Refundable
               </span>
             )}
             {priceStr && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 font-semibold">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-semibold">
                 {priceStr}{acc.cheapestRate ? '' : '/night'}
               </span>
             )}
@@ -122,20 +126,12 @@ function HotelStayCard({ accommodation, onSearch, onRemove }) {
 
         {/* Actions */}
         <div className="flex sm:flex-col gap-2 shrink-0 items-end">
-          <button
-            type="button"
-            onClick={onSearch}
-            className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-          >
+          <Button type="button" onClick={onSearch} variant="outline" size="sm">
             Change
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-          >
+          </Button>
+          <Button type="button" onClick={onRemove} variant="destructive" size="sm">
             Remove
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -143,7 +139,7 @@ function HotelStayCard({ accommodation, onSearch, onRemove }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-2 flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+        className="w-full px-4 py-2 flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted border-t border-border transition-colors"
       >
         {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         {expanded ? 'Less details' : 'More details'}
@@ -151,34 +147,34 @@ function HotelStayCard({ accommodation, onSearch, onRemove }) {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 text-xs text-gray-600">
+        <div className="px-4 pb-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 text-xs text-muted-foreground">
           {acc.contactNumber && (
             <div className="flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <Phone className="w-3.5 h-3.5 shrink-0" />
               <span>{acc.contactNumber}</span>
             </div>
           )}
           {acc.address && (
             <div className="flex items-center gap-1.5 sm:col-span-2">
-              <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
               <span>{acc.address}</span>
             </div>
           )}
           {priceStr && (
             <div className="flex items-center gap-1.5">
-              <span className="text-gray-400 shrink-0">Price:</span>
-              <span className="font-semibold text-gray-800">{priceStr}</span>
+              <span className="shrink-0">Price:</span>
+              <span className="font-semibold text-foreground">{priceStr}</span>
             </div>
           )}
           {acc.type && (
             <div className="flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <Building2 className="w-3.5 h-3.5 shrink-0" />
               <span className="capitalize">{acc.type}</span>
             </div>
           )}
           <div className="flex items-center gap-1.5 sm:col-span-2">
-            <span className="text-gray-400 shrink-0">Hotel ID:</span>
-            <span className="font-mono text-gray-400">{acc.hotelId || '—'}</span>
+            <span className="shrink-0">Hotel ID:</span>
+            <span className="font-mono">{acc.hotelId || '—'}</span>
           </div>
         </div>
       )}
@@ -190,11 +186,31 @@ function HotelStayCard({ accommodation, onSearch, onRemove }) {
  * Best-effort flight price lookup across the shapes the flight modal and
  * loaded packages may produce (totalAmount / fareTotal / price).
  */
-function getFlightPrice(flight) {
+function getFlightPrice(flight: any) {
   if (!flight) return null;
   const value = flight.totalAmount ?? flight.fareTotal ?? flight.price;
   return value == null || value === '' ? null : Number(value);
 }
+
+interface ItineraryEditorProps {
+  days?: any[];
+  onDayChange: (dayNumber: number, patch: any) => void;
+  onAddDay: () => void;
+  onRemoveDay: (dayNumber: number) => void;
+  destination?: string;
+  packageType?: string;
+  category?: string;
+  useLocationAutocomplete?: boolean;
+  LocationAutocompleteComponent?: any;
+  hideTitleAndDescription?: boolean;
+  hideDescription?: boolean;
+}
+
+const MEALS = [
+  { key: 'breakfast', label: 'Breakfast', icon: Coffee },
+  { key: 'lunch', label: 'Lunch', icon: UtensilsCrossed },
+  { key: 'dinner', label: 'Dinner', icon: Moon },
+] as const;
 
 const ItineraryEditor = ({
   days = [],
@@ -208,38 +224,38 @@ const ItineraryEditor = ({
   LocationAutocompleteComponent = null,
   hideTitleAndDescription = false,
   hideDescription = false,
-}) => {
-  const [uploadingDayImages, setUploadingDayImages] = useState({});
-  const [currentDayForHotel, setCurrentDayForHotel] = useState(null);
-  const [currentDayLocations, setCurrentDayLocations] = useState([]);
+}: ItineraryEditorProps) => {
+  const [uploadingDayImages, setUploadingDayImages] = useState<Record<number, boolean>>({});
+  const [currentDayForHotel, setCurrentDayForHotel] = useState<number | null>(null);
+  const [currentDayLocations, setCurrentDayLocations] = useState<string[]>([]);
   const [autoFillingHotel, setAutoFillingHotel] = useState(false);
-  const [expandedDays, setExpandedDays] = useState(() => {
+  const [expandedDays, setExpandedDays] = useState<Record<number, boolean>>(() => {
     // Initialize all days expanded synchronously — no post-mount flicker
-    const init = {};
+    const init: Record<number, boolean> = {};
     days.forEach(day => { if (day && day.dayNumber != null) init[day.dayNumber] = true; });
     return init;
   });
   const [showFlightModal, setShowFlightModal] = useState(false);
   // { dayNumber, index } — index null means "add a new flight".
-  const [flightModalTarget, setFlightModalTarget] = useState(null);
+  const [flightModalTarget, setFlightModalTarget] = useState<{ dayNumber: number; index: number | null } | null>(null);
   const [showHotelModal, setShowHotelModal] = useState(false);
-  const [hotelModalMode, setHotelModalMode] = useState('suggest');
-  const [highlightedFlightSection, setHighlightedFlightSection] = useState(null);
+  const [hotelModalMode, setHotelModalMode] = useState<'search' | 'suggest'>('suggest');
+  const [highlightedFlightSection, setHighlightedFlightSection] = useState<number | null>(null);
   // Cost subsections are collapsed by default — summary chips show totals.
-  const [expandedCosts, setExpandedCosts] = useState({});
+  const [expandedCosts, setExpandedCosts] = useState<Record<number, boolean>>({});
 
-  const toggleCostsExpand = (dayNumber) => {
+  const toggleCostsExpand = (dayNumber: number) => {
     setExpandedCosts(prev => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
   };
 
-  const handleMealToggle = (day, mealKey, checked) => {
+  const handleMealToggle = (day: any, mealKey: string, checked: boolean) => {
     onDayChange(day.dayNumber, {
       meals: { ...(day.meals || {}), [mealKey]: checked },
       [`${mealKey}Count`]: checked ? 1 : 0,
     });
   };
 
-  const handleMealCountChange = (day, field, value) => {
+  const handleMealCountChange = (day: any, field: string, value: string) => {
     const num = Math.max(0, parseInt(value, 10) || 0);
     onDayChange(day.dayNumber, {
       [field]: num,
@@ -247,9 +263,9 @@ const ItineraryEditor = ({
     });
   };
 
-  const handleActivityCostChange = (day, name, field, value) => {
+  const handleActivityCostChange = (day: any, name: string, field: string, value: string) => {
     const activities = getDayActivities(day);
-    const current = activities.find(a => a.name === name) || { name, defaultCost: 0, costOverride: null };
+    const current = activities.find((a: any) => a.name === name) || { name, defaultCost: 0, costOverride: null };
     const parsed = value === '' ? null : (parseFloat(value) || 0);
     onDayChange(day.dayNumber, {
       activityCosts: {
@@ -262,17 +278,17 @@ const ItineraryEditor = ({
     });
   };
 
-  const handleTransportCostChange = (day, index, patch) => {
+  const handleTransportCostChange = (day: any, index: number, patch: any) => {
     const current = getDayTransports(day);
     const rows = current.length > 0
       ? current
       : [createDefaultTransportRow()];
     onDayChange(day.dayNumber, {
-      transports: rows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+      transports: rows.map((row: any, i: number) => (i === index ? { ...row, ...patch } : row)),
     });
   };
 
-  const handleAddTransport = (day) => {
+  const handleAddTransport = (day: any) => {
     const current = getDayTransports(day);
     onDayChange(day.dayNumber, {
       transports: [
@@ -282,24 +298,24 @@ const ItineraryEditor = ({
     });
   };
 
-  const handleRemoveTransport = (day, index) => {
+  const handleRemoveTransport = (day: any, index: number) => {
     const current = getDayTransports(day);
     onDayChange(day.dayNumber, {
-      transports: current.filter((_, i) => i !== index),
+      transports: current.filter((_: any, i: number) => i !== index),
     });
   };
 
-  const handleAddFlight = (day) => {
+  const handleAddFlight = (day: any) => {
     setFlightModalTarget({ dayNumber: day.dayNumber, index: null });
     setShowFlightModal(true);
   };
 
-  const handleEditFlight = (day, index) => {
+  const handleEditFlight = (day: any, index: number) => {
     setFlightModalTarget({ dayNumber: day.dayNumber, index });
     setShowFlightModal(true);
   };
 
-  const handleRemoveFlight = (day, index) => {
+  const handleRemoveFlight = (day: any, index: number) => {
     const flights = Array.isArray(day.flights) ? day.flights : [];
     const removed = flights[index];
     if (!removed) return;
@@ -314,7 +330,7 @@ const ItineraryEditor = ({
    * A FLIGHT transport row exists without a linked flight — take the user to
    * the Flight Booking section so both stay in sync.
    */
-  const handleJumpToFlightSection = (day) => {
+  const handleJumpToFlightSection = (day: any) => {
     const section = document.getElementById(`day-${day.dayNumber}-flight-section`);
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setHighlightedFlightSection(day.dayNumber);
@@ -322,7 +338,7 @@ const ItineraryEditor = ({
     handleAddFlight(day);
   };
 
-  const renderCostsSection = (day) => {
+  const renderCostsSection = (day: any) => {
     const mealCounts = getMealCounts(day);
     const activityRows = getDayActivities(day);
     const transportRows = getDayTransports(day);
@@ -335,19 +351,20 @@ const ItineraryEditor = ({
     const activityTotal = calculateActivityCosts(activityRows, { groupSize: 1 }).total;
     const transportTotal = calculateTransportCosts(transportRows, { groupSize: 1 }).total;
     const flightTotal = transportRows
-      .filter((row) => row.transportMode === 'FLIGHT')
-      .reduce((sum, row) => sum + getTransportRowCost(row, 1), 0);
+      .filter((row: any) => row.transportMode === 'FLIGHT')
+      .reduce((sum: number, row: any) => sum + getTransportRowCost(row, 1), 0);
     const unlinkedFlightCount = countUnlinkedFlightRows(transportRows);
 
-    const chip = (label, value) => {
+    const chip = (label: string, value: number) => {
       const hasValue = Number(value) > 0;
       return (
         <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+          className={cn(
+            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border',
             hasValue
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-              : 'bg-slate-50 border-slate-200 text-slate-400'
-          }`}
+              ? 'bg-success/10 border-success/20 text-success'
+              : 'bg-muted border-border text-muted-foreground'
+          )}
         >
           {label}: {hasValue ? formatCurrency(value) : '—'}
         </span>
@@ -358,17 +375,17 @@ const ItineraryEditor = ({
     const mealCountSum = mealCounts.breakfastCount + mealCounts.lunchCount + mealCounts.dinnerCount;
 
     return (
-      <div className="bg-white rounded-xl border border-emerald-200 overflow-hidden">
+      <div className="bg-card rounded-lg border border-success/20 overflow-hidden">
         {/* Section header / chips row */}
         <button
           type="button"
           onClick={() => toggleCostsExpand(day.dayNumber)}
-          className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-emerald-50 to-white hover:from-emerald-100/70 transition-colors"
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-success/5 transition-colors"
         >
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <Receipt className="w-4 h-4 text-emerald-600" />
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Receipt className="w-4 h-4 text-success" />
             Costs &amp; Pricing
-            <span className="text-xs font-normal text-slate-400">
+            <span className="text-xs font-normal text-muted-foreground">
               ({isExpanded ? 'editing' : 'collapsed'})
             </span>
           </div>
@@ -380,18 +397,18 @@ const ItineraryEditor = ({
               {chip('Flight', flightTotal)}
               {chip('Hotel', accommodationTotal)}
             </div>
-            <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-              {isExpanded ? <ChevronUp className="w-4 h-4 text-emerald-600" /> : <ChevronDown className="w-4 h-4 text-emerald-600" />}
+            <div className="w-7 h-7 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+              {isExpanded ? <ChevronUp className="w-4 h-4 text-success" /> : <ChevronDown className="w-4 h-4 text-success" />}
             </div>
           </div>
         </button>
 
         {isExpanded && (
-          <div className="px-4 pb-4 pt-1 border-t border-emerald-100 space-y-4">
+          <div className="px-4 pb-4 pt-1 border-t border-success/10 space-y-4">
             {/* ── Meals ───────────────────────────────────────── */}
             <div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
-                <Utensils className="w-3.5 h-3.5 text-emerald-500" /> Meals
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                <Utensils className="w-3.5 h-3.5 text-success" /> Meals
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
                 {[
@@ -400,21 +417,20 @@ const ItineraryEditor = ({
                   { key: 'dinnerCount', label: 'Dinners' },
                 ].map((field) => (
                   <div key={field.key}>
-                    <label className="block text-xs text-slate-500 mb-1">{field.label}</label>
-                    <input
+                    <label className="block text-xs text-muted-foreground mb-1">{field.label}</label>
+                    <Input
                       type="number" min="0"
-                      value={mealCounts[field.key]}
+                      value={mealCounts[field.key as keyof typeof mealCounts]}
                       onChange={(e) => handleMealCountChange(day, field.key, e.target.value)}
                       onWheel={(e) => e.currentTarget.blur()}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     />
                   </div>
                 ))}
                 <div>
-                  <label className="block text-xs text-slate-500 mb-1" title="Leaves blank to use the $15/person default">
+                  <label className="block text-xs text-muted-foreground mb-1" title="Leaves blank to use the $15/person default">
                     Cost / meal
                   </label>
-                  <input
+                  <Input
                     type="number" min="0" step="0.01"
                     value={mealCounts.mealPriceOverride ?? ''}
                     placeholder="15"
@@ -422,46 +438,45 @@ const ItineraryEditor = ({
                       mealPriceOverride: e.target.value === '' ? null : (parseFloat(e.target.value) || 0),
                     })}
                     onWheel={(e) => e.currentTarget.blur()}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                 </div>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {mealCountSum} meal{mealCountSum === 1 ? '' : 's'} × {formatCurrency(mealUnitCost)} ={' '}
-                <span className="font-semibold text-emerald-700">{formatCurrency(mealTotal)}</span>
+                <span className="font-semibold text-success">{formatCurrency(mealTotal)}</span>
               </p>
             </div>
 
             {/* ── Activities ───────────────────────────────────── */}
             <div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
-                <Activity className="w-3.5 h-3.5 text-emerald-500" /> Activities
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                <Activity className="w-3.5 h-3.5 text-success" /> Activities
               </label>
               {activityRows.length === 0 ? (
-                <p className="text-xs text-slate-400">No activities added to this day.</p>
+                <p className="text-xs text-muted-foreground">No activities added to this day.</p>
               ) : (
                 <div className="space-y-2">
-                  {activityRows.map((activity) => {
+                  {activityRows.map((activity: any) => {
                     const unit = activity.costOverride ?? activity.defaultCost ?? 0;
                     const total = unit;
                     return (
-                      <div key={activity.name} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
-                        <span className="text-sm font-medium text-slate-700 flex-1 min-w-[120px]">{activity.name}</span>
-                        <span className="text-xs text-slate-500">
-                          Default: <span className="font-semibold text-slate-700">{formatCurrency(activity.defaultCost)}</span>
+                      <div key={activity.name} className="flex flex-wrap items-center gap-2 bg-muted rounded-lg border border-border px-3 py-2">
+                        <span className="text-sm font-medium text-foreground flex-1 min-w-[120px]">{activity.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          Default: <span className="font-semibold text-foreground">{formatCurrency(activity.defaultCost)}</span>
                         </span>
-                        <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           Override
-                          <input
+                          <Input
                             type="number" min="0" step="0.01"
                             value={activity.costOverride ?? ''}
                             placeholder={String(activity.defaultCost || 0)}
                             onChange={(e) => handleActivityCostChange(day, activity.name, 'costOverride', e.target.value)}
                             onWheel={(e) => e.currentTarget.blur()}
-                            className="w-24 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                            className="w-24"
                           />
                         </label>
-                        <span className="text-xs text-emerald-700 font-medium">
+                        <span className="text-xs text-success font-medium">
                           {formatCurrency(total)}
                         </span>
                       </div>
@@ -473,77 +488,69 @@ const ItineraryEditor = ({
 
             {/* ── Transport ────────────────────────────────────── */}
             <div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
-                <Car className="w-3.5 h-3.5 text-emerald-500" /> Transport
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                <Car className="w-3.5 h-3.5 text-success" /> Transport
               </label>
               {transportRows.length === 0 ? (
-                <p className="text-xs text-slate-400">No transport configured for this day.</p>
+                <p className="text-xs text-muted-foreground">No transport configured for this day.</p>
               ) : (
                 <div className="space-y-2">
-                  {transportRows.map((row, i) => (
+                  {transportRows.map((row: any, i: number) => (
                     <TransportRowEditor
                       key={`${day.dayNumber}-transport-${i}`}
                       index={i}
                       transport={row}
-                      onChange={(patch) => handleTransportCostChange(day, i, patch)}
-                      onRemove={(idx) => handleRemoveTransport(day, idx)}
+                      onChange={(patch: any) => handleTransportCostChange(day, i, patch)}
+                      onRemove={(idx: number) => handleRemoveTransport(day, idx)}
                     />
                   ))}
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-3 mt-2">
-                <button
-                  type="button"
-                  onClick={() => handleAddTransport(day)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
-                >
+                <Button type="button" onClick={() => handleAddTransport(day)} variant="outline" size="sm" className="border-success/30 text-success hover:bg-success/10">
                   <Plus className="w-3.5 h-3.5" /> Add Transport
-                </button>
-                <p className="text-xs text-slate-500">
-                  Total = <span className="font-semibold text-emerald-700">{formatCurrency(transportTotal)}</span>
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Total = <span className="font-semibold text-success">{formatCurrency(transportTotal)}</span>
                 </p>
               </div>
               {unlinkedFlightCount > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                  <Plane className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <div className="mt-2 flex flex-wrap items-center gap-2 bg-warning/5 border border-warning/20 rounded-lg px-3 py-2 text-xs text-warning">
+                  <Plane className="w-3.5 h-3.5 shrink-0" />
                   <span className="flex-1 min-w-[160px]">
                     {unlinkedFlightCount === 1
                       ? 'A flight cost was added — add the flight details so pricing stays in sync.'
                       : `${unlinkedFlightCount} flight costs were added — add the flight details so pricing stays in sync.`}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleJumpToFlightSection(day)}
-                    className="px-3 py-1.5 font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
-                  >
+                  <Button type="button" onClick={() => handleJumpToFlightSection(day)} variant="outline" size="sm" className="border-warning/30 text-warning hover:bg-warning/10">
                     Add flight details
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
 
             {/* ── Accommodation ────────────────────────────────── */}
             <div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">
-                <Building2 className="w-3.5 h-3.5 text-emerald-500" /> Accommodation
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                <Building2 className="w-3.5 h-3.5 text-success" /> Accommodation
               </label>
               {day.accommodation?.name ? (
-                <div className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
-                  <span className="text-sm font-medium text-slate-700 flex-1 min-w-[120px]">{day.accommodation.name}</span>
-                  <span className="text-xs text-slate-500">
-                    Total: <span className="font-semibold text-slate-700">{formatCurrency(accommodationTotal)}</span>
+                <div className="flex flex-wrap items-center gap-2 bg-muted rounded-lg border border-border px-3 py-2">
+                  <span className="text-sm font-medium text-foreground flex-1 min-w-[120px]">{day.accommodation.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    Total: <span className="font-semibold text-foreground">{formatCurrency(accommodationTotal)}</span>
                   </span>
                   {/* Tech debt: multi-day hotel stays are not yet supported. The
                       current implementation treats each day's accommodation as an
                       independent per-night booking. When multi-day stays are
                       implemented, the pricing engine should de-duplicate consecutive
                       nights at the same hotel. */}
-                  <span className="text-xs text-slate-400" title="Each day books one per-night stay for now">
+                  <span className="text-xs text-muted-foreground" title="Each day books one per-night stay for now">
                     {formatCurrency(accommodationTotal)} / night
                   </span>
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">Accommodation: —</p>
+                <p className="text-xs text-muted-foreground">Accommodation: —</p>
               )}
             </div>
           </div>
@@ -554,7 +561,7 @@ const ItineraryEditor = ({
 
   // Ensure new days (added after initial render) are expanded
   useEffect(() => {
-    const expanded = {};
+    const expanded: Record<number, boolean> = {};
     days.forEach(day => {
       if (day && day.dayNumber != null && expandedDays[day.dayNumber] === undefined) {
         expanded[day.dayNumber] = true;
@@ -563,13 +570,14 @@ const ItineraryEditor = ({
     if (Object.keys(expanded).length > 0) {
       setExpandedDays(prev => ({ ...prev, ...expanded }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days.length]);
 
-  const toggleDayExpand = (dayNumber) => {
+  const toggleDayExpand = (dayNumber: number) => {
     setExpandedDays(prev => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
   };
 
-  const handleDayImageUpload = async (dayNumber, files) => {
+  const handleDayImageUpload = async (dayNumber: number, files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setUploadingDayImages(prev => ({ ...prev, [dayNumber]: true }));
@@ -583,20 +591,19 @@ const ItineraryEditor = ({
       Swal.fire('Success', `${uploadedImages.length} image(s) uploaded successfully!`, 'success');
     } catch (error) {
       console.error('Day image upload error:', error);
-      Swal.fire('Error', error.message || 'Failed to upload images', 'error');
+      Swal.fire('Error', (error as Error).message || 'Failed to upload images', 'error');
     } finally {
       setUploadingDayImages(prev => ({ ...prev, [dayNumber]: false }));
     }
   };
 
-  const handleRemoveDayImage = (dayNumber, imageIndex) => {
+  const handleRemoveDayImage = (dayNumber: number, imageIndex: number) => {
     const day = days.find(d => d && d.dayNumber === dayNumber);
-    const updatedImages = (day?.images || []).filter((_, idx) => idx !== imageIndex);
+    const updatedImages = (day?.images || []).filter((_: any, idx: number) => idx !== imageIndex);
     onDayChange(dayNumber, { images: updatedImages });
   };
 
-  const autoFillBestMatchHotel = async (dayNumber, dayLocations) => {
-    if (!dayLocations || dayLocations.length === 0) return;
+  const autoFillBestMatchHotel = async (dayNumber: number, dayLocations: string[]) => {
     if (!destination) return;
 
     try {
@@ -639,7 +646,7 @@ const ItineraryEditor = ({
   };
 
   useEffect(() => {
-    const timeouts = [];
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
 
     days.forEach((day) => {
       const dayLocations = day && Array.isArray(day.locations) ? day.locations : [];
@@ -659,16 +666,17 @@ const ItineraryEditor = ({
     return () => {
       timeouts.forEach(timeoutId => clearTimeout(timeoutId));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days
     .filter(Boolean)
     .map(d => `${d.dayNumber}-${Array.isArray(d.locations) ? d.locations.join(',') : ''}`)
     .join('|'), destination, packageType, category]);
 
   // Field Group Component
-  const FieldGroup = ({ label, icon: Icon, children, className = '' }) => (
-    <div className={`bg-white rounded-xl border border-slate-200 p-4 ${className}`}>
-      <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
-        {Icon && <Icon className="w-4 h-4 text-slate-400" />}
+  const FieldGroup = ({ label, icon: Icon, children, className = '' }: { label: string; icon?: any; children: React.ReactNode; className?: string }) => (
+    <div className={cn('bg-card rounded-lg border border-border p-4', className)}>
+      <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+        {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
         {label}
       </label>
       {children}
@@ -677,50 +685,47 @@ const ItineraryEditor = ({
 
   if (!days || days.length === 0) {
     return (
-      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center">
-        <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Plus className="w-8 h-8 text-amber-600" />
+      <div className="bg-muted rounded-xl border-2 border-dashed border-border p-12 text-center">
+        <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <Plus className="w-8 h-8 text-primary" />
         </div>
-        <p className="text-slate-600 font-medium mb-2">No days added to itinerary</p>
-        <p className="text-sm text-slate-500 mb-6">Start building your travel itinerary</p>
-        <button
-          onClick={onAddDay}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all font-medium shadow-lg shadow-amber-500/25"
-        >
-          <Plus size={18} />
+        <p className="text-foreground font-medium mb-2">No days added to itinerary</p>
+        <p className="text-sm text-muted-foreground mb-6">Start building your travel itinerary</p>
+        <Button onClick={onAddDay}>
+          <Plus size={16} />
           Add First Day
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {days.filter(Boolean).map((day, index) => (
-        <div key={day.dayNumber} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+      {days.filter(Boolean).map((day) => (
+        <div key={day.dayNumber} className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
           {/* Day Header */}
           <div
-            className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-4 flex justify-between items-center cursor-pointer"
+            className="bg-primary text-primary-foreground px-6 py-4 flex justify-between items-center cursor-pointer"
             onClick={() => toggleDayExpand(day.dayNumber)}
           >
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <span className="text-lg font-bold">{day.dayNumber}</span>
+              <div className="w-10 h-10 bg-primary-foreground/20 rounded-lg flex items-center justify-center">
+                <span className="text-lg font-bold font-mono">{day.dayNumber}</span>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Day {day.dayNumber}</h3>
-                {day.title && <p className="text-amber-100 text-sm">{day.title}</p>}
+                <h3 className="font-heading font-semibold text-lg">Day {day.dayNumber}</h3>
+                {day.title && <p className="text-primary-foreground/80 text-sm">{day.title}</p>}
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={(e) => { e.stopPropagation(); onRemoveDay(day.dayNumber); }}
-                className="p-2 hover:bg-red-500 rounded-lg transition-colors"
+                className="p-2 hover:bg-destructive/80 rounded-lg transition-colors"
                 title="Remove day"
               >
                 <Trash2 size={18} />
               </button>
-              <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-primary-foreground/10 rounded-lg flex items-center justify-center">
                 {expandedDays[day.dayNumber] ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               </div>
             </div>
@@ -728,28 +733,26 @@ const ItineraryEditor = ({
 
           {/* Day Content */}
           {expandedDays[day.dayNumber] && (
-            <div className="p-6 bg-gradient-to-b from-amber-50/50 to-white space-y-4">
+            <div className="p-6 space-y-4">
               {/* Row 1: Title and Description */}
               {!hideTitleAndDescription && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <FieldGroup label="Day Title" icon={StickyNote}>
-                    <input
+                    <Input
                       type="text"
                       value={day.title || ''}
                       onChange={(e) => onDayChange(day.dayNumber, { title: e.target.value })}
                       placeholder="e.g., Arrival in Dubai (optional)"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
                     />
                   </FieldGroup>
 
                   {!hideDescription && (
                     <FieldGroup label="Description" icon={StickyNote}>
-                      <textarea
-                        rows="2"
+                      <Textarea
+                        rows={2}
                         value={day.description || ''}
                         onChange={(e) => onDayChange(day.dayNumber, { description: e.target.value })}
                         placeholder="Brief description of the day's activities..."
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all resize-none"
                       />
                     </FieldGroup>
                   )}
@@ -762,12 +765,12 @@ const ItineraryEditor = ({
                   {useLocationAutocomplete && LocationAutocompleteComponent ? (
                     <LocationAutocompleteComponent
                       locations={day.locations || []}
-                      onChange={(locations) => onDayChange(day.dayNumber, { locations })}
+                      onChange={(locations: string[]) => onDayChange(day.dayNumber, { locations })}
                     />
                   ) : (
                     <LocationSelector
                       locations={day.locations || []}
-                      onChange={(locations) => onDayChange(day.dayNumber, { locations })}
+                      onChange={(locations: string[]) => onDayChange(day.dayNumber, { locations })}
                       destination={destination}
                     />
                   )}
@@ -776,7 +779,7 @@ const ItineraryEditor = ({
                 <FieldGroup label="Activities" icon={Activity}>
                   <ActivitySelector
                     activities={day.activities || []}
-                    onChange={(activities) => onDayChange(day.dayNumber, { activities })}
+                    onChange={(activities: string[]) => onDayChange(day.dayNumber, { activities })}
                     destination={destination}
                   />
                 </FieldGroup>
@@ -785,95 +788,90 @@ const ItineraryEditor = ({
               {/* Row 3: Meals */}
               <FieldGroup label="Meals Included" icon={Utensils}>
                 <div className="flex flex-wrap gap-3">
-                  {[
-                    { key: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'amber' },
-                    { key: 'lunch', label: 'Lunch', icon: UtensilsCrossed, color: 'orange' },
-                    { key: 'dinner', label: 'Dinner', icon: Moon, color: 'violet' },
-                  ].map((meal) => (
-                    <label
-                      key={meal.key}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-all border ${day.meals?.[meal.key]
-                          ? `bg-${meal.color}-100 border-${meal.color}-300 text-${meal.color}-800`
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={day.meals?.[meal.key] || false}
-                        onChange={(e) => handleMealToggle(day, meal.key, e.target.checked)}
-                        className="sr-only"
-                      />
-                      {day.meals?.[meal.key] ? (
-                        <Check className="w-4 h-4" />
-                      ) : (
-                        <meal.icon className="w-4 h-4 opacity-50" />
-                      )}
-                      <span className="text-sm font-medium">{meal.label}</span>
-                    </label>
-                  ))}
+                  {MEALS.map((meal) => {
+                    const checked = Boolean(day.meals?.[meal.key]);
+                    return (
+                      <label
+                        key={meal.key}
+                        className={cn(
+                          'flex items-center gap-2 px-4 py-2.5 rounded-lg cursor-pointer transition-colors border',
+                          checked
+                            ? 'bg-warning/10 border-warning/30 text-warning'
+                            : 'bg-muted border-border text-muted-foreground hover:bg-accent'
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => handleMealToggle(day, meal.key, e.target.checked)}
+                          className="sr-only"
+                        />
+                        {checked ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <meal.icon className="w-4 h-4 opacity-50" />
+                        )}
+                        <span className="text-sm font-medium">{meal.label}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </FieldGroup>
 
               {/* Flight Booking — standalone section */}
               <div
                 id={`day-${day.dayNumber}-flight-section`}
-                className={`bg-white rounded-xl border overflow-hidden transition-shadow ${
+                className={cn(
+                  'bg-card rounded-lg border overflow-hidden transition-shadow',
                   highlightedFlightSection === day.dayNumber
-                    ? 'border-sky-400 ring-4 ring-sky-200'
-                    : 'border-sky-200'
-                }`}
+                    ? 'border-primary ring-4 ring-primary/20'
+                    : 'border-primary/20'
+                )}
               >
-                <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-sky-50 to-white">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <Plane className="w-4 h-4 text-sky-600" />
+                <div className="px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Plane className="w-4 h-4 text-primary" />
                     Flight Booking
                   </div>
-                  <button
+                  <Button
                     id={`day-${day.dayNumber}-add-flight`}
                     type="button"
                     onClick={() => handleAddFlight(day)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors"
+                    variant="outline"
+                    size="sm"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Flight
-                  </button>
+                  </Button>
                 </div>
 
-                <div className="px-4 pb-4 pt-3 border-t border-sky-100 space-y-2">
+                <div className="px-4 pb-4 pt-3 border-t border-primary/10 space-y-2">
                   {(Array.isArray(day.flights) ? day.flights : []).length === 0 ? (
-                    <p className="text-xs text-slate-400">No flight selected</p>
+                    <p className="text-xs text-muted-foreground">No flight selected</p>
                   ) : (
-                    (day.flights || []).map((flight, index) => (
-                      <div key={flight.id || index} className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                    (day.flights || []).map((flight: any, index: number) => (
+                      <div key={flight.id || index} className="bg-primary/5 rounded-lg border border-primary/20 p-4">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <span className="text-sm font-medium text-blue-800">
+                          <span className="text-sm font-medium text-primary">
                             {flight.origin ? `${flight.origin} → ${flight.destination}` : 'No flight selected'}
                           </span>
                           <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEditFlight(day, index)}
-                              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
-                            >
+                            <Button type="button" onClick={() => handleEditFlight(day, index)} size="sm">
                               Edit Flight
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveFlight(day, index)}
-                              className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 transition-colors"
-                            >
+                            </Button>
+                            <Button type="button" onClick={() => handleRemoveFlight(day, index)} variant="destructive" size="sm">
                               Remove Flight
-                            </button>
+                            </Button>
                           </div>
                         </div>
-                        <div className="mt-2 text-xs text-blue-700 space-y-0.5">
+                        <div className="mt-2 text-xs text-primary/80 space-y-0.5">
                           <p>Airline: {flight.airlinePreference || 'Any'} | Cabin: {flight.cabinClass || 'Economy'}</p>
                           {flight.departureTime && <p>Preferred: {flight.departureTime}</p>}
                           {getFlightPrice(flight) != null && (
-                            <p>Price: {formatCurrency(getFlightPrice(flight))} (auto-added to transport)</p>
+                            <p>Price: {formatCurrency(getFlightPrice(flight)!)} (auto-added to transport)</p>
                           )}
                           {flight.flightNumber && (
                             <>
-                              <p className="mt-1 font-medium text-green-700">Booked: {flight.flightNumber} ({flight.carrierName})</p>
+                              <p className="mt-1 font-medium text-success">Booked: {flight.flightNumber} ({flight.carrierName})</p>
                               <p>PNR: {flight.bookingReference} | Status: {flight.status}</p>
                             </>
                           )}
@@ -885,9 +883,9 @@ const ItineraryEditor = ({
               </div>
 
               {/* Row 4: Accommodation */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
-                  <Building2 className="w-4 h-4 text-slate-400" />
+              <div className="bg-card rounded-lg border border-border p-4">
+                <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                  <Building2 className="w-4 h-4 text-muted-foreground" />
                   Accommodation
                 </label>
 
@@ -909,11 +907,11 @@ const ItineraryEditor = ({
                   />
                 ) : (
                   /* ── No hotel selected — search prompt ─────── */
-                  <div className="text-center py-6 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-                    <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500 mb-3">No hotel selected for this day</p>
+                  <div className="text-center py-6 bg-muted rounded-lg border-2 border-dashed border-border">
+                    <Building2 className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground mb-3">No hotel selected for this day</p>
                     <div className="flex items-center justify-center gap-2">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => {
                           setCurrentDayForHotel(day.dayNumber);
@@ -921,39 +919,41 @@ const ItineraryEditor = ({
                           setHotelModalMode('suggest');
                           setShowHotelModal(true);
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25"
+                        size="sm"
                       >
                         <Search className="w-4 h-4" />
                         Search Hotels
-                      </button>
-                      <span className="text-xs text-slate-400">or fill below</span>
+                      </Button>
+                      <span className="text-xs text-muted-foreground">or fill below</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 px-3">
-                      <input
+                      <Input
                         type="text"
                         value={day.accommodation?.name || ''}
                         onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, name: e.target.value } })}
                         placeholder="Hotel name (manual)"
-                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                       />
-                      <select
-                        value={day.accommodation?.type || ''}
-                        onChange={(e) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, type: e.target.value } })}
-                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      <Select
+                        value={day.accommodation?.type || undefined}
+                        onValueChange={(value) => onDayChange(day.dayNumber, { accommodation: { ...day.accommodation, type: String(value) } })}
                       >
-                        <option value="">Type</option>
-                        <option value="hotel">Hotel</option>
-                        <option value="resort">Resort</option>
-                        <option value="guesthouse">Guesthouse</option>
-                        <option value="homestay">Homestay</option>
-                        <option value="camp">Camp</option>
-                      </select>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hotel">Hotel</SelectItem>
+                          <SelectItem value="resort">Resort</SelectItem>
+                          <SelectItem value="guesthouse">Guesthouse</SelectItem>
+                          <SelectItem value="homestay">Homestay</SelectItem>
+                          <SelectItem value="camp">Camp</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 )}
 
                 {autoFillingHotel && days.find(d => d && d.dayNumber === day.dayNumber)?.locations?.length > 0 && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+                  <div className="flex items-center gap-1 mt-2 text-xs text-primary bg-primary/5 px-2 py-1 rounded-lg">
                     <Loader className="w-3 h-3 animate-spin" />
                     <span>Finding best match...</span>
                   </div>
@@ -962,82 +962,83 @@ const ItineraryEditor = ({
 
               {/* Row 5: Notes */}
               <FieldGroup label="Additional Notes" icon={StickyNote}>
-                <textarea
-                  rows="2"
+                <Textarea
+                  rows={2}
                   value={day.notes || ''}
                   onChange={(e) => onDayChange(day.dayNumber, { notes: e.target.value })}
                   placeholder="Any additional notes or important information..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all resize-none"
                 />
               </FieldGroup>
 
               {/* Row 6: Day Images — intentionally shown regardless of
                   hideTitleAndDescription (that flag only concerns the
                   title/description text fields above, not imagery). */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
-                  <ImageIcon className="w-4 h-4 text-slate-400" />
+              <div className="bg-card rounded-lg border border-border p-4">
+                <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                  <ImageIcon className="w-4 h-4 text-muted-foreground" />
                   Day Images
                 </label>
 
-                  <div className="mb-3">
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/png,image/jpg"
-                      onChange={(e) => handleDayImageUpload(day.dayNumber, e.target.files)}
-                      disabled={uploadingDayImages[day.dayNumber]}
-                      className="hidden"
-                      id={`day-${day.dayNumber}-image-upload`}
-                    />
-                    <label
-                      htmlFor={`day-${day.dayNumber}-image-upload`}
-                      className={`inline-flex items-center gap-2 px-5 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-all ${uploadingDayImages[day.dayNumber]
-                          ? 'border-amber-300 bg-amber-50 opacity-50 cursor-not-allowed'
-                          : 'border-slate-300 bg-slate-50 hover:border-amber-400 hover:bg-amber-50'
-                        }`}
-                    >
-                      {uploadingDayImages[day.dayNumber] ? (
-                        <Loader className="w-4 h-4 animate-spin text-amber-600" />
-                      ) : (
-                        <Upload className="w-4 h-4 text-slate-500" />
-                      )}
-                      <span className="text-sm text-slate-600">
-                        {uploadingDayImages[day.dayNumber] ? 'Uploading...' : 'Upload Day Images'}
-                      </span>
-                    </label>
-                  </div>
-
-                  {day.images && day.images.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                      {day.images.map((img, imgIdx) => {
-                        const imageUrl = typeof img === 'string' ? img : img.url;
-                        return (
-                          <div key={imgIdx} className="relative group">
-                            <div className="aspect-square rounded-xl overflow-hidden border-2 border-slate-200 hover:border-amber-400 transition-colors">
-                              <img
-                                src={imageUrl}
-                                alt={`Day ${day.dayNumber} Image ${imgIdx + 1}`}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
-                                }}
-                              />
-                            </div>
-                            <button
-                              onClick={() => handleRemoveDayImage(day.dayNumber, imgIdx)}
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-colors shadow-lg opacity-0 group-hover:opacity-100"
-                              type="button"
-                              title="Remove image"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                <div className="mb-3">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/jpg"
+                    onChange={(e) => handleDayImageUpload(day.dayNumber, e.target.files)}
+                    disabled={uploadingDayImages[day.dayNumber]}
+                    className="hidden"
+                    id={`day-${day.dayNumber}-image-upload`}
+                  />
+                  <label
+                    htmlFor={`day-${day.dayNumber}-image-upload`}
+                    className={cn(
+                      'inline-flex items-center gap-2 px-5 py-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
+                      uploadingDayImages[day.dayNumber]
+                        ? 'border-primary/30 bg-primary/5 opacity-50 cursor-not-allowed'
+                        : 'border-border bg-muted hover:border-primary/40 hover:bg-primary/5'
+                    )}
+                  >
+                    {uploadingDayImages[day.dayNumber] ? (
+                      <Loader className="w-4 h-4 animate-spin text-primary" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    <span className="text-sm text-muted-foreground">
+                      {uploadingDayImages[day.dayNumber] ? 'Uploading...' : 'Upload Day Images'}
+                    </span>
+                  </label>
                 </div>
+
+                {day.images && day.images.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {day.images.map((img: any, imgIdx: number) => {
+                      const imageUrl = typeof img === 'string' ? img : img.url;
+                      return (
+                        <div key={imgIdx} className="relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden border-2 border-border hover:border-primary/40 transition-colors">
+                            <img
+                              src={imageUrl}
+                              alt={`Day ${day.dayNumber} Image ${imgIdx + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
+                              }}
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleRemoveDayImage(day.dayNumber, imgIdx)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors shadow-dropdown opacity-0 group-hover:opacity-100"
+                            type="button"
+                            title="Remove image"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* Costs & Pricing — last section of the day card */}
               {renderCostsSection(day)}
@@ -1049,7 +1050,7 @@ const ItineraryEditor = ({
       {/* Add Day Button */}
       <button
         onClick={onAddDay}
-        className="w-full py-4 border-2 border-dashed border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl text-amber-700 hover:border-amber-400 hover:from-amber-100 hover:to-orange-100 transition-all font-medium flex items-center justify-center gap-2"
+        className="w-full py-4 border-2 border-dashed border-primary/30 bg-primary/5 rounded-xl text-primary hover:border-primary/50 hover:bg-primary/10 transition-colors font-medium flex items-center justify-center gap-2"
       >
         <Plus size={20} />
         Add Another Day
@@ -1061,9 +1062,9 @@ const ItineraryEditor = ({
         onClose={() => { setShowFlightModal(false); setFlightModalTarget(null); }}
         mode="template"
         initialData={flightModalTarget
-          ? (days.find(d => d && d.dayNumber === flightModalTarget.dayNumber)?.flights || [])[flightModalTarget.index] || {}
+          ? (days.find(d => d && d.dayNumber === flightModalTarget.dayNumber)?.flights || [])[flightModalTarget.index as number] || {}
           : {}}
-        onSelectTemplate={(flightData) => {
+        onSelectTemplate={(flightData: any) => {
           if (flightModalTarget) {
             const day = days.find(d => d && d.dayNumber === flightModalTarget.dayNumber);
             const result = flightModalTarget.index != null
@@ -1094,7 +1095,7 @@ const ItineraryEditor = ({
         packageType={packageType}
         category={category}
         locations={currentDayLocations}
-        onSelectHotel={(hotel) => {
+        onSelectHotel={(hotel: any) => {
           if (currentDayForHotel) {
             const day = days.find(d => d && d.dayNumber === currentDayForHotel);
             onDayChange(currentDayForHotel, {

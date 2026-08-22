@@ -1,6 +1,6 @@
 /**
- * ItineraryGeneration Container Component - Redesigned
- * Modern layout with left sidebar navigation and unique component structure
+ * ItineraryGeneration Container Component
+ * Sidebar navigation layout for package management
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,8 +8,8 @@ import { useLocation } from 'wouter';
 import Swal from 'sweetalert2';
 import {
   Package, Plus, Sparkles, Search, ChevronRight, MapPin,
-  Calendar, Star, Users, Eye, Edit, Download, Copy, Trash2,
-  Image as ImageIcon, Filter, Grid, List, LayoutGrid, BookOpen, Menu, X
+  Calendar, Eye, Edit, Download, Copy, Trash2,
+  Image as ImageIcon, Grid, List, LayoutGrid, BookOpen, Menu, X
 } from 'lucide-react';
 
 // Hooks
@@ -24,8 +24,12 @@ import {
   NewEditPackageForm,
   PackagePDFPreviewDialog,
   AIPackageDialog,
+  PackageCard,
 } from '../components';
 import Pagination from '../../user-management/components/Common/Pagination';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 // Services
 import { uploadPackageImages } from '../../../services/cloudinaryService';
@@ -34,9 +38,8 @@ import ApiService from '../services/apiService';
 // Utils
 import {
   filterPackages,
-  formatPriceINR,
 } from '../utils/helpers';
-import { VALIDATION_MESSAGES, CATEGORY_COLORS, STATUS_COLORS } from '../utils/constants';
+import { VALIDATION_MESSAGES } from '../utils/constants';
 import { createDefaultPackage } from '../types';
 
 // Sample data
@@ -47,14 +50,14 @@ const ItineraryGenerationContainer = () => {
   const { user } = useAuth();
   const { hasPermission } = usePermission();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState(null);
-  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [showNewPackageDialog, setShowNewPackageDialog] = useState(false);
   const [showEditPackageDialog, setShowEditPackageDialog] = useState(false);
-  const [editPackageData, setEditPackageData] = useState(null);
+  const [editPackageData, setEditPackageData] = useState<any>(null);
   const [showAIPackageDialog, setShowAIPackageDialog] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
-  const [pdfPreviewData, setPdfPreviewData] = useState({
+  const [pdfPreviewData, setPdfPreviewData] = useState<{ isOpen: boolean; blob: Blob | null; fileName: string; packageData: any }>({
     isOpen: false,
     blob: null,
     fileName: '',
@@ -77,7 +80,7 @@ const ItineraryGenerationContainer = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState(null);
+  const [pagination, setPagination] = useState<{ pages: number; total: number } | null>(null);
   const [itemsPerPage] = useState(12);
 
   // Stats state
@@ -96,20 +99,18 @@ const ItineraryGenerationContainer = () => {
 
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(SAMPLE_PACKAGES);
-  const { formData: newFormData, setFormData: setNewFormData } = useItineraryForm(createDefaultPackage());
+  const { formData: newFormData, setFormData: setNewFormData } = useItineraryForm(createDefaultPackage() as any);
   const { images, setImages, handleUpload: handleImageUploadHook, removeImage, deletingIndexes } = useImageUpload();
 
   // Filter packages
-  let filteredPackages = filterPackages(packages, searchTerm);
+  const filteredPackages = filterPackages(packages, searchTerm);
 
   // Status filter tabs
   const statusTabs = [
-    { id: null, label: 'All Packages', count: stats.total, gradient: 'from-slate-500 to-slate-600', color: 'slate' },
-    { id: 'active', label: 'Active', count: stats.active, gradient: 'from-emerald-500 to-teal-600', color: 'emerald' },
-    { id: 'featured', label: 'Featured', count: stats.featured, gradient: 'from-purple-500 to-pink-600', color: 'purple' },
+    { id: null, label: 'All Packages', count: stats.total },
+    { id: 'active', label: 'Active', count: stats.active },
+    { id: 'featured', label: 'Featured', count: stats.featured },
   ];
-
-  const visibleTabs = statusTabs;
 
   /**
    * Load package stats from API
@@ -134,7 +135,7 @@ const ItineraryGenerationContainer = () => {
   useEffect(() => {
     const loadPackages = async (page = 1) => {
       try {
-        const params = { page, limit: itemsPerPage };
+        const params: Record<string, any> = { page, limit: itemsPerPage };
         if (statusFilter === 'active') params.isActive = true;
         if (statusFilter === 'featured') params.isFeatured = true;
 
@@ -152,7 +153,9 @@ const ItineraryGenerationContainer = () => {
         console.error('Error loading packages:', error);
       }
     };
+
     loadPackages(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSalesRep, currentPage, itemsPerPage, statusFilter]);
 
   // Handlers
@@ -176,14 +179,14 @@ const ItineraryGenerationContainer = () => {
     setShowAIPackageDialog(true);
   };
 
-  const handleAIPackageGenerated = (generatedPackageData) => {
+  const handleAIPackageGenerated = (generatedPackageData: any) => {
     // /generate-ai already persists the package + itinerary in one shot, so this must
     // flow into the edit path (PUT, same id) rather than the new-package create path —
     // routing it through "New Package" would create a second, itinerary-less duplicate.
-    setPackages((prev) => [generatedPackageData, ...prev]);
+    setPackages((prev: any[]) => [generatedPackageData, ...prev]);
 
     const days = generatedPackageData.days || generatedPackageData.itinerary?.days || [];
-    const formattedImages = (generatedPackageData.images || []).map(img => {
+    const formattedImages = (generatedPackageData.images || []).map((img: any) => {
       if (typeof img === 'object' && img.url) return img;
       if (typeof img === 'string') {
         return { url: img, public_id: img.split('/').pop()?.split('.')[0] || 'unknown' };
@@ -197,7 +200,7 @@ const ItineraryGenerationContainer = () => {
     setShowEditPackageDialog(true);
   };
 
-  const handleViewPackage = async (pkg) => {
+  const handleViewPackage = async (pkg: any) => {
     try {
       const packageId = pkg._id || pkg.id;
       const response = await ApiService.getPackage(packageId);
@@ -212,7 +215,7 @@ const ItineraryGenerationContainer = () => {
     }
   };
 
-  const handleEditPackage = async (pkg) => {
+  const handleEditPackage = async (pkg: any) => {
     if (isSalesRep && !hasPermission('manage_packages')) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to edit packages.', 'info');
       return;
@@ -229,7 +232,7 @@ const ItineraryGenerationContainer = () => {
       const fullPackage = response.data;
 
       // Map API relational itineraryDays → editor-friendly days
-      const days = (fullPackage.itineraryDays || []).map(apiDay => ({
+      const days = (fullPackage.itineraryDays || []).map((apiDay: any) => ({
         dayNumber: apiDay.dayNumber,
         title: apiDay.title || '',
         description: apiDay.description || '',
@@ -239,9 +242,9 @@ const ItineraryGenerationContainer = () => {
           dinner: apiDay.dinnerCount > 0,
         },
         mealPriceOverride: apiDay.mealPriceOverride,
-        locations: (apiDay.places || []).map(p => p.place?.name || p.customName).filter(Boolean),
-        activities: (apiDay.activities || []).map(a => a.activity?.name || '').filter(Boolean),
-        places: (apiDay.places || []).map(p => ({
+        locations: (apiDay.places || []).map((p: any) => p.place?.name || p.customName).filter(Boolean),
+        activities: (apiDay.activities || []).map((a: any) => a.activity?.name || '').filter(Boolean),
+        places: (apiDay.places || []).map((p: any) => ({
           name: p.place?.name || p.customName || '',
           placeId: p.placeId,
         })),
@@ -256,7 +259,7 @@ const ItineraryGenerationContainer = () => {
         notes: '',
       }));
 
-      const formattedImages = (fullPackage.images || []).map(img => {
+      const formattedImages = (fullPackage.images || []).map((img: any) => {
         if (typeof img === 'object' && img.url) return img;
         if (typeof img === 'string') {
           return { url: img, public_id: img.split('/').pop()?.split('.')[0] || 'unknown' };
@@ -274,7 +277,7 @@ const ItineraryGenerationContainer = () => {
     }
   };
 
-  const handleSaveNewPackage = async (formData) => {
+  const handleSaveNewPackage = async (formData: any) => {
     try {
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -294,7 +297,7 @@ const ItineraryGenerationContainer = () => {
         return;
       }
 
-      const cleanDays = (formData.days || []).filter(day => day && (day.title || day.dayNumber)).map(day => {
+      const cleanDays = (formData.days || []).filter((day: any) => day && (day.title || day.dayNumber)).map((day: any) => {
         const cleanDay = { ...day };
         if (!cleanDay.dayNumber && cleanDay.title) {
           const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
@@ -304,21 +307,21 @@ const ItineraryGenerationContainer = () => {
         if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
         if (cleanDay.accommodation) {
           if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
-          const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
+          const hasValidData = Object.values(cleanDay.accommodation).some((v) => v && v !== '');
           if (!hasValidData) delete cleanDay.accommodation;
         }
         return cleanDay;
       });
 
-      const sanitizedData = {
+      const sanitizedData: any = {
         ...formData,
         category: formData.category || 'FAMILY',
         basePrice: formData.basePrice ?? formData.price ?? 0,
         durationDays: formData.durationDays || formData.duration || 1,
         days: cleanDays,
         images: images
-          .filter(img => !img.isTemp && img.url)
-          .map(img => ({ url: img.url, publicId: img.publicId || img.public_id, altText: img.altText })),
+          .filter((img: any) => !img.isTemp && img.url)
+          .map((img: any) => ({ url: img.url, publicId: img.publicId || img.public_id, altText: img.altText })),
       };
 
       delete sanitizedData._id;
@@ -329,7 +332,7 @@ const ItineraryGenerationContainer = () => {
       const response = await ApiService.createPackage(sanitizedData);
 
       if (response.success) {
-        setPackages((prev) => [response.data, ...prev]);
+        setPackages((prev: any[]) => [response.data, ...prev]);
         setShowNewPackageDialog(false);
         setNewFormData(createDefaultPackage());
         setImages([]);
@@ -338,10 +341,10 @@ const ItineraryGenerationContainer = () => {
       } else {
         Swal.fire('Error', response.message || 'Failed to create package', 'error');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating package:', error);
       if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
-        const errorList = error.errors.map((err) => `• ${err.param || err.field}: ${err.msg}`).join('\n');
+        const errorList = error.errors.map((err: any) => `• ${err.param || err.field}: ${err.msg}`).join('\n');
         Swal.fire('Validation Error', `Please fix the following:\n\n${errorList}`, 'error');
       } else {
         Swal.fire('Error', error.message || 'Failed to save package to database', 'error');
@@ -349,7 +352,7 @@ const ItineraryGenerationContainer = () => {
     }
   };
 
-  const handleSaveEditPackage = async (formData) => {
+  const handleSaveEditPackage = async (formData: any) => {
     try {
       if (isUploadingImages) {
         Swal.fire('Please Wait', 'Images are still uploading. Please wait...', 'info');
@@ -376,7 +379,7 @@ const ItineraryGenerationContainer = () => {
 
       const packageId = formData._id || formData.id;
 
-      const cleanDays = (formData.days || []).filter(day => day && (day.title || day.dayNumber)).map(day => {
+      const cleanDays = (formData.days || []).filter((day: any) => day && (day.title || day.dayNumber)).map((day: any) => {
         const cleanDay = { ...day };
         if (!cleanDay.dayNumber && cleanDay.title) {
           const dayMatch = cleanDay.title.match(/day\s*(\d+)/i);
@@ -386,21 +389,21 @@ const ItineraryGenerationContainer = () => {
         if (cleanDay.description === undefined || cleanDay.description === null) cleanDay.description = '';
         if (cleanDay.accommodation) {
           if (!cleanDay.accommodation.type || cleanDay.accommodation.type === '') delete cleanDay.accommodation.type;
-          const hasValidData = Object.values(cleanDay.accommodation).some(v => v && v !== '');
+          const hasValidData = Object.values(cleanDay.accommodation).some((v) => v && v !== '');
           if (!hasValidData) delete cleanDay.accommodation;
         }
         return cleanDay;
       });
 
-      const sanitizedData = {
+      const sanitizedData: any = {
         ...formData,
         category: formData.category || 'FAMILY',
         basePrice: formData.basePrice ?? formData.price ?? 0,
         durationDays: formData.durationDays || formData.duration || 1,
         days: cleanDays,
         images: images
-          .filter(img => !img.isTemp && img.url)
-          .map(img => ({ url: img.url, publicId: img.publicId || img.public_id, altText: img.altText })),
+          .filter((img: any) => !img.isTemp && img.url)
+          .map((img: any) => ({ url: img.url, publicId: img.publicId || img.public_id, altText: img.altText })),
       };
 
       delete sanitizedData._id;
@@ -422,11 +425,11 @@ const ItineraryGenerationContainer = () => {
       }
     } catch (error) {
       console.error('Error updating package:', error);
-      Swal.fire('Error', error.message || 'Failed to update package', 'error');
+      Swal.fire('Error', (error as Error).message || 'Failed to update package', 'error');
     }
   };
 
-  const handleDownloadPackage = async (pkg) => {
+  const handleDownloadPackage = async (pkg: any) => {
     try {
       const packageId = pkg._id || pkg.id;
       setPdfPreviewData({ isOpen: true, blob: null, fileName: '', packageData: pkg });
@@ -446,8 +449,8 @@ const ItineraryGenerationContainer = () => {
     }
   };
 
-  const handleDeletePackage = (id) => {
-    const pkg = packages.find((p) => p._id === id || p.id === id);
+  const handleDeletePackage = (id: string) => {
+    const pkg = packages.find((p: any) => p._id === id || p.id === id);
     if (!pkg) return;
 
     Swal.fire({
@@ -475,13 +478,13 @@ const ItineraryGenerationContainer = () => {
           }
         } catch (error) {
           console.error('Error deleting package:', error);
-          Swal.fire('Error', error.message || 'Failed to delete package', 'error');
+          Swal.fire('Error', (error as Error).message || 'Failed to delete package', 'error');
         }
       }
     });
   };
 
-  const handleDuplicatePackage = (pkg) => {
+  const handleDuplicatePackage = (pkg: any) => {
     if (isSalesRep && !hasPermission('manage_packages')) {
       Swal.fire('Access Denied', 'Sales Representatives do not have permission to duplicate packages.', 'info');
       return;
@@ -498,13 +501,13 @@ const ItineraryGenerationContainer = () => {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const duplicateData = { ...pkg, title: `${pkg.title} (Copy)`, isActive: false, bookings: 0, rating: 0, numReviews: 0 };
+          const duplicateData: any = { ...pkg, title: `${pkg.title} (Copy)`, isActive: false, bookings: 0, rating: 0, numReviews: 0 };
           delete duplicateData._id;
 
           const response = await ApiService.createPackage(duplicateData);
 
           if (response.success) {
-            setPackages((prev) => [response.data, ...prev]);
+            setPackages((prev: any[]) => [response.data, ...prev]);
             setCurrentPage(1);
             Swal.fire('Success', `${pkg.title} has been duplicated successfully.`, 'success');
           } else {
@@ -512,13 +515,13 @@ const ItineraryGenerationContainer = () => {
           }
         } catch (error) {
           console.error('Error duplicating package:', error);
-          Swal.fire('Error', error.message || 'Failed to duplicate package', 'error');
+          Swal.fire('Error', (error as Error).message || 'Failed to duplicate package', 'error');
         }
       }
     });
   };
 
-  const handleImageUpload = async (files) => {
+  const handleImageUpload = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
     const fileArray = Array.from(files);
     setIsUploadingImages(true);
@@ -531,20 +534,20 @@ const ItineraryGenerationContainer = () => {
     setImages((prev) => [...prev, ...tempImages]);
 
     try {
-      const uploadedImages = await uploadPackageImages(files, (progress) => {
+      const uploadedImages = await uploadPackageImages(files, (progress: { current: number; total: number }) => {
         console.log(`Upload progress: ${progress.current}/${progress.total}`);
       });
 
       setImages((prev) => {
-        const withoutTemp = prev.filter(img => !img.isTemp);
+        const withoutTemp = prev.filter((img: any) => !img.isTemp);
         return [...withoutTemp, ...uploadedImages];
       });
 
       tempImages.forEach(img => URL.revokeObjectURL(img.url));
       Swal.fire('Success', `${uploadedImages.length} image(s) uploaded successfully!`, 'success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      setImages((prev) => prev.filter(img => !img.isTemp));
+      setImages((prev) => prev.filter((img: any) => !img.isTemp));
       tempImages.forEach(img => URL.revokeObjectURL(img.url));
 
       let errorMessage = 'Failed to upload images';
@@ -559,183 +562,44 @@ const ItineraryGenerationContainer = () => {
     }
   };
 
-  const handleImageRemove = (index) => {
+  const handleImageRemove = (index: number) => {
     const packageId = showEditPackageDialog ? (editPackageData?.id || editPackageData?._id) : null;
     removeImage(index, { packageId });
   };
 
-  const handleSetCover = async (imageId) => {
+  const handleSetCover = async (imageId: string) => {
     const packageId = editPackageData?.id || editPackageData?._id;
     if (!packageId) return;
 
     try {
       const response = await ApiService.setPackageCover(packageId, imageId);
       if (response.success) {
-        setEditPackageData((prev) => (prev ? { ...prev, coverImage: response.data.coverImage } : prev));
-        setPackages((prev) => prev.map((p) => (p.id === packageId ? { ...p, coverImage: response.data.coverImage } : p)));
+        setEditPackageData((prev: any) => (prev ? { ...prev, coverImage: response.data.coverImage } : prev));
+        setPackages((prev: any[]) => prev.map((p) => (p.id === packageId ? { ...p, coverImage: response.data.coverImage } : p)));
       }
     } catch (error) {
       console.error('Failed to set cover image:', error);
-      Swal.fire('Error', error.message || 'Failed to set cover image', 'error');
+      Swal.fire('Error', (error as Error).message || 'Failed to set cover image', 'error');
     }
   };
 
-  const handlePageChange = (newPage) => {
+  const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleStatusFilterChange = (status) => {
+  const handleStatusFilterChange = (status: string | null) => {
     setStatusFilter(status);
     setCurrentPage(1);
   };
 
-  const handleSearchChange = (value) => {
+  const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1);
   };
 
-  // Package Card Component
-  const PackageCard = ({ pkg }) => {
-    if (!pkg || typeof pkg !== 'object') return null;
-    const displayPrice = pkg.sellPrice ?? pkg.basePrice;
-    const formattedPrice = displayPrice ? formatPriceINR(displayPrice) : null;
-    const status = pkg.isActive ? 'published' : 'draft';
-    const statusLabel = pkg.isActive ? 'Published' : 'Draft';
-    const coverUrl = pkg.coverImage || (pkg.images?.[0] ? (typeof pkg.images[0] === 'string' ? pkg.images[0] : pkg.images[0].url) : null);
-
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all group">
-        {/* Image */}
-        <div
-          className="h-44 relative overflow-hidden flex items-center justify-center"
-          style={
-            coverUrl
-              ? {
-                backgroundImage: `url(${coverUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }
-              : { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }
-          }
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-          {!coverUrl && (
-            <ImageIcon className="w-12 h-12 text-white/50" />
-          )}
-
-          {/* Status Badge */}
-          <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${status === 'published' ? 'bg-emerald-500/90 text-white' :
-              status === 'draft' ? 'bg-amber-500/90 text-white' :
-                'bg-slate-500/90 text-white'
-            }`}>
-            {statusLabel}
-          </span>
-
-          {/* Price */}
-          <div className="absolute bottom-3 left-3">
-            <p className="text-2xl font-bold text-white drop-shadow-lg">{formattedPrice || 'Contact us'}</p>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-5">
-          <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-1">{pkg.title}</h3>
-
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CATEGORY_COLORS[pkg.category] || 'bg-slate-100 text-slate-700'}`}>
-              {pkg.category}
-            </span>
-            {pkg.region && (
-              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                {pkg.region}
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-2 text-sm text-slate-600 mb-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span>{pkg.durationDays || 'N/A'} days</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-slate-400" />
-              <span className="line-clamp-1">{Array.isArray(pkg.destinations) ? pkg.destinations.join(', ') : pkg.region || 'N/A'}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-2">
-              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-              <span className="font-semibold text-slate-800">{pkg.rating || 0}</span>
-              <span className="text-xs text-slate-400">({pkg.numReviews || 0})</span>
-            </div>
-            <div className="flex items-center gap-1 text-sm text-slate-500">
-              <Users className="w-4 h-4" />
-              <span>{pkg.bookings || 0}</span>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
-            <button
-              onClick={() => handleViewPackage(pkg)}
-              className="flex-1 px-3 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
-            >
-              <Eye className="w-4 h-4" />
-              View
-            </button>
-            {canEditPackages && (
-              <button
-                onClick={() => handleEditPackage(pkg)}
-                className="flex-1 px-3 py-2.5 bg-slate-500 text-white rounded-xl hover:bg-slate-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
-              >
-                <Edit className="w-4 h-4" />
-                Edit
-              </button>
-            )}
-          </div>
-
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => handleDownloadPackage(pkg)}
-              className="flex-1 px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
-            >
-              <Download className="w-4 h-4" />
-              PDF
-            </button>
-            {canEditPackages && (
-              <>
-                <button
-                  onClick={() => handleDuplicatePackage(pkg)}
-                  className="flex-1 px-3 py-2.5 bg-violet-500 text-white rounded-xl hover:bg-violet-600 transition-colors font-medium flex items-center justify-center gap-1.5 text-sm shadow-sm"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy
-                </button>
-                <button
-                  onClick={() => handleDeletePackage(pkg._id || pkg.id)}
-                  className="px-3 py-2.5 bg-rose-500 text-white rounded-xl hover:bg-rose-600 transition-colors font-medium flex items-center justify-center shadow-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50">
-      {/* Decorative Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-200/30 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 right-1/3 w-80 h-80 bg-blue-200/20 rounded-full blur-3xl" />
-      </div>
-
+    <div className="min-h-screen bg-background">
       <div className="relative flex">
         {/* Sidebar Backdrop (mobile) */}
         {sidebarOpen && (
@@ -743,79 +607,73 @@ const ItineraryGenerationContainer = () => {
         )}
 
         {/* Left Sidebar */}
-        <aside className={`
-          w-72 min-h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200/60 flex flex-col
-          md:sticky md:top-0
-          ${isMobile ? 'fixed inset-y-0 left-0 z-30 transition-transform duration-300 ' + (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'sticky top-0'}
-        `}>
+        <aside className={cn(
+          'w-72 min-h-screen bg-card border-r border-border flex flex-col',
+          'md:sticky md:top-0',
+          isMobile ? 'fixed inset-y-0 left-0 z-30 transition-transform duration-300 ' + (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'sticky top-0'
+        )}>
           {/* Sidebar Header */}
-          <div className="p-6 border-b border-slate-200/60">
+          <div className="p-6 border-b border-border">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
-                <Package className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
+                <Package className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-slate-800">Packages</h1>
-                <p className="text-xs text-slate-500">Travel Itineraries</p>
+                <h1 className="text-lg font-heading font-bold text-foreground">Packages</h1>
+                <p className="text-xs text-muted-foreground">Travel Itineraries</p>
               </div>
             </div>
 
             {/* Quick Stats */}
             <div className="grid grid-cols-2 gap-2 mt-4">
-              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
-                <p className="text-lg font-bold text-emerald-600">{stats.published}</p>
-                <p className="text-[10px] text-emerald-600/70 uppercase tracking-wider">Published</p>
+              <div className="bg-success/10 rounded-lg p-3 border border-success/20">
+                <p className="text-lg font-bold font-mono tabular-nums text-success">{stats.active}</p>
+                <p className="text-xs text-success/80 uppercase tracking-wider">Published</p>
               </div>
-              <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-                <p className="text-lg font-bold text-amber-600">{stats.draft}</p>
-                <p className="text-[10px] text-amber-600/70 uppercase tracking-wider">Drafts</p>
+              <div className="bg-warning/10 rounded-lg p-3 border border-warning/20">
+                <p className="text-lg font-bold font-mono tabular-nums text-warning">{stats.total - stats.active}</p>
+                <p className="text-xs text-warning/80 uppercase tracking-wider">Drafts</p>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
           {(!isSalesRep || canEditPackages) && (
-            <div className="p-4 space-y-2 border-b border-slate-200/60">
-              <button
-                onClick={handleNewPackageDialogOpen}
-                className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:shadow-xl transition-all"
-              >
-                <Plus className="w-5 h-5" />
+            <div className="p-4 space-y-2 border-b border-border">
+              <Button onClick={handleNewPackageDialogOpen} className="w-full">
+                <Plus className="w-4 h-4" />
                 New Package
-              </button>
+              </Button>
               {!isSalesRep && (
-                <button
-                  onClick={handleAIPackageDialogOpen}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 shadow-lg shadow-violet-500/25 hover:shadow-xl transition-all"
-                >
-                  <Sparkles className="w-5 h-5" />
+                <Button onClick={handleAIPackageDialogOpen} variant="outline" className="w-full">
+                  <Sparkles className="w-4 h-4" />
                   AI Generate
-                </button>
+                </Button>
               )}
             </div>
           )}
 
           {/* Filter Navigation */}
           <nav className="flex-1 p-4 space-y-2">
-            <p className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">Filter by Status</p>
+            <p className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filter by Status</p>
 
-            {visibleTabs.map((tab) => {
+            {statusTabs.map((tab) => {
               const isActive = statusFilter === tab.id;
               return (
                 <button
                   key={tab.id || 'all'}
                   onClick={() => { handleStatusFilterChange(tab.id); if (isMobile) setSidebarOpen(false); }}
-                  className={`w-full group rounded-xl transition-all duration-300 ${isActive ? 'shadow-lg' : 'hover:bg-slate-50'}`}
+                  className={cn('w-full group rounded-lg transition-colors', isActive ? '' : 'hover:bg-muted')}
                 >
-                  <div className={`flex items-center gap-3 p-3 rounded-xl ${isActive ? `bg-gradient-to-r ${tab.gradient} text-white` : 'text-slate-600'}`}>
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isActive ? 'bg-white/20' : `bg-${tab.color}-50`}`}>
-                      <BookOpen className={`w-5 h-5 ${isActive ? 'text-white' : `text-${tab.color}-600`}`} />
+                  <div className={cn('flex items-center gap-3 p-3 rounded-lg', isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}>
+                    <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', isActive ? 'bg-primary-foreground/20' : 'bg-muted')}>
+                      <BookOpen className="w-4 h-4" />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className={`font-medium text-sm ${isActive ? 'text-white' : 'text-slate-700'}`}>{tab.label}</p>
-                      <p className={`text-xs ${isActive ? 'text-white/70' : 'text-slate-400'}`}>{tab.count} packages</p>
+                      <p className={cn('font-medium text-sm', isActive ? 'text-primary-foreground' : 'text-foreground')}>{tab.label}</p>
+                      <p className={cn('text-xs', isActive ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{tab.count} packages</p>
                     </div>
-                    <ChevronRight className={`w-4 h-4 transition-transform ${isActive ? 'text-white/80' : 'text-slate-300 group-hover:translate-x-1'}`} />
+                    <ChevronRight className={cn('w-4 h-4 transition-transform', isActive ? 'text-primary-foreground/80' : 'text-muted-foreground group-hover:translate-x-1')} />
                   </div>
                 </button>
               );
@@ -823,13 +681,13 @@ const ItineraryGenerationContainer = () => {
           </nav>
 
           {/* Sidebar Footer */}
-          <div className="p-4 border-t border-slate-200/60">
-            <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-100">
+          <div className="p-4 border-t border-border">
+            <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-violet-500" />
-                <span className="text-xs font-semibold text-violet-600">Pro Tip</span>
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-xs font-semibold text-primary">Pro Tip</span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Use AI Generate to quickly create packages with destinations and itineraries.
               </p>
             </div>
@@ -839,41 +697,41 @@ const ItineraryGenerationContainer = () => {
         {/* Main Content */}
         <main className="flex-1">
           {/* Content Header */}
-          <div className="bg-white/60 backdrop-blur-sm border-b border-slate-200/60 px-4 sm:px-8 py-4 sm:py-6 sticky top-0 z-10">
+          <div className="bg-card border-b border-border px-4 sm:px-8 py-4 sm:py-6 sticky top-0 z-10">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3 sm:gap-4 pl-10 md:pl-0">
                 {/* Packages sidebar toggle - mobile only */}
                 <button
                   onClick={toggleSidebar}
-                  className="md:hidden p-2 bg-violet-100 hover:bg-violet-200 rounded-lg transition-colors"
+                  className="md:hidden p-2 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
                   title="Toggle packages sidebar"
                 >
-                  {sidebarOpen ? <X className="w-4 h-4 text-violet-700" /> : <Menu className="w-4 h-4 text-violet-700" />}
+                  {sidebarOpen ? <X className="w-4 h-4 text-primary" /> : <Menu className="w-4 h-4 text-primary" />}
                 </button>
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                  <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <Package className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800">
+                  <h2 className="text-xl font-heading font-bold text-foreground">
                     {statusFilter ? `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Packages` : 'All Packages'}
                   </h2>
-                  <p className="text-sm text-slate-500">{filteredPackages.length} packages found</p>
+                  <p className="text-sm text-muted-foreground">{filteredPackages.length} packages found</p>
                 </div>
               </div>
 
               {/* View Toggle */}
-              <div className="hidden sm:flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+              <div className="hidden sm:flex items-center gap-2 bg-muted rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={cn('p-2 rounded-md transition-colors', viewMode === 'grid' ? 'bg-card shadow-card text-foreground' : 'text-muted-foreground hover:text-foreground')}
                 >
-                  <LayoutGrid className="w-5 h-5" />
+                  <LayoutGrid className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={cn('p-2 rounded-md transition-colors', viewMode === 'list' ? 'bg-card shadow-card text-foreground' : 'text-muted-foreground hover:text-foreground')}
                 >
-                  <List className="w-5 h-5" />
+                  <List className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -881,34 +739,28 @@ const ItineraryGenerationContainer = () => {
             {/* Mobile Action Buttons */}
             {(!isSalesRep || canEditPackages) && (
               <div className="flex md:hidden gap-2 mb-4">
-                <button
-                  onClick={handleNewPackageDialogOpen}
-                  className="flex-1 px-3 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm shadow-sm"
-                >
+                <Button onClick={handleNewPackageDialogOpen} className="flex-1">
                   <Plus className="w-4 h-4" />
                   New Package
-                </button>
+                </Button>
                 {!isSalesRep && (
-                  <button
-                    onClick={handleAIPackageDialogOpen}
-                    className="flex-1 px-3 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 text-sm shadow-sm"
-                  >
+                  <Button onClick={handleAIPackageDialogOpen} variant="outline" className="flex-1">
                     <Sparkles className="w-4 h-4" />
                     AI Generate
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
 
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <input
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
                 type="text"
                 placeholder="Search packages by name or region..."
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full py-3 pl-12 pr-4 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+                className="pl-9"
               />
             </div>
           </div>
@@ -916,15 +768,23 @@ const ItineraryGenerationContainer = () => {
           {/* Content Body */}
           <div className="p-4 sm:p-8">
             {filteredPackages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <Package className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-lg font-medium text-slate-600">No packages found</p>
+                <p className="text-lg font-medium text-foreground">No packages found</p>
                 <p className="text-sm">Create your first package to get started</p>
               </div>
             ) : (
               <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6' : 'space-y-4'}>
-                {filteredPackages.map((pkg) => (
-                  <PackageCard key={pkg._id || pkg.id} pkg={pkg} />
+                {filteredPackages.map((pkg: any) => (
+                  <PackageCard
+                    key={pkg._id || pkg.id}
+                    pkg={pkg}
+                    onView={handleViewPackage}
+                    onEdit={handleEditPackage}
+                    onDownload={handleDownloadPackage}
+                    onDelete={handleDeletePackage}
+                    onDuplicate={handleDuplicatePackage}
+                  />
                 ))}
               </div>
             )}
@@ -957,7 +817,7 @@ const ItineraryGenerationContainer = () => {
         <NewEditPackageForm
           formData={newFormData}
           setFormData={setNewFormData}
-          onSave={(updatedData) => handleSaveNewPackage(updatedData || newFormData)}
+          onSave={(updatedData: any) => handleSaveNewPackage(updatedData || newFormData)}
           onCancel={() => setShowNewPackageDialog(false)}
           onImageUpload={handleImageUpload}
           onImageRemove={handleImageRemove}
@@ -977,7 +837,7 @@ const ItineraryGenerationContainer = () => {
           <NewEditPackageForm
             formData={editPackageData}
             setFormData={setEditPackageData}
-            onSave={(updatedData) => handleSaveEditPackage(updatedData || editPackageData)}
+            onSave={(updatedData: any) => handleSaveEditPackage(updatedData || editPackageData)}
             onCancel={() => setShowEditPackageDialog(false)}
             onImageUpload={handleImageUpload}
             onImageRemove={handleImageRemove}

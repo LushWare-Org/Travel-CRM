@@ -2,19 +2,6 @@
  * Utility constants and configuration
  */
 
-export const STATUS_COLORS = {
-  published: 'bg-green-100 text-green-800',
-  draft: 'bg-yellow-100 text-yellow-800',
-};
-
-export const CATEGORY_COLORS = {
-  HONEYMOON: 'bg-pink-100 text-pink-800',
-  FAMILY: 'bg-green-100 text-green-800',
-  COUPLE: 'bg-purple-100 text-purple-800',
-  GROUP: 'bg-blue-100 text-blue-800',
-  WILD_SAFARI: 'bg-lime-100 text-lime-800',
-};
-
 export const CATEGORY_OPTIONS = [
   { value: 'HONEYMOON', label: 'Honeymoon' },
   { value: 'COUPLE', label: 'Couple' },
