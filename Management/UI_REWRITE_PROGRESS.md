@@ -19,7 +19,7 @@ Tracks execution of the plan approved 2026-08-22. Full plan (context, decisions,
 ## Phase 0 — Tooling & Infrastructure
 
 - [x] 0.0 Create this progress file, commit first
-- [ ] 0.1 Remove dead deps (`@mui/material`, `@mui/icons-material`, `@mui/lab`, `@mui/x-date-pickers`, `@emotion/react`, `@emotion/styled`, `@headlessui/react`), `npm install`, re-grep to confirm
+- [x] 0.1 Remove dead deps (`@mui/material`, `@mui/icons-material`, `@mui/lab`, `@mui/x-date-pickers`, `@emotion/react`, `@emotion/styled`, `@headlessui/react`), `npm install`, re-grep to confirm
 - [ ] 0.2 TypeScript scaffolding: `tsconfig.json` (`allowJs`, `checkJs: false`, `strict: false`, aliases mirroring `@`/`@utils`), `tsconfig.node.json`, rename `vite.config.js`/`vitest.config.js` → `.ts`, extend `eslint.config.js` with a `**/*.{ts,tsx}` block at the same `warn` posture
 - [ ] 0.2b Third-party type-compat audit (lodash, js-cookie, file-saver, qrcode, json2csv, leaflet/react-leaflet, react-datepicker, react-phone-number-input, react-select, sweetalert2, i18next/react-i18next, zod v4) — add ambient `.d.ts` shims where needed
 - [ ] 0.3 Tailwind v4 upgrade (CSS-first `@theme`, PostCSS setup)
@@ -75,4 +75,4 @@ Tracks execution of the plan approved 2026-08-22. Full plan (context, decisions,
 
 ## Last session
 
-- **2026-08-22**: Plan approved. Created this progress file and the `feat/management-ui-design-system-rewrite` branch (base `microservices`). Next: Phase 0.1 (remove dead deps).
+- **2026-08-22**: Plan approved. Created this progress file and the `feat/management-ui-design-system-rewrite` branch (base `microservices`). Completed 0.1: removed `@mui/*`/`@emotion/*`/`@headlessui/react` (confirmed 0 usages via grep before and after), reinstalled with `--legacy-peer-deps` (matches how the existing lockfile was already resolved — a pre-existing vite@8/`@vitejs/plugin-react`@4 peer-dep mismatch unrelated to this change, not fixed here as out of scope). Verified: `npm run build` ✓, `npm run lint` ✓ (146 warnings, 0 errors — matches pre-existing baseline), `npm test` ✓ (260/260). `npm run test:e2e` not run this commit (requires full local stack up; skipped as low-risk given confirmed zero usage of removed packages) — run it before the next phase that touches Sidebar/ProtectedRoute (Phase 2). Next: Phase 0.2 (TypeScript scaffolding).

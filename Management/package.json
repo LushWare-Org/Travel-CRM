@@ -14,13 +14,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@emotion/react": "^11.11.1",
-    "@emotion/styled": "^11.11.0",
-    "@headlessui/react": "^2.2.2",
-    "@mui/icons-material": "^5.17.1",
-    "@mui/lab": "^5.0.0-alpha.135",
-    "@mui/material": "^5.15.0",
-    "@mui/x-date-pickers": "^6.19.0",
     "@stripe/react-stripe-js": "^3.6.0",
     "@stripe/stripe-js": "^7.2.0",
     "@travel-crm/constants": "file:../Services/shared/constants",
