@@ -20,3 +20,24 @@ export async function submitFacebookLead({ leadgenId, name, email, phone, messag
   }
   return res.json();
 }
+
+/**
+ * Log an inbound WhatsApp message or an outbound delivery-status callback
+ * onto the matching lead's timeline. lead-service resolves `phone` to a
+ * lead itself and no-ops (not an error) when nothing matches, so an
+ * unrecognized number never fails the webhook.
+ */
+export async function logWhatsappCommunication({ phone, notes, occurredAt, fetchImpl = fetch }) {
+  const res = await fetchImpl(`${LEAD_SERVICE_URL}/api/v1/leads/internal/communication-logs`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-internal-token': INTERNAL_EVENTS_TOKEN,
+    },
+    body: JSON.stringify({ phone, type: 'whatsapp', notes, occurredAt }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to log WhatsApp communication to lead-service (status ${res.status})`);
+  }
+  return res.json();
+}
