@@ -9,7 +9,7 @@ vi.mock('../../../../../services/analytics.service.js', () => ({
 
 vi.mock('react-hot-toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
-import PackageAnalytics from '../ItineraryAnalytics.jsx';
+import PackageAnalytics from '../ItineraryAnalytics.tsx';
 
 const overview = {
   stats: { totalItineraries: 18, totalInquiries: 40, totalConversions: 9 },

@@ -1,23 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 import {
   TimeRangeFilter,
-  StatCard,
   ChartContainer,
   LineChartComponent,
   BarChartComponent,
-} from "../Common";
-import PieChartComponent, { DEFAULT_PIE_COLORS } from "../Common/Charts/PieChartComponent";
-import { BarChart3, TrendingUp, Users, Target, Download, Activity, Zap } from "lucide-react";
-import { analyticsAPI } from "../../../../services/api";
-import { exportLeadAnalyticsPDF } from "../../utils/exportAnalytics";
-import toast from "react-hot-toast";
+} from '../Common';
+import PieChartComponent from '../Common/Charts/PieChartComponent';
+import { CHART_PALETTE } from '../Common/chartTheme';
+import { Users, Target, Download, Activity, Zap } from 'lucide-react';
+import { analyticsAPI } from '../../../../services/api';
+import { exportLeadAnalyticsPDF } from '../../utils/exportAnalytics';
+import toast from 'react-hot-toast';
+import { StatCard } from '../../../../components/shared/StatCard';
+import { Button } from '../../../../components/ui/button';
 
 /**
- * LeadAnalytics Component - Completely Redesigned
- * Modern layout with unique component structure
+ * LeadAnalytics Component
  */
 const LeadAnalytics = () => {
-  const [timeRange, setTimeRange] = useState("monthly");
+  const [timeRange, setTimeRange] = useState('monthly');
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [stats, setStats] = useState({
@@ -28,20 +29,20 @@ const LeadAnalytics = () => {
     new: 0,
     quoted: 0,
   });
-  const [trendData, setTrendData] = useState([]);
-  const [statusData, setStatusData] = useState([]);
-  const [categoryData, setCategoryData] = useState([]);
-  const [priceRangeData, setPriceRangeData] = useState([]);
-  const [countryData, setCountryData] = useState([]);
-  const [destinationData, setDestinationData] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [statusData, setStatusData] = useState<any[]>([]);
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [priceRangeData, setPriceRangeData] = useState<any[]>([]);
+  const [countryData, setCountryData] = useState<any[]>([]);
+  const [destinationData, setDestinationData] = useState<any[]>([]);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const numberFormatter = useMemo(() => new Intl.NumberFormat("en-US"), []);
+  const numberFormatter = useMemo(() => new Intl.NumberFormat('en-US'), []);
 
   useEffect(() => {
     const fetchLeadAnalytics = async () => {
       setLoading(true);
-      setErrorMessage("");
+      setErrorMessage('');
       try {
         const response = await analyticsAPI.getLeadOverview({ timeRange });
         const payload = response?.data || {};
@@ -58,30 +59,30 @@ const LeadAnalytics = () => {
         setCategoryData(payload?.categoryDistribution || []);
         setPriceRangeData(payload?.priceRangeDistribution || []);
 
-        const countries = (payload?.topCountries || []).map((item) => ({
+        const countries = (payload?.topCountries || []).map((item: any) => ({
           ...item,
           country: item?.country
             ? item.country
               .split(' ')
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
               .join(' ')
             : 'Unknown',
         }));
         setCountryData(countries);
 
-        const destinations = (payload?.topDestinations || []).map((item) => ({
+        const destinations = (payload?.topDestinations || []).map((item: any) => ({
           ...item,
           destination: item?.destination
             ? item.destination
               .split(' ')
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
               .join(' ')
             : 'Unknown',
         }));
         setDestinationData(destinations);
-      } catch (error) {
-        console.error("Failed to load lead analytics", error);
-        setErrorMessage(error.message || "Failed to load lead analytics data.");
+      } catch (error: any) {
+        console.error('Failed to load lead analytics', error);
+        setErrorMessage(error.message || 'Failed to load lead analytics data.');
         setStats({ totalLeads: 0, contacted: 0, interested: 0, converted: 0, new: 0, quoted: 0 });
         setTrendData([]);
         setStatusData([]);
@@ -100,47 +101,38 @@ const LeadAnalytics = () => {
   const handleExportPDF = async () => {
     try {
       setExporting(true);
-      const toastId = toast.loading("Preparing analytics PDF...");
+      const toastId = toast.loading('Preparing analytics PDF...');
       const summaryMetrics = [
-        { label: "Total Leads", value: stats.totalLeads },
-        { label: "Contacted", value: stats.contacted },
-        { label: "Interested", value: stats.interested },
-        { label: "Converted", value: stats.converted },
-        { label: "Time Range", value: timeRange.toUpperCase() },
+        { label: 'Total Leads', value: stats.totalLeads },
+        { label: 'Contacted', value: stats.contacted },
+        { label: 'Interested', value: stats.interested },
+        { label: 'Converted', value: stats.converted },
+        { label: 'Time Range', value: timeRange.toUpperCase() },
       ];
       await exportLeadAnalyticsPDF({ timeRange, summaryMetrics });
       toast.dismiss(toastId);
-      toast.success("Analytics PDF downloaded successfully!");
+      toast.success('Analytics PDF downloaded successfully!');
     } catch (error) {
-      console.error("Error exporting PDF:", error);
-      toast.error("Failed to export analytics PDF");
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export analytics PDF');
     } finally {
       setExporting(false);
     }
   };
 
   const leadLineChartLines = [
-    { dataKey: "new", stroke: "#3b82f6", name: "New Leads" },
-    { dataKey: "contacted", stroke: "#10b981", name: "Contacted" },
-    { dataKey: "interested", stroke: "#f59e0b", name: "Interested" },
-    { dataKey: "converted", stroke: "#8b5cf6", name: "Converted" },
-  ];
-
-  const categoryColors = [
-    "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#a855f7",
-    "#ec4899", "#3b82f6", "#22c55e", "#f97316", "#8b5cf6",
-  ];
-
-  const statusColors = [
-    "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6366f1",
+    { dataKey: 'new', stroke: CHART_PALETTE[0], name: 'New Leads' },
+    { dataKey: 'contacted', stroke: CHART_PALETTE[1], name: 'Contacted' },
+    { dataKey: 'interested', stroke: CHART_PALETTE[2], name: 'Interested' },
+    { dataKey: 'converted', stroke: CHART_PALETTE[3], name: 'Converted' },
   ];
 
   // Quick stats for header
   const quickStats = [
-    { label: 'Total', value: stats.totalLeads, color: 'text-slate-800' },
-    { label: 'Contacted', value: stats.contacted, color: 'text-blue-600' },
-    { label: 'Interested', value: stats.interested, color: 'text-amber-600' },
-    { label: 'Converted', value: stats.converted, color: 'text-emerald-600' },
+    { label: 'Total', value: stats.totalLeads, color: 'text-foreground' },
+    { label: 'Contacted', value: stats.contacted, color: 'text-primary' },
+    { label: 'Interested', value: stats.interested, color: 'text-warning' },
+    { label: 'Converted', value: stats.converted, color: 'text-success' },
   ];
 
   return (
@@ -148,28 +140,24 @@ const LeadAnalytics = () => {
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Lead Performance</h2>
-          <p className="text-sm text-slate-500 mt-1">Track your lead pipeline and conversions</p>
+          <h2 className="font-heading text-xl font-bold text-foreground">Lead Performance</h2>
+          <p className="text-sm text-muted-foreground mt-1">Track your lead pipeline and conversions</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <TimeRangeFilter selectedRange={timeRange} onRangeChange={setTimeRange} />
-          <button
-            onClick={handleExportPDF}
-            disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:from-slate-300 disabled:to-slate-400 text-white rounded-xl font-medium transition-all shadow-lg shadow-indigo-500/25"
-          >
-            <Download size={16} />
-            {exporting ? "Exporting..." : "Export"}
-          </button>
+          <Button onClick={handleExportPDF} disabled={exporting || loading}>
+            <Download className="w-4 h-4" />
+            {exporting ? 'Exporting...' : 'Export'}
+          </Button>
         </div>
       </div>
 
       {/* Quick Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {quickStats.map((stat, idx) => (
-          <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{stat.label}</p>
-            <p className={`text-2xl font-bold ${stat.color} mt-1`}>{numberFormatter.format(stat.value)}</p>
+          <div key={idx} className="bg-card rounded-lg border border-border p-4 shadow-card">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+            <p className={`font-mono text-2xl font-semibold tabular-nums ${stat.color} mt-1`}>{numberFormatter.format(stat.value)}</p>
           </div>
         ))}
       </div>
@@ -180,28 +168,28 @@ const LeadAnalytics = () => {
           icon={Users}
           label="Total Leads"
           value={numberFormatter.format(stats.totalLeads)}
-          color="blue"
+          color="primary"
           loading={loading}
         />
         <StatCard
           icon={Target}
           label="Contacted"
           value={numberFormatter.format(stats.contacted)}
-          color="green"
+          color="muted"
           loading={loading}
         />
         <StatCard
           icon={Zap}
           label="Interested"
           value={numberFormatter.format(stats.interested)}
-          color="purple"
+          color="warning"
           loading={loading}
         />
         <StatCard
           icon={Activity}
           label="Converted"
           value={numberFormatter.format(stats.converted)}
-          color="orange"
+          color="success"
           loading={loading}
         />
       </div>
@@ -213,7 +201,7 @@ const LeadAnalytics = () => {
       >
         {loading ? (
           <div className="flex items-center justify-center h-[320px]">
-            <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
+            <div className="animate-spin w-8 h-8 border-4 border-muted border-t-primary rounded-full" />
           </div>
         ) : trendData.length > 0 ? (
           <LineChartComponent
@@ -223,8 +211,8 @@ const LeadAnalytics = () => {
             height={320}
           />
         ) : (
-          <div className="flex items-center justify-center h-[320px] text-slate-400">
-            {errorMessage || "No lead trend data available for the selected range."}
+          <div className="flex items-center justify-center h-[320px] text-muted-foreground text-sm">
+            {errorMessage || 'No lead trend data available for the selected range.'}
           </div>
         )}
       </ChartContainer>
@@ -237,7 +225,7 @@ const LeadAnalytics = () => {
         >
           {loading ? (
             <div className="flex items-center justify-center h-[280px]">
-              <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
+              <div className="animate-spin w-8 h-8 border-4 border-muted border-t-primary rounded-full" />
             </div>
           ) : categoryData.length > 0 ? (
             <PieChartComponent
@@ -245,10 +233,9 @@ const LeadAnalytics = () => {
               dataKey="value"
               nameKey="name"
               height={280}
-              colors={categoryColors}
             />
           ) : (
-            <div className="flex items-center justify-center h-[280px] text-slate-400">
+            <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
               No category data available
             </div>
           )}
@@ -260,7 +247,7 @@ const LeadAnalytics = () => {
         >
           {loading ? (
             <div className="flex items-center justify-center h-[280px]">
-              <div className="animate-spin w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full" />
+              <div className="animate-spin w-8 h-8 border-4 border-muted border-t-primary rounded-full" />
             </div>
           ) : statusData.length > 0 ? (
             <PieChartComponent
@@ -268,10 +255,9 @@ const LeadAnalytics = () => {
               dataKey="value"
               nameKey="name"
               height={280}
-              colors={statusColors}
             />
           ) : (
-            <div className="flex items-center justify-center h-[280px] text-slate-400">
+            <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
               No status data available
             </div>
           )}
@@ -289,24 +275,24 @@ const LeadAnalytics = () => {
               <BarChartComponent
                 data={countryData}
                 bars={[
-                  { dataKey: "leads", fill: "#6366f1", name: "Leads" },
-                  { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
+                  { dataKey: 'leads', fill: CHART_PALETTE[0], name: 'Leads' },
+                  { dataKey: 'conversion', fill: CHART_PALETTE[1], name: 'Conversion %' },
                 ]}
                 xAxisKey="country"
                 height={260}
               />
               {/* Country List */}
-              <div className="grid grid-cols-2 gap-2 pt-4 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
                 {countryData.slice(0, 6).map((country, idx) => (
                   <div key={idx} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600 truncate">{country.country}</span>
-                    <span className="font-semibold text-slate-800">{country.leads}</span>
+                    <span className="text-muted-foreground truncate">{country.country}</span>
+                    <span className="font-mono font-semibold tabular-nums text-foreground">{country.leads}</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-[280px] text-slate-400">
+            <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
               No country data available
             </div>
           )}
@@ -319,12 +305,12 @@ const LeadAnalytics = () => {
           {priceRangeData.length > 0 ? (
             <BarChartComponent
               data={priceRangeData}
-              bars={[{ dataKey: "value", fill: "#8b5cf6", name: "Leads" }]}
+              bars={[{ dataKey: 'value', fill: CHART_PALETTE[0], name: 'Leads' }]}
               xAxisKey="range"
               height={280}
             />
           ) : (
-            <div className="flex items-center justify-center h-[280px] text-slate-400">
+            <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
               No price range data available
             </div>
           )}
@@ -340,14 +326,14 @@ const LeadAnalytics = () => {
           <BarChartComponent
             data={destinationData}
             bars={[
-              { dataKey: "leads", fill: "#3b82f6", name: "Leads" },
-              { dataKey: "conversion", fill: "#10b981", name: "Conversion %" },
+              { dataKey: 'leads', fill: CHART_PALETTE[0], name: 'Leads' },
+              { dataKey: 'conversion', fill: CHART_PALETTE[1], name: 'Conversion %' },
             ]}
             xAxisKey="destination"
             height={300}
           />
         ) : (
-          <div className="flex items-center justify-center h-[300px] text-slate-400">
+          <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
             No destination data available
           </div>
         )}

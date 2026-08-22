@@ -9,12 +9,15 @@ vi.mock('axios', () => ({ default: { post: mockPost } }));
 
 vi.mock('../../../../services/api.js', () => ({ API_BASE_URL: 'https://gateway.test/api/v1' }));
 
-const { captureAllCharts, exportLeadAnalyticsPDF } = await import('../exportAnalytics.js');
+const { captureAllCharts, exportLeadAnalyticsPDF } = await import('../exportAnalytics.ts');
 
 function renderChartContainer() {
   const container = document.createElement('div');
-  // Matches ChartContainer.jsx's real root className exactly.
-  container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg transition-all duration-300';
+  // Matches ChartContainer.tsx's real root shape exactly: it renders a shadcn
+  // Card, which sets data-slot="card" on its root div (src/components/ui/card.tsx) -
+  // a semantic marker, not a literal Tailwind class list (which broke this exact
+  // selector once before, see captureAllCharts's own comment).
+  container.setAttribute('data-slot', 'card');
   Object.defineProperty(container, 'offsetParent', { value: document.body, configurable: true });
   container.getBoundingClientRect = () => ({ width: 400, height: 300, top: 0, left: 0 });
 
@@ -22,7 +25,10 @@ function renderChartContainer() {
   chart.className = 'recharts-wrapper';
   container.appendChild(chart);
 
-  const title = document.createElement('h2');
+  // CardTitle (src/components/ui/card.tsx) renders a <div data-slot="card-title">,
+  // not a heading element.
+  const title = document.createElement('div');
+  title.setAttribute('data-slot', 'card-title');
   title.textContent = 'Revenue Trend';
   container.appendChild(title);
 
@@ -40,7 +46,7 @@ afterEach(() => {
 });
 
 describe('captureAllCharts selector', () => {
-  it('finds a chart rendered inside a real ChartContainer (rounded-2xl, not the old rounded-lg selector)', async () => {
+  it('finds a chart rendered inside a real ChartContainer, via the data-slot="card" marker rather than literal Tailwind classes', async () => {
     renderChartContainer();
 
     const charts = await captureAllCharts();

@@ -4,37 +4,33 @@ import {
   Cell,
   Tooltip,
   ResponsiveContainer,
-} from "recharts";
+} from 'recharts';
+import { chartTooltipStyle, CHART_PALETTE } from '../chartTheme';
 
-export const DEFAULT_PIE_COLORS = [
-  "#6366f1",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#3b82f6",
-  "#22c55e",
-  "#f97316",
-  "#a855f7",
-];
+export const DEFAULT_PIE_COLORS = CHART_PALETTE;
 
-/**
- * PieChartComponent - Completely Redesigned
- * Modern donut chart with center label and external legend list
- */
+interface PieChartComponentProps {
+  data: Record<string, any>[];
+  dataKey?: string;
+  nameKey?: string;
+  height?: number;
+  colors?: string[];
+  legendProps?: Record<string, unknown> | false;
+  pieProps?: Record<string, unknown>;
+  tooltipFormatter?: (value: any) => string;
+  labelFormatter?: (label: any) => string;
+}
+
 const PieChartComponent = ({
   data,
-  dataKey = "value",
-  nameKey = "name",
+  dataKey = 'value',
+  nameKey = 'name',
   height = 300,
   colors = DEFAULT_PIE_COLORS,
   legendProps = {},
   pieProps = {},
   tooltipFormatter,
-  labelFormatter,
-}) => {
-  // Calculate total for center label
+}: PieChartComponentProps) => {
   const total = data.reduce((sum, item) => sum + (item[dataKey] || 0), 0);
 
   const shouldRenderLegend = legendProps !== false;
@@ -56,31 +52,21 @@ const PieChartComponent = ({
               stroke="none"
               {...pieProps}
             >
-              {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={colors[index % colors.length]}
-                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
-                />
+              {data.map((_entry, index) => (
+                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </Pie>
             <Tooltip
               formatter={tooltipFormatter || ((value) => `${value}`)}
-              contentStyle={{
-                backgroundColor: 'rgba(255,255,255,0.95)',
-                border: '1px solid #e2e8f0',
-                borderRadius: '12px',
-                boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
-                padding: '12px 16px'
-              }}
+              contentStyle={chartTooltipStyle}
             />
           </PieChart>
         </ResponsiveContainer>
 
         {/* Center Label */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-2xl font-bold text-slate-800">{total}</span>
-          <span className="text-xs text-slate-400">Total</span>
+          <span className="font-mono text-2xl font-semibold tabular-nums text-foreground">{total}</span>
+          <span className="text-xs text-muted-foreground">Total</span>
         </div>
       </div>
 
@@ -94,10 +80,10 @@ const PieChartComponent = ({
                 style={{ backgroundColor: colors[index % colors.length] }}
               />
               <div className="flex items-baseline gap-2">
-                <span className="text-sm text-slate-600 truncate max-w-[120px]">
+                <span className="text-sm text-muted-foreground truncate max-w-[120px]">
                   {item[nameKey]}
                 </span>
-                <span className="text-sm font-semibold text-slate-800">
+                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
                   {item[dataKey]}
                 </span>
               </div>

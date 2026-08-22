@@ -354,7 +354,7 @@ No new breakpoint system is introduced in Phase 1 - Tailwind's default breakpoin
 
 ## Chart Theming (recharts)
 
-Established in `features/dashboard` (Phase 3.1) - reuse this pattern for every other `recharts` usage (`features/analytics`, Phase 4.1).
+Established in `features/dashboard` (Phase 3.1); centralized into `features/analytics/components/Common/chartTheme.ts` (Phase 4.1) - `chartGridColor`, `chartAxisColor`, `chartTooltipStyle`, `chartLegendStyle`, and the `CHART_PALETTE` array live there as the single source every chart in that feature imports, rather than each chart file re-deriving the same `var(--color-chart-1)` strings. Any future `recharts` usage outside `features/analytics` should still follow the pattern below (promote `chartTheme.ts` to `components/shared/` only if a second feature folder needs it - not preemptively).
 
 `recharts` takes literal CSS color strings on its own props (`stroke`, `fill`, `contentStyle`, `<stop stopColor>`), not Tailwind classes - so it references the same CSS custom properties the `bg-*`/`text-*` utilities resolve, as raw `var(...)` strings:
 - Series color: `var(--color-chart-1)` through `var(--color-chart-5)` - one token per series, `chart-1` for whichever series is "primary" in that chart.

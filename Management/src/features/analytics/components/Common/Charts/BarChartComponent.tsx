@@ -7,24 +7,34 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from "recharts";
+} from 'recharts';
+import { chartGridColor, chartAxisColor, chartTooltipStyle, chartLegendStyle } from '../chartTheme';
 
-/**
- * BarChartComponent - Completely Redesigned
- * Modern bars with rounded corners, gradient fills, and sleek styling
- */
+interface BarSeries {
+  dataKey: string;
+  fill: string;
+  name: string;
+}
+
+interface BarChartComponentProps {
+  data: Record<string, unknown>[];
+  bars?: BarSeries[];
+  xAxisKey?: string;
+  height?: number;
+  margin?: { top: number; right: number; left: number; bottom: number };
+}
+
 const BarChartComponent = ({
   data,
   bars = [],
-  xAxisKey = "name",
+  xAxisKey = 'name',
   height = 300,
   margin = { top: 10, right: 10, left: -10, bottom: 0 },
-}) => {
-  const defaultBars = [{ dataKey: "value", fill: "#6366f1", name: "Value" }];
+}: BarChartComponentProps) => {
+  const defaultBars: BarSeries[] = [{ dataKey: 'value', fill: 'var(--color-chart-1)', name: 'Value' }];
   const barConfig = bars.length > 0 ? bars : defaultBars;
 
-  // Generate gradient IDs
-  const gradientId = (idx) => `barGradient-${idx}`;
+  const gradientId = (idx: number) => `barGradient-${idx}`;
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -37,14 +47,10 @@ const BarChartComponent = ({
             </linearGradient>
           ))}
         </defs>
-        <CartesianGrid
-          strokeDasharray="3 3"
-          stroke="#e2e8f0"
-          vertical={false}
-        />
+        <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} vertical={false} />
         <XAxis
           dataKey={xAxisKey}
-          stroke="#94a3b8"
+          stroke={chartAxisColor}
           fontSize={11}
           tickLine={false}
           axisLine={false}
@@ -53,27 +59,9 @@ const BarChartComponent = ({
           textAnchor="end"
           height={60}
         />
-        <YAxis
-          stroke="#94a3b8"
-          fontSize={11}
-          tickLine={false}
-          axisLine={false}
-        />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: 'rgba(255,255,255,0.95)',
-            border: '1px solid #e2e8f0',
-            borderRadius: '12px',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
-            padding: '12px 16px'
-          }}
-          cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-        />
-        <Legend
-          wrapperStyle={{ paddingTop: 20 }}
-          iconType="circle"
-          iconSize={8}
-        />
+        <YAxis stroke={chartAxisColor} fontSize={11} tickLine={false} axisLine={false} />
+        <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'var(--color-muted)' }} />
+        <Legend wrapperStyle={chartLegendStyle} iconType="circle" iconSize={8} />
         {barConfig.map((bar, idx) => (
           <Bar
             key={idx}
