@@ -7,11 +7,17 @@ import { reconcileFlightsForSave } from '../utils/flightSync';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
 
-async function makeRequest(endpoint, options = {}) {
+interface ApiError extends Error {
+  status?: number;
+  data?: unknown;
+  errors?: unknown[];
+}
+
+async function makeRequest(endpoint: string, options: RequestInit & { headers?: Record<string, string> } = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
-  const config = {
+  const config: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -25,7 +31,7 @@ async function makeRequest(endpoint, options = {}) {
     const data = await response.json();
 
     if (!response.ok) {
-      const error = new Error(data.message || 'API request failed');
+      const error: ApiError = new Error(data.message || 'API request failed');
       error.status = response.status;
       error.data = data;
       error.errors = data.errors || [];
@@ -34,7 +40,7 @@ async function makeRequest(endpoint, options = {}) {
 
     return data;
   } catch (error) {
-    console.error(`[API Error] ${endpoint}:`, error.message);
+    console.error(`[API Error] ${endpoint}:`, (error as Error).message);
     throw error;
   }
 }
@@ -43,39 +49,39 @@ class ApiService {
 
   // ==================== PACKAGE ENDPOINTS ====================
 
-  static async getPackages(params = {}) {
+  static async getPackages(params: Record<string, string> = {}) {
     const queryString = new URLSearchParams(params).toString();
     return makeRequest(`/packages${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async getPackagesProtected(params = {}) {
+  static async getPackagesProtected(params: Record<string, string> = {}) {
     const queryString = new URLSearchParams(params).toString();
     return makeRequest(`/packages/protected/all${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async getPackage(id) {
+  static async getPackage(id: string) {
     return makeRequest(`/packages/${id}`);
   }
 
-  static async generateAIPackage(destination, packageType, category, nights, description = '') {
+  static async generateAIPackage(destination: string, packageType: string, category: string, nights: number | string, description = '') {
     return makeRequest('/packages/generate-ai', {
       method: 'POST',
       body: JSON.stringify({
         destination,
         packageType,
         category,
-        duration: parseInt(nights, 10),
+        duration: parseInt(String(nights), 10),
         description,
       }),
     });
   }
 
-  static async createPackage(packageData) {
+  static async createPackage(packageData: any) {
     const rawDays = Array.isArray(packageData.days)
       ? packageData.days
       : (Array.isArray(packageData.itineraryDays) ? packageData.itineraryDays : []);
 
-    const cleanData = {
+    const cleanData: any = {
       title: packageData.title || packageData.name,
       description: packageData.description,
       destination: packageData.destination,
@@ -91,7 +97,7 @@ class ApiService {
       currency: packageData.currency || 'USD',
       isActive: packageData.isActive ?? (packageData.status === 'published'),
       isFeatured: packageData.isFeatured ?? false,
-      images: (packageData.images || []).map((img) => ({
+      images: (packageData.images || []).map((img: any) => ({
         url: img.url || img,
         publicId: img.publicId || img.public_id,
         altText: img.altText || img.alt_text,
@@ -113,8 +119,8 @@ class ApiService {
     });
   }
 
-  static async updatePackage(id, packageData) {
-    const cleanData = { ...packageData };
+  static async updatePackage(id: string, packageData: any) {
+    const cleanData: any = { ...packageData };
     delete cleanData._id;
     delete cleanData.id;
     delete cleanData._v;
@@ -146,15 +152,15 @@ class ApiService {
     });
   }
 
-  static async deletePackage(id) {
+  static async deletePackage(id: string) {
     return makeRequest(`/packages/${id}`, { method: 'DELETE' });
   }
 
-  static async deletePackageImage(packageId, imageId) {
+  static async deletePackageImage(packageId: string, imageId: string) {
     return makeRequest(`/packages/${packageId}/images/${imageId}`, { method: 'DELETE' });
   }
 
-  static async setPackageCover(packageId, imageId) {
+  static async setPackageCover(packageId: string, imageId: string) {
     return makeRequest(`/packages/${packageId}/cover`, {
       method: 'PUT',
       body: JSON.stringify({ imageId }),
@@ -163,13 +169,13 @@ class ApiService {
 
   // Server-generated package PDF (Services/package-service's packagePDFGenerator.js).
   // Not routed through makeRequest() since that always parses the response as JSON.
-  static async getPackagePdfBlob(id) {
+  static async getPackagePdfBlob(id: string) {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/packages/${id}/ai-pdf`, {
       headers: { ...(token && { Authorization: `Bearer ${token}` }) },
     });
     if (!response.ok) {
-      const error = new Error('Failed to generate package PDF');
+      const error: ApiError = new Error('Failed to generate package PDF');
       error.status = response.status;
       throw error;
     }
@@ -184,15 +190,15 @@ class ApiService {
     return makeRequest('/packages/stats/all');
   }
 
-  static async searchPackages(query) {
+  static async searchPackages(query: string) {
     return makeRequest(`/packages/search/query?query=${encodeURIComponent(query)}`);
   }
 
-  static async getPackagesByCategory(category, limit = 10) {
+  static async getPackagesByCategory(category: string, limit = 10) {
     return makeRequest(`/packages/category/${category}?limit=${limit}`);
   }
 
-  static async calculatePrice(payload = {}) {
+  static async calculatePrice(payload: any = {}) {
     const {
       days,
       itineraryDays,
@@ -218,21 +224,21 @@ class ApiService {
 
   // ==================== PLACES & ACTIVITIES ====================
 
-  static async getPlaces(params = {}) {
+  static async getPlaces(params: Record<string, string> = {}) {
     const queryString = new URLSearchParams(params).toString();
     return makeRequest(`/places${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async createPlace(data) {
+  static async createPlace(data: any) {
     return makeRequest('/places', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  static async getActivities(params = {}) {
+  static async getActivities(params: Record<string, string> = {}) {
     const queryString = new URLSearchParams(params).toString();
     return makeRequest(`/activities${queryString ? `?${queryString}` : ''}`);
   }
 
-  static async createActivity(data) {
+  static async createActivity(data: any) {
     return makeRequest('/activities', { method: 'POST', body: JSON.stringify(data) });
   }
 }
@@ -243,7 +249,7 @@ class ApiService {
  * `day.meals` booleans, so those win over stale `breakfastCount`/`lunchCount`/
  * `dinnerCount` values copied from the API response.
  */
-function buildItineraryDaysPayload(days) {
+function buildItineraryDaysPayload(days: any[]) {
   return (days || []).filter(Boolean).map((day) => {
     const dayPlaces = Array.isArray(day.places) && day.places.length > 0
       ? day.places
@@ -252,13 +258,13 @@ function buildItineraryDaysPayload(days) {
     const editorActivities = Array.isArray(day.activities)
       ? day.activities
       : (typeof day.activities === 'string'
-        ? day.activities.split(',').map((s) => s.trim()).filter(Boolean)
+        ? day.activities.split(',').map((s: string) => s.trim()).filter(Boolean)
         : []);
     // The editor maps relational day activities to plain display names, which
     // loses the activityId. Prefer the raw relational rows (kept in
     // _relational.activities) so IDs and catalog costs survive an edit-save.
     const relationalActivities = Array.isArray(day._relational?.activities) ? day._relational.activities : [];
-    const activities = editorActivities.length > 0 && editorActivities.every((a) => typeof a === 'string') && relationalActivities.length > 0
+    const activities = editorActivities.length > 0 && editorActivities.every((a: any) => typeof a === 'string') && relationalActivities.length > 0
       ? relationalActivities
       : editorActivities;
 
@@ -289,13 +295,13 @@ function buildItineraryDaysPayload(days) {
       accommodation: day.accommodation ?? null,
       flights,
       images: Array.isArray(day.images)
-        ? day.images.map((img) => ({
+        ? day.images.map((img: any) => ({
             url: img.url || img,
             publicId: img.publicId || img.public_id,
             altText: img.altText || img.alt_text,
           }))
         : [],
-      places: dayPlaces.map((p, i) => {
+      places: dayPlaces.map((p: any, i: number) => {
         if (typeof p === 'string') return { customName: p, orderIndex: i };
         return {
           placeId: p.placeId || p.place?.id || undefined,
@@ -303,12 +309,12 @@ function buildItineraryDaysPayload(days) {
           orderIndex: p.orderIndex ?? i,
         };
       }),
-      activities: activities.map((a, i) => {
+      activities: activities.map((a: any, i: number) => {
         const isObj = a && typeof a === 'object';
         const name = isObj ? (a.name || a.activity?.name || '') : (a || '');
-        const cost = name ? activityCosts[name] : null;
-        const relationalRow = Array.isArray(day._relational?.activities)
-          ? day._relational.activities.find((row) =>
+        const cost: any = name ? activityCosts[name] : null;
+        const relationalRow: any = Array.isArray(day._relational?.activities)
+          ? day._relational.activities.find((row: any) =>
               (row.activity?.name || row.name) === name ||
               (isObj && a.activityId && row.activityId === a.activityId)
             )
@@ -318,14 +324,13 @@ function buildItineraryDaysPayload(days) {
           name: name || undefined,
           defaultCost:
             cost?.defaultCost ??
-            (isObj ? (a.defaultCost ?? a.activity?.defaultCost ?? undefined) : undefined) ??
-            relationalRow?.activity?.defaultCost ??
-            undefined,
+            (isObj ? (a.defaultCost ?? a.activity?.defaultCost) : undefined) ??
+            relationalRow?.activity?.defaultCost,
           costOverride: cost?.costOverride ?? (isObj ? (a.costOverride ?? null) : null),
           orderIndex: isObj ? (a.orderIndex ?? i) : i,
         };
       }),
-      transports: transports.map((t) => ({
+      transports: transports.map((t: any) => ({
         routeType: t.routeType || 'DAILY_ROUTING',
         transportMode: t.transportMode || String(t.transport || day.transport || 'CAR').toUpperCase(),
         pricingModel: t.pricingModel || 'PER_VEHICLE',

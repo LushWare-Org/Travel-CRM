@@ -12,6 +12,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "types": ["vite/client"],
 
     /* Incremental migration: existing .jsx/.js keep compiling untyped
        until explicitly renamed to .tsx/.ts. Do not flip checkJs on

@@ -6,7 +6,7 @@ import {
   resolveFlightRemove,
   countUnlinkedFlightRows,
   reconcileFlightsForSave,
-} from '../flightSync.js';
+} from '../flightSync';
 
 const flightRow = (overrides = {}) => ({
   routeType: 'DAILY_ROUTING',

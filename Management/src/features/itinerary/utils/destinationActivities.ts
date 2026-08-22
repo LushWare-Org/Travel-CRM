@@ -378,12 +378,12 @@ export const REGIONAL_ACTIVITIES = {
  * @param {boolean} includeGeneric - Include generic activities
  * @returns {Array} - Array of activity objects sorted by priority
  */
-export const getActivitiesForDestination = (destination, includeGeneric = true) => {
+export const getActivitiesForDestination = (destination?: string | null, includeGeneric = true): any[] => {
     if (!destination) {
         return DEFAULT_ACTIVITIES;
     }
 
-    const activities = [];
+    const activities: any[] = [];
 
     // 1. Add destination-specific activities (highest priority)
     if (DESTINATION_ACTIVITIES[destination]) {

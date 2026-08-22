@@ -224,7 +224,7 @@ export const DESTINATION_COUNTRY_MAP = {
  * @param {string} destination - Destination name (e.g., "Dubai", "Bali")
  * @returns {string|null} - ISO 3166-1 alpha-2 country code (e.g., "AE", "ID") or null
  */
-export const getCountryCodeFromDestination = (destination) => {
+export const getCountryCodeFromDestination = (destination?: string | null): string | null => {
     if (!destination || typeof destination !== 'string') return null;
 
     const normalizedDestination = destination.trim();
@@ -256,11 +256,11 @@ export const getCountryCodeFromDestination = (destination) => {
  * @param {string} destination - Destination name
  * @returns {string|null} - Region name or null
  */
-export const getRegionFromDestination = (destination) => {
+export const getRegionFromDestination = (destination?: string | null): string | null => {
     const countryCode = getCountryCodeFromDestination(destination);
     if (!countryCode) return null;
 
-    const REGION_MAP = {
+    const REGION_MAP: Record<string, string> = {
         // Middle East
         'AE': 'Middle East', 'SA': 'Middle East', 'QA': 'Middle East',
         'OM': 'Middle East', 'BH': 'Middle East', 'KW': 'Middle East',
