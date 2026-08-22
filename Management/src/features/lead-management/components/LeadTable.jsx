@@ -1,5 +1,6 @@
 import {
   MessageSquare,
+  MessageCircle,
   Edit,
   FileText,
   Receipt,
@@ -28,6 +29,7 @@ const LeadTable = ({
   statusLabels,
   onLeadClick,
   onRemarksClick,
+  onWhatsappClick,
   onEditClick,
   onQuotationClick,
   onInvoiceClick,
@@ -309,18 +311,33 @@ const LeadTable = ({
                   </div>
 
                   {/* Remarks indicator */}
-                  {lead.remarks?.length > 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemarksClick?.(lead);
-                      }}
-                      className="mt-3 flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>{lead.remarks.length} remark{lead.remarks.length > 1 ? 's' : ''}</span>
-                    </button>
-                  )}
+                  <div className="mt-3 flex items-center gap-4 flex-wrap">
+                    {lead.remarks?.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemarksClick?.(lead);
+                        }}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>{lead.remarks.length} remark{lead.remarks.length > 1 ? 's' : ''}</span>
+                      </button>
+                    )}
+                    {(lead.phone || lead.whatsapp) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onWhatsappClick?.(lead);
+                        }}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-green-600 transition-colors"
+                        title="WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Document Actions Section */}
@@ -689,6 +706,18 @@ const LeadTable = ({
                       >
                         <FileText className="w-4 h-4 text-blue-700" />
                       </button>
+                      {(lead.phone || lead.whatsapp) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onWhatsappClick?.(lead);
+                          }}
+                          className="px-2 py-2 transition-colors bg-gray-100 rounded-lg hover:bg-green-100"
+                          title="WhatsApp"
+                        >
+                          <MessageCircle className="w-4 h-4 text-green-600" />
+                        </button>
+                      )}
                       {canDelete && (
                         <button
                           onClick={(e) => {

@@ -23,6 +23,7 @@ import LeadTable from "../features/lead-management/components/LeadTable";
 import NewLeadDialog from "../features/lead-management/components/NewLeadDialog";
 import EditLeadDialog from "../features/lead-management/components/EditLeadDialog";
 import RemarksDialog from "../features/lead-management/components/RemarksDialog";
+import WhatsAppHistoryDialog from "../features/lead-management/components/WhatsAppHistoryDialog";
 import FilterDialog from "../features/lead-management/components/FilterDialog";
 import SettingsDialog from "../features/lead-management/components/SettingsDialog";
 import StatusChangeDialog from "../features/lead-management/components/StatusChangeDialog";
@@ -77,6 +78,7 @@ const LeadManagement = () => {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showRemarksDialog, setShowRemarksDialog] = useState(false);
+  const [showWhatsappDialog, setShowWhatsappDialog] = useState(false);
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showActiveSalesRepsDialog, setShowActiveSalesRepsDialog] = useState(false);
@@ -452,6 +454,10 @@ const LeadManagement = () => {
               setSelectedLead(lead);
               setShowRemarksDialog(true);
             }}
+            onWhatsappClick={(lead) => {
+              setSelectedLead(lead);
+              setShowWhatsappDialog(true);
+            }}
             onEditClick={(lead) => {
               setSelectedLead(lead);
               setShowEditDialog(true);
@@ -543,6 +549,16 @@ const LeadManagement = () => {
         isOpen={showRemarksDialog}
         onClose={() => {
           setShowRemarksDialog(false);
+          setSelectedLead(null);
+        }}
+        lead={selectedLead}
+        onSuccess={handleLeadSuccess}
+      />
+
+      <WhatsAppHistoryDialog
+        isOpen={showWhatsappDialog}
+        onClose={() => {
+          setShowWhatsappDialog(false);
           setSelectedLead(null);
         }}
         lead={selectedLead}
