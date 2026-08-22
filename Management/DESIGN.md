@@ -349,5 +349,18 @@ No new breakpoint system is introduced in Phase 1 - Tailwind's default breakpoin
 - **Most tokens (`border`, `ring`, `chart-*`, `success`, `warning`, etc.) aren't yet referenced by any `components:` entry**, which the linter flags as "orphaned" - expected at this stage (only `Button` exists), not a real gap. Resolves naturally as Phase 2 documents Card/Dialog/Table/Badge/Form.
 
 - **Form field validation/error states** are not yet designed - Phase 2 introduces `react-hook-form` + zod resolvers, and error-state styling (input border on invalid, error message typography) should be specified then, not improvised per-form.
-- **Chart component styling** (axis lines, gridlines, tooltip treatment for `recharts`) beyond the five `chart-*` color tokens isn't specified yet - due when `features/analytics`/`features/dashboard` migrate (Phase 3-4).
 - **Empty states and loading skeletons** have no defined visual language yet - each `StatCard` today improvises its own; the consolidated `StatCard` primitive (Phase 2.2) is where this should be settled once, not per-instance.
+
+## Chart Theming (recharts)
+
+Established in `features/dashboard` (Phase 3.1) - reuse this pattern for every other `recharts` usage (`features/analytics`, Phase 4.1).
+
+`recharts` takes literal CSS color strings on its own props (`stroke`, `fill`, `contentStyle`, `<stop stopColor>`), not Tailwind classes - so it references the same CSS custom properties the `bg-*`/`text-*` utilities resolve, as raw `var(...)` strings:
+- Series color: `var(--color-chart-1)` through `var(--color-chart-5)` - one token per series, `chart-1` for whichever series is "primary" in that chart.
+- Gridlines (`CartesianGrid`): `var(--color-border)`.
+- Axis ticks/labels: `var(--color-muted-foreground)`.
+- Tooltip (`contentStyle`): `background: var(--color-popover)`, `color: var(--color-popover-foreground)`, `border: 1px solid var(--color-border)`, `boxShadow: var(--shadow-dropdown)`.
+
+This works for dark mode with zero extra plumbing: the browser re-resolves `var()` on every paint, so toggling `.dark` re-colors an already-rendered chart with no React re-render or JS theme-detection needed - verified by screenshotting both themes.
+
+**Gradients in charts are not the same "no gradients" rule as UI chrome.** A single-hue fade-to-transparent area fill (`stopOpacity` 0.3→0) is a standard charting convention, not decoration, and stays. A *multi-hue* gradient on one data series (e.g. the prior indigo→violet bar fill) is retired - if a chart needs to show two things, that's two series with two `chart-*` tokens, not one series with a two-color gradient.
