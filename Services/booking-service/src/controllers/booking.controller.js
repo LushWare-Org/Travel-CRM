@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import { computeMargin } from '../../../shared/pricing-engine/src/index.js';
 
 const normalizePhone = (phone) => {
   if (!phone) return undefined;
@@ -13,12 +14,22 @@ const normalizePhone = (phone) => {
 
 async function findPackageById(id) {
   const rows = await prisma.$queryRaw`
-    SELECT id, name, destination, price, "isActive"
+    SELECT id, title, destination, "base_price" AS "basePrice",
+           "default_margin_type" AS "defaultMarginType",
+           "default_margin_input" AS "defaultMarginInput",
+           "is_active" AS "isActive"
     FROM crm_packages."Package"
     WHERE id = ${id}
     LIMIT 1
   `;
-  return rows[0] || null;
+  const pkg = rows[0];
+  if (!pkg) return null;
+
+  const basePrice = Number(pkg.basePrice);
+  const defaultMarginInput = Number(pkg.defaultMarginInput);
+  const sellPrice = computeMargin(basePrice, pkg.defaultMarginType, defaultMarginInput).sellPrice;
+  // name/price aliases keep this helper's existing call sites (pkg.name, pkg.price) unchanged.
+  return { ...pkg, name: pkg.title, price: sellPrice };
 }
 
 async function findUserByEmail(email) {
@@ -130,6 +141,16 @@ async function createLead({ name, email, phone, packageId, packageName, destinat
   `;
 
   return leadId;
+}
+
+/** Replaces each row's raw base-price/margin columns with a computed sell price, matching package-service's own pricing math. */
+function withPackageSellPrice(rows) {
+  return rows.map(({ packageBasePrice, packageMarginType, packageMarginInput, ...rest }) => ({
+    ...rest,
+    packagePrice: packageBasePrice != null
+      ? computeMargin(Number(packageBasePrice), packageMarginType, Number(packageMarginInput)).sellPrice
+      : null,
+  }));
 }
 
 async function incrementPackageBookings(packageId) {
@@ -255,16 +276,19 @@ export const getUserBookings = asyncHandler(async (req, res) => {
       b."numberOfTravelers", b."totalAmount", b."paidAmount",
       b."paymentStatus", b."bookingStatus", b."specialRequests",
       b."createdAt", b."updatedAt",
-      p.name AS "packageName", p.destination AS "packageDestination",
-      p.duration AS "packageDuration", p.price AS "packagePrice",
-      p."coverImageUrl" AS "packageCoverImage", p.slug AS "packageSlug"
+      p.title AS "packageName", p.destination AS "packageDestination",
+      p."duration_days" AS "packageDuration",
+      p."base_price" AS "packageBasePrice",
+      p."default_margin_type" AS "packageMarginType",
+      p."default_margin_input" AS "packageMarginInput",
+      p."cover_image" AS "packageCoverImage", p.slug AS "packageSlug"
     FROM crm_bookings."Booking" b
     LEFT JOIN crm_packages."Package" p ON p.id = b."packageId"
     WHERE b."userId" = ${userId}
     ORDER BY b."createdAt" DESC
   `;
 
-  res.status(200).json({ success: true, data: bookings || [] });
+  res.status(200).json({ success: true, data: withPackageSellPrice(bookings || []) });
 });
 
 export const getRecentBookings = asyncHandler(async (req, res) => {
@@ -276,9 +300,12 @@ export const getRecentBookings = asyncHandler(async (req, res) => {
       b."numberOfTravelers", b."totalAmount", b."paidAmount",
       b."paymentStatus", b."bookingStatus", b."specialRequests",
       b."confirmedAt", b."createdAt",
-      p.name AS "packageName", p.destination AS "packageDestination",
-      p.duration AS "packageDuration", p.price AS "packagePrice",
-      p."coverImageUrl" AS "packageCoverImage", p.slug AS "packageSlug",
+      p.title AS "packageName", p.destination AS "packageDestination",
+      p."duration_days" AS "packageDuration",
+      p."base_price" AS "packageBasePrice",
+      p."default_margin_type" AS "packageMarginType",
+      p."default_margin_input" AS "packageMarginInput",
+      p."cover_image" AS "packageCoverImage", p.slug AS "packageSlug",
       u.name AS "userName", u.email AS "userEmail"
     FROM crm_bookings."Booking" b
     LEFT JOIN crm_packages."Package" p ON p.id = b."packageId"
@@ -288,5 +315,5 @@ export const getRecentBookings = asyncHandler(async (req, res) => {
     LIMIT ${limit}
   `;
 
-  res.status(200).json({ success: true, data: bookings || [] });
+  res.status(200).json({ success: true, data: withPackageSellPrice(bookings || []) });
 });
