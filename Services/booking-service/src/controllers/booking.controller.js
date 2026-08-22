@@ -103,28 +103,42 @@ async function createLead({ name, email, phone, packageId, packageName, destinat
   const leadId = crypto.randomUUID();
   const source = 'booking';
   const platform = 'Website Form';
-  const status = 'new';
+  const lifecycleStatus = 'NEW';
   const tags = ['website-booking'];
   await prisma.$executeRaw`
     INSERT INTO crm_leads."Lead"
-      (id, name, email, phone, source, platform, "packageId", "packageName",
+      (id, name, email, phone, source, platform,
        destination, "destinationCountry", "travelDate", "endDate",
-       "numberOfTravelers", budget, message, status, tags,
+       "numberOfTravelers", budget, message, "lifecycleStatus", tags,
        "assignedToId", "assignmentMode", "leadDateTime", "createdAt", "updatedAt")
     VALUES
       (${leadId}, ${name}, ${email}, ${phone || null},
        ${source}::"crm_leads"."LeadSource",
        ${platform}::"crm_leads"."LeadPlatform",
-       ${packageId || null}, ${packageName || null},
        ${destination || null}, ${destination || null},
        ${travelDate || null}, ${endDate || null},
        ${travelers}, ${budget || null}, ${message || null},
-       ${status}::"crm_leads"."LeadStatus",
+       ${lifecycleStatus}::"crm_leads"."LeadLifecycleStatus",
        ${tags},
        ${assignedToId || null},
        ${assignedToId ? 'auto' : 'manual'}::"crm_leads"."AssignmentMode",
        NOW(), NOW(), NOW())
   `;
+
+  // A lead's package association lives on LeadPackageSelection, not a
+  // column on Lead itself — mirrors lead-service's own createLead controller
+  // (create the selection, then point primarySelectionId at it).
+  if (packageId) {
+    const selectionId = crypto.randomUUID();
+    await prisma.$executeRaw`
+      INSERT INTO crm_leads."LeadPackageSelection"
+        (id, "leadId", "packageId", "isManual", "packageName", "createdAt", "updatedAt")
+      VALUES (${selectionId}, ${leadId}, ${packageId}, false, ${packageName || null}, NOW(), NOW())
+    `;
+    await prisma.$executeRaw`
+      UPDATE crm_leads."Lead" SET "primarySelectionId" = ${selectionId} WHERE id = ${leadId}
+    `;
+  }
 
   if (message?.trim()) {
     const remarkId = crypto.randomUUID();
@@ -137,7 +151,7 @@ async function createLead({ name, email, phone, packageId, packageName, destinat
   const histId = crypto.randomUUID();
   await prisma.$executeRaw`
     INSERT INTO crm_leads."LeadStatusHistory" (id, "leadId", status, "changedAt")
-    VALUES (${histId}, ${leadId}, ${'new'}, NOW())
+    VALUES (${histId}, ${leadId}, ${lifecycleStatus}, NOW())
   `;
 
   return leadId;
