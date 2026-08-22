@@ -1,7 +1,29 @@
-import { useState, useEffect } from 'react';
-import { X, Search, MapPin, RefreshCw, Loader } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, MapPin, RefreshCw, Loader } from 'lucide-react';
 import { hotelAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+interface Hotel {
+  name: string;
+  address: string;
+  contactNumber?: string;
+  rating?: number | string | null;
+  [key: string]: unknown;
+}
+
+interface HotelSuggestionsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectHotel: (hotel: Hotel) => void;
+  destination?: string;
+  packageType?: string;
+  category?: string;
+  locations?: string[];
+}
 
 const HotelSuggestionsModal = ({
   isOpen,
@@ -11,14 +33,14 @@ const HotelSuggestionsModal = ({
   packageType,
   category,
   locations = [], // Locations array from itinerary day
-}) => {
-  const [hotels, setHotels] = useState([]);
+}: HotelSuggestionsModalProps) => {
+  const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [bestMatch, setBestMatch] = useState(null);
-  const [error, setError] = useState(null);
+  const [bestMatch, setBestMatch] = useState<Hotel | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!destination && (!locations || locations.length === 0)) {
       toast.error('Please provide a destination or location');
       return;
@@ -30,18 +52,18 @@ const HotelSuggestionsModal = ({
       // Combine all locations into a single string
       const locationsString = locations && locations.length > 0 ? locations.join(', ') : '';
       const response = await hotelAPI.suggest(destination, packageType, category, locationsString, 5);
-      
+
       if (response.success || response.status === 'success') {
         const hotelData = response.data || [];
         setHotels(hotelData);
         setHasSearched(true);
         setError(null);
-        
+
         // Set the first hotel as the best match
         if (hotelData.length > 0) {
           setBestMatch(hotelData[0]);
         }
-        
+
         if (hotelData.length === 0) {
           setError('No hotels found. Try different criteria or search again.');
         }
@@ -55,7 +77,7 @@ const HotelSuggestionsModal = ({
       }
     } catch (error) {
       console.error('Error fetching hotel suggestions:', error);
-      const errorMsg = error.message || 'Failed to fetch hotel suggestions. Please check your API key configuration.';
+      const errorMsg = (error as Error).message || 'Failed to fetch hotel suggestions. Please check your API key configuration.';
       setError(errorMsg);
       // Don't show toast for auto-search failures, only for manual searches
       if (hasSearched) {
@@ -64,7 +86,8 @@ const HotelSuggestionsModal = ({
     } finally {
       setLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination, packageType, category, locations?.join(',')]);
 
   // Auto-search when modal opens if locations are available
   useEffect(() => {
@@ -78,38 +101,29 @@ const HotelSuggestionsModal = ({
       setBestMatch(null);
       setError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, locations?.join(',')]);
 
   const handleSearchAgain = () => {
     handleSearch();
   };
 
-  const handleSelectHotel = (hotel) => {
+  const handleSelectHotel = (hotel: Hotel) => {
     onSelectHotel(hotel);
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent showCloseButton className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Hotel Suggestions</h2>
-            <p className="text-blue-100 text-sm mt-1">
-              Based on: {locations && locations.length > 0 ? locations.join(', ') : (destination || 'N/A')}
-              {packageType && ` • ${packageType}`}
-              {category && ` • ${category}`}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-blue-800 rounded-lg transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+        <div className="bg-primary text-primary-foreground p-6 rounded-t-xl">
+          <h2 className="text-2xl font-heading font-bold">Hotel Suggestions</h2>
+          <p className="text-primary-foreground/80 text-sm mt-1">
+            Based on: {locations && locations.length > 0 ? locations.join(', ') : (destination || 'N/A')}
+            {packageType && ` • ${packageType}`}
+            {category && ` • ${category}`}
+          </p>
         </div>
 
         {/* Content */}
@@ -118,53 +132,46 @@ const HotelSuggestionsModal = ({
           {!hasSearched && (
             <div className="text-center py-12">
               <div className="mb-6">
-                <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-xl font-heading font-semibold text-foreground mb-2">
                   Find Best Matching Hotels
                 </h3>
-                <p className="text-gray-500 mb-6">
+                <p className="text-muted-foreground mb-6">
                   Get AI-powered hotel suggestions based on your destination, package type, and category
                 </p>
               </div>
-              <button
-                onClick={handleSearch}
-                disabled={loading || !destination}
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2 mx-auto"
-              >
+              <Button onClick={handleSearch} disabled={loading || !destination}>
                 {loading ? (
                   <>
-                    <Loader className="w-5 h-5 animate-spin" />
+                    <Loader className="w-4 h-4 animate-spin" />
                     Searching...
                   </>
                 ) : (
                   <>
-                    <Search className="w-5 h-5" />
+                    <Search className="w-4 h-4" />
                     Search Hotels
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Error State */}
           {error && !loading && hasSearched && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 text-sm font-medium mb-2">Error loading hotels</p>
-              <p className="text-red-600 text-sm">{error}</p>
-              <button
-                onClick={handleSearch}
-                className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-              >
+            <div className="mb-6 p-4 bg-destructive/5 border border-destructive/10 rounded-lg">
+              <p className="text-destructive text-sm font-medium mb-2">Error loading hotels</p>
+              <p className="text-destructive/80 text-sm">{error}</p>
+              <Button onClick={handleSearch} variant="destructive" size="sm" className="mt-3">
                 Try Again
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Loading State */}
           {loading && hasSearched && (
             <div className="text-center py-12">
-              <Loader className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Finding best hotels for you...</p>
+              <Loader className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Finding best hotels for you...</p>
             </div>
           )}
 
@@ -172,77 +179,71 @@ const HotelSuggestionsModal = ({
           {!loading && hasSearched && hotels.length > 0 && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-700">
+                <h3 className="text-lg font-heading font-semibold text-foreground">
                   {hotels.length} Hotel Suggestions
                 </h3>
-                <button
-                  onClick={handleSearchAgain}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <Button onClick={handleSearchAgain} disabled={loading} variant="outline" size="sm">
+                  <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
                   Search Again
-                </button>
+                </Button>
               </div>
 
               {hotels.map((hotel, index) => {
-                const isBestMatch = bestMatch && hotel.name === bestMatch.name && hotel.address === bestMatch.address;
+                const isBestMatch = Boolean(bestMatch && hotel.name === bestMatch.name && hotel.address === bestMatch.address);
                 return (
                   <div
                     key={index}
-                    className={`border rounded-lg p-5 hover:shadow-lg transition-all cursor-pointer ${
-                      isBestMatch 
-                        ? 'border-green-500 bg-green-50 hover:border-green-600' 
-                        : 'border-gray-200 bg-white hover:border-blue-300'
-                    }`}
+                    className={cn(
+                      'border rounded-lg p-5 hover:shadow-dropdown transition-shadow cursor-pointer',
+                      isBestMatch
+                        ? 'border-success/40 bg-success/5 hover:border-success/60'
+                        : 'border-border bg-card hover:border-primary/40'
+                    )}
                     onClick={() => handleSelectHotel(hotel)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            isBestMatch ? 'bg-green-100' : 'bg-blue-100'
-                          }`}>
+                          <div className={cn(
+                            'w-10 h-10 rounded-lg flex items-center justify-center',
+                            isBestMatch ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
+                          )}>
                             {isBestMatch ? (
-                              <span className="text-green-600 font-bold text-xs">⭐</span>
+                              <span className="font-bold text-xs">⭐</span>
                             ) : (
-                              <span className={`font-bold text-lg ${isBestMatch ? 'text-green-600' : 'text-blue-600'}`}>
-                                {index + 1}
-                              </span>
+                              <span className="font-bold text-lg font-mono">{index + 1}</span>
                             )}
                           </div>
                           <div className="flex-1">
-                            <h4 className="text-lg font-semibold text-gray-900">
+                            <h4 className="text-lg font-semibold text-foreground">
                               {hotel.name}
                             </h4>
                             {isBestMatch && (
-                              <span className="inline-block mt-1 px-2 py-0.5 bg-green-500 text-white text-xs font-medium rounded">
+                              <Badge className="mt-1 bg-success text-success-foreground border-transparent">
                                 Best Match
-                              </span>
+                              </Badge>
                             )}
                           </div>
                         </div>
                       </div>
-                      <button
+                      <Button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelectHotel(hotel);
                         }}
-                        className={`ml-4 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                          isBestMatch
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
+                        variant={isBestMatch ? 'default' : 'outline'}
+                        size="sm"
+                        className="ml-4"
                       >
                         {isBestMatch ? 'Select Best' : 'Select'}
-                      </button>
+                      </Button>
                     </div>
-                    <div className="flex items-start gap-2 mt-3 text-gray-600">
-                      <MapPin className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 mt-3 text-muted-foreground">
+                      <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
                       <p className="text-sm">{hotel.address}</p>
                     </div>
                     {(hotel.contactNumber || hotel.rating) && (
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                         {hotel.contactNumber && (
                           <span className="flex items-center gap-1">
                             <span className="font-medium">Contact:</span>
@@ -252,9 +253,9 @@ const HotelSuggestionsModal = ({
                         {hotel.rating !== undefined && hotel.rating !== null && (
                           <span className="flex items-center gap-1">
                             <span className="font-medium">Rating:</span>
-                            <span className="flex items-center gap-1">
-                              <span className="text-yellow-500">★</span>
-                              <span>{parseFloat(hotel.rating).toFixed(1)}</span>
+                            <span className="flex items-center gap-1 text-warning">
+                              <span>★</span>
+                              <span className="text-foreground">{parseFloat(String(hotel.rating)).toFixed(1)}</span>
                             </span>
                           </span>
                         )}
@@ -269,29 +270,24 @@ const HotelSuggestionsModal = ({
           {/* No Results */}
           {!loading && hasSearched && hotels.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No hotels found. Try searching again with different criteria.</p>
-              <button
-                onClick={handleSearchAgain}
-                disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RefreshCw className={`w-4 h-4 inline mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <p className="text-muted-foreground mb-4">No hotels found. Try searching again with different criteria.</p>
+              <Button onClick={handleSearchAgain} disabled={loading} variant="outline">
+                <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
                 Search Again
-              </button>
+              </Button>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <p className="text-xs text-gray-500 text-center">
+        <div className="border-t border-border p-4 bg-muted rounded-b-xl">
+          <p className="text-xs text-muted-foreground text-center">
             Hotel suggestions are powered by AI and may vary. Please verify details before booking.
           </p>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
 export default HotelSuggestionsModal;
-

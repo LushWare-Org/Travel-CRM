@@ -1,7 +1,6 @@
 /**
- * Itinerary Display Component - Redesigned
- * Modern read-only itinerary view with premium styling
- * Aligned with backend day-based structure
+ * Itinerary Display Component
+ * Read-only itinerary view aligned with the backend day-based structure
  */
 
 import {
@@ -9,47 +8,47 @@ import {
   StickyNote, Image as ImageIcon, Coffee, UtensilsCrossed,
   Moon, Star, Phone, MapPinned, Clock, Calendar
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const ItineraryDisplay = ({ days = [] }) => {
+interface ItineraryDisplayProps {
+  days?: any[];
+}
+
+const badgeVariants = {
+  default: 'bg-muted text-muted-foreground border-border',
+  success: 'bg-success/10 text-success border-success/20',
+  warning: 'bg-warning/10 text-warning border-warning/20',
+  primary: 'bg-primary/10 text-primary border-primary/20',
+};
+
+const InfoBadge = ({ icon: Icon, children, variant = 'default' }: { icon?: any; children: React.ReactNode; variant?: keyof typeof badgeVariants }) => (
+  <span className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium', badgeVariants[variant])}>
+    {Icon && <Icon className="w-3.5 h-3.5" />}
+    {children}
+  </span>
+);
+
+const Section = ({ label, icon: Icon, children }: { label: string; icon?: any; children: React.ReactNode }) => (
+  <div>
+    <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+      {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
+      {label}
+    </h4>
+    {children}
+  </div>
+);
+
+const ItineraryDisplay = ({ days = [] }: ItineraryDisplayProps) => {
   if (!days || days.length === 0) {
     return (
-      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center">
-        <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Calendar className="w-8 h-8 text-slate-400" />
+      <div className="bg-muted rounded-xl border-2 border-dashed border-border p-12 text-center">
+        <div className="w-16 h-16 bg-secondary rounded-xl flex items-center justify-center mx-auto mb-4">
+          <Calendar className="w-8 h-8 text-muted-foreground" />
         </div>
-        <p className="text-slate-500 font-medium">No itinerary data available</p>
+        <p className="text-muted-foreground font-medium">No itinerary data available</p>
       </div>
     );
   }
-
-  // Info Badge Component
-  const InfoBadge = ({ icon: Icon, children, variant = 'default' }) => {
-    const variants = {
-      default: 'bg-slate-100 text-slate-700 border-slate-200',
-      success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      warning: 'bg-amber-50 text-amber-700 border-amber-200',
-      info: 'bg-blue-50 text-blue-700 border-blue-200',
-      purple: 'bg-violet-50 text-violet-700 border-violet-200',
-    };
-
-    return (
-      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium ${variants[variant]}`}>
-        {Icon && <Icon className="w-3.5 h-3.5" />}
-        {children}
-      </span>
-    );
-  };
-
-  // Section Component
-  const Section = ({ label, icon: Icon, children }) => (
-    <div>
-      <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3">
-        {Icon && <Icon className="w-4 h-4 text-slate-400" />}
-        {label}
-      </h4>
-      {children}
-    </div>
-  );
 
   return (
     <div className="space-y-4">
@@ -57,19 +56,19 @@ const ItineraryDisplay = ({ days = [] }) => {
         const locations = Array.isArray(day.locations) ? day.locations : [];
         const activities = Array.isArray(day.activities) ? day.activities : [];
         return (
-        <div key={day.dayNumber} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div key={day.dayNumber} className="bg-card rounded-xl border border-border overflow-hidden shadow-card">
           {/* Day Header */}
-          <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-4">
+          <div className="bg-primary text-primary-foreground px-6 py-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <span className="text-xl font-bold">{day.dayNumber}</span>
+              <div className="w-12 h-12 bg-primary-foreground/20 rounded-lg flex items-center justify-center">
+                <span className="text-xl font-bold font-mono">{day.dayNumber}</span>
               </div>
               <div>
-                <h3 className="text-lg font-semibold">
+                <h3 className="text-lg font-heading font-semibold">
                   Day {day.dayNumber}{day.title ? `: ${day.title}` : ''}
                 </h3>
                 {locations.length > 0 && (
-                  <p className="text-amber-100 text-sm flex items-center gap-1 mt-0.5">
+                  <p className="text-primary-foreground/80 text-sm flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3" />
                     {locations.slice(0, 3).join(' → ')}
                     {locations.length > 3 && ` +${locations.length - 3} more`}
@@ -80,11 +79,11 @@ const ItineraryDisplay = ({ days = [] }) => {
           </div>
 
           {/* Day Content */}
-          <div className="p-6 bg-gradient-to-b from-amber-50/30 to-white space-y-5">
+          <div className="p-6 space-y-5">
             {/* Description */}
             {day.description && (
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-slate-600 text-sm whitespace-pre-wrap leading-relaxed">{day.description}</p>
+              <div className="bg-muted rounded-lg p-4 border border-border">
+                <p className="text-muted-foreground text-sm whitespace-pre-wrap leading-relaxed">{day.description}</p>
               </div>
             )}
 
@@ -92,7 +91,7 @@ const ItineraryDisplay = ({ days = [] }) => {
             {locations.length > 0 && (
               <Section label="Locations Covered" icon={MapPin}>
                 <div className="flex flex-wrap gap-2">
-                  {locations.map((location, idx) => (
+                  {locations.map((location: string, idx: number) => (
                     <InfoBadge key={idx} icon={MapPinned} variant="success">
                       {location}
                     </InfoBadge>
@@ -105,9 +104,9 @@ const ItineraryDisplay = ({ days = [] }) => {
             {activities.length > 0 && (
               <Section label="Activities" icon={Activity}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {activities.map((activity, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg border border-blue-100">
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                  {activities.map((activity: string, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 bg-primary/5 text-primary px-3 py-2 rounded-lg border border-primary/10">
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full" />
                       <span className="text-sm">{activity}</span>
                     </div>
                   ))}
@@ -128,7 +127,7 @@ const ItineraryDisplay = ({ days = [] }) => {
                       <InfoBadge icon={UtensilsCrossed} variant="warning">Lunch</InfoBadge>
                     )}
                     {day.meals.dinner && (
-                      <InfoBadge icon={Moon} variant="purple">Dinner</InfoBadge>
+                      <InfoBadge icon={Moon} variant="warning">Dinner</InfoBadge>
                     )}
                   </div>
                 </Section>
@@ -137,7 +136,7 @@ const ItineraryDisplay = ({ days = [] }) => {
               {/* Transport */}
               {day.transport && (
                 <Section label="Transport" icon={Car}>
-                  <InfoBadge variant="info">
+                  <InfoBadge variant="primary">
                     {day.transport === 'flight' && '✈️ '}
                     {day.transport === 'train' && '🚂 '}
                     {day.transport === 'bus' && '🚌 '}
@@ -153,12 +152,12 @@ const ItineraryDisplay = ({ days = [] }) => {
             {/* Accommodation */}
             {day.accommodation && day.accommodation.name && (
               <Section label="Accommodation" icon={Building2}>
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200">
+                <div className="bg-muted rounded-lg p-4 border border-border">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div>
-                      <h5 className="font-semibold text-slate-800 text-base">{day.accommodation.name}</h5>
+                      <h5 className="font-semibold text-foreground text-base">{day.accommodation.name}</h5>
                       {day.accommodation.type && (
-                        <span className="inline-block mt-1 px-2 py-0.5 bg-violet-100 text-violet-700 text-xs rounded-md capitalize">
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-md capitalize">
                           {day.accommodation.type === 'hotel' && '🏨 '}
                           {day.accommodation.type === 'resort' && '🌴 '}
                           {day.accommodation.type === 'guesthouse' && '🏡 '}
@@ -169,24 +168,24 @@ const ItineraryDisplay = ({ days = [] }) => {
                       )}
                     </div>
                     {day.accommodation.rating > 0 && (
-                      <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-3 py-1 rounded-lg">
-                        <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                      <div className="flex items-center gap-1 bg-warning/10 text-warning px-3 py-1 rounded-lg">
+                        <Star className="w-4 h-4 fill-warning text-warning" />
                         <span className="font-semibold">{day.accommodation.rating}</span>
-                        <span className="text-xs text-amber-600">/5</span>
+                        <span className="text-xs">/5</span>
                       </div>
                     )}
                   </div>
 
                   <div className="mt-3 space-y-1.5">
                     {day.accommodation.address && (
-                      <p className="text-slate-600 text-sm flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-muted-foreground text-sm flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5" />
                         {day.accommodation.address}
                       </p>
                     )}
                     {day.accommodation.contactNumber && (
-                      <p className="text-slate-600 text-sm flex items-center gap-2">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-muted-foreground text-sm flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5" />
                         {day.accommodation.contactNumber}
                       </p>
                     )}
@@ -199,14 +198,14 @@ const ItineraryDisplay = ({ days = [] }) => {
             {Array.isArray(day.places) && day.places.length > 0 && (
               <Section label="Places to Visit" icon={MapPin}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {day.places.map((place, idx) => (
-                    <div key={idx} className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                      <p className="font-medium text-emerald-800">{place.name}</p>
+                  {day.places.map((place: any, idx: number) => (
+                    <div key={idx} className="bg-success/5 rounded-lg p-4 border border-success/10">
+                      <p className="font-medium text-success">{place.name}</p>
                       {place.description && (
-                        <p className="text-emerald-600 text-sm mt-1">{place.description}</p>
+                        <p className="text-muted-foreground text-sm mt-1">{place.description}</p>
                       )}
                       {place.duration && (
-                        <p className="text-emerald-500 text-xs mt-2 flex items-center gap-1">
+                        <p className="text-success text-xs mt-2 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {place.duration}
                         </p>
@@ -220,8 +219,8 @@ const ItineraryDisplay = ({ days = [] }) => {
             {/* Notes */}
             {day.notes && (
               <Section label="Additional Notes" icon={StickyNote}>
-                <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
-                  <p className="text-amber-800 text-sm">{day.notes}</p>
+                <div className="bg-warning/5 rounded-lg p-4 border border-warning/10">
+                  <p className="text-warning text-sm">{day.notes}</p>
                 </div>
               </Section>
             )}
@@ -230,16 +229,16 @@ const ItineraryDisplay = ({ days = [] }) => {
             {Array.isArray(day.images) && day.images.length > 0 && (
               <Section label="Day Images" icon={ImageIcon}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                  {day.images.map((img, idx) => {
+                  {day.images.map((img: any, idx: number) => {
                     const imageUrl = typeof img === 'string' ? img : img.url;
                     return (
-                      <div key={idx} className="aspect-square rounded-xl overflow-hidden border-2 border-slate-200 hover:border-amber-400 transition-all shadow-sm hover:shadow-md group">
+                      <div key={idx} className="aspect-square rounded-lg overflow-hidden border-2 border-border hover:border-primary/40 transition-colors shadow-card group">
                         <img
                           src={imageUrl}
                           alt={`Day ${day.dayNumber} Image ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-cover"
                           onError={(e) => {
-                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
+                            (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50" y="50" text-anchor="middle" dominant-baseline="middle"%3EImage%3C/text%3E%3C/svg%3E';
                           }}
                         />
                       </div>

@@ -5,6 +5,23 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { X, ChevronDown, Plus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface MultiSelectDropdownProps {
+  label?: string;
+  options?: Option[];
+  selectedValues?: string[];
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+  allowCustom?: boolean;
+}
 
 const MultiSelectDropdown = ({
   label,
@@ -13,16 +30,16 @@ const MultiSelectDropdown = ({
   onChange,
   placeholder = 'Select items...',
   allowCustom = false,
-}) => {
+}: MultiSelectDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [customInput, setCustomInput] = useState('');
-  const dropdownRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchTerm('');
       }
@@ -37,7 +54,7 @@ const MultiSelectDropdown = ({
     option.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleToggleOption = (value) => {
+  const handleToggleOption = (value: string) => {
     const isSelected = selectedValues.includes(value);
     if (isSelected) {
       onChange(selectedValues.filter((v) => v !== value));
@@ -46,7 +63,7 @@ const MultiSelectDropdown = ({
     }
   };
 
-  const handleRemoveTag = (value) => {
+  const handleRemoveTag = (value: string) => {
     onChange(selectedValues.filter((v) => v !== value));
   };
 
@@ -57,7 +74,7 @@ const MultiSelectDropdown = ({
     }
   };
 
-  const getDisplayLabel = (value) => {
+  const getDisplayLabel = (value: string) => {
     const option = options.find((opt) => opt.value === value);
     return option ? option.label : value;
   };
@@ -65,7 +82,7 @@ const MultiSelectDropdown = ({
   return (
     <div className="relative" ref={dropdownRef}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
           {label}
         </label>
       )}
@@ -76,13 +93,13 @@ const MultiSelectDropdown = ({
           {selectedValues.map((value) => (
             <span
               key={value}
-              className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+              className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
             >
               {getDisplayLabel(value)}
               <button
                 type="button"
                 onClick={() => handleRemoveTag(value)}
-                className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -94,31 +111,28 @@ const MultiSelectDropdown = ({
       {/* Dropdown Trigger */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white cursor-pointer hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between"
+        className="h-8 w-full px-2.5 border border-input rounded-lg bg-transparent cursor-pointer hover:border-ring/50 focus-visible:ring-3 focus-visible:ring-ring/50 flex items-center justify-between text-sm"
       >
-        <span className="text-gray-700">
+        <span className="text-foreground">
           {selectedValues.length === 0
             ? placeholder
             : `${selectedValues.length} selected`}
         </span>
         <ChevronDown
-          className={`w-5 h-5 text-gray-400 transition-transform ${
-            isOpen ? 'transform rotate-180' : ''
-          }`}
+          className={cn('w-4 h-4 text-muted-foreground transition-transform', isOpen && 'rotate-180')}
         />
       </div>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-dropdown max-h-60 overflow-y-auto">
           {/* Search Input */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 p-2">
-            <input
+          <div className="sticky top-0 bg-popover border-b border-border p-2">
+            <Input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search..."
-              className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -132,19 +146,20 @@ const MultiSelectDropdown = ({
                   <div
                     key={option.value}
                     onClick={() => handleToggleOption(option.value)}
-                    className={`px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
-                      isSelected ? 'bg-blue-50' : ''
-                    }`}
+                    className={cn(
+                      'px-3 py-2 cursor-pointer hover:bg-muted flex items-center justify-between',
+                      isSelected && 'bg-accent'
+                    )}
                   >
-                    <span className="text-sm text-gray-700">{option.label}</span>
+                    <span className="text-sm text-foreground">{option.label}</span>
                     {isSelected && (
-                      <span className="text-blue-600 font-semibold">✓</span>
+                      <span className="text-primary font-semibold">✓</span>
                     )}
                   </div>
                 );
               })
             ) : (
-              <div className="px-3 py-2 text-sm text-gray-500 text-center">
+              <div className="px-3 py-2 text-sm text-muted-foreground text-center">
                 No options found
               </div>
             )}
@@ -152,30 +167,29 @@ const MultiSelectDropdown = ({
 
           {/* Custom Input Section */}
           {allowCustom && (
-            <div className="border-t border-gray-200 p-2 bg-gray-50">
+            <div className="border-t border-border p-2 bg-muted">
               <div className="flex gap-2">
-                <input
+                <Input
                   type="text"
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       handleAddCustom();
                     }
                   }}
                   placeholder="Add custom item..."
-                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1"
                   onClick={(e) => e.stopPropagation()}
                 />
-                <button
+                <Button
                   type="button"
                   onClick={handleAddCustom}
-                  className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm flex items-center gap-1"
                 >
                   <Plus className="w-4 h-4" />
                   Add
-                </button>
+                </Button>
               </div>
             </div>
           )}

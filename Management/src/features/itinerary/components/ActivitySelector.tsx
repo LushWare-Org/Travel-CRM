@@ -5,14 +5,24 @@
 
 import { useState, useMemo } from 'react';
 import { Plus, X, Search } from 'lucide-react';
-import { DEFAULT_ACTIVITIES, ACTIVITY_CATEGORIES } from '../utils/activities';
+import { ACTIVITY_CATEGORIES } from '../utils/activities';
 import { getActivitiesForDestination } from '../utils/destinationActivities';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+
+interface ActivitySelectorProps {
+  activities?: string[] | string;
+  onChange: (activities: string[]) => void;
+  destination?: string | null;
+}
 
 const ActivitySelector = ({
   activities = [],
   onChange,
-  destination = null, // NEW: Destination context for context-aware suggestions
-}) => {
+  destination = null,
+}: ActivitySelectorProps) => {
   const [showSelector, setShowSelector] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,26 +33,26 @@ const ActivitySelector = ({
     ? activities
     : (typeof activities === 'string' ? activities.split(',').map(a => a.trim()).filter(Boolean) : []);
 
-  // NEW: Get destination-specific activities (memoized for performance)
+  // Destination-specific activities (memoized for performance)
   const availableActivities = useMemo(() => {
     return getActivitiesForDestination(destination, true);
   }, [destination]);
 
   // Filter activities based on category and search
-  const filteredActivities = availableActivities.filter(activity => {
+  const filteredActivities = availableActivities.filter((activity: any) => {
     const matchesCategory = selectedCategory === 'all' || activity.category === selectedCategory;
     const matchesSearch = activity.label.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const handleAddActivity = (activityLabel) => {
+  const handleAddActivity = (activityLabel: string) => {
     if (!activitiesArray.includes(activityLabel)) {
       onChange([...activitiesArray, activityLabel]);
     }
   };
 
-  const handleRemoveActivity = (activityToRemove) => {
-    onChange(activitiesArray.filter(a => a !== activityToRemove));
+  const handleRemoveActivity = (activityToRemove: string) => {
+    onChange(activitiesArray.filter((a) => a !== activityToRemove));
   };
 
   const handleAddCustomActivity = () => {
@@ -53,7 +63,7 @@ const ActivitySelector = ({
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddCustomActivity();
@@ -68,13 +78,13 @@ const ActivitySelector = ({
           {activitiesArray.map((activity, index) => (
             <span
               key={index}
-              className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+              className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
             >
               {activity}
               <button
                 type="button"
                 onClick={() => handleRemoveActivity(activity)}
-                className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
               >
                 <X size={14} />
               </button>
@@ -84,45 +94,44 @@ const ActivitySelector = ({
       )}
 
       {/* Toggle Selector Button */}
-      <button
+      <Button
         type="button"
         onClick={() => setShowSelector(!showSelector)}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm"
+        size="sm"
       >
         <Plus size={16} />
         {showSelector ? 'Hide Activity Selector' : 'Add Activities'}
-      </button>
+      </Button>
 
       {/* Activity Selector Panel */}
       {showSelector && (
-        <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50 space-y-4">
+        <div className="border border-border rounded-lg p-4 bg-muted space-y-4">
           {/* Custom Activity Input */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
               Add Custom Activity
             </label>
             <div className="flex gap-2">
-              <input
+              <Input
                 type="text"
                 value={customActivity}
                 onChange={(e) => setCustomActivity(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown}
                 placeholder="Type custom activity name..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="flex-1"
               />
-              <button
+              <Button
                 type="button"
                 onClick={handleAddCustomActivity}
                 disabled={!customActivity.trim()}
-                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
               >
                 Add
-              </button>
+              </Button>
             </div>
           </div>
 
-          <div className="border-t border-blue-300 pt-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <div className="border-t border-border pt-4">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
               Select from Predefined Activities
             </label>
 
@@ -130,35 +139,36 @@ const ActivitySelector = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                <input
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                <Input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search activities..."
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="pl-9"
                 />
               </div>
 
               {/* Category Filter */}
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                {ACTIVITY_CATEGORIES.map(category => (
-                  <option key={category.value} value={category.value}>
-                    {category.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(String(v))}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>{(v: string) => ACTIVITY_CATEGORIES.find((c: any) => c.value === v)?.label ?? v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ACTIVITY_CATEGORIES.map((category: any) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Activities Grid */}
-            <div className="max-h-64 overflow-y-auto border border-gray-300 rounded-md bg-white">
+            <div className="max-h-64 overflow-y-auto border border-border rounded-md bg-card">
               {filteredActivities.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-2">
-                  {filteredActivities.map((activity) => {
+                  {filteredActivities.map((activity: any) => {
                     const isSelected = activitiesArray.includes(activity.label);
                     return (
                       <button
@@ -166,10 +176,12 @@ const ActivitySelector = ({
                         type="button"
                         onClick={() => handleAddActivity(activity.label)}
                         disabled={isSelected}
-                        className={`px-3 py-2 text-left text-sm rounded transition-colors ${isSelected
-                            ? 'bg-green-100 text-green-800 cursor-not-allowed'
-                            : 'bg-gray-50 hover:bg-blue-100 text-gray-700'
-                          }`}
+                        className={cn(
+                          'px-3 py-2 text-left text-sm rounded-md transition-colors',
+                          isSelected
+                            ? 'bg-success/10 text-success cursor-not-allowed'
+                            : 'bg-muted hover:bg-accent text-foreground'
+                        )}
                       >
                         {activity.label}
                         {isSelected && <span className="ml-2 text-xs">✓ Added</span>}
@@ -178,16 +190,16 @@ const ActivitySelector = ({
                   })}
                 </div>
               ) : (
-                <div className="p-4 text-center text-gray-500 text-sm">
+                <div className="p-4 text-center text-muted-foreground text-sm">
                   No activities found. Try different search terms or category.
                 </div>
               )}
             </div>
 
             {/* Results Count */}
-            <div className="text-xs text-gray-600 mt-2">
+            <div className="text-xs text-muted-foreground mt-2">
               Showing {filteredActivities.length} of {availableActivities.length} activities
-              {destination && <span className="ml-1 text-blue-600">(filtered for {destination})</span>}
+              {destination && <span className="ml-1 text-primary">(filtered for {destination})</span>}
             </div>
           </div>
         </div>
@@ -195,7 +207,7 @@ const ActivitySelector = ({
 
       {/* Help Text */}
       {activitiesArray.length === 0 && !showSelector && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           Click "Add Activities" to select from predefined list or add custom activities
         </p>
       )}
