@@ -1,17 +1,7 @@
-import nodemailer from 'nodemailer';
 import prisma from '../db/client.js';
 import AppError from '../utils/appError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-
-const sendEmail = async ({ to, subject, html }) => {
-  const transport = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT || '587'),
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
-  });
-  await transport.sendMail({ from: process.env.EMAIL_FROM || process.env.EMAIL_USER, to, subject, html });
-};
+import { sendApplicantConfirmation, sendAdminApplicationNotice, sendApplicationStatusUpdate } from '../utils/email.js';
 
 export const applyForPosition = asyncHandler(async (req, res) => {
   const { fullName, email, phone, position, coverLetter, agreeTerms, resumeUrl, resumeFileName } = req.body;
@@ -51,18 +41,22 @@ export const applyForPosition = asyncHandler(async (req, res) => {
   await prisma.vacancy.update({ where: { id: vacancy.id }, data: { applicationsCount: { increment: 1 } } });
 
   // Send confirmation email (non-blocking)
-  sendEmail({
-    to: cleanEmail,
-    subject: `Application Received — ${vacancy.position}`,
-    html: `<p>Dear ${fullName},</p><p>We received your application for <strong>${vacancy.position}</strong>. We'll review it within 5-7 business days.</p>`,
-  }).catch((err) => req.log.error({ err, email: cleanEmail }, 'Failed to send applicant confirmation email'));
+  sendApplicantConfirmation({ to: cleanEmail, fullName, position: vacancy.position })
+    .catch((err) => req.log.error({ err, email: cleanEmail }, 'Failed to send applicant confirmation email'));
 
-  const adminEmails = (process.env.ADMIN_EMAILS || process.env.EMAIL_USER || '').split(',');
-  sendEmail({
-    to: adminEmails.join(','),
-    subject: `New Career Application — ${vacancy.position}`,
-    html: `<p><strong>Name:</strong> ${fullName}</p><p><strong>Position:</strong> ${vacancy.position}</p><p><strong>Email:</strong> ${cleanEmail}</p>`,
-  }).catch((err) => req.log.error({ err }, 'Failed to send admin notification email'));
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean);
+  if (adminEmails.length) {
+    sendAdminApplicationNotice({
+      to: adminEmails,
+      fullName,
+      position: vacancy.position,
+      email: cleanEmail,
+      phone: phone?.trim(),
+      resumeUrl,
+    }).catch((err) => req.log.error({ err }, 'Failed to send admin notification email'));
+  } else {
+    req.log.warn('ADMIN_EMAILS is not configured — skipping admin notification email');
+  }
 
   res.status(201).json({ status: 'success', message: 'Application submitted successfully!', data: { application } });
 });
@@ -107,17 +101,13 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
   });
 
   // Send notification email for terminal statuses (non-blocking)
-  if (status && !['pending', 'under_review'].includes(status)) {
-    const messages = {
-      under_review: 'Your application is under review.',
-      shortlisted: 'Congratulations! Your application has been shortlisted.',
-      rejected: 'Thank you for applying. Unfortunately, we cannot proceed with your application at this time.',
-      hired: 'Congratulations! We are pleased to offer you the position.',
-    };
-    sendEmail({
+  if (status && status !== 'pending') {
+    sendApplicationStatusUpdate({
       to: application.email,
-      subject: `Update on Your ${application.position} Application`,
-      html: `<p>Dear ${application.fullName},</p><p>${messages[status] || 'Your application status has been updated.'}</p>${feedback ? `<p><strong>Feedback:</strong> ${feedback}</p>` : ''}`,
+      fullName: application.fullName,
+      position: application.position,
+      status,
+      feedback,
     }).catch((err) => req.log.error({ err, email: application.email }, 'Failed to send application status email'));
   }
 
