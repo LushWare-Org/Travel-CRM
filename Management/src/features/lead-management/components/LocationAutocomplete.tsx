@@ -2,24 +2,41 @@ import { useState, useEffect, useRef } from 'react';
 import { MapPin, Loader2, X } from 'lucide-react';
 import { getCountryCodeFromDestination } from '../../itinerary/utils/destinationMapping';
 
+interface LocationSuggestion {
+  id: string | number;
+  displayName: string;
+  fullName: string;
+  lat: string;
+  lon: string;
+}
+
+interface LocationAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  onSelect?: (value: string) => void;
+  destination?: string | null;
+  country?: string | null;
+  prioritizeRegion?: boolean;
+}
+
 const LocationAutocomplete = ({
   value,
   onChange,
-  placeholder = "e.g., Colombo, Sri Lanka",
+  placeholder = 'e.g., Colombo, Sri Lanka',
   onSelect = undefined,
-  // NEW: Context props for destination-aware suggestions
-  destination = null,      // Package/lead destination (e.g., "Dubai", "Bali")
-  country = null,          // Optional: Direct country code override (e.g., "AE", "ID")
-  prioritizeRegion = true, // Prioritize results in the destination's region
-}) => {
+  // Context props for destination-aware suggestions
+  destination = null,
+  country = null,
+}: LocationAutocompleteProps) => {
   const [query, setQuery] = useState(value || '');
-  const [suggestions, setSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const inputRef = useRef(null);
-  const suggestionsRef = useRef(null);
-  const debounceTimerRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync with external value changes
   useEffect(() => {
@@ -27,7 +44,7 @@ const LocationAutocomplete = ({
   }, [value]);
 
   // Debounced search function
-  const searchLocations = async (searchQuery) => {
+  const searchLocations = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.trim().length < 2) {
       setSuggestions([]);
       setIsLoading(false);
@@ -35,24 +52,22 @@ const LocationAutocomplete = ({
     }
 
     setIsLoading(true);
-    
+
     try {
-      // NEW: Get country code from destination for context-aware filtering
+      // Get country code from destination for context-aware filtering
       const countryCode = country || getCountryCodeFromDestination(destination);
-      
-      // Build query parameters
+
       const params = new URLSearchParams({
         q: searchQuery,
         format: 'json',
-        limit: countryCode ? 10 : 5, // More results when filtering by country
-        addressdetails: 1,
+        limit: String(countryCode ? 10 : 5),
+        addressdetails: '1',
       });
-      
-      // Add country filter if available (ISO 3166-1 alpha-2 code)
+
       if (countryCode) {
         params.append('countrycodes', countryCode.toLowerCase());
       }
-      
+
       // Use Nominatim API with proper headers
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?${params.toString()}`,
@@ -70,15 +85,11 @@ const LocationAutocomplete = ({
 
       const data = await response.json();
 
-      // Format results
-      const formattedSuggestions = data.map((item, index) => {
-        // Build a readable location string
-        const parts = [];
+      const formattedSuggestions: LocationSuggestion[] = data.map((item: any, index: number) => {
+        const parts: string[] = [];
         if (item.name && item.name !== item.display_name.split(',')[0]) {
           parts.push(item.name);
         }
-
-        // Add city/town
         if (item.address?.city) {
           parts.push(item.address.city);
         } else if (item.address?.town) {
@@ -86,20 +97,14 @@ const LocationAutocomplete = ({
         } else if (item.address?.village) {
           parts.push(item.address.village);
         }
-
-        // Add state/region
         if (item.address?.state) {
           parts.push(item.address.state);
         }
-
-        // Add country
         if (item.address?.country) {
           parts.push(item.address.country);
         }
 
-        const displayText = parts.length > 0
-          ? parts.join(', ')
-          : item.display_name;
+        const displayText = parts.length > 0 ? parts.join(', ') : item.display_name;
 
         return {
           id: item.place_id || index,
@@ -119,13 +124,11 @@ const LocationAutocomplete = ({
     }
   };
 
-  // Debounce input
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setQuery(newValue);
     setSelectedIndex(-1);
 
-    // Clear previous timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
@@ -142,8 +145,7 @@ const LocationAutocomplete = ({
     }, 500);
   };
 
-  // Handle selection
-  const handleSelect = (suggestion) => {
+  const handleSelect = (suggestion: LocationSuggestion) => {
     setQuery(suggestion.displayName);
     setSuggestions([]);
     setShowSuggestions(false);
@@ -154,8 +156,7 @@ const LocationAutocomplete = ({
     setSelectedIndex(-1);
   };
 
-  // Handle keyboard navigation
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions || suggestions.length === 0) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -168,13 +169,11 @@ const LocationAutocomplete = ({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev =>
-          prev < suggestions.length - 1 ? prev + 1 : prev
-        );
+        setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
         break;
       case 'Enter':
         e.preventDefault();
@@ -195,7 +194,6 @@ const LocationAutocomplete = ({
     }
   };
 
-  // Clear input
   const handleClear = () => {
     setQuery('');
     setSuggestions([]);
@@ -206,12 +204,12 @@ const LocationAutocomplete = ({
 
   // Close suggestions when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target) &&
+        !suggestionsRef.current.contains(event.target as Node) &&
         inputRef.current &&
-        !inputRef.current.contains(event.target)
+        !inputRef.current.contains(event.target as Node)
       ) {
         setShowSuggestions(false);
       }
@@ -226,7 +224,7 @@ const LocationAutocomplete = ({
   return (
     <div className="relative">
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <input
           ref={inputRef}
           type="text"
@@ -239,20 +237,20 @@ const LocationAutocomplete = ({
             }
           }}
           placeholder={placeholder}
-          className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full h-8 pl-10 pr-8 border border-input rounded-md bg-transparent text-sm focus:outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
         {query && (
           <button
             onClick={handleClear}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded transition-colors"
             type="button"
           >
-            <X className="w-4 h-4 text-gray-400" />
+            <X className="w-4 h-4 text-muted-foreground" />
           </button>
         )}
         {isLoading && (
-          <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
-            <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+          <div className="absolute right-10 top-1/2 -translate-y-1/2">
+            <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
           </div>
         )}
       </div>
@@ -261,19 +259,18 @@ const LocationAutocomplete = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+          className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-[var(--shadow-dropdown)] max-h-60 overflow-y-auto"
         >
           {suggestions.map((suggestion, index) => (
             <button
               key={suggestion.id}
               type="button"
               onClick={() => handleSelect(suggestion)}
-              className={`w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors ${index === selectedIndex ? 'bg-blue-50' : ''
-                }`}
+              className={`w-full px-4 py-2 text-left hover:bg-primary/10 transition-colors ${index === selectedIndex ? 'bg-primary/10' : ''}`}
             >
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-gray-700">{suggestion.displayName}</span>
+                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <span className="text-sm text-foreground">{suggestion.displayName}</span>
               </div>
             </button>
           ))}
@@ -282,8 +279,8 @@ const LocationAutocomplete = ({
 
       {/* No results message */}
       {showSuggestions && !isLoading && suggestions.length === 0 && query.trim().length >= 2 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-3">
-          <p className="text-sm text-gray-500">No locations found</p>
+        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-[var(--shadow-dropdown)] p-3">
+          <p className="text-sm text-muted-foreground">No locations found</p>
         </div>
       )}
     </div>
