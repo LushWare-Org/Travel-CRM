@@ -72,7 +72,6 @@ export interface FilterableUser {
   phone?: string;
   role?: string;
   status?: string;
-  [key: string]: unknown;
 }
 
 export const filterUsers = <T extends FilterableUser>(

@@ -12,27 +12,9 @@ export const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-warning/10 text-warning',
 };
 
-// NOTE: retained only because AdminManagement.jsx/VendorManagement.jsx still
-// import these (unused, confirmed via grep) ahead of their own migration in
-// this same phase - dropped for real once those files are touched.
-export const ROLE_COLORS: Record<string, { badge: string; tab: string; button: string }> = {
-  Admin: {
-    badge: 'bg-chart-4/10 text-chart-4',
-    tab: 'bg-chart-4/10 text-chart-4',
-    button: 'bg-primary hover:bg-primary/80',
-  },
-  'Sales Rep': {
-    badge: 'bg-chart-2/10 text-chart-2',
-    tab: 'bg-chart-2/10 text-chart-2',
-    button: 'bg-primary hover:bg-primary/80',
-  },
-  Accountant: {
-    badge: 'bg-success/10 text-success',
-    tab: 'bg-success/10 text-success',
-    button: 'bg-primary hover:bg-primary/80',
-  },
-};
-
+// NOTE: retained only because VendorManagement.jsx still imports this
+// (unused, confirmed via grep) ahead of its own migration later in this
+// phase - dropped for real once that file is touched.
 export const VENDOR_VERIFICATION_COLORS: Record<string, string> = {
   pending: 'bg-warning/10 text-warning',
   verified: 'bg-success/10 text-success',
