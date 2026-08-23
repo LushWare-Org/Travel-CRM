@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import toast from '@/lib/toast';
 import { voucherAPI, packageAPI, leadAPI } from '../../../services/api';
 import { flightAPI } from '../../../services/flight.service';
-import PDFPreviewDialog from './PDFPreviewDialog';
+import PDFPreviewDialog from '@/components/shared/PdfPreview';
 import SendDocumentPanel from './shared/SendDocumentPanel';
 import { LOCALE } from '../../../utils/currency.js';
 import { Dialog, DialogContent } from '@/components/ui/dialog';

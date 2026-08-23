@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Download, FileText, MapPin, Calendar, Banknote, Users, X } from 'lucide-react';
+import { useMemo } from 'react';
+import { Download, ExternalLink, FileText, MapPin, Calendar, Banknote, Users, X } from 'lucide-react';
 import { formatPriceINR } from '../utils/helpers';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { usePdfPreview, PdfViewerFrame, PDF_DIALOG_SIZE_CLASSES } from '@/components/shared/PdfPreview';
 
 const FALLBACK_FILE_NAME = 'travel-itinerary.pdf';
 
@@ -25,7 +26,7 @@ const PackagePDFPreviewDialog = ({
   packageData,
   isGenerating = false,
 }: PackagePDFPreviewDialogProps) => {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { blobUrl: previewUrl, loading, error } = usePdfPreview({ isOpen, pdfBlob });
 
   const summaryItems = useMemo(() => {
     if (!packageData) return [];
@@ -54,28 +55,6 @@ const PackagePDFPreviewDialog = ({
     ].filter((item) => !!item.value);
   }, [packageData]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(null);
-      }
-      return;
-    }
-
-    if (pdfBlob) {
-      const url = URL.createObjectURL(pdfBlob);
-      setPreviewUrl(url);
-      return () => {
-        if (url) {
-          URL.revokeObjectURL(url);
-        }
-      };
-    } else {
-      setPreviewUrl(null);
-    }
-  }, [isOpen, pdfBlob]);
-
   const handleDownload = () => {
     if (onDownload) {
       onDownload();
@@ -100,10 +79,10 @@ const PackagePDFPreviewDialog = ({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-[95vw] w-full h-[92vh] p-0 gap-0 flex flex-col overflow-hidden rounded-xl"
+        className={`p-0 gap-0 flex flex-col overflow-hidden ${PDF_DIALOG_SIZE_CLASSES}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border bg-primary px-3 sm:px-6 py-3 sm:py-4 rounded-t-xl">
+        <div className="flex items-center justify-between border-b border-border bg-primary px-3 sm:px-6 py-3 sm:py-4 rounded-t-none sm:rounded-t-xl">
           <div className="flex items-center gap-2 sm:gap-3 text-primary-foreground min-w-0">
             <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary-foreground/20 shrink-0">
               <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -116,6 +95,18 @@ const PackagePDFPreviewDialog = ({
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {previewUrl && !isGenerating && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                title="Open in new tab"
+                render={<a href={previewUrl} target="_blank" rel="noopener noreferrer" />}
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Open in Tab</span>
+              </Button>
+            )}
             <Button
               onClick={handleDownload}
               disabled={!pdfBlob || isGenerating}
@@ -146,22 +137,14 @@ const PackagePDFPreviewDialog = ({
                   This usually takes just a few seconds. We're styling the document for you.
                 </p>
               </div>
-            ) : previewUrl ? (
-              <iframe
-                key={previewUrl}
-                src={previewUrl}
-                title="Package PDF Preview"
-                className="h-full w-full"
-                style={{ border: 'none' }}
-              />
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-                <FileText className="h-12 w-12" />
-                <p className="text-lg font-medium text-foreground">Preview unavailable</p>
-                <p className="max-w-sm text-center text-sm text-muted-foreground">
-                  We couldn't render the PDF preview. Try downloading the itinerary instead.
-                </p>
-              </div>
+              <PdfViewerFrame
+                blobUrl={previewUrl}
+                loading={loading}
+                error={error}
+                title="Package PDF Preview"
+                emptyMessage="We couldn't render the PDF preview. Try downloading the itinerary instead."
+              />
             )}
           </div>
 

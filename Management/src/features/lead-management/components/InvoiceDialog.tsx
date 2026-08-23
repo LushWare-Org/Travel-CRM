@@ -6,7 +6,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import toast from '@/lib/toast';
 import { invoiceAPI, quotationAPI, adminAPI } from '../../../services/api';
-import PDFPreviewDialog from './PDFPreviewDialog';
+import PDFPreviewDialog from '@/components/shared/PdfPreview';
 import { formatCurrency, LOCALE } from '../../../utils/currency.js';
 import { Row } from './shared/BillingPrimitives';
 import EditableBulletSection from './shared/EditableBulletSection';

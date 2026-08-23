@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Save, CreditCard, Eye, Receipt, Calendar, FileText } from 'lucide-react';
 import toast from '@/lib/toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
-import PDFPreviewDialog from './PDFPreviewDialog';
+import PDFPreviewDialog from '@/components/shared/PdfPreview';
 import SendDocumentPanel from './shared/SendDocumentPanel';
 import { formatCurrency, getCurrencySymbol, CURRENCY_CODE } from '../../../utils/currency.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';

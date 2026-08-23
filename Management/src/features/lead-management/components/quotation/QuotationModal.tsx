@@ -7,7 +7,7 @@ import type { LucideIcon } from 'lucide-react';
 import toast from '@/lib/toast';
 import Swal from 'sweetalert2';
 import { leadAPI, quotationAPI, packageAPI } from '../../../../services/api';
-import PDFPreviewDialog from '../PDFPreviewDialog';
+import PDFPreviewDialog from '@/components/shared/PdfPreview';
 import { Row, ChannelTab } from '../shared/BillingPrimitives';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   Loader2, Download, Eye, FileText, Receipt,
-  FileCheck, Ticket, Clock, ExternalLink,
-  Mail, Folder, X,
+  FileCheck, Ticket, Clock,
+  Mail, Folder,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -14,6 +14,7 @@ import {
 import toast from '@/lib/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { PdfPreviewDialog } from '@/components/shared/PdfPreview';
 
 type DocType = 'quotation' | 'invoice' | 'receipt' | 'voucher';
 type TabKey = 'quotations' | 'invoices' | 'receipts' | 'vouchers';
@@ -39,7 +40,7 @@ const LeadSectionView = ({ lead, onClose }: LeadSectionViewProps) => {
     vouchers: [],
   });
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfViewerType, setPdfViewerType] = useState<DocType | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('quotations');
   const [sendingDoc, setSendingDoc] = useState<{ id: string; type: DocType } | null>(null);
@@ -51,14 +52,6 @@ const LeadSectionView = ({ lead, onClose }: LeadSectionViewProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead]);
-
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [pdfUrl]);
 
   const fetchDocuments = async () => {
     if (!lead) return;
@@ -105,12 +98,7 @@ const LeadSectionView = ({ lead, onClose }: LeadSectionViewProps) => {
         throw new Error('Invalid PDF data received');
       }
 
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
+      setPdfBlob(blob);
       setPdfViewerType(type);
       setPdfViewerOpen(true);
     } catch (err) {
@@ -170,12 +158,9 @@ const LeadSectionView = ({ lead, onClose }: LeadSectionViewProps) => {
   };
 
   const closePdfViewer = () => {
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
-      setPdfUrl(null);
-    }
     setPdfViewerOpen(false);
     setPdfViewerType(null);
+    setPdfBlob(null);
   };
 
   if (!lead) return null;
@@ -262,39 +247,13 @@ const LeadSectionView = ({ lead, onClose }: LeadSectionViewProps) => {
       </Dialog>
 
       {/* PDF Viewer Modal */}
-      <Dialog open={pdfViewerOpen && !!pdfUrl} onOpenChange={(open) => { if (!open) closePdfViewer(); }}>
-        <DialogContent showCloseButton={false} className="max-w-5xl h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-            <div className="flex items-center gap-3">
-              <FileText className="w-5 h-5 text-muted-foreground" />
-              <span className="font-semibold text-foreground capitalize">{pdfViewerType} Preview</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {pdfUrl && (
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted rounded-lg transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Open in Tab
-                </a>
-              )}
-              <Button variant="ghost" size="icon" onClick={closePdfViewer}>
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
-          {pdfUrl && (
-            <iframe
-              src={pdfUrl}
-              className="w-full flex-1"
-              title="PDF Viewer"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <PdfPreviewDialog
+        isOpen={pdfViewerOpen && !!pdfBlob}
+        onClose={closePdfViewer}
+        pdfBlob={pdfBlob}
+        documentName={pdfViewerType ? `${pdfViewerType.charAt(0).toUpperCase()}${pdfViewerType.slice(1)}` : undefined}
+        onDownload
+      />
     </>
   );
 };
