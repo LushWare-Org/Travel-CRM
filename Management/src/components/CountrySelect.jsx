@@ -88,7 +88,7 @@ export default function CountrySelect({
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <input
           ref={inputRef}
           type="text"
@@ -108,13 +108,13 @@ export default function CountrySelect({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoComplete="off"
-          className="h-8 w-full pl-9 pr-9 py-1 text-sm bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+          className="h-8 w-full pl-9 pr-9 py-1 text-sm bg-popover border-2 border-border rounded-xl focus:outline-none focus-visible:border-ring focus-visible:ring-4 focus-visible:ring-ring/10 transition-all"
         />
         <button
           type="button"
           tabIndex={-1}
           onClick={() => { setOpen(!open); if (!open) { setQuery(''); inputRef.current?.focus(); } }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
         >
           {value ? (
             <X className="w-4 h-4" onClick={(e) => { e.stopPropagation(); handleClear(); }} />
@@ -125,9 +125,9 @@ export default function CountrySelect({
       </div>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white rounded-lg border border-gray-200 shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute z-50 mt-1 w-full bg-popover rounded-lg border border-border shadow-[var(--shadow-dropdown)] max-h-64 overflow-y-auto">
           {visible.length === 0 ? (
-            <div className="px-3 py-4 text-center text-sm text-gray-400">No countries found</div>
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">No countries found</div>
           ) : (
             visible.map((c, idx) => (
               <button
@@ -135,17 +135,17 @@ export default function CountrySelect({
                 type="button"
                 onClick={() => select(c)}
                 className={`w-full text-left px-3 py-2 flex items-center gap-2.5 text-sm transition-colors ${
-                  idx === highlightIdx ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                } ${c.code === value ? 'bg-blue-50/50 font-medium' : ''}`}
+                  idx === highlightIdx ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent'
+                } ${c.code === value ? 'bg-accent/50 font-medium' : ''}`}
               >
                 <span className="text-base shrink-0">{c.flag}</span>
                 <span className="truncate">{c.name}</span>
-                <span className="ml-auto text-xs text-gray-400 font-mono shrink-0">{c.code}</span>
+                <span className="ml-auto text-xs text-muted-foreground font-mono shrink-0">{c.code}</span>
               </button>
             ))
           )}
           {!query && COUNTRIES_PRIORITY.length > 10 && (
-            <div className="px-3 py-1.5 text-xs text-gray-400 text-center border-t border-gray-100">
+            <div className="px-3 py-1.5 text-xs text-muted-foreground text-center border-t border-border">
               Type to search all {COUNTRIES_PRIORITY.length} countries
             </div>
           )}

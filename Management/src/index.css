@@ -242,6 +242,7 @@ code {
   ---break---
 */
 :root {
+  color-scheme: light;
   --background: #f6f7f9;
   --foreground: #10131a;
   --card: #ffffff;
@@ -285,6 +286,7 @@ code {
   ---break---
 */
 .dark {
+  color-scheme: dark;
   --background: #0a0c0f;
   --foreground: #eef0f2;
   --card: #14171c;

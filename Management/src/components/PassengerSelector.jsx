@@ -39,38 +39,38 @@ export default function PassengerSelector({ adults = 1, children = 0, infants = 
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="h-8 flex items-center gap-2 w-full rounded-lg border border-gray-300 px-3 py-1 text-sm text-left focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white hover:border-gray-400 transition-colors"
+        className="h-8 flex items-center gap-2 w-full rounded-lg border border-input px-3 py-1 text-sm text-left focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none bg-popover hover:border-ring transition-colors"
       >
-        <Users className="w-4 h-4 text-gray-400 shrink-0" />
-        <span className="flex-1 text-gray-700">
+        <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+        <span className="flex-1 text-foreground">
           {total} traveler{total !== 1 ? "s" : ""}
         </span>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-64 bg-white rounded-lg border border-gray-200 shadow-lg p-4 right-0">
+        <div className="absolute z-50 mt-1 w-64 bg-popover rounded-lg border border-border shadow-[var(--shadow-dropdown)] p-4 right-0">
           {PASSENGER_TYPES.map(({ key, label, min, max, hint }) => (
-            <div key={key} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 border-b border-gray-100 last:border-0">
+            <div key={key} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 border-b border-border last:border-0">
               <div>
-                <div className="text-sm font-medium text-gray-700">{label}</div>
-                <div className="text-xs text-gray-400">{hint}</div>
+                <div className="text-sm font-medium text-foreground">{label}</div>
+                <div className="text-xs text-muted-foreground">{hint}</div>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => update(key, -1)}
                   disabled={counts[key] <= min}
-                  className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="w-7 h-7 rounded-full border border-input flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   <Minus className="w-3 h-3" />
                 </button>
-                <span className="w-5 text-center text-sm font-semibold text-gray-900">{counts[key]}</span>
+                <span className="w-5 text-center text-sm font-semibold text-foreground">{counts[key]}</span>
                 <button
                   type="button"
                   onClick={() => update(key, 1)}
                   disabled={counts[key] >= max}
-                  className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:border-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="w-7 h-7 rounded-full border border-input flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   <Plus className="w-3 h-3" />
                 </button>
@@ -80,7 +80,7 @@ export default function PassengerSelector({ adults = 1, children = 0, infants = 
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="mt-3 w-full py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+            className="mt-3 w-full py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-colors"
           >
             Done
           </button>
