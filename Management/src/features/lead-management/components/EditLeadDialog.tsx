@@ -4,6 +4,7 @@ import {
   User, MapPin, Plane, Users, Globe, Package, ChevronDown, ChevronUp,
   Trash2, Check, Lock, RefreshCw, XCircle, Wallet,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadAPI, packageAPI } from '../../../services/api';
 import PhoneInput from 'react-phone-number-input';
@@ -18,25 +19,19 @@ import LeadStatusBadge from './LeadStatusBadge';
 import PricingSection from './PricingSection';
 import { toEditorDays } from '../utils/toEditorDays';
 import { isLeadFieldLocked } from '../utils/leadLocks';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 // A lead can hold many packages at once, plus at most one manual
 // (from-scratch) itinerary slot — this sentinel is the "add" picker's third
 // option alongside real packages.
 const MANUAL_ITINERARY_VALUE = '__manual__';
 
-const emptySelectionPricing = {
-  marginType: null,
-  marginValue: 0,
-  depositType: 'PERCENTAGE',
-  depositValue: 30,
-  discountType: 'none',
-  discountValue: 0,
-  serviceChargeRate: 0,
-};
-
 // Maps a /leads/:id/packages selection (server shape, materialized or
 // derived) into the local editor-tab shape.
-function mapSelection(raw) {
+function mapSelection(raw: any) {
   return {
     id: raw.id,
     packageId: raw.packageId || null,
@@ -60,15 +55,24 @@ function mapSelection(raw) {
 
 // ── Module-level components (prevents remounting on re-render) ──
 
-function EditInputField({ label, required, icon: Icon, locked, children, testId }) {
+interface EditInputFieldProps {
+  label: string;
+  required?: boolean;
+  icon?: LucideIcon;
+  locked?: boolean;
+  children: React.ReactNode;
+  testId?: string;
+}
+
+function EditInputField({ label, required, icon: Icon, locked, children, testId }: EditInputFieldProps) {
   return (
     <div className="space-y-2" data-testid={testId}>
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+      <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+        {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
         {label}
-        {required && <span className="text-red-500">*</span>}
+        {required && <span className="text-destructive">*</span>}
         {locked && (
-          <span className="flex items-center gap-1 text-xs text-amber-600 font-normal" title="Locked after QUOTED — move the lead back to DRAFTING to edit">
+          <span className="flex items-center gap-1 text-xs text-warning font-normal" title="Locked after QUOTED — move the lead back to DRAFTING to edit">
             <Lock className="w-3 h-3" />
             Locked
           </span>
@@ -79,80 +83,93 @@ function EditInputField({ label, required, icon: Icon, locked, children, testId 
   );
 }
 
-function EditSectionHeader({ icon: Icon, title, subtitle, section, gradient, count, expanded, onToggle }) {
+interface EditSectionHeaderProps {
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  section: string;
+  count?: number;
+  expanded: boolean;
+  onToggle: (section: string) => void;
+}
+
+function EditSectionHeader({ icon: Icon, title, subtitle, section, count, expanded, onToggle }: EditSectionHeaderProps) {
   return (
     <button
       type="button"
       onClick={() => onToggle(section)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expanded
-          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
-          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-        }`}
+      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${
+        expanded ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/70'
+      }`}
     >
       <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${expanded ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
-          <Icon className={`w-5 h-5 ${expanded ? 'text-white' : 'text-gray-600'}`} />
+        <div className={`p-2 rounded-xl ${expanded ? 'bg-primary-foreground/20' : 'bg-card shadow-sm'}`}>
+          <Icon className={`w-5 h-5 ${expanded ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
         </div>
         <div className="text-left">
           <h3 className="font-semibold flex items-center gap-2">
             {title}
             {count !== undefined && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${expanded ? 'bg-white/20' : 'bg-gray-200'
-                }`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${expanded ? 'bg-primary-foreground/20' : 'bg-secondary'}`}>
                 {count}
               </span>
             )}
           </h3>
-          <p className={`text-xs ${expanded ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
+          <p className={`text-xs ${expanded ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{subtitle}</p>
         </div>
       </div>
-      {expanded ? (
-        <ChevronUp className="w-5 h-5" />
-      ) : (
-        <ChevronDown className="w-5 h-5" />
-      )}
+      {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
     </button>
   );
 }
 
 const emptyFormData = {
-  name: "",
-  email: "",
-  phone: "",
-  whatsapp: "",
-  numberOfTravelers: 1,
-  city: "",
-  salesRep: "",
-  assignedTo: "",
-  destination: "",
-  platform: "",
-  travelDate: "",
-  endDate: "",
-  lifecycleStatus: "NEW",
+  name: '',
+  email: '',
+  phone: '',
+  whatsapp: '',
+  numberOfTravelers: 1 as number | string,
+  city: '',
+  salesRep: '',
+  assignedTo: '',
+  destination: '',
+  platform: '',
+  travelDate: '',
+  endDate: '',
+  lifecycleStatus: 'NEW',
 };
 
-const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSelectionId }) => {
+interface EditLeadDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  lead: any;
+  salesReps: any[];
+  onSuccess?: () => void;
+  initialSelectionId?: string;
+}
+
+const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSelectionId }: EditLeadDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [packages, setPackages] = useState([]);
+  const [packages, setPackages] = useState<any[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [showItineraryEditor, setShowItineraryEditor] = useState(false);
   // One entry per attached package (plus the manual slot, if any) — see
   // mapSelection() for the shape. `dirty` marks a tab whose itinerary/pricing
   // has been edited locally and needs saving.
-  const [selections, setSelections] = useState([]);
-  const [activeSelectionId, setActiveSelectionId] = useState(null);
+  const [selections, setSelections] = useState<any[]>([]);
+  const [activeSelectionId, setActiveSelectionId] = useState<string | null>(null);
   const [addingPackage, setAddingPackage] = useState(false);
-  const [refreshingSelectionId, setRefreshingSelectionId] = useState(null);
+  const [refreshingSelectionId, setRefreshingSelectionId] = useState<string | null>(null);
   // Bumped whenever a transfer flight is added/edited/removed — those persist
   // straight to the DB and never touch itineraryDays/pricingSettings, so the
   // live pricing preview has no other way to know it needs to recompute.
   const [pricingRefreshToken, setPricingRefreshToken] = useState(0);
-  const [remarks, setRemarks] = useState([]);
-  const [editingRemarkIndex, setEditingRemarkIndex] = useState(null);
+  const [remarks, setRemarks] = useState<any[]>([]);
+  const [editingRemarkIndex, setEditingRemarkIndex] = useState<number | null>(null);
   const [editRemarkText, setEditRemarkText] = useState('');
   const [newRemarkText, setNewRemarkText] = useState('');
   const [showAddRemark, setShowAddRemark] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     personal: true,
     travel: true,
     package: true,
@@ -163,26 +180,23 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
   // Snapshot of everything the dialog loaded, so Cancel can revert in place
   // (the dialog stays mounted across open/close cycles, so React alone won't
   // reset it if the `lead` prop reference happens not to change).
-  const snapshotRef = useRef(null);
+  const snapshotRef = useRef<any>(null);
 
   const isLocked = isLeadFieldLocked(lead?.lifecycleStatus);
-  const activeSelection = selections.find(s => s.id === activeSelectionId) || null;
+  const activeSelection = selections.find((s) => s.id === activeSelectionId) || null;
 
   // Day-linked flight preferences live in day.flights[] but only day.transports[]
   // feeds cost lines — reconcile flights into a priced transport row (real price
   // wins when set, else the existing manual transport cost is preserved) before
   // this reaches pricing calculation or persistence. Same transform the package
   // editor already applies at save time (Management/src/features/itinerary/services/apiService.js).
-  const reconcileDays = (days) => (days || []).map(day => ({
+  const reconcileDays = (days: any[]) => (days || []).map((day) => ({
     ...day,
     transports: reconcileFlightsForSave({ flights: day.flights || [], transports: day.transports || [] }),
   }));
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
   useEffect(() => {
@@ -198,7 +212,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
 
       if (response && response.success === true && response.data) {
         const packagesList = (Array.isArray(response.data) ? response.data : [])
-          .filter((pkg) => pkg.isActive !== false);
+          .filter((pkg: any) => pkg.isActive !== false);
         setPackages(packagesList);
       } else {
         setPackages([]);
@@ -252,7 +266,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       const selRes = await leadAPI.getPackageSelections(leadId);
       const rawSelections = selRes?.data?.data || selRes?.data || [];
       const nextSelections = rawSelections.map(mapSelection);
-      const preferredSelectionId = nextSelections.some((s) => s.id === initialSelectionId)
+      const preferredSelectionId = nextSelections.some((s: any) => s.id === initialSelectionId)
         ? initialSelectionId
         : nextSelections[0]?.id ?? null;
       setSelections(nextSelections);
@@ -283,13 +297,13 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
     onClose();
   };
 
-  const updateActiveSelection = (patch) => {
-    setSelections(prev => prev.map(s => (
+  const updateActiveSelection = (patch: any) => {
+    setSelections((prev) => prev.map((s) => (
       s.id === activeSelectionId ? { ...s, ...patch, dirty: true } : s
     )));
   };
 
-  const handleAddPackage = async (value) => {
+  const handleAddPackage = async (value: string) => {
     if (!lead || !value) return;
     const leadId = lead._id || lead.id;
     const isManual = value === MANUAL_ITINERARY_VALUE;
@@ -300,17 +314,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       const detailRes = await leadAPI.getPackageSelection(leadId, createdId);
       const detail = detailRes?.data?.data || detailRes?.data;
       const newSelection = mapSelection(detail);
-      setSelections(prev => [...prev, newSelection]);
+      setSelections((prev) => [...prev, newSelection]);
       setActiveSelectionId(newSelection.id);
       setAddingPackage(false);
       setShowItineraryEditor(true);
       toast.success(isManual ? 'Manual itinerary added' : 'Package added');
-    } catch (err) {
+    } catch (err: any) {
       toast.error(`Failed to add package: ${err.message}`);
     }
   };
 
-  const handleRemoveSelection = async (selection) => {
+  const handleRemoveSelection = async (selection: any) => {
     if (!lead || !selection) return;
     if (!window.confirm(`Remove ${selection.isManual ? 'the manual itinerary' : (selection.packageName || 'this package')} from this lead?`)) {
       return;
@@ -318,20 +332,20 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
     const leadId = lead._id || lead.id;
     try {
       await leadAPI.removePackageSelection(leadId, selection.id);
-      setSelections(prev => {
-        const next = prev.filter(s => s.id !== selection.id);
+      setSelections((prev) => {
+        const next = prev.filter((s) => s.id !== selection.id);
         if (activeSelectionId === selection.id) {
           setActiveSelectionId(next[0]?.id ?? null);
         }
         return next;
       });
       toast.success('Package removed');
-    } catch (err) {
+    } catch (err: any) {
       toast.error(`Failed to remove package: ${err.message}`);
     }
   };
 
-  const handleRefreshSelection = async (selection, force = false) => {
+  const handleRefreshSelection = async (selection: any, force = false) => {
     if (!lead || !selection) return;
     const leadId = lead._id || lead.id;
     setRefreshingSelectionId(selection.id);
@@ -339,9 +353,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       await leadAPI.refreshPackageSelection(leadId, selection.id, force);
       const detailRes = await leadAPI.getPackageSelection(leadId, selection.id);
       const detail = detailRes?.data?.data || detailRes?.data;
-      setSelections(prev => prev.map(s => (s.id === selection.id ? mapSelection(detail) : s)));
+      setSelections((prev) => prev.map((s) => (s.id === selection.id ? mapSelection(detail) : s)));
       toast.success('Reverted to the original package');
-    } catch (err) {
+    } catch (err: any) {
       if (err.status === 409 && err.data?.code === 'REFRESH_BLOCKED_QUOTED') {
         const confirmed = window.confirm(
           'This package has already been quoted — refreshing will make the saved itinerary no longer match what the customer was quoted. Continue?'
@@ -377,7 +391,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
 
       // Persist each edited selection's itinerary + pricing before the
       // general lead update, mirroring the old single-package flow.
-      const dirtySelections = selections.filter(s => s.dirty);
+      const dirtySelections = selections.filter((s) => s.dirty);
       for (const selection of dirtySelections) {
         try {
           await leadAPI.updatePackageSelectionItinerary(leadId, selection.id, {
@@ -392,7 +406,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
         }
       }
 
-      const updateData = {
+      const updateData: any = {
         name: formData.name?.trim() || undefined,
         phone: formData.phone || undefined,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
@@ -406,7 +420,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
         remarks: remarks.length > 0 ? remarks : undefined,
       };
       if (formData.assignedTo && formData.assignedTo !== '' && formData.assignedTo !== '__name_only') {
-        const rep = salesReps.find(r => r.id === formData.assignedTo || r._id === formData.assignedTo);
+        const rep = salesReps.find((r) => r.id === formData.assignedTo || r._id === formData.assignedTo);
         updateData.assignedTo = formData.assignedTo;
         updateData.salesRep = rep ? rep.name : formData.salesRep || undefined;
       }
@@ -415,7 +429,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       toast.success('Lead updated successfully');
       onSuccess?.();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       toast.error(`Failed to update lead: ${error.message}`);
     } finally {
       setIsSubmitting(false);
@@ -433,28 +447,20 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
         }
       }}
     >
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-card rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-[var(--shadow-modal)] flex flex-col">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white p-4 sm:p-6 shrink-0">
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-          </div>
-
-          <div className="relative z-10 flex items-center justify-between">
+        <div className="bg-primary text-primary-foreground p-4 sm:p-6 shrink-0">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-white/15 backdrop-blur-sm rounded-2xl">
+              <div className="p-3 bg-primary-foreground/15 rounded-2xl">
                 <Edit className="w-7 h-7" />
               </div>
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold">Edit Lead</h2>
-                <p className="text-emerald-100 text-sm mt-0.5">{formData.name || 'Lead Details'}</p>
+                <p className="text-primary-foreground/80 text-sm mt-0.5">{formData.name || 'Lead Details'}</p>
               </div>
             </div>
-            <button
-              onClick={handleCancel}
-              className="p-2.5 hover:bg-white/15 rounded-xl transition-all"
-            >
+            <button onClick={handleCancel} className="p-2.5 hover:bg-primary-foreground/15 rounded-xl transition-all">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -471,28 +477,25 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
               title="Personal Information"
               subtitle="Contact details of the lead"
               section="personal"
-              gradient="from-blue-500 to-blue-600"
             />
 
             {expandedSections.personal && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-muted/50 rounded-2xl border border-border">
                 <EditInputField label="Full Name" required icon={User} testId="edit-lead-name">
-                  <input
+                  <Input
                     type="text"
                     aria-label="Full Name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                     placeholder="Enter full name"
                   />
                 </EditInputField>
 
                 <EditInputField label="Email Address" icon={Mail}>
-                  <input
+                  <Input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                     placeholder="email@example.com"
                   />
                 </EditInputField>
@@ -502,7 +505,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                     international
                     defaultCountry="LK"
                     value={formData.phone}
-                    onChange={(value) => setFormData({ ...formData, phone: value || "" })}
+                    onChange={(value) => setFormData({ ...formData, phone: value || '' })}
                     className="phone-input-wrapper"
                     placeholder="Enter phone number"
                   />
@@ -510,26 +513,28 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <Phone className="w-4 h-4 text-gray-400" />
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
                       WhatsApp Number
                     </label>
                     {formData.phone && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                        className="text-primary hover:text-primary"
                       >
                         <Copy className="w-3.5 h-3.5" />
                         Copy
-                      </button>
+                      </Button>
                     )}
                   </div>
                   <PhoneInput
                     international
                     defaultCountry="LK"
                     value={formData.whatsapp}
-                    onChange={(value) => setFormData({ ...formData, whatsapp: value || "" })}
+                    onChange={(value) => setFormData({ ...formData, whatsapp: value || '' })}
                     className="phone-input-wrapper"
                     placeholder="Enter WhatsApp number"
                   />
@@ -547,15 +552,14 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
               title="Travel Details"
               subtitle="Trip information and dates"
               section="travel"
-              gradient="from-purple-500 to-purple-600"
             />
 
             {expandedSections.travel && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-muted/50 rounded-2xl border border-border">
                 <EditInputField label="Departure City" icon={MapPin}>
                   <LocationAutocomplete
                     value={formData.city}
-                    onChange={(value) => setFormData({ ...formData, city: value })}
+                    onChange={(value: string) => setFormData({ ...formData, city: value })}
                     placeholder="e.g., Colombo, Sri Lanka"
                     destination={formData.destination}
                   />
@@ -564,37 +568,35 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                 <EditInputField label="Destination" icon={MapPin}>
                   <DestinationSelector
                     value={formData.destination}
-                    onChange={(event) =>
+                    onChange={(event: any) =>
                       setFormData({ ...formData, destination: event.target.value })
                     }
                   />
                 </EditInputField>
 
                 <EditInputField label="Travel Date (Start)" icon={Calendar} locked={isLocked}>
-                  <input
+                  <Input
                     type="date"
                     aria-label="Travel Date (Start)"
                     value={formData.travelDate}
                     onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
                     disabled={isLocked}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </EditInputField>
 
                 <EditInputField label="End Date" icon={Calendar} locked={isLocked}>
-                  <input
+                  <Input
                     type="date"
                     aria-label="End Date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     min={formData.travelDate || undefined}
                     disabled={isLocked}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </EditInputField>
 
                 <EditInputField label="Number of Travelers" icon={Users} locked={isLocked}>
-                  <input
+                  <Input
                     type="number"
                     min="1"
                     aria-label="Number of Travelers"
@@ -607,37 +609,34 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                       });
                     }}
                     disabled={isLocked}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="e.g., 2"
                   />
                 </EditInputField>
 
                 <EditInputField label="Budget" icon={Wallet}>
-                  <input
+                  <Input
                     type="text"
                     readOnly
                     aria-label="Budget"
                     value={lead?.budget || '—'}
                     title="Auto-filled from the primary package's quoted total"
-                    className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl text-gray-600 cursor-not-allowed focus:outline-none"
+                    className="bg-muted text-muted-foreground cursor-not-allowed"
                   />
-                  <p className="mt-1 text-xs text-gray-400">Auto-filled from the primary package total</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Auto-filled from the primary package total</p>
                 </EditInputField>
 
                 <EditInputField label="Platform / Source" icon={Globe}>
-                  <select
-                    value={formData.platform}
-                    onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
-                  >
-                    <option value="">Select Platform</option>
-                    <option value="Website_Form">🌐 Website Form</option>
-                    <option value="Social_Media">📱 Social Media</option>
-                    <option value="Phone_Call">📞 Phone Call</option>
-                    <option value="Referral">🤝 Referral</option>
-                    <option value="Email">📧 Email</option>
-                    <option value="Walk_in">🚶 Walk-in</option>
-                  </select>
+                  <Select value={formData.platform} onValueChange={(v) => setFormData({ ...formData, platform: String(v) })}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select Platform" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Website_Form">🌐 Website Form</SelectItem>
+                      <SelectItem value="Social_Media">📱 Social Media</SelectItem>
+                      <SelectItem value="Phone_Call">📞 Phone Call</SelectItem>
+                      <SelectItem value="Referral">🤝 Referral</SelectItem>
+                      <SelectItem value="Email">📧 Email</SelectItem>
+                      <SelectItem value="Walk_in">🚶 Walk-in</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </EditInputField>
               </div>
             )}
@@ -652,46 +651,53 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
               title="Package & Assignment"
               subtitle="Select package and sales representative"
               section="package"
-              gradient="from-emerald-500 to-teal-600"
             />
 
             {expandedSections.package && (
               <>
-                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
+                <div className="p-4 bg-muted/50 rounded-2xl border border-border space-y-4">
                   <EditInputField label="Sales Representative" icon={User}>
-                    <select
-                      value={formData.assignedTo || ''}
-                      onChange={(e) => {
-                        const id = e.target.value;
+                    <Select
+                      value={formData.assignedTo || '__none__'}
+                      onValueChange={(idValue) => {
+                        const id = String(idValue);
+                        if (id === '__none__') {
+                          setFormData((prev) => ({ ...prev, assignedTo: '', salesRep: '' }));
+                          return;
+                        }
                         if (id === '__name_only') {
-                          setFormData(prev => ({ ...prev, assignedTo: '__name_only' }));
+                          setFormData((prev) => ({ ...prev, assignedTo: '__name_only' }));
                           return;
                         }
-
-                        if (id === '') {
-                          setFormData(prev => ({ ...prev, assignedTo: '', salesRep: '' }));
-                          return;
-                        }
-
-                        const rep = salesReps.find(r => r.id === id || r._id === id);
-                        setFormData(prev => ({ ...prev, assignedTo: id, salesRep: rep ? rep.name : '' }));
+                        const rep = salesReps.find((r) => r.id === id || r._id === id);
+                        setFormData((prev) => ({ ...prev, assignedTo: id, salesRep: rep ? rep.name : '' }));
                       }}
-                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     >
-                      <option value="">Select Sales Rep</option>
-                      {formData.salesRep && (!formData.assignedTo || formData.assignedTo === '__name_only') && (
-                        <option value="__name_only">{formData.salesRep}</option>
-                      )}
-                      {salesReps.map((rep) => (
-                        <option key={rep.id || rep._id} value={rep.id || rep._id}>{rep.name}</option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Sales Rep">
+                          {(value: string) => {
+                            if (value === '__name_only') return formData.salesRep;
+                            const rep = salesReps.find((r) => r.id === value || r._id === value);
+                            return rep ? rep.name : value;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select Sales Rep</SelectItem>
+                        {formData.salesRep && (!formData.assignedTo || formData.assignedTo === '__name_only') && (
+                          <SelectItem value="__name_only">{formData.salesRep}</SelectItem>
+                        )}
+                        {salesReps.map((rep) => (
+                          <SelectItem key={rep.id || rep._id} value={rep.id || rep._id}>{rep.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </EditInputField>
 
                   {/* Package tabs — a lead can hold many packages at once, plus one manual slot */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                      <Package className="w-4 h-4 text-gray-400" />
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
+                      <Package className="w-4 h-4 text-muted-foreground" />
                       Packages
                     </label>
                     <div className="flex flex-wrap items-center gap-2">
@@ -701,10 +707,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                         return (
                           <div
                             key={selection.id}
-                            className={`group flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-xl text-sm font-medium border-2 transition-all ${isActive
-                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
-                                : 'bg-white border-gray-200 text-gray-700 hover:border-emerald-300'
-                              }`}
+                            className={`group flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                              isActive ? 'bg-primary border-primary text-primary-foreground shadow-sm' : 'bg-card border-border text-foreground hover:border-primary/40'
+                            }`}
                           >
                             <button
                               type="button"
@@ -713,7 +718,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                             >
                               {label}
                               {selection.currentQuoteId && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-emerald-100 text-emerald-700'}`}>
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-primary-foreground/20' : 'bg-success/10 text-success'}`}>
                                   Quoted
                                 </span>
                               )}
@@ -721,10 +726,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                             <button
                               type="button"
                               onClick={() => handleRemoveSelection(selection)}
-                              className={`p-0.5 rounded-full ${isActive ? 'hover:bg-white/20' : 'hover:bg-red-100'}`}
+                              className={`p-0.5 rounded-full ${isActive ? 'hover:bg-primary-foreground/20' : 'hover:bg-destructive/10'}`}
                               title="Remove package"
                             >
-                              <XCircle className={`w-3.5 h-3.5 ${isActive ? 'text-white/80' : 'text-gray-400 group-hover:text-red-500'}`} />
+                              <XCircle className={`w-3.5 h-3.5 ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground group-hover:text-destructive'}`} />
                             </button>
                           </div>
                         );
@@ -735,12 +740,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                           type="button"
                           onClick={() => setAddingPackage(true)}
                           disabled={loadingPackages}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border-2 border-dashed border-emerald-300 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border-2 border-dashed border-primary/30 text-primary hover:bg-primary/5 disabled:opacity-50"
                         >
                           <Plus className="w-4 h-4" />
                           Add Package
                         </button>
                       ) : (
+                        // Kept a real native <select> (not the Base UI Select
+                        // primitive) - this dialog's own component test drives
+                        // it with RTL's user.selectOptions and
+                        // getByLabelText('Add package'), which needs a genuine
+                        // <select>/<option> DOM tree.
                         <select
                           aria-label="Add package"
                           autoFocus
@@ -748,14 +758,14 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                           onChange={(e) => handleAddPackage(e.target.value)}
                           onBlur={() => setAddingPackage(false)}
                           disabled={loadingPackages}
-                          className="px-3 py-2 bg-white border-2 border-emerald-300 rounded-xl text-sm focus:outline-none focus:border-emerald-500"
+                          className="h-8 px-3 bg-transparent border-2 border-primary/30 rounded-xl text-sm focus:outline-none focus-visible:border-primary"
                         >
                           <option value="">{loadingPackages ? 'Loading packages...' : 'Select a package…'}</option>
-                          {!selections.some(s => s.isManual) && (
+                          {!selections.some((s) => s.isManual) && (
                             <option value={MANUAL_ITINERARY_VALUE}>Manual Itinerary (No Package)</option>
                           )}
                           {packages
-                            .filter((pkg) => !selections.some(s => s.packageId === (pkg._id || pkg.id)))
+                            .filter((pkg) => !selections.some((s) => s.packageId === (pkg._id || pkg.id)))
                             .map((pkg) => {
                               const optionId = pkg._id || pkg.id;
                               const label = pkg.title || pkg.name || 'Unnamed Package';
@@ -767,44 +777,45 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                       )}
                     </div>
                     {selections.length === 0 && (
-                      <p className="text-xs text-gray-400 mt-2">No packages attached yet — add one to start building an itinerary and quotation.</p>
+                      <p className="text-xs text-muted-foreground mt-2">No packages attached yet — add one to start building an itinerary and quotation.</p>
                     )}
                   </div>
                 </div>
 
                 {/* Itinerary editor for the active tab — collapsed so the dialog stays clean */}
                 {activeSelection && (
-                  <div className="mt-4 bg-white rounded-2xl border border-emerald-200 overflow-hidden">
+                  <div className="mt-4 bg-card rounded-2xl border border-border overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => setShowItineraryEditor(v => !v)}
-                      className="w-full flex items-center justify-between p-4 hover:bg-emerald-50/50 transition-colors"
+                      onClick={() => setShowItineraryEditor((v) => !v)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
                     >
-                      <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                        <Calendar className="w-4 h-4 text-emerald-600" />
+                      <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Calendar className="w-4 h-4 text-primary" />
                         Itinerary Editor — {activeSelection.isManual ? 'Manual Itinerary' : (activeSelection.packageName || 'Package')}
-                        <span className="text-xs font-normal text-gray-400">
+                        <span className="text-xs font-normal text-muted-foreground">
                           ({activeSelection.itineraryDays.length || 0} day{activeSelection.itineraryDays.length === 1 ? '' : 's'})
                         </span>
                       </span>
-                      {showItineraryEditor ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                      {showItineraryEditor ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                     </button>
 
                     {showItineraryEditor && (
-                      <div className="p-4 border-t border-emerald-100 space-y-3">
+                      <div className="p-4 border-t border-border space-y-3">
                         {!activeSelection.isManual && (
                           <div className="flex items-center justify-between px-1">
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted-foreground">
                               {activeSelection.isMaterialized
                                 ? 'This itinerary has been customized for this lead.'
                                 : 'Showing the original package itinerary — edit any field to customize it for this lead.'}
                             </span>
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleRefreshSelection(activeSelection)}
                               disabled={!activeSelection.isMaterialized || refreshingSelectionId === activeSelection.id}
                               title={activeSelection.isMaterialized ? 'Discard customizations and revert to the original package' : 'Nothing to refresh — this is already the original package'}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               {refreshingSelectionId === activeSelection.id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -812,14 +823,14 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                                 <RefreshCw className="w-3.5 h-3.5" />
                               )}
                               Refresh from original package
-                            </button>
+                            </Button>
                           </div>
                         )}
                         <ItineraryEditor
                           days={activeSelection.itineraryDays}
-                          onDayChange={(dayNumber, dayData) => {
+                          onDayChange={(dayNumber: number, dayData: any) => {
                             updateActiveSelection({
-                              itineraryDays: (activeSelection.itineraryDays || []).filter(Boolean).map(day =>
+                              itineraryDays: (activeSelection.itineraryDays || []).filter(Boolean).map((day: any) =>
                                 day.dayNumber === dayNumber ? { ...day, ...dayData } : day
                               ),
                             });
@@ -828,9 +839,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                             const newDayNumber = activeSelection.itineraryDays.length + 1;
                             updateActiveSelection({ itineraryDays: [...activeSelection.itineraryDays, createDefaultDay(newDayNumber)] });
                           }}
-                          onRemoveDay={(dayNumber) => {
-                            const filteredDays = activeSelection.itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                            const renumberedDays = filteredDays.map((day, index) => ({ ...day, dayNumber: index + 1 }));
+                          onRemoveDay={(dayNumber: number) => {
+                            const filteredDays = activeSelection.itineraryDays.filter((day: any) => day.dayNumber !== dayNumber);
+                            const renumberedDays = filteredDays.map((day: any, index: number) => ({ ...day, dayNumber: index + 1 }));
                             updateActiveSelection({ itineraryDays: renumberedDays });
                           }}
                           destination={formData.destination}
@@ -853,48 +864,45 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
               title="Remarks & Notes"
               subtitle="Add comments about this lead"
               section="remarks"
-              gradient="from-amber-500 to-orange-500"
               count={remarks.length}
             />
 
             {expandedSections.remarks && (
-              <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-4">
+              <div className="p-4 bg-muted/50 rounded-2xl border border-border space-y-4">
                 {/* Add New Remark Button */}
                 {!showAddRemark && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddRemark(true)}
-                    className="w-full px-4 py-3 border-2 border-dashed border-amber-300 text-amber-700 rounded-xl hover:bg-amber-100 hover:border-amber-400 transition-colors flex items-center justify-center gap-2 font-medium"
-                  >
+                  <Button type="button" variant="outline" onClick={() => setShowAddRemark(true)} className="w-full">
                     <Plus className="w-4 h-4" />
                     Add New Remark
-                  </button>
+                  </Button>
                 )}
 
                 {/* Add Remark Form */}
                 {showAddRemark && (
-                  <div className="p-4 bg-white rounded-xl border-2 border-amber-200 shadow-sm">
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">New Remark</label>
-                    <textarea
+                  <div className="p-4 bg-card rounded-xl border-2 border-primary/20 shadow-sm">
+                    <label className="block text-sm font-semibold text-foreground mb-3">New Remark</label>
+                    <Textarea
                       value={newRemarkText}
                       onChange={(e) => setNewRemarkText(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 resize-none mb-3 transition-all"
+                      className="resize-none mb-3"
                       rows={3}
                       placeholder="Enter your remark here..."
                     />
                     <div className="flex justify-end gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
+                        size="sm"
                         onClick={() => {
                           setShowAddRemark(false);
                           setNewRemarkText('');
                         }}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
                       >
                         Cancel
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        size="sm"
                         onClick={() => {
                           if (!newRemarkText.trim()) {
                             toast.error('Remark text cannot be empty');
@@ -910,11 +918,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                           setShowAddRemark(false);
                           toast.success('Remark added');
                         }}
-                        className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all flex items-center gap-2"
                       >
                         <Check className="w-4 h-4" />
                         Add Remark
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -923,28 +930,30 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                 <div className="space-y-3">
                   {remarks.length > 0 ? (
                     remarks.map((remark, index) => (
-                      <div key={index} className="p-4 bg-white rounded-xl border border-gray-200 hover:border-amber-300 hover:shadow-md transition-all group">
+                      <div key={index} className="p-4 bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-[var(--shadow-card)] transition-all group">
                         {editingRemarkIndex === index ? (
                           <div className="space-y-3">
-                            <textarea
+                            <Textarea
                               value={editRemarkText}
                               onChange={(e) => setEditRemarkText(e.target.value)}
-                              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 resize-none transition-all"
+                              className="resize-none"
                               rows={3}
                             />
                             <div className="flex items-center justify-end gap-2">
-                              <button
+                              <Button
                                 type="button"
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => {
                                   setEditingRemarkIndex(null);
                                   setEditRemarkText('');
                                 }}
-                                className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all"
                               >
                                 Cancel
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 type="button"
+                                size="sm"
                                 onClick={() => {
                                   if (!editRemarkText.trim()) {
                                     toast.error('Remark text cannot be empty');
@@ -964,17 +973,16 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                                   setEditRemarkText('');
                                   toast.success('Remark updated');
                                 }}
-                                className="px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all flex items-center gap-1.5"
                               >
                                 <Save className="w-4 h-4" />
                                 Save
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         ) : (
                           <>
                             <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm text-gray-800 flex-1">{remark.text}</p>
+                              <p className="text-sm text-foreground flex-1">{remark.text}</p>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                   type="button"
@@ -982,10 +990,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                                     setEditingRemarkIndex(index);
                                     setEditRemarkText(remark.text || '');
                                   }}
-                                  className="p-1.5 hover:bg-amber-100 rounded-lg transition-colors"
+                                  className="p-1.5 hover:bg-primary/10 rounded-lg transition-colors"
                                   title="Edit"
                                 >
-                                  <Edit className="w-4 h-4 text-amber-600" />
+                                  <Edit className="w-4 h-4 text-primary" />
                                 </button>
                                 <button
                                   type="button"
@@ -994,14 +1002,14 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                                     setRemarks(updatedRemarks);
                                     toast.success('Remark deleted');
                                   }}
-                                  className="p-1.5 hover:bg-red-100 rounded-lg transition-colors"
+                                  className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
                                   title="Delete"
                                 >
-                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                  <Trash2 className="w-4 h-4 text-destructive" />
                                 </button>
                               </div>
                             </div>
-                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
+                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
                               <span>
                                 {remark.date ? new Date(remark.date).toLocaleDateString('en-US', {
                                   year: 'numeric',
@@ -1016,10 +1024,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-gray-500 bg-white rounded-xl border-2 border-dashed border-gray-200">
-                      <MessageSquare className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                    <div className="text-center py-8 text-muted-foreground bg-card rounded-xl border-2 border-dashed border-border">
+                      <MessageSquare className="w-10 h-10 mx-auto mb-2 text-muted-foreground/40" />
                       <p className="text-sm font-medium">No remarks yet</p>
-                      <p className="text-xs mt-1 text-gray-400">Add your first note</p>
+                      <p className="text-xs mt-1 text-muted-foreground">Add your first note</p>
                     </div>
                   )}
                 </div>
@@ -1030,22 +1038,23 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
           {/* Lifecycle Status, Flight Bookings, then Pricing — existing leads only */}
           {(lead?._id || lead?.id) && (
             <div className="space-y-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-card rounded-xl border border-border p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-700">Lifecycle Status</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Lifecycle Status</h3>
                   <LeadStatusBadge status={lead.lifecycleStatus} />
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     // Trigger the parent's status change dialog
                     const event = new CustomEvent('open-status-change', { detail: lead });
                     window.dispatchEvent(event);
                   }}
-                  className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
                 >
                   Change Status
-                </button>
+                </Button>
               </div>
 
               {activeSelection ? (
@@ -1056,33 +1065,33 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                     leadStatus={lead.lifecycleStatus}
                     itineraryDays={activeSelection.itineraryDays}
                     travelDate={formData.travelDate}
-                    onUpdateDay={(dayNumber, updates) => {
+                    onUpdateDay={(dayNumber: number, updates: any) => {
                       updateActiveSelection({
-                        itineraryDays: (activeSelection.itineraryDays || []).filter(Boolean).map(day =>
+                        itineraryDays: (activeSelection.itineraryDays || []).filter(Boolean).map((day: any) =>
                           day.dayNumber === dayNumber ? { ...day, ...updates } : day
                         ),
                       });
                     }}
-                    onFlightsChanged={() => setPricingRefreshToken(t => t + 1)}
+                    onFlightsChanged={() => setPricingRefreshToken((t) => t + 1)}
                   />
 
-                  <div className="bg-white rounded-xl border border-gray-200 p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  <div className="bg-card rounded-xl border border-border p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-3">
                       Pricing — {activeSelection.isManual ? 'Manual Itinerary' : (activeSelection.packageName || 'Package')}
                     </h3>
                     <PricingSection
                       leadId={lead._id || lead.id}
                       selectionId={activeSelection.id}
                       days={reconcileDays(activeSelection.itineraryDays)}
-                      travelers={formData.numberOfTravelers || 1}
+                      travelers={Number(formData.numberOfTravelers) || 1}
                       pricing={activeSelection.pricingSettings}
                       refreshToken={pricingRefreshToken}
-                      onSettingsChange={(settings) => updateActiveSelection({ pricingSettings: settings })}
+                      onSettingsChange={(settings: any) => updateActiveSelection({ pricingSettings: settings })}
                     />
                   </div>
                 </>
               ) : (
-                <div className="text-center py-6 text-gray-400 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                <div className="text-center py-6 text-muted-foreground bg-card rounded-xl border-2 border-dashed border-border">
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">Add a package above to manage its itinerary and pricing</p>
                 </div>
@@ -1092,20 +1101,11 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
         </div>
 
         {/* Footer Actions */}
-        <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
-          <button
-            onClick={handleCancel}
-            className="flex-1 px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold"
-            type="button"
-          >
+        <div className="px-4 sm:px-6 py-4 bg-muted border-t border-border flex gap-3 shrink-0">
+          <Button type="button" variant="outline" onClick={handleCancel} className="flex-1">
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSubmitting}
-            className="flex-1 px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
-            type="button"
-          >
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={isSubmitting} className="flex-1">
             {isSubmitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -1117,7 +1117,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                 Save Changes
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
