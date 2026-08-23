@@ -3,12 +3,6 @@
  * Centralized export of all components
  */
 
-// Layout Components
-export { default as PageHeader } from './PageHeader';
-export { default as SearchBar } from './SearchBar';
-export { default as PackageStats } from './PackageStats';
-export { default as PackagesGrid } from './PackagesGrid';
-
 // Card Components
 export { default as PackageCard } from './PackageCard';
 
