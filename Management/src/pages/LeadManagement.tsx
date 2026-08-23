@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   RefreshCw,
@@ -6,11 +6,6 @@ import {
   Loader2,
   AlertCircle,
   Users,
-  TrendingUp,
-  UserCheck,
-  UserX,
-  ChevronLeft,
-  ChevronRight,
   LayoutGrid,
   List,
 } from "lucide-react";
@@ -34,20 +29,25 @@ import VoucherDialog from "../features/lead-management/components/VoucherDialog"
 import LeadSectionView from "../features/lead-management/components/LeadSectionView";
 import ActiveSalesRepsDialog from "../features/lead-management/components/ActiveSalesRepsDialog";
 import { LIFECYCLE_STATUS_COLORS, LIFECYCLE_STATUS_LABELS } from "../features/lead-management/components/LeadStatusBadge";
+import type { LifecycleStatus } from "../features/lead-management/components/LeadStatusBadge";
+
+type FilterKey = 'all' | LifecycleStatus;
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Lifecycle status maps (10 states) plus old-status fallbacks
-const statusColors = {
+const statusColors: Record<string, string> = {
   ...LIFECYCLE_STATUS_COLORS,
-  new: "bg-blue-100 text-blue-700",
-  contacted: "bg-amber-100 text-amber-700",
-  interested: "bg-purple-100 text-purple-700",
-  quoted: "bg-cyan-100 text-cyan-700",
-  converted: "bg-emerald-100 text-emerald-700",
-  lost: "bg-red-100 text-red-700",
-  not_interested: "bg-gray-100 text-gray-600",
+  new: "bg-primary/10 text-primary",
+  contacted: "bg-warning/10 text-warning",
+  interested: "bg-primary/10 text-primary",
+  quoted: "bg-primary/10 text-primary",
+  converted: "bg-success/10 text-success",
+  lost: "bg-destructive/10 text-destructive",
+  not_interested: "bg-muted text-muted-foreground",
 };
 
-const statusLabels = {
+const statusLabels: Record<string, string> = {
   ...LIFECYCLE_STATUS_LABELS,
   new: "New",
   contacted: "Contacted",
@@ -59,22 +59,22 @@ const statusLabels = {
 };
 
 const LeadManagement = () => {
-  const [leads, setLeads] = useState([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [totalLeads, setTotalLeads] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
+  const [error, setError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterStatus, setFilterStatus] = useState<FilterKey>("all");
   const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
-  const [filterPlatforms, setFilterPlatforms] = useState([]);
-  
-  const [statsSummary, setStatsSummary] = useState(null);
-  const [statusCounts, setStatusCounts] = useState({ all: 0 });
-  
+  const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
+
+  const [statsSummary, setStatsSummary] = useState<any>(null);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ all: 0 });
+
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showRemarksDialog, setShowRemarksDialog] = useState(false);
@@ -85,32 +85,36 @@ const LeadManagement = () => {
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   // Each billing document dialog owns its own lead so opening one for a
   // different lead can never leak into a dialog that's already open.
-  const [quotationLead, setQuotationLead] = useState(null);
-  const [invoiceLead, setInvoiceLead] = useState(null);
-  const [receiptLead, setReceiptLead] = useState(null);
-  const [voucherLead, setVoucherLead] = useState(null);
+  const [quotationLead, setQuotationLead] = useState<any>(null);
+  const [invoiceLead, setInvoiceLead] = useState<any>(null);
+  const [receiptLead, setReceiptLead] = useState<any>(null);
+  const [voucherLead, setVoucherLead] = useState<any>(null);
 
-  const [selectedLead, setSelectedLead] = useState(null);
-  const [statusLead, setStatusLead] = useState(null);
-  const [sectionLead, setSectionLead] = useState(null);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [statusLead, setStatusLead] = useState<any>(null);
+  const [sectionLead, setSectionLead] = useState<any>(null);
   // When set, the lead editor was opened from the quotation flow and we return
   // to the quotation modal once the editor closes.
-  const [resumeQuoteLead, setResumeQuoteLead] = useState(null);
-  const [resumeQuoteSelectionId, setResumeQuoteSelectionId] = useState(null);
+  const [resumeQuoteLead, setResumeQuoteLead] = useState<any>(null);
+  const [resumeQuoteSelectionId, setResumeQuoteSelectionId] = useState<string | null>(null);
   // Same hand-off, for the voucher flow's "Manage flights & itinerary" backlink.
-  const [resumeVoucherLead, setResumeVoucherLead] = useState(null);
-  const [resumeVoucherSelectionId, setResumeVoucherSelectionId] = useState(null);
+  const [resumeVoucherLead, setResumeVoucherLead] = useState<any>(null);
+  const [resumeVoucherSelectionId, setResumeVoucherSelectionId] = useState<string | null>(null);
   // Which package tab to open the lead editor/quotation modal on, carried
   // across the quotation <-> lead-editor hand-off so edits land on the same
   // package the user was viewing instead of defaulting to the first one.
-  const [editorInitialSelectionId, setEditorInitialSelectionId] = useState(null);
-  const [quotationInitialSelectionId, setQuotationInitialSelectionId] = useState(null);
-  const [voucherInitialSelectionId, setVoucherInitialSelectionId] = useState(null);
+  const [editorInitialSelectionId, setEditorInitialSelectionId] = useState<string | null>(null);
+  const [quotationInitialSelectionId, setQuotationInitialSelectionId] = useState<string | null>(null);
+  const [voucherInitialSelectionId, setVoucherInitialSelectionId] = useState<string | null>(null);
   const [showSectionView, setShowSectionView] = useState(false);
-  
+
   const [currentPage, setCurrentPage] = useState(1);
-  const [salesReps, setSalesReps] = useState([]);
-  const [assignmentSettings, setAssignmentSettings] = useState({
+  const [salesReps, setSalesReps] = useState<any[]>([]);
+  const [assignmentSettings, setAssignmentSettings] = useState<{
+    mode: 'auto' | 'manual';
+    strategy: 'round-robin' | 'load-based';
+    requireActiveLogin: boolean;
+  }>({
     mode: "manual",
     strategy: "round-robin",
     requireActiveLogin: false,
@@ -118,11 +122,11 @@ const LeadManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const highlightedLeadId = searchParams.get("leadId");
-  
+
   const currentUser = authAPI.getStoredUser();
   const canDelete = currentUser?.role === 'admin' || currentUser?.role === 'super-admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin';
 
-  const handleDeleteLead = async (leadId) => {
+  const handleDeleteLead = async (leadId: string) => {
     try {
       const response = await leadAPI.deleteLead(leadId);
       if (response.success) {
@@ -132,13 +136,13 @@ const LeadManagement = () => {
       } else {
         toast.error(response.message || "Failed to delete lead");
       }
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.message || "Error deleting lead");
     }
   };
-  
+
   // Mobile responsive view mode auto-detection
-  const [viewMode, setViewMode] = useState(window.innerWidth < 1024 ? 'grid' : 'table');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(window.innerWidth < 1024 ? 'grid' : 'table');
 
   const leadsPerPage = 12;
 
@@ -179,8 +183,8 @@ const LeadManagement = () => {
       const response = await leadAPI.getLeadStats();
       if (response.success) {
         setStatsSummary(response.summary || null);
-        const transformedCounts = { all: response.summary?.total || 0 };
-        (response.data || []).forEach(item => {
+        const transformedCounts: Record<string, number> = { all: response.summary?.total || 0 };
+        (response.data || []).forEach((item: any) => {
           transformedCounts[item._id] = item.count;
         });
         setStatusCounts(transformedCounts);
@@ -194,17 +198,17 @@ const LeadManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      const params = {
+      const params: Record<string, any> = {
         limit: leadsPerPage,
         page: currentPage,
       };
-      
+
       if (debouncedSearch) params.query = debouncedSearch; // The backend uses ?query= for search
       if (filterStatus !== "all") params.status = filterStatus;
       if (filterTravelDateStart) params['travelDate[gte]'] = filterTravelDateStart;
       if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
       if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
-      
+
       // Note: backend search uses leadAPI.searchLeads for query, but standard filters for standard endpoint.
       // If there is a search term, use the search endpoint, else standard endpoint.
       let response;
@@ -218,7 +222,7 @@ const LeadManagement = () => {
       if (response.success) {
         const leadsData = Array.isArray(response.data) ? response.data : response.data?.leads || [];
         setLeads(leadsData);
-        
+
         // Handle pagination metadata from server
         if (response.pagination) {
           setTotalPages(response.pagination.pages || 1);
@@ -231,7 +235,7 @@ const LeadManagement = () => {
       } else {
         setLeads([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message || "Failed to fetch leads");
       console.error("Error fetching leads:", err);
     } finally {
@@ -240,14 +244,13 @@ const LeadManagement = () => {
   };
 
   const fetchSalesReps = async () => {
-    // ... existing logic ...
     try {
       const response = await adminAPI.getSalesReps();
       if (response.success || response.status === 'success') {
         const repsData = Array.isArray(response.data)
           ? response.data
           : (response.data?.users || []);
-        const formattedReps = repsData.map((rep) => ({
+        const formattedReps = repsData.map((rep: any) => ({
           id: rep._id || rep.id,
           _id: rep._id || rep.id,
           name: rep.name || rep.fullName || "Unknown",
@@ -257,25 +260,24 @@ const LeadManagement = () => {
         }));
         setSalesReps(formattedReps);
       }
-    } catch (err) {}
+    } catch (err) { /* non-fatal - sales rep list stays empty */ }
   };
 
   const fetchAssignmentSettings = async () => {
-    // ... existing logic ...
     try {
       const response = await leadAPI.getAssignmentSettings();
       if (response.success && response.data) {
         const data = response.data;
         setAssignmentSettings({
-          mode: data.assignmentMode || "manual",
+          mode: data.assignmentMode === 'auto' ? 'auto' : 'manual',
           strategy: data.autoStrategy === 'load_based' ? 'load-based' : 'round-robin',
           requireActiveLogin: data.requireActiveLogin48h || false,
         });
       }
-    } catch (err) {}
+    } catch (err) { /* non-fatal - assignment settings stay at their default */ }
   };
 
-  const goToPage = (page) => {
+  const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -310,7 +312,7 @@ const LeadManagement = () => {
 
   // Hand off from the quotation modal to the lead editor, remembering to return
   // to the quotation flow once editing is done.
-  const openLeadEditorFromQuote = (lead, selectionId) => {
+  const openLeadEditorFromQuote = (lead: any, selectionId?: string | null) => {
     setQuotationLead(null);
     setResumeQuoteLead(lead);
     setResumeQuoteSelectionId(selectionId ?? null);
@@ -319,7 +321,7 @@ const LeadManagement = () => {
     setShowEditDialog(true);
   };
 
-  const openLeadEditorFromVoucher = (lead, selectionId) => {
+  const openLeadEditorFromVoucher = (lead: any, selectionId?: string | null) => {
     setVoucherLead(null);
     setResumeVoucherLead(lead);
     setResumeVoucherSelectionId(selectionId ?? null);
@@ -345,16 +347,16 @@ const LeadManagement = () => {
     }
   };
 
-  const handleStatusChange = async (lead, newStatus, reason) => {
+  const handleStatusChange = async (lead: any, newStatus: string, reason?: string) => {
     try {
       const leadId = lead._id || lead.id;
-      const payload = { lifecycleStatus: newStatus };
+      const payload: Record<string, any> = { lifecycleStatus: newStatus };
       if (reason) payload.lostReason = reason;
       await leadAPI.updateLead(leadId, payload);
       toast.success("Status updated successfully");
       fetchLeads();
       fetchLeadStats();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.message || "Failed to update status");
     }
     setShowStatusDialog(false);
@@ -362,58 +364,42 @@ const LeadManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-card border-b border-border">
         <div className="px-4 sm:px-6 py-4 sm:py-5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
             <div className="pl-10 md:pl-0">
-              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Lead Management</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Lead Management</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                 Track and manage your leads efficiently
               </p>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                  title="Table View"
-                >
-                  <List className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-                  title="Grid View"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-              </div>
-              <button
-                onClick={fetchLeads}
-                disabled={loading}
-                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+              <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'table' | 'grid')}>
+                <TabsList>
+                  <TabsTrigger value="table" aria-label="Table view">
+                    <List className="w-4 h-4" />
+                  </TabsTrigger>
+                  <TabsTrigger value="grid" aria-label="Grid view">
+                    <LayoutGrid className="w-4 h-4" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Button onClick={fetchLeads} disabled={loading} variant="outline">
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
-              </button>
-              <button
-                onClick={() => setShowSettingsDialog(true)}
-                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
+              </Button>
+              <Button onClick={() => setShowSettingsDialog(true)} variant="outline">
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">{assignmentSettings.mode === "auto"
                   ? `Auto: ${assignmentSettings.strategy}`
                   : "Manual"}</span>
-              </button>
-              <button
-                onClick={() => setShowNewDialog(true)}
-                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
+              </Button>
+              <Button onClick={() => setShowNewDialog(true)}>
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">New Lead</span>
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -446,31 +432,31 @@ const LeadManagement = () => {
             error={error}
             statusColors={statusColors}
             statusLabels={statusLabels}
-            onLeadClick={(lead) => {
+            onLeadClick={(lead: any) => {
               setSelectedLead(lead);
               setShowEditDialog(true);
             }}
-            onRemarksClick={(lead) => {
+            onRemarksClick={(lead: any) => {
               setSelectedLead(lead);
               setShowRemarksDialog(true);
             }}
-            onWhatsappClick={(lead) => {
+            onWhatsappClick={(lead: any) => {
               setSelectedLead(lead);
               setShowWhatsappDialog(true);
             }}
-            onEditClick={(lead) => {
+            onEditClick={(lead: any) => {
               setSelectedLead(lead);
               setShowEditDialog(true);
             }}
-            onStatusClick={(lead) => {
+            onStatusClick={(lead: any) => {
               setStatusLead(lead);
               setShowStatusDialog(true);
             }}
-            onQuotationClick={(lead) => setQuotationLead(lead)}
-            onInvoiceClick={(lead) => setInvoiceLead(lead)}
-            onReceiptClick={(lead) => setReceiptLead(lead)}
-            onVoucherClick={(lead) => setVoucherLead(lead)}
-            onSectionClick={(lead) => {
+            onQuotationClick={(lead: any) => setQuotationLead(lead)}
+            onInvoiceClick={(lead: any) => setInvoiceLead(lead)}
+            onReceiptClick={(lead: any) => setReceiptLead(lead)}
+            onVoucherClick={(lead: any) => setVoucherLead(lead)}
+            onSectionClick={(lead: any) => {
               setSectionLead(lead);
               setShowSectionView(true);
             }}
@@ -486,42 +472,36 @@ const LeadManagement = () => {
         )}
 
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200">
-            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-            <p className="mt-3 text-gray-600">Loading leads...</p>
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="mt-3 text-muted-foreground">Loading leads...</p>
           </div>
         )}
 
         {error && !loading && (
-          <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-red-200">
-            <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
-            <p className="text-red-600 font-medium">{error}</p>
-            <button
-              onClick={fetchLeads}
-              className="mt-4 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-            >
+          <div className="flex flex-col items-center justify-center py-16 bg-card rounded-xl border border-destructive/30">
+            <AlertCircle className="w-12 h-12 text-destructive mb-3" />
+            <p className="text-destructive font-medium">{error}</p>
+            <Button onClick={fetchLeads} variant="destructive" className="mt-4">
               Try Again
-            </button>
+            </Button>
           </div>
         )}
 
         {!loading && !error && leads.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200">
-            <Users className="w-12 h-12 text-gray-300 mb-4" />
-            <p className="text-gray-500 font-medium">No leads found</p>
-            <p className="text-gray-400 text-sm mt-1">
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
+            <Users className="w-12 h-12 text-muted-foreground/40 mb-4" />
+            <p className="text-muted-foreground font-medium">No leads found</p>
+            <p className="text-muted-foreground/70 text-sm mt-1">
               {searchTerm || filterStatus !== "all"
                 ? "Try adjusting your filters"
                 : "Create your first lead to get started"}
             </p>
             {!searchTerm && filterStatus === "all" && (
-              <button
-                onClick={() => setShowNewDialog(true)}
-                className="mt-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                <Plus className="w-4 h-4 inline mr-2" />
+              <Button onClick={() => setShowNewDialog(true)} className="mt-4">
+                <Plus className="w-4 h-4" />
                 Create Lead
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -532,7 +512,6 @@ const LeadManagement = () => {
         isOpen={showNewDialog}
         onClose={() => setShowNewDialog(false)}
         salesReps={salesReps}
-        assignmentSettings={assignmentSettings}
         onSuccess={handleLeadSuccess}
       />
 
