@@ -16,14 +16,14 @@ test.describe('Login', () => {
     await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
   });
 
-  test('logs in a salesRep-tier user and sees Lead Management', async ({ page }) => {
+  test('logs in a salesRep-tier user and sees Leads', async ({ page }) => {
     await page.goto('/login');
     await page.getByLabel('Email Address').fill(SEED_USERS.salesRep.email);
     await page.getByLabel('Password').fill(SEED_USERS.salesRep.password);
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL('/');
-    await expect(page.getByRole('button', { name: 'Lead Management' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Leads' })).toBeVisible();
   });
 
   test('shows an error and stays on /login for invalid credentials', async ({ page }) => {
