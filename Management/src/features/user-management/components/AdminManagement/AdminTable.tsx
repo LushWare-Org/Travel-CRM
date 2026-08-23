@@ -1,4 +1,4 @@
-import { Edit, Trash, Mail, RotateCcw, CheckCircle, Clock, Crown } from 'lucide-react';
+import { Eye, Edit, Trash, Mail, RotateCcw, CheckCircle, Clock, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '../../utils/helpers';
@@ -8,12 +8,12 @@ export interface AdminTableProps {
   admins: Admin[];
   onEdit: (admin: Admin) => void;
   onDelete: (admin: Admin) => void;
-  onSelectAdmin: (admin: Admin) => void;
+  onView: (admin: Admin) => void;
   onResendInvite: (admin: Admin) => void;
   onForcePasswordReset: (admin: Admin) => void;
 }
 
-const AdminTable = ({ admins, onEdit, onDelete, onResendInvite, onForcePasswordReset }: AdminTableProps) => {
+const AdminTable = ({ admins, onEdit, onDelete, onView, onResendInvite, onForcePasswordReset }: AdminTableProps) => {
   const getStatusBadge = (admin: Admin) => {
     if (admin.status === 'invited') {
       return (
@@ -111,9 +111,14 @@ const AdminTable = ({ admins, onEdit, onDelete, onResendInvite, onForcePasswordR
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-1">
                     {admin.isSuperAdmin ? (
-                      <span className="rounded bg-chart-3/10 px-2 py-1 text-xs font-semibold text-chart-3">
-                        Protected Account
-                      </span>
+                      <>
+                        <span className="rounded bg-chart-3/10 px-2 py-1 text-xs font-semibold text-chart-3">
+                          Protected Account
+                        </span>
+                        <Button variant="ghost" size="icon-sm" title="View Details" onClick={() => onView(admin)}>
+                          <Eye className="size-4" />
+                        </Button>
+                      </>
                     ) : (
                       <>
                         {admin.status === 'invited' && (
@@ -126,6 +131,9 @@ const AdminTable = ({ admins, onEdit, onDelete, onResendInvite, onForcePasswordR
                             <RotateCcw className="size-4" />
                           </Button>
                         )}
+                        <Button variant="ghost" size="icon-sm" title="View Details" onClick={() => onView(admin)}>
+                          <Eye className="size-4" />
+                        </Button>
                         <Button variant="ghost" size="icon-sm" title="Edit Admin" onClick={() => onEdit(admin)}>
                           <Edit className="size-4" />
                         </Button>

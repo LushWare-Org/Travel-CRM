@@ -15,6 +15,7 @@ import { ADMIN_PERMISSIONS_LIST } from '../../utils/constants';
 import { filterUsers, paginateArray } from '../../utils/helpers';
 import { formatPhoneToE164, COUNTRIES, parseE164 } from '../../utils/phoneUtils';
 import AdminTable from './AdminTable';
+import AdminDetailsModal from './AdminDetailsModal';
 import adminService from '../../../../services/admin.service';
 import { usePermission } from '../../../../contexts/PermissionContext';
 import { getPermissionDeniedMessage } from '../../utils/permissionUtils';
@@ -75,6 +76,7 @@ const AdminManagement = () => {
   const [showInviteResendConfirm, setShowInviteResendConfirm] = useState(false);
   const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
+  const [viewingAdmin, setViewingAdmin] = useState<Admin | null>(null);
   const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null);
   const [adminToResendInvite, setAdminToResendInvite] = useState<Admin | null>(null);
   const [adminToResetPassword, setAdminToResetPassword] = useState<Admin | null>(null);
@@ -614,7 +616,7 @@ const AdminManagement = () => {
                 admins={paginatedData.data}
                 onEdit={openEditDialog}
                 onDelete={handleDeleteAdmin}
-                onSelectAdmin={setSelectedAdmin}
+                onView={setViewingAdmin}
                 onResendInvite={handleResendInvitation}
                 onForcePasswordReset={handleForcePasswordReset}
               />
@@ -872,6 +874,14 @@ const AdminManagement = () => {
         confirmLabel="Send Reset Email"
         cancelLabel="Cancel"
         isLoading={isSubmitting}
+      />
+
+      {/* Admin Details (read-only, primarily for Super Admin rows which can't be edited/deleted) */}
+      <AdminDetailsModal
+        admin={viewingAdmin}
+        isOpen={!!viewingAdmin}
+        onClose={() => setViewingAdmin(null)}
+        isSuperAdmin={viewingAdmin?.isSuperAdmin}
       />
     </div>
   );
