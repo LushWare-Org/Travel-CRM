@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth.fixture.js';
 
 // Only asserting role-gated nav items here (allowedRoles / customCheck by
-// role), not permission-gated ones (Billing, User Management, Packages-for-
+// role), not permission-gated ones (Billing, Users, Packages-for-
 // admin) — those depend on seeded permission grants that can drift
 // independently of role and would make this spec flaky for the wrong reason.
 test.describe('Role-based navigation', () => {
@@ -10,15 +10,15 @@ test.describe('Role-based navigation', () => {
     await expect(superAdminPage.getByRole('button', { name: 'Lead Management' })).toHaveCount(0);
   });
 
-  test('admin sees Organization Settings but not Lead Management or Career', async ({ adminPage }) => {
-    await expect(adminPage.getByRole('button', { name: 'Organization Settings' })).toBeVisible();
+  test('admin sees Settings but not Lead Management or Career', async ({ adminPage }) => {
+    await expect(adminPage.getByRole('button', { name: 'Settings' })).toBeVisible();
     await expect(adminPage.getByRole('button', { name: 'Lead Management' })).toHaveCount(0);
     await expect(adminPage.getByRole('button', { name: 'Career' })).toHaveCount(0);
   });
 
-  test('salesRep sees Lead Management but not Organization Settings or Career', async ({ salesRepPage }) => {
+  test('salesRep sees Lead Management but not Settings or Career', async ({ salesRepPage }) => {
     await expect(salesRepPage.getByRole('button', { name: 'Lead Management' })).toBeVisible();
-    await expect(salesRepPage.getByRole('button', { name: 'Organization Settings' })).toHaveCount(0);
+    await expect(salesRepPage.getByRole('button', { name: 'Settings' })).toHaveCount(0);
     await expect(salesRepPage.getByRole('button', { name: 'Career' })).toHaveCount(0);
   });
 });

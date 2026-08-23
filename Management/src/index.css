@@ -93,6 +93,16 @@
   }
 }
 
+/* Briefly smooths the light/dark swap when the user changes theme; toggled
+   on/off around the swap by ThemeContext so it never affects hover/focus
+   transitions elsewhere. */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-transitioning,
+  .theme-transitioning * {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease !important;
+  }
+}
+
 body {
   margin: 0;
 }

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Menu, X, Home, Users, MapPin, DollarSign, User, LogOut,
-  BarChart3, Briefcase, ChevronRight, ChevronLeft, Sparkles, Plane, Hotel, Settings
+  BarChart3, Briefcase, ChevronRight, PanelLeftClose, PanelLeftOpen, Sparkles, Plane, Hotel, Settings
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
@@ -12,6 +12,7 @@ import { getSidebarInfo } from "../config/branding";
 import { adminAPI } from "../services/api";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import AppearanceToggle from "../components/AppearanceToggle";
 
 // Initials for the sidebar icon when no explicit short name is configured —
 // first letter of the first two words (e.g. "Lush Travel" -> "LT"), or the
@@ -49,7 +50,11 @@ const Sidebar = () => {
   const location = useLocation();
   const { logout, user } = useAuth();
   const permission = usePermission();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem("management-sidebar-open");
+    return stored === null ? true : stored === "true";
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
@@ -90,6 +95,8 @@ const Sidebar = () => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
+      // Raw setter — must not go through toggleSidebar, which would
+      // overwrite the desktop-persisted preference in localStorage.
       if (mobile) setSidebarOpen(false);
     };
     checkMobile();
@@ -101,6 +108,28 @@ const Sidebar = () => {
   useEffect(() => {
     if (isMobile) setMobileOpen(false);
   }, [location.pathname, isMobile]);
+
+  // Persists the collapsed/expanded choice so it survives reloads.
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("management-sidebar-open", String(next));
+      return next;
+    });
+  }, []);
+
+  // Ctrl/Cmd+B toggles the sidebar, matching VS Code/Linear convention.
+  useEffect(() => {
+    if (isMobile) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isMobile, toggleSidebar]);
 
   // Update time every minute
   useEffect(() => {
@@ -127,7 +156,7 @@ const Sidebar = () => {
     { icon: Plane, label: "Flights", path: "/flights", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
     { icon: Hotel, label: "Hotels", path: "/hotels", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
     { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
-    { icon: User, label: "User Management", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] },
+    { icon: User, label: "Users", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] },
     {
       icon: Briefcase,
       label: "Career",
@@ -137,7 +166,7 @@ const Sidebar = () => {
     },
     {
       icon: Settings,
-      label: "Organization Settings",
+      label: "Settings",
       path: "/settings",
       requiredPermission: null,
       allowedRoles: ["admin", "superAdmin"],
@@ -195,7 +224,7 @@ const Sidebar = () => {
 
         {/* Header / Brand */}
         <div className="p-5 border-b border-sidebar-border relative z-10">
-          <div className="flex items-center gap-3">
+          <div className={`flex ${isExpanded ? 'flex-row items-center gap-3' : 'flex-col items-center gap-2'}`}>
             <button
               type="button"
               onClick={() => {
@@ -238,6 +267,20 @@ const Sidebar = () => {
                 <X className="w-5 h-5" />
               </button>
             )}
+            {/* Collapse/expand trigger — sits in the header row so it never
+                floats outside the sidebar's own boundary. Stacks below the
+                logo when collapsed since w-20 has no room beside it. */}
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title={sidebarOpen ? "Collapse sidebar (Ctrl+B)" : "Expand sidebar (Ctrl+B)"}
+                aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-primary transition-colors duration-150 flex-shrink-0 ${isExpanded ? 'ml-auto' : ''}`}
+              >
+                {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+              </button>
+            )}
           </div>
         </div>
 
@@ -259,7 +302,6 @@ const Sidebar = () => {
                 onClick={() => {
                   navigate(item.path);
                   if (isMobile) setMobileOpen(false);
-                  else setSidebarOpen(false);
                 }}
                 onMouseEnter={() => setHoveredItem(index)}
                 onMouseLeave={() => setHoveredItem(null)}
@@ -310,7 +352,13 @@ const Sidebar = () => {
         )}
 
         {/* Footer Actions */}
-        <div className="p-4 space-y-2 relative z-10">
+        <div className="p-4 space-y-3 relative z-10">
+          <div>
+            {isExpanded && (
+              <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 px-1">Appearance</p>
+            )}
+            <AppearanceToggle collapsed={!isExpanded} />
+          </div>
           <Button
             onClick={handleLogout}
             disabled={isLoggingOut}
@@ -323,23 +371,6 @@ const Sidebar = () => {
           </Button>
         </div>
       </div>
-
-      {/* Collapse/expand toggle — straddles the sidebar's right edge, vertically
-          centered, so it stays in the same relative spot whether expanded or
-          collapsed. Single, predictable control for this state (replaces the
-          old bottom-of-sidebar button, which became indistinguishable from
-          nav icons once collapsed). */}
-      {!isMobile && (
-        <button
-          type="button"
-          onClick={() => setSidebarOpen((prev) => !prev)}
-          title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-card border border-border shadow-card text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors duration-150"
-        >
-          {sidebarOpen ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        </button>
-      )}
     </div>
   );
 

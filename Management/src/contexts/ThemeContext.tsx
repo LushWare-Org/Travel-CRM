@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export type ThemePreference = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
 
+// Keep in sync with the no-FOUC inline script in index.html.
 const STORAGE_KEY = 'management-theme';
 
 interface ThemeContextValue {
@@ -27,7 +28,14 @@ function readStoredTheme(): ThemePreference {
 }
 
 function applyResolvedTheme(resolved: ResolvedTheme) {
+  // Briefly enable transitions on theme-affected properties so the swap reads
+  // as a shift rather than a hard cut, without adding a global transition
+  // that would also animate hover/focus states.
+  document.documentElement.classList.add('theme-transitioning');
   document.documentElement.classList.toggle('dark', resolved === 'dark');
+  window.setTimeout(() => {
+    document.documentElement.classList.remove('theme-transitioning');
+  }, 200);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
