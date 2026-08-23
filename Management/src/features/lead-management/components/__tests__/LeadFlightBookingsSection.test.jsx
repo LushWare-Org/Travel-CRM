@@ -56,7 +56,7 @@ vi.mock('../../../shared', async () => ({
   },
 }));
 
-import LeadFlightBookingsSection from '../LeadFlightBookingsSection.jsx';
+import LeadFlightBookingsSection from '../LeadFlightBookingsSection';
 
 const toStartFixture = {
   id: 'flight-to-start',
