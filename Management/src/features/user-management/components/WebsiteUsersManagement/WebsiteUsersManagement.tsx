@@ -1,17 +1,29 @@
-import React, { useState } from 'react';
-import { Edit, Trash, Users, UserCheck, UserX, AlertCircle, Globe } from 'lucide-react';
-import { 
-  UserTableHeader, 
-  Pagination, 
-  UserFormDialog, 
-  ConfirmationDialog,
-  StatsCard,
-  FormGroup 
-} from '../Common';
-import { STATUS_COLORS } from '../../utils/constants';
+import { useState } from 'react';
+import { Users, UserCheck, UserX, AlertCircle } from 'lucide-react';
+import { UserTableHeader, Pagination, UserFormDialog, ConfirmationDialog, FormGroup } from '../Common';
+import { StatCard } from '@/components/shared/StatCard';
+import { Button } from '@/components/ui/button';
 import WebsiteUsersTable from './WebsiteUsersTable';
-import useWebsiteUsers from '../../hooks/useWebsiteUsers';
+import useWebsiteUsers, { type WebsiteUser } from '../../hooks/useWebsiteUsers';
 import { validatePhone, formatPhoneToE164, getPhonePlaceholder, COUNTRIES } from '../../utils/phoneUtils';
+
+interface WebsiteUserFormData {
+  name: string;
+  email: string;
+  phone: string;
+  phoneCountry: string;
+  password: string;
+  status: string;
+}
+
+const EMPTY_FORM: WebsiteUserFormData = {
+  name: '',
+  email: '',
+  phone: '',
+  phoneCountry: 'US',
+  password: '',
+  status: 'active',
+};
 
 const WebsiteUsersManagement = () => {
   const {
@@ -19,7 +31,6 @@ const WebsiteUsersManagement = () => {
     loading,
     error,
     pagination,
-    filters,
     updateUser,
     deleteUser,
     toggleUserStatus,
@@ -32,57 +43,41 @@ const WebsiteUsersManagement = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [userToDelete, setUserToDelete] = useState(null);
+  const [selectedUser, setSelectedUser] = useState<WebsiteUser | null>(null);
+  const [userToDelete, setUserToDelete] = useState<WebsiteUser | null>(null);
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    phoneCountry: 'US', // Default to US
-    password: '',
-    status: 'active'
-  });
+  const [formData, setFormData] = useState<WebsiteUserFormData>(EMPTY_FORM);
 
   // Calculate stats from all users
   const stats = {
     total: pagination?.totalUsers || 0,
-    active: users.filter(u => u.status === 'active').length,
-    inactive: users.filter(u => u.status === 'inactive').length,
-    totalRevenue: users.reduce((sum, user) => sum + (user.totalSpent || 0), 0),
-    totalBookings: users.reduce((sum, user) => sum + (user.bookings || 0), 0),
-    avgSpent: users.length > 0 ? (users.reduce((sum, user) => sum + (user.totalSpent || 0), 0) / users.length).toFixed(2) : 0
+    active: users.filter((u) => u.status === 'active').length,
+    inactive: users.filter((u) => u.status === 'inactive').length,
+    totalRevenue: users.reduce((sum, user) => sum + ((user.totalSpent as number) || 0), 0),
+    totalBookings: users.reduce((sum, user) => sum + ((user.bookings as number) || 0), 0),
+    avgSpent:
+      users.length > 0
+        ? (users.reduce((sum, user) => sum + ((user.totalSpent as number) || 0), 0) / users.length).toFixed(2)
+        : '0',
   };
 
-  // Filter users based on status
-  const filteredUsers = filterStatus === 'all'
-    ? users
-    : users.filter(u => u.status === filterStatus);
+  const filteredUsers = filterStatus === 'all' ? users : users.filter((u) => u.status === filterStatus);
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      phoneCountry: 'US',
-      password: '',
-      status: 'active'
-    });
+    setFormData(EMPTY_FORM);
     setFormError('');
   };
 
   const handleEditUser = async () => {
     setFormError('');
-    
-    // Validation
+
     if (!formData.name || !formData.email || !formData.phone) {
       setFormError('Name, email, and phone are required');
       return;
     }
 
-    // Validate phone number format
     if (!validatePhone(formData.phone, formData.phoneCountry)) {
       setFormError(`Please provide a valid phone number for ${formData.phoneCountry}`);
       return;
@@ -90,9 +85,8 @@ const WebsiteUsersManagement = () => {
 
     setIsSubmitting(true);
     try {
-      // Format phone to E.164 for API
       const phoneData = formatPhoneToE164(formData.phone, formData.phoneCountry);
-      
+
       if (!phoneData) {
         setFormError('Failed to format phone number. Please check the input.');
         setIsSubmitting(false);
@@ -102,72 +96,72 @@ const WebsiteUsersManagement = () => {
       const dataToSend = {
         ...formData,
         phone: phoneData.e164,
-        phoneCountry: phoneData.countryCode
+        phoneCountry: phoneData.countryCode,
       };
 
+      if (!selectedUser) return;
       await updateUser(selectedUser.id, dataToSend);
       setShowEditUserDialog(false);
       setSelectedUser(null);
       resetForm();
-      // Clear search and filters after successful update
       setSearchTerm('');
       setFilterStatus('all');
     } catch (err) {
-      setFormError(err.message || 'Failed to update user');
+      setFormError((err as Error).message || 'Failed to update user');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteUser = (user) => {
+  const handleDeleteUser = (user: WebsiteUser) => {
     setUserToDelete(user);
     setShowDeleteConfirm(true);
   };
 
   const confirmDelete = async () => {
+    if (!userToDelete) return;
     setIsSubmitting(true);
     try {
       await deleteUser(userToDelete.id);
       setShowDeleteConfirm(false);
       setUserToDelete(null);
       setSelectedUser(null);
-      // Clear search and filters after successful deletion
       setSearchTerm('');
       setFilterStatus('all');
     } catch (err) {
-      setFormError(err.message || 'Failed to delete user');
+      setFormError((err as Error).message || 'Failed to delete user');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (user) => {
+  const handleToggleStatus = async (user: WebsiteUser) => {
     try {
       await toggleUserStatus(user.id, user.status);
     } catch (err) {
-      setFormError(err.message || 'Failed to toggle user status');
+      setFormError((err as Error).message || 'Failed to toggle user status');
     }
   };
 
-  const openEditDialog = (user) => {
+  const openEditDialog = (user: WebsiteUser) => {
     setSelectedUser(user);
     setFormData({
       name: user.name,
       email: user.email,
-      phone: user.phone,
-      phoneCountry: user.phoneCountry || 'US',
+      phone: user.phone || '',
+      phoneCountry: (user.phoneCountry as string) || 'US',
       status: user.status,
-      password: '' // Don't show password in edit
+      password: '',
     });
     setShowEditUserDialog(true);
   };
 
-  const handleSearchChange = (value) => {
+  const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     searchUsers(value);
   };
 
-  const handleFilterStatusChange = (value) => {
+  const handleFilterStatusChange = (value: string) => {
     setFilterStatus(value);
   };
 
@@ -175,58 +169,45 @@ const WebsiteUsersManagement = () => {
     <div className="space-y-6">
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 border border-red-200 p-4 rounded-lg flex gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+          <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
           <div className="flex-1">
-            <h3 className="font-semibold text-red-900">Error</h3>
-            <p className="text-sm text-red-700 mt-1">{error}</p>
+            <h3 className="font-semibold text-destructive">Error</h3>
+            <p className="mt-1 text-sm text-destructive">{error}</p>
           </div>
-          <button
-            onClick={clearError}
-            className="text-red-600 hover:text-red-900 font-medium text-sm"
-          >
+          <Button variant="ghost" size="sm" onClick={clearError}>
             Dismiss
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Website Users</h2>
-          <p className="text-gray-600 mt-1">Manage platform users and their bookings</p>
+          <h2 className="font-heading text-2xl font-bold text-foreground">Website Users</h2>
+          <p className="mt-1 text-muted-foreground">Manage platform users and their bookings</p>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatsCard label="Total Users" value={stats.total} icon={Users} color="cyan" />
-        <StatsCard label="Active Users" value={stats.active} icon={UserCheck} color="green" />
-        <StatsCard label="Inactive" value={stats.inactive} icon={UserX} color="red" />
-        <StatsCard label="Total Bookings" value={stats.totalBookings} icon={Users} color="purple" />
-        <StatsCard 
-          label="Total Revenue" 
-          value={`$${(stats.totalRevenue / 1000).toFixed(1)}K`} 
-          icon={Users} 
-          color="green" 
-        />
-        <StatsCard 
-          label="Avg. Spent" 
-          value={`$${stats.avgSpent}`} 
-          icon={Users} 
-          color="blue" 
-        />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <StatCard label="Total Users" value={stats.total} icon={Users} color="primary" />
+        <StatCard label="Active Users" value={stats.active} icon={UserCheck} color="success" />
+        <StatCard label="Inactive" value={stats.inactive} icon={UserX} color="muted" />
+        <StatCard label="Total Bookings" value={stats.totalBookings} icon={Users} color="muted" />
+        <StatCard label="Total Revenue" value={`$${(stats.totalRevenue / 1000).toFixed(1)}K`} icon={Users} color="success" />
+        <StatCard label="Avg. Spent" value={`$${stats.avgSpent}`} icon={Users} color="primary" />
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex gap-4">
+      <div className="flex gap-4 rounded-lg border border-border bg-card p-4 shadow-card">
         <div className="w-full sm:w-64">
-          <label className="block text-sm font-medium text-gray-700 mb-2">User Status</label>
+          <label className="mb-2 block text-sm font-medium text-foreground">User Status</label>
           <select
             value={filterStatus}
             onChange={(e) => handleFilterStatusChange(e.target.value)}
             disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
           >
             <option value="all">All Users</option>
             <option value="active">Active</option>
@@ -246,7 +227,7 @@ const WebsiteUsersManagement = () => {
       />
 
       {loading && !users.length ? (
-        <div className="text-center py-12 text-gray-500">
+        <div className="py-12 text-center text-muted-foreground">
           <p className="text-lg">Loading users...</p>
         </div>
       ) : (
@@ -282,20 +263,18 @@ const WebsiteUsersManagement = () => {
         title="Edit Website User"
         subtitle="Update user information"
         submitLabel="Update User"
-        submitColor="cyan"
         isSubmitting={isSubmitting}
         error={formError}
       >
         <div className="space-y-4">
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
               />
             </FormGroup>
             <FormGroup label="Email" required>
@@ -304,21 +283,21 @@ const WebsiteUsersManagement = () => {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
               />
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Phone" required>
               <div className="flex gap-2">
                 <select
                   value={formData.phoneCountry}
                   onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
                   disabled={isSubmitting}
-                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                  className="h-8 w-28 rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                 >
-                  {COUNTRIES.map(country => (
+                  {COUNTRIES.map((country) => (
                     <option key={country.code} value={country.code}>
                       {country.flag} {country.code}
                     </option>
@@ -329,18 +308,18 @@ const WebsiteUsersManagement = () => {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   disabled={isSubmitting}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                  className="h-8 flex-1 rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                   placeholder={getPhonePlaceholder(formData.phoneCountry)}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Enter phone number with or without country code</p>
+              <p className="mt-1 text-xs text-muted-foreground">Enter phone number with or without country code</p>
             </FormGroup>
             <FormGroup label="Status" required>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -362,7 +341,7 @@ const WebsiteUsersManagement = () => {
         description={`Are you sure you want to delete ${userToDelete?.name}? This action cannot be undone and will remove all associated data.`}
         confirmLabel="Delete"
         cancelLabel="Cancel"
-        isDangerous={true}
+        isDangerous
         isSubmitting={isSubmitting}
       />
     </div>
