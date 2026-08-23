@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isLeadFieldLocked, FIELD_LOCKED_STATUSES } from '../leadLocks.js';
+import { isLeadFieldLocked, FIELD_LOCKED_STATUSES } from '../leadLocks';
 
 describe('isLeadFieldLocked', () => {
   it('is unlocked for NEW', () => {

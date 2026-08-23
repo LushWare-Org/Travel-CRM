@@ -13,6 +13,6 @@ export const FIELD_LOCKED_STATUSES = [
   'BOOKING_FAILED',
 ];
 
-export function isLeadFieldLocked(lifecycleStatus) {
-  return FIELD_LOCKED_STATUSES.includes(lifecycleStatus);
+export function isLeadFieldLocked(lifecycleStatus: string | undefined | null): boolean {
+  return FIELD_LOCKED_STATUSES.includes(lifecycleStatus as string);
 }

@@ -1,3 +1,5 @@
+import type { ItineraryDay } from '@/features/itinerary/types';
+
 /**
  * Convert API day shapes (package blueprint serialization, lead serialized
  * itinerary) into the ItineraryEditor's canonical day shape:
@@ -5,13 +7,13 @@
  *   - places/locations: array of name strings
  *   - meals booleans derived from counts, transports normalized
  */
-export function toEditorDays(days) {
+export function toEditorDays(days: any[] | null | undefined): ItineraryDay[] {
   return (days || []).map((day) => {
     const rawActs = Array.isArray(day.activities) ? day.activities : [];
     const activityCosts = { ...(day.activityCosts || {}) };
-    const relational = [];
+    const relational: any[] = [];
 
-    rawActs.forEach((a) => {
+    rawActs.forEach((a: any) => {
       if (a && typeof a === 'object') {
         const name = a.name || a.activity?.name || '';
         if (name) {
@@ -47,16 +49,16 @@ export function toEditorDays(days) {
         dinner: !!day.dinnerCount,
       },
       activities: rawActs
-        .map((a) => (typeof a === 'string' ? a : (a.name || a.activity?.name || '')))
+        .map((a: any) => (typeof a === 'string' ? a : (a.name || a.activity?.name || '')))
         .filter(Boolean),
       activityCosts,
       _relational: { ...(day._relational || {}), activities: relational },
       locations: Array.isArray(day.locations)
         ? day.locations
         : (day.places || [])
-            .map((p) => (typeof p === 'string' ? p : (p.customName || p.place?.name || '')))
+            .map((p: any) => (typeof p === 'string' ? p : (p.customName || p.place?.name || '')))
             .filter(Boolean),
-      transports: (day.transports || []).map((t) => ({
+      transports: (day.transports || []).map((t: any) => ({
         routeType: t.routeType ?? null,
         transportMode: t.transportMode ?? null,
         pricingModel: t.pricingModel ?? null,
@@ -65,6 +67,6 @@ export function toEditorDays(days) {
       })),
       accommodation: day.accommodation || {},
       flights: day.flights || [],
-    };
+    } as ItineraryDay;
   });
 }
