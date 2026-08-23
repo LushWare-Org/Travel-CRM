@@ -10,7 +10,12 @@ interface PDFPreviewDialogProps {
   onClose: () => void;
   pdfUrl: string | null;
   documentName?: string;
-  onDownload?: () => void;
+  // Only ever checked for truthiness to decide whether to show the Download
+  // button - PDFPreviewDialog always runs its own internal handleDownload,
+  // it never invokes this. Callers pass either a real callback
+  // (VoucherDialog) or a bare boolean flag (InvoiceDialog's `onDownload`
+  // shorthand) - both are pre-existing, real usages, so the type accepts both.
+  onDownload?: boolean | (() => void);
   onBack?: () => void;
   documents?: unknown[];
   currentIndex?: number;
