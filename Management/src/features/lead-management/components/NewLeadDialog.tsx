@@ -4,6 +4,7 @@ import {
   MapPin, Plane, Users, Globe, Package, MessageSquare,
   ChevronDown, ChevronUp, Sparkles, Save, ArrowRightLeft,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
@@ -11,7 +12,6 @@ import { OPTIONAL_FLIGHT_TYPE } from '@travel-crm/constants';
 import { leadAPI, packageAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import LocationAutocomplete from './LocationAutocomplete';
-import AirportAutocomplete from '../../../components/AirportAutocomplete';
 import CountrySelect from '../../../components/CountrySelect';
 import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
 import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
@@ -19,6 +19,10 @@ import PricingSection from './PricingSection';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import { createDefaultDay } from '../../itinerary/types/index.js';
 import { reconcileFlightsForSave } from '../../itinerary/utils/flightSync';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 // A lead has one package or a manual (from-scratch) itinerary, never both —
 // this sentinel is a third option inside the Package select itself.
@@ -26,83 +30,107 @@ const MANUAL_ITINERARY_VALUE = '__manual__';
 
 // ── Module-level components (NOT inside NewLeadDialog — prevents remounting) ──
 
-function InputField({ label, required, icon: Icon, children, testId }) {
+interface InputFieldProps {
+  label: string;
+  required?: boolean;
+  icon?: LucideIcon;
+  children: React.ReactNode;
+  testId?: string;
+}
+
+function InputField({ label, required, icon: Icon, children, testId }: InputFieldProps) {
   return (
     <div className="space-y-2" data-testid={testId}>
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+      <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+        {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
         {label}
-        {required && <span className="text-red-500">*</span>}
+        {required && <span className="text-destructive">*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-function SectionHeader({ icon: Icon, title, subtitle, section, gradient, expanded, onToggle }) {
+interface SectionHeaderProps {
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  section: string;
+  expanded: boolean;
+  onToggle: (section: string) => void;
+}
+
+function SectionHeader({ icon: Icon, title, subtitle, section, expanded, onToggle }: SectionHeaderProps) {
   return (
     <button
       type="button"
       onClick={() => onToggle(section)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${expanded
-          ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
-          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-        }`}
+      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${
+        expanded ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/70'
+      }`}
     >
       <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${expanded ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
-          <Icon className={`w-5 h-5 ${expanded ? 'text-white' : 'text-gray-600'}`} />
+        <div className={`p-2 rounded-xl ${expanded ? 'bg-primary-foreground/20' : 'bg-card shadow-sm'}`}>
+          <Icon className={`w-5 h-5 ${expanded ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
         </div>
         <div className="text-left">
           <h3 className="font-semibold">{title}</h3>
-          <p className={`text-xs ${expanded ? 'text-white/70' : 'text-gray-500'}`}>{subtitle}</p>
+          <p className={`text-xs ${expanded ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{subtitle}</p>
         </div>
       </div>
-      {expanded ? (
-        <ChevronUp className="w-5 h-5" />
-      ) : (
-        <ChevronDown className="w-5 h-5" />
-      )}
+      {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
     </button>
   );
 }
 
-const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
+interface SalesRep {
+  id: string;
+  name: string;
+}
+
+interface NewLeadDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  salesReps: SalesRep[];
+  onSuccess?: () => void;
+}
+
+const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }: NewLeadDialogProps) => {
   const { user } = useAuth();
   const isSalesRep = user?.role === 'salesRep';
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [packages, setPackages] = useState([]);
+  const [packages, setPackages] = useState<any[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
   const [showTransferFlightModal, setShowTransferFlightModal] = useState(false);
-  const [transferFlightType, setTransferFlightType] = useState('inbound'); // 'inbound' | 'outbound'
-  const [itineraryDays, setItineraryDays] = useState([]);
-  const [expandedSections, setExpandedSections] = useState({
+  const [transferFlightType, setTransferFlightType] = useState<'inbound' | 'outbound'>('inbound');
+  const [itineraryDays, setItineraryDays] = useState<any[]>([]);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     personal: true,
     travel: true,
     package: true,
     remarks: false,
     transfers: false,
   });
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    whatsapp: "",
+  const [formData, setFormData] = useState<any>({
+    name: '',
+    email: '',
+    phone: '',
+    whatsapp: '',
     numberOfTravelers: 1,
-    city: "",
-    salesRep: "",
-    assignedTo: "",
-    fromCountry: "",
-    platform: "",
-    travelDate: "",
-    endDate: "",
-    package: "",
-    packageName: "",
+    city: '',
+    salesRep: '',
+    assignedTo: '',
+    fromCountry: '',
+    platform: '',
+    travelDate: '',
+    endDate: '',
+    package: '',
+    packageName: '',
     isManualItinerary: false,
     // Flight preference objects from template modal
     inboundFlightPrefs: null,
     outboundFlightPrefs: null,
-    remarks: [{ text: "", date: "" }],
+    remarks: [{ text: '', date: '' }],
   });
 
   // Fetch packages when dialog opens
@@ -110,13 +138,10 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
     if (isOpen) {
       fetchPackages();
       if (isSalesRep && user?._id) {
-        setFormData(prev => ({
-          ...prev,
-          assignedTo: user._id,
-          salesRep: user.name || ''
-        }));
+        setFormData((prev: any) => ({ ...prev, assignedTo: user._id, salesRep: user.name || '' }));
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isSalesRep, user?._id]);
 
   const fetchPackages = async () => {
@@ -126,14 +151,12 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
       if (response && response.success === true && response.data) {
         let packagesList = Array.isArray(response.data) ? response.data : [];
-        packagesList = packagesList.filter(pkg =>
-          pkg.isActive !== false
-        );
+        packagesList = packagesList.filter((pkg: any) => pkg.isActive !== false);
         setPackages(packagesList);
       } else {
         setPackages([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching packages:', error);
       setPackages([]);
       if (error.message && !error.message.includes('401') && !error.message.includes('403')) {
@@ -145,51 +168,34 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
   };
 
   const addRemarkField = () => {
-    setFormData({
-      ...formData,
-      remarks: [...formData.remarks, { text: "", date: "" }],
-    });
+    setFormData({ ...formData, remarks: [...formData.remarks, { text: '', date: '' }] });
   };
 
-  const updateRemark = (index, field, value) => {
+  const updateRemark = (index: number, field: string, value: string) => {
     const updatedRemarks = [...formData.remarks];
     updatedRemarks[index] = { ...updatedRemarks[index], [field]: value };
-    setFormData({
-      ...formData,
-      remarks: updatedRemarks,
-    });
+    setFormData({ ...formData, remarks: updatedRemarks });
   };
 
-  const removeRemark = (index) => {
-    const updatedRemarks = formData.remarks.filter((_, i) => i !== index);
-    setFormData({
-      ...formData,
-      remarks: updatedRemarks.length > 0 ? updatedRemarks : [{ text: "", date: "" }],
-    });
+  const removeRemark = (index: number) => {
+    const updatedRemarks = formData.remarks.filter((_: any, i: number) => i !== index);
+    setFormData({ ...formData, remarks: updatedRemarks.length > 0 ? updatedRemarks : [{ text: '', date: '' }] });
   };
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const handlePackageSelect = async (value) => {
+  const handlePackageSelect = async (value: string) => {
     if (value === MANUAL_ITINERARY_VALUE) {
-      setFormData(prev => ({
-        ...prev,
-        package: '',
-        packageName: '',
-        isManualItinerary: true,
-      }));
-      setItineraryDays(prev => (prev && prev.length > 0 ? prev : [createDefaultDay(1)]));
+      setFormData((prev: any) => ({ ...prev, package: '', packageName: '', isManualItinerary: true }));
+      setItineraryDays((prev) => (prev && prev.length > 0 ? prev : [createDefaultDay(1)]));
       return;
     }
 
     const packageId = value;
-    const selectedPackage = packages.find(pkg => (pkg._id || pkg.id) === packageId);
-    setFormData(prev => ({
+    const selectedPackage = packages.find((pkg) => (pkg._id || pkg.id) === packageId);
+    setFormData((prev: any) => ({
       ...prev,
       package: packageId,
       packageName: selectedPackage?.title || selectedPackage?.name || '',
@@ -229,17 +235,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         whatsapp: formData.whatsapp || undefined,
         salesRep: salesRepName,
         assignedTo: assignedTo,
-        platform: formData.platform || "Manual_Entry",
-        source: "manual",
+        platform: formData.platform || 'Manual_Entry',
+        source: 'manual',
         travelDate: formData.travelDate || undefined,
         endDate: formData.endDate || undefined,
         packageId: formData.package || undefined,
         packageName: formData.packageName || undefined,
         isManualItinerary: formData.isManualItinerary,
         numberOfTravelers: formData.numberOfTravelers ? Number(formData.numberOfTravelers) : undefined,
-        remarks: formData.remarks.filter((r) => r.text.trim() !== "").map(r => ({
+        remarks: formData.remarks.filter((r: any) => r.text.trim() !== '').map((r: any) => ({
           text: r.text.trim(),
-          date: r.date || new Date().toISOString().split("T")[0]
+          date: r.date || new Date().toISOString().split('T')[0],
         })),
         lifecycleStatus,
       };
@@ -269,13 +275,13 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
         }
         if (flightSaves.length > 0) {
           const results = await Promise.allSettled(flightSaves);
-          if (results.some(r => r.status === 'rejected')) {
+          if (results.some((r) => r.status === 'rejected')) {
             toast.error('Lead created, but some flight preferences failed to save');
           }
         }
 
         if (formData.isManualItinerary && itineraryDays.length > 0) {
-          const reconciledDays = itineraryDays.map(day => ({
+          const reconciledDays = itineraryDays.map((day) => ({
             ...day,
             transports: reconcileFlightsForSave({ flights: day.flights || [], transports: day.transports || [] }),
           }));
@@ -289,70 +295,50 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
       }
 
       setFormData({
-        name: "",
-        email: "",
-        phone: "",
+        name: '',
+        email: '',
+        phone: '',
         numberOfTravelers: 1,
-        city: "",
-        whatsapp: "",
-        salesRep: "",
-        assignedTo: "",
-        fromCountry: "",
-        platform: "",
-        travelDate: "",
-        endDate: "",
-        package: "",
-        packageName: "",
+        city: '',
+        whatsapp: '',
+        salesRep: '',
+        assignedTo: '',
+        fromCountry: '',
+        platform: '',
+        travelDate: '',
+        endDate: '',
+        package: '',
+        packageName: '',
         isManualItinerary: false,
         inboundFlightPrefs: null,
         outboundFlightPrefs: null,
-        remarks: [{ text: "", date: "" }],
+        remarks: [{ text: '', date: '' }],
       });
       setItineraryDays([]);
 
       onSuccess?.();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       toast.error(`Failed to create lead: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 text-white p-4 sm:p-6 shrink-0">
-          {/* Decorative Elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-            <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-          </div>
-
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white/15 backdrop-blur-sm rounded-2xl">
-                <Sparkles className="w-7 h-7" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold">Create New Lead</h2>
-                <p className="text-blue-100 text-sm mt-0.5">Fill in the details to add a new lead</p>
-              </div>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogHeader className="bg-primary text-primary-foreground p-4 sm:p-6 shrink-0 space-y-0">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary-foreground/15 rounded-2xl">
+              <Sparkles className="w-7 h-7" />
             </div>
-            <button
-              onClick={onClose}
-              className="p-2.5 hover:bg-white/15 rounded-xl transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div>
+              <DialogTitle className="text-xl sm:text-2xl text-primary-foreground">Create New Lead</DialogTitle>
+              <DialogDescription className="text-primary-foreground/80 mt-0.5">Fill in the details to add a new lead</DialogDescription>
+            </div>
           </div>
-        </div>
+        </DialogHeader>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -365,27 +351,24 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               title="Personal Information"
               subtitle="Contact details of the lead"
               section="personal"
-              gradient="from-blue-500 to-blue-600"
             />
 
             {expandedSections.personal && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-muted/50 rounded-2xl border border-border">
                 <InputField label="Full Name" required icon={User} testId="new-lead-name">
-                  <input
+                  <Input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                     placeholder="Enter full name"
                   />
                 </InputField>
 
                 <InputField label="Email Address" icon={Mail}>
-                  <input
+                  <Input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
                     placeholder="email@example.com"
                   />
                 </InputField>
@@ -395,7 +378,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     international
                     defaultCountry="LK"
                     value={formData.phone}
-                    onChange={(value) => setFormData({ ...formData, phone: value || "" })}
+                    onChange={(value) => setFormData({ ...formData, phone: value || '' })}
                     className="phone-input-wrapper"
                     placeholder="Enter phone number"
                   />
@@ -403,26 +386,28 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <Phone className="w-4 h-4 text-gray-400" />
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
                       WhatsApp Number
                     </label>
                     {formData.phone && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
-                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                        className="text-primary hover:text-primary"
                       >
                         <Copy className="w-3.5 h-3.5" />
                         Copy
-                      </button>
+                      </Button>
                     )}
                   </div>
                   <PhoneInput
                     international
                     defaultCountry="LK"
                     value={formData.whatsapp}
-                    onChange={(value) => setFormData({ ...formData, whatsapp: value || "" })}
+                    onChange={(value) => setFormData({ ...formData, whatsapp: value || '' })}
                     className="phone-input-wrapper"
                     placeholder="Enter WhatsApp number"
                   />
@@ -440,15 +425,14 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               title="Travel Details"
               subtitle="Trip information and dates"
               section="travel"
-              gradient="from-purple-500 to-purple-600"
             />
 
             {expandedSections.travel && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-muted/50 rounded-2xl border border-border">
                 <InputField label="Departure City" icon={MapPin}>
                   <LocationAutocomplete
                     value={formData.city}
-                    onChange={(value) => setFormData({ ...formData, city: value })}
+                    onChange={(value: string) => setFormData({ ...formData, city: value })}
                     placeholder="e.g., Colombo, Sri Lanka"
                   />
                 </InputField>
@@ -456,61 +440,53 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 <InputField label="Country of Residence" icon={Globe}>
                   <CountrySelect
                     value={formData.fromCountry}
-                    onChange={(code) => setFormData({ ...formData, fromCountry: code })}
+                    onChange={(code: string) => setFormData({ ...formData, fromCountry: code })}
                     placeholder="Search country..."
                   />
                 </InputField>
 
                 <InputField label="Travel Date" icon={Calendar}>
-                  <input
+                  <Input
                     type="date"
                     value={formData.travelDate}
                     onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                   />
                 </InputField>
 
                 <InputField label="Return Date" icon={Calendar}>
-                  <input
+                  <Input
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     min={formData.travelDate || undefined}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                   />
                 </InputField>
 
                 <InputField label="Number of Travelers" icon={Users}>
-                  <input
+                  <Input
                     type="number"
                     min="1"
                     value={formData.numberOfTravelers}
                     onChange={(e) => {
                       const value = e.target.value;
-                      setFormData({
-                        ...formData,
-                        numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)),
-                      });
+                      setFormData({ ...formData, numberOfTravelers: value === '' ? '' : Math.max(1, Number(value)) });
                     }}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
                     placeholder="e.g., 2"
                   />
                 </InputField>
 
                 <InputField label="Lead Source" icon={Globe}>
-                  <select
-                    value={formData.platform}
-                    onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all"
-                  >
-                    <option value="">Select Source</option>
-                    <option value="Website_Form">🌐 Website Form</option>
-                    <option value="Social_Media">📱 Social Media</option>
-                    <option value="Phone_Call">📞 Phone Call</option>
-                    <option value="Referral">🤝 Referral</option>
-                    <option value="Email">📧 Email</option>
-                    <option value="Walk_in">🚶 Walk-in</option>
-                  </select>
+                  <Select value={formData.platform} onValueChange={(v) => setFormData({ ...formData, platform: String(v) })}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Select Source" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Website_Form">🌐 Website Form</SelectItem>
+                      <SelectItem value="Social_Media">📱 Social Media</SelectItem>
+                      <SelectItem value="Phone_Call">📞 Phone Call</SelectItem>
+                      <SelectItem value="Referral">🤝 Referral</SelectItem>
+                      <SelectItem value="Email">📧 Email</SelectItem>
+                      <SelectItem value="Walk_in">🚶 Walk-in</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </InputField>
               </div>
             )}
@@ -525,18 +501,28 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               title="Package & Assignment"
               subtitle="Select package and sales representative"
               section="package"
-              gradient="from-emerald-500 to-teal-600"
             />
 
             {expandedSections.package && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-muted/50 rounded-2xl border border-border">
+                {/*
+                  This <select> is intentionally kept a real native element, not
+                  the Base UI Select primitive: e2e/leads/lead-lifecycle.spec.js
+                  drives it with Playwright's native `.selectOption({label})`,
+                  which requires an actual <select>/<option> DOM - Base UI's
+                  Select renders a button-based combobox with no native <select>
+                  in the DOM at all, which would break this interaction model
+                  entirely (not just a label mismatch). Retoned via plain
+                  Tailwind classes at the same visual weight as the rest of the
+                  form instead.
+                */}
                 <InputField label="Package" icon={Package} testId="new-lead-package">
                   <select
                     aria-label="Package"
                     value={formData.isManualItinerary ? MANUAL_ITINERARY_VALUE : (formData.package || '')}
                     onChange={(e) => handlePackageSelect(e.target.value)}
                     disabled={loadingPackages}
-                    className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full h-8 px-3 bg-transparent border border-input rounded-lg text-sm focus:outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:bg-input/50 disabled:cursor-not-allowed"
                   >
                     <option value="">{loadingPackages ? 'Loading packages...' : 'Select Package'}</option>
                     <option value={MANUAL_ITINERARY_VALUE}>Manual Itinerary (No Package)</option>
@@ -554,46 +540,41 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
 
                 <InputField label="Sales Representative" icon={User}>
                   {!isSalesRep ? (
-                    <select
+                    <Select
                       value={formData.assignedTo || ''}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        const rep = salesReps.find(r => r.id === id);
+                      onValueChange={(id) => {
+                        const rep = salesReps.find((r) => r.id === id);
                         setFormData({ ...formData, assignedTo: id, salesRep: rep ? rep.name : '' });
                       }}
-                      className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all"
                     >
-                      <option value="">Select Sales Rep</option>
-                      {salesReps.map((rep) => (
-                        <option key={rep.id} value={rep.id}>{rep.name}</option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Select Sales Rep" /></SelectTrigger>
+                      <SelectContent>
+                        {salesReps.map((rep) => (
+                          <SelectItem key={rep.id} value={rep.id}>{rep.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
-                    <input
-                      type="text"
-                      value={user?.name || ''}
-                      disabled
-                      className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl text-gray-600 cursor-not-allowed"
-                    />
+                    <Input type="text" value={user?.name || ''} disabled />
                   )}
                 </InputField>
               </div>
             )}
 
             {expandedSections.package && formData.isManualItinerary && (
-              <div className="p-4 bg-white rounded-2xl border border-emerald-200">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-emerald-600" />
+              <div className="p-4 bg-card rounded-2xl border border-border">
+                <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" />
                   Custom Itinerary
-                  <span className="text-xs font-normal text-gray-400">
+                  <span className="text-xs font-normal text-muted-foreground">
                     ({itineraryDays.length || 0} day{itineraryDays.length === 1 ? '' : 's'})
                   </span>
                 </h4>
                 <ItineraryEditor
                   days={itineraryDays}
-                  onDayChange={(dayNumber, dayData) => {
-                    setItineraryDays(prev =>
-                      (prev || []).filter(Boolean).map(day =>
+                  onDayChange={(dayNumber: number, dayData: any) => {
+                    setItineraryDays((prev) =>
+                      (prev || []).filter(Boolean).map((day) =>
                         day.dayNumber === dayNumber ? { ...day, ...dayData } : day
                       )
                     );
@@ -602,12 +583,9 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     const newDayNumber = itineraryDays.length + 1;
                     setItineraryDays([...itineraryDays, createDefaultDay(newDayNumber)]);
                   }}
-                  onRemoveDay={(dayNumber) => {
-                    const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
-                    const renumberedDays = filteredDays.map((day, index) => ({
-                      ...day,
-                      dayNumber: index + 1,
-                    }));
+                  onRemoveDay={(dayNumber: number) => {
+                    const filteredDays = itineraryDays.filter((day) => day.dayNumber !== dayNumber);
+                    const renumberedDays = filteredDays.map((day, index) => ({ ...day, dayNumber: index + 1 }));
                     setItineraryDays(renumberedDays);
                   }}
                   destination={formData.destination}
@@ -626,30 +604,29 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               title="Remarks & Notes"
               subtitle="Add optional comments about this lead"
               section="remarks"
-              gradient="from-amber-500 to-orange-500"
             />
 
             {expandedSections.remarks && (
-              <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-3">
-                {formData.remarks.map((remark, index) => (
+              <div className="p-4 bg-muted/50 rounded-2xl border border-border space-y-3">
+                {formData.remarks.map((remark: any, index: number) => (
                   <div key={index} className="flex gap-3 items-center">
-                    <input
+                    <Input
                       type="text"
                       value={remark.text}
-                      onChange={(e) => updateRemark(index, "text", e.target.value)}
-                      className="flex-1 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
+                      onChange={(e) => updateRemark(index, 'text', e.target.value)}
+                      className="flex-1"
                       placeholder={`Remark ${index + 1}`}
                     />
-                    <input
+                    <Input
                       type="date"
                       value={remark.date}
-                      onChange={(e) => updateRemark(index, "date", e.target.value)}
-                      className="w-full sm:w-44 px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all"
+                      onChange={(e) => updateRemark(index, 'date', e.target.value)}
+                      className="w-full sm:w-44"
                     />
                     {formData.remarks.length > 1 && (
                       <button
                         onClick={() => removeRemark(index)}
-                        className="p-3 text-red-500 hover:bg-red-100 rounded-xl transition-colors"
+                        className="p-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
                         type="button"
                       >
                         <X className="w-4 h-4" />
@@ -657,14 +634,10 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                     )}
                   </div>
                 ))}
-                <button
-                  onClick={addRemarkField}
-                  className="w-full px-4 py-3 border-2 border-dashed border-amber-300 text-amber-700 rounded-xl hover:bg-amber-100 hover:border-amber-400 transition-colors flex items-center justify-center gap-2 font-medium"
-                  type="button"
-                >
+                <Button type="button" variant="outline" onClick={addRemarkField} className="w-full">
                   <Plus className="w-4 h-4" />
                   Add Another Remark
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -678,14 +651,13 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               title="Transfer Flights"
               subtitle="Optional: flight route preferences to reach the trip and return home"
               section="transfers"
-              gradient="from-cyan-500 to-blue-600"
             />
 
             {expandedSections.transfers && (
-              <div className="p-4 bg-cyan-50/50 rounded-2xl border border-cyan-100 space-y-4">
+              <div className="p-4 bg-muted/50 rounded-2xl border border-border space-y-4">
                 {/* Inbound Transfer */}
-                <div className="bg-white rounded-xl border border-cyan-200 p-4">
-                  <h4 className="text-sm font-semibold text-cyan-800 mb-3">Inbound Transfer — Getting to the Trip</h4>
+                <div className="bg-card rounded-xl border border-border p-4">
+                  <h4 className="text-sm font-semibold text-foreground mb-3">Inbound Transfer — Getting to the Trip</h4>
                   {formData.inboundFlightPrefs ? (
                     <FlightPreferenceCard
                       prefs={formData.inboundFlightPrefs}
@@ -702,7 +674,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                         setTransferFlightType('inbound');
                         setShowTransferFlightModal(true);
                       }}
-                      className="w-full py-3 border-2 border-dashed border-cyan-300 text-cyan-700 rounded-xl hover:bg-cyan-50 hover:border-cyan-400 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                      className="w-full py-3 border-2 border-dashed border-primary/30 text-primary rounded-xl hover:bg-primary/5 hover:border-primary/50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
                     >
                       <Plus className="w-4 h-4" />
                       Add Inbound Flight Preferences
@@ -711,8 +683,8 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 </div>
 
                 {/* Outbound Transfer */}
-                <div className="bg-white rounded-xl border border-cyan-200 p-4">
-                  <h4 className="text-sm font-semibold text-cyan-800 mb-3">Outbound Transfer — Returning Home</h4>
+                <div className="bg-card rounded-xl border border-border p-4">
+                  <h4 className="text-sm font-semibold text-foreground mb-3">Outbound Transfer — Returning Home</h4>
                   {formData.outboundFlightPrefs ? (
                     <FlightPreferenceCard
                       prefs={formData.outboundFlightPrefs}
@@ -729,7 +701,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                         setTransferFlightType('outbound');
                         setShowTransferFlightModal(true);
                       }}
-                      className="w-full py-3 border-2 border-dashed border-cyan-300 text-cyan-700 rounded-xl hover:bg-cyan-50 hover:border-cyan-400 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
+                      className="w-full py-3 border-2 border-dashed border-primary/30 text-primary rounded-xl hover:bg-primary/5 hover:border-primary/50 transition-colors flex items-center justify-center gap-2 font-medium text-sm"
                     >
                       <Plus className="w-4 h-4" />
                       Add Outbound Flight Preferences
@@ -739,6 +711,14 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
               </div>
             )}
           </div>
+
+          {/* Pricing preview — live price for the selected package or manual itinerary */}
+          {(formData.package || formData.isManualItinerary) && (
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Pricing Preview</h3>
+              <PricingSection days={itineraryDays} travelers={formData.numberOfTravelers || 1} />
+            </div>
+          )}
         </div>
 
         {/* Transfer Flight Preference Modal (template mode — saves preferences only, no booking) */}
@@ -749,7 +729,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           initialData={transferFlightType === 'inbound'
             ? (formData.inboundFlightPrefs || {})
             : getOutboundModalDefaults(formData.inboundFlightPrefs, formData.outboundFlightPrefs)}
-          onSelectTemplate={(prefs) => {
+          onSelectTemplate={(prefs: any) => {
             if (transferFlightType === 'inbound') {
               setFormData({ ...formData, inboundFlightPrefs: prefs });
             } else {
@@ -759,31 +739,17 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
           }}
         />
 
-        {/* Pricing preview — live price for the selected package or manual itinerary */}
-        {(formData.package || formData.isManualItinerary) && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Pricing Preview</h3>
-            <PricingSection
-              days={itineraryDays}
-              travelers={formData.numberOfTravelers || 1}
-            />
-          </div>
-        )}
-
         {/* Footer Actions */}
-        <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-6 py-3.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all font-semibold"
-            type="button"
-          >
+        <DialogFooter className="flex-row">
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => handleSubmit('DRAFTING')}
             disabled={isSubmitting}
-            className="flex-1 px-4 py-3.5 bg-gradient-to-r from-indigo-500 to-violet-600 text-white rounded-xl hover:from-indigo-600 hover:to-violet-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25"
-            type="button"
+            className="flex-1"
           >
             {isSubmitting ? (
               <>
@@ -796,12 +762,12 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 Save & Draft
               </>
             )}
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
             onClick={() => handleSubmit('NEW')}
             disabled={isSubmitting}
-            className="flex-1 px-4 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
-            type="button"
+            className="flex-1"
           >
             {isSubmitting ? (
               <>
@@ -814,10 +780,10 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }) => {
                 Create Lead
               </>
             )}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

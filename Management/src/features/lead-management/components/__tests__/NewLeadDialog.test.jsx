@@ -78,7 +78,7 @@ vi.mock('../../../shared', async () => ({
   },
 }));
 
-import NewLeadDialog from '../NewLeadDialog.jsx';
+import NewLeadDialog from '../NewLeadDialog';
 
 const PKG_A = 'pkg-a';
 const packagesFixture = [{ _id: PKG_A, title: 'Sri Lanka Explorer', destination: 'Sri Lanka' }];
