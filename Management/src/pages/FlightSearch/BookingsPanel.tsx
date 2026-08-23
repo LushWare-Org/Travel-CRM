@@ -95,7 +95,7 @@ export default function BookingsPanel({
             <TabsList>
               {STATUS_TABS.map((tab) => (
                 <TabsTrigger key={tab.id} value={tab.id}>
-                  {tab.label} <span className="opacity-70">{statusCounts[tab.id]}</span>
+                  {tab.label} <span>{statusCounts[tab.id]}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
