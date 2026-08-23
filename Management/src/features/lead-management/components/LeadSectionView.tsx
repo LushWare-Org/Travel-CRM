@@ -198,7 +198,7 @@ const LeadSectionView = ({ lead, onClose }: LeadSectionViewProps) => {
   return (
     <>
       <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader className="px-6 py-4 border-b border-border space-y-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-muted rounded-lg">

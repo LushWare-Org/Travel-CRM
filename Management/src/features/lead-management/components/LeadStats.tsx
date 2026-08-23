@@ -136,7 +136,7 @@ const LeadStats = ({ summary, salesReps, onAssignSuccess }: LeadStatsProps) => {
 
       {/* Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="capitalize">{modalType} Leads</DialogTitle>
             <DialogDescription>{filteredModalLeads.length} leads</DialogDescription>

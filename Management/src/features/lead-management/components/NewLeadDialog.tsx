@@ -327,7 +327,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }: NewLeadDialogP
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
         <DialogHeader className="bg-primary text-primary-foreground p-4 sm:p-6 shrink-0 space-y-0">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary-foreground/15 rounded-2xl">

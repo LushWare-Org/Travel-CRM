@@ -335,7 +335,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }: InvoiceDialogProps)
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent className="max-w-3xl max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-3xl max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader className="bg-primary text-primary-foreground px-6 py-4 space-y-0">
             <div className="flex items-center gap-3 min-w-0">
               <div className="rounded-lg bg-primary-foreground/20 p-2 shrink-0"><Receipt className="h-5 w-5" /></div>

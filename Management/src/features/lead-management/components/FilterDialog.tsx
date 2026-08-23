@@ -51,7 +51,7 @@ const FilterDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Advanced Filters</DialogTitle>
         </DialogHeader>

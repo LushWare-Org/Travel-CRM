@@ -94,7 +94,7 @@ const WhatsAppHistoryDialog = ({ isOpen, onClose, lead, onSuccess }: WhatsAppHis
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] p-0 overflow-hidden flex flex-col gap-0">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] p-0 overflow-hidden flex flex-col gap-0">
         <DialogHeader className="bg-primary text-primary-foreground p-6 shrink-0 space-y-0">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-primary-foreground/10">

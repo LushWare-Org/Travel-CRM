@@ -294,7 +294,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }: ReceiptDialogProps)
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent className="max-w-4xl h-full sm:h-auto sm:max-h-[95vh] p-0 gap-0 rounded-none sm:rounded-2xl overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-4xl h-full sm:h-auto sm:max-h-[95vh] p-0 gap-0 rounded-none sm:rounded-2xl overflow-hidden flex flex-col">
           <DialogHeader className="px-4 sm:px-6 py-4 sm:py-5 border-b border-border space-y-0">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">

@@ -91,7 +91,7 @@ const ActiveSalesRepsDialog = ({ isOpen, onClose, requireActiveLogin48h }: Activ
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Active Sales Representatives</DialogTitle>
           <DialogDescription>

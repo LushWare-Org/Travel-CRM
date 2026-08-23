@@ -154,7 +154,7 @@ const RemarksDialog = ({ isOpen, onClose, lead, onSuccess }: RemarksDialogProps)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
         <DialogHeader className="bg-primary text-primary-foreground p-6 shrink-0 space-y-0">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-primary-foreground/10">
