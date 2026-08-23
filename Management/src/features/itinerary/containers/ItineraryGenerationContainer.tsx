@@ -99,7 +99,12 @@ const ItineraryGenerationContainer = () => {
 
   // Use custom hooks
   const { packages, setPackages, updatePackage, deletePackage } = usePackageState(SAMPLE_PACKAGES);
-  const { formData: newFormData, setFormData: setNewFormData } = useItineraryForm(createDefaultPackage() as any);
+  // Was previously passed as the first arg (packageId: string|null), not the second
+  // (initialData) - only ever type-checked because of an `as any` cast, which is what
+  // surfaced this. formData/newFormData initialized to a generic empty shape instead
+  // of the real defaults until the first setNewFormData(createDefaultPackage()) call
+  // overwrote it - fixed at the source rather than left masked.
+  const { formData: newFormData, setFormData: setNewFormData } = useItineraryForm(null, createDefaultPackage());
   const { images, setImages, handleUpload: handleImageUploadHook, removeImage, deletingIndexes } = useImageUpload();
 
   // Filter packages

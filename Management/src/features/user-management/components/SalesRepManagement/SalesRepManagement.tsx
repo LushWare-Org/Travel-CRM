@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { UserTableHeader, Pagination, UserFormDialog, ConfirmationDialog, FormGroup } from '../Common';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
+import type { ApiError } from '@/lib/errors';
 import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 import SalesRepTable, { type SalesRep } from './SalesRepTable';
 import salesRepService from '../../../../services/salesRep.service';
@@ -182,7 +183,7 @@ const SalesRepManagement = () => {
       setSalesReps(transformedReps);
       setTotalPages(rawPagination?.pages || 1);
     } catch (err) {
-      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to load sales representatives';
+      const errorMsg = (err as ApiError).userMessage || (err as Error).message || 'Failed to load sales representatives';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Load sales reps error:', err);
@@ -301,7 +302,7 @@ const SalesRepManagement = () => {
         setCurrentPage(1);
       }
     } catch (err) {
-      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to create sales representative';
+      const errorMsg = (err as ApiError).userMessage || (err as Error).message || 'Failed to create sales representative';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Create sales rep error:', err);
@@ -351,7 +352,7 @@ const SalesRepManagement = () => {
         await loadStats();
       }
     } catch (err) {
-      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to update sales representative';
+      const errorMsg = (err as ApiError).userMessage || (err as Error).message || 'Failed to update sales representative';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Update sales rep error:', err);
@@ -382,7 +383,7 @@ const SalesRepManagement = () => {
         await loadStats();
       }
     } catch (err) {
-      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to delete sales representative';
+      const errorMsg = (err as ApiError).userMessage || (err as Error).message || 'Failed to delete sales representative';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Delete sales rep error:', err);
@@ -411,7 +412,7 @@ const SalesRepManagement = () => {
         setRepToResendInvite(null);
       }
     } catch (err) {
-      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to resend invitation';
+      const errorMsg = (err as ApiError).userMessage || (err as Error).message || 'Failed to resend invitation';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Resend invitation error:', err);
@@ -440,7 +441,7 @@ const SalesRepManagement = () => {
         setRepToResetPassword(null);
       }
     } catch (err) {
-      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to send password reset';
+      const errorMsg = (err as ApiError).userMessage || (err as Error).message || 'Failed to send password reset';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Password reset error:', err);

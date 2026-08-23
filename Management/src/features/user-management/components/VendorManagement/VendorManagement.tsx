@@ -4,6 +4,7 @@ import { UserTableHeader, Pagination, UserFormDialog, ConfirmationDialog, FormGr
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import type { ApiError } from '@/lib/errors';
 import { formatDate } from '../../utils/helpers';
 import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 import vendorService from '../../../../services/vendor.service';
@@ -157,7 +158,7 @@ const VendorManagement = () => {
       }
     } catch (err) {
       console.error('Error loading vendors:', err);
-      setError((err as any).userMessage || (err as Error).message || 'Failed to load vendors');
+      setError((err as ApiError).userMessage || (err as Error).message || 'Failed to load vendors');
     } finally {
       setLoading(false);
     }
@@ -238,15 +239,16 @@ const VendorManagement = () => {
     } catch (err) {
       console.error('Error creating vendor:', err);
 
-      if ((err as any).validationErrors) {
+      const validationErrors = (err as ApiError).validationErrors;
+      if (validationErrors) {
         const backendErrors: Record<string, string> = {};
-        Object.entries((err as any).validationErrors).forEach(([field, messages]) => {
+        Object.entries(validationErrors).forEach(([field, messages]) => {
           backendErrors[field] = Array.isArray(messages) ? messages[0] : (messages as string);
         });
         setValidationErrors(backendErrors);
       }
 
-      setError((err as any).userMessage || (err as Error).message || 'Failed to create vendor');
+      setError((err as ApiError).userMessage || (err as Error).message || 'Failed to create vendor');
     } finally {
       setActionLoading(false);
     }
@@ -310,7 +312,7 @@ const VendorManagement = () => {
       }
     } catch (err) {
       console.error('Error updating vendor:', err);
-      setError((err as any).userMessage || (err as Error).message || 'Failed to update vendor');
+      setError((err as ApiError).userMessage || (err as Error).message || 'Failed to update vendor');
     } finally {
       setActionLoading(false);
     }
@@ -342,7 +344,7 @@ const VendorManagement = () => {
       }
     } catch (err) {
       console.error('Error resending invitation:', err);
-      setError((err as any).userMessage || (err as Error).message || 'Failed to resend invitation');
+      setError((err as ApiError).userMessage || (err as Error).message || 'Failed to resend invitation');
     } finally {
       setActionLoading(false);
     }
@@ -369,7 +371,7 @@ const VendorManagement = () => {
       }
     } catch (err) {
       console.error('Error resetting password:', err);
-      setError((err as any).userMessage || (err as Error).message || 'Failed to reset password');
+      setError((err as ApiError).userMessage || (err as Error).message || 'Failed to reset password');
     } finally {
       setActionLoading(false);
     }
@@ -397,7 +399,7 @@ const VendorManagement = () => {
       }
     } catch (err) {
       console.error('Error deleting vendor:', err);
-      setError((err as any).userMessage || (err as Error).message || 'Failed to delete vendor');
+      setError((err as ApiError).userMessage || (err as Error).message || 'Failed to delete vendor');
     } finally {
       setActionLoading(false);
     }
