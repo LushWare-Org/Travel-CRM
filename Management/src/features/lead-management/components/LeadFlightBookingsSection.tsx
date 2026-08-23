@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plane, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, Settings2, Pencil, ExternalLink } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/toast';
 import { OPTIONAL_FLIGHT_TYPE } from '@travel-crm/constants';
 import { flightAPI } from '../../../services/flight.service';
 import { leadAPI } from '../../../services/api';

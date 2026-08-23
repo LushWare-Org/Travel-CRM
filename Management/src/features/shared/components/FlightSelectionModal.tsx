@@ -3,7 +3,7 @@ import {
   Plane, Search, ChevronRight, ChevronLeft, Loader2,
   CheckCircle2, ArrowRightLeft, Users, Info, AlertCircle,
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/toast';
 import { flightAPI } from '../../../services/flight.service';
 import AirportAutocomplete from '../../../components/AirportAutocomplete';
 import PassengerSelector from '../../../components/PassengerSelector';
@@ -318,7 +318,7 @@ export default function FlightSelectionModal({
         tripType,
       });
       setOffers(response.data || []);
-      if (!response.data?.length) toast('No flights found', { icon: '✈️' });
+      if (!response.data?.length) toast('No flights found', { type: 'info' });
     } catch (error: any) {
       setSearchError(error.message || 'Flight search failed');
       toast.error(error.message || 'Flight search failed');

@@ -10,7 +10,7 @@ vi.mock('../../../../services/api', () => ({
   leadAPI: { calculateSelectionPricing: mockCalculateSelectionPricing, previewPricing: mockPreviewPricing },
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 

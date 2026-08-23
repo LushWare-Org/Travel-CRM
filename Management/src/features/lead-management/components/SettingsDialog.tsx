@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, RotateCcw, BarChart3, Check, Users, Eye } from 'lucide-react';
 import { adminAPI, leadAPI } from '../../../services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 

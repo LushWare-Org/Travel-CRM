@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, AlertCircle, CheckCircle, Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import authService from '../services/auth.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

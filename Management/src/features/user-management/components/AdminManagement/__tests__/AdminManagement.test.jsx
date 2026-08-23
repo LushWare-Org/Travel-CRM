@@ -25,7 +25,7 @@ vi.mock('../../../../../contexts/PermissionContext', () => ({
   usePermission: () => ({ hasPermission: () => true }),
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
   Toaster: () => null,
 }));

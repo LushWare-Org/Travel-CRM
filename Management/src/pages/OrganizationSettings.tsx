@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Building2, Save, Upload, Loader2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { adminAPI, uploadAPI } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

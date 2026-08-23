@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, Sparkles, Save, ArrowRightLeft,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { OPTIONAL_FLIGHT_TYPE } from '@travel-crm/constants';

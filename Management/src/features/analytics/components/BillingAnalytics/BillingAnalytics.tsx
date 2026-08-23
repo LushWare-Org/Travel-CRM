@@ -10,7 +10,7 @@ import { CHART_PALETTE } from '../Common/chartTheme';
 import { DollarSign, Wallet, TrendingUp, Download, Receipt } from 'lucide-react';
 import { analyticsAPI } from '../../../../services/api';
 import { exportBillingAnalyticsPDF } from '../../utils/exportAnalytics';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { formatCompact, formatCurrency, getCurrencySymbol } from '../../../../utils/currency.js';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';

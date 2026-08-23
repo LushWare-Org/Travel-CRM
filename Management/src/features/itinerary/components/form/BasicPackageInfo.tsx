@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, MapPin, Tag, FileText, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { CATEGORY_OPTIONS } from '../../utils/constants';
 import DestinationSelector from '../DestinationSelector';
 import packageAIApi from '../../../../services/packageAIApi';

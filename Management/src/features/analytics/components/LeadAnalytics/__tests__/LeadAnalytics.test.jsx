@@ -7,7 +7,7 @@ vi.mock('../../../../../services/api.js', () => ({
   analyticsAPI: { getLeadOverview: mockGetLeadOverview },
 }));
 
-vi.mock('react-hot-toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
 import LeadAnalytics from '../LeadAnalytics.tsx';
 

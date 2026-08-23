@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MessageCircle, Clock, Loader2, Send, CheckCheck, User, Bot } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { leadAPI } from '../../../services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';

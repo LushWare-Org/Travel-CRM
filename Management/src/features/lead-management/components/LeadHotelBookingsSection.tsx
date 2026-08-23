@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Building2, Plus, Loader2, Ban, AlertCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/toast';
 import HotelService from '../../../services/hotel.service';
 import { HotelSelectionModal } from '../../shared';
 import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { leadAPI, adminAPI, authAPI } from "../services/api";
-import toast from "react-hot-toast";
+import toast from '@/lib/toast';
 import LeadStats from "../features/lead-management/components/LeadStats";
 import LeadFilters from "../features/lead-management/components/LeadFilters";
 import LeadTable from "../features/lead-management/components/LeadTable";

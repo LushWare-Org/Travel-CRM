@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermission } from "../contexts/PermissionContext";
-import toast from "react-hot-toast";
+import toast from '@/lib/toast';
 import { getSidebarInfo } from "../config/branding";
 import { adminAPI } from "../services/api";
 import { Button } from "../components/ui/button";

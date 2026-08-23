@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import packageAIApi from '../services/packageAIApi.js';
 
 const AIGenerateButton = ({ packageId, onContentGenerated, disabled = false }) => {

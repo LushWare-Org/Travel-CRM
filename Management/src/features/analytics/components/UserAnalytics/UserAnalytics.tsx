@@ -9,7 +9,7 @@ import {
 import { CHART_PALETTE } from '../Common/chartTheme';
 import { Users, UserCheck, Shield, Download, Activity, Award } from 'lucide-react';
 import { exportUserAnalyticsPDF } from '../../utils/exportAnalytics';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import AnalyticsService from '../../../../services/analytics.service';
 import {
   getUserGrowthByTimeRange,

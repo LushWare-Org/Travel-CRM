@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import axios from 'axios';
 import { Eye, EyeOff, Clock, Loader2, ShieldCheck } from 'lucide-react';
 import { getLoginBranding } from '../config/branding';

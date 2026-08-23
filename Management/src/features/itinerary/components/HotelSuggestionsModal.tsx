@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, MapPin, RefreshCw, Loader } from 'lucide-react';
 import { hotelAPI } from '../../../services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

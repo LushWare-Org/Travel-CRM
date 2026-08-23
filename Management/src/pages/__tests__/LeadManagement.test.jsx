@@ -23,7 +23,7 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 

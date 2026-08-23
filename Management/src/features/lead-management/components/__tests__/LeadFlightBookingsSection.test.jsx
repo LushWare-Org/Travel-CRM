@@ -18,7 +18,7 @@ vi.mock('../../../../services/api', () => ({
   leadAPI: { getSelectionFlights: mockGetSelectionFlights, addSelectionFlight: mockAddSelectionFlight, deleteSelectionFlight: mockDeleteSelectionFlight },
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 

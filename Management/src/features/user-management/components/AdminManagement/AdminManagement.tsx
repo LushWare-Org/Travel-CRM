@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Plus, Shield, Mail, AlertCircle, Loader } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from '@/lib/toast';
 import {
   UserTableHeader,
   Pagination,
@@ -378,13 +378,11 @@ const AdminManagement = () => {
 
       toast.success(`Invitation resent to ${adminToResendInvite.email}`, {
         duration: 4000,
-        position: 'top-right',
       });
     } catch (err) {
       console.error('Error resending invitation:', err);
       toast.error((err as Error).message || 'Failed to resend invitation', {
         duration: 4000,
-        position: 'top-right',
       });
     } finally {
       setIsSubmitting(false);
@@ -426,7 +424,6 @@ const AdminManagement = () => {
 
         toast.success(`Password reset email sent to ${adminToResetPassword.email}`, {
           duration: 4000,
-          position: 'top-right',
         });
       } else {
         throw new Error(response.message || 'Failed to send password reset email');
@@ -441,7 +438,6 @@ const AdminManagement = () => {
 
       toast.error(errorMessage, {
         duration: 4000,
-        position: 'top-right',
       });
     } finally {
       setIsSubmitting(false);
@@ -453,7 +449,6 @@ const AdminManagement = () => {
     if (!canManageAdmins) {
       toast.error(getPermissionDeniedMessage('delete', 'admin accounts'), {
         duration: 4000,
-        position: 'top-right',
       });
       return;
     }
@@ -476,14 +471,12 @@ const AdminManagement = () => {
 
         toast.success(`Admin "${adminToDelete.name}" deleted successfully`, {
           duration: 4000,
-          position: 'top-right',
         });
       }
     } catch (err) {
       console.error('Error deleting admin:', err);
       toast.error((err as Error).message || 'Failed to delete admin', {
         duration: 4000,
-        position: 'top-right',
       });
     } finally {
       setIsSubmitting(false);
@@ -495,7 +488,6 @@ const AdminManagement = () => {
     if (!canManageAdmins) {
       toast.error(getPermissionDeniedMessage('update', 'admin accounts'), {
         duration: 4000,
-        position: 'top-right',
       });
       return;
     }
@@ -553,9 +545,6 @@ const AdminManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Toast Notifications Container */}
-      <Toaster position="top-right" reverseOrder={false} toastOptions={{ duration: 4000 }} />
-
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">

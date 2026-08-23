@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/toast";
 import Sidebar from "./pages/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
@@ -117,18 +117,7 @@ function App() {
       >
         <AppContent />
       </Router>
-      <Toaster
-        position="top-right"
-        reverseOrder={false}
-        gutter={8}
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-        }}
-      />
+      <Toaster timeout={4000} />
     </>
   );
 }

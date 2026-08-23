@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import careerService from '../../services/career.service';
 import { Button } from '../../components/ui/button';

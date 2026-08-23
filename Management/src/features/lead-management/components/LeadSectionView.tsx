@@ -11,7 +11,7 @@ import {
   receiptAPI,
   voucherAPI,
 } from '../../../services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 

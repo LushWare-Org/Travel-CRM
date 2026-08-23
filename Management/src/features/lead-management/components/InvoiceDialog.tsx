@@ -4,7 +4,7 @@ import {
   Receipt, ScrollText, StickyNote, CheckCircle2, MapPin, Calendar, Plus,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { invoiceAPI, quotationAPI, adminAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import { formatCurrency, LOCALE } from '../../../utils/currency.js';

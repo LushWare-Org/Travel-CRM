@@ -5,7 +5,7 @@ import {
   Trash2, Check, Lock, RefreshCw, XCircle, Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { leadAPI, packageAPI } from '../../../services/api';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';

@@ -10,7 +10,7 @@ import { CHART_PALETTE } from '../Common/chartTheme';
 import { Users, Target, Download, Activity, Zap } from 'lucide-react';
 import { analyticsAPI } from '../../../../services/api';
 import { exportLeadAnalyticsPDF } from '../../utils/exportAnalytics';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
 

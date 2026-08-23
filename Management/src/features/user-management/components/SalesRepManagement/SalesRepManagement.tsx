@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, User, TrendingUp, AlertCircle, Loader } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/toast';
 import { UserTableHeader, Pagination, UserFormDialog, ConfirmationDialog, FormGroup } from '../Common';
 import { StatCard } from '@/components/shared/StatCard';
 import { Button } from '@/components/ui/button';

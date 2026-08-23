@@ -23,7 +23,7 @@ vi.mock('../../../../../services/salesRep.service', () => ({
   },
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 

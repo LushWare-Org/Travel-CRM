@@ -5,7 +5,7 @@ import {
   Users, Info, CheckCircle2, Building2, Phone, Bed,
 } from 'lucide-react';
 import HotelService from '../../../services/hotel.service';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import CountrySelect from '../../../components/CountrySelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 import { Button } from '../../../components/ui/button';
@@ -325,7 +325,7 @@ export default function HotelSelectionModal({
       });
       const data = response.data || [];
       setSearchResults(data);
-      if (!data.length) toast('No hotels found', { icon: '🏨' });
+      if (!data.length) toast('No hotels found', { type: 'info' });
     } catch (error: any) {
       setSearchError(error.message || 'Search failed');
       toast.error(error.message || 'Hotel search failed');

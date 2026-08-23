@@ -4,7 +4,7 @@ import {
   Eye, Send, Pencil, CheckCircle2, MapPin, Users, Calendar, Check,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import Swal from 'sweetalert2';
 import { leadAPI, quotationAPI, packageAPI } from '../../../../services/api';
 import PDFPreviewDialog from '../PDFPreviewDialog';

@@ -9,7 +9,7 @@ import { CHART_PALETTE } from '../Common/chartTheme';
 import { ShoppingCart, TrendingUp, Download, Briefcase, Star } from 'lucide-react';
 import AnalyticsService from '../../../../services/analytics.service';
 import { exportPackageAnalyticsPDF } from '../../utils/exportAnalytics';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
 

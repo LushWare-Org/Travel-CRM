@@ -4,7 +4,7 @@ import {
   ChevronRight, Search, Loader2,
 } from 'lucide-react';
 import { leadAPI } from '../../../services/api';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';

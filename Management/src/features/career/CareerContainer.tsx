@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Eye, Edit2, Trash2, Search, ChevronLeft, ChevronRight, Download, Users, Clock, CheckCircle2, XCircle, Award } from 'lucide-react';
 import careerService from '../../services/career.service';
 import { Button } from '../../components/ui/button';

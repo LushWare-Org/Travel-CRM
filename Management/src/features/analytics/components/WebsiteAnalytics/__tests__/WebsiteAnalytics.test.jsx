@@ -7,7 +7,7 @@ vi.mock('../../../../../services/analytics.service.js', () => ({
   default: { getWebsiteAnalyticsOverview: mockGetWebsiteAnalyticsOverview },
 }));
 
-vi.mock('react-hot-toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
 import WebsiteAnalytics from '../WebsiteAnalytics.tsx';
 

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { Eye, EyeOff, Mail, Lock, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 import BRANDING, { getLoginBranding } from '../config/branding';
 import { Button } from '@/components/ui/button';

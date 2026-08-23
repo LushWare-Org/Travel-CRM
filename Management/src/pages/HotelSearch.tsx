@@ -4,7 +4,7 @@ import {
   Loader2, CheckCircle2, Ban, ListChecks, Star,
   Users, MapPin, Building2, Info,
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/toast';
 import HotelService from '../services/hotel.service';
 import CountrySelect from '../components/CountrySelect';
 import { Button } from '@/components/ui/button';
@@ -201,7 +201,7 @@ export default function HotelSearch() {
         limit: 20,
       });
       setOffers(response.data || []);
-      if (!response.data?.length) toast('No hotels found', { icon: '🏨' });
+      if (!response.data?.length) toast('No hotels found', { type: 'info' });
     } catch (err) {
       toast.error((err as Error)?.message || 'Hotel search failed');
     } finally {

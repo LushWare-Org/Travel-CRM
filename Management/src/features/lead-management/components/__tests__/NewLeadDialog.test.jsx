@@ -28,7 +28,7 @@ vi.mock('../../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', role: 'admin', name: 'Admin User' } }),
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 

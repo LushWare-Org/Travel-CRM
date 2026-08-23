@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, Save, Eye, Download, Plus, Trash2, Calendar, MapPin, Hotel, Utensils, FileText, Ticket, ChevronRight, User, Clock, Globe, Plane, Pencil } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { voucherAPI, packageAPI, leadAPI } from '../../../services/api';
 import { flightAPI } from '../../../services/flight.service';
 import PDFPreviewDialog from './PDFPreviewDialog';

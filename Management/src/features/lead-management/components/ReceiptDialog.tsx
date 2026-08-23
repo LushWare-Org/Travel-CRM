@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Save, CreditCard, Eye, Receipt, Calendar, FileText } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { receiptAPI, invoiceAPI } from '../../../services/api';
 import PDFPreviewDialog from './PDFPreviewDialog';
 import SendDocumentPanel from './shared/SendDocumentPanel';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plane, Search, ListChecks, SlidersHorizontal } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/toast';
 import { flightAPI } from '../../services/flight.service';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -168,7 +168,7 @@ export default function FlightSearch() {
           ? `${form.origin} → ${form.destination}, ${new Date(form.departureDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
           : ''
       );
-      if (!results.length) toast('No flights found for this search', { icon: '✈️' });
+      if (!results.length) toast('No flights found for this search', { type: 'info' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- flight.service.js is untyped JS, error shape is unknown at this boundary
     } catch (error: any) {
       toast.error(error.message || 'Flight search failed');

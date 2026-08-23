@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Edit, Save, XCircle, Loader2, MessageSquare, Clock, Hash, Plus, Trash2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import { leadAPI } from '../../../services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';

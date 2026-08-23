@@ -9,7 +9,7 @@ import {
 import { CHART_PALETTE } from '../Common/chartTheme';
 import { Search, MapPin, TrendingUp, Download, Target } from 'lucide-react';
 import { exportWebsiteAnalyticsPDF } from '../../utils/exportAnalytics';
-import toast from 'react-hot-toast';
+import toast from '@/lib/toast';
 import AnalyticsService from '../../../../services/analytics.service';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
