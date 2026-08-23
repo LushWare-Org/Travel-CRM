@@ -1,20 +1,34 @@
 import { useState, useEffect } from 'react';
 import { X, Download, Loader2, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelcloud.com/api/v1';
 
-const PDFPreviewDialog = ({ 
-  isOpen, 
-  onClose, 
-  pdfUrl, 
-  documentName, 
+interface PDFPreviewDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pdfUrl: string | null;
+  documentName?: string;
+  onDownload?: () => void;
+  onBack?: () => void;
+  documents?: unknown[];
+  currentIndex?: number;
+  onNavigate?: (index: number) => void;
+}
+
+const PDFPreviewDialog = ({
+  isOpen,
+  onClose,
+  pdfUrl,
+  documentName,
   onDownload,
   onBack,
   documents = [],
   currentIndex = 0,
-  onNavigate
-}) => {
-  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+  onNavigate,
+}: PDFPreviewDialogProps) => {
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -36,23 +50,23 @@ const PDFPreviewDialog = ({
       }
 
       const headers = {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       };
 
       fetch(fullUrl, { headers })
-        .then(response => {
+        .then((response) => {
           if (!response.ok) {
             console.error(`HTTP Error: ${response.status}. Token: ${token ? 'present' : 'missing'}`);
             throw new Error('Failed to load PDF');
           }
           return response.blob();
         })
-        .then(blob => {
+        .then((blob) => {
           const url = window.URL.createObjectURL(blob);
           setPdfBlobUrl(url);
           setLoading(false);
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('Error loading PDF:', error);
           setLoading(false);
         });
@@ -63,9 +77,8 @@ const PDFPreviewDialog = ({
         window.URL.revokeObjectURL(pdfBlobUrl);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, pdfUrl]);
-
-  if (!isOpen) return null;
 
   const handleDownload = () => {
     if (pdfBlobUrl) {
@@ -102,31 +115,24 @@ const PDFPreviewDialog = ({
   const canGoPrevious = currentIndex > 0;
   const canGoNext = currentIndex < documents.length - 1;
 
-   const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4" onClick={handleBackdropClick}>
-      <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full max-w-6xl h-full sm:h-[90vh] flex flex-col">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="p-0 gap-0 w-full max-w-6xl h-full sm:h-[90vh] rounded-none sm:rounded-xl flex flex-col"
+      >
         {/* Header */}
-        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-600 to-blue-700">
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-border flex items-center justify-between bg-primary rounded-t-none sm:rounded-t-xl">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             {onBack && (
-              <button
-                onClick={handleBack}
-                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded transition-colors font-medium text-sm"
-                title="Back to Form"
-              >
+              <Button variant="ghost" size="sm" onClick={handleBack} className="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground" title="Back to Form">
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Back</span>
-              </button>
+              </Button>
             )}
             <div className="min-w-0">
-              <h2 className="text-lg sm:text-2xl font-bold text-white">PDF Preview</h2>
-              <p className="text-blue-100 text-sm mt-1">
+              <h2 className="text-lg sm:text-2xl font-bold text-primary-foreground">PDF Preview</h2>
+              <p className="text-primary-foreground/80 text-sm mt-1">
                 {documentName || 'Document'}
                 {canNavigate && (
                   <span className="ml-2 opacity-75">
@@ -140,36 +146,37 @@ const PDFPreviewDialog = ({
             {/* Navigation Buttons */}
             {canNavigate && (
               <div className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2">
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handlePrevious}
                   disabled={!canGoPrevious}
-                  className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground disabled:opacity-50"
                   title="Previous Document"
                 >
                   <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleNext}
                   disabled={!canGoNext}
-                  className="p-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground disabled:opacity-50"
                   title="Next Document"
                 >
                   <ChevronRight className="w-5 h-5" />
-                </button>
+                </Button>
               </div>
             )}
             {onDownload && pdfBlobUrl && !loading && (
-              <button
-                onClick={handleDownload}
-                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-white text-blue-600 rounded hover:bg-blue-50 transition-colors font-medium text-sm"
-              >
+              <Button variant="secondary" size="sm" onClick={handleDownload}>
                 <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">Download</span>
-              </button>
+              </Button>
             )}
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors"
+              className="text-primary-foreground hover:opacity-80 transition-colors"
               title="Close"
             >
               <X className="w-6 h-6" />
@@ -181,8 +188,8 @@ const PDFPreviewDialog = ({
         <div className="flex-1 overflow-hidden relative">
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              <span className="ml-2 text-gray-600">Loading PDF...</span>
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">Loading PDF...</span>
             </div>
           ) : pdfBlobUrl ? (
             <iframe
@@ -193,15 +200,14 @@ const PDFPreviewDialog = ({
               title="PDF Preview"
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="flex items-center justify-center h-full text-muted-foreground">
               <p>Failed to load PDF</p>
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
 export default PDFPreviewDialog;
-

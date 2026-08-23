@@ -14,7 +14,7 @@ vi.mock('react-hot-toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-import PricingSection from '../PricingSection.jsx';
+import PricingSection from '../PricingSection';
 
 const financialsFixture = (overrides = {}) => ({
   estimatedTotal: 1000,
