@@ -220,12 +220,40 @@ export const refreshPackageSelection = asyncHandler(async (req, res) => {
 export const quotePackageSelection = asyncHandler(async (req, res) => {
   const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
   if (!lead) throw new AppError('Lead not found', 404);
+
+  // Ownership check first, before any materialization side effects.
+  await loadOwnedSelection(req.params.id, req.params.selectionId);
+
+  // A still-pristine selection has no persisted pricing/cost lines — the UI
+  // shows a computed preview, but the gatekeeper needs the persisted numbers.
+  // Materialize it (freeze the package blueprint/manual default), then
+  // recompute totals so sellSubtotal matches what the quotation snapshot
+  // sends to billing instead of staying 0 and rejecting the quote.
+  if (!(await isSelectionMaterialized(req.params.selectionId))) {
+    await materializeSelection({ selectionId: req.params.selectionId });
+  }
+  await recomputeSelectionPricing(req.params.selectionId);
+
   const selection = await loadOwnedSelection(req.params.id, req.params.selectionId, { pricing: true, costLines: true });
 
+  const pricingInputs = gatekeeperInputs(selection.pricing, selection.costLines);
+  const statusHistoryCreate = [];
+  let effectiveStatus = lead.lifecycleStatus;
+
+  // A NEW lead with a priced selection is implicitly ready to draft — the
+  // same auto-promotion applyLeadSelectionItinerary/draftLead already apply
+  // elsewhere — so quoting shouldn't require a separate manual "move to
+  // drafting" step first.
+  if (effectiveStatus === 'NEW') {
+    validateTransition({ currentStatus: effectiveStatus, nextStatus: 'DRAFTING', pricing: pricingInputs });
+    effectiveStatus = 'DRAFTING';
+    statusHistoryCreate.push({ status: 'DRAFTING', actor: 'USER', changedById: req.user.id, notes: 'Moved to drafting' });
+  }
+
   validateTransition({
-    currentStatus: lead.lifecycleStatus,
+    currentStatus: effectiveStatus,
     nextStatus: 'QUOTED',
-    pricing: gatekeeperInputs(selection.pricing, selection.costLines),
+    pricing: pricingInputs,
   });
 
   const quotation = await snapshotSelectionQuotation(selection.id, { createdById: req.user.id });
@@ -246,10 +274,9 @@ export const quotePackageSelection = asyncHandler(async (req, res) => {
 
   const leadUpdateData = { primarySelectionId: selection.id };
   if (lead.lifecycleStatus !== 'QUOTED') {
+    statusHistoryCreate.push({ status: 'QUOTED', actor: 'USER', changedById: req.user.id, notes: 'Quotation snapshot sent to billing' });
     leadUpdateData.lifecycleStatus = 'QUOTED';
-    leadUpdateData.statusHistory = {
-      create: [{ status: 'QUOTED', actor: 'USER', changedById: req.user.id, notes: 'Quotation snapshot sent to billing' }],
-    };
+    leadUpdateData.statusHistory = { create: statusHistoryCreate };
   }
   await prisma.lead.update({
     where: { id: lead.id },

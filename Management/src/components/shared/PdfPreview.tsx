@@ -8,7 +8,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.lushtravelclou
 // Large enough to feel like a real document viewer instead of a cramped
 // modal, capped so it doesn't stretch unreasonably wide on ultra-wide
 // monitors. Full-bleed on mobile, matching the prior per-caller convention.
-export const PDF_DIALOG_SIZE_CLASSES = 'w-full max-w-[1600px] w-[95vw] h-full sm:h-[90vh] rounded-none sm:rounded-xl';
+//
+// The sm: variants are deliberate: DialogContent's base carries `sm:max-w-sm`,
+// and twMerge only drops that constraint when the caller's override shares
+// its `sm:` variant — a bare `max-w-[1600px]` survives the merge and loses
+// the CSS cascade to the later-emitted `sm:max-w-sm`, silently shrinking the
+// dialog to 384px on desktop.
+export const PDF_DIALOG_SIZE_CLASSES = 'w-full sm:w-[95vw] max-w-[1920px] sm:max-w-[1920px] h-full sm:h-[90vh] rounded-none sm:rounded-xl';
 
 interface UsePdfPreviewArgs {
   isOpen: boolean;
