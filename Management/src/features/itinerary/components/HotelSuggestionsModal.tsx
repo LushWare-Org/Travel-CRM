@@ -115,7 +115,11 @@ const HotelSuggestionsModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent showCloseButton className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent
+        showCloseButton
+        className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+        closeClassName="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground dark:hover:bg-primary-foreground/20 dark:hover:text-primary-foreground"
+      >
         {/* Header */}
         <div className="bg-primary text-primary-foreground p-6 rounded-t-xl">
           <h2 className="text-2xl font-heading font-bold">Hotel Suggestions</h2>

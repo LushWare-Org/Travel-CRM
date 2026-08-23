@@ -603,7 +603,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }: ReceiptDialogProps)
             </div>
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row items-stretch sm:items-center sm:justify-between">
+          <DialogFooter className="-mx-0 -mb-0 flex-col sm:flex-row items-stretch sm:items-center sm:justify-between">
             <div>
               {currentReceiptId && (
                 <Button variant="secondary" onClick={() => handlePreviewPDF(currentReceiptId)}>

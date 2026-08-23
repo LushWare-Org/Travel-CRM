@@ -298,7 +298,10 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }: NewLeadDialogP
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent
+        className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col"
+        closeClassName="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground dark:hover:bg-primary-foreground/20 dark:hover:text-primary-foreground"
+      >
         <FormDialogHeader icon={Sparkles} title="Create New Lead" subtitle="Fill in the details to add a new lead" />
 
         <FormDialogBody>

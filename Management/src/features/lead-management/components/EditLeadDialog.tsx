@@ -405,7 +405,10 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
-      <DialogContent className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent
+        className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col"
+        closeClassName="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground dark:hover:bg-primary-foreground/20 dark:hover:text-primary-foreground"
+      >
         <FormDialogHeader icon={Edit} title="Edit Lead" subtitle={formData.name || 'Lead Details'} />
 
         <FormDialogBody>
