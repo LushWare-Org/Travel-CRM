@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  X, Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, Copy,
+  Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, Copy,
   User, MapPin, Plane, Users, Globe, Package, ChevronDown, ChevronUp,
   Trash2, Check, Lock, RefreshCw, XCircle, Wallet,
 } from 'lucide-react';
@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 // A lead can hold many packages at once, plus at most one manual
 // (from-scratch) itinerary slot — this sentinel is the "add" picker's third
@@ -439,32 +440,20 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
   if (!isOpen || !lead) return null;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          handleCancel();
-        }
-      }}
-    >
-      <div className="bg-card rounded-3xl max-w-4xl w-full max-h-[95vh] overflow-hidden shadow-[var(--shadow-modal)] flex flex-col">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
+      <DialogContent className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-primary text-primary-foreground p-4 sm:p-6 shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary-foreground/15 rounded-2xl">
-                <Edit className="w-7 h-7" />
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold">Edit Lead</h2>
-                <p className="text-primary-foreground/80 text-sm mt-0.5">{formData.name || 'Lead Details'}</p>
-              </div>
+        <DialogHeader className="bg-primary text-primary-foreground p-4 sm:p-6 shrink-0 space-y-0">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary-foreground/15 rounded-2xl">
+              <Edit className="w-7 h-7" />
             </div>
-            <button onClick={handleCancel} className="p-2.5 hover:bg-primary-foreground/15 rounded-xl transition-all">
-              <X className="w-5 h-5" />
-            </button>
+            <div>
+              <DialogTitle className="text-xl sm:text-2xl text-primary-foreground">Edit Lead</DialogTitle>
+              <DialogDescription className="text-primary-foreground/80 mt-0.5">{formData.name || 'Lead Details'}</DialogDescription>
+            </div>
           </div>
-        </div>
+        </DialogHeader>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
@@ -676,6 +665,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Sales Rep">
                           {(value: string) => {
+                            if (value === '__none__') return 'Select Sales Rep';
                             if (value === '__name_only') return formData.salesRep;
                             const rep = salesReps.find((r) => r.id === value || r._id === value);
                             return rep ? rep.name : value;
@@ -1101,7 +1091,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
         </div>
 
         {/* Footer Actions */}
-        <div className="px-4 sm:px-6 py-4 bg-muted border-t border-border flex gap-3 shrink-0">
+        <DialogFooter className="flex-row bg-muted gap-3 shrink-0">
           <Button type="button" variant="outline" onClick={handleCancel} className="flex-1">
             Cancel
           </Button>
@@ -1118,9 +1108,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
               </>
             )}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
