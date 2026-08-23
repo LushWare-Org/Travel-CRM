@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
-import { Clock } from 'lucide-react';
+import { Clock, Loader2, ShieldCheck } from 'lucide-react';
 import { getLoginBranding } from '../config/branding';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function SalesRepLoginOTP() {
   const navigate = useNavigate();
@@ -68,7 +70,7 @@ export default function SalesRepLoginOTP() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -93,7 +95,7 @@ export default function SalesRepLoginOTP() {
     return true;
   };
 
-  const handleOtpSubmit = async (e) => {
+  const handleOtpSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -137,19 +139,20 @@ export default function SalesRepLoginOTP() {
       }
     } catch (err) {
       console.error('OTP Verification Error:', err); // Debug log
-      const errorMessage = err.response?.data?.message || err.message || 'Invalid OTP. Please try again.';
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data
+          ?.message ||
+        (err as Error)?.message ||
+        'Invalid OTP. Please try again.';
       setError(errorMessage);
 
-      // Increment attempt count
       const newAttemptCount = attemptCount + 1;
       setAttemptCount(newAttemptCount);
 
-      // Show attempt warning
       if (newAttemptCount < 5) {
         toast.error(`${errorMessage} (${5 - newAttemptCount} attempts remaining)`);
       } else {
         toast.error('Too many failed attempts. Please login again.');
-        // Clear session and redirect
         localStorage.removeItem('otpTempToken');
         localStorage.removeItem('otpMaskedEmail');
         navigate('/login');
@@ -179,7 +182,9 @@ export default function SalesRepLoginOTP() {
         toast.success('New OTP sent to your email');
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.message || 'Failed to resend OTP. Please try again.';
+      const errorMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to resend OTP. Please try again.';
       setError(errorMessage);
       toast.error(errorMessage);
       setCanResendOtp(true);
@@ -195,33 +200,32 @@ export default function SalesRepLoginOTP() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
-        {/* Logo/Header */}
-        <div className="text-center mb-4 sm:mb-8">
-          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">{getLoginBranding().title}</h1>
-          <p className="text-gray-600 text-sm sm:text-base">Verify Your Identity</p>
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground mb-1">
+            {getLoginBranding().title}
+          </h1>
+          <p className="text-muted-foreground text-sm">Verify Your Identity</p>
         </div>
 
-        {/* OTP Card */}
-        <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8">
+        <div className="bg-card border border-border rounded-xl shadow-[var(--shadow-modal)] p-6 sm:p-8">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Enter OTP</h2>
-            <p className="text-gray-600 text-sm">
-              We've sent a 6-digit code to <strong>{maskedEmail}</strong>
+            <h2 className="font-heading text-xl font-semibold text-foreground mb-2">Enter OTP</h2>
+            <p className="text-muted-foreground text-sm">
+              We&apos;ve sent a 6-digit code to <strong className="text-foreground">{maskedEmail}</strong>
             </p>
           </div>
 
-          <form onSubmit={handleOtpSubmit} className="space-y-5">
-            {/* OTP Input Field */}
+          <form onSubmit={handleOtpSubmit} className="space-y-4">
             <div>
-              <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="otp" className="block text-sm font-medium text-foreground mb-2">
                 Enter 6-Digit OTP
               </label>
-              <input
+              <Input
                 id="otp"
                 type="text"
-                maxLength="6"
+                maxLength={6}
                 value={otpCode}
                 onChange={(e) => {
                   const value = e.target.value.replace(/\D/g, '');
@@ -229,22 +233,21 @@ export default function SalesRepLoginOTP() {
                   setError('');
                 }}
                 placeholder="000000"
-                className="w-full px-4 py-3 text-center text-2xl sm:text-3xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 outline-none tracking-wider sm:tracking-widest font-mono"
+                className="h-14 text-center text-2xl sm:text-3xl font-mono font-bold tracking-widest"
                 disabled={isSubmitting || timer === 0}
               />
             </div>
 
-            {/* Timer and Resend */}
             <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center text-gray-600">
+              <div className="flex items-center text-muted-foreground">
                 <Clock size={16} className="mr-2" />
                 <span>
                   {timer > 0 ? (
                     <>
-                      Expires in <strong className="ml-1">{formatTime(timer)}</strong>
+                      Expires in <strong className="ml-1 text-foreground">{formatTime(timer)}</strong>
                     </>
                   ) : (
-                    <span className="text-red-600">OTP expired</span>
+                    <span className="text-destructive">OTP expired</span>
                   )}
                 </span>
               </div>
@@ -252,81 +255,61 @@ export default function SalesRepLoginOTP() {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={!canResendOtp || isSubmitting || timer === 0}
-                className={`font-medium transition ${canResendOtp && timer > 0
-                    ? 'text-blue-600 hover:text-blue-700 cursor-pointer'
-                    : 'text-gray-400 cursor-not-allowed'
-                  }`}
+                className={`font-medium transition-colors ${
+                  canResendOtp && timer > 0
+                    ? 'text-primary hover:text-primary/80 cursor-pointer'
+                    : 'text-muted-foreground cursor-not-allowed'
+                }`}
               >
                 {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
               </button>
             </div>
 
-            {/* Attempt Counter */}
             {attemptCount > 0 && attemptCount < 5 && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-700">
+              <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                <p className="text-sm text-warning">
                   {5 - attemptCount} attempt{5 - attemptCount !== 1 ? 's' : ''} remaining
                 </p>
               </div>
             )}
 
-            {/* Error Message */}
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-sm text-destructive">{error}</p>
               </div>
             )}
 
-            {/* Submit Button */}
-            <button
+            <Button
               type="submit"
               disabled={isSubmitting || otpCode.length !== 6 || timer === 0}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center"
+              className="w-full h-10 gap-2"
             >
               {isSubmitting ? (
                 <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Verifying...
                 </>
               ) : (
                 'Complete Login'
               )}
-            </button>
+            </Button>
 
-            {/* Back Button */}
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleBackToLogin}
               disabled={isSubmitting}
-              className="w-full text-gray-600 hover:text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-200"
+              className="w-full h-10"
             >
-              ← Back to Login
-            </button>
+              &larr; Back to Login
+            </Button>
           </form>
 
-          {/* Security Info */}
-          <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-700">
-              <strong>🔒 Security:</strong> Never share your OTP code. We will never ask for it via email or phone.
+          <div className="mt-6 p-3 bg-primary/10 border border-primary/20 rounded-lg flex gap-2">
+            <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <p className="text-xs text-primary">
+              <strong>Security:</strong> Never share your OTP code. We will never ask for it via email
+              or phone.
             </p>
           </div>
         </div>
