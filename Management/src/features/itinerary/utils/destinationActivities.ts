@@ -7,7 +7,7 @@ import { DEFAULT_ACTIVITIES } from './activities';
 import { getRegionFromDestination } from './destinationMapping';
 
 // Destination-specific activities (most popular destinations)
-export const DESTINATION_ACTIVITIES = {
+export const DESTINATION_ACTIVITIES: Record<string, string[]> = {
     // Middle East - Dubai/UAE
     'Dubai': [
         'Burj Khalifa Visit',
@@ -273,7 +273,7 @@ export const DESTINATION_ACTIVITIES = {
 };
 
 // Regional activities (broader categories)
-export const REGIONAL_ACTIVITIES = {
+export const REGIONAL_ACTIVITIES: Record<string, string[]> = {
     'Middle East': [
         'Desert Safari',
         'Camel Riding',

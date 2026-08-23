@@ -101,7 +101,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialSe
     setLoadingPackage(true);
     try {
       const res = await leadAPI.getPackageSelections(leadId);
-      const list = res?.data || [];
+      const list: any[] = res?.data || [];
       setSelections(list);
       const mostRecentlyAccepted = [...list]
         .filter((s) => s.quoteAcceptedAt)

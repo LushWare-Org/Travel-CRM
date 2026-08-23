@@ -521,7 +521,7 @@ const LeadManagement = () => {
         lead={selectedLead}
         salesReps={salesReps}
         onSuccess={handleLeadSuccess}
-        initialSelectionId={editorInitialSelectionId}
+        initialSelectionId={editorInitialSelectionId ?? undefined}
       />
 
       <RemarksDialog
@@ -595,7 +595,7 @@ const LeadManagement = () => {
           lead={quotationLead}
           onSuccess={handleQuotationSuccess}
           onEditLead={openLeadEditorFromQuote}
-          initialSelectionId={quotationInitialSelectionId}
+          initialSelectionId={quotationInitialSelectionId ?? undefined}
         />
       )}
 
@@ -627,7 +627,7 @@ const LeadManagement = () => {
           lead={voucherLead}
           onSuccess={handleVoucherSuccess}
           onEditLead={openLeadEditorFromVoucher}
-          initialSelectionId={voucherInitialSelectionId}
+          initialSelectionId={voucherInitialSelectionId ?? undefined}
         />
       )}
 

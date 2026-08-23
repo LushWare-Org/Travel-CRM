@@ -4,7 +4,7 @@
  */
 
 // International Destinations
-export const LOCATIONS_BY_DESTINATION = {
+export const LOCATIONS_BY_DESTINATION: Record<string, string[]> = {
   // Popular International
   'Almaty, Kazakhstan': [
     'Medeu Ice Skating Rink',
@@ -820,7 +820,7 @@ export const LOCATIONS_BY_DESTINATION = {
 
 
 // Get locations for a specific destination
-export const getLocationsForDestination = (destination) => {
+export const getLocationsForDestination = (destination?: string | null): string[] => {
   if (!destination) return [];
 
   // Try exact match first

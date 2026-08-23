@@ -17,7 +17,7 @@ vi.mock('../../../../services/websiteUser.service', () => ({
     deleteUser: mockDeleteUser,
     toggleUserStatus: mockToggleUserStatus,
     validateUserData: () => ({ valid: true, errors: {} }),
-    transformUserData: (u) => ({
+    transformUserData: (u: any) => ({
       id: u._id || u.id,
       name: u.name,
       email: u.email,

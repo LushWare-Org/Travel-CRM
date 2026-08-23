@@ -25,6 +25,9 @@ class ApiService {
   }
 
   // Generic fetch method
+  /**
+   * @returns {Promise<any>} Parsed response body (raw envelope shape varies per endpoint)
+   */
   async fetch(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {

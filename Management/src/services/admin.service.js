@@ -26,7 +26,7 @@ class AdminService {
    * @param {string} params.role - Filter by role (customer, salesRep, vendor, admin)
    * @param {boolean} params.isActive - Filter by active status
    * @param {boolean} params.isEmailVerified - Filter by email verification status
-   * @returns {Promise<Object>} User list with pagination info
+   * @returns {Promise<any>} User list with pagination info
    */
   async getAllUsers(params = {}) {
     try {
@@ -41,7 +41,7 @@ class AdminService {
   /**
    * Get single user by ID
    * @param {string} userId - User ID (MongoDB ObjectId)
-   * @returns {Promise<Object>} User data
+   * @returns {Promise<any>} User data
    */
   async getUserById(userId) {
     try {
@@ -57,7 +57,7 @@ class AdminService {
    * Get users by specific role
    * @param {string} role - User role (customer, salesRep, vendor, admin)
    * @param {Object} params - Additional query parameters
-   * @returns {Promise<Object>} Users with specified role
+   * @returns {Promise<any>} Users with specified role
    */
   async getUsersByRole(role, params = {}) {
     try {
@@ -71,7 +71,7 @@ class AdminService {
 
   /**
    * Get user statistics for dashboard
-   * @returns {Promise<Object>} User statistics (total, active, by role, etc.)
+   * @returns {Promise<any>} User statistics (total, active, by role, etc.)
    */
   async getUserStats() {
     try {
@@ -91,7 +91,7 @@ class AdminService {
    * @param {string} userData.phone - User phone number
    * @param {string} userData.password - User password (required)
    * @param {string} userData.role - User role: customer, salesRep, vendor, admin (required)
-   * @returns {Promise<Object>} Created user
+   * @returns {Promise<any>} Created user
    */
   async createUser(userData) {
     try {
@@ -112,7 +112,7 @@ class AdminService {
    * @param {string} updateData.email - Email address
    * @param {string} updateData.role - User role
    * @param {boolean} updateData.isActive - Active status
-   * @returns {Promise<Object>} Updated user
+   * @returns {Promise<any>} Updated user
    */
   async updateUser(userId, updateData) {
     try {
@@ -131,7 +131,7 @@ class AdminService {
    * @param {string} passwordData.currentPassword - Current password
    * @param {string} passwordData.newPassword - New password
    * @param {string} passwordData.confirmPassword - Confirm new password
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async updateUserPassword(userId, passwordData) {
     try {
@@ -147,7 +147,7 @@ class AdminService {
    * Delete user permanently
    * @param {string} userId - User ID
    * @param {boolean} confirmDelete - Must be true to confirm deletion
-   * @returns {Promise<Object>} Success response
+   * @returns {Promise<any>} Success response
    */
   async deleteUser(userId, confirmDelete = true) {
     try {
@@ -163,7 +163,7 @@ class AdminService {
    * Toggle user active status (soft delete/archive)
    * @param {string} userId - User ID
    * @param {boolean} isActive - Active status
-   * @returns {Promise<Object>} Updated user
+   * @returns {Promise<any>} Updated user
    */
   async toggleUserStatus(userId, isActive) {
     try {
@@ -179,7 +179,7 @@ class AdminService {
    * Assign or update user role
    * @param {string} userId - User ID
    * @param {string} role - New role (customer, salesRep, vendor, admin)
-   * @returns {Promise<Object>} Updated user
+   * @returns {Promise<any>} Updated user
    */
   async assignUserRole(userId, role) {
     try {
@@ -195,7 +195,7 @@ class AdminService {
    * Force password reset for a user (admin only)
    * Generates a temporary password and sends reset email
    * @param {string} userId - User ID
-   * @returns {Promise<Object>} Success response with message
+   * @returns {Promise<any>} Success response with message
    */
   async resetUserPassword(userId) {
     try {
@@ -213,7 +213,7 @@ class AdminService {
 
   /**
    * Get current user profile
-   * @returns {Promise<Object>} Current user profile data
+   * @returns {Promise<any>} Current user profile data
    */
   async getCurrentUserProfile() {
     try {
@@ -228,7 +228,7 @@ class AdminService {
   /**
    * Get all admin users (including super admins)
    * @param {Object} params - Query parameters
-   * @returns {Promise<Object>} Admin users list
+   * @returns {Promise<any>} Admin users list
    */
   async getAllAdmins(params = {}) {
     try {
@@ -280,7 +280,7 @@ class AdminService {
    * @param {string} adminData.phone - Admin phone
    * @param {string} adminData.password - Temporary password
    * @param {Array<string>} adminData.permissions - Admin permissions
-   * @returns {Promise<Object>} Created admin
+   * @returns {Promise<any>} Created admin
    */
   async createAdmin(adminData) {
     try {
@@ -299,7 +299,7 @@ class AdminService {
    * Update admin user
    * @param {string} adminId - Admin ID
    * @param {Object} updateData - Data to update
-   * @returns {Promise<Object>} Updated admin
+   * @returns {Promise<any>} Updated admin
    */
   async updateAdmin(adminId, updateData) {
     try {
@@ -313,7 +313,7 @@ class AdminService {
 
   /**
    * Get admin dashboard statistics
-   * @returns {Promise<Object>} Dashboard statistics
+   * @returns {Promise<any>} Dashboard statistics
    */
   async getDashboardStats() {
     try {
@@ -331,7 +331,7 @@ class AdminService {
 
   /**
    * Get application settings
-   * @returns {Promise<Object>} Settings data
+   * @returns {Promise<any>} Settings data
    */
   async getSettings() {
     try {
@@ -346,7 +346,7 @@ class AdminService {
   /**
    * Update application settings
    * @param {Object} settingsData - Settings to update
-   * @returns {Promise<Object>} Updated settings
+   * @returns {Promise<any>} Updated settings
    */
   async updateSettings(settingsData) {
     try {
@@ -364,7 +364,7 @@ class AdminService {
 
   /**
    * Get available permissions list
-   * @returns {Promise<Object>} List of available permissions
+   * @returns {Promise<any>} List of available permissions
    */
   async getAvailablePermissions() {
     try {
@@ -379,7 +379,7 @@ class AdminService {
   /**
    * Get admin user permissions
    * @param {string} adminId - Admin user ID
-   * @returns {Promise<Object>} Admin permissions
+   * @returns {Promise<any>} Admin permissions
    */
   async getAdminPermissions(adminId) {
     try {
@@ -395,7 +395,7 @@ class AdminService {
    * Update admin user permissions
    * @param {string} adminId - Admin user ID
    * @param {Array<string>} permissions - Array of permission IDs
-   * @returns {Promise<Object>} Updated admin
+   * @returns {Promise<any>} Updated admin
    */
   async updateAdminPermissions(adminId, permissions) {
     try {

@@ -138,7 +138,8 @@ export const useWebsiteUsers = () => {
           role: 'customer', // Always customer role
         };
 
-        const response = await websiteUserService.createUser(apiData);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- service is untyped JS; its JSDoc documents phone/phoneCountry as required, which doesn't match the real (optional) runtime contract
+        const response = await websiteUserService.createUser(apiData as any);
 
         if (response.status === 'success') {
           // Reset filters and refresh user list

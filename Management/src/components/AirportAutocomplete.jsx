@@ -9,6 +9,16 @@ import AIRPORTS from "../data/airports";
  * `listMode` ("popular" | "all") controls the default list shown on focus
  * before typing: "popular" (default) is a curated shortlist of major hubs,
  * "all" is every airport in alphabetical order.
+ *
+ * @param {Object} props
+ * @param {string} [props.value]
+ * @param {(code: string) => void} props.onChange
+ * @param {string} [props.placeholder]
+ * @param {string} [props.label]
+ * @param {string} [props.id]
+ * @param {string} [props.excludeCode]
+ * @param {"popular"|"all"} [props.listMode]
+ * @param {string} [props.prioritizeCountry]
  */
 export default function AirportAutocomplete({
   value = "",

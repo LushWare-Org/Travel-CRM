@@ -39,7 +39,7 @@ const TransportRowEditor = ({ transport, onChange, onRemove, index }: TransportR
             onValueChange={(value) => onChange(applyTransportModeDefault(row, String(value)))}
           >
             <SelectTrigger className="w-full">
-              <SelectValue>{(value: string) => TRANSPORT_MODE_LABELS[value] ?? value}</SelectValue>
+              <SelectValue>{(value: string) => (TRANSPORT_MODE_LABELS as Record<string, string>)[value] ?? value}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {Object.entries(TRANSPORT_MODE_LABELS).map(([value, label]) => (
@@ -59,7 +59,7 @@ const TransportRowEditor = ({ transport, onChange, onRemove, index }: TransportR
             onValueChange={(value) => onChange(applyPricingModelChange(row, String(value)))}
           >
             <SelectTrigger className="w-full">
-              <SelectValue>{(value: string) => PRICING_MODEL_LABELS[value] ?? value}</SelectValue>
+              <SelectValue>{(value: string) => (PRICING_MODEL_LABELS as Record<string, string>)[value] ?? value}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {Object.entries(PRICING_MODEL_LABELS).map(([value, label]) => (
