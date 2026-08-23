@@ -15,6 +15,9 @@ const {
   mockLoadPrimarySelection,
   mockLeadCommunicationLogCreate,
   mockSendWhatsappText,
+  mockLeadGroupBy,
+  mockLeadAggregate,
+  mockLeadCount,
 } = vi.hoisted(() => ({
   mockLeadFindUnique: vi.fn(),
   mockLeadFindFirst: vi.fn(),
@@ -30,6 +33,9 @@ const {
   mockLoadPrimarySelection: vi.fn(),
   mockLeadCommunicationLogCreate: vi.fn(),
   mockSendWhatsappText: vi.fn(),
+  mockLeadGroupBy: vi.fn(),
+  mockLeadAggregate: vi.fn(),
+  mockLeadCount: vi.fn(),
 }));
 
 vi.mock('../../db/client.js', () => ({
@@ -37,6 +43,7 @@ vi.mock('../../db/client.js', () => ({
     lead: {
       findUnique: mockLeadFindUnique, findFirst: mockLeadFindFirst, findMany: mockLeadFindMany,
       update: mockLeadUpdate, create: mockLeadCreate,
+      groupBy: mockLeadGroupBy, aggregate: mockLeadAggregate, count: mockLeadCount,
     },
     leadRemark: { create: mockLeadRemarkCreate },
     leadCommunicationLog: { create: mockLeadCommunicationLogCreate },
@@ -58,7 +65,7 @@ vi.mock('../../services/notification.client.js', () => ({
 import {
   updateLead, createLead, draftLead, assignLead, unassignLead,
   getLeadsByStatus, searchLeads, handleFacebookLeadEvent,
-  logCommunication, sendWhatsappReply,
+  logCommunication, sendWhatsappReply, getLeadStats,
 } from '../lead.controller.js';
 
 const PKG_A = '11111111-1111-1111-1111-111111111111';
@@ -601,5 +608,75 @@ describe('sendWhatsappReply — agent free-form reply', () => {
     await sendWhatsappReply(req, res, next);
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
+  });
+});
+
+describe('getLeadStats — assigned/unassigned/conversionRate summary', () => {
+  beforeEach(() => {
+    mockLeadGroupBy.mockReset();
+    mockLeadAggregate.mockReset();
+    mockLeadCount.mockReset();
+  });
+
+  it('computes assigned, unassigned, and conversionRate for an admin (unscoped) request', async () => {
+    mockLeadGroupBy.mockResolvedValue([
+      { lifecycleStatus: 'NEW', _count: 3 },
+      { lifecycleStatus: 'CONFIRMED', _count: 2 },
+    ]);
+    mockLeadAggregate.mockResolvedValue({ _count: 22 });
+    // Promise.all order in the controller: assigned count, then confirmed count.
+    mockLeadCount.mockResolvedValueOnce(11).mockResolvedValueOnce(2);
+
+    const { req, res, next } = buildReqRes({ user: adminUser });
+    await getLeadStats(req, res, next);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      summary: expect.objectContaining({
+        total: 22,
+        assigned: 11,
+        unassigned: 11,
+        converted: 2,
+        conversionRate: '9.1',
+      }),
+    }));
+  });
+
+  it('does not let the assigned-count query clobber a salesRep\'s own assignedToId scope', async () => {
+    // Regression test: prisma.lead.count({ where: { ...where, assignedToId: { not:
+    // null } } }) used to silently overwrite where.assignedToId (the salesRep's own
+    // id) with { not: null }, counting every assigned lead app-wide instead of just
+    // this rep's own leads - producing assigned > total and a negative unassigned.
+    // The fix composes both conditions via an AND array instead of a key-colliding
+    // spread.
+    mockLeadGroupBy.mockResolvedValue([{ lifecycleStatus: 'NEW', _count: 3 }]);
+    mockLeadAggregate.mockResolvedValue({ _count: 3 });
+    mockLeadCount.mockResolvedValueOnce(3).mockResolvedValueOnce(0);
+
+    const salesRepUser = { id: 'rep-self', role: 'salesRep', isSuperAdmin: false, permissions: [] };
+    const { req, res, next } = buildReqRes({ user: salesRepUser });
+    await getLeadStats(req, res, next);
+
+    const assignedCountCall = mockLeadCount.mock.calls[0][0];
+    expect(assignedCountCall.where).toEqual({
+      AND: [{ assignedToId: 'rep-self' }, { assignedToId: { not: null } }],
+    });
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      summary: expect.objectContaining({ total: 3, assigned: 3, unassigned: 0 }),
+    }));
+  });
+
+  it('returns "0.0" conversionRate when there are no leads in scope', async () => {
+    mockLeadGroupBy.mockResolvedValue([]);
+    mockLeadAggregate.mockResolvedValue({ _count: 0 });
+    mockLeadCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+    const { req, res, next } = buildReqRes({ user: adminUser });
+    await getLeadStats(req, res, next);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      summary: expect.objectContaining({ total: 0, assigned: 0, unassigned: 0, conversionRate: '0.0' }),
+    }));
   });
 });
