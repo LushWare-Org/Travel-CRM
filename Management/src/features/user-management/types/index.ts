@@ -1,12 +1,8 @@
-/**
- * User Management Types and Enums
- */
-
 export const USER_ROLES = {
   ADMIN: 'Admin',
   SALES_REP: 'Sales Rep',
-  ACCOUNTANT: 'Accountant'
-};
+  ACCOUNTANT: 'Accountant',
+} as const;
 
 export const VENDOR_TYPES = {
   HOTEL: 'Hotel',
@@ -16,15 +12,15 @@ export const VENDOR_TYPES = {
   CAR_RENTAL: 'Car Rental',
   TOUR_OPERATOR: 'Tour Operator',
   AIRLINE: 'Airline',
-  OTHER: 'Other'
-};
+  OTHER: 'Other',
+} as const;
 
 export const USER_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
   SUSPENDED: 'suspended',
-  PENDING: 'pending'
-};
+  PENDING: 'pending',
+} as const;
 
 export const ADMIN_PERMISSIONS = {
   MANAGE_USERS: 'manage_users',
@@ -34,12 +30,12 @@ export const ADMIN_PERMISSIONS = {
   MANAGE_BILLING: 'manage_billing',
   MANAGE_ADMINS: 'manage_admins',
   MANAGE_LEADS: 'manage_leads',
-  MANAGE_PACKAGES: 'manage_packages'
-};
+  MANAGE_PACKAGES: 'manage_packages',
+} as const;
 
 export const VENDOR_VERIFICATION_STATUS = {
   PENDING: 'pending',
   VERIFIED: 'verified',
   REJECTED: 'rejected',
-  SUSPENDED: 'suspended'
-};
+  SUSPENDED: 'suspended',
+} as const;

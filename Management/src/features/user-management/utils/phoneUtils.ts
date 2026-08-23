@@ -4,32 +4,45 @@
  * Uses E.164 format for API communication (e.g., +94768952480)
  */
 
-import { parsePhoneNumber } from 'libphonenumber-js';
+import { parsePhoneNumber, type CountryCode } from 'libphonenumber-js';
 import { COUNTRIES as ALL_COUNTRIES } from '../../../data/countries';
+
+export interface Country {
+  code: string;
+  name: string;
+  flag: string;
+  callingCode: string;
+}
 
 /**
  * List of supported countries with their codes.
  * Derived from centralized data/countries.js — single source of truth.
  */
-export const COUNTRIES = ALL_COUNTRIES.map((c) => ({
-  code: c.code,
-  name: c.name,
-  flag: c.flag,
-  callingCode: c.phoneCode,
-}));
+export const COUNTRIES: Country[] = ALL_COUNTRIES.map(
+  (c: { code: string; name: string; flag: string; phoneCode: string }) => ({
+    code: c.code,
+    name: c.name,
+    flag: c.flag,
+    callingCode: c.phoneCode,
+  })
+);
+
+export interface FormattedPhone {
+  e164: string;
+  countryCode?: string;
+  formatted: string;
+  national: string;
+}
 
 /**
  * Validate phone number for given country
- * @param {string} phone - Phone number (can include country code or not)
- * @param {string} countryCode - ISO 3166-1 alpha-2 country code (e.g., 'US', 'LK')
- * @returns {boolean} True if valid
  */
-export const validatePhone = (phone, countryCode) => {
+export const validatePhone = (phone: string, countryCode: string): boolean => {
   if (!phone || !countryCode) return false;
 
   try {
-    const parsed = parsePhoneNumber(phone, countryCode);
-    return parsed && parsed.isValid();
+    const parsed = parsePhoneNumber(phone, countryCode as CountryCode);
+    return Boolean(parsed && parsed.isValid());
   } catch (err) {
     return false;
   }
@@ -37,15 +50,12 @@ export const validatePhone = (phone, countryCode) => {
 
 /**
  * Format phone number to E.164 format for API
- * @param {string} phone - Phone number
- * @param {string} countryCode - ISO 3166-1 alpha-2 country code
- * @returns {Object|null} { e164: '+1234567890', countryCode: 'US' } or null if invalid
  */
-export const formatPhoneToE164 = (phone, countryCode) => {
+export const formatPhoneToE164 = (phone: string, countryCode: string): FormattedPhone | null => {
   if (!phone || !countryCode) return null;
 
   try {
-    const parsed = parsePhoneNumber(phone, countryCode);
+    const parsed = parsePhoneNumber(phone, countryCode as CountryCode);
     if (!parsed || !parsed.isValid()) {
       return null;
     }
@@ -63,30 +73,26 @@ export const formatPhoneToE164 = (phone, countryCode) => {
 
 /**
  * Get country name by code
- * @param {string} countryCode - ISO country code
- * @returns {string} Country name
  */
-export const getCountryName = (countryCode) => {
-  const country = COUNTRIES.find(c => c.code === countryCode);
+export const getCountryName = (countryCode: string): string => {
+  const country = COUNTRIES.find((c) => c.code === countryCode);
   return country ? country.name : countryCode;
 };
 
 /**
  * Get country flag by code
- * @param {string} countryCode - ISO country code
- * @returns {string} Country flag emoji
  */
-export const getCountryFlag = (countryCode) => {
-  const country = COUNTRIES.find(c => c.code === countryCode);
+export const getCountryFlag = (countryCode: string): string => {
+  const country = COUNTRIES.find((c) => c.code === countryCode);
   return country ? country.flag : '🌍';
 };
 
 /**
  * Parse E.164 formatted phone to get country code
- * @param {string} e164 - E.164 formatted phone (e.g., '+94768952480')
- * @returns {Object|null} { countryCode: 'LK', phone: '768952480' } or null if invalid
  */
-export const parseE164 = (e164) => {
+export const parseE164 = (
+  e164?: string | null
+): { countryCode?: string; e164: string; formatted: string } | null => {
   if (!e164) return null;
 
   try {
@@ -107,11 +113,9 @@ export const parseE164 = (e164) => {
 
 /**
  * Get phone input placeholder for country
- * @param {string} countryCode - ISO country code
- * @returns {string} Placeholder text
  */
-export const getPhonePlaceholder = (countryCode) => {
-  const examples = {
+export const getPhonePlaceholder = (countryCode: string): string => {
+  const examples: Record<string, string> = {
     US: '+1 (234) 567-8900',
     GB: '+44 20 7946 0958',
     CA: '+1 (416) 555-0123',

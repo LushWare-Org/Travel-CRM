@@ -5,16 +5,29 @@
 
 import { PERMISSION_LIST } from '../../../contexts/PermissionContext';
 
+export interface PermissionContextLike {
+  hasPermission: (permission: string) => boolean;
+}
+
+export interface AccessibleTab {
+  id: string;
+  label: string;
+  role: string;
+  requiredPermission: string;
+  icon: string;
+  color: string;
+}
+
 /**
  * Get tab configuration for user management based on user role/permissions
  * Returns only tabs the user has permission to access
- * @param {Object} permissionContext - The permission context object from usePermission()
- * @returns {Array} Array of tab objects with id, label, and access info
  */
-export const getAccessibleTabs = (permissionContext) => {
+export const getAccessibleTabs = (
+  permissionContext: PermissionContextLike | null | undefined
+): AccessibleTab[] => {
   if (!permissionContext) return [];
 
-  const allTabs = [
+  const allTabs: AccessibleTab[] = [
     {
       id: 'admins',
       label: 'Manage Admins',
@@ -50,23 +63,21 @@ export const getAccessibleTabs = (permissionContext) => {
   ];
 
   // Filter tabs based on user permissions
-  return allTabs.filter((tab) =>
-    permissionContext.hasPermission(tab.requiredPermission)
-  );
+  return allTabs.filter((tab) => permissionContext.hasPermission(tab.requiredPermission));
 };
 
 /**
  * Check if user has permission to perform an action on a role
- * @param {Object} permissionContext - The permission context object
- * @param {string} targetRole - The role being managed (admin, salesRep, vendor, customer)
- * @param {string} action - The action (create, read, update, delete)
- * @returns {boolean} True if user can perform this action
  */
-export const canPerformActionOnRole = (permissionContext, targetRole, action) => {
+export const canPerformActionOnRole = (
+  permissionContext: PermissionContextLike | null | undefined,
+  targetRole: string,
+  action: string
+): boolean => {
   if (!permissionContext) return false;
 
   // Map target role to required permission
-  const rolePermissionMap = {
+  const rolePermissionMap: Record<string, string> = {
     admin: PERMISSION_LIST.MANAGE_ADMINS,
     salesRep: PERMISSION_LIST.MANAGE_SALES_REPS,
     vendor: PERMISSION_LIST.MANAGE_VENDORS,
@@ -74,19 +85,14 @@ export const canPerformActionOnRole = (permissionContext, targetRole, action) =>
   };
 
   const requiredPermission = rolePermissionMap[targetRole];
-  return requiredPermission
-    ? permissionContext.hasPermission(requiredPermission)
-    : false;
+  return requiredPermission ? permissionContext.hasPermission(requiredPermission) : false;
 };
 
 /**
  * Get a permission-denied error message
- * @param {string} action - The action that was denied (e.g., 'create', 'manage', 'delete')
- * @param {string} roleLabel - The role being managed (e.g., 'Admin accounts')
- * @returns {string} User-friendly error message
  */
-export const getPermissionDeniedMessage = (action, roleLabel = 'this resource') => {
-  const actions = {
+export const getPermissionDeniedMessage = (action: string, roleLabel = 'this resource'): string => {
+  const actions: Record<string, string> = {
     create: `create ${roleLabel}`,
     update: `update ${roleLabel}`,
     delete: `delete ${roleLabel}`,
@@ -100,11 +106,9 @@ export const getPermissionDeniedMessage = (action, roleLabel = 'this resource') 
 
 /**
  * Get label for a role (formatted for display)
- * @param {string} role - The role identifier (admin, salesRep, vendor, customer)
- * @returns {string} User-friendly role label
  */
-export const getRoleLabel = (role) => {
-  const labels = {
+export const getRoleLabel = (role: string): string => {
+  const labels: Record<string, string> = {
     admin: 'Admin',
     salesRep: 'Sales Representative',
     vendor: 'Vendor',
@@ -115,11 +119,9 @@ export const getRoleLabel = (role) => {
 
 /**
  * Get role plural form for messages
- * @param {string} role - The role identifier
- * @returns {string} Plural role label
  */
-export const getRolePluralLabel = (role) => {
-  const labels = {
+export const getRolePluralLabel = (role: string): string => {
+  const labels: Record<string, string> = {
     admin: 'Admins',
     salesRep: 'Sales Representatives',
     vendor: 'Vendors',
@@ -130,23 +132,31 @@ export const getRolePluralLabel = (role) => {
 
 /**
  * Create a section/tab that's disabled due to lack of permissions
- * @param {string} tabLabel - The label of the tab
- * @param {string} requiredPermission - The permission needed (display only)
- * @returns {Object} Object with disabled flag and message
  */
-export const getDisabledTabInfo = (tabLabel, requiredPermission) => {
+export const getDisabledTabInfo = (tabLabel: string, requiredPermission: string) => {
   return {
     disabled: true,
     message: `Access to "${tabLabel}" requires the "${requiredPermission}" permission.`,
   };
 };
 
+export interface AdminCapabilities {
+  canManageUsers: boolean;
+  canManageSalesReps: boolean;
+  canManageVendors: boolean;
+  canManageAdmins: boolean;
+  canViewReports: boolean;
+  canManageBilling: boolean;
+  canManageLeads: boolean;
+  canManagePackages: boolean;
+}
+
 /**
  * Check if user can perform basic admin operations
- * @param {Object} permissionContext - The permission context
- * @returns {Object} Object with boolean flags for each operation type
  */
-export const getAdminCapabilities = (permissionContext) => {
+export const getAdminCapabilities = (
+  permissionContext: PermissionContextLike | null | undefined
+): AdminCapabilities => {
   if (!permissionContext) {
     return {
       canManageUsers: false,
@@ -161,22 +171,12 @@ export const getAdminCapabilities = (permissionContext) => {
   }
 
   return {
-    canManageUsers: permissionContext.hasPermission(
-      PERMISSION_LIST.MANAGE_USERS
-    ),
-    canManageSalesReps: permissionContext.hasPermission(
-      PERMISSION_LIST.MANAGE_SALES_REPS
-    ),
-    canManageVendors: permissionContext.hasPermission(
-      PERMISSION_LIST.MANAGE_VENDORS
-    ),
-    canManageAdmins: permissionContext.hasPermission(
-      PERMISSION_LIST.MANAGE_ADMINS
-    ),
+    canManageUsers: permissionContext.hasPermission(PERMISSION_LIST.MANAGE_USERS),
+    canManageSalesReps: permissionContext.hasPermission(PERMISSION_LIST.MANAGE_SALES_REPS),
+    canManageVendors: permissionContext.hasPermission(PERMISSION_LIST.MANAGE_VENDORS),
+    canManageAdmins: permissionContext.hasPermission(PERMISSION_LIST.MANAGE_ADMINS),
     canViewReports: permissionContext.hasPermission(PERMISSION_LIST.VIEW_REPORTS),
-    canManageBilling: permissionContext.hasPermission(
-      PERMISSION_LIST.MANAGE_BILLING
-    ),
+    canManageBilling: permissionContext.hasPermission(PERMISSION_LIST.MANAGE_BILLING),
     canManageLeads: permissionContext.hasPermission(PERMISSION_LIST.MANAGE_LEADS),
     canManagePackages: permissionContext.hasPermission(PERMISSION_LIST.MANAGE_PACKAGES),
   };
@@ -184,10 +184,10 @@ export const getAdminCapabilities = (permissionContext) => {
 
 /**
  * Get the count of accessible management sections
- * @param {Object} permissionContext - The permission context
- * @returns {number} Number of sections user can access
  */
-export const getAccessibleSectionCount = (permissionContext) => {
+export const getAccessibleSectionCount = (
+  permissionContext: PermissionContextLike | null | undefined
+): number => {
   if (!permissionContext) return 0;
 
   const capabilities = getAdminCapabilities(permissionContext);

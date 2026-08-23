@@ -2,7 +2,7 @@
  * User Management Helper Functions
  */
 
-export const formatDate = (date) => {
+export const formatDate = (date?: string | number | Date | null): string => {
   if (!date) return 'N/A';
   try {
     const d = new Date(date);
@@ -12,98 +12,124 @@ export const formatDate = (date) => {
   }
 };
 
-export const formatDateTime = (date) => {
-  if (!date) return 'N/A';
+export const formatDateTime = (
+  date?: string | number | Date | null
+): { date: string; time: string } => {
+  if (!date) return { date: 'N/A', time: 'N/A' };
   try {
     const d = new Date(date);
     const dateStr = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     return {
       date: dateStr,
-      time: timeStr
+      time: timeStr,
     };
   } catch (error) {
     return { date: 'N/A', time: 'N/A' };
   }
 };
 
-export const validateEmail = (email) => {
+export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-export const validatePhone = (phone) => {
+export const validatePhone = (phone: string): boolean => {
   const phoneRegex = /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/;
   return phoneRegex.test(phone.replace(/\s/g, ''));
 };
 
-export const generatePasswordStrength = (password) => {
+export const generatePasswordStrength = (password: string): { score: number; label: string } => {
   let strength = 0;
   if (password.length >= 8) strength++;
   if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
   if (password.match(/[0-9]/)) strength++;
   if (password.match(/[@$!%*?&]/)) strength++;
-  
+
   return {
     score: strength,
-    label: ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'][strength]
+    label: ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'][strength],
   };
 };
 
-export const getInitials = (name) => {
+export const getInitials = (name: string): string => {
   return name
     .split(' ')
-    .map(n => n[0])
+    .map((n) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);
 };
 
-export const truncateText = (text, maxLength) => {
+export const truncateText = (text?: string | null, maxLength = 0): string => {
   if (!text) return '';
   return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
 };
 
-export const filterUsers = (users, searchTerm, filters = {}) => {
-  return users.filter(user => {
+export interface FilterableUser {
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+export const filterUsers = <T extends FilterableUser>(
+  users: T[],
+  searchTerm: string,
+  filters: { role?: string; status?: string } = {}
+): T[] => {
+  return users.filter((user) => {
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = 
-      !searchTerm || 
+    const matchesSearch =
+      !searchTerm ||
       user.name?.toLowerCase().includes(searchLower) ||
       user.email?.toLowerCase().includes(searchLower) ||
       user.phone?.includes(searchTerm);
-    
+
     const matchesRole = !filters.role || user.role === filters.role;
     const matchesStatus = !filters.status || user.status === filters.status;
-    
+
     return matchesSearch && matchesRole && matchesStatus;
   });
 };
 
-export const sortUsers = (users, sortField = 'createdAt', sortOrder = 'desc') => {
+export const sortUsers = <T extends Record<string, unknown>>(
+  users: T[],
+  sortField = 'createdAt',
+  sortOrder: 'asc' | 'desc' = 'desc'
+): T[] => {
   const sorted = [...users].sort((a, b) => {
     const aValue = a[sortField];
     const bValue = b[sortField];
-    
-    if (typeof aValue === 'string') {
-      return sortOrder === 'asc' 
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue);
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortOrder === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
     }
-    
-    return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+
+    return sortOrder === 'asc'
+      ? (aValue as number) - (bValue as number)
+      : (bValue as number) - (aValue as number);
   });
-  
+
   return sorted;
 };
 
-export const paginateArray = (array, page, limit) => {
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  pages: number;
+  current: number;
+}
+
+export const paginateArray = <T>(array: T[], page: number, limit: number): PaginatedResult<T> => {
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
   return {
     data: array.slice(startIndex, endIndex),
     total: array.length,
     pages: Math.ceil(array.length / limit),
-    current: page
+    current: page,
   };
 };
