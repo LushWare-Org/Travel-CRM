@@ -39,7 +39,7 @@ export default function PassengerSelector({ adults = 1, children = 0, infants = 
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-left focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white hover:border-gray-400 transition-colors"
+        className="h-8 flex items-center gap-2 w-full rounded-lg border border-gray-300 px-3 py-1 text-sm text-left focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white hover:border-gray-400 transition-colors"
       >
         <Users className="w-4 h-4 text-gray-400 shrink-0" />
         <span className="flex-1 text-gray-700">

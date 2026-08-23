@@ -520,7 +520,7 @@ export default function FlightSelectionModal({
                     </TabsList>
                   </Tabs>
                   <Select value={searchForm.cabinClass} onValueChange={(value) => setSearchForm({ ...searchForm, cabinClass: String(value) })}>
-                    <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {CABIN_CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>

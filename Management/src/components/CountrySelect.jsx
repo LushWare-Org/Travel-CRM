@@ -108,7 +108,7 @@ export default function CountrySelect({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoComplete="off"
-          className="w-full pl-9 pr-9 py-2.5 text-sm bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+          className="h-8 w-full pl-9 pr-9 py-1 text-sm bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
         />
         <button
           type="button"
@@ -145,7 +145,7 @@ export default function CountrySelect({
             ))
           )}
           {!query && COUNTRIES_PRIORITY.length > 10 && (
-            <div className="px-3 py-1.5 text-[10px] text-gray-400 text-center border-t border-gray-100">
+            <div className="px-3 py-1.5 text-xs text-gray-400 text-center border-t border-gray-100">
               Type to search all {COUNTRIES_PRIORITY.length} countries
             </div>
           )}
