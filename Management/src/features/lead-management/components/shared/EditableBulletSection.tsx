@@ -1,7 +1,24 @@
 import { useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { Pencil, Plus, Trash2, Check, X } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 
-const toLines = (value) => String(value || '').split('\n').map((s) => s.trim()).filter(Boolean);
+const toLines = (value: string | null | undefined) =>
+  String(value || '').split('\n').map((s) => s.trim()).filter(Boolean);
+
+interface EditableBulletSectionProps {
+  icon?: LucideIcon;
+  title: string;
+  subtitle?: string;
+  value: string | null | undefined;
+  onSave: (next: string) => Promise<void> | void;
+  mode?: 'bullets' | 'text';
+  placeholder?: string;
+  saving?: boolean;
+}
 
 /**
  * A full-width card for an editable text field with an explicit Edit →
@@ -12,9 +29,18 @@ const toLines = (value) => String(value || '').split('\n').map((s) => s.trim()).
  * discards local edits and reverts to the last-saved `value` without
  * calling onSave.
  */
-const EditableBulletSection = ({ icon: Icon, title, subtitle, value, onSave, mode = 'bullets', placeholder = 'Add a point…', saving = false }) => {
+const EditableBulletSection = ({
+  icon: Icon,
+  title,
+  subtitle,
+  value,
+  onSave,
+  mode = 'bullets',
+  placeholder = 'Add a point…',
+  saving = false,
+}: EditableBulletSectionProps) => {
   const [editing, setEditing] = useState(false);
-  const [lines, setLines] = useState([]);
+  const [lines, setLines] = useState<string[]>([]);
   const [text, setText] = useState('');
 
   const startEditing = () => {
@@ -40,103 +66,90 @@ const EditableBulletSection = ({ icon: Icon, title, subtitle, value, onSave, mod
     }
   };
 
-  const updateLine = (idx, line) => setLines((prev) => prev.map((l, i) => (i === idx ? line : l)));
-  const removeLine = (idx) => setLines((prev) => prev.filter((_, i) => i !== idx));
+  const updateLine = (idx: number, line: string) => setLines((prev) => prev.map((l, i) => (i === idx ? line : l)));
+  const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
   const addLine = () => setLines((prev) => [...prev, '']);
 
   const bullets = toLines(value);
 
   return (
-    <div className="rounded-xl border border-slate-200 p-5">
+    <Card className="p-5">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          {Icon && <Icon className="h-4 w-4 text-teal-600" />}
+          {Icon && <Icon className="h-4 w-4 text-primary" />}
           <div>
-            <p className="text-sm font-semibold text-slate-800">{title}</p>
-            {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           </div>
         </div>
         {!editing && (
-          <button
-            type="button"
-            onClick={startEditing}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-50"
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={startEditing} className="text-primary hover:text-primary">
             <Pencil className="h-3.5 w-3.5" /> Edit
-          </button>
+          </Button>
         )}
       </div>
 
       {editing ? (
         <div className="space-y-2">
           {mode === 'text' ? (
-            <textarea
+            <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={4}
               placeholder={placeholder}
-              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="resize-none"
             />
           ) : (
             <>
               {lines.map((line, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <span className="text-slate-300">•</span>
-                  <input
+                  <span className="text-muted-foreground">•</span>
+                  <Input
                     type="text"
                     value={line}
                     onChange={(e) => updateLine(idx, e.target.value)}
                     placeholder={placeholder}
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="flex-1"
                   />
-                  <button type="button" onClick={() => removeLine(idx)} className="p-1.5 text-slate-400 hover:text-red-500" aria-label="Remove point">
+                  <button type="button" onClick={() => removeLine(idx)} className="p-1.5 text-muted-foreground hover:text-destructive" aria-label="Remove point">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
-              <button type="button" onClick={addLine} className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-600 hover:text-teal-700">
+              <Button type="button" variant="ghost" size="sm" onClick={addLine} className="text-primary hover:text-primary">
                 <Plus className="h-4 w-4" /> Add point
-              </button>
+              </Button>
             </>
           )}
 
-          <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
-            <button
-              type="button"
-              onClick={cancel}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
+          <div className="mt-3 flex justify-end gap-2 border-t border-border pt-3">
+            <Button type="button" variant="outline" size="sm" onClick={cancel}>
               <X className="h-3.5 w-3.5" /> Cancel
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" size="sm" onClick={save} disabled={saving}>
               <Check className="h-3.5 w-3.5" /> {saving ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
           </div>
         </div>
       ) : mode === 'text' ? (
         value ? (
-          <p className="whitespace-pre-line text-sm text-slate-600">{value}</p>
+          <p className="whitespace-pre-line text-sm text-muted-foreground">{value}</p>
         ) : (
-          <p className="text-sm text-slate-400">No notes added yet.</p>
+          <p className="text-sm text-muted-foreground">No notes added yet.</p>
         )
       ) : bullets.length > 0 ? (
-        <ul className="space-y-1.5 text-sm text-slate-600">
+        <ul className="space-y-1.5 text-sm text-muted-foreground">
           {bullets.map((line, idx) => (
             <li key={idx} className="flex gap-2">
-              <span className="text-teal-500">•</span>
+              <span className="text-primary">•</span>
               <span>{line}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-slate-400">No points added yet.</p>
+        <p className="text-sm text-muted-foreground">No points added yet.</p>
       )}
-    </div>
+    </Card>
   );
 };
 

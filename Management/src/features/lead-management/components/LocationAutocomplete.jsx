@@ -6,7 +6,7 @@ const LocationAutocomplete = ({
   value,
   onChange,
   placeholder = "e.g., Colombo, Sri Lanka",
-  onSelect,
+  onSelect = undefined,
   // NEW: Context props for destination-aware suggestions
   destination = null,      // Package/lead destination (e.g., "Dubai", "Bali")
   country = null,          // Optional: Direct country code override (e.g., "AE", "ID")
