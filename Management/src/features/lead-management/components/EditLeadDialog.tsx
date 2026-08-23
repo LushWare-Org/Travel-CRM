@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, Plus, Copy,
+  Mail, Phone, Save, Loader2, Edit, Calendar, MessageSquare, MessageCircle, Plus,
   User, MapPin, Plane, Users, Globe, Package, ChevronDown, ChevronUp,
   Trash2, Check, Lock, RefreshCw, XCircle, Wallet,
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import toast from '@/lib/toast';
 import { leadAPI, packageAPI } from '../../../services/api';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import PhoneCountrySelect from '../../../components/PhoneCountrySelect';
 import LocationAutocomplete from './LocationAutocomplete';
 import ItineraryEditor from '../../itinerary/components/ItineraryEditor';
 import DestinationSelector from '../../itinerary/components/DestinationSelector';
@@ -177,6 +178,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
     remarks: false,
   });
   const [formData, setFormData] = useState(emptyFormData);
+  const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(true);
 
   // Snapshot of everything the dialog loaded, so Cancel can revert in place
   // (the dialog stays mounted across open/close cycles, so React alone won't
@@ -254,6 +256,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       lifecycleStatus: lead.lifecycleStatus || 'NEW',
     };
     setFormData(nextFormData);
+    setWhatsappSameAsPhone(!lead.whatsapp || lead.whatsapp === lead.phone);
     setRemarks(lead.remarks || []);
 
     if (!leadId) {
@@ -491,41 +494,54 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
 
                 <EditInputField label="Contact Number" required icon={Phone} testId="edit-lead-phone">
                   <PhoneInput
-                    international
                     defaultCountry="LK"
+                    countrySelectComponent={PhoneCountrySelect}
+                    initialValueFormat="national"
                     value={formData.phone}
-                    onChange={(value) => setFormData({ ...formData, phone: value || '' })}
+                    onChange={(value) => {
+                      const next = value || '';
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        phone: next,
+                        whatsapp: whatsappSameAsPhone ? next : prev.whatsapp,
+                      }));
+                    }}
                     className="phone-input-wrapper"
                     placeholder="Enter phone number"
                   />
                 </EditInputField>
 
-                <div className="space-y-2">
+                <div className="space-y-2" data-testid="edit-lead-whatsapp">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <MessageCircle className="w-4 h-4 text-muted-foreground" />
                       WhatsApp Number
                     </label>
-                    {formData.phone && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFormData({ ...formData, whatsapp: formData.phone })}
-                        className="text-primary hover:text-primary"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        Copy
-                      </Button>
-                    )}
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={whatsappSameAsPhone}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setWhatsappSameAsPhone(checked);
+                          if (checked) {
+                            setFormData((prev: any) => ({ ...prev, whatsapp: prev.phone }));
+                          }
+                        }}
+                        className="size-3.5 accent-primary"
+                      />
+                      Same as phone number
+                    </label>
                   </div>
                   <PhoneInput
-                    international
                     defaultCountry="LK"
+                    countrySelectComponent={PhoneCountrySelect}
+                    initialValueFormat="national"
                     value={formData.whatsapp}
                     onChange={(value) => setFormData({ ...formData, whatsapp: value || '' })}
                     className="phone-input-wrapper"
                     placeholder="Enter WhatsApp number"
+                    disabled={whatsappSameAsPhone}
                   />
                 </div>
               </div>

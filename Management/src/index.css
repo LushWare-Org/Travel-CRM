@@ -111,77 +111,96 @@ code {
   display: flex !important;
   align-items: stretch !important;
   width: 100% !important;
-  border-radius: 0.5rem !important;
-  border: 1px solid #d1d5db !important;
+  height: 2rem !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--input) !important;
   transition: all 0.2s !important;
-  background: white !important;
+  background: transparent !important;
 }
 
 .phone-input-wrapper .PhoneInput:focus-within {
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+  border-color: var(--ring) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent) !important;
   outline: none !important;
 }
 
 .phone-input-wrapper .PhoneInputInput {
   flex: 1 !important;
-  padding: 0.625rem 0.875rem !important;
+  min-width: 0 !important;
+  padding: 0.25rem 0.625rem !important;
   border: none !important;
-  border-left: 1px solid #e5e7eb !important;
+  border-left: 1px solid var(--border) !important;
   outline: none !important;
   font-size: 0.875rem !important;
   line-height: 1.5rem !important;
-  background: white !important;
-  color: #111827 !important;
-  border-radius: 0 0.5rem 0.5rem 0 !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0 !important;
 }
 
 .phone-input-wrapper .PhoneInputInput::placeholder {
-  color: #9ca3af !important;
+  color: var(--muted-foreground) !important;
 }
 
 .phone-input-wrapper .PhoneInputCountry {
   display: flex !important;
   align-items: center !important;
-  padding: 0.625rem 0.75rem !important;
-  background: #f9fafb !important;
-  border-right: 1px solid #e5e7eb !important;
+  padding: 0.25rem 0.625rem !important;
+  background: var(--muted) !important;
+  border-right: 1px solid var(--border) !important;
   cursor: pointer !important;
   transition: all 0.2s !important;
-  min-width: 100px !important;
-  border-radius: 0.5rem 0 0 0.5rem !important;
+  min-width: 96px !important;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg) !important;
   border: none !important;
 }
 
 .phone-input-wrapper .PhoneInputCountry:hover {
-  background: #f3f4f6 !important;
+  background: var(--accent) !important;
 }
 
 .phone-input-wrapper .PhoneInputCountryIcon {
-  width: 1.5rem !important;
-  height: 1.5rem !important;
-  margin-right: 0.5rem !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  margin-right: 0.375rem !important;
   border-radius: 0.125rem !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 1px 2px var(--shadow-color) !important;
+}
+
+.phone-input-wrapper .PhoneInputCountrySelectCode {
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: var(--foreground) !important;
+  margin-right: 0.875rem !important;
+  white-space: nowrap !important;
 }
 
 .phone-input-wrapper .PhoneInputCountrySelect {
-  appearance: none !important;
   background: transparent !important;
   border: none !important;
   outline: none !important;
   cursor: pointer !important;
-  font-size: 0.875rem !important;
+  font-size: 0.8125rem !important;
   font-weight: 500 !important;
-  color: #374151 !important;
+  color: var(--foreground) !important;
   padding-right: 1.25rem !important;
+}
+
+/* `appearance: none` on the select above would stop Chromium/Brave from
+   dark-theming its native options popup (it'd render a plain white list
+   despite `color-scheme: dark`), so style the `<option>` rows directly
+   instead — browsers honor per-option background/text colors even for
+   the OS-drawn popup. */
+.phone-input-wrapper .PhoneInputCountrySelect option {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
 }
 
 .phone-input-wrapper .PhoneInputCountrySelectArrow {
   position: absolute !important;
   right: 0.5rem !important;
   pointer-events: none !important;
-  color: #6b7280 !important;
+  color: var(--muted-foreground) !important;
   width: 0.75rem !important;
   height: 0.75rem !important;
 }
