@@ -12,16 +12,6 @@ export const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-warning/10 text-warning',
 };
 
-// NOTE: retained only because VendorManagement.jsx still imports this
-// (unused, confirmed via grep) ahead of its own migration later in this
-// phase - dropped for real once that file is touched.
-export const VENDOR_VERIFICATION_COLORS: Record<string, string> = {
-  pending: 'bg-warning/10 text-warning',
-  verified: 'bg-success/10 text-success',
-  rejected: 'bg-destructive/10 text-destructive',
-  suspended: 'bg-destructive/10 text-destructive',
-};
-
 // Categorical (non-state) - rotates the chart palette per DESIGN.md's Badge
 // section, same pattern as features/career's position tags.
 export const VENDOR_TYPE_COLORS: Record<string, string> = {
