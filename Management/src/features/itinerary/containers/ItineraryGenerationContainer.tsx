@@ -245,6 +245,9 @@ const ItineraryGenerationContainer = () => {
           lunch: apiDay.lunchCount > 0,
           dinner: apiDay.dinnerCount > 0,
         },
+        breakfastCount: apiDay.breakfastCount ?? 0,
+        lunchCount: apiDay.lunchCount ?? 0,
+        dinnerCount: apiDay.dinnerCount ?? 0,
         mealPriceOverride: apiDay.mealPriceOverride,
         locations: (apiDay.places || []).map((p: any) => p.place?.name || p.customName).filter(Boolean),
         activities: (apiDay.activities || []).map((a: any) => a.activity?.name || '').filter(Boolean),
@@ -253,7 +256,7 @@ const ItineraryGenerationContainer = () => {
           placeId: p.placeId,
         })),
         flights: apiDay.flights || [],
-        accommodation: null,
+        accommodation: apiDay.accommodation && Object.keys(apiDay.accommodation).length > 0 ? apiDay.accommodation : null,
         _relational: {
           places: apiDay.places || [],
           activities: apiDay.activities || [],

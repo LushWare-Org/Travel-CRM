@@ -628,7 +628,7 @@ const ItineraryEditor = ({
       );
 
       if (response.success || response.status === 'success') {
-        const hotels = response.data || [];
+        const hotels = response.data?.hotels || [];
         if (hotels.length > 0) {
           const bestMatch = hotels[0];
           const day = days.find(d => d && d.dayNumber === dayNumber);
