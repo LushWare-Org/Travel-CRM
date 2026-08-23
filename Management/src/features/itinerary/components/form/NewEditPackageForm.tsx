@@ -3,11 +3,11 @@
  * Sectioned form layout: Basic Info, Images, Itinerary, Price Calculation, Actions
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Swal from 'sweetalert2';
 import {
-  Save, Send, X, Info, ChevronDown, Loader,
-  FileText, DollarSign, Image, Calendar, Eye
+  Save, Send, X, Info, Loader,
+  FileText, DollarSign, Image, Calendar, Eye, Package,
 } from 'lucide-react';
 import BasicPackageInfo from './BasicPackageInfo';
 import PriceCalculation from './PriceCalculation';
@@ -18,59 +18,17 @@ import { validateItinerary } from '../../utils/helpers';
 import { createDefaultDay } from '../../types/index';
 import { formatCurrency } from '../../../../utils/currency.js';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-
-// ═══════════════════════════════════════════════════════════════════
-//  StableSectionCard — defined at module scope so React never
-//  unmounts/remounts it on parent re-renders. This prevents the
-//  ItineraryEditor (and other children) from losing scroll position
-//  and internal state when a day field changes.
-// ═══════════════════════════════════════════════════════════════════
-interface StableSectionCardProps {
-  id: string;
-  icon: any;
-  title: string;
-  description: string;
-  children: React.ReactNode;
-  expanded: boolean;
-  onToggle: (id: string) => void;
-}
-
-function StableSectionCard({ id, icon: Icon, title, description, children, expanded, onToggle }: StableSectionCardProps) {
-  return (
-    <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
-      <button
-        type="button"
-        onClick={() => onToggle(id)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-muted transition-colors"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-            <Icon className="w-5 h-5" />
-          </div>
-          <div className="text-left">
-            <h3 className="text-lg font-heading font-semibold text-foreground">{title}</h3>
-            <p className="text-sm text-muted-foreground">{description}</p>
-          </div>
-        </div>
-        <div className={cn('w-8 h-8 rounded-lg bg-muted flex items-center justify-center transition-transform', expanded && 'rotate-180')}>
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        </div>
-      </button>
-      {expanded && (
-        <div className="px-6 pb-6 pt-2 border-t border-border">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { FormDialogHeader, FormDialogBody, FormDialogSection, FormDialogFooter } from '@/components/shared/FormDialogSections';
 
 interface NewEditPackageFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: ReactNode;
   formData: any;
   setFormData: (data: any) => void;
   onSave?: (data: any) => void;
-  onCancel: () => void;
   onImageUpload: (files: FileList) => void;
   onImageRemove: (index: number) => void;
   images: any[];
@@ -83,10 +41,13 @@ interface NewEditPackageFormProps {
 }
 
 const NewEditPackageForm = ({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
   formData,
   setFormData,
   onSave,
-  onCancel,
   onImageUpload,
   onImageRemove,
   images,
@@ -221,23 +182,26 @@ const NewEditPackageForm = ({
   const duration = itineraryDays.length;
 
   return (
-    <div className="space-y-6">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <FormDialogHeader icon={Package} title={title} subtitle={subtitle} />
+        <FormDialogBody>
       {/* Basic Info Section */}
       {!onlyItineraryEditable ? (
-        <StableSectionCard
+        <FormDialogSection
           id="basic"
           expanded={expandedSections.basic}
           onToggle={toggleSection}
           icon={FileText}
           title="Basic Information"
-          description="Package name, destination, and description"
+          subtitle="Package name, destination, and description"
         >
           <BasicPackageInfo
             formData={localFormData}
             onChange={handleBasicInfoChange}
             packageId={localFormData._id || localFormData.id || null}
           />
-        </StableSectionCard>
+        </FormDialogSection>
       ) : (
         <div className="bg-muted rounded-xl border border-border p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -268,13 +232,13 @@ const NewEditPackageForm = ({
 
       {/* Images Section */}
       {!onlyItineraryEditable && (
-        <StableSectionCard
+        <FormDialogSection
           id="images"
           expanded={expandedSections.images}
           onToggle={toggleSection}
           icon={Image}
           title="Package Images"
-          description="Upload attractive images for your package"
+          subtitle="Upload attractive images for your package"
         >
           <ImageUpload
             images={images || localFormData.images || []}
@@ -285,17 +249,17 @@ const NewEditPackageForm = ({
             coverUrl={coverImage}
             onSetCover={onSetCover}
           />
-        </StableSectionCard>
+        </FormDialogSection>
       )}
 
       {/* Itinerary Section */}
-      <StableSectionCard
+      <FormDialogSection
         id="itinerary"
         expanded={expandedSections.itinerary}
         onToggle={toggleSection}
         icon={Calendar}
         title="Day-wise Itinerary"
-        description="Plan activities and experiences for each day"
+        subtitle="Plan activities and experiences for each day"
       >
         {!showItinerary ? (
           <div className="space-y-6">
@@ -330,24 +294,24 @@ const NewEditPackageForm = ({
             </Button>
           </div>
         )}
-      </StableSectionCard>
+      </FormDialogSection>
 
       {/* Price Calculation Section */}
       {!onlyItineraryEditable ? (
-        <StableSectionCard
+        <FormDialogSection
           id="details"
           expanded={expandedSections.details}
           onToggle={toggleSection}
           icon={DollarSign}
           title="Price Calculation"
-          description="Live pricing breakdown computed from itinerary costs"
+          subtitle="Live pricing breakdown computed from itinerary costs"
         >
           <PriceCalculation
             formData={localFormData}
             onFormChange={handleDetailsChange}
             duration={duration}
           />
-        </StableSectionCard>
+        </FormDialogSection>
       ) : (
         <div className="bg-muted rounded-xl border border-border p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -411,49 +375,52 @@ const NewEditPackageForm = ({
         </div>
       )}
 
-      {/* Action Buttons */}
-      {!hideLeadManagementButtons ? (
-        <div className="space-y-4 pt-6 border-t border-border">
-          {/* Tip Box */}
-          <div className="bg-primary/5 rounded-lg p-4 border border-primary/10 flex items-start gap-3">
-            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Info className="w-4 h-4 text-primary" />
-            </div>
-            <p className="text-sm text-primary">
-              <strong>Tip:</strong> You can save as draft at any time, even with incomplete itinerary data.
-              Your progress will be preserved and you can continue editing later.
-            </p>
+      {/* Tip Box — informational, scrolls with the form content rather than
+          living in the pinned footer, which is buttons-only. */}
+      {!hideLeadManagementButtons && (
+        <div className="bg-primary/5 rounded-lg p-4 border border-primary/10 flex items-start gap-3">
+          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Info className="w-4 h-4 text-primary" />
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            <Button onClick={() => handleSave('draft')} disabled={saving} variant="outline" className="flex-1">
-              {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? 'Saving...' : 'Save as Draft'}
-            </Button>
-            <Button onClick={() => handleSave('published')} disabled={saving} className="flex-1">
-              {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              {saving ? 'Publishing...' : 'Publish'}
-            </Button>
-            <Button onClick={onCancel} variant="outline">
-              <X className="w-4 h-4" />
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex gap-3 pt-6 border-t border-border">
-          <Button onClick={() => handleSave('published')} className="flex-1">
-            <Save className="w-4 h-4" />
-            Save Customized Package
-          </Button>
-          <Button onClick={onCancel} variant="outline">
-            <X className="w-4 h-4" />
-            Cancel
-          </Button>
+          <p className="text-sm text-primary">
+            <strong>Tip:</strong> You can save as draft at any time, even with incomplete itinerary data.
+            Your progress will be preserved and you can continue editing later.
+          </p>
         </div>
       )}
-    </div>
+        </FormDialogBody>
+
+        <FormDialogFooter>
+          {!hideLeadManagementButtons ? (
+            <>
+              <Button onClick={() => handleSave('draft')} disabled={saving} variant="outline" className="flex-1">
+                {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {saving ? 'Saving...' : 'Save as Draft'}
+              </Button>
+              <Button onClick={() => handleSave('published')} disabled={saving} className="flex-1">
+                {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {saving ? 'Publishing...' : 'Publish'}
+              </Button>
+              <Button onClick={onClose} variant="outline">
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={() => handleSave('published')} className="flex-1">
+                <Save className="w-4 h-4" />
+                Save Customized Package
+              </Button>
+              <Button onClick={onClose} variant="outline">
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+            </>
+          )}
+        </FormDialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

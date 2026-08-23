@@ -20,7 +20,6 @@ import { usePermission } from '../../../contexts/PermissionContext';
 // Components
 import {
   PackageDetailsModal,
-  PackageFormModal,
   NewEditPackageForm,
   PackagePDFPreviewDialog,
   AIPackageDialog,
@@ -813,47 +812,39 @@ const ItineraryGenerationContainer = () => {
       {/* Modals */}
       <PackageDetailsModal pkg={selectedPackage} onClose={() => setSelectedPackage(null)} />
 
-      <PackageFormModal
+      <NewEditPackageForm
         isOpen={showNewPackageDialog}
         title="Create New Travel Package"
         subtitle="Build a new itinerary with destinations, activities, and pricing"
         onClose={() => setShowNewPackageDialog(false)}
-      >
+        formData={newFormData}
+        setFormData={setNewFormData}
+        onSave={(updatedData: any) => handleSaveNewPackage(updatedData || newFormData)}
+        onImageUpload={handleImageUpload}
+        onImageRemove={handleImageRemove}
+        images={images}
+        isUploadingImages={isUploadingImages}
+        deletingImageIndexes={deletingIndexes}
+      />
+
+      {editPackageData && (
         <NewEditPackageForm
-          formData={newFormData}
-          setFormData={setNewFormData}
-          onSave={(updatedData: any) => handleSaveNewPackage(updatedData || newFormData)}
-          onCancel={() => setShowNewPackageDialog(false)}
+          isOpen={showEditPackageDialog}
+          title="Edit Travel Package"
+          subtitle="Update package details and itinerary"
+          onClose={() => setShowEditPackageDialog(false)}
+          formData={editPackageData}
+          setFormData={setEditPackageData}
+          onSave={(updatedData: any) => handleSaveEditPackage(updatedData || editPackageData)}
           onImageUpload={handleImageUpload}
           onImageRemove={handleImageRemove}
           images={images}
           isUploadingImages={isUploadingImages}
           deletingImageIndexes={deletingIndexes}
+          coverImage={editPackageData.coverImage}
+          onSetCover={handleSetCover}
         />
-      </PackageFormModal>
-
-      <PackageFormModal
-        isOpen={showEditPackageDialog}
-        title="Edit Travel Package"
-        subtitle="Update package details and itinerary"
-        onClose={() => setShowEditPackageDialog(false)}
-      >
-        {editPackageData && (
-          <NewEditPackageForm
-            formData={editPackageData}
-            setFormData={setEditPackageData}
-            onSave={(updatedData: any) => handleSaveEditPackage(updatedData || editPackageData)}
-            onCancel={() => setShowEditPackageDialog(false)}
-            onImageUpload={handleImageUpload}
-            onImageRemove={handleImageRemove}
-            images={images}
-            isUploadingImages={isUploadingImages}
-            deletingImageIndexes={deletingIndexes}
-            coverImage={editPackageData.coverImage}
-            onSetCover={handleSetCover}
-          />
-        )}
-      </PackageFormModal>
+      )}
 
       <AIPackageDialog
         isOpen={showAIPackageDialog}

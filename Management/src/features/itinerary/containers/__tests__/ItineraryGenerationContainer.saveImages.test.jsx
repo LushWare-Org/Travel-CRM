@@ -44,9 +44,13 @@ vi.mock('../../components', async (importOriginal) => {
     AIPackageDialog: () => null,
     // The regression is in the container's save-payload construction, not the
     // form UI — stub the (heavy) real form with a button that triggers the
-    // container's own onSave the same way a real submit would.
-    NewEditPackageForm: ({ onSave }) => (
-      <button onClick={() => onSave()}>Stub Save</button>
+    // container's own onSave the same way a real submit would. NewEditPackageForm
+    // now owns its own Dialog/isOpen gating internally (previously provided by
+    // the real PackageFormModal wrapper), so the stub must respect `isOpen`
+    // itself — otherwise both the New and Edit package stubs would render
+    // simultaneously and collide on the "Stub Save" role query.
+    NewEditPackageForm: ({ isOpen, onSave }) => (
+      isOpen ? <button onClick={() => onSave()}>Stub Save</button> : null
     ),
   };
 });

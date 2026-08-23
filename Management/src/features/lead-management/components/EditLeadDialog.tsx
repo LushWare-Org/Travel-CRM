@@ -24,7 +24,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { FormDialogHeader, FormDialogBody, FormDialogSection, FormDialogFooter } from '@/components/shared/FormDialogSections';
 
 // A lead can hold many packages at once, plus at most one manual
 // (from-scratch) itinerary slot — this sentinel is the "add" picker's third
@@ -82,46 +83,6 @@ function EditInputField({ label, required, icon: Icon, locked, children, testId 
       </label>
       {children}
     </div>
-  );
-}
-
-interface EditSectionHeaderProps {
-  icon: LucideIcon;
-  title: string;
-  subtitle: string;
-  section: string;
-  count?: number;
-  expanded: boolean;
-  onToggle: (section: string) => void;
-}
-
-function EditSectionHeader({ icon: Icon, title, subtitle, section, count, expanded, onToggle }: EditSectionHeaderProps) {
-  return (
-    <button
-      type="button"
-      onClick={() => onToggle(section)}
-      className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all ${
-        expanded ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/70'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${expanded ? 'bg-primary-foreground/20' : 'bg-card shadow-sm'}`}>
-          <Icon className={`w-5 h-5 ${expanded ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
-        </div>
-        <div className="text-left">
-          <h3 className="font-semibold flex items-center gap-2">
-            {title}
-            {count !== undefined && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${expanded ? 'bg-primary-foreground/20' : 'bg-secondary'}`}>
-                {count}
-              </span>
-            )}
-          </h3>
-          <p className={`text-xs ${expanded ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>{subtitle}</p>
-        </div>
-      </div>
-      {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-    </button>
   );
 }
 
@@ -445,34 +406,18 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
       <DialogContent className="sm:max-w-4xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
-        {/* Header */}
-        <DialogHeader className="bg-primary text-primary-foreground p-4 sm:p-6 shrink-0 space-y-0">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-primary-foreground/15 rounded-2xl">
-              <Edit className="w-7 h-7" />
-            </div>
-            <div>
-              <DialogTitle className="text-xl sm:text-2xl text-primary-foreground">Edit Lead</DialogTitle>
-              <DialogDescription className="text-primary-foreground/80 mt-0.5">{formData.name || 'Lead Details'}</DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+        <FormDialogHeader icon={Edit} title="Edit Lead" subtitle={formData.name || 'Lead Details'} />
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {/* Personal Information Section */}
-          <div className="space-y-4">
-            <EditSectionHeader
-              expanded={expandedSections.personal}
-              onToggle={toggleSection}
-              icon={User}
-              title="Personal Information"
-              subtitle="Contact details of the lead"
-              section="personal"
-            />
-
-            {expandedSections.personal && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-muted/50 rounded-2xl border border-border">
+        <FormDialogBody>
+          <FormDialogSection
+            id="personal"
+            expanded={expandedSections.personal}
+            onToggle={toggleSection}
+            icon={User}
+            title="Personal Information"
+            subtitle="Contact details of the lead"
+          >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <EditInputField label="Full Name" required icon={User} testId="edit-lead-name">
                   <Input
                     type="text"
@@ -545,22 +490,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                   />
                 </div>
               </div>
-            )}
-          </div>
+          </FormDialogSection>
 
-          {/* Travel Details Section */}
-          <div className="space-y-4">
-            <EditSectionHeader
-              expanded={expandedSections.travel}
-              onToggle={toggleSection}
-              icon={Plane}
-              title="Travel Details"
-              subtitle="Trip information and dates"
-              section="travel"
-            />
-
-            {expandedSections.travel && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-muted/50 rounded-2xl border border-border">
+          <FormDialogSection
+            id="travel"
+            expanded={expandedSections.travel}
+            onToggle={toggleSection}
+            icon={Plane}
+            title="Travel Details"
+            subtitle="Trip information and dates"
+          >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <EditInputField label="Departure City" icon={MapPin}>
                   <LocationAutocomplete
                     value={formData.city}
@@ -644,23 +584,17 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                   </Select>
                 </EditInputField>
               </div>
-            )}
-          </div>
+          </FormDialogSection>
 
-          {/* Package & Assignment Section */}
-          <div className="space-y-4">
-            <EditSectionHeader
-              expanded={expandedSections.package}
-              onToggle={toggleSection}
-              icon={Package}
-              title="Package & Assignment"
-              subtitle="Select package and sales representative"
-              section="package"
-            />
-
-            {expandedSections.package && (
-              <>
-                <div className="p-4 bg-muted/50 rounded-2xl border border-border space-y-4">
+          <FormDialogSection
+            id="package"
+            expanded={expandedSections.package}
+            onToggle={toggleSection}
+            icon={Package}
+            title="Package & Assignment"
+            subtitle="Select package and sales representative"
+          >
+                <div className="space-y-4">
                   <EditInputField label="Sales Representative" icon={User}>
                     <Select
                       value={formData.assignedTo || '__none__'}
@@ -857,24 +791,18 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                     )}
                   </div>
                 )}
-              </>
-            )}
-          </div>
+          </FormDialogSection>
 
-          {/* Remarks Section */}
-          <div className="space-y-4">
-            <EditSectionHeader
-              expanded={expandedSections.remarks}
-              onToggle={toggleSection}
-              icon={MessageSquare}
-              title="Remarks & Notes"
-              subtitle="Add comments about this lead"
-              section="remarks"
-              count={remarks.length}
-            />
-
-            {expandedSections.remarks && (
-              <div className="p-4 bg-muted/50 rounded-2xl border border-border space-y-4">
+          <FormDialogSection
+            id="remarks"
+            expanded={expandedSections.remarks}
+            onToggle={toggleSection}
+            icon={MessageSquare}
+            title="Remarks & Notes"
+            subtitle="Add comments about this lead"
+            count={remarks.length}
+          >
+              <div className="space-y-4">
                 {/* Add New Remark Button */}
                 {!showAddRemark && (
                   <Button type="button" variant="outline" onClick={() => setShowAddRemark(true)} className="w-full">
@@ -1038,8 +966,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
                   )}
                 </div>
               </div>
-            )}
-          </div>
+          </FormDialogSection>
 
           {/* Lifecycle Status, Flight Bookings, then Pricing — existing leads only */}
           {(lead?._id || lead?.id) && (
@@ -1104,10 +1031,9 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
               )}
             </div>
           )}
-        </div>
+        </FormDialogBody>
 
-        {/* Footer Actions */}
-        <DialogFooter className="flex-row bg-muted gap-3 shrink-0">
+        <FormDialogFooter>
           <Button type="button" variant="outline" onClick={handleCancel} className="flex-1">
             Cancel
           </Button>
@@ -1124,7 +1050,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
               </>
             )}
           </Button>
-        </DialogFooter>
+        </FormDialogFooter>
       </DialogContent>
     </Dialog>
   );
