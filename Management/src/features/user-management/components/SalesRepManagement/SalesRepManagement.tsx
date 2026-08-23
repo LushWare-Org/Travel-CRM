@@ -1,20 +1,13 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash, User, TrendingUp, Mail, CheckCircle, AlertCircle, Copy, Loader } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, User, TrendingUp, AlertCircle, Loader } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { 
-  UserTableHeader, 
-  Pagination, 
-  UserFormDialog, 
-  ConfirmationDialog,
-  StatsCard,
-  FormGroup 
-} from '../Common';
-import { STATUS_COLORS } from '../../utils/constants';
-import { filterUsers, paginateArray } from '../../utils/helpers';
-import SalesRepTable from './SalesRepTable';
+import { UserTableHeader, Pagination, UserFormDialog, ConfirmationDialog, FormGroup } from '../Common';
+import { StatCard } from '@/components/shared/StatCard';
+import { Button } from '@/components/ui/button';
+import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
+import SalesRepTable, { type SalesRep } from './SalesRepTable';
 import salesRepService from '../../../../services/salesRep.service';
 import adminService from '../../../../services/admin.service';
-import { validatePhone, formatPhoneToE164, getPhonePlaceholder, parseE164, COUNTRIES } from '../../utils/phoneUtils';
 import { unwrapList } from '../../../../services/apiResponse';
 
 // Deliberately scoped to just this one permission for now — extend this array
@@ -25,9 +18,29 @@ const SALESREP_TOGGLEABLE_PERMISSIONS = [
   { id: 'manage_packages', label: 'Can create/edit/delete packages', category: 'Travel' },
 ];
 
+interface SalesRepFormData {
+  name: string;
+  email: string;
+  phone: string;
+  phoneCountry: string;
+  commissionRate: number;
+  targetLeads: number;
+  permissions: string[];
+}
+
+const EMPTY_FORM: SalesRepFormData = {
+  name: '',
+  email: '',
+  phone: '',
+  phoneCountry: 'IN',
+  commissionRate: 10,
+  targetLeads: 50,
+  permissions: [],
+};
+
 const SalesRepManagement = () => {
   const isInitialMount = useRef(true);
-  const [salesReps, setSalesReps] = useState([]);
+  const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -39,40 +52,33 @@ const SalesRepManagement = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showResendInviteConfirm, setShowResendInviteConfirm] = useState(false);
   const [showPasswordResetConfirm, setShowPasswordResetConfirm] = useState(false);
-  const [selectedRep, setSelectedRep] = useState(null);
-  const [repToDelete, setRepToDelete] = useState(null);
-  const [repToResendInvite, setRepToResendInvite] = useState(null);
-  const [repToResetPassword, setRepToResetPassword] = useState(null);
-  const [onlineStatus, setOnlineStatus] = useState({});
+  const [selectedRep, setSelectedRep] = useState<SalesRep | null>(null);
+  const [repToDelete, setRepToDelete] = useState<SalesRep | null>(null);
+  const [repToResendInvite, setRepToResendInvite] = useState<SalesRep | null>(null);
+  const [repToResetPassword, setRepToResetPassword] = useState<SalesRep | null>(null);
+  const [onlineStatus, setOnlineStatus] = useState<Record<string, boolean>>({});
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
     totalLeads: 0,
     totalEarnings: 0,
-    avgConversion: 0
+    avgConversion: 0,
   });
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    phoneCountry: 'IN',
-    commissionRate: 10,
-    targetLeads: 50,
-    permissions: []
-  });
+  const [formData, setFormData] = useState<SalesRepFormData>(EMPTY_FORM);
 
   const ITEMS_PER_PAGE = 10;
 
   // Calculate online count from onlineStatus
   const onlineCount = useMemo(() => {
-    return Object.values(onlineStatus).filter(status => status === true).length;
+    return Object.values(onlineStatus).filter((status) => status === true).length;
   }, [onlineStatus]);
 
   // Load sales reps from backend on mount
   useEffect(() => {
     loadSalesReps();
     loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reload when page or search changes (skip initial mount to avoid duplicate call)
@@ -81,22 +87,21 @@ const SalesRepManagement = () => {
       isInitialMount.current = false;
       return;
     }
-    
+
     loadSalesReps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, searchTerm]);
 
   // Poll for online status every 60 seconds
   useEffect(() => {
-    // Load online status immediately
     loadOnlineStatus();
-    
-    // Set up polling interval
+
     const interval = setInterval(() => {
       loadOnlineStatus();
-    }, 60000); // Poll every 60 seconds
-    
-    // Cleanup interval on unmount
+    }, 60000);
+
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -121,46 +126,46 @@ const SalesRepManagement = () => {
     try {
       setIsLoading(true);
       setError('');
-      
-      // Build params object - only include search if it has a value
-      const params = {
-        page: page,
+
+      const params: Record<string, unknown> = {
+        page,
         limit: ITEMS_PER_PAGE,
-        sort: '-createdAt'
+        sort: '-createdAt',
       };
-      
-      // Only add search if it's not empty
+
       if (search && search.trim()) {
         params.search = search.trim();
       }
-      
-      const response = await salesRepService.getAllSalesReps(params);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- service is untyped JS; its JSDoc documents these params as required, which doesn't match the real (all-optional) runtime contract
+      const response = await salesRepService.getAllSalesReps(params as any);
 
       // user-service returns a flat array in `data` and pagination at the
       // top level — check that shape first, since it's what the backend
       // actually sends (the `data.salesReps` shape was never real).
       const { items: repsData, pagination: rawPagination } = unwrapList(response);
 
-      // Transform the data to match the expected format
-      const transformedReps = repsData.map(rep => {
-        // Determine status based on account state
+      const transformedReps: SalesRep[] = repsData.map((rep: Record<string, any>) => {
         let status = 'inactive';
         if (rep.isActive) {
-          // If they have a temp password or haven't verified email, they're still "invited"
           if (rep.isTempPassword || !rep.isEmailVerified) {
             status = 'invited';
           } else {
             status = 'verified';
           }
         }
-        
+
         return {
           id: rep._id || rep.id,
           name: rep.name,
           email: rep.email,
           phone: rep.phone || '',
-          status: status,
-          accountStatus: rep.mustChangePassword ? 'pending_password_reset' : (rep.isEmailVerified ? 'verified' : 'pending_first_login'),
+          status,
+          accountStatus: rep.mustChangePassword
+            ? 'pending_password_reset'
+            : rep.isEmailVerified
+              ? 'verified'
+              : 'pending_first_login',
           commissionRate: rep.commissionRate || 10,
           permissions: rep.permissions || [],
           leadsAssigned: rep.leadsAssigned || 0,
@@ -170,20 +175,17 @@ const SalesRepManagement = () => {
           isActive: rep.isActive,
           isEmailVerified: rep.isEmailVerified,
           isTempPassword: rep.isTempPassword,
-          mustChangePassword: rep.mustChangePassword
+          mustChangePassword: rep.mustChangePassword,
         };
       });
-      
-      setSalesReps(transformedReps);
 
-      // Handle pagination
+      setSalesReps(transformedReps);
       setTotalPages(rawPagination?.pages || 1);
     } catch (err) {
-      const errorMsg = err.userMessage || err.message || 'Failed to load sales representatives';
+      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to load sales representatives';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Load sales reps error:', err);
-      console.error('Error details:', err.response || err);
     } finally {
       setIsLoading(false);
     }
@@ -195,14 +197,14 @@ const SalesRepManagement = () => {
   const loadStats = async () => {
     try {
       const response = await salesRepService.getSalesRepStats();
-      
+
       if (response.data) {
         setStats({
           total: response.data.total || 0,
           active: response.data.active || 0,
           totalLeads: response.data.totalLeads || 0,
           totalEarnings: response.data.totalEarnings || 0,
-          avgConversion: response.data.avgConversion || 0
+          avgConversion: response.data.avgConversion || 0,
         });
       }
     } catch (err) {
@@ -210,23 +212,19 @@ const SalesRepManagement = () => {
     }
   };
 
-  const openEditDialog = (rep) => {
+  const openEditDialog = (rep: SalesRep) => {
     setSelectedRep(rep);
-    
-    // Parse phone number if it's in E.164 format
+
     let phoneCountry = rep.phoneCountry || 'US';
     let phoneNumber = rep.phone || '';
-    
+
     if (rep.phone) {
       const parsed = parseE164(rep.phone);
       if (parsed) {
-        // Use parsed country code, fallback to stored phoneCountry or 'US'
         phoneCountry = parsed.countryCode || rep.phoneCountry || 'US';
-        // Get the calling code for this country
-        const country = COUNTRIES.find(c => c.code === phoneCountry);
+        const country = COUNTRIES.find((c) => c.code === phoneCountry);
         const callingCode = country?.callingCode?.replace('+', '') || '';
-        
-        // Extract only the local phone number by removing the calling code prefix
+
         if (callingCode && rep.phone.startsWith('+' + callingCode)) {
           phoneNumber = rep.phone.substring(callingCode.length + 1);
         } else {
@@ -234,57 +232,39 @@ const SalesRepManagement = () => {
         }
       }
     }
-    
+
     setFormData({
       name: rep.name,
       email: rep.email,
       phone: phoneNumber,
-      phoneCountry: phoneCountry,
+      phoneCountry,
       commissionRate: rep.commissionRate,
       targetLeads: 50,
-      permissions: rep.permissions || []
+      permissions: rep.permissions || [],
     });
     setShowEditRepDialog(true);
   };
 
-  /**
-   * Reset form to initial state
-   */
   const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      phoneCountry: 'IN',
-      commissionRate: 10,
-      targetLeads: 50,
-      permissions: []
-    });
+    setFormData(EMPTY_FORM);
     setSelectedRep(null);
   };
 
-  const togglePermission = (permissionId) => {
-    setFormData(prev => ({
+  const togglePermission = (permissionId: string) => {
+    setFormData((prev) => ({
       ...prev,
       permissions: prev.permissions.includes(permissionId)
-        ? prev.permissions.filter(p => p !== permissionId)
-        : [...prev.permissions, permissionId]
+        ? prev.permissions.filter((p) => p !== permissionId)
+        : [...prev.permissions, permissionId],
     }));
   };
 
-  /**
-   * Handle adding a new sales representative
-   */
-  const handleAddRep = async (e) => {
-    e.preventDefault();
-    
-    // Validation
+  const handleAddRep = async () => {
     if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    // Validate phone number with country code
     if (!validatePhone(formData.phone, formData.phoneCountry)) {
       toast.error(`Invalid phone number for ${formData.phoneCountry}. Please enter a valid number.`);
       return;
@@ -302,9 +282,9 @@ const SalesRepManagement = () => {
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
-        phone: formatPhoneToE164(formData.phone, formData.phoneCountry)?.e164,
+        phone: formatPhoneToE164(formData.phone, formData.phoneCountry)?.e164 ?? '',
         phoneCountry: formData.phoneCountry,
-        commissionRate: formData.commissionRate
+        commissionRate: formData.commissionRate,
       };
 
       const response = await salesRepService.createSalesRep(payload);
@@ -313,17 +293,15 @@ const SalesRepManagement = () => {
         toast.success(`Sales rep created! Invitation sent to ${formData.email}`);
         setShowNewRepDialog(false);
         resetForm();
-        
-        // Reload data first with current state
+
         await loadSalesReps(1, '');
         await loadStats();
-        
-        // Then reset pagination/search state
+
         setSearchTerm('');
         setCurrentPage(1);
       }
     } catch (err) {
-      const errorMsg = err.userMessage || err.message || 'Failed to create sales representative';
+      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to create sales representative';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Create sales rep error:', err);
@@ -332,21 +310,14 @@ const SalesRepManagement = () => {
     }
   };
 
-  /**
-   * Handle editing a sales representative
-   */
-  const handleEditRep = async (e) => {
-    e.preventDefault();
-
+  const handleEditRep = async () => {
     if (!selectedRep) return;
 
-    // Validation
     if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    // Validate phone number with country code
     if (!validatePhone(formData.phone, formData.phoneCountry)) {
       toast.error(`Invalid phone number for ${formData.phoneCountry}. Please enter a valid number.`);
       return;
@@ -364,9 +335,9 @@ const SalesRepManagement = () => {
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
-        phone: formatPhoneToE164(formData.phone, formData.phoneCountry)?.e164,
+        phone: formatPhoneToE164(formData.phone, formData.phoneCountry)?.e164 ?? '',
         phoneCountry: formData.phoneCountry,
-        commissionRate: formData.commissionRate
+        commissionRate: formData.commissionRate,
       };
 
       const response = await salesRepService.updateSalesRep(selectedRep.id, payload);
@@ -380,7 +351,7 @@ const SalesRepManagement = () => {
         await loadStats();
       }
     } catch (err) {
-      const errorMsg = err.userMessage || err.message || 'Failed to update sales representative';
+      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to update sales representative';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Update sales rep error:', err);
@@ -389,17 +360,11 @@ const SalesRepManagement = () => {
     }
   };
 
-  /**
-   * Handle delete confirmation dialog
-   */
-  const handleDeleteRep = (rep) => {
+  const handleDeleteRep = (rep: SalesRep) => {
     setRepToDelete(rep);
     setShowDeleteConfirm(true);
   };
 
-  /**
-   * Confirm and delete sales representative
-   */
   const confirmDelete = async () => {
     if (!repToDelete) return;
 
@@ -417,7 +382,7 @@ const SalesRepManagement = () => {
         await loadStats();
       }
     } catch (err) {
-      const errorMsg = err.userMessage || err.message || 'Failed to delete sales representative';
+      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to delete sales representative';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Delete sales rep error:', err);
@@ -426,17 +391,11 @@ const SalesRepManagement = () => {
     }
   };
 
-  /**
-   * Handle resend invitation confirmation dialog
-   */
-  const handleResendInvitation = (rep) => {
+  const handleResendInvitation = (rep: SalesRep) => {
     setRepToResendInvite(rep);
     setShowResendInviteConfirm(true);
   };
 
-  /**
-   * Confirm and resend invitation
-   */
   const confirmResendInvitation = async () => {
     if (!repToResendInvite) return;
 
@@ -452,7 +411,7 @@ const SalesRepManagement = () => {
         setRepToResendInvite(null);
       }
     } catch (err) {
-      const errorMsg = err.userMessage || err.message || 'Failed to resend invitation';
+      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to resend invitation';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Resend invitation error:', err);
@@ -461,17 +420,11 @@ const SalesRepManagement = () => {
     }
   };
 
-  /**
-   * Handle force password reset confirmation dialog
-   */
-  const handleForcePasswordReset = (rep) => {
+  const handleForcePasswordReset = (rep: SalesRep) => {
     setRepToResetPassword(rep);
     setShowPasswordResetConfirm(true);
   };
 
-  /**
-   * Confirm and send password reset
-   */
   const confirmPasswordReset = async () => {
     if (!repToResetPassword) return;
 
@@ -487,7 +440,7 @@ const SalesRepManagement = () => {
         setRepToResetPassword(null);
       }
     } catch (err) {
-      const errorMsg = err.userMessage || err.message || 'Failed to send password reset';
+      const errorMsg = (err as any).userMessage || (err as Error).message || 'Failed to send password reset';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Password reset error:', err);
@@ -500,56 +453,56 @@ const SalesRepManagement = () => {
     <div className="space-y-6">
       {/* Loading State */}
       {isLoading && (
-        <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center gap-3">
-          <Loader className="w-5 h-5 text-blue-600 animate-spin" />
-          <p className="text-gray-700 font-medium">Loading sales representatives...</p>
+        <div className="flex items-center justify-center gap-3 rounded-lg border border-border bg-muted p-8">
+          <Loader className="size-5 animate-spin text-primary" />
+          <p className="font-medium text-foreground">Loading sales representatives...</p>
         </div>
       )}
 
       {!isLoading && (
         <>
           {/* Header */}
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Sales Representatives</h2>
-              <p className="text-gray-600 mt-1">Manage sales team members and track performance</p>
+              <h2 className="font-heading text-2xl font-bold text-foreground">Sales Representatives</h2>
+              <p className="mt-1 text-muted-foreground">Manage sales team members and track performance</p>
             </div>
-            <button
+            <Button
+              disabled={isSubmitting}
               onClick={() => {
                 resetForm();
                 setShowNewRepDialog(true);
               }}
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="size-4" />
               Add Sales Rep
-            </button>
+            </Button>
           </div>
 
           {/* Security Info Banner */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-accent p-4">
+            <AlertCircle className="mt-0.5 size-5 shrink-0 text-primary" />
             <div>
-              <p className="text-sm font-semibold text-blue-900">Account & Security Policy</p>
-              <p className="text-sm text-blue-800 mt-1">
-                Sales reps receive invitation emails with temporary passwords. They must set a permanent password on first login. 
-                Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase, numbers, and symbols.
+              <p className="text-sm font-semibold text-foreground">Account & Security Policy</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Sales reps receive invitation emails with temporary passwords. They must set a permanent password on
+                first login. Passwords expire after 90 days and require: 12+ characters, uppercase, lowercase,
+                numbers, and symbols.
               </p>
             </div>
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            <StatsCard label="Total Reps" value={stats.total} icon={User} color="blue" />
-            <StatsCard label="Active Reps" value={onlineCount} icon={User} color="green" />
-            <StatsCard label="Total Leads" value={stats.totalLeads} icon={TrendingUp} color="purple" />
-            <StatsCard label="Conv. Rate (%)" value={stats.avgConversion} icon={TrendingUp} color="orange" />
-            <StatsCard 
-              label="Total Earnings" 
-              value={`$${(stats.totalEarnings / 1000).toFixed(1)}K`} 
-              icon={User} 
-              color="green" 
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            <StatCard label="Total Reps" value={stats.total} icon={User} color="primary" />
+            <StatCard label="Active Reps" value={onlineCount} icon={User} color="success" />
+            <StatCard label="Total Leads" value={stats.totalLeads} icon={TrendingUp} color="muted" />
+            <StatCard label="Conv. Rate (%)" value={stats.avgConversion} icon={TrendingUp} color="warning" />
+            <StatCard
+              label="Total Earnings"
+              value={`$${(stats.totalEarnings / 1000).toFixed(1)}K`}
+              icon={User}
+              color="success"
             />
           </div>
 
@@ -582,10 +535,12 @@ const SalesRepManagement = () => {
               />
             </>
           ) : (
-            <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg text-center">
-              <User className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600 font-medium">No sales representatives found</p>
-              <p className="text-sm text-gray-500 mt-1">Create your first sales rep by clicking the "Add Sales Rep" button</p>
+            <div className="rounded-lg border border-border bg-muted p-8 text-center">
+              <User className="mx-auto mb-3 size-12 text-muted-foreground" />
+              <p className="font-medium text-foreground">No sales representatives found</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create your first sales rep by clicking the &quot;Add Sales Rep&quot; button
+              </p>
             </div>
           )}
         </>
@@ -603,30 +558,28 @@ const SalesRepManagement = () => {
         title="Add New Sales Representative"
         subtitle="Onboard a new sales team member"
         submitLabel={isSubmitting ? 'Creating...' : 'Create & Send Invitation'}
-        submitColor="blue"
         isSubmitting={isSubmitting}
         error={error}
       >
         <div className="space-y-4">
-          {/* What Happens Next */}
-          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-            <p className="text-xs font-semibold text-blue-900">WHAT HAPPENS NEXT:</p>
-            <ol className="text-xs text-blue-800 mt-2 space-y-1 ml-4">
-              <li>1. ✅ Sales rep account is created in the system</li>
-              <li>2. 🔐 Temporary password is generated automatically</li>
-              <li>3. 📧 Invitation email is sent to their address</li>
-              <li>4. 🔑 They must set permanent password on first login</li>
+          <div className="rounded-lg border border-primary/20 bg-accent p-3">
+            <p className="text-xs font-semibold text-foreground">WHAT HAPPENS NEXT:</p>
+            <ol className="mt-2 ml-4 space-y-1 text-xs text-muted-foreground">
+              <li>1. Sales rep account is created in the system</li>
+              <li>2. Temporary password is generated automatically</li>
+              <li>3. Invitation email is sent to their address</li>
+              <li>4. They must set permanent password on first login</li>
             </ol>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                 placeholder="John Doe"
               />
             </FormGroup>
@@ -636,19 +589,19 @@ const SalesRepManagement = () => {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                 placeholder="john@email.com"
               />
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Country Code" required>
               <select
                 value={formData.phoneCountry}
                 onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
               >
                 {COUNTRIES.map((country) => (
                   <option key={country.code} value={country.code}>
@@ -664,20 +617,20 @@ const SalesRepManagement = () => {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                 placeholder={getPhonePlaceholder(formData.phoneCountry)}
               />
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Commission Rate (%)" required>
               <input
                 type="number"
                 value={formData.commissionRate}
                 onChange={(e) => setFormData({ ...formData, commissionRate: parseFloat(e.target.value) })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                 placeholder="10"
                 min="0"
                 max="100"
@@ -685,13 +638,13 @@ const SalesRepManagement = () => {
             </FormGroup>
           </div>
 
-          <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-            <p className="text-xs font-semibold text-green-900 mb-2">🔐 Account Security</p>
-            <ul className="text-xs text-green-800 space-y-1">
-              <li>• Temporary password: Auto-generated (12 chars, secure)</li>
-              <li>• Sent via email: Sales rep receives invitation link</li>
-              <li>• First login: Must create permanent password</li>
-              <li>• Password expires: After 90 days</li>
+          <div className="rounded-lg border border-success/30 bg-success/10 p-4">
+            <p className="mb-2 text-xs font-semibold text-success">Account Security</p>
+            <ul className="space-y-1 text-xs text-success">
+              <li>- Temporary password: Auto-generated (12 chars, secure)</li>
+              <li>- Sent via email: Sales rep receives invitation link</li>
+              <li>- First login: Must create permanent password</li>
+              <li>- Password expires: After 90 days</li>
             </ul>
           </div>
         </div>
@@ -709,19 +662,18 @@ const SalesRepManagement = () => {
         title="Edit Sales Representative"
         subtitle="Update sales rep information"
         submitLabel={isSubmitting ? 'Updating...' : 'Update Sales Rep'}
-        submitColor="blue"
         isSubmitting={isSubmitting}
         error={error}
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Full Name" required>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
               />
             </FormGroup>
             <FormGroup label="Email" required>
@@ -730,18 +682,18 @@ const SalesRepManagement = () => {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
               />
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Country Code" required>
               <select
                 value={formData.phoneCountry}
                 onChange={(e) => setFormData({ ...formData, phoneCountry: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
               >
                 {COUNTRIES.map((country) => (
                   <option key={country.code} value={country.code}>
@@ -757,44 +709,44 @@ const SalesRepManagement = () => {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                 placeholder={getPhonePlaceholder(formData.phoneCountry)}
               />
             </FormGroup>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormGroup label="Commission Rate (%)" required>
               <input
                 type="number"
                 value={formData.commissionRate}
                 onChange={(e) => setFormData({ ...formData, commissionRate: parseFloat(e.target.value) })}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm focus:outline-none focus:ring-3 focus:ring-ring/50 disabled:opacity-50"
                 min="0"
                 max="100"
               />
             </FormGroup>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm font-semibold text-gray-900 mb-3">Permissions</p>
+          <div className="rounded-lg bg-muted p-4">
+            <p className="mb-3 text-sm font-semibold text-foreground">Permissions</p>
             <div className="space-y-2">
-              {SALESREP_TOGGLEABLE_PERMISSIONS.map(perm => (
+              {SALESREP_TOGGLEABLE_PERMISSIONS.map((perm) => (
                 <label
                   key={perm.id}
-                  className="flex items-center gap-2 text-sm p-2 rounded transition-colors cursor-pointer hover:bg-white"
+                  className="flex cursor-pointer items-center gap-2 rounded p-2 text-sm transition-colors hover:bg-card"
                 >
                   <input
                     type="checkbox"
                     checked={formData.permissions.includes(perm.id)}
                     onChange={() => togglePermission(perm.id)}
                     disabled={isSubmitting}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="size-4 accent-primary disabled:opacity-50"
                   />
                   <div>
-                    <span className="text-gray-900">{perm.label}</span>
-                    <span className="ml-2 text-xs text-gray-500">({perm.category})</span>
+                    <span className="text-foreground">{perm.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">({perm.category})</span>
                   </div>
                 </label>
               ))}
@@ -815,7 +767,7 @@ const SalesRepManagement = () => {
         description={`Are you sure you want to delete ${repToDelete?.name}? Their assigned leads will need to be reassigned.`}
         confirmLabel={isSubmitting ? 'Deleting...' : 'Delete'}
         cancelLabel="Cancel"
-        isDangerous={true}
+        isDangerous
         isSubmitting={isSubmitting}
       />
 
