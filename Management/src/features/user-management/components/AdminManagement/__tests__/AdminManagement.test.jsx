@@ -71,8 +71,8 @@ describe('AdminManagement', () => {
     await waitFor(() => expect(screen.getByText('Alice Admin')).toBeInTheDocument());
 
     await user.click(screen.getByTitle('Delete Admin'));
-    const dialog = await screen.findByText('Delete Admin', { selector: 'h2' });
-    await user.click(within(dialog.closest('div.p-6')).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Admin' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(mockDeleteUser).toHaveBeenCalledWith(ADMIN_ID));
     expect(mockDeleteUser).not.toHaveBeenCalledWith(undefined);
