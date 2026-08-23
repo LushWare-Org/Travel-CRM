@@ -64,7 +64,7 @@ function AppContent() {
         path="/*"
         element={
           isAuthenticated ? (
-            <div className="flex h-screen bg-gray-50">
+            <div className="flex h-screen bg-background">
               <Sidebar />
               <div className="flex-1 overflow-auto min-w-0">
                 <div className="md:hidden h-0" /> {/* Spacer for mobile hamburger */}

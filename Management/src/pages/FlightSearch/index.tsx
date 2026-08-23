@@ -282,7 +282,7 @@ export default function FlightSearch() {
 
   return (
     <FlightErrorBoundary>
-      <div className="mx-auto max-w-7xl p-4 md:p-6">
+      <div className="min-h-screen bg-background mx-auto max-w-7xl p-4 md:p-6">
         <div className="mb-6 flex items-center gap-3">
           <div className="rounded-lg bg-primary p-2.5 text-primary-foreground">
             <Plane className="h-6 w-6" />

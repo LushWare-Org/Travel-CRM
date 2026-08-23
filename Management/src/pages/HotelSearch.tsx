@@ -291,7 +291,7 @@ export default function HotelSearch() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-background p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2.5 rounded-lg bg-primary text-primary-foreground">
           <Hotel className="w-6 h-6" />
