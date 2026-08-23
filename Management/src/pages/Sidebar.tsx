@@ -245,7 +245,7 @@ const Sidebar = () => {
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto relative z-10">
           <div className={`${isExpanded ? 'px-3' : 'px-1'} mb-4`}>
             {isExpanded && (
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Main Menu</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Main Menu</p>
             )}
           </div>
 

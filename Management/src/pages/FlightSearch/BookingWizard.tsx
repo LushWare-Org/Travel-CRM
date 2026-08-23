@@ -185,7 +185,7 @@ export function ReviewStep({ selectedOffer, travelers, contact, booking, onBack,
 
       <div className="mb-4 rounded-lg bg-muted/50 p-4">
         <div className="mb-2 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
             {selectedOffer.airlineCode}
           </div>
           <span className="text-sm font-semibold text-foreground">{selectedOffer.airline} · {selectedOffer.cabinClass}</span>
@@ -210,7 +210,7 @@ export function ReviewStep({ selectedOffer, travelers, contact, booking, onBack,
         <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Travelers</div>
         {travelers.map((t, i) => (
           <div key={i} className="flex items-center gap-2 py-1 text-sm text-foreground">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">{i + 1}</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">{i + 1}</span>
             {t.title} {t.firstName} {t.lastName}
             <span className="text-xs capitalize text-muted-foreground">({t.type})</span>
           </div>

@@ -247,15 +247,15 @@ const UserAnalyticsPanel = ({ data }: { data: any }) => {
       <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
         <div className="text-center p-3 sm:p-4 bg-muted rounded-lg">
           <p className="text-xl sm:text-3xl font-mono font-semibold tabular-nums text-foreground">{userStats.totalUsers || 0}</p>
-          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total Users</p>
+          <p className="text-xs text-muted-foreground mt-1">Total Users</p>
         </div>
         <div className="text-center p-3 sm:p-4 bg-success/10 rounded-lg">
           <p className="text-xl sm:text-3xl font-mono font-semibold tabular-nums text-success">{userStats.activeUsers || 0}</p>
-          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Active</p>
+          <p className="text-xs text-muted-foreground mt-1">Active</p>
         </div>
         <div className="text-center p-3 sm:p-4 bg-destructive/10 rounded-lg">
           <p className="text-xl sm:text-3xl font-mono font-semibold tabular-nums text-destructive">{userStats.inactiveUsers || 0}</p>
-          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Inactive</p>
+          <p className="text-xs text-muted-foreground mt-1">Inactive</p>
         </div>
       </div>
 
