@@ -1,9 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Building2, Save, Upload, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminAPI, uploadAPI } from '../services/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
-const EMPTY_FORM = {
+interface SettingsForm {
+  companyName: string;
+  companyShortName: string;
+  companyLegalName: string;
+  companyAddress: string;
+  companyGstNumber: string;
+  tagline: string;
+  logoUrl: string;
+  contactEmail: string;
+  salesEmail: string;
+  supportEmail: string;
+  contactPhone: string;
+  whatsappNumber: string;
+  website: string;
+  themeInk: string;
+  themeMuted: string;
+  themeAccent: string;
+  themeAccentDark: string;
+  defaultCurrency: string;
+  defaultTaxRate: string;
+  defaultServiceChargeRate: string;
+  quotationValidityDays: string;
+  quotationTerms: string;
+  cancellationPolicy: string;
+  invoicePaymentTerms: string;
+  invoicePaymentInstructions: string;
+  ratingTagline: string;
+  paymentMethods: string;
+  docPrefixQuotation: string;
+  docPrefixInvoice: string;
+  docPrefixReceipt: string;
+  docPrefixPayment: string;
+  docPrefixCreditNote: string;
+  docPrefixVoucher: string;
+  bankName: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
+  bankIfscCode: string;
+  bankSwiftCode: string;
+  bankBranch: string;
+  bankAccountType: string;
+  upiId: string;
+}
+
+const EMPTY_FORM: SettingsForm = {
   companyName: '', companyShortName: '', companyLegalName: '', companyAddress: '', companyGstNumber: '', tagline: '', logoUrl: '',
   contactEmail: '', salesEmail: '', supportEmail: '', contactPhone: '', whatsappNumber: '', website: '',
   themeInk: '', themeMuted: '', themeAccent: '', themeAccentDark: '',
@@ -16,7 +64,7 @@ const EMPTY_FORM = {
   bankSwiftCode: '', bankBranch: '', bankAccountType: '', upiId: '',
 };
 
-const NULLABLE_FIELDS = [
+const NULLABLE_FIELDS: (keyof SettingsForm)[] = [
   'companyShortName', 'companyLegalName', 'companyAddress', 'companyGstNumber', 'tagline', 'logoUrl',
   'contactEmail', 'salesEmail', 'supportEmail', 'contactPhone', 'whatsappNumber', 'website',
   'themeInk', 'themeMuted', 'themeAccent', 'themeAccentDark',
@@ -25,7 +73,7 @@ const NULLABLE_FIELDS = [
   'bankSwiftCode', 'bankBranch', 'bankAccountType', 'upiId',
 ];
 
-const settingsToForm = (settings) => ({
+const settingsToForm = (settings: Record<string, any>): SettingsForm => ({
   companyName: settings.companyName ?? '',
   companyShortName: settings.companyShortName ?? '',
   companyLegalName: settings.companyLegalName ?? '',
@@ -69,15 +117,17 @@ const settingsToForm = (settings) => ({
   upiId: settings.upiId ?? '',
 });
 
-const formToPayload = (form) => {
-  const payload = { companyName: form.companyName };
+const formToPayload = (form: SettingsForm) => {
+  const payload: Record<string, any> = { companyName: form.companyName };
   for (const field of NULLABLE_FIELDS) {
     payload[field] = form[field].trim() === '' ? null : form[field];
   }
   payload.defaultCurrency = form.defaultCurrency.trim().toUpperCase() || 'USD';
   payload.defaultTaxRate = form.defaultTaxRate === '' ? null : Number(form.defaultTaxRate);
-  payload.defaultServiceChargeRate = form.defaultServiceChargeRate === '' ? null : Number(form.defaultServiceChargeRate);
-  payload.quotationValidityDays = form.quotationValidityDays === '' ? 30 : Number(form.quotationValidityDays);
+  payload.defaultServiceChargeRate =
+    form.defaultServiceChargeRate === '' ? null : Number(form.defaultServiceChargeRate);
+  payload.quotationValidityDays =
+    form.quotationValidityDays === '' ? 30 : Number(form.quotationValidityDays);
   payload.paymentMethods = form.paymentMethods
     .split(',')
     .map((s) => s.trim())
@@ -93,47 +143,60 @@ const formToPayload = (form) => {
   return payload;
 };
 
-function Field({ label, helperText, ...props }) {
+interface FieldProps extends React.ComponentProps<typeof Input> {
+  label: string;
+  helperText?: string;
+}
+
+function Field({ label, helperText, ...props }: FieldProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-      <input
-        {...props}
-        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-      />
-      {helperText && <p className="text-xs text-gray-500 mt-1">{helperText}</p>}
+      <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
+      <Input {...props} className="h-9" />
+      {helperText && <p className="text-xs text-muted-foreground mt-1">{helperText}</p>}
     </div>
   );
 }
 
-function TextAreaField({ label, helperText, ...props }) {
+interface TextAreaFieldProps extends React.ComponentProps<typeof Textarea> {
+  label: string;
+  helperText?: string;
+}
+
+function TextAreaField({ label, helperText, ...props }: TextAreaFieldProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-      <textarea
-        {...props}
-        rows={4}
-        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-      />
-      {helperText && <p className="text-xs text-gray-500 mt-1">{helperText}</p>}
+      <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
+      <Textarea {...props} rows={4} />
+      {helperText && <p className="text-xs text-muted-foreground mt-1">{helperText}</p>}
     </div>
   );
 }
 
-function Section({ title, description, children }) {
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="mb-5">
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-        {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
+      </CardContent>
+    </Card>
   );
 }
 
 const OrganizationSettings = () => {
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<SettingsForm>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -146,16 +209,17 @@ const OrganizationSettings = () => {
           setForm(settingsToForm(response.data.settings));
         }
       } catch (err) {
-        toast.error(err.message || 'Failed to load organization settings');
+        toast.error((err as Error)?.message || 'Failed to load organization settings');
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = (field: keyof SettingsForm) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const handleLogoUpload = async (e) => {
+  const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingLogo(true);
@@ -168,7 +232,7 @@ const OrganizationSettings = () => {
         toast.error(response.message || 'Logo upload failed');
       }
     } catch (err) {
-      toast.error(err.message || 'Logo upload failed');
+      toast.error((err as Error)?.message || 'Logo upload failed');
     } finally {
       setUploadingLogo(false);
       e.target.value = '';
@@ -190,7 +254,7 @@ const OrganizationSettings = () => {
         toast.error(response.message || 'Failed to save settings');
       }
     } catch (err) {
-      toast.error(err.message || 'Failed to save settings');
+      toast.error((err as Error)?.message || 'Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -198,54 +262,79 @@ const OrganizationSettings = () => {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+      <div className="h-full flex items-center justify-center bg-background">
+        <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-auto bg-gray-50">
+    <div className="h-full overflow-auto bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gray-900 rounded-lg">
-              <Building2 className="w-5 h-5 text-white" />
+            <div className="p-2.5 bg-primary rounded-lg">
+              <Building2 className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Organization Settings</h1>
-              <p className="text-sm text-gray-500">
+              <h1 className="font-heading text-xl font-semibold text-foreground">
+                Organization Settings
+              </h1>
+              <p className="text-sm text-muted-foreground">
                 Company identity, branding, and quotation defaults used across the CRM
               </p>
             </div>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-          >
+          <Button onClick={handleSave} disabled={saving} className="gap-2 h-9">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+          </Button>
         </div>
 
-        <Section title="Company Identity" description="Shown on quotations, invoices, and the Management sidebar">
+        <Section
+          title="Company Identity"
+          description="Shown on quotations, invoices, and the Management sidebar"
+        >
           <Field label="Company Name" required value={form.companyName} onChange={set('companyName')} />
           <Field label="Short Name" value={form.companyShortName} onChange={set('companyShortName')} />
           <Field label="Legal Name" value={form.companyLegalName} onChange={set('companyLegalName')} />
           <Field label="Tagline" value={form.tagline} onChange={set('tagline')} />
-          <Field label="GST Number" value={form.companyGstNumber} onChange={set('companyGstNumber')} helperText="Shown on invoice PDFs as the 'Bill From' GST No" />
-          <Field label="Address" value={form.companyAddress} onChange={set('companyAddress')} helperText="Shown on invoice PDFs as the 'Bill From' address" />
+          <Field
+            label="GST Number"
+            value={form.companyGstNumber}
+            onChange={set('companyGstNumber')}
+            helperText="Shown on invoice PDFs as the 'Bill From' GST No"
+          />
+          <Field
+            label="Address"
+            value={form.companyAddress}
+            onChange={set('companyAddress')}
+            helperText="Shown on invoice PDFs as the 'Bill From' address"
+          />
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Logo</label>
             <div className="flex items-center gap-3">
               {form.logoUrl && (
-                <img src={form.logoUrl} alt="Logo preview" className="h-10 w-auto rounded border border-gray-200" />
+                <img
+                  src={form.logoUrl}
+                  alt="Logo preview"
+                  className="h-10 w-auto rounded border border-border"
+                />
               )}
-              <label className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                {uploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              <label className="flex items-center gap-2 px-3 py-2 text-sm border border-border rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                {uploadingLogo ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
                 {uploadingLogo ? 'Uploading...' : 'Upload logo'}
-                <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                  disabled={uploadingLogo}
+                />
               </label>
             </div>
           </div>
@@ -264,25 +353,79 @@ const OrganizationSettings = () => {
           <Field label="Ink (text)" type="color" value={form.themeInk || '#1F2937'} onChange={set('themeInk')} />
           <Field label="Muted text" type="color" value={form.themeMuted || '#64748B'} onChange={set('themeMuted')} />
           <Field label="Accent" type="color" value={form.themeAccent || '#F5A623'} onChange={set('themeAccent')} />
-          <Field label="Accent (dark)" type="color" value={form.themeAccentDark || '#D98A0B'} onChange={set('themeAccentDark')} />
+          <Field
+            label="Accent (dark)"
+            type="color"
+            value={form.themeAccentDark || '#D98A0B'}
+            onChange={set('themeAccentDark')}
+          />
         </Section>
 
         <Section title="Quotation Defaults" description="Used whenever a quotation doesn't specify its own values">
-          <Field label="Default Currency" maxLength={3} value={form.defaultCurrency} onChange={set('defaultCurrency')} helperText="3-letter code, e.g. USD" />
-          <Field label="Validity (days)" type="number" min="1" value={form.quotationValidityDays} onChange={set('quotationValidityDays')} />
-          <Field label="Default Tax Rate (%)" type="number" min="0" max="100" step="0.01" value={form.defaultTaxRate} onChange={set('defaultTaxRate')} />
-          <Field label="Default Service Charge Rate (%)" type="number" min="0" max="100" step="0.01" value={form.defaultServiceChargeRate} onChange={set('defaultServiceChargeRate')} />
-          <Field label="Rating Tagline" value={form.ratingTagline} onChange={set('ratingTagline')} helperText="Shown in the PDF footer band" />
-          <Field label="Payment Methods" value={form.paymentMethods} onChange={set('paymentMethods')} helperText="Comma-separated, e.g. Bank Transfer, UPI, Visa" />
+          <Field
+            label="Default Currency"
+            maxLength={3}
+            value={form.defaultCurrency}
+            onChange={set('defaultCurrency')}
+            helperText="3-letter code, e.g. USD"
+          />
+          <Field
+            label="Validity (days)"
+            type="number"
+            min="1"
+            value={form.quotationValidityDays}
+            onChange={set('quotationValidityDays')}
+          />
+          <Field
+            label="Default Tax Rate (%)"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={form.defaultTaxRate}
+            onChange={set('defaultTaxRate')}
+          />
+          <Field
+            label="Default Service Charge Rate (%)"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={form.defaultServiceChargeRate}
+            onChange={set('defaultServiceChargeRate')}
+          />
+          <Field
+            label="Rating Tagline"
+            value={form.ratingTagline}
+            onChange={set('ratingTagline')}
+            helperText="Shown in the PDF footer band"
+          />
+          <Field
+            label="Payment Methods"
+            value={form.paymentMethods}
+            onChange={set('paymentMethods')}
+            helperText="Comma-separated, e.g. Bank Transfer, UPI, Visa"
+          />
           <div className="sm:col-span-2">
-            <TextAreaField label="Terms & Conditions" value={form.quotationTerms} onChange={set('quotationTerms')} />
+            <TextAreaField
+              label="Terms & Conditions"
+              value={form.quotationTerms}
+              onChange={set('quotationTerms')}
+            />
           </div>
           <div className="sm:col-span-2">
-            <TextAreaField label="Cancellation Policy" value={form.cancellationPolicy} onChange={set('cancellationPolicy')} />
+            <TextAreaField
+              label="Cancellation Policy"
+              value={form.cancellationPolicy}
+              onChange={set('cancellationPolicy')}
+            />
           </div>
         </Section>
 
-        <Section title="Document Number Prefixes" description="Leave blank to keep the default prefix for that document type">
+        <Section
+          title="Document Number Prefixes"
+          description="Leave blank to keep the default prefix for that document type"
+        >
           <Field label="Quotation" placeholder="QUO" value={form.docPrefixQuotation} onChange={set('docPrefixQuotation')} />
           <Field label="Invoice" placeholder="INV" value={form.docPrefixInvoice} onChange={set('docPrefixInvoice')} />
           <Field label="Receipt" placeholder="REC" value={form.docPrefixReceipt} onChange={set('docPrefixReceipt')} />
@@ -291,7 +434,10 @@ const OrganizationSettings = () => {
           <Field label="Voucher" placeholder="VOU" value={form.docPrefixVoucher} onChange={set('docPrefixVoucher')} />
         </Section>
 
-        <Section title="Bank & Payment Details" description="Shown on quotation PDFs when configured — visible to customers">
+        <Section
+          title="Bank & Payment Details"
+          description="Shown on quotation PDFs when configured - visible to customers"
+        >
           <Field label="Bank Name" value={form.bankName} onChange={set('bankName')} />
           <Field label="Account Name" value={form.bankAccountName} onChange={set('bankAccountName')} />
           <Field label="Account Number" value={form.bankAccountNumber} onChange={set('bankAccountNumber')} />
@@ -302,12 +448,25 @@ const OrganizationSettings = () => {
           <Field label="UPI ID" value={form.upiId} onChange={set('upiId')} />
         </Section>
 
-        <Section title="Invoice Defaults" description="Default Payment Terms and Payment Instructions bullets shown on invoice PDFs — overridable per invoice when it's created">
+        <Section
+          title="Invoice Defaults"
+          description="Default Payment Terms and Payment Instructions bullets shown on invoice PDFs - overridable per invoice when it's created"
+        >
           <div className="sm:col-span-2">
-            <TextAreaField label="Payment Terms" value={form.invoicePaymentTerms} onChange={set('invoicePaymentTerms')} helperText="One bullet per line" />
+            <TextAreaField
+              label="Payment Terms"
+              value={form.invoicePaymentTerms}
+              onChange={set('invoicePaymentTerms')}
+              helperText="One bullet per line"
+            />
           </div>
           <div className="sm:col-span-2">
-            <TextAreaField label="Payment Instructions" value={form.invoicePaymentInstructions} onChange={set('invoicePaymentInstructions')} helperText="One bullet per line, shown below the bank details" />
+            <TextAreaField
+              label="Payment Instructions"
+              value={form.invoicePaymentInstructions}
+              onChange={set('invoicePaymentInstructions')}
+              helperText="One bullet per line, shown below the bank details"
+            />
           </div>
         </Section>
       </div>
