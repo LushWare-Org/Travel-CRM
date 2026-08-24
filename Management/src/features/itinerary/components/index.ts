@@ -6,6 +6,10 @@
 // Card Components
 export { default as PackageCard } from './PackageCard';
 
+// Layout Components
+export { default as PackageStats } from './PackageStats';
+export { default as PackageFilters } from './PackageFilters';
+
 // Modal Components
 export { default as PackageDetailsModal } from './PackageDetailsModal';
 export { default as PackagePDFPreviewDialog } from './PackagePDFPreviewDialog';
