@@ -24,7 +24,7 @@ vi.mock('../../../../../services/api', () => ({
   packageAPI: { getById: mockGetPackageById },
 }));
 
-vi.mock('../../PDFPreviewDialog', () => ({
+vi.mock('@/components/shared/PdfPreview', () => ({
   default: ({ isOpen, pdfUrl }) => (isOpen ? <div data-testid="pdf-preview">{pdfUrl}</div> : null),
 }));
 

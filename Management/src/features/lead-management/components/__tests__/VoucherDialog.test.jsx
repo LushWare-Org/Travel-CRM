@@ -32,7 +32,7 @@ vi.mock('../../../../services/flight.service', () => ({
   flightAPI: { getItineraryFlights: mockGetItineraryFlights },
 }));
 
-vi.mock('../PDFPreviewDialog', () => ({
+vi.mock('@/components/shared/PdfPreview', () => ({
   default: ({ isOpen, pdfUrl }) => (isOpen ? <div data-testid="pdf-preview">{pdfUrl}</div> : null),
 }));
 
