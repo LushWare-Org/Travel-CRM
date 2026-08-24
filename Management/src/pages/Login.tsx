@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from '@/lib/toast';
-import { Eye, EyeOff, Mail, Lock, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import BRANDING, { getLoginBranding } from '../config/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,9 +87,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-lg bg-primary mb-6">
-            <Sparkles className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <img
+            src="/logo-full.png"
+            alt={getLoginBranding().title}
+            className="h-16 w-auto max-w-[280px] mx-auto mb-6 object-contain"
+          />
           <h1 className="font-heading text-2xl font-bold text-foreground mb-1">
             {getLoginBranding().title}
           </h1>
