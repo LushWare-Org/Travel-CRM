@@ -86,7 +86,7 @@ const Sidebar = () => {
       orgBranding?.companyShortName ||
       (orgBranding?.companyName ? deriveInitials(orgBranding.companyName) : fallbackInfo.shortName),
     tagline: orgBranding?.tagline || fallbackInfo.tagline,
-    logoUrl: orgBranding?.logoUrl || null,
+    logoUrl: orgBranding?.logoUrl || fallbackInfo.logoUrl,
   };
   const canEditOrgSettings = user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'superAdmin';
 
@@ -233,11 +233,15 @@ const Sidebar = () => {
                 if (isMobile) setMobileOpen(false);
               }}
               title={canEditOrgSettings ? 'Organization Settings' : brandInfo.name}
-              className={`${isExpanded ? 'w-11 h-11' : 'w-10 h-10'} rounded-lg flex items-center justify-center font-bold text-sidebar-primary-foreground bg-sidebar-primary transition-colors duration-200 flex-shrink-0 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:bg-sidebar-primary/90' : 'cursor-default'}`}
+              className={
+                isExpanded && brandInfo.logoUrl
+                  ? `h-11 w-auto max-w-[180px] px-1 rounded-lg flex items-center justify-center transition-colors duration-200 flex-shrink-0 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:bg-sidebar-accent' : 'cursor-default'}`
+                  : `${isExpanded ? 'w-11 h-11' : 'w-10 h-10'} rounded-lg flex items-center justify-center font-bold text-sidebar-primary-foreground bg-sidebar-primary transition-colors duration-200 flex-shrink-0 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:bg-sidebar-primary/90' : 'cursor-default'}`
+              }
               disabled={!canEditOrgSettings}
             >
-              {brandInfo.logoUrl ? (
-                <img src={brandInfo.logoUrl} alt={brandInfo.name} className="w-full h-full object-cover" />
+              {isExpanded && brandInfo.logoUrl ? (
+                <img src={brandInfo.logoUrl} alt={brandInfo.name} className="h-full w-auto object-contain" />
               ) : (
                 <span className={`${isExpanded ? 'text-base' : 'text-sm'} font-heading font-extrabold tracking-tight`}>
                   {brandInfo.shortName.substring(0, 2)}
