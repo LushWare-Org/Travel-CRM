@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/toast";
 import Sidebar from "./pages/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
@@ -64,7 +64,7 @@ function AppContent() {
         path="/*"
         element={
           isAuthenticated ? (
-            <div className="flex h-screen bg-gray-50">
+            <div className="flex h-screen bg-background">
               <Sidebar />
               <div className="flex-1 overflow-auto min-w-0">
                 <div className="md:hidden h-0" /> {/* Spacer for mobile hamburger */}
@@ -117,18 +117,7 @@ function App() {
       >
         <AppContent />
       </Router>
-      <Toaster
-        position="top-right"
-        reverseOrder={false}
-        gutter={8}
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-        }}
-      />
+      <Toaster timeout={4000} />
     </>
   );
 }

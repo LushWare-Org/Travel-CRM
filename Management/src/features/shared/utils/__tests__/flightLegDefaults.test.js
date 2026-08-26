@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { flipLegForReturn, getOutboundModalDefaults } from '../flightLegDefaults.js';
+import { flipLegForReturn, getOutboundModalDefaults } from '../flightLegDefaults.ts';
 
 describe('flipLegForReturn', () => {
   it('swaps origin and destination', () => {

@@ -9,7 +9,7 @@ const packageAIApi = {
   /**
    * Generate AI content from title only (no package ID needed)
    * @param {object} data - { title, destination?, duration?, category? }
-   * @returns {Promise<object>} Generated content
+   * @returns {Promise<any>} Generated content
    */
   generateFromTitle: async (data) => {
     try {
@@ -23,7 +23,7 @@ const packageAIApi = {
   /**
    * Generate AI content for a package
    * @param {string} packageId - Package ID
-   * @returns {Promise<object>} Generated content
+   * @returns {Promise<any>} Generated content
    */
   generateContent: async (packageId) => {
     try {
@@ -37,7 +37,7 @@ const packageAIApi = {
   /**
    * Preview AI content without saving
    * @param {string} packageId - Package ID
-   * @returns {Promise<object>} Preview content
+   * @returns {Promise<any>} Preview content
    */
   previewContent: async (packageId) => {
     return apiService.get(`/packages/${packageId}/preview-ai-content`);

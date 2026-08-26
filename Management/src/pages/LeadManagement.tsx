@@ -1,0 +1,647 @@
+import { useState, useEffect } from "react";
+import {
+  Plus,
+  RefreshCw,
+  Settings,
+  Loader2,
+  AlertCircle,
+  Users,
+  LayoutGrid,
+  List,
+} from "lucide-react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { leadAPI, adminAPI, authAPI } from "../services/api";
+import toast from '@/lib/toast';
+import LeadStats from "../features/lead-management/components/LeadStats";
+import LeadFilters from "../features/lead-management/components/LeadFilters";
+import LeadTable from "../features/lead-management/components/LeadTable";
+import NewLeadDialog from "../features/lead-management/components/NewLeadDialog";
+import EditLeadDialog from "../features/lead-management/components/EditLeadDialog";
+import RemarksDialog from "../features/lead-management/components/RemarksDialog";
+import WhatsAppHistoryDialog from "../features/lead-management/components/WhatsAppHistoryDialog";
+import FilterDialog from "../features/lead-management/components/FilterDialog";
+import SettingsDialog from "../features/lead-management/components/SettingsDialog";
+import StatusChangeDialog from "../features/lead-management/components/StatusChangeDialog";
+import QuotationModal from "../features/lead-management/components/quotation/QuotationModal";
+import InvoiceDialog from "../features/lead-management/components/InvoiceDialog";
+import ReceiptDialog from "../features/lead-management/components/ReceiptDialog";
+import VoucherDialog from "../features/lead-management/components/VoucherDialog";
+import LeadSectionView from "../features/lead-management/components/LeadSectionView";
+import ActiveSalesRepsDialog from "../features/lead-management/components/ActiveSalesRepsDialog";
+import { LIFECYCLE_STATUS_COLORS, LIFECYCLE_STATUS_LABELS } from "../features/lead-management/components/LeadStatusBadge";
+import type { LifecycleStatus } from "../features/lead-management/components/LeadStatusBadge";
+
+type FilterKey = 'all' | LifecycleStatus;
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Lifecycle status maps (10 states) plus old-status fallbacks
+const statusColors: Record<string, string> = {
+  ...LIFECYCLE_STATUS_COLORS,
+  new: "bg-primary/10 text-primary",
+  contacted: "bg-warning/10 text-warning",
+  interested: "bg-primary/10 text-primary",
+  quoted: "bg-primary/10 text-primary",
+  converted: "bg-success/10 text-success",
+  lost: "bg-destructive/10 text-destructive",
+  not_interested: "bg-muted text-muted-foreground",
+};
+
+const statusLabels: Record<string, string> = {
+  ...LIFECYCLE_STATUS_LABELS,
+  new: "New",
+  contacted: "Contacted",
+  interested: "Interested",
+  quoted: "Quoted",
+  converted: "Converted",
+  lost: "Lost",
+  not_interested: "Not Interested",
+};
+
+const LeadManagement = () => {
+  const [leads, setLeads] = useState<any[]>([]);
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<FilterKey>("all");
+  const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
+  const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
+  const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
+
+  const [statsSummary, setStatsSummary] = useState<any>(null);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ all: 0 });
+
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showRemarksDialog, setShowRemarksDialog] = useState(false);
+  const [showWhatsappDialog, setShowWhatsappDialog] = useState(false);
+  const [showFilterDialog, setShowFilterDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showActiveSalesRepsDialog, setShowActiveSalesRepsDialog] = useState(false);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  // Each billing document dialog owns its own lead so opening one for a
+  // different lead can never leak into a dialog that's already open.
+  const [quotationLead, setQuotationLead] = useState<any>(null);
+  const [invoiceLead, setInvoiceLead] = useState<any>(null);
+  const [receiptLead, setReceiptLead] = useState<any>(null);
+  const [voucherLead, setVoucherLead] = useState<any>(null);
+
+  const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [statusLead, setStatusLead] = useState<any>(null);
+  const [sectionLead, setSectionLead] = useState<any>(null);
+  // When set, the lead editor was opened from the quotation flow and we return
+  // to the quotation modal once the editor closes.
+  const [resumeQuoteLead, setResumeQuoteLead] = useState<any>(null);
+  const [resumeQuoteSelectionId, setResumeQuoteSelectionId] = useState<string | null>(null);
+  // Same hand-off, for the voucher flow's "Manage flights & itinerary" backlink.
+  const [resumeVoucherLead, setResumeVoucherLead] = useState<any>(null);
+  const [resumeVoucherSelectionId, setResumeVoucherSelectionId] = useState<string | null>(null);
+  // Which package tab to open the lead editor/quotation modal on, carried
+  // across the quotation <-> lead-editor hand-off so edits land on the same
+  // package the user was viewing instead of defaulting to the first one.
+  const [editorInitialSelectionId, setEditorInitialSelectionId] = useState<string | null>(null);
+  const [quotationInitialSelectionId, setQuotationInitialSelectionId] = useState<string | null>(null);
+  const [voucherInitialSelectionId, setVoucherInitialSelectionId] = useState<string | null>(null);
+  const [showSectionView, setShowSectionView] = useState(false);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [salesReps, setSalesReps] = useState<any[]>([]);
+  const [assignmentSettings, setAssignmentSettings] = useState<{
+    mode: 'auto' | 'manual';
+    strategy: 'round-robin' | 'load-based';
+    requireActiveLogin: boolean;
+  }>({
+    mode: "manual",
+    strategy: "round-robin",
+    requireActiveLogin: false,
+  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const highlightedLeadId = searchParams.get("leadId");
+
+  const currentUser = authAPI.getStoredUser();
+  const canDelete = currentUser?.role === 'admin' || currentUser?.role === 'super-admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin';
+
+  const handleDeleteLead = async (leadId: string) => {
+    try {
+      const response = await leadAPI.deleteLead(leadId);
+      if (response.success) {
+        toast.success("Lead deleted successfully");
+        fetchLeads();
+        fetchLeadStats();
+      } else {
+        toast.error(response.message || "Failed to delete lead");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error deleting lead");
+    }
+  };
+
+  // Mobile responsive view mode auto-detection
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(window.innerWidth < 1024 ? 'grid' : 'table');
+
+  const leadsPerPage = 12;
+
+  // Handle window resize for responsive view
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setViewMode('grid');
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Debounce Search Term to prevent spamming the API
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to first page on new search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Refetch leads when filters or page change
+  useEffect(() => {
+    fetchLeads();
+    fetchLeadStats();
+  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, currentPage]);
+
+  useEffect(() => {
+    fetchSalesReps();
+    fetchAssignmentSettings();
+    fetchLeadStats();
+  }, []);
+
+  const fetchLeadStats = async () => {
+    try {
+      const response = await leadAPI.getLeadStats();
+      if (response.success) {
+        setStatsSummary(response.summary || null);
+        const transformedCounts: Record<string, number> = { all: response.summary?.total || 0 };
+        (response.data || []).forEach((item: any) => {
+          transformedCounts[item._id] = item.count;
+        });
+        setStatusCounts(transformedCounts);
+      }
+    } catch (e) {
+      console.error("Failed to load stats", e);
+    }
+  };
+
+  const fetchLeads = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params: Record<string, any> = {
+        limit: leadsPerPage,
+        page: currentPage,
+      };
+
+      if (debouncedSearch) params.query = debouncedSearch; // The backend uses ?query= for search
+      if (filterStatus !== "all") params.status = filterStatus;
+      if (filterTravelDateStart) params['travelDate[gte]'] = filterTravelDateStart;
+      if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
+      if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
+
+      // Note: backend search uses leadAPI.searchLeads for query, but standard filters for standard endpoint.
+      // If there is a search term, use the search endpoint, else standard endpoint.
+      let response;
+      if (debouncedSearch) {
+        response = await leadAPI.searchLeads(debouncedSearch);
+        // The search endpoint might not have full pagination built the same way
+      } else {
+        response = await leadAPI.getAllLeads(params);
+      }
+
+      if (response.success) {
+        const leadsData = Array.isArray(response.data) ? response.data : response.data?.leads || [];
+        setLeads(leadsData);
+
+        // Handle pagination metadata from server
+        if (response.pagination) {
+          setTotalPages(response.pagination.pages || 1);
+          setTotalLeads(response.pagination.total || leadsData.length);
+        } else {
+          // Fallback if search endpoint doesn't return pagination
+          setTotalPages(1);
+          setTotalLeads(response.count || leadsData.length);
+        }
+      } else {
+        setLeads([]);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch leads");
+      console.error("Error fetching leads:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSalesReps = async () => {
+    try {
+      const response = await adminAPI.getSalesReps();
+      if (response.success || response.status === 'success') {
+        const repsData = Array.isArray(response.data)
+          ? response.data
+          : (response.data?.users || []);
+        const formattedReps = repsData.map((rep: any) => ({
+          id: rep._id || rep.id,
+          _id: rep._id || rep.id,
+          name: rep.name || rep.fullName || "Unknown",
+          email: rep.email || "",
+          isActive: rep.isActive !== false,
+          isLoggedIn: rep.isLoggedIn || false,
+        }));
+        setSalesReps(formattedReps);
+      }
+    } catch (err) { /* non-fatal - sales rep list stays empty */ }
+  };
+
+  const fetchAssignmentSettings = async () => {
+    try {
+      const response = await leadAPI.getAssignmentSettings();
+      if (response.success && response.data) {
+        const data = response.data;
+        setAssignmentSettings({
+          mode: data.assignmentMode === 'auto' ? 'auto' : 'manual',
+          strategy: data.autoStrategy === 'load_based' ? 'load-based' : 'round-robin',
+          requireActiveLogin: data.requireActiveLogin48h || false,
+        });
+      }
+    } catch (err) { /* non-fatal - assignment settings stay at their default */ }
+  };
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const handleLeadSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) {
+      setSearchParams({});
+    }
+  };
+
+  // Quotation/Invoice/Receipt/Voucher each own their lead state, but share
+  // this same refetch-and-clear-highlight behavior on success.
+  const handleQuotationSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+  const handleInvoiceSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+  const handleReceiptSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+  const handleVoucherSuccess = () => {
+    fetchLeads();
+    if (highlightedLeadId) setSearchParams({});
+  };
+
+  // Hand off from the quotation modal to the lead editor, remembering to return
+  // to the quotation flow once editing is done.
+  const openLeadEditorFromQuote = (lead: any, selectionId?: string | null) => {
+    setQuotationLead(null);
+    setResumeQuoteLead(lead);
+    setResumeQuoteSelectionId(selectionId ?? null);
+    setEditorInitialSelectionId(selectionId ?? null);
+    setSelectedLead(lead);
+    setShowEditDialog(true);
+  };
+
+  const openLeadEditorFromVoucher = (lead: any, selectionId?: string | null) => {
+    setVoucherLead(null);
+    setResumeVoucherLead(lead);
+    setResumeVoucherSelectionId(selectionId ?? null);
+    setEditorInitialSelectionId(selectionId ?? null);
+    setSelectedLead(lead);
+    setShowEditDialog(true);
+  };
+
+  const closeLeadEditor = () => {
+    setShowEditDialog(false);
+    setSelectedLead(null);
+    setEditorInitialSelectionId(null);
+    if (resumeQuoteLead) {
+      setQuotationInitialSelectionId(resumeQuoteSelectionId);
+      setQuotationLead(resumeQuoteLead);
+      setResumeQuoteLead(null);
+      setResumeQuoteSelectionId(null);
+    } else if (resumeVoucherLead) {
+      setVoucherInitialSelectionId(resumeVoucherSelectionId);
+      setVoucherLead(resumeVoucherLead);
+      setResumeVoucherLead(null);
+      setResumeVoucherSelectionId(null);
+    }
+  };
+
+  const handleStatusChange = async (lead: any, newStatus: string, reason?: string) => {
+    try {
+      const leadId = lead._id || lead.id;
+      const payload: Record<string, any> = { lifecycleStatus: newStatus };
+      if (reason) payload.lostReason = reason;
+      await leadAPI.updateLead(leadId, payload);
+      toast.success("Status updated successfully");
+      fetchLeads();
+      fetchLeadStats();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    }
+    setShowStatusDialog(false);
+    setStatusLead(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="bg-card border-b border-border">
+        <div className="px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+            <div className="pl-10 md:pl-0">
+              <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Lead Management</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                Track and manage your leads efficiently
+              </p>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'table' | 'grid')}>
+                <TabsList>
+                  <TabsTrigger value="table" aria-label="Table view">
+                    <List className="w-4 h-4" />
+                  </TabsTrigger>
+                  <TabsTrigger value="grid" aria-label="Grid view">
+                    <LayoutGrid className="w-4 h-4" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Button onClick={fetchLeads} disabled={loading} variant="outline">
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+              <Button onClick={() => setShowSettingsDialog(true)} variant="outline">
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">{assignmentSettings.mode === "auto"
+                  ? `Auto: ${assignmentSettings.strategy}`
+                  : "Manual"}</span>
+              </Button>
+              <Button onClick={() => setShowNewDialog(true)}>
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Lead</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* Stats Cards */}
+        <LeadStats
+          summary={statsSummary}
+          salesReps={salesReps}
+          onAssignSuccess={() => { fetchLeads(); fetchLeadStats(); }}
+        />
+
+        {/* Filters */}
+        <LeadFilters
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          statusCounts={statusCounts}
+          onAdvancedFilterClick={() => setShowFilterDialog(true)}
+        />
+
+        {/* Lead Cards Grid */}
+        {!loading && !error && leads.length > 0 && (
+          <LeadTable
+            viewMode={viewMode}
+            leads={leads}
+            loading={loading}
+            error={error}
+            statusColors={statusColors}
+            statusLabels={statusLabels}
+            onLeadClick={(lead: any) => {
+              setSelectedLead(lead);
+              setShowEditDialog(true);
+            }}
+            onRemarksClick={(lead: any) => {
+              setSelectedLead(lead);
+              setShowRemarksDialog(true);
+            }}
+            onWhatsappClick={(lead: any) => {
+              setSelectedLead(lead);
+              setShowWhatsappDialog(true);
+            }}
+            onEditClick={(lead: any) => {
+              setSelectedLead(lead);
+              setShowEditDialog(true);
+            }}
+            onStatusClick={(lead: any) => {
+              setStatusLead(lead);
+              setShowStatusDialog(true);
+            }}
+            onQuotationClick={(lead: any) => setQuotationLead(lead)}
+            onInvoiceClick={(lead: any) => setInvoiceLead(lead)}
+            onReceiptClick={(lead: any) => setReceiptLead(lead)}
+            onVoucherClick={(lead: any) => setVoucherLead(lead)}
+            onSectionClick={(lead: any) => {
+              setSectionLead(lead);
+              setShowSectionView(true);
+            }}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+            leadsPerPage={leadsPerPage}
+            totalLeads={totalLeads}
+            highlightedLeadId={highlightedLeadId}
+            canDelete={canDelete}
+            onDeleteClick={handleDeleteLead}
+          />
+        )}
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="mt-3 text-muted-foreground">Loading leads...</p>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="flex flex-col items-center justify-center py-16 bg-card rounded-xl border border-destructive/30">
+            <AlertCircle className="w-12 h-12 text-destructive mb-3" />
+            <p className="text-destructive font-medium">{error}</p>
+            <Button onClick={fetchLeads} variant="destructive" className="mt-4">
+              Try Again
+            </Button>
+          </div>
+        )}
+
+        {!loading && !error && leads.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
+            <Users className="w-12 h-12 text-muted-foreground/40 mb-4" />
+            <p className="text-muted-foreground font-medium">No leads found</p>
+            <p className="text-muted-foreground/70 text-sm mt-1">
+              {searchTerm || filterStatus !== "all"
+                ? "Try adjusting your filters"
+                : "Create your first lead to get started"}
+            </p>
+            {!searchTerm && filterStatus === "all" && (
+              <Button onClick={() => setShowNewDialog(true)} className="mt-4">
+                <Plus className="w-4 h-4" />
+                Create Lead
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Dialogs */}
+      <NewLeadDialog
+        isOpen={showNewDialog}
+        onClose={() => setShowNewDialog(false)}
+        salesReps={salesReps}
+        onSuccess={handleLeadSuccess}
+      />
+
+      <EditLeadDialog
+        isOpen={showEditDialog}
+        onClose={closeLeadEditor}
+        lead={selectedLead}
+        salesReps={salesReps}
+        onSuccess={handleLeadSuccess}
+        initialSelectionId={editorInitialSelectionId ?? undefined}
+      />
+
+      <RemarksDialog
+        isOpen={showRemarksDialog}
+        onClose={() => {
+          setShowRemarksDialog(false);
+          setSelectedLead(null);
+        }}
+        lead={selectedLead}
+        onSuccess={handleLeadSuccess}
+      />
+
+      <WhatsAppHistoryDialog
+        isOpen={showWhatsappDialog}
+        onClose={() => {
+          setShowWhatsappDialog(false);
+          setSelectedLead(null);
+        }}
+        lead={selectedLead}
+        onSuccess={handleLeadSuccess}
+      />
+
+      <FilterDialog
+        isOpen={showFilterDialog}
+        onClose={() => setShowFilterDialog(false)}
+        filterTravelDateStart={filterTravelDateStart}
+        setFilterTravelDateStart={setFilterTravelDateStart}
+        filterTravelDateEnd={filterTravelDateEnd}
+        setFilterTravelDateEnd={setFilterTravelDateEnd}
+        filterPlatforms={filterPlatforms}
+        setFilterPlatforms={setFilterPlatforms}
+      />
+
+      <SettingsDialog
+        isOpen={showSettingsDialog}
+        onClose={() => setShowSettingsDialog(false)}
+        assignmentSettings={assignmentSettings}
+        setAssignmentSettings={setAssignmentSettings}
+        salesReps={salesReps}
+        onViewActiveSalesReps={() => {
+          setShowSettingsDialog(false);
+          setShowActiveSalesRepsDialog(true);
+        }}
+      />
+
+      <ActiveSalesRepsDialog
+        isOpen={showActiveSalesRepsDialog}
+        onClose={() => setShowActiveSalesRepsDialog(false)}
+        requireActiveLogin48h={assignmentSettings.requireActiveLogin}
+      />
+
+      <StatusChangeDialog
+        isOpen={showStatusDialog}
+        onClose={() => {
+          setShowStatusDialog(false);
+          setStatusLead(null);
+        }}
+        lead={statusLead}
+        statusLabels={statusLabels}
+        statusColors={statusColors}
+        onStatusChange={handleStatusChange}
+      />
+
+      {quotationLead && (
+        <QuotationModal
+          isOpen
+          onClose={() => {
+            setQuotationLead(null);
+            setQuotationInitialSelectionId(null);
+          }}
+          lead={quotationLead}
+          onSuccess={handleQuotationSuccess}
+          onEditLead={openLeadEditorFromQuote}
+          initialSelectionId={quotationInitialSelectionId ?? undefined}
+        />
+      )}
+
+      {invoiceLead && (
+        <InvoiceDialog
+          isOpen
+          onClose={() => setInvoiceLead(null)}
+          lead={invoiceLead}
+          onSuccess={handleInvoiceSuccess}
+        />
+      )}
+
+      {receiptLead && (
+        <ReceiptDialog
+          isOpen
+          onClose={() => setReceiptLead(null)}
+          lead={receiptLead}
+          onSuccess={handleReceiptSuccess}
+        />
+      )}
+
+      {voucherLead && (
+        <VoucherDialog
+          isOpen
+          onClose={() => {
+            setVoucherLead(null);
+            setVoucherInitialSelectionId(null);
+          }}
+          lead={voucherLead}
+          onSuccess={handleVoucherSuccess}
+          onEditLead={openLeadEditorFromVoucher}
+          initialSelectionId={voucherInitialSelectionId ?? undefined}
+        />
+      )}
+
+      {showSectionView && sectionLead && (
+        <LeadSectionView
+          lead={sectionLead}
+          onClose={() => {
+            setShowSectionView(false);
+            setSectionLead(null);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default LeadManagement;

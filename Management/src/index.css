@@ -1,6 +1,45 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/archivo";
+@import "@fontsource-variable/public-sans";
+@import "@fontsource-variable/jetbrains-mono";
+/*
+  ---break---
+*/
+@custom-variant dark (&:is(.dark *));
+
+/* Signal Console design tokens - see DESIGN.md. The old blue/cyan/indigo/sky/primary
+   block that lived here was a byte-for-byte copy of Tailwind defaults plus one unused
+   brand color (zero usages confirmed) - removed rather than migrated. Raw bg-blue-*
+   etc classes in not-yet-migrated feature folders keep working via Tailwind v4 built-ins. */
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    @apply font-sans;
+  }
+}
 
 /* ========================================
    MOBILE RESPONSIVE UTILITIES
@@ -54,13 +93,18 @@
   }
 }
 
+/* Briefly smooths the light/dark swap when the user changes theme; toggled
+   on/off around the swap by ThemeContext so it never affects hover/focus
+   transitions elsewhere. */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-transitioning,
+  .theme-transitioning * {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease !important;
+  }
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 code {
@@ -77,77 +121,236 @@ code {
   display: flex !important;
   align-items: stretch !important;
   width: 100% !important;
-  border-radius: 0.5rem !important;
-  border: 1px solid #d1d5db !important;
+  height: 2rem !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--input) !important;
   transition: all 0.2s !important;
-  background: white !important;
+  background: transparent !important;
 }
 
 .phone-input-wrapper .PhoneInput:focus-within {
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+  border-color: var(--ring) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent) !important;
   outline: none !important;
 }
 
 .phone-input-wrapper .PhoneInputInput {
   flex: 1 !important;
-  padding: 0.625rem 0.875rem !important;
+  min-width: 0 !important;
+  padding: 0.25rem 0.625rem !important;
   border: none !important;
-  border-left: 1px solid #e5e7eb !important;
+  border-left: 1px solid var(--border) !important;
   outline: none !important;
   font-size: 0.875rem !important;
   line-height: 1.5rem !important;
-  background: white !important;
-  color: #111827 !important;
-  border-radius: 0 0.5rem 0.5rem 0 !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0 !important;
 }
 
 .phone-input-wrapper .PhoneInputInput::placeholder {
-  color: #9ca3af !important;
+  color: var(--muted-foreground) !important;
 }
 
 .phone-input-wrapper .PhoneInputCountry {
   display: flex !important;
   align-items: center !important;
-  padding: 0.625rem 0.75rem !important;
-  background: #f9fafb !important;
-  border-right: 1px solid #e5e7eb !important;
+  padding: 0.25rem 0.625rem !important;
+  background: var(--muted) !important;
+  border-right: 1px solid var(--border) !important;
   cursor: pointer !important;
   transition: all 0.2s !important;
-  min-width: 100px !important;
-  border-radius: 0.5rem 0 0 0.5rem !important;
+  min-width: 96px !important;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg) !important;
   border: none !important;
 }
 
 .phone-input-wrapper .PhoneInputCountry:hover {
-  background: #f3f4f6 !important;
+  background: var(--accent) !important;
 }
 
 .phone-input-wrapper .PhoneInputCountryIcon {
-  width: 1.5rem !important;
-  height: 1.5rem !important;
-  margin-right: 0.5rem !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  margin-right: 0.375rem !important;
   border-radius: 0.125rem !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 1px 2px var(--shadow-color) !important;
+}
+
+.phone-input-wrapper .PhoneInputCountrySelectCode {
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: var(--foreground) !important;
+  margin-right: 0.875rem !important;
+  white-space: nowrap !important;
 }
 
 .phone-input-wrapper .PhoneInputCountrySelect {
-  appearance: none !important;
   background: transparent !important;
   border: none !important;
   outline: none !important;
   cursor: pointer !important;
-  font-size: 0.875rem !important;
+  font-size: 0.8125rem !important;
   font-weight: 500 !important;
-  color: #374151 !important;
+  color: var(--foreground) !important;
   padding-right: 1.25rem !important;
+}
+
+/* `appearance: none` on the select above would stop Chromium/Brave from
+   dark-theming its native options popup (it'd render a plain white list
+   despite `color-scheme: dark`), so style the `<option>` rows directly
+   instead — browsers honor per-option background/text colors even for
+   the OS-drawn popup. */
+.phone-input-wrapper .PhoneInputCountrySelect option {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
 }
 
 .phone-input-wrapper .PhoneInputCountrySelectArrow {
   position: absolute !important;
   right: 0.5rem !important;
   pointer-events: none !important;
-  color: #6b7280 !important;
+  color: var(--muted-foreground) !important;
   width: 0.75rem !important;
   height: 0.75rem !important;
+}
+/*
+  ---break---
+*/
+@theme inline {
+  --font-heading: 'Archivo Variable', sans-serif;
+  --font-sans: 'Public Sans Variable', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --shadow-card: 0 1px 2px var(--shadow-color), 0 1px 1px var(--shadow-color);
+  --shadow-dropdown: 0 4px 12px var(--shadow-color-strong);
+  --shadow-modal: 0 12px 32px var(--shadow-color-strong);
+}
+/*
+  ---break---
+*/
+:root {
+  color-scheme: light;
+  --background: #f6f7f9;
+  --foreground: #10131a;
+  --card: #ffffff;
+  --card-foreground: #10131a;
+  --popover: #ffffff;
+  --popover-foreground: #10131a;
+  --primary: #0f7f8c;
+  --primary-foreground: #ffffff;
+  --secondary: #eef0f3;
+  --secondary-foreground: #10131a;
+  --muted: #eef0f3;
+  --muted-foreground: #5b6472;
+  --accent: #e3f2f2;
+  --accent-foreground: #10131a;
+  --destructive: #c8392f;
+  --border: #dfe2e7;
+  --input: #dfe2e7;
+  --ring: #0f7f8c;
+  --success: #1a8f52;
+  --success-foreground: #ffffff;
+  --warning: #b8790f;
+  --warning-foreground: #ffffff;
+  --shadow-color: rgba(16, 19, 26, 0.06);
+  --shadow-color-strong: rgba(16, 19, 26, 0.14);
+  --chart-1: #0f7f8c;
+  --chart-2: #3b5bdb;
+  --chart-3: #b8790f;
+  --chart-4: #7c5cbf;
+  --chart-5: #c2447a;
+  --radius: 0.5rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #10131a;
+  --sidebar-primary: #0f7f8c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef0f3;
+  --sidebar-accent-foreground: #10131a;
+  --sidebar-border: #dfe2e7;
+  --sidebar-ring: #0f7f8c;
+}
+/*
+  ---break---
+*/
+.dark {
+  color-scheme: dark;
+  --background: #0a0c0f;
+  --foreground: #eef0f2;
+  --card: #14171c;
+  --card-foreground: #eef0f2;
+  --popover: #14171c;
+  --popover-foreground: #eef0f2;
+  --primary: #2dd4d9;
+  --primary-foreground: #06181a;
+  --secondary: #1b1f26;
+  --secondary-foreground: #eef0f2;
+  --muted: #1b1f26;
+  --muted-foreground: #9aa3ad;
+  --accent: #10282a;
+  --accent-foreground: #eef0f2;
+  --destructive: #ef6259;
+  --border: #262b33;
+  --input: #262b33;
+  --ring: #2dd4d9;
+  --success: #3ec27a;
+  --success-foreground: #062012;
+  --warning: #e0a83f;
+  --warning-foreground: #2b1f06;
+  --shadow-color: rgba(0, 0, 0, 0.32);
+  --shadow-color-strong: rgba(0, 0, 0, 0.48);
+  --chart-1: #2dd4d9;
+  --chart-2: #6d8cf5;
+  --chart-3: #e0a83f;
+  --chart-4: #a78bd6;
+  --chart-5: #e07bab;
+  --sidebar: #14171c;
+  --sidebar-foreground: #eef0f2;
+  --sidebar-primary: #2dd4d9;
+  --sidebar-primary-foreground: #06181a;
+  --sidebar-accent: #1b1f26;
+  --sidebar-accent-foreground: #eef0f2;
+  --sidebar-border: #262b33;
+  --sidebar-ring: #2dd4d9;
 }

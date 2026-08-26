@@ -18,7 +18,7 @@ vi.mock('../../../../services/api', () => ({
   leadAPI: { getSelectionFlights: mockGetSelectionFlights, addSelectionFlight: mockAddSelectionFlight, deleteSelectionFlight: mockDeleteSelectionFlight },
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -56,7 +56,7 @@ vi.mock('../../../shared', async () => ({
   },
 }));
 
-import LeadFlightBookingsSection from '../LeadFlightBookingsSection.jsx';
+import LeadFlightBookingsSection from '../LeadFlightBookingsSection';
 
 const toStartFixture = {
   id: 'flight-to-start',

@@ -7,9 +7,9 @@ vi.mock('../../../../../services/api.js', () => ({
   analyticsAPI: { getBillingOverview: mockGetBillingOverview },
 }));
 
-vi.mock('react-hot-toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
-import BillingAnalytics from '../BillingAnalytics.jsx';
+import BillingAnalytics from '../BillingAnalytics.tsx';
 
 const fixture = {
   success: true,

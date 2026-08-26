@@ -80,6 +80,8 @@ const itineraryDay = z.object({
   activities: z.array(dayActivity).optional().default([]),
   transports: z.array(dayTransport).optional().default([]),
   images: z.array(dayImageSchema).optional().default([]),
+  accommodation: z.record(z.any()).optional().default({}),
+  flights: z.array(z.any()).optional().default([]),
 });
 
 // ─── Package schemas ───────────────────────────────────────────

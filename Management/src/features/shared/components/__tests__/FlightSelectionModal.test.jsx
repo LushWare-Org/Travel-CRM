@@ -21,11 +21,11 @@ vi.mock('../../../../components/PassengerSelector', () => ({
   default: () => <div data-testid="passenger-selector" />,
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }),
 }));
 
-import FlightSelectionModal from '../FlightSelectionModal.jsx';
+import FlightSelectionModal from '../FlightSelectionModal.tsx';
 
 function renderModal(props = {}) {
   return render(

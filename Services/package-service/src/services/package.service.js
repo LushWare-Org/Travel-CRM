@@ -228,6 +228,7 @@ export function buildItineraryDaysData(days) {
     dinnerCount: day.dinnerCount ?? 0,
     mealPriceOverride: day.mealPriceOverride ?? null,
     images: day.images ?? [],
+    accommodation: day.accommodation ?? {},
     places: {
       create: (day.places || []).map((p, i) => ({
         placeId: p.placeId || undefined,

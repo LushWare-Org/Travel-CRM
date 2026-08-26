@@ -32,9 +32,9 @@ vi.mock('../../../services/analytics.service.js', () => ({
 
 vi.mock('../../../contexts/AuthContext.jsx', () => ({ useAuth: mockUseAuth }));
 vi.mock('../../../contexts/PermissionContext.jsx', () => ({ usePermission: mockUsePermission }));
-vi.mock('react-hot-toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
-import DashboardContainer from '../DashboardContainer.jsx';
+import DashboardContainer from '../DashboardContainer.tsx';
 
 const leadOverview = { stats: { totalLeads: 55 }, trend: [{ label: 'Jul', new: 10 }, { label: 'Aug', new: 20 }], destinationPerformance: [] };
 const packageOverview = { stats: { totalItineraries: 14 }, destinationPerformance: [{ destination: 'Bali', inquiries: 5 }] };

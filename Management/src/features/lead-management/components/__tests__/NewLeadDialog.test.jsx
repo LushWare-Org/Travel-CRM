@@ -28,7 +28,7 @@ vi.mock('../../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', role: 'admin', name: 'Admin User' } }),
 }));
 
-vi.mock('react-hot-toast', () => ({
+vi.mock('@/lib/toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
 
@@ -78,7 +78,7 @@ vi.mock('../../../shared', async () => ({
   },
 }));
 
-import NewLeadDialog from '../NewLeadDialog.jsx';
+import NewLeadDialog from '../NewLeadDialog';
 
 const PKG_A = 'pkg-a';
 const packagesFixture = [{ _id: PKG_A, title: 'Sri Lanka Explorer', destination: 'Sri Lanka' }];

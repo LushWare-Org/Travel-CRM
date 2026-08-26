@@ -25,6 +25,9 @@ class ApiService {
   }
 
   // Generic fetch method
+  /**
+   * @returns {Promise<any>} Parsed response body (raw envelope shape varies per endpoint)
+   */
   async fetch(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
@@ -519,29 +522,29 @@ export const adminAPI = {
   },
   getSalesReps: async () => {
     const api = new ApiService();
-    // fetch active sales reps, large limit to avoid pagination in UI
+    // fetch active sales reps, large limit to avoid pagination in UI (backend caps at 100)
     return api.get("/admin/users", {
       role: "salesRep",
       isActive: true,
-      limit: 200,
+      limit: 100,
       page: 1,
     });
   },
   getSalesRepsAndAdmins: async () => {
     const api = new ApiService();
-    // fetch both active sales reps and admins, large limit to avoid pagination in UI
+    // fetch both active sales reps and admins, large limit to avoid pagination in UI (backend caps at 100)
     // Make two separate calls and combine results
     const [salesRepsRes, adminsRes] = await Promise.all([
       api.get("/admin/users", {
         role: "salesRep",
         isActive: true,
-        limit: 200,
+        limit: 100,
         page: 1,
       }),
       api.get("/admin/users", {
         role: "admin",
         isActive: true,
-        limit: 200,
+        limit: 100,
         page: 1,
       }),
     ]);

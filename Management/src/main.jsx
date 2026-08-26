@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { PermissionProvider } from './contexts/PermissionContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './index.css';
 
 // Suppress React DevTools message in development
@@ -26,10 +27,12 @@ if (process.env.NODE_ENV === 'development') {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AuthProvider>
-      <PermissionProvider>
-        <App />
-      </PermissionProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <PermissionProvider>
+          <App />
+        </PermissionProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );

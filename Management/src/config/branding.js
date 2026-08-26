@@ -13,10 +13,10 @@ const BRANDING = {
     // Company Information
     // ==========================================
     company: {
-        name: import.meta.env.VITE_COMPANY_NAME || 'Travel CRM',
-        shortName: import.meta.env.VITE_COMPANY_SHORT_NAME || 'CRM',
+        name: import.meta.env.VITE_COMPANY_NAME || 'LUSH Ware',
+        shortName: import.meta.env.VITE_COMPANY_SHORT_NAME || 'LW',
         tagline: import.meta.env.VITE_COMPANY_TAGLINE || 'Your Travel Partner',
-        legalName: import.meta.env.VITE_COMPANY_LEGAL_NAME || 'Travel CRM Solutions',
+        legalName: import.meta.env.VITE_COMPANY_LEGAL_NAME || 'LUSH Ware',
     },
 
     // ==========================================
@@ -40,7 +40,7 @@ const BRANDING = {
     // App Configuration
     // ==========================================
     app: {
-        name: import.meta.env.VITE_APP_NAME || 'Travel CRM Management',
+        name: import.meta.env.VITE_APP_NAME || 'LUSH Ware Management',
         version: import.meta.env.VITE_APP_VERSION || '1.0.0',
     },
 
@@ -48,7 +48,7 @@ const BRANDING = {
     // PDF Configuration (for itinerary generation)
     // ==========================================
     pdf: {
-        company: import.meta.env.VITE_COMPANY_NAME || 'Travel CRM',
+        company: import.meta.env.VITE_COMPANY_NAME || 'LUSH Ware',
         tagline: import.meta.env.VITE_COMPANY_TAGLINE || 'Your Ultimate Travel Partner',
         contact: `Contact us: ${import.meta.env.VITE_COMPANY_EMAIL || 'info@example.com'} | ${import.meta.env.VITE_COMPANY_PHONE || '+1-800-000-0000'}`,
         email: import.meta.env.VITE_COMPANY_EMAIL || 'info@example.com',
@@ -87,6 +87,7 @@ export const getSidebarInfo = () => {
         name: BRANDING.company.name,
         tagline: BRANDING.company.tagline || 'Travel Agency Management',
         shortName: BRANDING.company.shortName,
+        logoUrl: '/logo-full.png',
     };
 };
 

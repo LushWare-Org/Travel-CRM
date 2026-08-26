@@ -13,9 +13,9 @@ vi.mock('../../../../../services/analytics.service.js', () => ({
   },
 }));
 
-vi.mock('react-hot-toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/toast', () => ({ default: { loading: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
-import UserAnalytics from '../UserAnalytics.jsx';
+import UserAnalytics from '../UserAnalytics.tsx';
 
 const overview = {
   stats: { totalUsers: 100, activeUsers: 80, inactiveUsers: 20, verifiedUsers: 60, usersWithBookings: 25, conversionRate: 25 },

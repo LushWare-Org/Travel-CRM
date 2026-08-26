@@ -433,16 +433,24 @@ export const getMyLeads = asyncHandler(async (req, res) => {
 
 export const getLeadStats = asyncHandler(async (req, res) => {
   const where = req.user.role === 'salesRep' ? { assignedToId: req.user.id } : {};
-  const [byStatus, totals] = await Promise.all([
+  const [byStatus, totals, assigned, confirmed] = await Promise.all([
     prisma.lead.groupBy({ by: ['lifecycleStatus'], _count: true, where }),
     prisma.lead.aggregate({ _count: true, where }),
+    prisma.lead.count({ where: { AND: [where, { assignedToId: { not: null } }] } }),
+    prisma.lead.count({ where: { ...where, lifecycleStatus: 'CONFIRMED' } }),
   ]);
   const total = totals._count;
   const mapped = (byStatus || []).map(item => ({
     _id: item.lifecycleStatus,
     count: item._count,
   }));
-  res.json({ success: true, data: mapped, summary: { total, byStatus: mapped } });
+  const unassigned = total - assigned;
+  const conversionRate = total > 0 ? ((confirmed / total) * 100).toFixed(1) : '0.0';
+  res.json({
+    success: true,
+    data: mapped,
+    summary: { total, byStatus: mapped, assigned, unassigned, converted: confirmed, conversionRate },
+  });
 });
 
 export const searchLeads = asyncHandler(async (req, res) => {

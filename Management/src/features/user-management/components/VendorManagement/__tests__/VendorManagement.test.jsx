@@ -59,8 +59,8 @@ describe('VendorManagement', () => {
     await waitFor(() => expect(screen.getByText('Sunrise Hotels')).toBeInTheDocument());
 
     await user.click(screen.getByTitle('Delete Vendor'));
-    const dialog = await screen.findByRole('heading', { name: 'Delete Vendor' });
-    await user.click(within(dialog.closest('div.p-6')).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Vendor' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(mockDeleteVendor).toHaveBeenCalledWith(VENDOR_ID));
     expect(mockDeleteVendor).not.toHaveBeenCalledWith(undefined);
