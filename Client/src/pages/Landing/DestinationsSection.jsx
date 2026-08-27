@@ -7,6 +7,7 @@ import {
   ArrowRight,
 } from "lucide-react"
 import { fetchPackages } from "../../utils/packageApi"
+import { REVIEW_VIDEOS } from "../../config/media"
 
 const videoHeights = [
   "h-96",
@@ -28,21 +29,7 @@ function ReviewsVideoSlider() {
   const [currentPage, setCurrentPage] = useState(0)
   const videosPerPage = 8
 
-  const videoData = [
-    { name: "Bali Tour", location: "Bali", file: "/reviews/bali.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives7.mp4" },
-    { name: "Thailand Tour", location: "Thailand", file: "/reviews/thailand2.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives3.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives2.mp4" },
-    { name: "Dubai Tour", location: "Dubai", file: "/reviews/dubai.mp4" },
-    { name: "Machachafushi Tour", location: "Machachafushi", file: "/reviews/machachafushi.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives1.mp4" },
-    { name: "Thailand Tour", location: "Thailand", file: "/reviews/thailand.mp4" },
-    { name: "Mauritius Tour", location: "Mauritius", file: "/reviews/mauritius.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives4.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives6.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives5.mp4" },
-  ]
+  const videoData = REVIEW_VIDEOS
 
   const totalPages = Math.ceil(videoData.length / videosPerPage)
   const startIndex = currentPage * videosPerPage
@@ -52,7 +39,7 @@ function ReviewsVideoSlider() {
   const goToNext = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1))
 
   return (
-    <section className="relative py-16 bg-[#051C35] overflow-hidden">
+    <section className="relative py-16 bg-brand-dark-950 overflow-hidden">
       <style>{`
         @keyframes twinkle {
           0%, 100% { opacity: 0; transform: scale(0.5); }
@@ -170,7 +157,7 @@ function InternationalGrid({ destinations, loading }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-orange-500" />
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-brand-500" />
       </div>
     )
   }
@@ -265,11 +252,11 @@ export default function DestinationsSection() {
           </div>
           <InternationalGrid destinations={destinations} loading={loading} />
           <div className="text-center mt-8">
-            <button onClick={() => navigate("/destinations-international")} className="group inline-flex items-center justify-center px-10 py-3.5 text-slate-800 font-semibold text-base tracking-wide border-2 border-slate-800 rounded-lg hover:border-orange-400 transition-all duration-300 transform hover:scale-105 hover:shadow-lg">
-              <span className="group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-orange-800 group-hover:to-yellow-700 group-hover:bg-clip-text transition-all duration-300">
+            <button onClick={() => navigate("/destinations-international")} className="group inline-flex items-center justify-center px-10 py-3.5 text-slate-800 font-semibold text-base tracking-wide border-2 border-slate-800 rounded-lg hover:border-brand-400 transition-all duration-300 transform hover:scale-105 hover:shadow-lg">
+              <span className="group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-brand-800 group-hover:to-brand-accent-700 group-hover:bg-clip-text transition-all duration-300">
                 Explore All Locations
               </span>
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:text-orange-500 transition-colors duration-300" />
+              <ArrowRight className="ml-2 w-5 h-5 group-hover:text-brand-500 transition-colors duration-300" />
             </button>
           </div>
         </div>

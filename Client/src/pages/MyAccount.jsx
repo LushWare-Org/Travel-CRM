@@ -6,6 +6,7 @@ import { fetchUserBookings } from '../utils/bookingApi';
 import { fetchUserCustomizedPackages } from '../utils/customizationApi';
 import { fetchUserManualItineraries } from '../utils/manualItineraryApi';
 import { formatCurrency } from '../utils/currency';
+import { API_BASE_URL } from '../utils/apiConfig';
 
 export default function MyAccount() {
   const navigate = useNavigate();
@@ -176,8 +177,7 @@ export default function MyAccount() {
       if (!token) {
         throw new Error('Authentication token not found');
       }
-      const baseUrl = 'https://api.harshkumar.space/api/v1';
-      const response = await fetch(`${baseUrl}/users/profile`, {
+      const response = await fetch(`${API_BASE_URL}/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -238,7 +238,7 @@ export default function MyAccount() {
           >
             Welcome Back,{' '}
             <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-brand-400 via-brand-accent-400 to-brand-accent-400 bg-clip-text text-transparent">
                 {user?.name || 'Traveler'}
               </span>
               <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
@@ -273,7 +273,7 @@ export default function MyAccount() {
               onClick={() => setActiveTab('bookings')}
               className={`px-6 py-4 font-bold text-sm md:text-base whitespace-nowrap rounded-xl transition-all ${
                 activeTab === 'bookings'
-                  ? 'bg-gradient-to-r from-orange-400 to-yellow-500 text-black shadow-lg'
+                  ? 'bg-gradient-to-r from-brand-400 to-brand-accent-500 text-black shadow-lg'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -283,7 +283,7 @@ export default function MyAccount() {
               onClick={() => setActiveTab('customized')}
               className={`px-6 py-3 font-bold text-sm md:text-base whitespace-nowrap rounded-xl transition-all ${
                 activeTab === 'customized'
-                  ? 'bg-gradient-to-r from-orange-400 to-yellow-500 text-black shadow-lg'
+                  ? 'bg-gradient-to-r from-brand-400 to-brand-accent-500 text-black shadow-lg'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -293,7 +293,7 @@ export default function MyAccount() {
               onClick={() => setActiveTab('manual')}
               className={`px-6 py-3 font-bold text-sm md:text-base whitespace-nowrap rounded-xl transition-all ${
                 activeTab === 'manual'
-                  ? 'bg-gradient-to-r from-orange-400 to-yellow-500 text-black shadow-lg'
+                  ? 'bg-gradient-to-r from-brand-400 to-brand-accent-500 text-black shadow-lg'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -312,7 +312,7 @@ export default function MyAccount() {
                 <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg flex-shrink-0">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg flex-shrink-0">
                         {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                       </div>
                       {!sidebarCollapsed && (
@@ -339,7 +339,7 @@ export default function MyAccount() {
                     <>
                       <div className="space-y-2 mb-4">
                         <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                          <Mail className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                          <Mail className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                           <div className="min-w-0 flex-1">
                             <p className="text-md text-gray-600 font-semibold">Email:</p>
                             <p className="text-md text-gray-900 truncate font-medium">{user?.email}</p>
@@ -347,7 +347,7 @@ export default function MyAccount() {
                         </div>
                         {user?.phone && (
                           <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                            <Phone className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                            <Phone className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                             <div className="min-w-0 flex-1">
                               <p className="text-md text-gray-600 font-semibold">Phone: </p>
                               <p className="text-md text-gray-900 truncate font-medium">{user.phone}</p>
@@ -374,7 +374,7 @@ export default function MyAccount() {
             <div className={`hidden lg:block ${sidebarCollapsed ? 'w-20' : 'w-80'} flex-shrink-0 transition-all duration-300`}>
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg flex-shrink-0">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg flex-shrink-0">
                     {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -385,7 +385,7 @@ export default function MyAccount() {
                 {/* Contact Info */}
                 <div className="space-y-2 mb-4">
                   <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                    <Mail className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <Mail className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
                       <p className="text-md text-gray-600 font-semibold">Email:</p>
                       <p className="text-md text-gray-900 truncate font-medium">{user?.email}</p>
@@ -393,7 +393,7 @@ export default function MyAccount() {
                   </div>
                   {user?.phone && (
                     <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                      <Phone className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                      <Phone className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
                         <p className="text-md text-gray-600 font-semibold">Phone: </p>
                         <p className="text-md text-gray-900 truncate font-medium">{user.phone}</p>
@@ -420,7 +420,7 @@ export default function MyAccount() {
           {loading ? (
             <div className="flex items-center justify-center py-24">
               <div className="text-center">
-                <Loader className="w-16 h-16 text-orange-500 animate-spin mx-auto mb-4" />
+                <Loader className="w-16 h-16 text-brand-500 animate-spin mx-auto mb-4" />
                 <p className="text-gray-600 font-semibold text-lg">Loading your requests...</p>
               </div>
             </div>
@@ -446,7 +446,7 @@ export default function MyAccount() {
               </p>
               <button
                 onClick={() => navigate('/packages')}
-                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl font-bold text-lg hover:shadow-lg transform hover:scale-105 transition-all"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl font-bold text-lg hover:shadow-lg transform hover:scale-105 transition-all"
               >
                 Explore Packages
                 <ArrowRight className="w-5 h-5" />
@@ -457,7 +457,7 @@ export default function MyAccount() {
               {activeData.map((item) => (
                 <div
                   key={item._id || item.id}
-                  className="group bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100 hover:shadow-2xl hover:border-orange-300 transition-all duration-300"
+                  className="group bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100 hover:shadow-2xl hover:border-brand-300 transition-all duration-300"
                 >
                   <div className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300">
                     {item.package?.images?.[0]?.url || item.coverImage?.url || item.images?.[0]?.url ? (
@@ -484,7 +484,7 @@ export default function MyAccount() {
                       <p className="text-xs text-gray-600 font-semibold">
                         {activeTab === 'bookings' ? 'Total Amount' : activeTab === 'customized' ? 'Price per Person' : 'Duration'}
                       </p>
-                      <p className="text-2xl font-black text-orange-600">
+                      <p className="text-2xl font-black text-brand-600">
                         {activeTab === 'bookings' && formatCurrency(item.totalAmount)}
                         {activeTab === 'customized' && formatCurrency(item.price)}
                         {activeTab === 'manual' && `${item.days?.length || 0} Days`}
@@ -498,7 +498,7 @@ export default function MyAccount() {
                       {activeTab === 'manual' && (item.lead?.name || 'Trip Plan')}
                     </h3>
                     <div className="flex items-center gap-2 text-gray-600 mb-4">
-                      <MapPin className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                      <MapPin className="w-4 h-4 text-brand-500 flex-shrink-0" />
                       <span className="line-clamp-1">
                         {activeTab === 'bookings' && (item.package?.destination || item.destination || 'N/A')}
                         {activeTab === 'customized' && (item.destination || 'N/A')}
@@ -511,7 +511,7 @@ export default function MyAccount() {
                           {activeTab === 'bookings' ? 'Travel Date' : activeTab === 'customized' ? 'Duration' : 'Days'}
                         </p>
                         <div className="flex items-center gap-1 text-gray-900 font-bold">
-                          <Calendar className="w-4 h-4 text-orange-500" />
+                          <Calendar className="w-4 h-4 text-brand-500" />
                           <span className="text-sm">
                             {activeTab === 'bookings' && (
                               item.travelDate
@@ -531,7 +531,7 @@ export default function MyAccount() {
                           {activeTab === 'bookings' ? 'Travelers' : 'Group Size'}
                         </p>
                         <div className="flex items-center gap-1 text-gray-900 font-bold">
-                          <Users className="w-4 h-4 text-orange-500" />
+                          <Users className="w-4 h-4 text-brand-500" />
                           <span className="text-sm">
                             {activeTab === 'bookings' && (item.numberOfTravelers || 1)}
                             {activeTab === 'customized' && (item.maxGroupSize || 'Any')}
@@ -551,12 +551,12 @@ export default function MyAccount() {
                               ? item.paymentStatus === 'paid'
                                 ? 'bg-green-500'
                                 : item.paymentStatus === 'partial'
-                                ? 'bg-yellow-500'
+                                ? 'bg-brand-accent-500'
                                 : 'bg-red-500'
                               : item.status === 'confirmed' || item.status === 'completed'
                               ? 'bg-green-500'
                               : item.status === 'pending'
-                              ? 'bg-yellow-500'
+                              ? 'bg-brand-accent-500'
                               : 'bg-gray-500'
                           }`}
                         />
@@ -567,7 +567,7 @@ export default function MyAccount() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-gray-600 text-sm mb-6">
-                      <Clock className="w-4 h-4 text-orange-500" />
+                      <Clock className="w-4 h-4 text-brand-500" />
                       <span>
                         {activeTab === 'bookings' && 'Booked on'} {(activeTab === 'customized' || activeTab === 'manual') && 'Created on'}{' '}
                         {item.createdAt || item.travelDate
@@ -627,7 +627,7 @@ export default function MyAccount() {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
                     placeholder="Enter your name"
                   />
                 </div>
@@ -638,7 +638,7 @@ export default function MyAccount() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
                     placeholder="Enter your email"
                   />
                 </div>
@@ -649,7 +649,7 @@ export default function MyAccount() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
                     placeholder="Enter your phone number"
                   />
                 </div>
@@ -667,7 +667,7 @@ export default function MyAccount() {
               <button
                 onClick={handleSaveProfile}
                 disabled={isSaving}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Saving...' : 'Save Changes'}

@@ -4,6 +4,7 @@ import { fetchPackages } from '../utils/packageApi';
 import { useAuth } from '../context/AuthContext';
 import LazyIcon from '../components/LazyIcon';
 import { ChevronDown } from 'lucide-react';
+import BRANDING from '../config/branding';
 
 const MAX_NAV_ITEMS = 12;
 
@@ -159,7 +160,7 @@ export default function Header({ currentPage, onNavigate }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
           <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
-            <img src="/logo.png" alt="TripSkyWay Logo" className="h-10 w-auto" />
+            <img src="/logo.png" alt={`${BRANDING.company.name} Logo`} className="h-10 w-auto" />
           </a>
           <div className="flex-1" />
           <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
@@ -189,10 +190,10 @@ export default function Header({ currentPage, onNavigate }) {
                     }}
                     className={`relative px-5 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap text-sm font-medium
                       ${isActive
-                        ? 'text-orange-400 font-semibold bg-orange-900/20'
-                        : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
+                        ? 'text-brand-400 font-semibold bg-brand-900/20'
+                        : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'
                       }
-                      ${item.page === 'login' ? 'border border-orange-500/50 hover:border-orange-400' : ''}
+                      ${item.page === 'login' ? 'border border-brand-500/50 hover:border-brand-400' : ''}
                     `}
                   >
                     {item.name}
@@ -227,12 +228,12 @@ export default function Header({ currentPage, onNavigate }) {
                                 onNavigate('packages', `destination=${sub.slug}`);
                                 setActiveDropdown(null);
                               }}
-                              className="group flex items-center gap-3 px-4 py-2.5 text-gray-800 hover:text-orange-600 hover:bg-orange-50 transition-colors rounded-lg mx-1.5"
+                              className="group flex items-center gap-3 px-4 py-2.5 text-gray-800 hover:text-brand-600 hover:bg-brand-50 transition-colors rounded-lg mx-1.5"
                               style={{
                                 animation: `fadeInRight 0.35s ease-out ${idx * 0.035}s both`,
                               }}
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400/60 group-hover:bg-orange-500 transition-colors flex-shrink-0" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-brand-400/60 group-hover:bg-brand-500 transition-colors flex-shrink-0" />
                               <span className="text-sm font-medium truncate">{sub.name}</span>
                             </a>
                           ))}
@@ -247,9 +248,9 @@ export default function Header({ currentPage, onNavigate }) {
             {/* Right Side */}
             <a
               href="/planner"
-              className="group relative overflow-hidden bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2 ml-4 flex-shrink-0"
+              className="group relative overflow-hidden bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2 ml-4 flex-shrink-0"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-r from-brand-accent-500 to-brand-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="relative flex items-center justify-center gap-1.5">
                 <LazyIcon name="Plane" size={14} className="w-3.5 h-3.5" />
                 <span className="text-xs">Plan Your Trip</span>
@@ -263,9 +264,9 @@ export default function Header({ currentPage, onNavigate }) {
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen(prev => !prev)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-full border border-gray-700 bg-gray-900/80 backdrop-blur-sm hover:border-orange-500 transition-all"
+                  className="flex items-center gap-2 px-3 py-2 rounded-full border border-gray-700 bg-gray-900/80 backdrop-blur-sm hover:border-brand-500 transition-all"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
                     {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span className="text-sm font-medium text-gray-200 max-w-[100px] truncate">
@@ -286,7 +287,7 @@ export default function Header({ currentPage, onNavigate }) {
                         setUserMenuOpen(false);
                         onNavigate('home');
                       }}
-                      className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors flex items-center gap-3"
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-600 transition-colors flex items-center gap-3"
                     >
                       <LazyIcon name="LogOut" size={16} className="w-4 h-4" />
                       <span>Logout</span>
@@ -298,7 +299,7 @@ export default function Header({ currentPage, onNavigate }) {
             {/* Side Menu Button */}
             <button
               onClick={() => setSideMenuOpen(!sideMenuOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-orange-500 transition-all flex-shrink-0"
+              className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-brand-500 transition-all flex-shrink-0"
               aria-label="Toggle side menu"
             >
               {sideMenuOpen ? <LazyIcon name="X" size={20} className="w-5 h-5" /> : <LazyIcon name="Menu" size={20} className="w-5 h-5" />}
@@ -306,7 +307,7 @@ export default function Header({ currentPage, onNavigate }) {
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-orange-500 transition-all"
+            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-brand-500 transition-all"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <LazyIcon name="X" size={20} className="w-5 h-5" /> : <LazyIcon name="Menu" size={20} className="w-5 h-5" />}
@@ -345,8 +346,8 @@ export default function Header({ currentPage, onNavigate }) {
                       }}
                       className={`flex-1 text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
                         ${isActive
-                          ? 'text-orange-400 bg-orange-900/20'
-                          : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
+                          ? 'text-brand-400 bg-brand-900/20'
+                          : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'
                         }
                       `}
                     >
@@ -355,7 +356,7 @@ export default function Header({ currentPage, onNavigate }) {
                     {item.dropdown && (
                       <button
                         onClick={() => setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page)}
-                        className="px-3 py-3 text-gray-300 hover:text-orange-400 transition-all"
+                        className="px-3 py-3 text-gray-300 hover:text-brand-400 transition-all"
                       >
                         <LazyIcon name="ChevronDown" size={16} className={`transition-transform ${isMobileDropdownOpen ? 'rotate-180' : ''}`} />
                       </button>
@@ -373,7 +374,7 @@ export default function Header({ currentPage, onNavigate }) {
                             setMobileMenuOpen(false);
                             setMobileDropdownOpen(null);
                           }}
-                          className="text-left px-3 py-2 text-xs rounded-lg bg-gray-800/50 text-gray-300 hover:text-orange-400 hover:bg-orange-900/20 transition-all"
+                          className="text-left px-3 py-2 text-xs rounded-lg bg-gray-800/50 text-gray-300 hover:text-brand-400 hover:bg-brand-900/20 transition-all"
                         >
                           {dest.name}
                         </button>
@@ -390,7 +391,7 @@ export default function Header({ currentPage, onNavigate }) {
                   onNavigate('planner');
                   setMobileMenuOpen(false);
                 }}
-                className="block w-full text-center py-2 rounded-lg bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-semibold text-sm hover:shadow-lg transition-all"
+                className="block w-full text-center py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white font-semibold text-sm hover:shadow-lg transition-all"
               >
                 Plan Your Trip
               </a>
@@ -403,7 +404,7 @@ export default function Header({ currentPage, onNavigate }) {
                     setMobileMenuOpen(false);
                     onNavigate('home');
                   }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-orange-400 hover:bg-white/5 rounded-lg transition-all flex items-center gap-3"
+                  className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-brand-400 hover:bg-white/5 rounded-lg transition-all flex items-center gap-3"
                 >
                   <LazyIcon name="LogOut" size={16} className="w-4 h-4" />
                   <span>Logout</span>
@@ -445,8 +446,8 @@ export default function Header({ currentPage, onNavigate }) {
                   }}
                   className={`w-full text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
                     ${isActive
-                      ? 'text-orange-400 bg-orange-900/20'
-                      : 'text-gray-300 hover:text-orange-400 hover:bg-white/5'
+                      ? 'text-brand-400 bg-brand-900/20'
+                      : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'
                     }
                   `}
                 >

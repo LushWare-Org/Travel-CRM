@@ -68,7 +68,7 @@ Each service has its own `package.json` — there is no root workspace. Commands
 - All API routes are prefixed `/api/v1/`
 - Use `zod` for input validation (already a root dependency)
 - Environment files: `.env` per service, never commit real credentials
-- **Git commits:** Never add `Co-Authored-By: Claude` or any Anthropic/Claude email to commit messages
+- **Git commits:** All commits must include this trailer at the end of the message, naming whichever model actually produced the commit — `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`. Exception: the first commit of a session is user-only, no `Co-Authored-By` line.
 
 ## Logging
 

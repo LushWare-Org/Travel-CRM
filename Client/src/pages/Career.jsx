@@ -10,6 +10,8 @@ import {
   X
 } from 'lucide-react';
 import careerService from '../utils/careerApi';
+import BRANDING from '../config/branding';
+import { HERO_TITLE, HIRING_PERKS } from '../content/career';
 
 export default function Career() {
   const [vacancies, setVacancies] = useState([]);
@@ -130,6 +132,17 @@ export default function Career() {
       if (formData.resume) {
         console.log('Starting imgbb upload with file:', formData.resume.name, formData.resume.size);
 
+        if (!BRANDING.integrations.imgbbApiKey) {
+          console.error('imgbb API key not configured');
+          setSubmitStatus('error');
+          setErrors((prev) => ({
+            ...prev,
+            submit: 'Resume upload is not configured for this site.',
+          }));
+          setIsSubmitting(false);
+          return;
+        }
+
         const imgbbFormData = new FormData();
         imgbbFormData.append('image', formData.resume);
 
@@ -137,7 +150,7 @@ export default function Career() {
         try {
           console.log('Sending to imgbb API...');
           const imgbbResponse = await fetch(
-            'https://api.imgbb.com/1/upload?key=4e08e03047ee0d48610586ad270e2b39',
+            `${BRANDING.integrations.imgbbUploadUrl}?key=${BRANDING.integrations.imgbbApiKey}`,
             {
               method: 'POST',
               body: imgbbFormData,
@@ -237,7 +250,7 @@ export default function Career() {
     <div className="min-h-screen bg-gray-50">
       <section className="relative py-16 overflow-hidden bg-black text-white">
         <div className="relative max-w-7xl mx-auto px-6 text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">Join With Us</h1>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">{HERO_TITLE}</h1>
           <p className="text-xl max-w-3xl mx-auto opacity-95">
             Help millions of travelers create unforgettable memories. Be part of a passionate team that loves what they do.
           </p>
@@ -250,7 +263,7 @@ export default function Career() {
           <h2 className="text-3xl font-bold text-gray-900 mb-10">Open Positions</h2>
           {loadingVacancies ? (
             <div className="text-center py-8">
-              <Loader className="w-8 h-8 animate-spin mx-auto text-orange-600" />
+              <Loader className="w-8 h-8 animate-spin mx-auto text-brand-600" />
               <p className="text-gray-600 mt-2">Loading positions...</p>
             </div>
           ) : vacancies.length > 0 ? (
@@ -278,7 +291,7 @@ export default function Career() {
                         formElement.scrollIntoView({ behavior: 'smooth' });
                       }
                     }}
-                    className="text-orange-600 font-medium text-sm hover:text-orange-700 transition-colors flex items-center gap-2"
+                    className="text-brand-600 font-medium text-sm hover:text-brand-700 transition-colors flex items-center gap-2"
                   >
                     Apply Now <ArrowRight className="w-4 h-4" />
                   </a>
@@ -299,7 +312,7 @@ export default function Career() {
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="space-y-8">
               <div className="bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-br from-orange-600 to-yellow-400 text-white px-8 py-5">
+                <div className="bg-gradient-to-br from-brand-600 to-brand-accent-400 text-white px-8 py-5">
                   <h3 className="text-3xl font-bold flex items-center gap-3">
                     <Briefcase className="w-8 h-8" />
                     We're Hiring!
@@ -308,26 +321,12 @@ export default function Career() {
                 <div className="p-8 space-y-7">
                   <div>
                     <ul className="space-y-3 text-gray-700">
-                      <li className="flex items-start gap-3">
-                        <span className="text-orange-600 mt-1">✓</span>
-                        Freshers & Experienced Welcome
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="text-orange-600 mt-1">✓</span>
-                        Salary Negotiable
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="text-orange-600 mt-1">✓</span>
-                        Basic computer knowledge
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="text-orange-600 mt-1">✓</span>
-                        Excellent communication skills
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="text-orange-600 mt-1">✓</span>
-                        Passion for travel & tourism
-                      </li>
+                      {HIRING_PERKS.map((perk) => (
+                        <li key={perk} className="flex items-start gap-3">
+                          <span className="text-brand-600 mt-1">✓</span>
+                          {perk}
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 </div>
@@ -370,7 +369,7 @@ export default function Career() {
                       onChange={handleInputChange}
                       className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.fullName
                           ? 'border-red-400 bg-red-50'
-                          : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
+                          : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
                         }`}
                       placeholder="John Doe"
                     />
@@ -390,7 +389,7 @@ export default function Career() {
                         onChange={handleInputChange}
                         className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.email
                             ? 'border-red-400 bg-red-50'
-                            : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
+                            : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
                           }`}
                         placeholder="john@example.com"
                       />
@@ -407,9 +406,9 @@ export default function Career() {
                         onChange={handleInputChange}
                         className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.phone
                             ? 'border-red-400 bg-red-50'
-                            : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
+                            : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
                           }`}
-                        placeholder="+91 98765 43210"
+                        placeholder="Your phone number"
                       />
                       {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
                     </div>
@@ -426,7 +425,7 @@ export default function Career() {
                       onChange={handleInputChange}
                       className={`w-full px-4 py-3 rounded-lg border-2 transition ${errors.position
                           ? 'border-red-400 bg-red-50'
-                          : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
+                          : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
                         }`}
                     >
                       <option value="">-- Choose a position --</option>
@@ -451,7 +450,7 @@ export default function Career() {
                       rows={6}
                       className={`w-full px-4 py-3 rounded-lg border-2 transition resize-none ${errors.coverLetter
                           ? 'border-red-400 bg-red-50'
-                          : 'border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200'
+                          : 'border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200'
                         }`}
                       placeholder="Tell us why you'd be a great fit for this position..."
                     />
@@ -468,7 +467,7 @@ export default function Career() {
                         htmlFor="resumeInput"
                         className={`block border-2 border-dashed rounded-xl px-6 py-10 text-center cursor-pointer transition ${errors.resume
                             ? 'border-red-400 bg-red-50'
-                            : 'border-gray-300 hover:border-orange-500 hover:bg-orange-50'
+                            : 'border-gray-300 hover:border-brand-500 hover:bg-brand-50'
                           }`}
                       >
                         <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
@@ -513,7 +512,7 @@ export default function Career() {
                       id="agreeTerms"
                       checked={formData.agreeTerms}
                       onChange={handleInputChange}
-                      className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500 mt-1"
+                      className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 mt-1"
                     />
                     <label htmlFor="agreeTerms" className="text-sm text-gray-700">
                       I confirm that I have read and agree to the terms and conditions. I understand that my information will be stored and used for recruitment purposes only.
@@ -544,7 +543,7 @@ export default function Career() {
                     {isSubmitting && uploadProgress > 0 && (
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="bg-orange-600 h-2 rounded-full transition-all"
+                          className="bg-brand-600 h-2 rounded-full transition-all"
                           style={{ width: `${uploadProgress}%` }}
                         />
                       </div>

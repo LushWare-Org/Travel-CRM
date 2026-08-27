@@ -7,6 +7,8 @@ import {
   Heart,
   TrendingUp
 } from 'lucide-react';
+import { TRUST_STATS, getTrustHeadline, TAGLINE } from '../../content/aboutSection';
+import BRANDING from '../../config/branding';
 
 export default function AboutSection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -24,12 +26,7 @@ export default function AboutSection() {
     const steps = 60;
     const interval = duration / steps;
 
-    const targets = {
-      customisation: 100,
-      concierge: 24,
-      visaSuccess: 100,
-      travelers: 11000
-    };
+    const targets = TRUST_STATS;
 
     let currentStep = 0;
     const timer = setInterval(() => {
@@ -79,16 +76,16 @@ export default function AboutSection() {
     <section className="py-2 bg-white relative overflow-hidden">
       <div className="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Hero Banner */}
-        <div className={`relative bg-gradient-to-r from-orange-500 via-orange-500 to-orange-500 rounded-3xl p-8 md:p-10 mb-20 overflow-hidden transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+        <div className={`relative bg-gradient-to-r from-brand-500 via-brand-500 to-brand-500 rounded-3xl p-8 md:p-10 mb-20 overflow-hidden transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           <div className="absolute inset-0 bg-black/10" />
           <div className="absolute left-8 top-1/2 -translate-y-1/2 opacity-20 hidden lg:block">
             <svg width="70" height="100" viewBox="0 0 80 120" fill="none">
-              <path d="M40 10C35 20 30 30 25 40C20 50 15 60 10 70C20 65 30 60 40 60C50 60 60 65 70 70C65 60 60 50 55 40C50 30 45 20 40 10Z" fill="currentColor" className="text-yellow-300"/>
+              <path d="M40 10C35 20 30 30 25 40C20 50 15 60 10 70C20 65 30 60 40 60C50 60 60 65 70 70C65 60 60 50 55 40C50 30 45 20 40 10Z" fill="currentColor" className="text-brand-accent-300"/>
             </svg>
           </div>
           <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-20 rotate-180 hidden lg:block">
             <svg width="70" height="100" viewBox="0 0 80 120" fill="none">
-              <path d="M40 10C35 20 30 30 25 40C20 50 15 60 10 70C20 65 30 60 40 60C50 60 60 65 70 70C65 60 60 50 55 40C50 30 45 20 40 10Z" fill="currentColor" className="text-yellow-300"/>
+              <path d="M40 10C35 20 30 30 25 40C20 50 15 60 10 70C20 65 30 60 40 60C50 60 60 65 70 70C65 60 60 50 55 40C50 30 45 20 40 10Z" fill="currentColor" className="text-brand-accent-300"/>
             </svg>
           </div>
 
@@ -96,13 +93,13 @@ export default function AboutSection() {
             {/* Title */}
             <div className="text-center mb-8">
               <div className="flex items-center justify-center mb-5">
-                <Award className="w-10 h-10 text-yellow-300 mr-4" />
+                <Award className="w-10 h-10 text-brand-accent-300 mr-4" />
                 <h3 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
-                  Why Choose TripSkyway?
+                  {getTrustHeadline(BRANDING.company.name)}
                 </h3>
               </div>
               <p className="text-white/90 text-base md:text-lg max-w-2xl mx-auto">
-                Your gateway from India to amazing world holidays
+                {TAGLINE}
               </p>
 
               {/* Google Rating Badge */}
@@ -117,7 +114,7 @@ export default function AboutSection() {
                   <span className="text-gray-900 font-bold text-md">4.9</span>
                   <div className="flex">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                      <Star key={star} className="w-4 h-4 text-brand-accent-400 fill-brand-accent-400" />
                     ))}
                   </div>
                   {/* <span className="text-gray-600 text-sm font-medium">(250 + reviews)</span> */}
@@ -165,10 +162,10 @@ export default function AboutSection() {
             return (
               <div
                 key={index}
-                className="group bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-orange-200"
+                className="group bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-brand-200"
               >
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                  <Icon className="w-6 h-6 text-orange-600" />
+                <div className="w-12 h-12 bg-gradient-to-br from-brand-100 to-brand-200 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Icon className="w-6 h-6 text-brand-600" />
                 </div>
                 <h4 className="text-lg font-bold text-gray-900 mb-2">{feature.title}</h4>
                 <p className="text-gray-600 text-sm leading-relaxed">{feature.description}</p>

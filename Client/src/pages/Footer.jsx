@@ -1,4 +1,5 @@
 import { MapPin, Phone, Mail, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
+import BRANDING, { getCopyrightText } from '../config/branding';
 
 export default function Footer({ onNavigate }) {
   return (
@@ -7,20 +8,34 @@ export default function Footer({ onNavigate }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center mb-4">
-              <img src="/logo.png" alt="Trip Sky Way Logo" className="h-12 w-auto" />
+              <img src="/logo.png" alt={`${BRANDING.company.name} Logo`} className="h-12 w-auto" />
               <div className="ml-3">
               </div>
             </div>
             <p className="text-sm mb-4">
-              Creating unforgettable travel experiences worldwide. Your trusted partner for international holidays since 2021.
+              {`Creating unforgettable travel experiences worldwide. Your trusted partner for international holidays since ${BRANDING.company.foundedYear}.`}
             </p>
             <div className="flex gap-3">
-              <a href="https://www.facebook.com/tripskyway" target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
-                <Facebook size={18} />
-              </a>
-              <a href="https://www.instagram.com/tripskyway" target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-yellow-600 transition">
-                <Instagram size={18} />
-              </a>
+              {BRANDING.social.facebook && (
+                <a href={BRANDING.social.facebook} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                  <Facebook size={18} />
+                </a>
+              )}
+              {BRANDING.social.instagram && (
+                <a href={BRANDING.social.instagram} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                  <Instagram size={18} />
+                </a>
+              )}
+              {BRANDING.social.twitter && (
+                <a href={BRANDING.social.twitter} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                  <Twitter size={18} />
+                </a>
+              )}
+              {BRANDING.social.youtube && (
+                <a href={BRANDING.social.youtube} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                  <Youtube size={18} />
+                </a>
+              )}
             </div>
           </div>
 
@@ -28,32 +43,32 @@ export default function Footer({ onNavigate }) {
             <h4 className="text-white font-semibold mb-4 font-poppins">Quick Links</h4>
             <ul className="space-y-3 text-sm">
               <li>
-                <button onClick={() => onNavigate('home')} className="hover:text-yellow-400 transition">
+                <button onClick={() => onNavigate('home')} className="hover:text-brand-accent-400 transition">
                   Home
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('packages')} className="hover:text-yellow-400 transition">
+                <button onClick={() => onNavigate('packages')} className="hover:text-brand-accent-400 transition">
                   Holiday Packages
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('planner')} className="hover:text-yellow-400 transition">
+                <button onClick={() => onNavigate('planner')} className="hover:text-brand-accent-400 transition">
                   Plan Your Trip
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('career')} className="hover:text-yellow-400 transition">
+                <button onClick={() => onNavigate('career')} className="hover:text-brand-accent-400 transition">
                   Career
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('about')} className="hover:text-yellow-400 transition">
+                <button onClick={() => onNavigate('about')} className="hover:text-brand-accent-400 transition">
                   About Us
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('contact')} className="hover:text-yellow-400 transition">
+                <button onClick={() => onNavigate('contact')} className="hover:text-brand-accent-400 transition">
                   Contact
                 </button>
               </li>
@@ -64,7 +79,7 @@ export default function Footer({ onNavigate }) {
             <h4 className="text-white font-semibold mb-4 font-poppins">Destinations</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <button onClick={() => onNavigate('destinations-international')} className="hover:text-yellow-400 transition">
+                <button onClick={() => onNavigate('destinations-international')} className="hover:text-brand-accent-400 transition">
                   International Destinations
                 </button>
               </li>
@@ -75,19 +90,19 @@ export default function Footer({ onNavigate }) {
             <h4 className="text-white font-semibold mb-4 font-poppins">Contact Us</h4>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2">
-                <MapPin size={18} className="mt-0.5 flex-shrink-0 text-yellow-400" />
-                <span>2/73, near Gurudwara, Lalita Park, Laxmi Nagar, New Delhi, Delhi, 110092</span>
+                <MapPin size={18} className="mt-0.5 flex-shrink-0 text-brand-accent-400" />
+                <span>{BRANDING.contact.address}</span>
               </li>
               <li className="flex items-center gap-2">
-                <Phone size={18} className="flex-shrink-0 text-yellow-400" />
-                <a href="tel:+919876543210" className="hover:text-yellow-400 transition">
-                  +91 98765 43210
+                <Phone size={18} className="flex-shrink-0 text-brand-accent-400" />
+                <a href={`tel:${BRANDING.contact.phone}`} className="hover:text-brand-accent-400 transition">
+                  {BRANDING.contact.phone}
                 </a>
               </li>
               <li className="flex items-center gap-2">
-                <Mail size={18} className="flex-shrink-0 text-yellow-400" />
-                <a href="mailto:info@travelagency.com" className="hover:text-yellow-400 transition">
-                  info@tripskyway.com
+                <Mail size={18} className="flex-shrink-0 text-brand-accent-400" />
+                <a href={`mailto:${BRANDING.contact.email}`} className="hover:text-brand-accent-400 transition">
+                  {BRANDING.contact.email}
                 </a>
               </li>
             </ul>
@@ -96,11 +111,17 @@ export default function Footer({ onNavigate }) {
 
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
-            <p>&copy; 2025 TripSkyWay. All rights reserved.</p>
+            <p>{getCopyrightText()}</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-yellow-400 transition">Privacy Policy</a>
-              <a href="#" className="hover:text-yellow-400 transition">Terms of Service</a>
-              <a href="#" className="hover:text-yellow-400 transition">Cancellation Policy</a>
+              {BRANDING.legal.privacyUrl && (
+                <a href={BRANDING.legal.privacyUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">Privacy Policy</a>
+              )}
+              {BRANDING.legal.termsUrl && (
+                <a href={BRANDING.legal.termsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">Terms of Service</a>
+              )}
+              {BRANDING.legal.cancellationUrl && (
+                <a href={BRANDING.legal.cancellationUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">Cancellation Policy</a>
+              )}
             </div>
           </div>
         </div>

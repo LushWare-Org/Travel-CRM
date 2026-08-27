@@ -4,6 +4,11 @@ import { submitContactForm } from '../utils/contactApi';
 import DestinationSelector from '../components/DestinationSelector';
 import LocationSelector from '../components/LocationSelector';
 import { useAuth } from '../context/AuthContext';
+import BRANDING from '../config/branding';
+import { HERO_TITLE, HERO_SUBTITLE, OFFICE_HOURS_TEXT } from '../content/contact';
+import { HERO_VIDEOS } from '../config/media';
+
+const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v4');
 
 export default function ContactUs() {
   const { user } = useAuth();
@@ -38,25 +43,25 @@ export default function ContactUs() {
     {
       icon: Phone,
       title: 'Call Us',
-      info: '+91 987 6543 210',
-      subtext: 'Mon-Fri, 10AM - 7PM EST',
+      info: BRANDING.contact.phone,
+      subtext: BRANDING.contact.officeHours,
       color: 'from-blue-500 to-cyan-500',
-      action: 'tel:+919876543210'
+      action: `tel:${BRANDING.contact.phone}`
     },
     {
       icon: Mail,
       title: 'Email Us',
-      info: 'info@tripskyway.com',
+      info: BRANDING.contact.email,
       subtext: 'We reply within 24 hours',
       color: 'from-purple-500 to-pink-500',
-      action: 'mailto:info@tripskyway.com'
+      action: `mailto:${BRANDING.contact.email}`
     },
     {
       icon: MapPin,
       title: 'Visit Us',
-      info: '2/73, near Gurudwara, Lalita Park, Laxmi Nagar, New Delhi, Delhi, 110092',
+      info: BRANDING.contact.address,
       subtext: 'By appointment only',
-      color: 'from-orange-500 to-red-500',
+      color: 'from-brand-500 to-red-500',
       action: ''
     }
   ];
@@ -132,16 +137,16 @@ export default function ContactUs() {
           preload="auto"
           aria-hidden="true"
         >
-          <source src="/v4.mp4" type="video/mp4" />
+          <source src={heroVideo?.video} type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/70 z-10" aria-hidden="true"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-              Let's Plan Your
-              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400">
-                Dream Journey
+              {HERO_TITLE}
+              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-brand-400 via-brand-accent-400 to-brand-accent-400">
+                {HERO_SUBTITLE}
               </span>
             </h1>
             
@@ -169,13 +174,13 @@ export default function ContactUs() {
               </div>
 
               {/* Content */}
-              <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-orange-600 group-hover:to-yellow-600 transition-all duration-300">
+              <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-brand-600 group-hover:to-brand-accent-600 transition-all duration-300">
                 {method.title}
               </h3>
               <p className="text-md font-semibold text-gray-700 mb-1">{method.info}</p>
               <p className="text-sm text-gray-500">{method.subtext}</p>
               <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                <ArrowRight className="w-6 h-6 text-orange-600" />
+                <ArrowRight className="w-6 h-6 text-brand-600" />
               </div>
             </a>
           ))}
@@ -205,7 +210,7 @@ export default function ContactUs() {
                   <p className="text-gray-600 mb-6">We'll get back to you shortly</p>
                   <button
                     onClick={() => setSubmitted(false)}
-                    className="px-8 py-3 bg-gradient-to-r from-orange-600 to-yellow-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+                    className="px-8 py-3 bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
                   >
                     Send Another Message
                   </button>
@@ -223,14 +228,14 @@ export default function ContactUs() {
                         Your Name *
                       </label>
                       <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-600 transition-colors" />
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                         <input
                           type="text"
                           name="name"
                           value={formData.name}
                           onChange={handleChange}
                           required
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-600 focus:ring-2 focus:ring-orange-200 transition-all outline-none text-gray-900"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
                           placeholder="John Doe"
                         />
                       </div>
@@ -241,14 +246,14 @@ export default function ContactUs() {
                         Email Address *
                       </label>
                       <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-600 transition-colors" />
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                         <input
                           type="email"
                           name="email"
                           value={formData.email}
                           onChange={handleChange}
                           required
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-600 focus:ring-2 focus:ring-orange-200 transition-all outline-none text-gray-900"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
                           placeholder="john@example.com"
                         />
                       </div>
@@ -261,13 +266,13 @@ export default function ContactUs() {
                         Phone Number
                       </label>
                       <div className="relative">
-                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-600 transition-colors" />
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                         <input
                           type="tel"
                           name="phone"
                           value={formData.phone}
                           onChange={handleChange}
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-600 focus:ring-2 focus:ring-orange-200 transition-all outline-none text-gray-900"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
                           placeholder="+1 (555) 123-4567"
                         />
                       </div>
@@ -278,13 +283,13 @@ export default function ContactUs() {
                         Travel Date
                       </label>
                       <div className="relative">
-                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-600 transition-colors" />
+                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                         <input
                           type="date"
                           name="travelDate"
                           value={formData.travelDate}
                           onChange={handleChange}
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-600 focus:ring-2 focus:ring-orange-200 transition-all outline-none text-gray-900"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
                         />
                       </div>
                     </div>
@@ -307,14 +312,14 @@ export default function ContactUs() {
                         Subject *
                       </label>
                       <div className="relative">
-                        <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-orange-600 transition-colors" />
+                        <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
                         <input
                           type="text"
                           name="subject"
                           value={formData.subject}
                           onChange={handleChange}
                           required
-                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-600 focus:ring-2 focus:ring-orange-200 transition-all outline-none text-gray-900"
+                          className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none text-gray-900"
                           placeholder="How can we help?"
                         />
                       </div>
@@ -323,9 +328,9 @@ export default function ContactUs() {
 
                   {/* Show selected destination confirmation */}
                   {selectedDest && (
-                    <div className="p-4 bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-xl">
+                    <div className="p-4 bg-gradient-to-br from-brand-50 to-brand-accent-50 border border-brand-200 rounded-xl">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-gradient-to-r from-brand-500 to-brand-accent-500 rounded-full flex items-center justify-center">
                           <Check className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -358,7 +363,7 @@ export default function ContactUs() {
                       onChange={handleChange}
                       required
                       rows={6}
-                      className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-600 focus:ring-2 focus:ring-orange-200 transition-all outline-none resize-none text-gray-900"
+                      className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-brand-600 focus:ring-2 focus:ring-brand-200 transition-all outline-none resize-none text-gray-900"
                       placeholder="Tell us about your dream vacation..."
                     ></textarea>
                   </div>
@@ -366,9 +371,9 @@ export default function ContactUs() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full group relative overflow-hidden bg-gradient-to-r from-orange-600 to-yellow-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full group relative overflow-hidden bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-brand-accent-600 to-brand-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     <div className="relative px-8 py-5 flex items-center justify-center space-x-3">
                       {isSubmitting ? (
                         <>
@@ -396,23 +401,20 @@ export default function ContactUs() {
                   <Clock className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Office Hours</h3>
-                  <p className="text-gray-600">When you can reach us</p>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{OFFICE_HOURS_TEXT.title}</h3>
+                  <p className="text-gray-600">{OFFICE_HOURS_TEXT.subtitle}</p>
                 </div>
               </div>
               <div className="space-y-3">
-                <div className="flex justify-between items-center py-3 border-b border-blue-200">
-                  <span className="font-semibold text-gray-700">Monday - Friday</span>
-                  <span className="text-gray-900 font-bold">10:00 AM - 7:00 PM</span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b border-blue-200">
-                  <span className="font-semibold text-gray-700">Saturday</span>
-                  <span className="text-gray-900 font-bold">10:00 AM - 7:00 PM</span>
-                </div>
-                <div className="flex justify-between items-center py-3">
-                  <span className="font-semibold text-gray-700">Sunday</span>
-                  <span className="text-red-700 font-bold">Closed</span>
-                </div>
+                {OFFICE_HOURS_TEXT.rows.map((row, idx) => (
+                  <div
+                    key={row.days}
+                    className={`flex justify-between items-center py-3 ${idx < OFFICE_HOURS_TEXT.rows.length - 1 ? 'border-b border-blue-200' : ''}`}
+                  >
+                    <span className="font-semibold text-gray-700">{row.days}</span>
+                    <span className={`font-bold ${row.hours === 'Closed' ? 'text-red-700' : 'text-gray-900'}`}>{row.hours}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

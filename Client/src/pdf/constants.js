@@ -1,6 +1,7 @@
 /**
  * Utility constants and configuration
  */
+import BRANDING from '../config/branding';
 
 export const CATEGORY_COLORS = {
   honeymoon: 'bg-pink-100 text-pink-800',
@@ -163,21 +164,17 @@ export const TRANSPORT_OPTIONS = [
   { value: 'Mixed', label: 'Mixed Transport' },
 ];
 
-export const IMAGE_UPLOAD_API_KEY = '4e08e03047ee0d48610586ad270e2b39';
-export const IMAGE_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
-
 export const PDF_CONFIG = {
   pageWidth: null, // Set dynamically
   pageHeight: null, // Set dynamically
   margin: 20,
   lineHeight: 7,
-  headerBgColor: [0, 0, 255],
-  company: 'Trip Sky Way.',
-  tagline: 'Your Ultimate Travel Partner',
-  contact: 'Contact us: info@tripskyway.com | +1-800-TRAVEL',
-  email: 'info@tripskyway.com',
-  phone: '+1-800-TRAVEL',
-  website: 'https://www.tripskyway.com',
+  company: BRANDING.pdf.company,
+  tagline: BRANDING.pdf.tagline,
+  contact: `Contact us: ${BRANDING.pdf.email} | ${BRANDING.pdf.phone}`,
+  email: BRANDING.pdf.email,
+  phone: BRANDING.pdf.phone,
+  website: BRANDING.pdf.website,
 };
 
 export const VALIDATION_MESSAGES = {

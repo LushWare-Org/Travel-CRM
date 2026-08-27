@@ -9,6 +9,8 @@ import { jsPDF } from 'jspdf';
 import Swal from 'sweetalert2';
 import { PDF_CONFIG } from './constants';
 import ApiService from './apiService';
+import { formatCurrency } from '../utils/currency';
+import { PALETTE, hexToRgb } from '../config/theme';
 
 /**
  * Load image and convert to base64
@@ -98,7 +100,7 @@ const loadPackageImages = async (pkg) => {
   return images;
 };
 
-const BRAND_LOGO_PATH = '/website-logo-1.png';
+const BRAND_LOGO_PATH = '/logo.png';
 
 const loadBrandLogo = async () => {
   try {
@@ -379,18 +381,7 @@ function legacyBuildPDFDocument(pkg, images) {
       if (!Number.isFinite(numeric)) {
         return 'On request';
       }
-      const symbol = import.meta.env.VITE_CURRENCY_SYMBOL;
-      const code = import.meta.env.VITE_CURRENCY_CODE || 'INR';
-
-      if (symbol) {
-        return `${symbol} ${numeric.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-      }
-
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: code,
-        maximumFractionDigits: 0,
-      }).format(numeric);
+      return formatCurrency(numeric);
     };
 
     // ========== START PDF GENERATION ==========
@@ -1005,9 +996,9 @@ function buildPDFDocument(pkg, images) {
       primaryText: [31, 41, 55],
       secondaryText: [75, 85, 99],
       mutedText: [107, 114, 128],
-      accent: [234, 88, 12],
-      accentDark: [234, 179, 8],
-      badgeBg: [234, 88, 12],
+      accent: hexToRgb(PALETTE.brand[600]),
+      accentDark: hexToRgb(PALETTE.brandAccent[500]),
+      badgeBg: hexToRgb(PALETTE.brand[600]),
       badgeText: [255, 255, 255],
       cardBg: [245, 245, 245],
       cardBorder: [156, 163, 175],
@@ -1084,21 +1075,9 @@ function buildPDFDocument(pkg, images) {
       }
       const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
       if (!Number.isFinite(numeric)) {
-        return String(value);
+        return 'On request';
       }
-
-      const symbol = import.meta.env.VITE_CURRENCY_SYMBOL;
-      const code = import.meta.env.VITE_CURRENCY_CODE || 'INR';
-
-      if (symbol) {
-        return `${symbol} ${numeric.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-      }
-
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: code,
-        maximumFractionDigits: 0,
-      }).format(numeric);
+      return formatCurrency(numeric);
     };
 
     const formatDateDisplay = (value) => {
@@ -1387,7 +1366,7 @@ function buildPDFDocument(pkg, images) {
       const headerX = margin;
       const headerWidth = contentWidth;
 
-      doc.setFillColor(12, 12, 12);
+      doc.setFillColor(...hexToRgb(PALETTE.brandDark[950]));
       doc.roundedRect(headerX, headerY, headerWidth, headerHeight, 6, 6, 'F');
 
       let cursorX = headerX + 14;
@@ -1413,12 +1392,12 @@ function buildPDFDocument(pkg, images) {
       doc.setFont(undefined, 'bold');
       doc.setFontSize(12);
       doc.setTextColor(255, 255, 255);
-      doc.text('Trip Sky Way', cursorX, headerY + 14);
+      doc.text(PDF_CONFIG.company, cursorX, headerY + 14);
 
       doc.setFont(undefined, 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(210, 210, 210);
-      doc.text('Curating inspired journeys', cursorX, headerY + 21);
+      doc.text(PDF_CONFIG.tagline, cursorX, headerY + 21);
 
       setBodyFont();
       return headerY + headerHeight;

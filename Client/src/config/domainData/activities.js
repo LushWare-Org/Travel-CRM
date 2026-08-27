@@ -2,6 +2,7 @@
  * Default list of activities for itinerary planning
  * Organized by category for better user experience
  */
+// Per-company reference data. Replace with this company's actual destinations/locations/activities before shipping a new deployment.
 
 export const DEFAULT_ACTIVITIES = [
   // Sightseeing & Culture

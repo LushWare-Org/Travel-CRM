@@ -3,39 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchPackages } from '../../utils/packageApi';
 import { formatCurrency } from '../../utils/currency';
-
-const ALL_STATS = [
-  {
-    value: 11000,
-    suffix: '+',
-    label: 'Happy Customers'
-  },
-  {
-    value: 100,
-    suffix: '%',
-    label: 'Easy Booking'
-  },
-  {
-    value: 100,
-    suffix: '%',
-    label: 'Satisfaction'
-  },
-  {
-    value: 100,
-    suffix: '%',
-    label: 'Your Assurance'
-  },
-  {
-    value: 100,
-    suffix: '+',
-    label: 'Best Price & Experience'
-  },
-  {
-    value: 24,
-    suffix: '/7',
-    label: 'On-Trip Support'
-  },
-];
+import { ALL_STATS } from '../../content/stats';
 
 export default function RecommendedPackagesSection() {
   const navigate = useNavigate();
@@ -144,7 +112,7 @@ export default function RecommendedPackagesSection() {
           {/* <div className="lg:col-span-4 space-y-8 lg:ml-9">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-12 font-poppins leading-tight">
               Excellence in 
-              <span className="block mt-2 bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+              <span className="block mt-2 bg-gradient-to-r from-brand-600 to-red-600 bg-clip-text text-transparent">
                 Every Journey
               </span>
             </h2>
@@ -154,7 +122,7 @@ export default function RecommendedPackagesSection() {
                 const displayIndex = currentStatIndex + offset;
                 return (
                   <div key={offset} className="h-[70px] flex items-center group">
-                    <div className="flex items-start gap-6 w-full p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 hover:shadow-lg transition-all duration-300 hover:border-orange-300">
+                    <div className="flex items-start gap-6 w-full p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 hover:shadow-lg transition-all duration-300 hover:border-brand-300">
                       <div className="flex items-center gap-0">
                         <div className="relative h-12 overflow-hidden inline-block">
                           <div 
@@ -165,7 +133,7 @@ export default function RecommendedPackagesSection() {
                           >
                             {allStatsExtended.map((stat, index) => (
                               <div key={index} className="h-12 flex items-center">
-                                <span className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent leading-none">
+                                <span className="text-4xl font-bold bg-gradient-to-r from-brand-600 to-red-600 bg-clip-text text-transparent leading-none">
                                   {stat.value.toLocaleString()}{stat.suffix}
                                 </span>
                               </div>
@@ -208,7 +176,7 @@ export default function RecommendedPackagesSection() {
 
             {loading ? (
               <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-orange-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-brand-500"></div>
               </div>
             ) : categoryPackages.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
@@ -243,7 +211,7 @@ export default function RecommendedPackagesSection() {
                           className="flex-shrink-0 w-full sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)] cursor-pointer"
                           onClick={() => handlePackageClick(pkg.categoryName)}
                         >
-                          <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-orange-100 group h-full flex flex-col">
+                          <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-brand-100 group h-full flex flex-col">
                             <div className="relative h-56 overflow-hidden flex-shrink-0">
                               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
                               <img
@@ -264,7 +232,7 @@ export default function RecommendedPackagesSection() {
                               </p>
                               <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                                 <span className="text-sm text-gray-600">Starting from</span>
-                                <span className="text-xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                                <span className="text-xl font-bold bg-gradient-to-r from-brand-600 to-red-600 bg-clip-text text-transparent">
                                   {formatCurrency(pkg.price)}
                                 </span>
                               </div>

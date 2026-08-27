@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { getWhatsAppUrl } from '../config/branding';
 
 const WhatsappFloatingButton = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  
-  const phoneNumber = '+919876543210';
-  const message = encodeURIComponent("Hello! I'm interested in your holiday packages.");
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+
+  const whatsappUrl = getWhatsAppUrl("Hello! I'm interested in your holiday packages.");
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 1000);

@@ -2,6 +2,7 @@
  * Popular locations/attractions by destination
  * For quick selection when creating day itineraries
  */
+// Per-company reference data. Replace with this company's actual destinations/locations/activities before shipping a new deployment.
 
 // International Destinations
 export const LOCATIONS_BY_DESTINATION = {

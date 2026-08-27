@@ -8,16 +8,8 @@ const __dirname = dirname(__filename);
 
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      "@management": resolve(__dirname, "../Management/src"),
-    },
-  },
   server: {
     open: true,
-    fs: {
-      allow: [resolve(__dirname, "..")],
-    },
     proxy: {
       // "/api": "http://localhost:5001/api",
     },

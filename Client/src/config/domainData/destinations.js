@@ -2,6 +2,7 @@
  * Destinations for travel packages
  * Organized by popular and other international destinations
  */
+// Per-company reference data. Replace with this company's actual destinations/locations/activities before shipping a new deployment.
 
 // Popular International Destinations
 export const POPULAR_INTERNATIONAL = [

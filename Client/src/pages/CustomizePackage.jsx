@@ -231,7 +231,7 @@ export default function CustomizePackage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white">
         <div className="flex flex-col items-center gap-4 text-gray-600">
           <Loader2 className="w-8 h-8 animate-spin" />
           <p className="font-semibold">Preparing customization experience...</p>
@@ -281,7 +281,7 @@ export default function CustomizePackage() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30" />
             <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-6 md:p-8 lg:p-12">
               <div className="flex items-center gap-2 text-xs sm:text-sm text-white/90 mb-2 sm:mb-3">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-brand-400" />
                 <span className="font-semibold">Tailored Journey Request</span>
               </div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-1 sm:mb-3 line-clamp-2 sm:line-clamp-none">{pkg.title}</h1>
@@ -304,7 +304,7 @@ export default function CustomizePackage() {
         </div>
 
         {/* What Happens Next - Full Width Info Card */}
-        <div className="bg-gradient-to-r from-orange-500 to-amber-600 rounded-2xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 text-white shadow-xl">
+        <div className="bg-gradient-to-r from-brand-500 to-brand-accent-600 rounded-2xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8 text-white shadow-xl">
           <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
             <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -313,7 +313,7 @@ export default function CustomizePackage() {
             </div>
             <div className="flex-1">
               <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3">What happens next?</h3>
-              <ul className="space-y-1.5 sm:space-y-2 text-orange-50 text-sm sm:text-base">
+              <ul className="space-y-1.5 sm:space-y-2 text-brand-50 text-sm sm:text-base">
                 <li className="flex items-start gap-2">
                   <svg className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -349,9 +349,9 @@ export default function CustomizePackage() {
                           <div
                             className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-lg transition-all duration-300 ${
                               currentStep === step
-                                ? 'bg-orange-600 text-white scale-110 shadow-lg'
+                                ? 'bg-brand-600 text-white scale-110 shadow-lg'
                                 : currentStep > step
-                                ? 'bg-orange-500 text-white'
+                                ? 'bg-brand-500 text-white'
                                 : 'bg-gray-200 text-gray-500'
                             }`}
                           >
@@ -374,7 +374,7 @@ export default function CustomizePackage() {
                         {step < 5 && (
                           <div
                             className={`flex-1 h-1 mx-1 sm:mx-2 rounded-full transition-all duration-300 ${
-                              currentStep > step ? 'bg-orange-500' : 'bg-gray-200'
+                              currentStep > step ? 'bg-brand-500' : 'bg-gray-200'
                             }`}
                           />
                         )}
@@ -406,8 +406,8 @@ export default function CustomizePackage() {
                 {currentStep === 1 && (
                   <div className="mb-8 sm:mb-10">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-6">
-                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-100 flex items-center justify-center">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
@@ -425,7 +425,7 @@ export default function CustomizePackage() {
                             type="text"
                             value={contact.name}
                             onChange={(e) => setContact((prev) => ({ ...prev, name: e.target.value }))}
-                            className="w-full px-4 sm:px-5 py-3 sm:py-4 text-base sm:text-lg border-2 border-black/10 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
+                            className="w-full px-4 sm:px-5 py-3 sm:py-4 text-base sm:text-lg border-2 border-black/10 rounded-2xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
                             placeholder="Your name"
                           />
                         </div>
@@ -433,14 +433,14 @@ export default function CustomizePackage() {
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs sm:text-sm font-medium text-black">What's your email?</span>
-                            <span className="px-2 py-0.5 text-xs font-bold text-orange-600 bg-orange-100 rounded-full">Required</span>
+                            <span className="px-2 py-0.5 text-xs font-bold text-brand-600 bg-brand-100 rounded-full">Required</span>
                           </div>
                           <input
                             type="email"
                             required
                             value={contact.email}
                             onChange={(e) => setContact((prev) => ({ ...prev, email: e.target.value }))}
-                            className="w-full px-4 sm:px-5 py-3 sm:py-4 text-base sm:text-lg border-2 border-orange-500/30 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
+                            className="w-full px-4 sm:px-5 py-3 sm:py-4 text-base sm:text-lg border-2 border-brand-500/30 rounded-2xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
                             placeholder="your.email@example.com"
                           />
                         </div>
@@ -469,8 +469,8 @@ export default function CustomizePackage() {
                 {currentStep === 2 && (
                   <div className="mb-8 sm:mb-10">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-6">
-                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-100 flex items-center justify-center">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </div>
@@ -479,10 +479,10 @@ export default function CustomizePackage() {
                       <p className="text-xs sm:text-sm text-black/60 mb-4 sm:mb-6">Help us personalize your experience</p>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                        <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-black/5 hover:border-orange-500/30 transition-all shadow-sm hover:shadow-md">
+                        <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-black/5 hover:border-brand-500/30 transition-all shadow-sm hover:shadow-md">
                           <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
-                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                               </svg>
                             </div>
@@ -496,15 +496,15 @@ export default function CustomizePackage() {
                             min="1"
                             value={travelPrefs.travelers}
                             onChange={(e) => setTravelPrefs((prev) => ({ ...prev, travelers: e.target.value }))}
-                            className="w-full px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg border-2 border-black/10 rounded-xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all bg-white"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg border-2 border-black/10 rounded-xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 transition-all bg-white"
                             placeholder="2"
                           />
                         </div>
 
-                        <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-black/5 hover:border-orange-500/30 transition-all shadow-sm hover:shadow-md">
+                        <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-black/5 hover:border-brand-500/30 transition-all shadow-sm hover:shadow-md">
                           <div className="flex items-center gap-2 sm:gap-3 mb-3">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
-                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </div>
@@ -517,7 +517,7 @@ export default function CustomizePackage() {
                             type="date"
                             value={travelPrefs.travelDate}
                             onChange={(e) => setTravelPrefs((prev) => ({ ...prev, travelDate: e.target.value }))}
-                            className="w-full px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg border-2 border-black/10 rounded-xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all bg-white"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg border-2 border-black/10 rounded-xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 transition-all bg-white"
                           />
                         </div>
                       </div>
@@ -530,8 +530,8 @@ export default function CustomizePackage() {
                 {currentStep === 3 && (
                   <div className="mb-8 sm:mb-10">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-6">
-                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-100 flex items-center justify-center">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                       </svg>
                     </div>
@@ -546,7 +546,7 @@ export default function CustomizePackage() {
                         <button
                           type="button"
                           onClick={handleAddDay}
-                          className="px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white rounded-xl bg-orange-600 hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center sm:justify-start"
+                          className="px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white rounded-xl bg-brand-600 hover:bg-brand-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center sm:justify-start"
                         >
                           <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -559,7 +559,7 @@ export default function CustomizePackage() {
                       <div key={day.id} className="border border-gray-200 rounded-2xl p-4 sm:p-6 bg-gradient-to-br from-white to-gray-50/50 shadow-sm hover:shadow-md transition-all duration-200">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
                           <div className="flex items-center gap-3 sm:gap-4">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-orange-600 text-white font-bold text-base sm:text-lg flex items-center justify-center shadow-md flex-shrink-0">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand-600 text-white font-bold text-base sm:text-lg flex items-center justify-center shadow-md flex-shrink-0">
                               {index + 1}
                             </div>
                             <div>
@@ -572,7 +572,7 @@ export default function CustomizePackage() {
                           <button
                             type="button"
                             onClick={() => handleRemoveDay(index)}
-                            className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-black hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors duration-200"
+                            className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-black hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors duration-200"
                           >
                             <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -582,7 +582,7 @@ export default function CustomizePackage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                           <div className="space-y-2">
                             <label className="block text-xs sm:text-sm font-semibold text-black mb-2 flex items-center gap-2">
-                              <svg className="w-3 h-3 sm:w-4 sm:h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3 h-3 sm:w-4 sm:h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                               </svg>
                               Activities
@@ -594,7 +594,7 @@ export default function CustomizePackage() {
                           </div>
                           <div className="space-y-2">
                             <label className="block text-xs sm:text-sm font-semibold text-black mb-2 flex items-center gap-2">
-                              <svg className="w-3 h-3 sm:w-4 sm:h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3 h-3 sm:w-4 sm:h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                               </svg>
@@ -610,7 +610,7 @@ export default function CustomizePackage() {
                       </div>
                     ))}
                     {!dayOverrides.length && (
-                      <div className="border-2 border-dashed border-black/20 rounded-2xl p-8 sm:p-12 text-center bg-gradient-to-br from-white to-orange-50/30">
+                      <div className="border-2 border-dashed border-black/20 rounded-2xl p-8 sm:p-12 text-center bg-gradient-to-br from-white to-brand-50/30">
                         <svg className="w-12 h-12 sm:w-16 sm:h-16 text-black/40 mx-auto mb-3 sm:mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
@@ -619,7 +619,7 @@ export default function CustomizePackage() {
                         <button
                           type="button"
                           onClick={handleAddDay}
-                          className="px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white rounded-xl bg-orange-600 hover:bg-orange-700 shadow-md hover:shadow-lg transition-all duration-200"
+                          className="px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700 shadow-md hover:shadow-lg transition-all duration-200"
                         >
                           Add Your First Day
                         </button>
@@ -635,8 +635,8 @@ export default function CustomizePackage() {
                 {currentStep === 4 && (
                   <div className="mb-8 sm:mb-10">
                     <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 mb-6">
-                      <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-100 flex items-center justify-center">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </div>
@@ -647,7 +647,7 @@ export default function CustomizePackage() {
                           rows={5}
                           value={message}
                           onChange={(e) => setMessage(e.target.value)}
-                          className="w-full px-4 sm:px-5 py-3 sm:py-4 text-sm sm:text-base border-2 border-black/10 rounded-2xl focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-200 resize-none bg-white shadow-sm hover:shadow-md"
+                          className="w-full px-4 sm:px-5 py-3 sm:py-4 text-sm sm:text-base border-2 border-black/10 rounded-2xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-200 resize-none bg-white shadow-sm hover:shadow-md"
                           placeholder="Share your thoughts, preferences, or any special requirements..."
                         />
                       </div>
@@ -658,9 +658,9 @@ export default function CustomizePackage() {
                 {/* Step 5: Review & Submit */}
                 {currentStep === 5 && (
                   <div className="mb-8 sm:mb-10">
-                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-3xl p-6 sm:p-8 border-2 border-orange-200">
+                    <div className="bg-gradient-to-br from-brand-50 to-brand-accent-50 rounded-3xl p-6 sm:p-8 border-2 border-brand-200">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-6">
-                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-orange-600 flex items-center justify-center flex-shrink-0">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-brand-600 flex items-center justify-center flex-shrink-0">
                           <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                         </div>
                         <div>
@@ -672,7 +672,7 @@ export default function CustomizePackage() {
                       <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
                         <div className="bg-white rounded-xl p-4 sm:p-5 border border-black/10">
                           <h4 className="font-semibold text-black mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
-                            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                             Contact Information
@@ -686,7 +686,7 @@ export default function CustomizePackage() {
 
                         <div className="bg-white rounded-xl p-4 sm:p-5 border border-black/10">
                           <h4 className="font-semibold text-black mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
-                            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             Travel Preferences
@@ -700,7 +700,7 @@ export default function CustomizePackage() {
                         {dayOverrides.length > 0 && (
                           <div className="bg-white rounded-xl p-4 sm:p-5 border border-black/10">
                             <h4 className="font-semibold text-black mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
-                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                               </svg>
                               Itinerary Days
@@ -712,7 +712,7 @@ export default function CustomizePackage() {
                         {message && (
                           <div className="bg-white rounded-xl p-4 sm:p-5 border border-black/10">
                             <h4 className="font-semibold text-black mb-2 flex items-center gap-2 text-sm sm:text-base">
-                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                               Additional Notes
@@ -722,15 +722,15 @@ export default function CustomizePackage() {
                         )}
                       </div>
 
-                      <div className="bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 rounded-2xl p-5 sm:p-6 text-white">
+                      <div className="bg-gradient-to-br from-brand-500 via-brand-600 to-brand-accent-600 rounded-2xl p-5 sm:p-6 text-white">
                         <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                           <CheckCircle2 className="w-7 h-7 sm:w-8 sm:h-8" />
                           <h4 className="text-lg sm:text-xl font-bold">Ready to create your perfect trip?</h4>
                         </div>
-                        <p className="text-orange-50 mb-4 sm:mb-6 text-xs sm:text-sm">
+                        <p className="text-brand-50 mb-4 sm:mb-6 text-xs sm:text-sm">
                           Our travel experts will review your preferences and send you a personalized itinerary within 24 hours.
                         </p>
-                        <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm text-orange-50 mb-5 sm:mb-6">
+                        <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm text-brand-50 mb-5 sm:mb-6">
                           <div className="flex items-center gap-1.5 sm:gap-2">
                             <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -753,7 +753,7 @@ export default function CustomizePackage() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="w-full px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-base sm:text-lg text-orange-600 bg-white shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 transform disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                          className="w-full px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-base sm:text-lg text-brand-600 bg-white shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 transform disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                         >
                           {isSubmitting ? (
                             <>
@@ -801,7 +801,7 @@ export default function CustomizePackage() {
                     <button
                       type="button"
                       onClick={handleNextStep}
-                      className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold text-white bg-orange-600 hover:bg-orange-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm sm:text-base w-full sm:w-auto"
+                      className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold text-white bg-brand-600 hover:bg-brand-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm sm:text-base w-full sm:w-auto"
                     >
                       Next
                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -830,7 +830,7 @@ export default function CustomizePackage() {
                   setSuccessModalVisible(false);
                   navigate(`/package/${id}`);
                 }}
-                className="px-16 py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white font-bold rounded-2xl hover:from-orange-700 hover:to-amber-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                className="px-16 py-3 bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white font-bold rounded-2xl hover:from-brand-700 hover:to-brand-accent-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
               >
                 OK
               </button>

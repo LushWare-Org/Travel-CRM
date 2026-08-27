@@ -13,6 +13,7 @@ import { formatCurrency } from '../utils/currency';
 import { generateManagementPDF } from '../utils/managementPdfBridge';
 import { useAuth } from '../context/AuthContext';
 import { submitBookingRequest } from '../utils/bookingApi';
+import BRANDING from '../config/branding';
 
 export default function PackageDetails() {
   const { id } = useParams();
@@ -301,7 +302,7 @@ export default function PackageDetails() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-amber-500" />
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-accent-500" />
         </div>
       </div>
     );
@@ -316,7 +317,7 @@ export default function PackageDetails() {
           <button
             type="button"
             onClick={() => navigate('/packages')}
-            className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-black hover:shadow-xl transform hover:scale-105 transition-all"
+            className="px-8 py-4 bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white rounded-2xl font-black hover:shadow-xl transform hover:scale-105 transition-all"
           >
             Browse packages
           </button>
@@ -334,7 +335,7 @@ export default function PackageDetails() {
           <button
             type="button"
             onClick={() => navigate('/packages')}
-            className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-black hover:shadow-xl transform hover:scale-105 transition-all"
+            className="px-8 py-4 bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white rounded-2xl font-black hover:shadow-xl transform hover:scale-105 transition-all"
           >
             Explore packages
           </button>
@@ -639,7 +640,7 @@ export default function PackageDetails() {
           <div className="max-w-7xl mx-auto px-6 lg:px-12 w-full">
             {pkg.destination && (
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/20 px-4 py-2 rounded-full mb-6 transform hover:scale-105 transition-transform">
-                <MapPin className="w-4 h-4 text-amber-400" />
+                <MapPin className="w-4 h-4 text-brand-accent-400" />
                 <span className="text-white/90 font-medium text-sm">
                   {pkg.destination.name}{pkg.destination.country && `, ${pkg.destination.country}`}
                 </span>
@@ -669,11 +670,11 @@ export default function PackageDetails() {
                 <span className="font-medium">{pkg.duration_days} Days</span>
               </div>
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
-                <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                <Star className="w-5 h-5 text-brand-accent-400 fill-current" />
                 <span className="font-medium">4.9</span>
                 {/* <span className="text-white/80">(250+ Reviews)</span> */}
               </div>
-              <span className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-black rounded-full font-semibold capitalize">
+              <span className="px-4 py-2 bg-gradient-to-r from-brand-accent-500 to-brand-500 backdrop-blur-sm text-black rounded-full font-semibold capitalize">
                 {pkg.category}
               </span>
             </div>
@@ -738,10 +739,10 @@ export default function PackageDetails() {
               <div className="p-6 lg:p-10 section-padding-sm">
                 {activeSection === 'overview' && (
                   <div className="space-y-6 lg:space-y-10">
-                    <div className="bg-white rounded-2xl p-6 lg:p-8 border border-orange-200">
+                    <div className="bg-white rounded-2xl p-6 lg:p-8 border border-brand-200">
                       <div className="flex items-center gap-3 mb-10">
-                        <Award className="w-6 h-6 lg:w-8 lg:h-8 text-orange-600" />
-                        <h3 className="text-2xl lg:text-3xl font-black text-black">Why Choose Trip Sky Way?</h3>
+                        <Award className="w-6 h-6 lg:w-8 lg:h-8 text-brand-600" />
+                        <h3 className="text-2xl lg:text-3xl font-black text-black">{`Why Choose ${BRANDING.company.name}?`}</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
                         <div className="flex items-start gap-3">
@@ -793,10 +794,10 @@ export default function PackageDetails() {
                           {pkg.highlights.map((h, i) => (
                             <div
                               key={i}
-                              className="group relative bg-gray-50 rounded-2xl p-4 lg:p-5 hover:shadow-lg transition-all duration-300 border hover:border-amber-300"
+                              className="group relative bg-gray-50 rounded-2xl p-4 lg:p-5 hover:shadow-lg transition-all duration-300 border hover:border-brand-accent-300"
                             >
                               <div className="flex items-start gap-3 lg:gap-4">
-                                <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <div className="flex-shrink-0 w-6 h-6 bg-gradient-to-br from-brand-accent-500 to-brand-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                                   <Check className="w-4 h-4 lg:w-6 lg:h-6 text-white" />
                                 </div>
                                 <p className="text-black font-semibold leading-relaxed flex-1 text-sm lg:text-base">{h}</p>
@@ -817,14 +818,14 @@ export default function PackageDetails() {
                       <div key={i} className="group relative">
                         <div className="itinerary-day-mobile flex flex-col lg:flex-row gap-4 lg:gap-6">
                           <div className="relative flex-shrink-0 itinerary-day-number-mobile">
-                            <div className="w-14 lg:w-16 h-14 lg:h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl lg:text-3xl shadow-lg group-hover:scale-110 transition-transform">
+                            <div className="w-14 lg:w-16 h-14 lg:h-16 bg-gradient-to-br from-brand-accent-500 to-brand-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl lg:text-3xl shadow-lg group-hover:scale-110 transition-transform">
                               {i + 1}
                             </div>
                             {i < (pkg.itinerary?.length || 0)  && (
-                              <div className="itinerary-connector-mobile lg:absolute lg:top-20 lg:left-1/2 lg:-translate-x-1/2 w-1 h-12 lg:h-12 bg-gradient-to-b from-orange-300 to-transparent" />
+                              <div className="itinerary-connector-mobile lg:absolute lg:top-20 lg:left-1/2 lg:-translate-x-1/2 w-1 h-12 lg:h-12 bg-gradient-to-b from-brand-300 to-transparent" />
                             )}
                           </div>
-                          <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-amber-300 hover:shadow-xl transition-all itinerary-padding-sm">
+                          <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-brand-accent-300 hover:shadow-xl transition-all itinerary-padding-sm">
                             <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2 lg:mb-3">{day.title}</h3>
                             <p className="text-gray-700 leading-relaxed text-base lg:text-lg">{day.description}</p>
                           </div>
@@ -867,25 +868,25 @@ export default function PackageDetails() {
                         </ul>
                       </div>
                     </div>
-                    <div className="rounded-3xl p-6 lg:p-8 border-2 border-amber-200">
+                    <div className="rounded-3xl p-6 lg:p-8 border-2 border-brand-accent-200">
                       <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-4 lg:mb-6">Booking Terms</h3>
                       <div className="space-y-4 lg:space-y-5">
                         <div className="flex items-start gap-3 lg:gap-4">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="w-2 h-2 bg-brand-accent-500 rounded-full mt-2.5 flex-shrink-0" />
                           <div className="flex-1">
                             <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Cancellation Policy</h4>
                             <p className="text-gray-700 leading-relaxed text-sm lg:text-base">Free cancellation up to 48 hours before departure. Cancellations made within 48 hours will incur a 50% charge. No-shows will be charged 100% of the booking amount.</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-3 lg:gap-4">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="w-2 h-2 bg-brand-accent-500 rounded-full mt-2.5 flex-shrink-0" />
                           <div className="flex-1">
                             <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Payment Terms</h4>
                             <p className="text-gray-700 leading-relaxed text-sm lg:text-base">A 30% deposit is required at the time of booking. The remaining balance must be paid 14 days before departure. We accept all major credit cards, bank transfers, and PayPal.</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-3 lg:gap-4">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2.5 flex-shrink-0" />
+                          <div className="w-2 h-2 bg-brand-accent-500 rounded-full mt-2.5 flex-shrink-0" />
                           <div className="flex-1">
                             <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Group Bookings</h4>
                             <p className="text-gray-700 leading-relaxed text-sm lg:text-base">Special rates available for groups of 10 or more travelers. Contact our team for customized group packages and discounts.</p>
@@ -929,14 +930,14 @@ export default function PackageDetails() {
                       setSubmissionType('booking');
                       setShowBookingModal(true);
                     }}
-                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg hover:shadow-xl hover:from-yellow-600 hover:to-orange-600 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2 button-padding-sm"
+                    className="w-full bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg hover:shadow-xl hover:from-brand-accent-600 hover:to-brand-600 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2 button-padding-sm"
                   >
                     <Calendar className="w-4 h-4 lg:w-5 lg:h-5" />
                     Book Now
                   </button>
                   <button
                     onClick={() => navigate(`/package/${pkg.id}/customize`)}
-                    className="w-full border-2 border-yellow-500 text-yellow-700 py-3.5 lg:py-4 rounded-xl font-semibold hover:bg-yellow-50 hover:border-yellow-600 transition-all flex items-center justify-center gap-2 button-padding-sm"
+                    className="w-full border-2 border-brand-accent-500 text-brand-accent-700 py-3.5 lg:py-4 rounded-xl font-semibold hover:bg-brand-accent-50 hover:border-brand-accent-600 transition-all flex items-center justify-center gap-2 button-padding-sm"
                   >
                     Customize Package
                   </button>
@@ -946,27 +947,27 @@ export default function PackageDetails() {
                 <h4 className="text-xl lg:text-2xl font-black mb-4 lg:mb-6">Need Assistance?</h4>
                 <div className="space-y-3 lg:space-y-4">
                   <a
-                    href="tel:+1234567890"
+                    href={`tel:${BRANDING.contact.phone}`}
                     className="flex items-center gap-3 lg:gap-4 p-4 assistance-contact-mobile bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all block"
                   >
-                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-brand-accent-500 rounded-xl flex items-center justify-center flex-shrink-0">
                       <Phone className="w-6 h-6 lg:w-7 lg:h-7" />
                     </div>
                     <div>
-                      <p className="text-xs text-amber-200 uppercase tracking-wide">Call Us</p>
-                      <p className="font-black text-base lg:text-lg">+91 (987) 6543-210</p>
+                      <p className="text-xs text-brand-accent-200 uppercase tracking-wide">Call Us</p>
+                      <p className="font-black text-base lg:text-lg">{BRANDING.contact.phone}</p>
                     </div>
                   </a>
                   <a
-                    href="mailto:info@tripskyway.com"
+                    href={`mailto:${BRANDING.contact.email}`}
                     className="flex items-center gap-3 lg:gap-4 p-4 assistance-contact-mobile bg-white/10 backdrop-blur-xl rounded-2xl hover:bg-white/20 transition-all block"
                   >
-                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 lg:w-14 lg:h-14 bg-brand-500 rounded-xl flex items-center justify-center flex-shrink-0">
                       <Mail className="w-6 h-6 lg:w-7 lg:h-7" />
                     </div>
                     <div>
-                      <p className="text-xs text-amber-200 uppercase tracking-wide">Email Us</p>
-                      <p className="font-black text-base lg:text-lg">info@tripskyway.com</p>
+                      <p className="text-xs text-brand-accent-200 uppercase tracking-wide">Email Us</p>
+                      <p className="font-black text-base lg:text-lg">{BRANDING.contact.email}</p>
                     </div>
                   </a>
                 </div>
@@ -980,13 +981,13 @@ export default function PackageDetails() {
       {showBookingModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-max-height-mobile">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl lg:max-w-5xl w-full max-h-[95vh] overflow-y-auto modal-max-height-mobile">
-            <div className="sticky top-0 bg-gradient-to-r from-amber-500 to-orange-500 p-6 lg:p-8 text-white modal-header-padding-sm">
+            <div className="sticky top-0 bg-gradient-to-r from-brand-accent-500 to-brand-500 p-6 lg:p-8 text-white modal-header-padding-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-2xl lg:text-3xl font-black mb-2">
                     Book Your Adventure
                   </h3>
-                  <p className="text-amber-100 text-sm lg:text-base">
+                  <p className="text-brand-accent-100 text-sm lg:text-base">
                     Fill in your details and we'll get back to you within 24 hours
                   </p>
                 </div>
@@ -1011,21 +1012,21 @@ export default function PackageDetails() {
                       <div
                         className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
                           currentStep >= step
-                            ? 'bg-amber-500 text-white'
+                            ? 'bg-brand-accent-500 text-white'
                             : 'bg-gray-200 text-gray-500'
                         }`}
                       >
                         {currentStep > step ? <Check className="w-5 h-5" /> : step}
                       </div>
                       <p className={`text-xs mt-2 font-semibold ${
-                        currentStep >= step ? 'text-amber-600' : 'text-gray-400'
+                        currentStep >= step ? 'text-brand-accent-600' : 'text-gray-400'
                       }`}>
                         {step === 1 ? 'Contact' : step === 2 ? 'Travel' : 'Review'}
                       </p>
                     </div>
                     {step < 3 && (
                       <div className={`flex-1 h-0.5 mx-4 ${
-                        currentStep > step ? 'bg-amber-500' : 'bg-gray-200'
+                        currentStep > step ? 'bg-brand-accent-500' : 'bg-gray-200'
                       }`} />
                     )}
                   </React.Fragment>
@@ -1046,7 +1047,7 @@ export default function PackageDetails() {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <label className="block text-sm font-black text-gray-900">Email Address</label>
-                      <span className="px-2.5 py-1 text-xs font-bold text-amber-600 bg-amber-100 rounded-full">Required</span>
+                      <span className="px-2.5 py-1 text-xs font-bold text-brand-accent-600 bg-brand-accent-100 rounded-full">Required</span>
                     </div>
                     <input
                       type="email"
@@ -1058,10 +1059,10 @@ export default function PackageDetails() {
                           setFormErrors({...formErrors, email: ''});
                         }
                       }}
-                      className={`w-full px-5 py-4 text-base border-2 rounded-2xl focus:ring-4 focus:ring-amber-100 transition-all form-input-mobile ${
+                      className={`w-full px-5 py-4 text-base border-2 rounded-2xl focus:ring-4 focus:ring-brand-accent-100 transition-all form-input-mobile ${
                         formErrors.email
                           ? 'border-red-500 focus:border-red-500'
-                          : 'border-amber-500/30 focus:border-amber-500 bg-amber-50/50'
+                          : 'border-brand-accent-500/30 focus:border-brand-accent-500 bg-brand-accent-50/50'
                       }`}
                       placeholder="your.email@example.com"
                     />
@@ -1091,7 +1092,7 @@ export default function PackageDetails() {
                             setFormErrors({...formErrors, name: ''});
                           }
                         }}
-                        className="w-full px-5 py-4 text-base border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 transition-all form-input-mobile bg-white hover:bg-gray-50"
+                        className="w-full px-5 py-4 text-base border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-brand-accent-100 focus:border-brand-accent-500 transition-all form-input-mobile bg-white hover:bg-gray-50"
                         placeholder="John Doe"
                       />
                     </div>
@@ -1122,7 +1123,7 @@ export default function PackageDetails() {
                     <button
                       type="button"
                       onClick={handleNext}
-                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm"
+                      className="w-full bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm"
                     >
                       Next Step
                       <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
@@ -1135,25 +1136,25 @@ export default function PackageDetails() {
               {currentStep === 2 && (
                 <div className="space-y-8">
                   {/* Enhanced Header */}
-                  <div className="text-center pb-4 border-b border-amber-100">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl mb-4 shadow-lg">
+                  <div className="text-center pb-4 border-b border-brand-accent-100">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-brand-accent-400 to-brand-500 rounded-2xl mb-4 shadow-lg">
                       <Calendar className="w-8 h-8 text-white" />
                     </div>
-                    <h4 className="text-2xl lg:text-3xl font-black text-gray-900 mb-2 bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                    <h4 className="text-2xl lg:text-3xl font-black text-gray-900 mb-2 bg-gradient-to-r from-brand-accent-600 to-brand-600 bg-clip-text text-transparent">
                       Plan Your Journey
                     </h4>
                     <p className="text-sm text-gray-600">Select your travel dates and preferences</p>
                   </div>
 
                   {/* Date Range Picker - Enhanced */}
-                  <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-3xl p-6 lg:p-8 border-2 border-amber-100 shadow-lg w-full">
+                  <div className="bg-gradient-to-br from-brand-accent-50/50 to-brand-50/30 rounded-3xl p-6 lg:p-8 border-2 border-brand-accent-100 shadow-lg w-full">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-amber-100 rounded-xl flex-shrink-0">
-                        <Calendar className="w-5 h-5 text-amber-600" />
+                      <div className="p-2 bg-brand-accent-100 rounded-xl flex-shrink-0">
+                        <Calendar className="w-5 h-5 text-brand-accent-600" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <label className="block text-base font-bold text-gray-900">Travel Date Range</label>
-                        <span className="text-xs text-amber-600 font-medium">Click dates to select your range</span>
+                        <span className="text-xs text-brand-accent-600 font-medium">Click dates to select your range</span>
                       </div>
                     </div>
                     <div className="flex justify-center bg-white rounded-2xl p-4 lg:p-6 shadow-inner w-full overflow-x-auto">
@@ -1219,11 +1220,11 @@ export default function PackageDetails() {
                       <div className={`mt-4 p-4 rounded-xl transition-all duration-300 ${
                         formData.endDate 
                           ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200' 
-                          : 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200'
+                          : 'bg-gradient-to-r from-brand-accent-50 to-brand-50 border-2 border-brand-accent-200'
                       }`}>
                         <div className="flex items-center gap-2 justify-center">
-                          <Check className={`w-5 h-5 ${formData.endDate ? 'text-green-600' : 'text-amber-600'}`} />
-                          <p className={`text-sm font-bold ${formData.endDate ? 'text-green-800' : 'text-amber-800'}`}>
+                          <Check className={`w-5 h-5 ${formData.endDate ? 'text-green-600' : 'text-brand-accent-600'}`} />
+                          <p className={`text-sm font-bold ${formData.endDate ? 'text-green-800' : 'text-brand-accent-800'}`}>
                             {formData.endDate 
                               ? `Selected: ${(typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${(typeof formData.endDate === 'string' ? new Date(formData.endDate) : formData.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
                               : `Start Date: ${(typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - Select end date`}
@@ -1306,7 +1307,7 @@ export default function PackageDetails() {
                     <button
                       type="button"
                       onClick={handleNext}
-                      className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm"
+                      className="flex-1 bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-4 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm"
                     >
                       Next Step
                       <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
@@ -1360,7 +1361,7 @@ export default function PackageDetails() {
                     <button
                       type="submit"
                       disabled={isSubmittingBooking}
-                      className={`flex-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm ${
+                      className={`flex-1 bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-4 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm ${
                         isSubmittingBooking ? 'opacity-70 cursor-not-allowed' : ''
                       }`}
                     >
@@ -1432,7 +1433,7 @@ export default function PackageDetails() {
                   required
                   value={reviewData.name}
                   onChange={(e) => setReviewData({ ...reviewData, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none form-input-mobile"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none form-input-mobile"
                   placeholder="Enter your name"
                 />
               </div>
@@ -1452,7 +1453,7 @@ export default function PackageDetails() {
                       <Star
                         className={`w-7 h-7 lg:w-8 lg:h-8 ${
                           star <= reviewData.rating
-                            ? 'text-yellow-400 fill-current'
+                            ? 'text-brand-accent-400 fill-current'
                             : 'text-gray-300'
                         }`}
                       />
@@ -1466,7 +1467,7 @@ export default function PackageDetails() {
                   required
                   value={reviewData.comment}
                   onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none resize-none form-input-mobile"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none resize-none form-input-mobile"
                   rows={4}
                   placeholder="Share your experience..."
                 />
@@ -1509,8 +1510,8 @@ export default function PackageDetails() {
                 Thank you for your booking request. We'll review your details and contact you within 24 hours to confirm your adventure!
               </p>
               {isDownloading && (
-                <div className="mb-4 p-4 bg-amber-50 border-2 border-amber-200 rounded-xl">
-                  <p className="text-sm text-amber-800 font-semibold flex items-center justify-center gap-2">
+                <div className="mb-4 p-4 bg-brand-accent-50 border-2 border-brand-accent-200 rounded-xl">
+                  <p className="text-sm text-brand-accent-800 font-semibold flex items-center justify-center gap-2">
                     <Download className="w-5 h-5 animate-bounce" />
                     Downloading your itinerary PDF...
                   </p>
@@ -1529,7 +1530,7 @@ export default function PackageDetails() {
                     }
                   }}
                   disabled={isDownloading}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-2xl font-bold text-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-300 button-padding-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-4 rounded-2xl font-bold text-lg hover:shadow-2xl transform hover:scale-105 active:scale-95 transition-all duration-300 button-padding-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   <Download className="w-5 h-5" />
                   {isDownloading ? 'Downloading...' : 'Download Itinerary PDF'}

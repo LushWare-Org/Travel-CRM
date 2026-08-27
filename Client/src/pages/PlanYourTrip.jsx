@@ -400,7 +400,7 @@ export default function PlanYourTrip() {
                   <div
                     onMouseDown={() => handleDayDown(startOfDay(c))}
                     onMouseEnter={() => handleDayEnter(startOfDay(c))}
-                    className={`w-8 h-8 rounded-md flex items-center justify-center ${isSelected ? 'bg-orange-100 text-orange-700' : 'hover:bg-gray-100'}`}
+                    className={`w-8 h-8 rounded-md flex items-center justify-center ${isSelected ? 'bg-brand-100 text-brand-700' : 'hover:bg-gray-100'}`}
                   >
                     {c.getDate()}
                   </div>
@@ -417,7 +417,7 @@ export default function PlanYourTrip() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50 font-opensans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 font-opensans">
       <div className="w-full mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-5xl">
         <form onSubmit={(e) => { e.preventDefault(); next(); }}>
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-4 sm:p-5 md:p-6 mb-4 sm:mb-5 md:mb-6">
@@ -429,7 +429,7 @@ export default function PlanYourTrip() {
                       <div
                         className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all ${
                           s <= step
-                            ? 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white'
+                            ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white'
                             : 'bg-gray-200 text-gray-500'
                         }`}
                       >
@@ -442,7 +442,7 @@ export default function PlanYourTrip() {
                     {s < 4 && (
                       <div
                         className={`flex-1 h-0.5 sm:h-1 mx-1 sm:mx-2 md:mx-4 mt-4 sm:mt-5 transition-all ${
-                          s < step ? 'bg-gradient-to-r from-orange-600 to-yellow-600' : 'bg-gray-200'
+                          s < step ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600' : 'bg-gray-200'
                         }`}
                       />
                     )}
@@ -455,7 +455,7 @@ export default function PlanYourTrip() {
           {step === 1 && (
             <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-gray-100">
               <div className="flex items-center space-x-3 mb-4 sm:mb-6">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-xl flex items-center justify-center">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-brand-500 to-brand-accent-500 rounded-xl flex items-center justify-center">
                   <MapPin className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-poppins">
@@ -475,9 +475,9 @@ export default function PlanYourTrip() {
               </div>
 
               {selectedDest && (
-                <div className="mt-4 p-3 sm:p-4 bg-gradient-to-br from-orange-50 to-yellow-50 border border-orange-200 rounded-xl">
+                <div className="mt-4 p-3 sm:p-4 bg-gradient-to-br from-brand-50 to-brand-accent-50 border border-brand-200 rounded-xl">
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gradient-to-r from-orange-500 to-yellow-500 rounded-full flex items-center justify-center">
+                    <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gradient-to-r from-brand-500 to-brand-accent-500 rounded-full flex items-center justify-center">
                       <Check className="w-4 sm:w-6 h-4 sm:h-6 text-white" />
                     </div>
                     <div>
@@ -511,7 +511,7 @@ export default function PlanYourTrip() {
                     value={startDate || ""}
                     onClick={() => setShowCal(true)}
                     placeholder="Select start date"
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white cursor-pointer"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white cursor-pointer"
                     required
                   />
                 </div>
@@ -523,7 +523,7 @@ export default function PlanYourTrip() {
                     value={endDate || ""}
                     onClick={() => setShowCal(true)}
                     placeholder="Select end date"
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white cursor-pointer"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white cursor-pointer"
                     required
                   />
                 </div>
@@ -540,9 +540,9 @@ export default function PlanYourTrip() {
               </div>
 
               {duration > 0 && (
-                <div className="mt-4 p-3 sm:p-4 bg-orange-50 border border-orange-200 rounded-xl flex items-center space-x-2">
-                  <Clock className="w-4 sm:w-5 h-4 sm:h-5 text-orange-600" />
-                  <p className="text-xs sm:text-sm text-orange-800 font-semibold">
+                <div className="mt-4 p-3 sm:p-4 bg-brand-50 border border-brand-200 rounded-xl flex items-center space-x-2">
+                  <Clock className="w-4 sm:w-5 h-4 sm:h-5 text-brand-600" />
+                  <p className="text-xs sm:text-sm text-brand-800 font-semibold">
                     {duration} Days / {duration - 1} Nights
                   </p>
                 </div>
@@ -599,7 +599,7 @@ export default function PlanYourTrip() {
                   <button
                     type="button"
                     onClick={() => setStep(2)}
-                    className="text-sm sm:text-base text-orange-600 hover:text-orange-700 font-semibold"
+                    className="text-sm sm:text-base text-brand-600 hover:text-brand-700 font-semibold"
                   >
                     Go to Dates & Travelers →
                   </button>
@@ -610,7 +610,7 @@ export default function PlanYourTrip() {
                   <button
                     type="button"
                     onClick={handleAddDay}
-                    className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white text-xs sm:text-sm rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all font-semibold shadow-md flex items-center gap-2 mx-auto"
+                    className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white text-xs sm:text-sm rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-all font-semibold shadow-md flex items-center gap-2 mx-auto"
                   >
                     <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
                     Add Day 1
@@ -620,7 +620,7 @@ export default function PlanYourTrip() {
                 <div className="space-y-4 sm:space-y-6" data-itinerary-form>
                   {/* Navigation and Progress - Only show if more than one day */}
                   {itineraryDays.length > 1 && (
-                    <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
+                    <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-brand-50 to-brand-accent-50 rounded-xl border border-brand-200">
                       <button
                         type="button"
                         onClick={() => setCurrentDayIndex(prev => Math.max(0, prev - 1))}
@@ -647,7 +647,7 @@ export default function PlanYourTrip() {
 
                   {/* Progress Indicator - Show when only one day */}
                   {itineraryDays.length === 1 && (
-                    <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
+                    <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-gradient-to-r from-brand-50 to-brand-accent-50 rounded-xl border border-brand-200">
                       <p className="text-xs sm:text-sm font-medium text-gray-700 text-center">
                         Day 1 of {duration} {duration > 1 && '(Click "Add Day 2" below to add more days)'}
                       </p>
@@ -658,7 +658,7 @@ export default function PlanYourTrip() {
                   {itineraryDays[currentDayIndex] && (
                     <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50">
                       {/* Day Header */}
-                      <div className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-6 py-4 flex items-center justify-between">
+                      <div className="bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white px-6 py-4 flex items-center justify-between">
                         <h3 className="font-bold text-lg font-poppins">
                           Day {itineraryDays[currentDayIndex].dayNumber}
                         </h3>
@@ -686,7 +686,7 @@ export default function PlanYourTrip() {
                             value={itineraryDays[currentDayIndex].title || ''}
                             onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'title', e.target.value)}
                             placeholder={`e.g., Arrival in ${selectedDest?.label || selectedDest || 'destination'}`}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             required
                           />
                         </div>
@@ -725,7 +725,7 @@ export default function PlanYourTrip() {
                               value={itineraryDays[currentDayIndex].accommodation?.name || ''}
                               onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'accommodation', 'name', e.target.value)}
                               placeholder="e.g., Grand Hotel"
-                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             />
                           </div>
                           <div>
@@ -735,7 +735,7 @@ export default function PlanYourTrip() {
                             <select
                               value={itineraryDays[currentDayIndex].accommodation?.type || 'hotel'}
                               onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'accommodation', 'type', e.target.value)}
-                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             >
                               {accommodationTypes.map(type => (
                                 <option key={type.value} value={type.value}>{type.label}</option>
@@ -755,7 +755,7 @@ export default function PlanYourTrip() {
                                 type="checkbox"
                                 checked={itineraryDays[currentDayIndex].meals?.breakfast || false}
                                 onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'meals', 'breakfast', e.target.checked)}
-                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                                className="w-5 h-5 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
                               />
                               <span className="text-sm text-gray-700 flex items-center gap-1">
                                 <Coffee className="w-4 h-4" /> Breakfast
@@ -766,7 +766,7 @@ export default function PlanYourTrip() {
                                 type="checkbox"
                                 checked={itineraryDays[currentDayIndex].meals?.lunch || false}
                                 onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'meals', 'lunch', e.target.checked)}
-                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                                className="w-5 h-5 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
                               />
                               <span className="text-sm text-gray-700 flex items-center gap-1">
                                 <UtensilsCrossed className="w-4 h-4" /> Lunch
@@ -777,7 +777,7 @@ export default function PlanYourTrip() {
                                 type="checkbox"
                                 checked={itineraryDays[currentDayIndex].meals?.dinner || false}
                                 onChange={(e) => handleDayNestedChange(itineraryDays[currentDayIndex].dayNumber, 'meals', 'dinner', e.target.checked)}
-                                className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                                className="w-5 h-5 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
                               />
                               <span className="text-sm text-gray-700 flex items-center gap-1">
                                 <UtensilsCrossed className="w-4 h-4" /> Dinner
@@ -794,7 +794,7 @@ export default function PlanYourTrip() {
                           <select
                             value={itineraryDays[currentDayIndex].transport || ''}
                             onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'transport', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                           >
                             <option value="">Select transport</option>
                             {transportOptions.map(opt => {
@@ -816,7 +816,7 @@ export default function PlanYourTrip() {
                             value={itineraryDays[currentDayIndex].notes || ''}
                             onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'notes', e.target.value)}
                             placeholder="Any special requests or notes for this day..."
-                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-none"
                           />
                         </div>
                       </div>
@@ -829,7 +829,7 @@ export default function PlanYourTrip() {
                       <button
                         type="button"
                         onClick={handleAddDay}
-                        className="px-6 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all font-semibold shadow-md flex items-center gap-2"
+                        className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-all font-semibold shadow-md flex items-center gap-2"
                       >
                         <Plus className="w-5 h-5" />
                         Add Day {itineraryDays.length + 1}
@@ -872,20 +872,20 @@ export default function PlanYourTrip() {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     />
                   </div>
 
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <label className="block text-sm font-semibold text-gray-700">Email Address</label>
-                      <span className="px-2 py-0.5 text-xs font-bold text-orange-600 bg-orange-100 rounded-full">Required</span>
+                      <span className="px-2 py-0.5 text-xs font-bold text-brand-600 bg-brand-100 rounded-full">Required</span>
                     </div>
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-orange-500/30 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-4 py-3 border-2 border-brand-500/30 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                       required
                     />
                   </div>
@@ -908,9 +908,9 @@ export default function PlanYourTrip() {
 
                 {/* full trip summary */}
                 <div>
-                  <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-2xl p-6 border border-orange-200 h-full">
+                  <div className="bg-gradient-to-br from-brand-50 to-brand-accent-50 rounded-2xl p-6 border border-brand-200 h-full">
                     <h3 className="font-bold mb-4 flex items-center text-lg">
-                      <Check className="w-5 h-5 mr-2 text-orange-600" /> Trip Summary
+                      <Check className="w-5 h-5 mr-2 text-brand-600" /> Trip Summary
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
                       <div>
@@ -981,7 +981,7 @@ export default function PlanYourTrip() {
                 (step === 3 && duration === 0) ||
                 (step === 4 && !email)
                   ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-orange-600 to-yellow-600 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                  : 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white hover:shadow-xl transform hover:scale-[1.02]'
               }`}
             >
               {isSubmitting ? (
@@ -1029,7 +1029,7 @@ export default function PlanYourTrip() {
                   setItineraryDays([]);
                   setValidationMsg('');
                 }}
-                className="w-full px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700"
+                className="w-full px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700"
               >
                 OK
               </button>

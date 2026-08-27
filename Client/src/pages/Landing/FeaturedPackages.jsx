@@ -31,7 +31,7 @@ export default function FeaturedPackages({ packages }) {
               <Link 
                 key={pkg.id} 
                 to={`/package/${pkg.id}`} 
-                className={`group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
+                className={`group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-brand-accent-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
                   featuredPackages.length === 3 && idx === 2 && 'md:col-span-2 lg:col-span-1 md:mx-auto'
                 } w-full md:max-w-sm lg:max-w-none`}
               >
@@ -47,7 +47,7 @@ export default function FeaturedPackages({ packages }) {
                       <div>
                       </div>
                       <div>
-                        <span className="inline-block bg-yellow-500/90 text-black px-3 py-1 rounded-full text-xs font-bold mb-2">FEATURED</span>
+                        <span className="inline-block bg-brand-accent-500/90 text-black px-3 py-1 rounded-full text-xs font-bold mb-2">FEATURED</span>
                       </div>
                     </div>
                   </div>
@@ -57,7 +57,7 @@ export default function FeaturedPackages({ packages }) {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <Clock className="w-4 h-4 text-yellow-400" />
+                          <Clock className="w-4 h-4 text-brand-accent-400" />
                           <span className="text-sm">{pkg.duration_days} Days</span>
                         </div>
                       </div>
@@ -66,11 +66,11 @@ export default function FeaturedPackages({ packages }) {
                   
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="absolute inset-0 p-6 text-white flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <h4 className="text-lg font-bold mb-3 text-yellow-400">What's Included:</h4>
+                    <h4 className="text-lg font-bold mb-3 text-brand-accent-400">What's Included:</h4>
                     <ul className="text-md space-y-2">
                       {pkg.inclusions && pkg.inclusions.slice(0, 5).map((inclusion, idx) => (
                         <li key={idx} className="flex items-start">
-                          <span className="text-yellow-400 mr-2">✓</span>
+                          <span className="text-brand-accent-400 mr-2">✓</span>
                           <span className="line-clamp-1">{inclusion}</span>
                         </li>
                       ))}
@@ -78,17 +78,17 @@ export default function FeaturedPackages({ packages }) {
                   </div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-yellow-600 transition-colors font-poppins">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-brand-accent-600 transition-colors font-poppins">
                     {pkg.name}
                   </h3>
                   <p className="text-gray-600 text-sm mb-6 line-clamp-2">{pkg.description}</p>
                   <div className="flex items-center justify-between pt-4 border-t-2 border-gray-200">
                    <div>
-                      <div className="text-2xl font-bold text-orange-600 font-poppins">
+                      <div className="text-2xl font-bold text-brand-600 font-poppins">
                         {formatCurrency(pkg.price_from)}
                     </div>
                     </div>
-                    <button className="px-6 py-2 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-yellow-600 hover:to-orange-600 hover:shadow-lg transition-all duration-300 font-opensans">
+                    <button className="px-6 py-2 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-brand-accent-600 hover:to-brand-600 hover:shadow-lg transition-all duration-300 font-opensans">
                       View Details
                     </button>
                   </div>
@@ -101,12 +101,12 @@ export default function FeaturedPackages({ packages }) {
       <div className="text-center mt-12">
         <button 
           onClick={() => navigate('/packages')}
-          className="group inline-flex items-center justify-center px-10 py-3.5 text-slate-800 font-semibold text-base tracking-wide border-2 border-slate-800 rounded-lg hover:border-orange-400 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+          className="group inline-flex items-center justify-center px-10 py-3.5 text-slate-800 font-semibold text-base tracking-wide border-2 border-slate-800 rounded-lg hover:border-brand-400 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
         >
-          <span className="group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-orange-800 group-hover:to-yellow-700 group-hover:bg-clip-text transition-all duration-300">
+          <span className="group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-brand-800 group-hover:to-brand-accent-700 group-hover:bg-clip-text transition-all duration-300">
             Explore All Packages
           </span>
-          <ArrowRight className="ml-2 w-5 h-5 group-hover:text-orange-500 transition-colors duration-300" />
+          <ArrowRight className="ml-2 w-5 h-5 group-hover:text-brand-500 transition-colors duration-300" />
         </button>
       </div>
     </section>
