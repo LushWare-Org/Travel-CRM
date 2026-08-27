@@ -9,7 +9,7 @@ import { Search, MapPin, Globe, ChevronDown } from 'lucide-react';
 import {
   POPULAR_INTERNATIONAL,
   OTHER_INTERNATIONAL,
-} from '../utils/destinations';
+} from '../config/domainData/destinations';
 
 const DestinationSelector = ({ value, onChange, placeholder = 'Select Destination' }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -83,8 +83,8 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
             type="button"
             onClick={() => handleSelect(dest)}
             className={`px-3 py-2 text-sm text-left rounded-xl transition-all ${value?.value === dest.value || value?.label === dest.label
-                ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-semibold shadow-md'
-                : 'bg-gray-50 hover:bg-orange-50 text-gray-700 hover:text-orange-700 border border-gray-200 hover:border-orange-300'
+                ? 'bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white font-semibold shadow-md'
+                : 'bg-gray-50 hover:bg-brand-50 text-gray-700 hover:text-brand-700 border border-gray-200 hover:border-brand-300'
               }`}
           >
             {dest.label}
@@ -99,10 +99,10 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
       {/* Selected Value Display / Trigger */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white cursor-pointer flex items-center justify-between hover:border-orange-500 transition-colors focus:ring-2 focus:ring-orange-500"
+        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white cursor-pointer flex items-center justify-between hover:border-brand-500 transition-colors focus:ring-2 focus:ring-brand-500"
       >
         <div className="flex items-center gap-2 flex-1">
-          <MapPin className="w-5 h-5 text-orange-600 flex-shrink-0" />
+          <MapPin className="w-5 h-5 text-brand-600 flex-shrink-0" />
           <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>
             {value?.label || value || placeholder}
           </span>
@@ -115,18 +115,18 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute z-50 w-[calc(100vw-1rem)] sm:w-full sm:min-w-[520px] max-w-[600px] mt-2 bg-white border-2 border-orange-200 rounded-2xl shadow-2xl overflow-hidden left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0">
+        <div className="absolute z-50 w-[calc(100vw-1rem)] sm:w-full sm:min-w-[520px] max-w-[600px] mt-2 bg-white border-2 border-brand-200 rounded-2xl shadow-2xl overflow-hidden left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0">
           {/* Search Bar */}
-          <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-yellow-50">
+          <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-brand-50 to-brand-accent-50">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-orange-600" size={18} />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-brand-600" size={18} />
               <input
                 ref={inputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search destinations..."
-                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm bg-white"
+                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm bg-white"
                 autoFocus
               />
             </div>
@@ -138,8 +138,8 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
               type="button"
               onClick={() => setActiveTab('popular-international')}
               className={`flex-1 px-4 py-3 text-xs font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'popular-international'
-                  ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
-                  : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
+                  ? 'text-brand-600 border-b-2 border-brand-600 bg-brand-50'
+                  : 'text-gray-600 hover:text-brand-600 hover:bg-gray-50'
                 }`}
             >
               <Globe size={14} />
@@ -149,8 +149,8 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
               type="button"
               onClick={() => setActiveTab('other-international')}
               className={`flex-1 px-4 py-3 text-xs font-semibold transition-all flex items-center justify-center gap-2 ${activeTab === 'other-international'
-                  ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
-                  : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
+                  ? 'text-brand-600 border-b-2 border-brand-600 bg-brand-50'
+                  : 'text-gray-600 hover:text-brand-600 hover:bg-gray-50'
                 }`}
             >
               <MapPin size={14} />
@@ -163,7 +163,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
             {activeTab === 'popular-international' && (
               <div>
                 <div className="px-2 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 mb-2">
-                  <Globe size={12} className="text-orange-600" />
+                  <Globe size={12} className="text-brand-600" />
                   Popular International Destinations
                 </div>
                 {renderDestinationGrid(
@@ -176,7 +176,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
             {activeTab === 'other-international' && (
               <div>
                 <div className="px-2 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 bg-white rounded-lg mb-2">
-                  <Globe size={12} className="text-orange-600" />
+                  <Globe size={12} className="text-brand-600" />
                   More International Destinations
                 </div>
                 {renderDestinationGrid(
@@ -188,9 +188,9 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
           </div>
 
           {/* Custom Input Option */}
-          <div className="p-4 border-t border-gray-200 bg-gradient-to-r from-orange-50 to-yellow-50">
+          <div className="p-4 border-t border-gray-200 bg-gradient-to-r from-brand-50 to-brand-accent-50">
             <div className="text-sm text-gray-700 font-medium mb-2 flex items-center gap-2">
-              <MapPin size={14} className="text-orange-600" />
+              <MapPin size={14} className="text-brand-600" />
               Don't see your destination?
             </div>
             <div className="flex gap-2">
@@ -200,13 +200,13 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
                 onChange={(e) => setCustomDestination(e.target.value)}
                 onKeyPress={handleCustomDestinationKeyPress}
                 placeholder="Type custom destination..."
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm bg-white"
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm bg-white"
               />
               <button
                 type="button"
                 onClick={handleCustomDestinationSubmit}
                 disabled={!customDestination.trim()}
-                className="px-4 py-2.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add
               </button>

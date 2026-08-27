@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { Plus, X, MapPin, Search } from 'lucide-react';
-import { getLocationsForDestination, ALL_LOCATIONS } from '../utils/locations';
+import { getLocationsForDestination, ALL_LOCATIONS } from '../config/domainData/locations';
 import LocationAutocomplete from './LocationAutocomplete';
 
 const LocationSelector = ({ locations = [], onChange, destination = '' }) => {

@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { Plus, X, Search } from 'lucide-react';
-import { DEFAULT_ACTIVITIES, ACTIVITY_CATEGORIES } from '../utils/activities';
+import { DEFAULT_ACTIVITIES, ACTIVITY_CATEGORIES } from '../config/domainData/activities';
 
 const ActivitySelector = ({ activities = [], onChange }) => {
   const [showSelector, setShowSelector] = useState(false);

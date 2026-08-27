@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import { fetchPackages } from '../utils/packageApi';
 import { formatCurrency } from '../utils/currency';
+import { HERO_VIDEOS } from '../config/media';
+
+const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v3');
 
 const FALLBACK_IMAGE = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
 
@@ -167,8 +170,8 @@ export default function DestinationsInternational() {
 
   const totalPages = Math.ceil(filteredDestinations.length / itemsPerPage);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-orange-500" /></div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load destinations</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700">Try again</button></div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-500" /></div>;
+  if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load destinations</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700">Try again</button></div></div>;
 
   return (
     <div className="min-h-screen bg-white">
@@ -176,7 +179,7 @@ export default function DestinationsInternational() {
       <div className="relative w-full py-24 overflow-hidden">
         <div className="absolute inset-0">
           <img
-            src="/v3-poster.webp"
+            src={heroVideo?.poster}
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
             loading="eager"
@@ -192,7 +195,7 @@ export default function DestinationsInternational() {
             playsInline
             preload="none"
           >
-            <source src="/v3.mp4" type="video/mp4" />
+            <source src={heroVideo?.video} type="video/mp4" />
           </video>
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
@@ -205,7 +208,7 @@ export default function DestinationsInternational() {
           >
             Discover Your Next{' '}
             <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-brand-400 via-brand-accent-400 to-brand-accent-400 bg-clip-text text-transparent">
                 Adventure
               </span>
               <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
@@ -240,7 +243,7 @@ export default function DestinationsInternational() {
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
-                    className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-xs font-bold shadow-lg"
+                    className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-brand-400 to-red-500 flex items-center justify-center text-white text-xs font-bold shadow-lg"
                   >
                     {String.fromCharCode(64 + i)}
                   </div>
@@ -255,7 +258,7 @@ export default function DestinationsInternational() {
             <div className="flex items-center gap-2">
               <div className="flex">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                  <Star key={i} className="w-5 h-5 text-brand-accent-400 fill-brand-accent-400" />
                 ))}
               </div>
               <span className="text-white font-semibold">4.9/5</span>
@@ -274,7 +277,7 @@ export default function DestinationsInternational() {
                 onClick={() => setShowFilters((prev) => !prev)}
                 className={`flex items-center space-x-2 px-3 md:px-4 py-2 rounded-lg transition-all duration-300 text-sm md:text-base ${showFilters
                     ? 'bg-gray-100 hover:bg-gray-200 text-black shadow-md hover:shadow-lg'
-                    : 'bg-gray-100 hover:bg-gray-200 text-black border border-gray-200 hover:border-orange-300'
+                    : 'bg-gray-100 hover:bg-gray-200 text-black border border-gray-200 hover:border-brand-300'
                   }`}
               >
                 <SlidersHorizontal className="w-4 h-4" />
@@ -286,7 +289,7 @@ export default function DestinationsInternational() {
                 )}
               </button>
               {activeFiltersCount > 0 && (
-                <button onClick={clearAllFilters} className="text-xs md:text-sm text-gray-600 hover:text-orange-600 font-medium flex items-center space-x-1 transition-colors duration-200 whitespace-nowrap">
+                <button onClick={clearAllFilters} className="text-xs md:text-sm text-gray-600 hover:text-brand-600 font-medium flex items-center space-x-1 transition-colors duration-200 whitespace-nowrap">
                   <X className="w-4 h-4" />
                   <span>Clear</span>
                 </button>
@@ -296,7 +299,7 @@ export default function DestinationsInternational() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full md:w-auto px-3 md:px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 text-sm md:text-base"
+                className="w-full md:w-auto px-3 md:px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white transition-all duration-200 text-sm md:text-base"
               >
                 <option value="popularity">Most Popular</option>
                 <option value="price-low">Price: Low to High</option>
@@ -307,8 +310,8 @@ export default function DestinationsInternational() {
                 <button
                   onClick={() => setViewMode('grid')}
                   className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'grid'
-                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
-                      : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
+                      ? 'bg-brand-50 text-brand-600 shadow-sm border border-brand-200'
+                      : 'text-gray-500 hover:bg-gray-200 hover:border-brand-300'
                     }`}
                 >
                   <Grid className="w-5 h-5" />
@@ -316,8 +319,8 @@ export default function DestinationsInternational() {
                 <button
                   onClick={() => setViewMode('list')}
                   className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'list'
-                      ? 'bg-orange-50 text-orange-600 shadow-sm border border-orange-200'
-                      : 'text-gray-500 hover:bg-gray-200 hover:border-orange-300'
+                      ? 'bg-brand-50 text-brand-600 shadow-sm border border-brand-200'
+                      : 'text-gray-500 hover:bg-gray-200 hover:border-brand-300'
                     }`}
                 >
                   <List className="w-5 h-5" />
@@ -337,7 +340,7 @@ export default function DestinationsInternational() {
               <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-screen md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-32 2xl:rounded-2xl 2xl:h-auto overflow-y-auto">
                 <div className="flex items-center justify-between mb-6 2xl:mb-6">
                   <h3 className="text-xl font-bold flex items-center gap-2">
-                    <Filter className="w-5 h-5 text-orange-600" />
+                    <Filter className="w-5 h-5 text-brand-600" />
                   </h3>
                   <button
                     onClick={() => setShowFilters(false)}
@@ -356,7 +359,7 @@ export default function DestinationsInternational() {
                       placeholder="Search destinations, countries..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 text-gray-900 placeholder-gray-400 transition-all duration-200"
+                      className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-200 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-gray-900 placeholder-gray-400 transition-all duration-200"
                     />
                   </div>
                 </div>
@@ -372,28 +375,28 @@ export default function DestinationsInternational() {
                       <div key={region}>
                         <button
                           onClick={() => toggleRegion(region)}
-                          className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center justify-between group cursor-pointer border border-gray-200 hover:border-orange-300 hover:shadow-sm ${selectedRegions.includes(region)
-                              ? 'bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100 text-orange-800 border-orange-300 shadow-sm'
+                          className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 flex items-center justify-between group cursor-pointer border border-gray-200 hover:border-brand-300 hover:shadow-sm ${selectedRegions.includes(region)
+                              ? 'bg-gradient-to-r from-brand-50 via-brand-accent-50 to-brand-100 text-brand-800 border-brand-300 shadow-sm'
                               : 'bg-white hover:bg-gray-50 text-gray-700'
                             }`}
                         >
                           <span className="font-medium">{region}</span>
                           <ChevronRight
                             className={`w-4 h-4 transition-transform ${selectedRegions.includes(region)
-                                ? 'text-orange-600'
-                                : 'text-gray-400 group-hover:text-orange-500'
+                                ? 'text-brand-600'
+                                : 'text-gray-400 group-hover:text-brand-500'
                               }`}
                           />
                         </button>
                         {region !== 'All' && selectedRegions.includes(region) && countriesByRegion[region] && (
-                          <div className="mt-2 ml-4 space-y-1 pl-2 border-l-2 border-orange-200">
+                          <div className="mt-2 ml-4 space-y-1 pl-2 border-l-2 border-brand-200">
                             {countriesByRegion[region].map((country) => (
-                              <label key={country} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200">
+                              <label key={country} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200">
                                 <input
                                   type="checkbox"
                                   checked={selectedCountries.includes(country)}
                                   onChange={() => toggleCountry(country)}
-                                  className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 focus:ring-2"
+                                  className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
                                 />
                                 <span className="text-gray-700">{country}</span>
                               </label>
@@ -415,13 +418,13 @@ export default function DestinationsInternational() {
                     {filterOptions.priceRanges.map((range) => (
                       <label
                         key={range.label}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"
                       >
                         <input
                           type="checkbox"
                           checked={selectedPriceRange?.label === range.label}
                           onChange={() => setSelectedPriceRange((prev) => (prev?.label === range.label ? null : range))}
-                          className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 focus:ring-2"
+                          className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
                         />
                         <span className="text-gray-700 font-medium">{range.label}</span>
                       </label>
@@ -438,20 +441,20 @@ export default function DestinationsInternational() {
                     {[5, 4, 3].map((starCount) => (
                       <label
                         key={starCount}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-orange-50/50 cursor-pointer transition-all duration-200"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"
                       >
                         <input
                           type="checkbox"
                           checked={minRating === starCount}
                           onChange={() => setMinRating((prev) => (prev === starCount ? 0 : starCount))}
-                          className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500 focus:ring-2"
+                          className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
                         />
                         <div className="flex items-center gap-2">
                           <div className="flex gap-0.5">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
-                                className={`w-4 h-4 ${i < starCount ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                                className={`w-4 h-4 ${i < starCount ? 'fill-brand-accent-400 text-brand-accent-400' : 'text-gray-300'}`}
                               />
                             ))}
                           </div>
@@ -499,7 +502,7 @@ export default function DestinationsInternational() {
                       <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-yellow-400" />
+                            <Clock className="w-4 h-4 text-brand-accent-400" />
                             <span className="text-sm">{dest.duration}</span>
                           </div>
                         </div>
@@ -509,7 +512,7 @@ export default function DestinationsInternational() {
                       </div>
                     </div>
                     <div className="p-4 flex flex-col flex-grow">
-                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-2 mb-2">
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-brand-600 transition-colors line-clamp-2 mb-2">
                         {dest.name}, {dest.country}
                       </h3>
                       <p className="text-gray-600 text-sm line-clamp-2 mb-3 flex-grow">{dest.description}</p>
@@ -527,7 +530,7 @@ export default function DestinationsInternational() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs text-gray-500">Starting from</p>
-                          <p className="text-lg font-bold text-orange-600">{formatCurrency(dest.price)}</p>
+                          <p className="text-lg font-bold text-brand-600">{formatCurrency(dest.price)}</p>
                         </div>
                         <button className="px-4 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-gray-700 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-xl text-xs whitespace-nowrap">
                           View Details
@@ -547,7 +550,7 @@ export default function DestinationsInternational() {
                     onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/packages?destination=${dest.slug}`); }}
                     role="button"
                     tabIndex={0}
-                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-100 hover:shadow-2xl hover:border-yellow-500 transition-all duration-300 cursor-pointer"
+                    className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-100 hover:shadow-2xl hover:border-brand-accent-500 transition-all duration-300 cursor-pointer"
                   >
                     <div className="flex flex-col lg:flex-row">
                       <div className="relative lg:w-80 h-64 lg:h-80 overflow-hidden flex-shrink-0">
@@ -563,7 +566,7 @@ export default function DestinationsInternational() {
                       <div className="flex-1 p-4 lg:p-5">
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2 group-hover:text-brand-600 transition-colors">
                               {dest.name}, {dest.country}
                             </h3>
                           </div>
@@ -582,7 +585,7 @@ export default function DestinationsInternational() {
                         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                           <div>
                             <p className="text-xs text-gray-500 mb-1">Starting Price</p>
-                            <p className="text-3xl font-bold text-orange-600">{formatCurrency(dest.price)}</p>
+                            <p className="text-3xl font-bold text-brand-600">{formatCurrency(dest.price)}</p>
                           </div>
                           <Link
                             to={`/packages?destination=${dest.slug}`}
@@ -604,7 +607,7 @@ export default function DestinationsInternational() {
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-6 py-3 bg-gray-100 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
+                  className="px-6 py-3 bg-gray-100 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
                 >
                   ← Previous
                 </button>
@@ -614,7 +617,7 @@ export default function DestinationsInternational() {
                       key={page}
                       onClick={() => setCurrentPage(page)}
                       className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${currentPage === page
-                          ? 'bg-orange-600 text-white shadow-lg'
+                          ? 'bg-brand-600 text-white shadow-lg'
                           : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                         }`}
                     >
@@ -625,7 +628,7 @@ export default function DestinationsInternational() {
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-6 py-3 bg-gray-100 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
+                  className="px-6 py-3 bg-gray-100 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
                 >
                   Next →
                 </button>
