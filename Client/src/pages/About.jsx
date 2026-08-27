@@ -1,95 +1,14 @@
+import { Globe, Compass } from 'lucide-react';
 import { useState } from 'react';
-import { Globe, Heart, Shield, Award, Users, Compass, Plane, Star, Mail, Linkedin, Twitter } from 'lucide-react';
+import { TEAM_MEMBERS, STORY_PARAGRAPHS } from '../content/about';
+import BRANDING from '../config/branding';
+import { HERO_VIDEOS } from '../config/media';
+
+const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v3');
 
 export default function AboutUs() {
   const [activeTab, setActiveTab] = useState('story');
   const [hoveredMember, setHoveredMember] = useState(null);
-
-  const stats = [
-    { icon: Users, number: '50K+', label: 'Happy Travelers', color: 'from-orange-500 to-red-500' },
-    { icon: Globe, number: '100+', label: 'Destinations', color: 'from-blue-500 to-cyan-500' },
-    { icon: Award, number: '15+', label: 'Years Experience', color: 'from-purple-500 to-pink-500' },
-    { icon: Star, number: '4.9', label: 'Average Rating', color: 'from-yellow-500 to-orange-500' },
-  ];
-
-  const values = [
-    {
-      icon: Heart,
-      title: 'Passion for Travel',
-      description: 'We live and breathe travel, bringing authentic experiences to every journey we craft.',
-      gradient: 'from-red-500 to-pink-500'
-    },
-    {
-      icon: Shield,
-      title: 'Trust & Safety',
-      description: 'Your safety is our priority. We ensure secure bookings and reliable travel partners.',
-      gradient: 'from-blue-500 to-indigo-500'
-    },
-    {
-      icon: Compass,
-      title: 'Personalized Journeys',
-      description: 'Every traveler is unique. We tailor experiences that match your dreams perfectly.',
-      gradient: 'from-green-500 to-teal-500'
-    },
-    {
-      icon: Plane,
-      title: '24/7 Support',
-      description: 'Around the clock assistance wherever you are in the world. We\'ve got your back.',
-      gradient: 'from-purple-500 to-violet-500'
-    },
-  ];
-
-  const team = [
-    {
-      name: 'Rajesh Kumar',
-      role: 'Founder & CEO',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Visionary leader with 15+ years in travel industry',
-      social: { linkedin: '#', twitter: '#', email: 'rajesh@tripskyway.com' }
-    },
-    {
-      name: 'Priya Sharma',
-      role: 'Head of Operations',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Expert in streamlining travel experiences globally',
-    },
-    {
-      name: 'Amit Patel',
-      role: 'Lead Travel Designer',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Crafting unforgettable journeys since 2021',
-    },
-    {
-      name: 'Sneha Reddy',
-      role: 'Customer Experience Manager',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Passionate about creating memorable moments',
-    },
-    {
-      name: 'Vikram Singh',
-      role: 'International Relations Head',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Building bridges across continents',
-    },
-    {
-      name: 'Anjali Mehta',
-      role: 'Marketing Director',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Storyteller bringing destinations',
-    },
-    {
-      name: 'Karan Desai',
-      role: 'Technology Lead',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Innovating the future of travel tech',
-    },
-    {
-      name: 'Meera Iyer',
-      role: 'Sustainability Officer',
-      image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
-      bio: 'Champion of responsible tourism',
-    },
-  ];
 
   const tabs = [
     { id: 'story', label: 'Our Story', icon: Globe },
@@ -97,12 +16,12 @@ export default function AboutUs() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50">
       <div className="relative h-[50vh] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/60 z-10"></div>
           <video
             className="absolute inset-0 w-full h-full object-cover"
-            src="/v3.mp4"
+            src={heroVideo?.video}
             autoPlay
             muted
             loop
@@ -113,8 +32,8 @@ export default function AboutUs() {
           <div className="text-center max-w-4xl">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
               Crafting Dream
-              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-400">
-                Journeys Since 2021
+              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-brand-400 via-brand-accent-400 to-brand-accent-400">
+                {`Journeys Since ${BRANDING.company.foundedYear}`}
               </span>
             </h1>
             <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
@@ -133,7 +52,7 @@ export default function AboutUs() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center justify-center gap-2 px-4 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base ${
                   activeTab === tab.id
-                    ? 'bg-gradient-to-r from-orange-600 to-yellow-500 text-white shadow-md'
+                    ? 'bg-gradient-to-r from-brand-600 to-brand-accent-500 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -152,18 +71,11 @@ export default function AboutUs() {
                 Our Journey Began with a Dream
               </h2>
               <div className="space-y-6 text-md text-gray-700 leading-relaxed">
-                <p className="text-justify">
-                  TripSkyway is a premier travel agency specializing in providing exceptional travel experiences to its clients. With a wealth of knowledge and expertise in the travel industry, TripSkyway is committed to delivering unparalleled service and value to every customer.
-                </p>
-                <p className="text-justify">
-                  Whether you're looking for a romantic getaway, an adventure-packed vacation, or a relaxing beach retreat, TripSkyway has you covered. With a wide range of travel packages and customizable itineraries, you're sure to find the perfect vacation to suit your individual preferences and budget.                
+                {STORY_PARAGRAPHS.map((paragraph, idx) => (
+                  <p key={idx} className="text-justify">
+                    {paragraph}
                   </p>
-                <p className="text-justify">
-                  At TripSkyway, customer satisfaction is of the utmost importance. When you contact the agency, you can expect personalized attention and exceptional service from a team of experienced travel professionals. The agency's commitment to customer service extends throughout your entire travel experience, ensuring that your trip is everything you hoped it would be and more.
-                </p>
-                <p className="text-justify">
-                  So whether you're planning a weekend getaway or a month-long excursion, let TripSkyway help you make the most of your travel experience. With their expertise and dedication to excellence, you can rest assured that your vacation will be remembered.
-                </p>
+                ))}
               </div>
             </div>
           )}
@@ -198,7 +110,7 @@ export default function AboutUs() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {team.map((member, idx) => (
+            {TEAM_MEMBERS.map((member, idx) => (
               <div
                 key={idx}
                 className="group relative"
@@ -219,7 +131,7 @@ export default function AboutUs() {
                   {/* Info Container */}
                   <div className="p-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-1">{member.name}</h3>
-                    <div className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-yellow-600 mb-3">
+                    <div className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-brand-accent-600 mb-3">
                       {member.role}
                     </div>
                   </div>
