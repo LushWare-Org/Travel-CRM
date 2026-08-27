@@ -22,6 +22,7 @@ import type { LucideIcon } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../../services/api/manualItinerary";
+import { pluralize } from "../../lib/pluralize";
 import DestinationSelector from "../../components/shared/DestinationSelector";
 import LocationSelector from "../../components/shared/LocationSelector";
 import ActivitySelector from "../../components/shared/ActivitySelector";
@@ -469,7 +470,7 @@ export default function PlanYourTripContainer() {
                 <div className="mt-4 p-3 sm:p-4 bg-brand-50 border border-brand-200 rounded-xl flex items-center space-x-2">
                   <Clock className="w-4 sm:w-5 h-4 sm:h-5 text-brand-600" />
                   <p className="text-xs sm:text-sm text-brand-800 font-semibold">
-                    {duration} Days / {duration - 1} Nights
+                    {pluralize(duration, 'Day')} / {pluralize(Math.max(duration - 1, 0), 'Night')}
                   </p>
                 </div>
               )}
@@ -513,7 +514,7 @@ export default function PlanYourTripContainer() {
                       Plan Your Itinerary
                     </h2>
                     <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
-                      {duration} Days / {duration - 1} Nights in {destLabel(selectedDest) || 'destination'}
+                      {pluralize(duration, 'Day')} / {pluralize(Math.max(duration - 1, 0), 'Night')} in {destLabel(selectedDest) || 'destination'}
                     </p>
                   </div>
                 </div>
