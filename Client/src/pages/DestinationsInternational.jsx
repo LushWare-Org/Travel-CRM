@@ -18,8 +18,8 @@ import {
   ArrowRight,
   Sun,
 } from 'lucide-react';
-import { fetchPackages } from '../utils/packageApi';
-import { formatCurrency } from '../utils/currency';
+import { fetchPackages } from '../services/api/packages';
+import { formatCurrency } from '../lib/currency';
 import { HERO_VIDEOS } from '../config/media';
 
 const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v3');

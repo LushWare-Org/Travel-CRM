@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Star, Clock, Banknote, Filter, X, SlidersHorizontal, Grid, List, ArrowRight, Compass, Sun, Users } from 'lucide-react';
-import { fetchPackages } from '../utils/packageApi';
-import { createSlug } from '../utils/packageTransform';
-import { formatCurrency, getCurrencySymbol } from '../utils/currency';
+import { fetchPackages } from '../services/api/packages';
+import { createSlug } from '../services/api/packages.transform';
+import { formatCurrency, getCurrencySymbol } from '../lib/currency';
 import { HERO_VIDEOS } from '../config/media';
 
 const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v4');

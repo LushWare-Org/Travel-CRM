@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { login as apiLogin, register as apiRegister } from '../utils/authApi';
+import { login as apiLogin, register as apiRegister } from '../services/api/auth';
+import { getToken, getUser, persist as persistAuth } from '../services/auth/tokenStorage';
 
 const AuthContext = createContext(null);
-
-const STORAGE_KEY = 'tsw_auth';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -11,33 +10,18 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.user) {
-          setUser(parsed.user);
-          setToken(parsed.token || null);
-        }
-      }
-    } catch {
-      // ignore parse errors
-    } finally {
-      setLoading(false);
+    const storedUser = getUser();
+    if (storedUser) {
+      setUser(storedUser);
+      setToken(getToken());
     }
+    setLoading(false);
   }, []);
 
   const persist = useCallback((nextUser, nextToken) => {
     setUser(nextUser);
     setToken(nextToken || null);
-    if (nextUser) {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ user: nextUser, token: nextToken || null }),
-      );
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    persistAuth(nextUser, nextToken || null);
   }, []);
 
   const login = useCallback(async ({ email, password }) => {

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { fetchPackages } from '../../utils/packageApi';
-import { formatCurrency } from '../../utils/currency';
+import { fetchPackages } from '../../services/api/packages';
+import { formatCurrency } from '../../lib/currency';
 import { ALL_STATS } from '../../content/stats';
 
 export default function RecommendedPackagesSection() {

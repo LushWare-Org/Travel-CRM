@@ -6,7 +6,7 @@ import {
   ChevronRight,
   ArrowRight,
 } from "lucide-react"
-import { fetchPackages } from "../../utils/packageApi"
+import { fetchPackages } from "../../services/api/packages"
 import { REVIEW_VIDEOS } from "../../config/media"
 
 const videoHeights = [

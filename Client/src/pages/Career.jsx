@@ -9,7 +9,7 @@ import {
   FileText,
   X
 } from 'lucide-react';
-import careerService from '../utils/careerApi';
+import careerService from '../services/api/career';
 import BRANDING from '../config/branding';
 import { HERO_TITLE, HIRING_PERKS } from '../content/career';
 

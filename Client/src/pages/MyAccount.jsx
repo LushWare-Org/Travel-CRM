@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, Users, DollarSign, Clock, ArrowRight, Loader, Star, Edit2, Save, X, Mail, Phone, Package, Compass, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { fetchUserBookings } from '../utils/bookingApi';
-import { fetchUserCustomizedPackages } from '../utils/customizationApi';
-import { fetchUserManualItineraries } from '../utils/manualItineraryApi';
-import { formatCurrency } from '../utils/currency';
-import { API_BASE_URL } from '../utils/apiConfig';
+import { fetchUserBookings } from '../services/api/booking';
+import { fetchUserCustomizedPackages } from '../services/api/customization';
+import { fetchUserManualItineraries } from '../services/api/manualItinerary';
+import { formatCurrency } from '../lib/currency';
+import { updateProfile } from '../services/api/account';
+import { mergeStoredUser } from '../services/auth/tokenStorage';
 
 export default function MyAccount() {
   const navigate = useNavigate();
@@ -172,28 +173,11 @@ export default function MyAccount() {
     setIsSaving(true);
     setUpdateMessage(null);
     try {
-      const authData = JSON.parse(localStorage.getItem('tsw_auth') || '{}');
-      const token = authData?.token;
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-      const response = await fetch(`${API_BASE_URL}/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message || 'Failed to update profile');
-      }
+      await updateProfile(formData);
       setUpdateMessage({ type: 'success', text: 'Profile updated successfully!' });
       setIsEditMode(false);
-      
-      const updatedAuthData = { ...authData, user: { ...authData.user, ...formData } };
-      localStorage.setItem('tsw_auth', JSON.stringify(updatedAuthData));
+
+      mergeStoredUser(formData);
       setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
       console.error('Profile update error:', err);

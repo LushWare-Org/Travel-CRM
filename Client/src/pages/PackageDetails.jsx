@@ -8,11 +8,11 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { fetchPackageById, submitReview, fetchPackageReviews } from '../utils/packageApi';
-import { formatCurrency } from '../utils/currency';
+import { fetchPackageById, submitReview, fetchPackageReviews } from '../services/api/packages';
+import { formatCurrency } from '../lib/currency';
 import { generateManagementPDF } from '../utils/managementPdfBridge';
 import { useAuth } from '../context/AuthContext';
-import { submitBookingRequest } from '../utils/bookingApi';
+import { submitBookingRequest } from '../services/api/booking';
 import BRANDING from '../config/branding';
 
 export default function PackageDetails() {

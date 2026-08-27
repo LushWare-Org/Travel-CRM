@@ -1,79 +1,14 @@
-const slugify = (value = '') => value
-  .toString()
-  .toLowerCase()
-  .trim()
-  .replace(/[\s_]+/g, '-')
-  .replace(/[^a-z0-9-]+/g, '')
-  .replace(/-{2,}/g, '-')
-  .replace(/^-|-$/g, '');
+import { COUNTRY_REGION_MAP } from '../../config/domainData/destinations';
 
-
-
-const COUNTRY_REGION_MAP = {
-  'indonesia': 'Asia',
-  'maldives': 'Asia',
-  'thailand': 'Asia',
-  'uae': 'Middle East',
-  'united arab emirates': 'Middle East',
-  'dubai': 'Middle East',
-  'abu dhabi': 'Middle East',
-  'malaysia': 'Asia',
-  'singapore': 'Asia',
-  'kazakhstan': 'Asia',
-  'mauritius': 'Africa',
-  'seychelles': 'Africa',
-  'vietnam': 'Asia',
-  'sri lanka': 'Asia',
-  'nepal': 'Asia',
-  'bhutan': 'Asia',
-  'japan': 'Asia',
-  'south korea': 'Asia',
-  'china': 'Asia',
-  'hong kong': 'Asia',
-  'indian ocean': 'Asia',
-  'bali': 'Asia',
-  'switzerland': 'Europe',
-  'france': 'Europe',
-  'italy': 'Europe',
-  'spain': 'Europe',
-  'greece': 'Europe',
-  'turkey': 'Europe',
-  'austria': 'Europe',
-  'germany': 'Europe',
-  'netherlands': 'Europe',
-  'united kingdom': 'Europe',
-  'england': 'Europe',
-  'scotland': 'Europe',
-  'ireland': 'Europe',
-  'portugal': 'Europe',
-  'croatia': 'Europe',
-  'sweden': 'Europe',
-  'norway': 'Europe',
-  'finland': 'Europe',
-  'denmark': 'Europe',
-  'czech republic': 'Europe',
-  'hungary': 'Europe',
-  'egypt': 'Africa',
-  'kenya': 'Africa',
-  'south africa': 'Africa',
-  'tanzania': 'Africa',
-  'morocco': 'Africa',
-  'canada': 'Americas',
-  'united states': 'Americas',
-  'usa': 'Americas',
-  'mexico': 'Americas',
-  'brazil': 'Americas',
-  'argentina': 'Americas',
-  'peru': 'Americas',
-  'chile': 'Americas',
-  'australia': 'Oceania',
-  'new zealand': 'Oceania',
-  'fiji': 'Oceania',
-  'oman': 'Middle East',
-  'qatar': 'Middle East',
-  'saudi arabia': 'Middle East',
-  'jordan': 'Middle East',
-};
+const slugify = (value = ''): string =>
+  value
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]+/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
 
 const ACTIVITY_RULES = [
   { label: 'Beach', pattern: /(beach|island|sea|snorkel|water|cruise|coast)/i },
@@ -88,14 +23,22 @@ const ACTIVITY_RULES = [
   { label: 'Family', pattern: /(family|kids|children|child|friendly)/i },
 ];
 
+const inferRegion = (countryOrLocation = ''): string =>
+  COUNTRY_REGION_MAP[countryOrLocation.toLowerCase()] || 'Global';
 
+export interface DestinationMeta {
+  raw: string;
+  name: string;
+  country: string;
+  type: string;
+  region: string;
+  slug: string;
+  key: string;
+  nameSlug: string;
+  countrySlug: string;
+}
 
-const inferRegion = (countryOrLocation = '') => {
-  const normalized = countryOrLocation.toLowerCase();
-  return COUNTRY_REGION_MAP[normalized] || 'Global';
-};
-
-export const normalizeDestination = (destinationValue = '') => {
+export const normalizeDestination = (destinationValue = ''): DestinationMeta => {
   const raw = `${destinationValue || ''}`.trim();
   if (!raw) {
     return {
@@ -111,7 +54,10 @@ export const normalizeDestination = (destinationValue = '') => {
     };
   }
 
-  const parts = raw.split(',').map((part) => part.trim()).filter(Boolean);
+  const parts = raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
   const name = parts[0] || raw;
   const lastSegment = parts.length > 1 ? parts[parts.length - 1] : '';
   const type = 'international';
@@ -122,20 +68,45 @@ export const normalizeDestination = (destinationValue = '') => {
   const slug = countrySlug || nameSlug;
   const key = slug || slugify(raw);
 
-  return {
-    raw,
-    name,
-    country,
-    type,
-    region,
-    slug,
-    key,
-    nameSlug,
-    countrySlug,
-  };
+  return { raw, name, country, type, region, slug, key, nameSlug, countrySlug };
 };
 
-const extractItinerary = (itinerary) => {
+interface ApiPackage {
+  _id?: string;
+  id?: string;
+  slug?: string;
+  name?: string;
+  description?: string;
+  destination?: string;
+  duration?: number;
+  price?: number;
+  category?: string;
+  difficulty?: string | null;
+  rating?: number;
+  averageRating?: number;
+  numReviews?: number;
+  reviewCount?: number;
+  bookings?: number;
+  images?: Array<{ url?: string }>;
+  coverImage?: { url?: string };
+  highlights?: string[];
+  inclusions?: string[];
+  exclusions?: string[];
+  itinerary?: { days?: Array<{ dayNumber?: number; title?: string; description?: string }> };
+  isFeatured?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: unknown;
+}
+
+interface ItineraryDay {
+  dayNumber: number;
+  title: string;
+  description: string;
+}
+
+const extractItinerary = (itinerary: ApiPackage['itinerary']): ItineraryDay[] => {
   if (!itinerary || !Array.isArray(itinerary.days)) {
     return [];
   }
@@ -150,10 +121,11 @@ const extractItinerary = (itinerary) => {
     }));
 };
 
-const extractImages = (images = [], coverImage) => {
-  const normalizedImages = Array.isArray(images)
-    ? images.map((img) => img?.url).filter(Boolean)
-    : [];
+const extractImages = (
+  images: ApiPackage['images'] = [],
+  coverImage: ApiPackage['coverImage'],
+): { coverImage: string; images: string[] } => {
+  const normalizedImages = Array.isArray(images) ? images.map((img) => img?.url).filter((url): url is string => Boolean(url)) : [];
 
   const cover = coverImage?.url || normalizedImages[0] || '';
 
@@ -163,14 +135,10 @@ const extractImages = (images = [], coverImage) => {
   };
 };
 
-const extractActivitiesFromPackage = (pkg) => {
-  const texts = [
-    ...(Array.isArray(pkg?.highlights) ? pkg.highlights : []),
-    ...(Array.isArray(pkg?.inclusions) ? pkg.inclusions : []),
-    pkg?.description || '',
-  ].join(' | ');
+const extractActivitiesFromPackage = (pkg: { highlights?: string[]; inclusions?: string[]; description?: string }): Set<string> => {
+  const texts = [...(Array.isArray(pkg?.highlights) ? pkg.highlights : []), ...(Array.isArray(pkg?.inclusions) ? pkg.inclusions : []), pkg?.description || ''].join(' | ');
 
-  const activities = new Set();
+  const activities = new Set<string>();
   ACTIVITY_RULES.forEach((rule) => {
     if (rule.pattern.test(texts)) {
       activities.add(rule.label);
@@ -180,7 +148,36 @@ const extractActivitiesFromPackage = (pkg) => {
   return activities;
 };
 
-export const normalizePackage = (apiPackage = {}) => {
+export interface NormalizedPackage {
+  id?: string;
+  slug: string;
+  title: string;
+  name: string;
+  description: string;
+  destinationRaw: string;
+  destination: DestinationMeta;
+  duration_days: number;
+  price_from: number;
+  category: string;
+  difficulty: string | null;
+  rating: number;
+  reviews_count: number;
+  bookings: number;
+  image_url: string;
+  images: string[];
+  highlights: string[];
+  inclusions: string[];
+  exclusions: string[];
+  activities: string[];
+  itinerary: ItineraryDay[];
+  isFeatured: boolean;
+  isActive: boolean;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  raw: ApiPackage;
+}
+
+export const normalizePackage = (apiPackage: ApiPackage = {}): NormalizedPackage => {
   const destinationMeta = normalizeDestination(apiPackage.destination);
   const { coverImage, images } = extractImages(apiPackage.images, apiPackage.coverImage);
   const itinerary = extractItinerary(apiPackage.itinerary);
@@ -216,8 +213,52 @@ export const normalizePackage = (apiPackage = {}) => {
   };
 };
 
-export const aggregateDestinations = (normalizedPackages = []) => {
-  const destinationMap = new Map();
+export interface AggregatedDestination {
+  id: string;
+  name: string;
+  country: string;
+  type: string;
+  region: string;
+  slug: string;
+  nameSlug: string;
+  countrySlug: string;
+  raw: string;
+  description: string;
+  image_url: string;
+  packages: NormalizedPackage[];
+  price: number;
+  minDuration: number;
+  maxDuration: number;
+  rating: number;
+  reviews: number;
+  packagesCount: number;
+  durationLabel: string;
+  activities: string[];
+}
+
+interface DestinationAccumulator {
+  id: string;
+  name: string;
+  country: string;
+  type: string;
+  region: string;
+  slug: string;
+  nameSlug: string;
+  countrySlug: string;
+  raw: string;
+  description: string;
+  image_url: string;
+  packages: NormalizedPackage[];
+  minPrice: number;
+  minDuration: number;
+  maxDuration: number;
+  ratingSum: number;
+  reviewCount: number;
+  activities: Set<string>;
+}
+
+export const aggregateDestinations = (normalizedPackages: NormalizedPackage[] = []): AggregatedDestination[] => {
+  const destinationMap = new Map<string, DestinationAccumulator>();
 
   normalizedPackages.forEach((pkg) => {
     const destinationKey = pkg.destination?.key;
@@ -242,11 +283,11 @@ export const aggregateDestinations = (normalizedPackages = []) => {
         maxDuration: 0,
         ratingSum: 0,
         reviewCount: 0,
-        activities: new Set(),
+        activities: new Set<string>(),
       });
     }
 
-    const entry = destinationMap.get(destinationKey);
+    const entry = destinationMap.get(destinationKey)!;
     entry.packages.push(pkg);
     entry.minPrice = Math.min(entry.minPrice, pkg.price_from || Number.POSITIVE_INFINITY);
     entry.minDuration = Math.min(entry.minDuration, pkg.duration_days || Number.POSITIVE_INFINITY);
@@ -265,9 +306,7 @@ export const aggregateDestinations = (normalizedPackages = []) => {
   });
 
   return Array.from(destinationMap.values()).map((entry) => {
-    const averageRating = entry.packages.length
-      ? Number((entry.ratingSum / entry.packages.length).toFixed(1))
-      : 0;
+    const averageRating = entry.packages.length ? Number((entry.ratingSum / entry.packages.length).toFixed(1)) : 0;
 
     const price = entry.minPrice === Number.POSITIVE_INFINITY ? 0 : entry.minPrice;
     const minDuration = entry.minDuration === Number.POSITIVE_INFINITY ? 0 : entry.minDuration;
@@ -297,4 +336,3 @@ export const aggregateDestinations = (normalizedPackages = []) => {
 };
 
 export const createSlug = slugify;
-

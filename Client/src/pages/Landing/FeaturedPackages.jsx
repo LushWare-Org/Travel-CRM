@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Clock, Star, ArrowRight } from 'lucide-react';
-import { formatCurrency } from '../../utils/currency';
+import { formatCurrency } from '../../lib/currency';
 
 export default function FeaturedPackages({ packages }) {
   const navigate = useNavigate();

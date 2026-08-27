@@ -9,7 +9,7 @@ import PALETTE from './brandPalette.json';
 
 export { PALETTE };
 
-export const hexToRgb = (hex) => {
+export const hexToRgb = (hex: string): [number, number, number] => {
   const cleaned = String(hex || '').replace(/^#/, '');
   if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return [0, 0, 0];
   const int = parseInt(cleaned, 16);
@@ -20,9 +20,9 @@ export const hexToRgb = (hex) => {
  * Sets --brand-{shade} and --brand-{shade}-rgb on :root so index.css and
  * inline styles can reference brand colors without hardcoded hex literals.
  */
-export const applyCssVariables = () => {
+export const applyCssVariables = (): void => {
   const root = document.documentElement;
-  const setShade = (family, shades) => {
+  const setShade = (family: string, shades: Record<string, string>): void => {
     Object.entries(shades).forEach(([shade, hex]) => {
       const [r, g, b] = hexToRgb(hex);
       root.style.setProperty(`--${family}-${shade}`, hex);

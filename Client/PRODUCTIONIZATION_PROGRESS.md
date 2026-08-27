@@ -31,23 +31,23 @@ Tracks execution of the plan approved 2026-08-27. Full plan (context, decisions,
 
 ## Phase 1 — Foundation: services, lib, config → TypeScript, HTTP resilience, dedupe
 
-- [ ] 1.1 `services/http/{config,retry,client}.ts` (+ retry unit tests)
-- [ ] 1.2 `services/auth/tokenStorage.ts` (+ unit tests), refactor `AuthContext.jsx` onto it
-- [ ] 1.3 `services/api/*.ts` relocation (packages/career/auth/booking/contact/customization/manualItinerary) + new `account.ts`
-- [ ] 1.4 Fix `MyAccount.jsx` raw-fetch profile save → `updateProfile`/`mergeStoredUser`
-- [ ] 1.5 Delete `pdf/apiService.js`, fix `pdfService.js` to use `getPackageEnvelope`
-- [ ] 1.6 Delete `utils/managementPdfBridge.js`
-- [ ] 1.7 `pdf/constants.ts` — prune 9 dead exports, keep `PDF_CONFIG`
-- [ ] 1.8 `config/domainData/destinations.ts` — add `COUNTRY_REGION_MAP`
-- [ ] 1.9 `services/api/packages.transform.ts` (+ unit tests)
-- [ ] 1.10 `lib/currency.ts` (+ unit tests)
-- [ ] 1.11 `lib/elfsight.ts` hook
-- [ ] 1.12 `config/{branding,theme,media}.ts` rename
-- [ ] 1.13 `config/pages.ts` `PAGE_CONFIG` (+ unit tests)
-- [ ] 1.14 `config/floatingActions.ts`
-- [ ] 1.15 Tailwind z-index scale
-- [ ] 1.16 `.env.example` additions
-- [ ] 1.17 Delete now-empty `src/utils/` via `lsp rename_file` moves
+- [x] 1.1 `services/http/{config,retry,client}.ts` (+ retry unit tests)
+- [x] 1.2 `services/auth/tokenStorage.ts` (+ unit tests), refactor `AuthContext.jsx` onto it
+- [x] 1.3 `services/api/*.ts` relocation (packages/career/auth/booking/contact/customization/manualItinerary) + new `account.ts`
+- [x] 1.4 Fix `MyAccount.jsx` raw-fetch profile save → `updateProfile`/`mergeStoredUser`
+- [x] 1.5 Delete `pdf/apiService.js`, fix `pdfService.js` to use `getPackageEnvelope`
+- [ ] 1.6 Delete `utils/managementPdfBridge.js` — **deferred to Phase 5** (see session log: deleting now would break `PackageDetails.jsx`'s still-untouched import; its target `features/packages/pdf/pdfService.ts` doesn't exist until Phase 5)
+- [x] 1.7 `pdf/constants.ts` — prune dead exports, keep `PDF_CONFIG` (pruned 10: the 9 plan-flagged ones + `STATUS_COLORS`, found equally dead on re-grep)
+- [x] 1.8 `config/domainData/destinations.ts` — add `COUNTRY_REGION_MAP`
+- [x] 1.9 `services/api/packages.transform.ts` (+ unit tests)
+- [x] 1.10 `lib/currency.ts` (+ unit tests)
+- [x] 1.11 `lib/elfsight.ts` hook
+- [x] 1.12 `config/{branding,theme,media}.ts` rename
+- [x] 1.13 `config/pages.ts` `PAGE_CONFIG` (+ unit tests) — plus new shared `config/envFlag.ts`
+- [x] 1.14 `config/floatingActions.ts`
+- [x] 1.15 Tailwind z-index scale
+- [x] 1.16 `.env.example` additions
+- [ ] 1.17 Delete now-empty `src/utils/` — **not yet empty**, holds only the deferred `managementPdfBridge.js` (1.6); every other file moved/deleted
 
 **Gate 1:** `typecheck`/`lint`/`build`/`test` green; live network check against local gateway.
 
@@ -106,3 +106,17 @@ Tracks execution of the plan approved 2026-08-27. Full plan (context, decisions,
   Booted the full local backend stack (`cd Services && npm run dev` — gateway :3000 + all 11 microservices, shared Supabase Postgres, env files already present) for live verification going forward.
   **Gate 0 verified**: `npm run build`/`lint`/`typecheck`/`test`/`dev` all green. Live browser check (real backend running) of `/`, `/packages`, `/package/:id`, `/contact` — zero console errors, matches pre-Phase-0 behavior.
   Next: **Phase 1** — services/lib/config → TypeScript, HTTP consolidation with retry, the three ad-hoc-HTTP-path fixes.
+
+- **2026-08-27 (continued)**: **Phase 1 complete.** Built the consolidated HTTP stack: `services/http/config.ts` (`HTTP_CONFIG` from `VITE_API_*` env vars incl. new retry config), `services/http/retry.ts` (`shouldRetry`/`computeDelayMs` — capped exponential backoff + jitter, same shape as `Services/package-service/src/ai/geminiClient.js`'s `2 ** (attempt-1) * 500 + jitter`; GET/HEAD retried by default, `Retry-After` header honored, per-request `{retry: true|false}` override), `services/http/client.ts` (single axios instance, auto-retry interceptor, same error-enrichment shape the old `apiClient.js` had). 24 new unit tests for retry logic (attempt caps, method/status allowlists, opt-in/opt-out override, Retry-After precedence, backoff math).
+  `services/auth/tokenStorage.ts` — single `'tsw_auth'` source of truth (`getToken`/`getUser`/`persist`/`clear`/`mergeStoredUser`), 12 unit tests incl. corrupt-JSON and missing-key paths. Refactored `AuthContext.jsx` onto it (no behavior change — same envelope shape, same React state flow).
+  Relocated all `utils/*Api.js` → `services/api/*.ts` (auth/booking/career/contact/customization/manualItinerary/packages), all now on the shared `httpClient`. `contactApi.js`/`customizationApi.js`/`manualItineraryApi.js`'s unused default-object exports dropped (confirmed zero consumers via grep — everything used named imports); `careerApi.js` kept its default-object shape since `Career.jsx` genuinely imports it that way. New `services/api/account.ts` (`updateProfile`) and `getPackageEnvelope` (raw, non-normalized `/packages/:id` envelope, for the PDF fix below — distinct from `fetchPackageById`'s normalized shape). `lsp rename_file` couldn't actually rewrite import paths (the LSP's TS server fails to initialize — this is a no-root-workspace monorepo, likely resolving `typescript` from the repo root instead of `Client/`), so plain filesystem renames only; fixed the ~30 affected import sites by hand/`sed` afterward and confirmed via grep (zero stale references remain).
+  **Fixed `MyAccount.jsx`'s raw-fetch profile save** (1.4): replaced the hand-rolled `fetch` + manual `localStorage.getItem('tsw_auth')` parsing with `updateProfile()` + `mergeStoredUser()`, same success/error UI and `setTimeout(reload, 1000)` behavior preserved exactly.
+  **Fixed the `'tsw_auth'`-vs-`'authToken'`/`'token'` key bug** (1.5, the plan's flagged highest-risk edit): deleted `pdf/apiService.js` (`ApiService.getPackage` was reading the wrong localStorage keys, so PDF downloads never sent a valid `Authorization` header) and repointed `pdfService.js`'s `createPackagePdfBlob` at `getPackageEnvelope` — verified byte-identical response shape (`{success, data}` from the same `GET /packages/:id`) and, live in-browser: logged in as the seeded customer (`david.kumar@gmail.com` / `Customer@123`, found via `Services/update-passwords.mjs`), called `getPackageEnvelope` directly via a dynamic import in the browser console — `{success: true, hasData: true}` — and confirmed the network tab shows `Authorization: Bearer <token>` matching the live `tsw_auth` token on `/packages/:id` requests.
+  `utils/managementPdfBridge.js` **kept, not deleted** (1.6) — the plan's own fallback clause applies: `PackageDetails.jsx` still imports from it and isn't touched until Phase 5, so deleting now would break the site. Actual deletion + `PackageDetails.jsx`'s one-line import fix moved to Phase 5 alongside the rest of that file's migration.
+  `pdf/constants.ts` pruned to just `PDF_CONFIG` (1.7) — deleted the 9 plan-flagged dead exports plus `STATUS_COLORS`, which my own re-grep (per the "re-grep before deleting" rule) found equally unreferenced outside its own definition, so folded it into the same cleanup.
+  `config/domainData/destinations.ts` gained `COUNTRY_REGION_MAP` (1.8, moved verbatim from `packageTransform.js`); `services/api/packages.transform.ts` (1.9, moved + typed, `NormalizedPackage`/`AggregatedDestination`/`DestinationMeta` interfaces) imports it. 15 new unit tests. `lib/currency.ts` (1.10, typed, 6 new unit tests) and `lib/elfsight.ts` (1.11, new — a `useElfsightWidget()` hook consolidating the two previously-duplicated, non-idempotent inline elfsight-script-loaders in `PackageDetails.jsx`/`TestimonialsSection.jsx`; wiring both call sites onto it is deferred to Phases 5/6 per the plan, this step only creates the hook).
+  `config/{branding,theme,media}.ts` renamed + typed (1.12 — added a `Branding` interface, `hexToRgb`/`applyCssVariables` signatures). `config/pages.ts` (`PAGE_CONFIG`, 1.13, 4 new unit tests) and `config/floatingActions.ts` (1.14) — both pull a small shared `flag()` helper into new `config/envFlag.ts` rather than duplicating the env-parsing logic across two files. Tailwind z-index scale added (1.15: `header`/`dropdown`/`floating-action`/`overlay`/`modal`). `.env.example` gained the retry/page-toggle/floating-button/SEO sections (1.16).
+  **Real hooks bug found and fixed along the way** (`TestimonialsSection.jsx`, already noted under Phase 0 — carried forward here since it directly enabled the elfsight-hook consolidation work in 1.11).
+  **Gate 1 verified**: `typecheck`/`lint`(0 errors/41 warnings, all pre-existing)/`build`/`test`(46/46) all green. Live browser walkthrough of every route (`/`, `/packages`, `/contact`, `/career`, `/login`, `/about`, `/destinations-international`, `/planner`, `/my-account`, `/package/:id`) — zero console errors except two pre-existing 404s on `/my-account` (`/customized-packages/my-requests`, `/manual-itineraries/my-requests` — confirmed via grep that gateway never registered these routes at all, unrelated to this refactor, same endpoint paths as the original code).
+  **Local dev note**: `Client/.env` (gitignored, pre-existing) points `VITE_API_URL` at production `https://api.lushtravelcloud.com`, which was intermittently returning `ERR_CONNECTION_RESET` from this sandbox. Backed up to `.env.bak` and pointed `.env` at `http://localhost:3000/api/v1` for the rest of this session's live verification against the local backend stack (`cd Services && npm run dev`); restore `.env` from `.env.bak` before ending the session if the production-pointing default matters for this machine's normal workflow.
+  Next: **Phase 2** — app shell (`MainLayout`, floating-action registry, route gating, `index.html` templating) + shared selector components → TypeScript. Two independent slices per the plan — dispatch as parallel subagents.

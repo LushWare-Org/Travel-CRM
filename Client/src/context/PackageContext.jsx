@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { fetchPackages } from '../utils/packageApi';
+import { fetchPackages } from '../services/api/packages';
 
 const PackageContext = createContext();
 

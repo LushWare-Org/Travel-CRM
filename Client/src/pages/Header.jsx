@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { fetchPackages } from '../utils/packageApi';
+import { fetchPackages } from '../services/api/packages';
 import { useAuth } from '../context/AuthContext';
 import LazyIcon from '../components/LazyIcon';
 import { ChevronDown } from 'lucide-react';

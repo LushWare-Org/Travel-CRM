@@ -8,7 +8,52 @@
  * in your .env or .env.local file (prefixed with VITE_).
  */
 
-const BRANDING = {
+export interface Branding {
+  company: {
+    name: string;
+    shortName: string;
+    tagline: string;
+    legalName: string;
+    foundedYear: number;
+  };
+  contact: {
+    email: string;
+    supportEmail: string;
+    phone: string;
+    whatsapp: string;
+    address: string;
+    officeHours: string;
+  };
+  urls: {
+    website: string;
+  };
+  social: {
+    facebook: string;
+    instagram: string;
+    twitter: string;
+    youtube: string;
+  };
+  legal: {
+    privacyUrl: string;
+    termsUrl: string;
+    cancellationUrl: string;
+  };
+  integrations: {
+    elfsightAppId: string;
+    imgbbApiKey: string;
+    imgbbUploadUrl: string;
+  };
+  pdf: {
+    company: string;
+    tagline: string;
+    email: string;
+    phone: string;
+    website: string;
+    logoPath: string;
+  };
+}
+
+const BRANDING: Branding = {
   company: {
     name: import.meta.env.VITE_COMPANY_NAME || 'Your Company',
     shortName: import.meta.env.VITE_COMPANY_SHORT_NAME || 'YC',
@@ -53,12 +98,13 @@ const BRANDING = {
   },
 };
 
-export const getWhatsAppUrl = (message) => {
+export const getWhatsAppUrl = (message?: string): string => {
   const text = encodeURIComponent(message || `Hello! I'm interested in your holiday packages.`);
   return `https://wa.me/${BRANDING.contact.whatsapp.replace(/^\+/, '')}?text=${text}`;
 };
 
-export const getCopyrightText = (year = new Date().getFullYear()) =>
+export const getCopyrightText = (year: number = new Date().getFullYear()): string =>
   `© ${year} ${BRANDING.company.name}. All rights reserved.`;
+
 
 export default BRANDING;

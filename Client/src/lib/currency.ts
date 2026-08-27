@@ -8,12 +8,10 @@ const FORMATTER = new Intl.NumberFormat(CURRENCY_LOCALE, {
   maximumFractionDigits: 0,
 });
 
-export const formatCurrency = (value) => {
+export const formatCurrency = (value: number | string | null | undefined): string => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
-    return CURRENCY_SYMBOL
-      ? `${CURRENCY_SYMBOL} 0`
-      : FORMATTER.format(0);
+    return CURRENCY_SYMBOL ? `${CURRENCY_SYMBOL} 0` : FORMATTER.format(0);
   }
 
   if (CURRENCY_SYMBOL) {
@@ -29,20 +27,12 @@ export const formatCurrency = (value) => {
   return FORMATTER.format(numeric);
 };
 
-export const getCurrencySymbol = () => {
+export const getCurrencySymbol = (): string => {
   if (CURRENCY_SYMBOL) return CURRENCY_SYMBOL;
   try {
-    return FORMATTER.formatToParts(0).find(part => part.type === 'currency').value;
-  } catch (e) {
+    const part = FORMATTER.formatToParts(0).find((p) => p.type === 'currency');
+    return part ? part.value : '₹';
+  } catch {
     return '₹';
   }
 };
-
-
-
-
-
-
-
-
-

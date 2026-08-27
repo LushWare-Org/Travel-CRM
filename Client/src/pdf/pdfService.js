@@ -8,8 +8,8 @@
 import { jsPDF } from 'jspdf';
 import Swal from 'sweetalert2';
 import { PDF_CONFIG } from './constants';
-import ApiService from './apiService';
-import { formatCurrency } from '../utils/currency';
+import { getPackageEnvelope } from '../services/api/packages';
+import { formatCurrency } from '../lib/currency';
 import { PALETTE, hexToRgb } from '../config/theme';
 
 /**
@@ -1874,7 +1874,7 @@ export const createPackagePdfBlob = async (
   if (fetchLatest && (pkg._id || pkg.id)) {
     try {
       const packageId = pkg._id || pkg.id;
-      const response = await ApiService.getPackage(packageId);
+      const response = await getPackageEnvelope(packageId);
 
       if (response.success && response.data) {
         completePackage = response.data;

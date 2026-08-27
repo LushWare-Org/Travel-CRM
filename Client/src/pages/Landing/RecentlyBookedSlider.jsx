@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Clock, Star, User } from 'lucide-react';
-import { formatCurrency } from '../../utils/currency';
+import { formatCurrency } from '../../lib/currency';
 
 export default function RecentlyBookedSlider({ items = [] }) {
   const [slideIdx, setSlideIdx] = useState(0);

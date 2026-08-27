@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { submitManualItineraryRequest } from "../utils/manualItineraryApi";
+import { submitManualItineraryRequest } from "../services/api/manualItinerary";
 import DestinationSelector from "../components/DestinationSelector";
 import LocationSelector from "../components/LocationSelector";
 import ActivitySelector from "../components/ActivitySelector";
