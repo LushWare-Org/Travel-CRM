@@ -8,6 +8,7 @@ import { fetchPackageById, submitReview, fetchPackageReviews } from '../../servi
 import type { NormalizedPackage } from '../../services/api/packages.transform';
 import type { PdfPackageData } from './pdf/pdfService';
 import { formatCurrency } from '../../lib/currency';
+import { pluralize } from '../../lib/pluralize';
 import { useElfsightWidget } from '../../lib/elfsight';
 import { generateAndDownloadPDF as generateManagementPDF } from './pdf/pdfService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -258,6 +259,7 @@ export default function PackageDetailsContainer() {
         ...packageData,
         _id: packageData._id || packageData.id || id,
         id: packageData.id || packageData._id || id,
+        category: packageData.category ?? undefined,
         difficulty: packageData.difficulty ?? undefined,
       };
       
@@ -693,12 +695,11 @@ export default function PackageDetailsContainer() {
            <div className="flex flex-wrap items-center gap-6 text-white">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                 <Clock className="w-5 h-5" />
-                <span className="font-medium">{pkg.duration_days} Days</span>
+                <span className="font-medium">{pluralize(pkg.duration_days, 'Day')}</span>
               </div>
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                 <Star className="w-5 h-5 text-brand-accent-400 fill-current" />
-                <span className="font-medium">4.9</span>
-                {/* <span className="text-white/80">(250+ Reviews)</span> */}
+                <span className="font-medium">{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Not yet rated'}</span>
               </div>
               <span className="px-4 py-2 bg-gradient-to-r from-brand-accent-500 to-brand-500 backdrop-blur-sm text-black rounded-full font-semibold capitalize">
                 {pkg.category}
@@ -837,62 +838,75 @@ export default function PackageDetailsContainer() {
                 )}
                 {activeSection === 'itinerary' && (
                   <div className="space-y-4 lg:space-y-6">
-                    <h2 className="text-2xl lg:text-3xl font-black text-gray-900 mb-6 lg:mb-8 bg-black bg-clip-text text-transparent">
-                      Journey Timeline
-                    </h2>
-                    {pkg.itinerary?.map((day, i) => (
-                      <div key={i} className="group relative">
-                        <div className="itinerary-day-mobile flex flex-col lg:flex-row gap-4 lg:gap-6">
-                          <div className="relative flex-shrink-0 itinerary-day-number-mobile">
-                            <div className="w-14 lg:w-16 h-14 lg:h-16 bg-gradient-to-br from-brand-accent-500 to-brand-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl lg:text-3xl shadow-lg group-hover:scale-110 transition-transform">
-                              {i + 1}
+                    {pkg.itinerary && pkg.itinerary.length > 0 ? (
+                      <>
+                        <h2 className="text-2xl lg:text-3xl font-black text-gray-900 mb-6 lg:mb-8 bg-black bg-clip-text text-transparent">
+                          Journey Timeline
+                        </h2>
+                        {pkg.itinerary.map((day, i) => (
+                          <div key={i} className="group relative">
+                            <div className="itinerary-day-mobile flex flex-col lg:flex-row gap-4 lg:gap-6">
+                              <div className="relative flex-shrink-0 itinerary-day-number-mobile">
+                                <div className="w-14 lg:w-16 h-14 lg:h-16 bg-gradient-to-br from-brand-accent-500 to-brand-500 rounded-2xl flex items-center justify-center text-white font-black text-2xl lg:text-3xl shadow-lg group-hover:scale-110 transition-transform">
+                                  {i + 1}
+                                </div>
+                                {i < pkg.itinerary.length - 1 && (
+                                  <div className="itinerary-connector-mobile lg:absolute lg:top-20 lg:left-1/2 lg:-translate-x-1/2 w-1 h-12 lg:h-12 bg-gradient-to-b from-brand-300 to-transparent" />
+                                )}
+                              </div>
+                              <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-brand-accent-300 hover:shadow-xl transition-all itinerary-padding-sm">
+                                <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2 lg:mb-3">{day.title}</h3>
+                                <p className="text-gray-700 leading-relaxed text-base lg:text-lg">{day.description}</p>
+                              </div>
                             </div>
-                            {i < (pkg.itinerary?.length || 0)  && (
-                              <div className="itinerary-connector-mobile lg:absolute lg:top-20 lg:left-1/2 lg:-translate-x-1/2 w-1 h-12 lg:h-12 bg-gradient-to-b from-brand-300 to-transparent" />
-                            )}
                           </div>
-                          <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-brand-accent-300 hover:shadow-xl transition-all itinerary-padding-sm">
-                            <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2 lg:mb-3">{day.title}</h3>
-                            <p className="text-gray-700 leading-relaxed text-base lg:text-lg">{day.description}</p>
-                          </div>
-                        </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="text-center py-16">
+                        <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2">Itinerary Coming Soon</h3>
+                        <p className="text-gray-600 text-sm lg:text-base">Our travel experts are finalizing the day-by-day plan for this package — contact us for the latest details.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
                 {activeSection === 'inclusions' && (
                   <div className="space-y-6 lg:space-y-8">
                     <div className="inclusions-grid-mobile lg:grid-cols-2 grid gap-6 lg:gap-8">
-                      <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
-                        <div className="flex items-center gap-3 mb-4 lg:mb-6">
-                          <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Inclusions</h3>
+                      {pkg.inclusions && pkg.inclusions.length > 0 && (
+                        <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
+                          <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                            <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Inclusions</h3>
+                          </div>
+                          <ul className="space-y-3">
+                            {pkg.inclusions.map((inc, i) => (
+                              <li key={i} className="flex items-start gap-3 text-gray-700">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
+                                  <Check className="w-4 h-4 text-green-600" />
+                                </div>
+                                <span className="text-sm lg:text-base">{inc}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <ul className="space-y-3">
-                          {pkg.inclusions?.map((inc, i) => (
-                            <li key={i} className="flex items-start gap-3 text-gray-700">
-                              <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-green-600 flex items-center justify-center mt-0.5">
-                                <Check className="w-4 h-4 text-green-600" />
-                              </div>
-                              <span className="text-sm lg:text-base">{inc}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
-                        <div className="flex items-center gap-3 mb-4 lg:mb-6">
-                          <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Exclusions</h3>
+                      )}
+                      {pkg.exclusions && pkg.exclusions.length > 0 && (
+                        <div className="rounded-2xl p-5 lg:p-6 border border-gray-200 inclusions-padding-sm">
+                          <div className="flex items-center gap-3 mb-4 lg:mb-6">
+                            <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Exclusions</h3>
+                          </div>
+                          <ul className="space-y-3">
+                            {pkg.exclusions.map((exc, i) => (
+                              <li key={i} className="flex items-start gap-3 text-gray-700">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-red-600 flex items-center justify-center mt-0.5">
+                                  <X className="w-4 h-4 text-red-600" />
+                                </div>
+                                <span className="text-sm lg:text-base">{exc}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <ul className="space-y-3">
-                          {pkg.exclusions?.map((exc, i) => (
-                            <li key={i} className="flex items-start gap-3 text-gray-700">
-                              <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-red-600 flex items-center justify-center mt-0.5">
-                                <X className="w-4 h-4 text-red-600" />
-                              </div>
-                              <span className="text-sm lg:text-base">{exc}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      )}
                     </div>
                     <div className="rounded-3xl p-6 lg:p-8 border-2 border-brand-accent-200">
                       <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-4 lg:mb-6">Booking Terms</h3>
@@ -918,6 +932,15 @@ export default function PackageDetailsContainer() {
                             <p className="text-gray-700 leading-relaxed text-sm lg:text-base">Special rates available for groups of 10 or more travelers. Contact our team for customized group packages and discounts.</p>
                           </div>
                         </div>
+                        {pkg.termsAndConditions && (
+                          <div className="flex items-start gap-3 lg:gap-4">
+                            <div className="w-2 h-2 bg-brand-accent-500 rounded-full mt-2.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <h4 className="font-black text-gray-900 mb-2 text-base lg:text-lg">Additional Terms</h4>
+                              <p className="text-gray-700 leading-relaxed text-sm lg:text-base whitespace-pre-wrap">{pkg.termsAndConditions}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -925,10 +948,38 @@ export default function PackageDetailsContainer() {
                 {activeSection === 'reviews' && (
                   <div className="space-y-4 lg:space-y-6">
                     <div className="mb-6 lg:mb-8">
-                      <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Google Reviews</h2>
-                      <p className="text-gray-600 text-sm lg:text-base">Verified reviews from real travelers on Google</p>
+                      <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">Traveler Reviews</h2>
+                      <p className="text-gray-600 text-sm lg:text-base">What our travelers say about this package</p>
                     </div>
-                    
+
+                    {reviews.length > 0 ? (
+                      <div className="space-y-4">
+                        {reviews.map((review) => (
+                          <div key={review.id} className="bg-white rounded-2xl p-5 lg:p-6 border border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-bold text-gray-900">{review.user_name}</span>
+                              <div className="flex items-center gap-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`w-4 h-4 ${i < review.rating ? 'text-brand-accent-400 fill-current' : 'text-gray-300'}`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-gray-700 leading-relaxed text-sm lg:text-base mb-2">{review.comment}</p>
+                            <span className="text-xs text-gray-500">
+                              {new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10">
+                        <p className="text-gray-600">No reviews yet — be the first to share your experience!</p>
+                      </div>
+                    )}
+
                     {/* Elfsight */}
                     <div className="bg-white rounded-2xl p-6 lg:p-8 border border-gray-100">
                       <div ref={elRef} className="elfsight-app-29a1900e-0181-4873-aac0-7b426c7a478b" data-elfsight-app-lazy></div>
