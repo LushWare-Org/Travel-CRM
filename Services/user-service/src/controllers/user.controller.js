@@ -32,11 +32,19 @@ export const getCurrentUserProfile = asyncHandler(async (req, res) => {
 });
 
 export const updateCurrentUserProfile = asyncHandler(async (req, res) => {
-  const { name, phone } = parseOrThrow(updateCurrentUserProfileSchema, req.body);
-  const user = await prisma.user.update({
-    where: { id: req.user.id },
-    data: { ...(name && { name }), ...(phone !== undefined && { phone }) },
-  });
+  const { name, email, phone } = parseOrThrow(updateCurrentUserProfileSchema, req.body);
+  let user;
+  try {
+    user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { ...(name && { name }), ...(email && { email }), ...(phone !== undefined && { phone }) },
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError('A user with this email already exists', 400);
+    }
+    throw error;
+  }
   res.json({ status: 'success', message: 'Profile updated', data: { user: safeUser(user) } });
 });
 

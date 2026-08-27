@@ -40,5 +40,9 @@ export const ProfileUpdateRequest = z.object({
   phone: z.string(),
 });
 
-// PUT /users/profile returns the updated user under `data`.
-export const ProfileUpdateResult = WebsiteUser;
+// PUT /users/profile (user-service updateCurrentUserProfile) returns
+// `{ status: 'success', data: { user } }` — the updated user is nested
+// under `data.user`, not `data` directly.
+export const ProfileUpdateResult = z.object({
+  user: WebsiteUser,
+});

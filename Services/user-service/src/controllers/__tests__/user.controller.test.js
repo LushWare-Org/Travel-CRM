@@ -98,6 +98,30 @@ describe('updateCurrentUserProfile', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
   });
+
+  it('updates the email field', async () => {
+    mockUpdate.mockResolvedValue({ id: ACTOR.id, name: 'New Name', email: 'new@example.com', phone: '+94770000000' });
+    const { req, res, next } = buildReqRes({
+      body: { name: 'New Name', email: 'new@example.com', phone: '+94770000000' },
+    });
+
+    await updateCurrentUserProfile(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: ACTOR.id },
+      data: { name: 'New Name', email: 'new@example.com', phone: '+94770000000' },
+    });
+  });
+
+  it('maps a duplicate-email conflict (P2002) to a 400 error', async () => {
+    mockUpdate.mockRejectedValue({ code: 'P2002' });
+    const { req, res, next } = buildReqRes({ body: { email: 'taken@example.com' } });
+
+    await updateCurrentUserProfile(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+  });
 });
 
 describe('getAllUsers', () => {

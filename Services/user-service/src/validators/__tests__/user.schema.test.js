@@ -78,6 +78,10 @@ describe('updateCurrentUserProfileSchema', () => {
   it('rejects role in the payload (not an editable self-service field)', () => {
     expect(updateCurrentUserProfileSchema.safeParse({ role: 'admin' }).success).toBe(false);
   });
+
+  it('accepts an email update', () => {
+    expect(updateCurrentUserProfileSchema.safeParse({ email: 'new@example.com' }).success).toBe(true);
+  });
 });
 
 describe('updateUserPasswordSchema', () => {

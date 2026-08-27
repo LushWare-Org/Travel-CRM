@@ -4,6 +4,7 @@ import { nameField, emailField, phoneField, passwordField, permissionsField, USE
 export const updateCurrentUserProfileSchema = z
   .object({
     name: nameField.optional(),
+    email: emailField.optional(),
     phone: phoneField,
   })
   .strict();
