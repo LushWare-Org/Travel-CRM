@@ -35,8 +35,8 @@ code {
 }
 
 .phone-input-wrapper .PhoneInput:focus-within {
-  border-color: #ea580c !important;
-  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.5) !important;
+  border-color: var(--brand-600) !important;
+  box-shadow: 0 0 0 2px rgba(var(--brand-600-rgb), 0.5) !important;
   outline: none !important;
 }
 
@@ -61,7 +61,7 @@ code {
   display: flex !important;
   align-items: center !important;
   padding: 0.75rem 0.875rem !important;
-  background: #fff7ed !important;
+  background: var(--brand-50) !important;
   border-right: 2px solid rgba(0, 0, 0, 0.1) !important;
   cursor: pointer !important;
   transition: all 0.2s !important;
@@ -71,7 +71,7 @@ code {
 }
 
 .phone-input-wrapper .PhoneInputCountry:hover {
-  background: #ffedd5 !important;
+  background: var(--brand-100) !important;
 }
 
 .phone-input-wrapper .PhoneInputCountryIcon {
@@ -120,8 +120,8 @@ code {
 
 .react-datepicker__input-container input:focus {
   outline: none !important;
-  border-color: #ea580c !important;
-  box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.1) !important;
+  border-color: var(--brand-600) !important;
+  box-shadow: 0 0 0 4px rgba(var(--brand-600-rgb), 0.1) !important;
 }
 
 .react-datepicker__input-container input:hover {
@@ -141,7 +141,7 @@ code {
 }
 
 .react-datepicker__header {
-  background: linear-gradient(to right, #f59e0b, #ea580c) !important;
+  background: linear-gradient(to right, var(--brand-accent-500), var(--brand-600)) !important;
   border-bottom: none !important;
   padding-top: 1rem !important;
   border-radius: 0 !important;
@@ -190,21 +190,21 @@ code {
 }
 
 .react-datepicker__day:hover {
-  background: #fff7ed !important;
+  background: var(--brand-50) !important;
   border-radius: 0.5rem !important;
 }
 
 .react-datepicker__day--selected,
 .react-datepicker__day--in-selecting-range,
 .react-datepicker__day--in-range {
-  background: linear-gradient(to right, #f59e0b, #ea580c) !important;
+  background: linear-gradient(to right, var(--brand-accent-500), var(--brand-600)) !important;
   color: white !important;
   font-weight: 700 !important;
 }
 
 .react-datepicker__day--range-start,
 .react-datepicker__day--range-end {
-  background: linear-gradient(to right, #ea580c, #dc2626) !important;
+  background: linear-gradient(to right, var(--brand-600), #dc2626) !important;
   color: white !important;
   font-weight: 700 !important;
 }
@@ -215,8 +215,8 @@ code {
 }
 
 .react-datepicker__day--keyboard-selected {
-  background: #fff7ed !important;
-  color: #ea580c !important;
+  background: var(--brand-50) !important;
+  color: var(--brand-600) !important;
 }
 
 .react-datepicker__navigation {
