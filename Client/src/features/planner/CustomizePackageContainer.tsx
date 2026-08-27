@@ -3,72 +3,52 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { fetchPackageById } from '../services/api/packages';
-import { submitCustomizationRequest } from '../services/api/customization';
-import { formatCurrency } from '../lib/currency';
-import { useAuth } from '../context/AuthContext';
-import ActivitySelector from '../components/shared/ActivitySelector';
-import LocationSelector from '../components/shared/LocationSelector';
+import { fetchPackageById } from '../../services/api/packages';
+import type { NormalizedPackage } from '../../services/api/packages.transform';
+import { submitCustomizationRequest } from '../../services/api/customization';
+import { formatCurrency } from '../../lib/currency';
+import { useAuth } from '../../context/AuthContext';
+import ActivitySelector from '../../components/shared/ActivitySelector';
+import LocationSelector from '../../components/shared/LocationSelector';
+import { buildDayState, splitTextToList } from './utils/formHelpers';
+import type { DayOverrideState } from './utils/formHelpers';
 
-const splitTextToList = (value) => {
-  if (!value) return [];
-  return value
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-};
+interface ContactState {
+  name: string;
+  email: string;
+  phone: string;
+}
 
-const combineListToText = (list) => (Array.isArray(list) ? list.filter(Boolean).join('\n') : '');
+interface TravelPrefsState {
+  // The travelers input is a number field; its raw value arrives as a string.
+  travelers: number | string;
+  travelDate: string;
+}
 
-const sanitizeNumber = (value) => {
-  if (value === '' || value === null || value === undefined) return '';
-  const num = Number(value);
-  return Number.isFinite(num) ? num : '';
-};
-
-const buildDayState = (day, index) => ({
-  id: `day-${index + 1}`,
-  dayNumber: day?.dayNumber || index + 1,
-  title: day?.title || `Day ${index + 1}`,
-  description: day?.description || '',
-  activities: Array.isArray(day?.activities) ? day.activities : (typeof day?.activities === 'string' ? splitTextToList(day.activities) : []),
-  locations: Array.isArray(day?.locations) ? day.locations : (typeof day?.locations === 'string' ? splitTextToList(day.locations) : []),
-});
-
-export default function CustomizePackage() {
+export default function CustomizePackageContainer() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [pkg, setPkg] = useState(null);
+  const [pkg, setPkg] = useState<NormalizedPackage | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successModalMessage, setSuccessModalMessage] = useState('');
 
-  const [contact, setContact] = useState({
+  const [contact, setContact] = useState<ContactState>({
     name: '',
     email: '',
     phone: '',
   });
 
-  const [travelPrefs, setTravelPrefs] = useState({
+  const [travelPrefs, setTravelPrefs] = useState<TravelPrefsState>({
     travelers: 2,
     travelDate: '',
   });
 
-  const [overrides, setOverrides] = useState({
-    duration: '',
-    price: '',
-    description: '',
-    highlightsText: '',
-    inclusionsText: '',
-    exclusionsText: '',
-    termsText: '',
-  });
-
   const [message, setMessage] = useState('');
-  const [dayOverrides, setDayOverrides] = useState([]);
+  const [dayOverrides, setDayOverrides] = useState<DayOverrideState[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 5;
 
@@ -95,26 +75,10 @@ export default function CustomizePackage() {
         if (!isMounted) return;
         setPkg(data);
 
-        const baseDuration = data?.duration_days || data?.raw?.duration || '';
-        const baseDescription = data?.description || data?.raw?.description || '';
-        const baseHighlights = data?.highlights || data?.raw?.highlights || [];
-        const baseInclusions = data?.inclusions || data?.raw?.inclusions || [];
-        const baseExclusions = data?.exclusions || data?.raw?.exclusions || [];
-        const baseTerms = data?.raw?.terms || [];
-
-        setOverrides({
-          duration: sanitizeNumber(baseDuration),
-          description: baseDescription,
-          highlightsText: combineListToText(baseHighlights),
-          inclusionsText: combineListToText(baseInclusions),
-          exclusionsText: combineListToText(baseExclusions),
-          termsText: combineListToText(baseTerms),
-        });
-
         // Get itinerary days from raw data (includes activities and locations)
         const rawItinerary = data?.raw?.itinerary;
         const itineraryDays = rawItinerary?.days || data?.itinerary || [];
-        
+
         const initialDays = Array.isArray(itineraryDays)
           ? itineraryDays.map((day, index) => buildDayState(day, index))
           : [];
@@ -139,13 +103,10 @@ export default function CustomizePackage() {
     [pkg],
   );
 
-  const handleDayChange = (index, field, value) => {
+  const handleDayChange = (index: number, field: string, value: unknown) => {
     setDayOverrides((prev) => {
       const next = [...prev];
-      next[index] = {
-        ...next[index],
-        [field]: value,
-      };
+      next[index] = { ...next[index], [field]: value } as DayOverrideState;
       return next;
     });
   };
@@ -167,7 +128,7 @@ export default function CustomizePackage() {
     });
   };
 
-  const handleRemoveDay = (index) => {
+  const handleRemoveDay = (index: number) => {
     setDayOverrides((prev) => prev.filter((_, idx) => idx !== index));
   };
 
@@ -190,7 +151,7 @@ export default function CustomizePackage() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!pkg) return;
 
@@ -200,7 +161,7 @@ export default function CustomizePackage() {
     }
 
     const payload = {
-      packageId: pkg.id || pkg._id || pkg?.raw?._id,
+      packageId: pkg.id || pkg?.raw?._id,
       name: contact.name?.trim() || '',
       email: contact.email.trim(),
       phone: contact.phone?.trim() || '',
@@ -288,7 +249,7 @@ export default function CustomizePackage() {
               <p className="text-white/90 text-xs sm:text-sm md:text-base lg:text-lg mb-3 sm:mb-6 w-full break-words">
                 {pkg.destination?.name || pkg.destinationRaw}, {pkg.destination?.country}
               </p>
-              
+
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 lg:gap-6 mt-2 sm:mt-4">
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 sm:px-6 py-2 sm:py-3 border border-white/30">
                   <p className="text-xs text-white/80 uppercase tracking-wide mb-0.5 sm:mb-1">Duration</p>
@@ -414,7 +375,7 @@ export default function CustomizePackage() {
                     <div className="flex-1">
                       <h3 className="text-lg sm:text-xl font-bold text-black mb-1">How can we reach you?</h3>
                       <p className="text-xs sm:text-sm text-black/60 mb-4 sm:mb-6">We'll send your customized itinerary to your email</p>
-                      
+
                       <div className="space-y-3 sm:space-y-4">
                         <div>
                           <div className="flex items-center gap-2 mb-2">
@@ -429,7 +390,7 @@ export default function CustomizePackage() {
                             placeholder="Your name"
                           />
                         </div>
-                        
+
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs sm:text-sm font-medium text-black">What's your email?</span>
@@ -477,7 +438,7 @@ export default function CustomizePackage() {
                     <div className="flex-1">
                       <h3 className="text-lg sm:text-xl font-bold text-black mb-1">Tell us about your trip</h3>
                       <p className="text-xs sm:text-sm text-black/60 mb-4 sm:mb-6">Help us personalize your experience</p>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                         <div className="bg-white rounded-2xl p-4 sm:p-5 border-2 border-black/5 hover:border-brand-500/30 transition-all shadow-sm hover:shadow-md">
                           <div className="flex items-center gap-2 sm:gap-3 mb-3">
@@ -842,5 +803,3 @@ export default function CustomizePackage() {
       </div>
   );
 }
-
-

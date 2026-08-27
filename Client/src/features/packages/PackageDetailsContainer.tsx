@@ -1,57 +1,61 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Clock, Star, MapPin, Check, X, Calendar, Download, ChevronLeft, ChevronRight,
-  Award, Sparkles, ArrowRight, ChevronDown, Phone, Mail, Users,
+  Award, Sparkles, ChevronDown, Phone, Mail,
 } from 'lucide-react';
-import PhoneInput from 'react-phone-number-input';
-import 'react-phone-number-input/style.css';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { fetchPackageById, submitReview, fetchPackageReviews } from '../services/api/packages';
-import { formatCurrency } from '../lib/currency';
-import { generateManagementPDF } from '../utils/managementPdfBridge';
-import { useAuth } from '../context/AuthContext';
-import { submitBookingRequest } from '../services/api/booking';
-import BRANDING from '../config/branding';
+import { fetchPackageById, submitReview, fetchPackageReviews } from '../../services/api/packages';
+import type { NormalizedPackage } from '../../services/api/packages.transform';
+import type { PdfPackageData } from './pdf/pdfService';
+import { formatCurrency } from '../../lib/currency';
+import { useElfsightWidget } from '../../lib/elfsight';
+import { generateAndDownloadPDF as generateManagementPDF } from './pdf/pdfService';
+import { useAuth } from '../../context/AuthContext';
+import { submitBookingRequest } from '../../services/api/booking';
+import BRANDING from '../../config/branding';
+import BookingModal from './components/BookingModal';
+import ReviewModal from './components/ReviewModal';
+import type { BookingFormData } from './components/BookingModal';
+import type { ReviewFormData } from './components/ReviewModal';
 
-export default function PackageDetails() {
+interface Review {
+  id: string;
+  user_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+}
+
+export default function PackageDetailsContainer() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [pkg, setPkg] = useState(null);
-  const [reviews, setReviews] = useState([]);
+  const [pkg, setPkg] = useState<NormalizedPackage | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [activeSection, setActiveSection] = useState('overview');
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isImageHovered, setIsImageHovered] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [showBookingForm, setShowBookingForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BookingFormData>({
     name: '', email: '', phone: '', travelers: 1, travelDate: null, endDate: null, message: '',
   });
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submissionType, setSubmissionType] = useState('booking');
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
-  const [reviewData, setReviewData] = useState({
+  const [reviewData, setReviewData] = useState<ReviewFormData>({
     name: '', email: '', rating: 0, comment: '',
   });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [showReviewSuccess, setShowReviewSuccess] = useState(false);
   const { user } = useAuth();
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://elfsightcdn.com/platform.js';
-    script.async = true;
-    document.body.appendChild(script);
-  }, []);
+  const elRef = useElfsightWidget();
 
   useEffect(() => {
     if (!id) return;
@@ -110,12 +114,6 @@ export default function PackageDetails() {
   }, [user]);
 
   const heroImages = pkg?.images || [];
-  const validatePhone = (phone) => {
-    if (!phone || phone.trim() === '') return false;
-    const digits = phone.replace(/\D/g, '');
-    return digits.length >= 5 && digits.length <= 15;
-  };
-
   useEffect(() => {
     if (!heroImages || heroImages.length <= 1 || isImageHovered) return;
     
@@ -127,25 +125,14 @@ export default function PackageDetails() {
     }, 2800);
 
     return () => clearInterval(interval);
-  }, [heroImages.length, isImageHovered]);
+  }, [heroImages, isImageHovered]);
 
   useEffect(() => {
     setTimeout(() => setIsVisible(true), 100);
   }, []);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = (scrollTop / docHeight) * 100;
-      setScrollProgress(progress);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   const validateStep = (step) => {
-    const errors = {};
+    const errors: Record<string, string> = {};
     if (step === 1) {
       // Step 1: Only email is required
       if (!formData.email?.trim()) {
@@ -176,7 +163,7 @@ export default function PackageDetails() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!pkg) return;
 
@@ -216,7 +203,7 @@ export default function PackageDetails() {
         travelDate: formatDate(formData.travelDate),
         endDate: formatDate(formData.endDate) || undefined,
         message: formData.message?.trim() || undefined,
-        packageId: pkg.id || pkg._id || pkg?.raw?._id,
+        packageId: pkg.id || pkg.raw?._id,
         type: submissionType,
       };
       
@@ -259,11 +246,11 @@ export default function PackageDetails() {
     try {
       // Get the package data - prefer raw (original API response) which has _id
       // If raw doesn't exist, use pkg but ensure it has the ID
-      const packageData = pkg.raw || pkg;
+      const packageData: NormalizedPackage['raw'] = pkg.raw || (pkg as unknown as NormalizedPackage['raw']);
       
       // Ensure the package has an ID for dynamic fetching
       // The PDF service will fetch the latest package data from API using this ID
-      const packageWithId = {
+      const packageWithId: PdfPackageData = {
         ...packageData,
         _id: packageData._id || packageData.id || id,
         id: packageData.id || packageData._id || id,
@@ -289,6 +276,39 @@ export default function PackageDetails() {
 
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev - 1 + heroImages.length) % heroImages.length);
+  };
+
+  const handleReviewSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!reviewData.name || !reviewData.rating || !reviewData.comment) {
+      alert('Please fill in all fields');
+      return;
+    }
+    setIsSubmittingReview(true);
+    try {
+      const newReview = await submitReview(id, reviewData);
+      if (newReview) {
+        setReviews([
+          {
+            id: newReview.id,
+            user_name: newReview.user_name,
+            rating: newReview.rating,
+            comment: newReview.comment,
+            created_at: newReview.created_at,
+          },
+          ...reviews,
+        ]);
+      }
+      setReviewData({ name: '', email: '', rating: 0, comment: '' });
+      setShowReviewModal(false);
+      setShowReviewSuccess(true);
+      setTimeout(() => setShowReviewSuccess(false), 4000);
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      alert('Failed to submit review. Please try again.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
 
   const sections = [
@@ -716,7 +736,7 @@ export default function PackageDetails() {
               
               {/* Section Tabs */}
               <div className="flex flex-col lg:flex-row border-b border-gray-200 section-tabs-mobile">
-                {sections.map((section, index) => {
+                {sections.map((section) => {
                   const Icon = section.icon;
                   return (
                     <button
@@ -905,7 +925,7 @@ export default function PackageDetails() {
                     
                     {/* Elfsight */}
                     <div className="bg-white rounded-2xl p-6 lg:p-8 border border-gray-100">
-                      <div className="elfsight-app-29a1900e-0181-4873-aac0-7b426c7a478b" data-elfsight-app-lazy></div>
+                      <div ref={elRef} className="elfsight-app-29a1900e-0181-4873-aac0-7b426c7a478b" data-elfsight-app-lazy></div>
                     </div>
                   </div>
                 )}
@@ -978,520 +998,33 @@ export default function PackageDetails() {
       </div>
 
       {/* Booking Modal */}
-      {showBookingModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-max-height-mobile">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-4xl lg:max-w-5xl w-full max-h-[95vh] overflow-y-auto modal-max-height-mobile">
-            <div className="sticky top-0 bg-gradient-to-r from-brand-accent-500 to-brand-500 p-6 lg:p-8 text-white modal-header-padding-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-2xl lg:text-3xl font-black mb-2">
-                    Book Your Adventure
-                  </h3>
-                  <p className="text-brand-accent-100 text-sm lg:text-base">
-                    Fill in your details and we'll get back to you within 24 hours
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowBookingModal(false);
-                    setCurrentStep(1);
-                    setFormErrors({});
-                  }}
-                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-                >
-                  <X className="w-6 h-6 lg:w-8 lg:h-8" />
-                </button>
-              </div>
-            </div>
-            {/* Step Progress Indicator */}
-            <div className="px-6 lg:px-8 pt-6">
-              <div className="flex items-center justify-between mb-6">
-                {[1, 2, 3].map((step) => (
-                  <React.Fragment key={step}>
-                    <div className="flex flex-col items-center flex-shrink-0">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
-                          currentStep >= step
-                            ? 'bg-brand-accent-500 text-white'
-                            : 'bg-gray-200 text-gray-500'
-                        }`}
-                      >
-                        {currentStep > step ? <Check className="w-5 h-5" /> : step}
-                      </div>
-                      <p className={`text-xs mt-2 font-semibold ${
-                        currentStep >= step ? 'text-brand-accent-600' : 'text-gray-400'
-                      }`}>
-                        {step === 1 ? 'Contact' : step === 2 ? 'Travel' : 'Review'}
-                      </p>
-                    </div>
-                    {step < 3 && (
-                      <div className={`flex-1 h-0.5 mx-4 ${
-                        currentStep > step ? 'bg-brand-accent-500' : 'bg-gray-200'
-                      }`} />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 lg:p-8 space-y-6 modal-form-padding-sm relative">
-              {/* Step 1: Contact Information */}
-              {currentStep === 1 && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900 mb-4">Contact Information</h4>
-                    <p className="text-sm text-gray-600 mb-6">Let's start with your contact details</p>
-                  </div>
-                  
-                  {/* Email - Required */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <label className="block text-sm font-black text-gray-900">Email Address</label>
-                      <span className="px-2.5 py-1 text-xs font-bold text-brand-accent-600 bg-brand-accent-100 rounded-full">Required</span>
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) => {
-                        setFormData({...formData, email: e.target.value});
-                        if (formErrors.email) {
-                          setFormErrors({...formErrors, email: ''});
-                        }
-                      }}
-                      className={`w-full px-5 py-4 text-base border-2 rounded-2xl focus:ring-4 focus:ring-brand-accent-100 transition-all form-input-mobile ${
-                        formErrors.email
-                          ? 'border-red-500 focus:border-red-500'
-                          : 'border-brand-accent-500/30 focus:border-brand-accent-500 bg-brand-accent-50/50'
-                      }`}
-                      placeholder="your.email@example.com"
-                    />
-                    {formErrors.email && (
-                      <p className="text-red-600 text-sm font-semibold mt-2 flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        {formErrors.email}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="form-grid-mobile lg:grid-cols-2 grid gap-6">
-                    {/* Name - Optional */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <label className="block text-sm font-semibold text-gray-700">Full Name</label>
-                        <span className="text-xs text-gray-500">(Optional)</span>
-                      </div>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => {
-                          setFormData({...formData, name: e.target.value});
-                          if (formErrors.name) {
-                            setFormErrors({...formErrors, name: ''});
-                          }
-                        }}
-                        className="w-full px-5 py-4 text-base border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-brand-accent-100 focus:border-brand-accent-500 transition-all form-input-mobile bg-white hover:bg-gray-50"
-                        placeholder="John Doe"
-                      />
-                    </div>
-
-                    {/* Phone - Optional with country code */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <label className="block text-sm font-semibold text-gray-700">Phone Number</label>
-                        <span className="text-xs text-gray-500">(Optional)</span>
-                      </div>
-                      <PhoneInput
-                        international
-                        defaultCountry="LK"
-                        value={formData.phone}
-                        onChange={(value) => {
-                          setFormData({...formData, phone: value || ''});
-                          if (formErrors.phone) {
-                            setFormErrors({...formErrors, phone: ''});
-                          }
-                        }}
-                        className="phone-input-wrapper"
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      className="w-full bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm"
-                    >
-                      Next Step
-                      <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Travel Details */}
-              {currentStep === 2 && (
-                <div className="space-y-8">
-                  {/* Enhanced Header */}
-                  <div className="text-center pb-4 border-b border-brand-accent-100">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-brand-accent-400 to-brand-500 rounded-2xl mb-4 shadow-lg">
-                      <Calendar className="w-8 h-8 text-white" />
-                    </div>
-                    <h4 className="text-2xl lg:text-3xl font-black text-gray-900 mb-2 bg-gradient-to-r from-brand-accent-600 to-brand-600 bg-clip-text text-transparent">
-                      Plan Your Journey
-                    </h4>
-                    <p className="text-sm text-gray-600">Select your travel dates and preferences</p>
-                  </div>
-
-                  {/* Date Range Picker - Enhanced */}
-                  <div className="bg-gradient-to-br from-brand-accent-50/50 to-brand-50/30 rounded-3xl p-6 lg:p-8 border-2 border-brand-accent-100 shadow-lg w-full">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-brand-accent-100 rounded-xl flex-shrink-0">
-                        <Calendar className="w-5 h-5 text-brand-accent-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <label className="block text-base font-bold text-gray-900">Travel Date Range</label>
-                        <span className="text-xs text-brand-accent-600 font-medium">Click dates to select your range</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-center bg-white rounded-2xl p-4 lg:p-6 shadow-inner w-full overflow-x-auto">
-                      <DatePicker
-                          selected={formData.travelDate ? (typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate) : null}
-                          onChange={(dates) => {
-                          // With selectsRange, dates is either [start, end] array or a single Date
-                          if (dates) {
-                            if (Array.isArray(dates)) {
-                              // Both dates selected - [startDate, endDate]
-                              const [start, end] = dates;
-                              setFormData({
-                                ...formData,
-                                travelDate: start || null,
-                                endDate: end || null,
-                              });
-                            } else {
-                              // Single date clicked - react-datepicker handles range selection automatically
-                              // First click sets start, second click sets end
-                              // We just need to update our state accordingly
-                              if (!formData.travelDate || formData.endDate) {
-                                // Starting new selection or resetting
-                                setFormData({
-                                  ...formData,
-                                  travelDate: dates,
-                                  endDate: null,
-                                });
-                              } else {
-                                // Second date clicked - set as end date
-                                if (dates >= formData.travelDate) {
-                                  setFormData({
-                                    ...formData,
-                                    endDate: dates,
-                                  });
-                                } else {
-                                  // Selected date is before start, make it the new start
-                                  setFormData({
-                                    ...formData,
-                                    travelDate: dates,
-                                    endDate: null,
-                                  });
-                                }
-                              }
-                            }
-                          } else {
-                            // Cleared
-                            setFormData({
-                              ...formData,
-                              travelDate: null,
-                              endDate: null,
-                            });
-                          }
-                        }}
-                        startDate={formData.travelDate ? (typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate) : null}
-                        endDate={formData.endDate ? (typeof formData.endDate === 'string' ? new Date(formData.endDate) : formData.endDate) : null}
-                        selectsRange
-                        inline
-                        minDate={new Date()}
-                        calendarClassName="!shadow-2xl !border-gray-200 !rounded-2xl"
-                      />
-                    </div>
-                    {formData.travelDate && (
-                      <div className={`mt-4 p-4 rounded-xl transition-all duration-300 ${
-                        formData.endDate 
-                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200' 
-                          : 'bg-gradient-to-r from-brand-accent-50 to-brand-50 border-2 border-brand-accent-200'
-                      }`}>
-                        <div className="flex items-center gap-2 justify-center">
-                          <Check className={`w-5 h-5 ${formData.endDate ? 'text-green-600' : 'text-brand-accent-600'}`} />
-                          <p className={`text-sm font-bold ${formData.endDate ? 'text-green-800' : 'text-brand-accent-800'}`}>
-                            {formData.endDate 
-                              ? `Selected: ${(typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${(typeof formData.endDate === 'string' ? new Date(formData.endDate) : formData.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                              : `Start Date: ${(typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - Select end date`}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Enhanced Travelers & Requests Section */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Number of Travelers - Enhanced */}
-                    <div className="bg-gradient-to-br from-blue-50/50 to-indigo-50/30 rounded-2xl p-6 border-2 border-blue-100 hover:border-blue-200 transition-all min-w-0">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-blue-100 rounded-xl flex-shrink-0">
-                          <Users className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <label className="block text-base font-bold text-gray-900">Number of Travelers</label>
-                          <span className="text-xs text-gray-500">(Optional)</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setFormData({...formData, travelers: Math.max(1, formData.travelers - 1)})}
-                          className="w-12 h-12 rounded-xl bg-white border-2 border-blue-200 text-blue-600 font-bold text-lg hover:bg-blue-50 hover:border-blue-300 transition-all flex items-center justify-center shadow-sm"
-                        >
-                          −
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          value={formData.travelers}
-                          onChange={(e) => setFormData({...formData, travelers: +e.target.value || 1})}
-                          className="flex-1 px-5 py-4 text-center text-2xl font-bold border-2 border-blue-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-400 transition-all bg-white"
-                          placeholder="2"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setFormData({...formData, travelers: formData.travelers + 1})}
-                          className="w-12 h-12 rounded-xl bg-white border-2 border-blue-200 text-blue-600 font-bold text-lg hover:bg-blue-50 hover:border-blue-300 transition-all flex items-center justify-center shadow-sm"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Special Requests - Enhanced */}
-                    <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/30 rounded-2xl p-6 border-2 border-purple-100 hover:border-purple-200 transition-all min-w-0">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-purple-100 rounded-xl flex-shrink-0">
-                          <Sparkles className="w-5 h-5 text-purple-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <label className="block text-base font-bold text-gray-900">Special Requests</label>
-                          <span className="text-xs text-gray-500">(Optional)</span>
-                        </div>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={formData.message}
-                        onChange={(e) => setFormData({...formData, message: e.target.value})}
-                        className="w-full px-5 py-4 text-base border-2 border-purple-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all resize-none bg-white hover:bg-purple-50/50 placeholder:text-gray-400"
-                        placeholder="Any dietary requirements, accessibility needs, or special occasions? We're here to make your trip perfect!"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Navigation Buttons */}
-                  <div className="pt-6 flex gap-3 border-t border-gray-100">
-                    <button
-                      type="button"
-                      onClick={handlePrevious}
-                      className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-bold text-base lg:text-lg hover:bg-gray-200 hover:shadow-lg transition-all flex items-center justify-center gap-2 button-padding-sm"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      className="flex-1 bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-4 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm"
-                    >
-                      Next Step
-                      <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Review & Submit */}
-              {currentStep === 3 && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900 mb-4">Review & Submit</h4>
-                    <p className="text-sm text-gray-600 mb-6">Please review your information before submitting</p>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-2xl p-6 space-y-4">
-                    <div className="border-b border-gray-200 pb-4">
-                      <h5 className="font-bold text-gray-900 mb-3">Contact Information</h5>
-                      <div className="space-y-2 text-sm">
-                        <p><span className="font-semibold">Email:</span> {formData.email || <span className="text-gray-400">Not provided</span>}</p>
-                        <p><span className="font-semibold">Name:</span> {formData.name || <span className="text-gray-400">Not provided</span>}</p>
-                        <p><span className="font-semibold">Phone:</span> {formData.phone || <span className="text-gray-400">Not provided</span>}</p>
-                      </div>
-                    </div>
-                    <div className="border-b border-gray-200 pb-4">
-                      <h5 className="font-bold text-gray-900 mb-3">Travel Details</h5>
-                      <div className="space-y-2 text-sm">
-                        <p><span className="font-semibold">Date Range:</span> {
-                          formData.travelDate && formData.endDate
-                            ? `${(typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${(typeof formData.endDate === 'string' ? new Date(formData.endDate) : formData.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                            : formData.travelDate
-                            ? `${(typeof formData.travelDate === 'string' ? new Date(formData.travelDate) : formData.travelDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (Start only)`
-                            : <span className="text-gray-400">Not provided</span>
-                        }</p>
-                        <p><span className="font-semibold">Travelers:</span> {formData.travelers || 1}</p>
-                        <p><span className="font-semibold">Special Requests:</span> {formData.message || <span className="text-gray-400">None</span>}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handlePrevious}
-                      className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-bold text-base lg:text-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-2 button-padding-sm"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                      Previous
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmittingBooking}
-                      className={`flex-1 bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-4 rounded-2xl font-black text-base lg:text-lg hover:shadow-2xl transform hover:scale-105 transition-all flex items-center justify-center gap-3 button-padding-sm ${
-                        isSubmittingBooking ? 'opacity-70 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      {isSubmittingBooking
-                        ? 'Submitting...'
-                        : 'Submit Booking Request'}
-                      <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
+      <BookingModal
+        open={showBookingModal}
+        formData={formData}
+        formErrors={formErrors}
+        currentStep={currentStep}
+        isSubmittingBooking={isSubmittingBooking}
+        setFormData={setFormData}
+        setFormErrors={setFormErrors}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        onSubmit={handleSubmit}
+        onClose={() => {
+          setShowBookingModal(false);
+          setCurrentStep(1);
+          setFormErrors({});
+        }}
+      />
 
       {/* Review Modal - Mobile Responsive */}
-      {showReviewModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full review-modal-mobile p-6 lg:p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl lg:text-2xl font-bold text-gray-900">Write a Review</h3>
-              <button
-                onClick={() => setShowReviewModal(false)}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!reviewData.name || !reviewData.rating || !reviewData.comment) {
-                  alert('Please fill in all fields');
-                  return;
-                }
-                setIsSubmittingReview(true);
-                try {
-                  const newReview = await submitReview(id, reviewData);
-                  if (newReview) {
-                    setReviews([
-                      {
-                        id: newReview.id,
-                        user_name: newReview.user_name,
-                        rating: newReview.rating,
-                        comment: newReview.comment,
-                        created_at: newReview.created_at,
-                      },
-                      ...reviews,
-                    ]);
-                  }
-                  setReviewData({ name: '', email: '', rating: 0, comment: '' });
-                  setShowReviewModal(false);
-                  setShowReviewSuccess(true);
-                  setTimeout(() => setShowReviewSuccess(false), 4000);
-                } catch (error) {
-                  console.error('Error submitting review:', error);
-                  alert('Failed to submit review. Please try again.');
-                } finally {
-                  setIsSubmittingReview(false);
-                }
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Your Name</label>
-                <input
-                  type="text"
-                  required
-                  value={reviewData.name}
-                  onChange={(e) => setReviewData({ ...reviewData, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none form-input-mobile"
-                  placeholder="Enter your name"
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-gray-900">Rating</label>
-                  <span className="text-sm text-gray-600">{reviewData.rating} out of 5</span>
-                </div>
-                <div className="flex gap-2 justify-center sm:justify-start">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setReviewData({ ...reviewData, rating: star })}
-                      className="transition-colors p-1"
-                    >
-                      <Star
-                        className={`w-7 h-7 lg:w-8 lg:h-8 ${
-                          star <= reviewData.rating
-                            ? 'text-brand-accent-400 fill-current'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Your Review</label>
-                <textarea
-                  required
-                  value={reviewData.comment}
-                  onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-accent-500 focus:border-transparent outline-none resize-none form-input-mobile"
-                  rows={4}
-                  placeholder="Share your experience..."
-                />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowReviewModal(false)}
-                  className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors button-padding-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingReview}
-                  className="flex-1 px-4 py-3 bg-black text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed button-padding-sm"
-                >
-                  {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ReviewModal
+        open={showReviewModal}
+        reviewData={reviewData}
+        isSubmittingReview={isSubmittingReview}
+        setReviewData={setReviewData}
+        onSubmit={handleReviewSubmit}
+        onClose={() => setShowReviewModal(false)}
+      />
 
       {/* Success Modal - Mobile Responsive */}
       {showSuccessModal && (

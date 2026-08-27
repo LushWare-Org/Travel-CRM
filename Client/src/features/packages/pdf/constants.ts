@@ -1,7 +1,7 @@
 /**
  * Utility constants and configuration
  */
-import BRANDING from '../config/branding';
+import BRANDING from '../../../config/branding';
 
 export const PDF_CONFIG = {
   pageWidth: null, // Set dynamically

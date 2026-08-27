@@ -6,15 +6,15 @@ import { AuthProvider } from './context/AuthContext';
 import { PAGE_CONFIG } from './config/pages';
 
 const DestinationsInternational = lazy(() => import('./pages/DestinationsPage'));
-const PackageDetails = lazy(() => import('./pages/PackageDetails'));
-const CustomizePackage = lazy(() => import('./pages/CustomizePackage'));
-const Packages = lazy(() => import('./pages/Packages'));
+const PackageDetails = lazy(() => import('./pages/PackageDetailsPage'));
+const CustomizePackage = lazy(() => import('./pages/CustomizePackagePage'));
+const Packages = lazy(() => import('./pages/PackagesPage'));
 const AboutUs = lazy(() => import('./pages/AboutPage'));
 const Contact = lazy(() => import('./pages/ContactPage'));
 const Career = lazy(() => import('./pages/CareerPage'));
 const Login = lazy(() => import('./pages/LoginPage'));
 const MyAccount = lazy(() => import('./pages/MyAccountPage'));
-const PlanYourTrip = lazy(() => import('./pages/PlanYourTrip'));
+const PlanYourTrip = lazy(() => import('./pages/PlanYourTripPage'));
 
 function AppContent() {
   const navigate = useNavigate();

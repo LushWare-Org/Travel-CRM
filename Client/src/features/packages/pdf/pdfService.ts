@@ -8,17 +8,103 @@
 import { jsPDF } from 'jspdf';
 import Swal from 'sweetalert2';
 import { PDF_CONFIG } from './constants';
-import { getPackageEnvelope } from '../services/api/packages';
-import { formatCurrency } from '../lib/currency';
-import { PALETTE, hexToRgb } from '../config/theme';
+import { getPackageEnvelope } from '../../../services/api/packages';
+import { formatCurrency } from '../../../lib/currency';
+import { PALETTE, hexToRgb } from '../../../config/theme';
+
+interface PdfDay {
+  dayNumber?: number | string;
+  day?: number | string;
+  title?: string;
+  description?: string;
+  images?: Array<{ url?: string } | string>;
+  places?: Array<{ place?: { name?: string }; customName?: string }>;
+  locations?: string[];
+  location?: string;
+  activities?: Array<{ activity?: { name?: string } } | string>;
+  timeline?: Array<{
+    label?: string;
+    timeOfDay?: string;
+    time?: string;
+    title?: string;
+    description?: string;
+    summary?: string;
+    detail?: string;
+    activity?: string;
+    notes?: string;
+  }>;
+  morning?: string;
+  afternoon?: string;
+  evening?: string;
+  night?: string;
+  meals?: { breakfast?: boolean; lunch?: boolean; dinner?: boolean; snacks?: boolean };
+  breakfastCount?: number;
+  lunchCount?: number;
+  dinnerCount?: number;
+  accommodation?: { name?: string; type?: string; rating?: number } | string;
+  transports?: Array<{ transportMode?: string; pricingModel?: string }>;
+  transport?: string;
+  notes?: string;
+}
+
+export interface PdfPackageData {
+  _id?: string;
+  id?: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  destination?: string;
+  country?: string;
+  region?: string;
+  category?: string;
+  tagline?: string;
+  theme?: string;
+  difficulty?: string;
+  duration?: number | string;
+  maxGroupSize?: number | string;
+  price?: number | string;
+  priceNotes?: string;
+  highlights?: string[];
+  inclusions?: string[];
+  exclusions?: string[];
+  terms?: string[];
+  images?: Array<{ url?: string } | string>;
+  itineraryDays?: PdfDay[] | Record<string, PdfDay[]>;
+  days?: PdfDay[];
+  itinerary?: { days?: PdfDay[] };
+  [key: string]: unknown;
+}
+
+interface PdfImages {
+  packageImages: Array<string | null>;
+  dayImages: Record<string, string>;
+  brandLogo?: string | null;
+}
+
+/**
+ * Formats a currency value for PDF rendering. Wraps the shared
+ * `formatCurrency` from `lib/currency.ts` (which formats missing/invalid
+ * values as `0`) to restore the PDF layout's "On request" fallback for
+ * absent prices.
+ */
+export const formatCurrencyForPdf = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined || value === '') {
+    return 'On request';
+  }
+  const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
+  if (!Number.isFinite(numeric)) {
+    return 'On request';
+  }
+  return formatCurrency(numeric);
+};
 
 /**
  * Load image and convert to base64
  * @param {string} url - Image URL
  * @returns {Promise<string>} Base64 image data
  */
-const loadImageAsBase64 = (url) => {
-  return new Promise((resolve, reject) => {
+const loadImageAsBase64 = (url: string): Promise<string | null> => {
+  return new Promise((resolve) => {
     if (!url) {
       resolve(null);
       return;
@@ -56,8 +142,8 @@ const loadImageAsBase64 = (url) => {
  * @param {object} pkg - Package object
  * @returns {Promise<object>} Object containing loaded images
  */
-const loadPackageImages = async (pkg) => {
-  const images = {
+const loadPackageImages = async (pkg: PdfPackageData): Promise<PdfImages> => {
+  const images: PdfImages = {
     packageImages: [],
     dayImages: {}
   };
@@ -66,7 +152,7 @@ const loadPackageImages = async (pkg) => {
     // Load main package images
     if (pkg.images && Array.isArray(pkg.images) && pkg.images.length > 0) {
       const imagePromises = pkg.images.slice(0, 4).map(img => {
-        const url = img.url || img;
+        const url = typeof img === 'string' ? img : (img.url || '');
         return loadImageAsBase64(url);
       });
 
@@ -76,11 +162,11 @@ const loadPackageImages = async (pkg) => {
 
     // Load day-specific images
     const dayEntries = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
-    if (dayEntries && dayEntries.length > 0) {
+    if (Array.isArray(dayEntries) && dayEntries.length > 0) {
       for (const day of dayEntries) {
         if (day.images && Array.isArray(day.images) && day.images.length > 0) {
           const dayNumber = day.dayNumber || day.day;
-          const dayImageUrl = day.images[0].url || day.images[0];
+          const dayImageUrl = (typeof day.images[0] === 'string' ? day.images[0] : day.images[0].url) || '';
           const loadedImage = await loadImageAsBase64(dayImageUrl);
           if (loadedImage) {
             images.dayImages[dayNumber] = loadedImage;
@@ -102,7 +188,7 @@ const loadPackageImages = async (pkg) => {
 
 const BRAND_LOGO_PATH = '/logo.png';
 
-const loadBrandLogo = async () => {
+const loadBrandLogo = async (): Promise<string | null> => {
   try {
     return await loadImageAsBase64(BRAND_LOGO_PATH);
   } catch (error) {
@@ -115,7 +201,7 @@ const loadBrandLogo = async () => {
  * Generate and download PDF for a package
  * @param {object} pkg - Package object
  */
-export const generateAndDownloadPDF = async (pkg) => {
+export const generateAndDownloadPDF = async (pkg: PdfPackageData): Promise<void> => {
   try {
     Swal.fire({
       title: 'Generating PDF...',
@@ -155,832 +241,13 @@ export const generateAndDownloadPDF = async (pkg) => {
   }
 };
 
-/**
- * Legacy PDF builder retained for reference.
- */
-// eslint-disable-next-line no-unused-vars
-function legacyBuildPDFDocument(pkg, images) {
-  try {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const contentWidth = pageWidth - margin * 2;
-    let yPos = 20;
-
-    let pageNumber = 1;
-
-    // Colors
-    const primaryColor = [126, 93, 65]; // Warm chestnut
-    const secondaryColor = [88, 68, 52]; // Deep cacao
-    const accentColor = [55, 119, 79]; // Forest green accent
-    const lightBg = [249, 242, 230]; // Muted parchment
-    const successColor = [82, 121, 92]; // Soft sage
-
-    // Helper function to add decorative header
-    const addHeader = (isFirstPage = false) => {
-      doc.setFillColor(247, 234, 212);
-      doc.rect(0, 0, pageWidth, 38, 'F');
-
-      doc.setFillColor(231, 199, 150);
-      doc.rect(0, 0, pageWidth, 18, 'F');
-
-      doc.setFontSize(20);
-      doc.setTextColor(80, 62, 44);
-      doc.setFont(undefined, 'bold');
-      doc.text(PDF_CONFIG.company, margin, 14);
-
-      doc.setFontSize(9);
-      doc.setFont(undefined, 'normal');
-      doc.text(PDF_CONFIG.tagline, margin, 22);
-
-      doc.setDrawColor(204, 176, 134);
-      doc.setLineWidth(0.6);
-      doc.line(margin, 28, pageWidth - margin, 28);
-
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(0, 0, 0);
-    };
-
-    // Helper function to add footer with page numbers
-    const addFooter = () => {
-      // Footer background
-      doc.setFillColor(...lightBg);
-      doc.rect(0, pageHeight - 25, pageWidth, 25, 'F');
-
-      // Decorative line
-      doc.setDrawColor(...primaryColor);
-      doc.setLineWidth(0.8);
-      doc.line(margin, pageHeight - 23, pageWidth - margin, pageHeight - 23);
-
-      // Contact info
-      doc.setFontSize(9);
-      doc.setTextColor(...secondaryColor);
-      doc.setFont(undefined, 'normal');
-
-      const footerY = pageHeight - 15;
-
-      // Email (clickable)
-      doc.setTextColor(41, 128, 185);
-      const emailText = PDF_CONFIG.email;
-      const emailWidth = doc.getTextWidth(emailText);
-      doc.textWithLink(emailText, margin, footerY, { url: `mailto:${PDF_CONFIG.email}` });
-
-      // Phone
-      doc.setTextColor(...secondaryColor);
-      doc.text(` | ${PDF_CONFIG.phone}`, margin + emailWidth, footerY);
-
-      // Website (clickable, right-aligned)
-      doc.setTextColor(41, 128, 185);
-      const websiteText = PDF_CONFIG.website.replace('https://', '');
-      const websiteWidth = doc.getTextWidth(websiteText);
-      doc.textWithLink(websiteText, pageWidth - margin - websiteWidth, footerY, {
-        url: PDF_CONFIG.website
-      });
-
-      // Page number (center)
-      doc.setTextColor(...secondaryColor);
-      doc.setFontSize(8);
-      doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
-
-      doc.setTextColor(0, 0, 0);
-      pageNumber++;
-    };
-
-    // Helper function to check space and add new page if needed
-    const ensureSpace = (requiredSpace) => {
-      if (yPos + requiredSpace > pageHeight - 35) {
-        addFooter();
-        doc.addPage();
-        addHeader();
-        yPos = 48;
-        return true;
-      }
-      return false;
-    };
-
-    // Helper function for section titles with icon-like design
-    const addSectionTitle = (title, color = primaryColor) => {
-      ensureSpace(18);
-
-      // Background box with rounded effect
-      doc.setFillColor(...color);
-      doc.roundedRect(margin, yPos, contentWidth, 10, 2, 2, 'F');
-
-      // White text
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.text(title, margin + 4, yPos + 7);
-
-      // Reset
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(0, 0, 0);
-      yPos += 14;
-    };
-
-    // Helper function for info boxes
-    const addInfoBox = (label, value, icon = '●') => {
-      if (!value) return;
-
-      ensureSpace(10);
-
-      // Light background
-      doc.setFillColor(250, 250, 250);
-      doc.roundedRect(margin, yPos, contentWidth, 8, 1, 1, 'F');
-
-      // Icon/bullet
-      doc.setTextColor(...primaryColor);
-      doc.setFontSize(10);
-      doc.text(icon, margin + 2, yPos + 5.5);
-
-      // Label (bold)
-      doc.setTextColor(...secondaryColor);
-      doc.setFont(undefined, 'bold');
-      doc.text(label + ': ', margin + 6, yPos + 5.5);
-
-      // Value
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(0, 0, 0);
-      const labelWidth = doc.getTextWidth(label + ': ');
-      const valueText = String(value).trim();
-      const lines = doc.splitTextToSize(valueText, contentWidth - labelWidth - 12);
-      doc.text(lines[0], margin + 8 + labelWidth, yPos + 5.5);
-
-      yPos += 10;
-    };
-
-    const coverPalette = {
-      background: [243, 229, 207],
-      deepText: [58, 44, 31],
-      accent: [55, 119, 79],
-      softAccent: [215, 178, 118],
-      cardBg: [255, 245, 226],
-      bullet: [80, 60, 45],
-      divider: [214, 197, 168],
-    };
-
-    const drawBadge = (label, x, y, options = {}) => {
-      const { fill = coverPalette.accent, textColor = [255, 255, 255], width = 55, height = 11 } = options;
-      doc.setFillColor(...fill);
-      doc.roundedRect(x, y, width, height, 3, 3, 'F');
-      doc.setFontSize(9);
-      doc.setFont(undefined, 'bold');
-      doc.setTextColor(...textColor);
-      doc.text(label, x + width / 2, y + height / 2 + 2, { align: 'center' });
-      doc.setTextColor(0, 0, 0);
-    };
-
-    const addSectionLabel = (label, x, y) => {
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(...coverPalette.deepText);
-      doc.text(label.toUpperCase(), x, y);
-      doc.setDrawColor(...coverPalette.divider);
-      doc.setLineWidth(0.6);
-      doc.line(x, y + 2, x + 60, y + 2);
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(60, 60, 60);
-      return y + 8;
-    };
-
-    const addBulletColumn = (items, { x, y, columnWidth, maxColumns = 2, bulletColor = coverPalette.bullet }) => {
-      if (!items || !items.length) return y;
-      const sanitized = items.map((item) => String(item).trim()).filter(Boolean);
-      if (!sanitized.length) return y;
-
-      const columnCount = Math.min(maxColumns, sanitized.length);
-      const rows = Math.ceil(sanitized.length / columnCount);
-      let currentRow = 0;
-
-      for (let index = 0; index < sanitized.length; index++) {
-        const columnIndex = index % columnCount;
-        const rowIndex = Math.floor(index / columnCount);
-        currentRow = Math.max(currentRow, rowIndex);
-
-        const itemX = x + columnIndex * columnWidth;
-        const itemY = y + rowIndex * 8;
-
-        doc.setFillColor(...bulletColor);
-        doc.circle(itemX, itemY + 1.5, 0.9, 'F');
-
-        doc.setFontSize(10);
-        doc.setTextColor(69, 58, 45);
-        const lines = doc.splitTextToSize(sanitized[index], columnWidth - 5);
-        doc.text(lines, itemX + 3.5, itemY + 2.5);
-      }
-
-      return y + (currentRow + 1) * 8 + 4;
-    };
-
-    const formatINR = (value) => {
-      if (value === null || value === undefined || value === '') {
-        return 'On request';
-      }
-      const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
-      if (!Number.isFinite(numeric)) {
-        return 'On request';
-      }
-      return formatCurrency(numeric);
-    };
-
-    // ========== START PDF GENERATION ==========
-    doc.setFillColor(...coverPalette.background);
-    doc.rect(0, 0, pageWidth, pageHeight, 'F');
-
-    const coverMargin = 18;
-    const heroWidth = pageWidth - coverMargin * 2;
-    let coverY = coverMargin + 12;
-
-    const durationDays = Number(pkg.duration) || null;
-    const nightsCount = durationDays && durationDays > 1 ? durationDays - 1 : null;
-
-    if (durationDays) {
-      const nightsLabel = nightsCount
-        ? `${nightsCount} ${nightsCount > 1 ? 'NIGHTS' : 'NIGHT'}`
-        : '1 NIGHT';
-      const daysLabel = `${durationDays} ${durationDays > 1 ? 'DAYS' : 'DAY'}`;
-      drawBadge(
-        `${nightsLabel} / ${daysLabel}`,
-        pageWidth - coverMargin - 65,
-        coverMargin - 4,
-        { width: 65, height: 12 },
-      );
-    }
-
-    // Primary title
-    doc.setTextColor(...coverPalette.deepText);
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(30);
-    const primaryTitle = (pkg.name || pkg.destination || 'Signature Escape').toUpperCase();
-    const primaryLines = doc.splitTextToSize(primaryTitle, heroWidth);
-    doc.text(primaryLines, pageWidth / 2, coverY, { align: 'center' });
-    coverY += primaryLines.length * 12 + 4;
-
-    // Secondary title (category or tagline)
-    const secondaryTitle =
-      (pkg.category && `${pkg.category} Adventure`) ||
-      pkg.tagline ||
-      'Curated Travel Experience';
-    doc.setFontSize(16);
-    doc.text(secondaryTitle.toUpperCase(), pageWidth / 2, coverY + 6, { align: 'center' });
-    coverY += 22;
-
-    // Hero image
-    const heroHeight = 80;
-    doc.setDrawColor(...coverPalette.divider);
-    doc.setLineWidth(0.6);
-    doc.roundedRect(coverMargin, coverY, heroWidth, heroHeight, 8, 8, 'S');
-
-    if (images.packageImages && images.packageImages.length > 0) {
-      try {
-        doc.addImage(
-          images.packageImages[0],
-          'JPEG',
-          coverMargin + 1.5,
-          coverY + 1.5,
-          heroWidth - 3,
-          heroHeight - 3,
-        );
-      } catch (error) {
-        console.warn('Error adding hero image:', error);
-        doc.setFillColor(180, 150, 110);
-        doc.roundedRect(coverMargin + 1.5, coverY + 1.5, heroWidth - 3, heroHeight - 3, 7, 7, 'F');
-      }
-    } else {
-      doc.setFillColor(200, 170, 130);
-      doc.roundedRect(coverMargin + 1.5, coverY + 1.5, heroWidth - 3, heroHeight - 3, 7, 7, 'F');
-    }
-
-    coverY += heroHeight + 14;
-
-    // Two-column layout
-    const leftColumnWidth = heroWidth * 0.62;
-    const rightColumnWidth = heroWidth - leftColumnWidth - 12;
-    const leftX = coverMargin;
-    const rightX = leftX + leftColumnWidth + 12;
-    let leftY = coverY;
-    let rightY = coverY;
-
-    // Description
-    const overviewText =
-      pkg.description ||
-      `Experience a bespoke journey with guided experiences, curated stays, and unforgettable highlights in ${pkg.destination || 'your chosen destination'}.`;
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(79, 63, 49);
-    const overviewLines = doc.splitTextToSize(overviewText, leftColumnWidth);
-    doc.text(overviewLines, leftX, leftY);
-    leftY += overviewLines.length * 5.5 + 10;
-
-    const coverDays = pkg.days || pkg.itinerary?.days || [];
-
-    // Highlights
-    const highlightItems = (Array.isArray(pkg.highlights) && pkg.highlights.length
-      ? pkg.highlights
-      : [
-        `Guided explorations of ${pkg.destination || 'signature attractions'}`,
-        'Curated accommodations with local character',
-        'Authentic culinary experiences & cultural immersions',
-        'Dedicated travel specialist and concierge support',
-      ]).slice(0, 6);
-
-    leftY = addSectionLabel('Highlights', leftX, leftY);
-    leftY = addBulletColumn(highlightItems, {
-      x: leftX,
-      y: leftY + 2,
-      columnWidth: (leftColumnWidth - 6) / 2,
-      maxColumns: 2,
-    }) + 6;
-
-    // Inclusions & Exclusions side-by-side
-    const inclusionItems = (Array.isArray(pkg.inclusions) && pkg.inclusions.length
-      ? pkg.inclusions
-      : [
-        'Premium hotel accommodation',
-        'Daily breakfast & signature meals',
-        'Private guided excursions',
-        'All arranged ground transfers',
-        'Entrance fees to listed attractions',
-      ]).slice(0, 6);
-
-    const exclusionItems = (Array.isArray(pkg.exclusions) && pkg.exclusions.length
-      ? pkg.exclusions
-      : [
-        'International airfare',
-        'Personal expenses & shopping',
-        'Travel insurance policies',
-        'Gratuities for guides & drivers',
-        'Optional excursions not listed',
-      ]).slice(0, 6);
-
-    const basePairY = leftY;
-    const inclusionLabelBottom = addSectionLabel('Inclusions', leftX, basePairY);
-    const exclusionLabelBottom = addSectionLabel(
-      'Exclusions',
-      leftX + leftColumnWidth / 2 + 6,
-      basePairY,
-    );
-
-    const inclusionEnd = addBulletColumn(inclusionItems, {
-      x: leftX,
-      y: inclusionLabelBottom + 2,
-      columnWidth: leftColumnWidth / 2 - 6,
-      maxColumns: 1,
-    });
-
-    const exclusionEnd = addBulletColumn(exclusionItems, {
-      x: leftX + leftColumnWidth / 2 + 6,
-      y: exclusionLabelBottom + 2,
-      columnWidth: leftColumnWidth / 2 - 6,
-      maxColumns: 1,
-    });
-
-    leftY = Math.max(inclusionEnd, exclusionEnd) + 10;
-
-    // Itinerary snapshot
-    const itineraryLabelBottom = addSectionLabel('Itinerary', leftX, leftY);
-    let itineraryY = itineraryLabelBottom + 2;
-    doc.setFontSize(10);
-    doc.setTextColor(79, 63, 49);
-
-    if (coverDays.length) {
-      coverDays.slice(0, 4).forEach((day, idx) => {
-        const dayNumber = day.dayNumber || day.day || idx + 1;
-        const dayTitle = day.title || `Day ${dayNumber}`;
-        const daySummary =
-          day.description ||
-          day.activities?.join(', ') ||
-          `${pkg.destination || 'Destination'} exploration`;
-        doc.setFont(undefined, 'bold');
-        doc.text(`Day ${dayNumber}: ${dayTitle}`, leftX, itineraryY);
-        doc.setFont(undefined, 'normal');
-        const summaryLines = doc.splitTextToSize(daySummary, leftColumnWidth);
-        doc.text(summaryLines, leftX, itineraryY + 4);
-        itineraryY += summaryLines.length * 5 + 8;
-      });
-      if (coverDays.length > 4) {
-        doc.setFont(undefined, 'italic');
-        doc.text(`+${coverDays.length - 4} more days curated in detail`, leftX, itineraryY);
-        doc.setFont(undefined, 'normal');
-        itineraryY += 8;
-      }
-    } else {
-      doc.text(
-        'A bespoke day-wise plan crafted to balance adventure, relaxation, and cultural immersion.',
-        leftX,
-        itineraryY,
-      );
-      itineraryY += 12;
-    }
-
-    leftY = itineraryY + 4;
-
-    // Right column info card
-    doc.setFillColor(...coverPalette.cardBg);
-    doc.setDrawColor(...coverPalette.softAccent);
-    const infoCardHeight = 80;
-    doc.roundedRect(rightX, rightY, rightColumnWidth, infoCardHeight, 6, 6, 'FD');
-
-    doc.setFont(undefined, 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(94, 74, 52);
-    doc.text('PRICE', rightX + 6, rightY + 12);
-    doc.setFontSize(20);
-    doc.text(formatINR(pkg.price), rightX + 6, rightY + 28);
-
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text('MAX GROUP SIZE', rightX + 6, rightY + 42);
-    doc.setFont(undefined, 'normal');
-    doc.text(pkg.maxGroupSize ? String(pkg.maxGroupSize) : 'Flexible', rightX + 6, rightY + 50);
-
-    doc.setFont(undefined, 'bold');
-    doc.text('DIFFICULTY LEVEL', rightX + 6, rightY + 60);
-    doc.setFont(undefined, 'normal');
-    const difficultyLabel = pkg.difficulty
-      ? pkg.difficulty.charAt(0).toUpperCase() + pkg.difficulty.slice(1)
-      : 'Moderate';
-    doc.text(difficultyLabel, rightX + 6, rightY + 68);
-
-    rightY += infoCardHeight + 10;
-
-    // Secondary image / location badge
-    const secondaryImage = images.packageImages?.[1];
-    const secondaryHeight = 38;
-    doc.setDrawColor(...coverPalette.divider);
-    doc.roundedRect(rightX, rightY, rightColumnWidth, secondaryHeight, 6, 6, 'S');
-    if (secondaryImage) {
-      try {
-        doc.addImage(
-          secondaryImage,
-          'JPEG',
-          rightX + 1.5,
-          rightY + 1.5,
-          rightColumnWidth - 3,
-          secondaryHeight - 3,
-        );
-      } catch (error) {
-        console.warn('Error adding secondary image:', error);
-      }
-    } else {
-      doc.setFillColor(204, 188, 160);
-      doc.roundedRect(rightX + 1.5, rightY + 1.5, rightColumnWidth - 3, secondaryHeight - 3, 5, 5, 'F');
-    }
-
-    doc.setFillColor(...coverPalette.accent);
-    doc.roundedRect(rightX, rightY + secondaryHeight - 12, rightColumnWidth, 12, 6, 6, 'F');
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text(
-      (pkg.destination || pkg.country || 'Discover the World').toUpperCase(),
-      rightX + rightColumnWidth / 2,
-      rightY + secondaryHeight - 3,
-      { align: 'center' },
-    );
-
-    // Reset to default styles
-    doc.setTextColor(0, 0, 0);
-
-    // Footer and next page setup
-    addFooter();
-    doc.addPage();
-    addHeader();
-    yPos = 48;
-
-    const remainingGalleryImages = (images.packageImages || []).slice(2);
-    if (remainingGalleryImages.length) {
-      ensureSpace(20);
-      doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
-      doc.setTextColor(...coverPalette.deepText);
-      doc.text('Visual Highlights', margin, yPos);
-      doc.setDrawColor(...coverPalette.divider);
-      doc.line(margin, yPos + 2, margin + 60, yPos + 2);
-      yPos += 12;
-
-      const galleryPerRow = 3;
-      const gallerySpacing = 6;
-      const galleryWidth = (contentWidth - gallerySpacing * (galleryPerRow - 1)) / galleryPerRow;
-      const galleryHeight = 45;
-
-      const galleryRows = Math.ceil(remainingGalleryImages.length / galleryPerRow);
-      ensureSpace(galleryRows * (galleryHeight + gallerySpacing) + 10);
-
-      for (let row = 0; row < galleryRows; row++) {
-        const rowY = yPos + row * (galleryHeight + gallerySpacing);
-
-        for (let col = 0; col < galleryPerRow; col++) {
-          const index = row * galleryPerRow + col;
-          if (index >= remainingGalleryImages.length) break;
-
-          const imgX = margin + col * (galleryWidth + gallerySpacing);
-          const imgData = remainingGalleryImages[index];
-
-          doc.setDrawColor(...coverPalette.divider);
-          doc.setFillColor(...coverPalette.cardBg);
-          doc.roundedRect(imgX, rowY, galleryWidth, galleryHeight, 6, 6, 'FD');
-
-          if (imgData) {
-            try {
-              doc.addImage(
-                imgData,
-                'JPEG',
-                imgX + 2,
-                rowY + 2,
-                galleryWidth - 4,
-                galleryHeight - 4,
-              );
-            } catch (error) {
-              console.warn('Error adding gallery image:', error);
-            }
-          }
-        }
-      }
-
-      yPos += galleryRows * (galleryHeight + gallerySpacing) + 6;
-      doc.setTextColor(0, 0, 0);
-    }
-
-    // ========== DAY-WISE ITINERARY ==========
-    ensureSpace(30);
-
-    // Itinerary header page
-    doc.setFillColor(...accentColor);
-    doc.rect(0, yPos - 3, pageWidth, 18, 'F');
-
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont(undefined, 'bold');
-    doc.text('DETAILED ITINERARY', pageWidth / 2, yPos + 8, { align: 'center' });
-
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(0, 0, 0);
-    yPos += 23;
-
-    // Process each day
-    const days = pkg.days || pkg.itinerary?.days || [];
-
-    if (days && days.length > 0) {
-      days.forEach((day, dayIndex) => {
-        ensureSpace(40);
-
-        doc.setFillColor(...coverPalette.cardBg);
-        doc.roundedRect(margin, yPos, contentWidth, 16, 3, 3, 'F');
-
-        doc.setFillColor(...coverPalette.accent);
-        doc.roundedRect(margin, yPos, 34, 16, 3, 3, 'F');
-
-        doc.setFontSize(12);
-        doc.setTextColor(255, 255, 255);
-        doc.setFont(undefined, 'bold');
-        doc.text(`DAY ${day.dayNumber || dayIndex + 1}`, margin + 17, yPos + 10, { align: 'center' });
-
-        doc.setFontSize(12);
-        doc.setTextColor(...coverPalette.deepText);
-        doc.text(day.title || 'Curated Experience', margin + 42, yPos + 10);
-
-        doc.setFont(undefined, 'normal');
-        doc.setTextColor(92, 74, 58);
-        yPos += 20;
-
-        // Day image if available
-        const dayNumber = day.dayNumber || dayIndex + 1;
-        if (images.dayImages[dayNumber]) {
-          const legacyImageHeight = 46;
-          const legacyImagePadding = 2;
-          const legacyTopMargin = 6;
-
-          ensureSpace(legacyImageHeight + legacyTopMargin);
-
-          const imgWidth = contentWidth;
-
-          try {
-            doc.addImage(
-              images.dayImages[dayNumber],
-              'JPEG',
-              margin + legacyImagePadding,
-              yPos + legacyTopMargin,
-              imgWidth - legacyImagePadding * 2,
-              legacyImageHeight - legacyImagePadding * 2,
-            );
-          } catch (error) {
-            console.warn('Error adding day image:', error);
-          }
-
-          yPos += legacyImageHeight + legacyTopMargin + 2;
-        }
-
-        // Description
-        if (day.description) {
-          ensureSpace(15);
-
-          doc.setFillColor(253, 247, 235);
-          const descLines = doc.splitTextToSize(String(day.description).trim(), contentWidth - 8);
-          const boxHeight = descLines.length * 5 + 6;
-
-          doc.roundedRect(margin, yPos, contentWidth, boxHeight, 2, 2, 'F');
-          doc.setDrawColor(...coverPalette.divider);
-          doc.roundedRect(margin, yPos, contentWidth, boxHeight, 2, 2, 'S');
-
-          doc.setFontSize(10);
-          doc.setTextColor(92, 74, 58);
-          doc.text(descLines, margin + 4, yPos + 5);
-
-          yPos += boxHeight + 5;
-          doc.setTextColor(92, 74, 58);
-        }
-
-        // Locations
-        if (day.locations && day.locations.length > 0) {
-          ensureSpace(10);
-
-          doc.setFillColor(250, 241, 226);
-          const locLines = doc.splitTextToSize(
-            day.locations.map((l) => String(l).trim()).join('  •  '),
-            contentWidth - 10,
-          );
-          const locHeight = locLines.length * 5 + 8;
-          doc.roundedRect(margin, yPos, contentWidth, locHeight, 2, 2, 'F');
-
-          doc.setFontSize(11);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(...coverPalette.accent);
-          doc.text('Locations', margin + 4, yPos + 7);
-
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(92, 74, 58);
-          doc.setFontSize(10);
-          doc.text(locLines, margin + 4, yPos + 13);
-
-          yPos += locHeight + 4;
-        }
-
-        // Activities
-        if (day.activities && day.activities.length > 0) {
-          ensureSpace(10);
-
-          doc.setFillColor(245, 232, 210);
-          const actLines = doc.splitTextToSize(
-            day.activities.map((a) => String(a).trim()).join('  •  '),
-            contentWidth - 10,
-          );
-          const actHeight = actLines.length * 5 + 8;
-          doc.roundedRect(margin, yPos, contentWidth, actHeight, 2, 2, 'F');
-
-          doc.setFontSize(11);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(176, 134, 80);
-          doc.text('Signature Moments', margin + 4, yPos + 7);
-
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(92, 74, 58);
-          doc.setFontSize(10);
-          doc.text(actLines, margin + 4, yPos + 13);
-
-          yPos += actHeight + 4;
-        }
-
-        // Accommodation
-        if (day.accommodation && day.accommodation.name) {
-          ensureSpace(10);
-
-          doc.setFillColor(253, 247, 235);
-          doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
-
-          doc.setFontSize(10);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(176, 134, 80);
-          doc.text('Stay', margin + 4, yPos + 7);
-
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(92, 74, 58);
-
-          let accText = String(day.accommodation.name).trim();
-          if (day.accommodation.type) accText += ` (${day.accommodation.type})`;
-          if (day.accommodation.rating) {
-            accText += ` - ${day.accommodation.rating} stars`;
-          }
-
-          doc.text(accText, margin + 26, yPos + 7);
-          yPos += 14;
-        }
-
-        // Meals
-        if (day.meals && (day.meals.breakfast || day.meals.lunch || day.meals.dinner)) {
-          ensureSpace(10);
-
-          doc.setFillColor(246, 232, 224);
-          doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
-
-          doc.setFontSize(10);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(193, 102, 80);
-          doc.text('Meals', margin + 4, yPos + 7);
-
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(92, 74, 58);
-
-          const meals = [];
-          if (day.meals.breakfast) meals.push('Breakfast');
-          if (day.meals.lunch) meals.push('Lunch');
-          if (day.meals.dinner) meals.push('Dinner');
-
-          doc.text(meals.join('  •  '), margin + 26, yPos + 7);
-          yPos += 14;
-        }
-
-        // Transport
-        if (day.transport) {
-          ensureSpace(10);
-
-          doc.setFillColor(232, 239, 233);
-          doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
-
-          doc.setFontSize(10);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(...coverPalette.accent);
-          doc.text('Transport', margin + 4, yPos + 7);
-
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(92, 74, 58);
-
-          const transportText = String(day.transport).charAt(0).toUpperCase() + String(day.transport).slice(1);
-          doc.text(transportText, margin + 26, yPos + 7);
-          yPos += 14;
-        }
-
-        // Notes
-        if (day.notes) {
-          ensureSpace(12);
-
-          doc.setFontSize(9);
-          doc.setFont(undefined, 'italic');
-          doc.setTextColor(142, 116, 94);
-
-          const notesLines = doc.splitTextToSize('Note: ' + String(day.notes).trim(), contentWidth - 6);
-          doc.text(notesLines, margin + 3, yPos + 5);
-
-          yPos += notesLines.length * 4.5 + 5;
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(92, 74, 58);
-        }
-
-        // Separator between days
-        yPos += 8;
-        if (dayIndex < days.length - 1) {
-          doc.setDrawColor(...coverPalette.divider);
-          doc.setLineWidth(0.6);
-          doc.line(margin + 18, yPos, pageWidth - margin - 18, yPos);
-          yPos += 8;
-        }
-      });
-    } else {
-      doc.setFontSize(11);
-      doc.setTextColor(150, 150, 150);
-      doc.text('No detailed itinerary available', pageWidth / 2, yPos, { align: 'center' });
-      yPos += 15;
-    }
-
-    // ========== TERMS & CONDITIONS ==========
-    if (pkg.terms && pkg.terms.length > 0) {
-      ensureSpace(20);
-      addSectionTitle('Terms & Conditions', [149, 165, 166]);
-
-      doc.setFontSize(9);
-      doc.setTextColor(80, 80, 80);
-
-      pkg.terms.forEach((term, index) => {
-        const termText = String(term).trim();
-        const lines = doc.splitTextToSize(`${index + 1}. ${termText}`, contentWidth - 4);
-
-        ensureSpace(lines.length * 4 + 3);
-        doc.text(lines, margin + 2, yPos);
-        yPos += lines.length * 4 + 3;
-      });
-
-      doc.setTextColor(0, 0, 0);
-    }
-
-    // ========== FINAL FOOTER ==========
-    addFooter();
-
-    const fileName = `${(pkg.name || 'Package').replace(/[^a-z0-9]/gi, '_')}_Itinerary.pdf`;
-    return { doc, fileName };
-  } catch (error) {
-    console.error('[PDF Service] PDF generation error:', error);
-    throw error;
-  }
-}
-
 // NOTE: cover-page fields below (pkg.name, pkg.price, pkg.terms, pkg.highlights,
 // pkg.maxGroupSize, pkg.duration) still reference the pre-relational package shape;
 // serializePackage() actually returns title/basePrice/sellPrice/termsAndConditions
 // (string)/inclusions/exclusions/durationDays. This degrades gracefully today
 // ("On Request", empty terms section) rather than breaking, so it was left as a
 // known gap out of scope for the itinerary-shape fix — see plan history.
-function buildPDFDocument(pkg, images) {
+function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
   try {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -990,7 +257,7 @@ function buildPDFDocument(pkg, images) {
     let yPos = margin;
     let pageNumber = 1;
 
-    const palette = {
+    const palette: Record<string, [number, number, number]> = {
       background: [249, 250, 251],
       secondaryBackground: [209, 213, 219],
       primaryText: [31, 41, 55],
@@ -1069,44 +336,20 @@ function buildPDFDocument(pkg, images) {
       return false;
     };
 
-    const formatINR = (value) => {
-      if (value === null || value === undefined || value === '') {
-        return 'On request';
-      }
-      const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
-      if (!Number.isFinite(numeric)) {
-        return 'On request';
-      }
-      return formatCurrency(numeric);
-    };
-
-    const formatDateDisplay = (value) => {
-      if (!value) return 'To be confirmed';
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) {
-        return String(value);
-      }
-      return parsed.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      });
-    };
-
     const normalizeDays = () => {
       const rawDays = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
       if (Array.isArray(rawDays)) {
         return rawDays.slice().sort((a, b) => {
-          const aDay = a.dayNumber ?? a.day ?? 0;
-          const bDay = b.dayNumber ?? b.day ?? 0;
+          const aDay = Number(a.dayNumber ?? a.day ?? 0);
+          const bDay = Number(b.dayNumber ?? b.day ?? 0);
           return aDay - bDay;
         });
       }
       return Object.values(rawDays)
         .flat()
         .sort((a, b) => {
-          const aDay = a.dayNumber ?? a.day ?? 0;
-          const bDay = b.dayNumber ?? b.day ?? 0;
+          const aDay = Number(a.dayNumber ?? a.day ?? 0);
+          const bDay = Number(b.dayNumber ?? b.day ?? 0);
           return aDay - bDay;
         });
     };
@@ -1115,7 +358,7 @@ function buildPDFDocument(pkg, images) {
     // objects ({ place: { name }, customName } / { activity: { name } }); older/local
     // editor state may still carry flat string[] (day.locations/day.activities). Both
     // are supported here so the PDF renders correctly regardless of the source shape.
-    const getLocationNames = (day) => {
+    const getLocationNames = (day: PdfDay) => {
       if (Array.isArray(day.places) && day.places.length) {
         return day.places.map((p) => p?.place?.name || p?.customName).filter(Boolean);
       }
@@ -1123,14 +366,14 @@ function buildPDFDocument(pkg, images) {
       return legacy.map((l) => String(l).trim()).filter(Boolean);
     };
 
-    const getActivityNames = (day) => {
+    const getActivityNames = (day: PdfDay) => {
       if (Array.isArray(day.activities) && day.activities.length && day.activities[0] && typeof day.activities[0] === 'object' && 'activity' in day.activities[0]) {
-        return day.activities.map((a) => a?.activity?.name).filter(Boolean);
+        return day.activities.map((a) => (a as { activity?: { name?: string } }).activity?.name).filter(Boolean);
       }
       return (Array.isArray(day.activities) ? day.activities : []).map((a) => String(a).trim()).filter(Boolean);
     };
 
-    const getDaySegments = (day) => {
+    const getDaySegments = (day: PdfDay) => {
       const segments = [];
       if (Array.isArray(day.timeline)) {
         day.timeline.forEach((segment) => {
@@ -1155,7 +398,7 @@ function buildPDFDocument(pkg, images) {
           }
         });
       }
-      ['morning', 'afternoon', 'evening', 'night'].forEach((period) => {
+      (['morning', 'afternoon', 'evening', 'night'] as const).forEach((period) => {
         if (day[period]) {
           segments.push({
             label: period,
@@ -1179,7 +422,7 @@ function buildPDFDocument(pkg, images) {
       return segments.slice(0, 4);
     };
 
-    const getMealsText = (day) => {
+    const getMealsText = (day: PdfDay) => {
       if (day?.meals && typeof day.meals === 'object') {
         const legacy = [];
         if (day.meals.breakfast) legacy.push('Breakfast');
@@ -1217,33 +460,7 @@ function buildPDFDocument(pkg, images) {
       setBodyFont();
     };
 
-    const drawInfoCard = (items) => {
-      const cardHeight = 50;
-      ensureSpace(cardHeight);
-      doc.setFillColor(...palette.cardBg);
-      doc.setDrawColor(...palette.cardBorder);
-      doc.roundedRect(margin, yPos, contentWidth, cardHeight, 8, 8, 'FD');
-
-      const columnWidth = contentWidth / items.length;
-      items.forEach((item, index) => {
-        const x = margin + index * columnWidth + 6;
-        doc.setFont(undefined, 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...palette.accentDark);
-        doc.text(item.label, x, yPos + 14);
-        doc.setFont(undefined, 'normal');
-        doc.setFontSize(25);
-        doc.setTextColor(...palette.primaryText);
-        const lines = doc.splitTextToSize(item.value || '—', columnWidth - 12);
-        doc.text(lines, x, yPos + 24);
-      });
-
-      yPos += cardHeight;
-      addSectionGap();
-      setBodyFont();
-    };
-
-    const drawBulletListCard = (title, items, options = {}) => {
+    const drawBulletListCard = (title, items, options: { innerPadding?: number; bulletColor?: [number, number, number] } = {}) => {
       const { innerPadding: customPadding, bulletColor = palette.accent } = options;
       const sanitizedItems = (items || [])
         .map((item) => String(item).trim())
@@ -1295,7 +512,7 @@ function buildPDFDocument(pkg, images) {
       setBodyFont();
     };
 
-    const drawOverviewHighlightsCard = (overview, highlightItems, options = {}) => {
+    const drawOverviewHighlightsCard = (overview, highlightItems, options: { innerPadding?: number } = {}) => {
       const { innerPadding: customPadding } = options;
       const summaryText =
         overview ||
@@ -1403,7 +620,7 @@ function buildPDFDocument(pkg, images) {
       return headerY + headerHeight;
     };
 
-    const drawDayCard = (day, index) => {
+    const drawDayCard = (day: PdfDay, index: number) => {
       const dayNumber = day.dayNumber ?? day.day ?? index + 1;
       const dayTitle = day.title || `Curated Experience`;
       const locationText = getLocationNames(day).join(' • ');
@@ -1414,7 +631,7 @@ function buildPDFDocument(pkg, images) {
       }));
 
       const supportingNotes = [];
-      if (day.accommodation?.name) {
+      if (typeof day.accommodation === 'object' && day.accommodation !== null && day.accommodation.name) {
         const accommodationParts = [
           day.accommodation.name,
           day.accommodation.type && `(${day.accommodation.type})`,
@@ -1826,7 +1043,7 @@ function buildPDFDocument(pkg, images) {
     doc.setFont(undefined, 'bold');
     doc.setFontSize(28);
     doc.setTextColor(...palette.primaryText);
-    const priceText = formatINR(pkg.price);
+    const priceText = formatCurrencyForPdf(pkg.price);
     const sanitizedPrice = priceText.replace(/[^\d.,]/g, '');
     const currencyCode = import.meta.env.VITE_CURRENCY_CODE || 'INR';
     doc.text(`${currencyCode} ${sanitizedPrice}`, priceLeftX, yPos + 36);
@@ -1866,9 +1083,9 @@ function buildPDFDocument(pkg, images) {
  * @returns {Promise<{ blob: Blob, fileName: string, packageData: object, doc?: jsPDF }>}
  */
 export const createPackagePdfBlob = async (
-  pkg,
-  { fetchLatest = true, includeDoc = false } = {},
-) => {
+  pkg: PdfPackageData,
+  { fetchLatest = true, includeDoc = false }: { fetchLatest?: boolean; includeDoc?: boolean } = {},
+): Promise<{ blob: Blob; fileName: string; packageData: PdfPackageData; doc?: jsPDF }> => {
   let completePackage = pkg;
 
   if (fetchLatest && (pkg._id || pkg.id)) {
@@ -1890,7 +1107,7 @@ export const createPackagePdfBlob = async (
   const { doc, fileName } = buildPDFDocument(completePackage, images);
   const blob = doc.output('blob');
 
-  const result = {
+  const result: { blob: Blob; fileName: string; packageData: PdfPackageData; doc?: jsPDF } = {
     blob,
     fileName,
     packageData: completePackage,

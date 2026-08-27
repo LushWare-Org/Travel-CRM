@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   MapPin,
   Calendar,
@@ -16,18 +16,19 @@ import {
   Train,
   Coffee,
   UtensilsCrossed,
-  Bed,
   Loader2,
 } from "lucide-react";
+import type { LucideIcon } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { submitManualItineraryRequest } from "../services/api/manualItinerary";
-import DestinationSelector from "../components/shared/DestinationSelector";
-import LocationSelector from "../components/shared/LocationSelector";
-import ActivitySelector from "../components/shared/ActivitySelector";
-import { useAuth } from "../context/AuthContext";
+import { submitManualItineraryRequest } from "../../services/api/manualItinerary";
+import DestinationSelector from "../../components/shared/DestinationSelector";
+import LocationSelector from "../../components/shared/LocationSelector";
+import ActivitySelector from "../../components/shared/ActivitySelector";
+import { useAuth } from "../../context/AuthContext";
+import DateRangeCalendar from "./components/DateRangeCalendar";
 
-const transportOptions = [
+const transportOptions: Array<{ value: string; label: string; icon: LucideIcon }> = [
   { value: "flight", label: "Flight", icon: Plane },
   { value: "train", label: "Train", icon: Train },
   { value: "bus", label: "Bus", icon: Car },
@@ -37,7 +38,7 @@ const transportOptions = [
   { value: "other", label: "Other", icon: Car },
 ];
 
-const accommodationTypes = [
+const accommodationTypes: Array<{ value: string; label: string }> = [
   { value: "hotel", label: "Hotel" },
   { value: "resort", label: "Resort" },
   { value: "guesthouse", label: "Guesthouse" },
@@ -46,24 +47,77 @@ const accommodationTypes = [
   { value: "other", label: "Other" },
 ];
 
-export default function PlanYourTrip() {
+/** A destination option as emitted by DestinationSelector, or a bare label string. */
+type DestinationLike = { value: string; label: string } | string | null;
+
+/** Projects the display label from a destination option or bare string. */
+const destLabel = (dest: DestinationLike): string => {
+  if (dest && typeof dest === 'object') return dest.label;
+  return typeof dest === 'string' ? dest : '';
+};
+
+/** Projects the option value from a destination option or bare string. */
+const destValue = (dest: DestinationLike): string => {
+  if (dest && typeof dest === 'object') return dest.value;
+  return typeof dest === 'string' ? dest : '';
+};
+
+interface DayAccommodation {
+  name: string;
+  type: string;
+  rating: number;
+  address: string;
+  contactNumber: string;
+}
+
+interface DayMeals {
+  breakfast: boolean;
+  lunch: boolean;
+  dinner: boolean;
+}
+
+interface ItineraryDay {
+  dayNumber: number;
+  title: string;
+  locations: string[];
+  activities: string[];
+  accommodation: DayAccommodation;
+  meals: DayMeals;
+  transport: string;
+  places: string[];
+  notes: string;
+}
+
+/** The day object serialized into the manual-itinerary request payload. */
+interface ItineraryDayPayload {
+  dayNumber: number;
+  title: string;
+  locations: string[];
+  activities: string[];
+  accommodation: DayAccommodation;
+  meals: DayMeals;
+  places: string[];
+  notes: string;
+  transport?: string;
+}
+
+export default function PlanYourTripContainer() {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
-  const [selectedDest, setSelectedDest] = useState(null);
+  const [selectedDest, setSelectedDest] = useState<DestinationLike>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [travelers, setTravelers] = useState(2);
-  const [selectedActivities, setSelectedActivities] = useState([]);
   // Default preferences (not shown in UI, but used for generating default values)
-  const defaultAccommodation = "4-star";
-  const defaultMealPlan = "breakfast";
+  const defaultAccommodation = "4-star" as string;
+  const defaultMealPlan = "breakfast" as string;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [showCal, setShowCal] = useState(false);
   const [validationMsg, setValidationMsg] = useState('');
-  const [itineraryDays, setItineraryDays] = useState([]);
+  const [itineraryDays, setItineraryDays] = useState<ItineraryDay[]>([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0); // Index of currently visible day (0-based)
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -110,7 +164,7 @@ export default function PlanYourTrip() {
   const handleAddDay = () => {
     const nextDayNumber = itineraryDays.length + 1;
     if (nextDayNumber <= duration) {
-      const newDay = {
+      const newDay: ItineraryDay = {
         dayNumber: nextDayNumber,
         title: `Day ${nextDayNumber}`,
         locations: [],
@@ -144,7 +198,7 @@ export default function PlanYourTrip() {
   };
 
   // Handle removing a day
-  const handleRemoveDay = (dayNumber) => {
+  const handleRemoveDay = (dayNumber: number) => {
     const filteredDays = itineraryDays.filter(day => day.dayNumber !== dayNumber);
     // Renumber remaining days
     const renumberedDays = filteredDays.map((day, index) => ({
@@ -158,40 +212,33 @@ export default function PlanYourTrip() {
     }
   };
 
-  // Handle switching to a different day
-  const handleGoToDay = (index) => {
-    setCurrentDayIndex(index);
-  };
-
-  const progress = (step / 4) * 100;
-
-  const handleDayChange = (dayNumber, field, value) => {
+  const handleDayChange = (dayNumber: number, field: string, value: unknown) => {
     setItineraryDays(prev =>
       prev.map(day =>
         day.dayNumber === dayNumber
-          ? { ...day, [field]: value }
+          ? { ...day, [field]: value } as ItineraryDay
           : day
       )
     );
   };
 
-  const handleDayNestedChange = (dayNumber, parentField, childField, value) => {
+  const handleDayNestedChange = (dayNumber: number, parentField: string, childField: string, value: unknown) => {
     setItineraryDays(prev =>
       prev.map(day =>
         day.dayNumber === dayNumber
           ? {
               ...day,
               [parentField]: {
-                ...day[parentField],
+                ...day[parentField as keyof ItineraryDay] as object,
                 [childField]: value,
               },
-            }
+            } as ItineraryDay
           : day
       )
     );
   };
 
-  const handleDestinationChange = (destination) => {
+  const handleDestinationChange = (destination: { value: string; label: string }) => {
     setSelectedDest(destination);
     setValidationMsg('');
   };
@@ -239,9 +286,9 @@ export default function PlanYourTrip() {
 
     try {
       // Extract destination info
-      const destinationName = selectedDest?.label || selectedDest || '';
-      const destinationValue = selectedDest?.value || selectedDest || '';
-      
+      const destinationName = destLabel(selectedDest);
+      const destinationValue = destValue(selectedDest);
+
       const payload = {
         name: name.trim(),
         email: email.trim(),
@@ -255,7 +302,7 @@ export default function PlanYourTrip() {
         budget: '',
         message: '',
         days: itineraryDays.map(day => {
-          const dayData = {
+          const dayData: ItineraryDayPayload = {
             dayNumber: day.dayNumber,
             title: day.title || `Day ${day.dayNumber}`,
             locations: day.locations || [],
@@ -275,12 +322,12 @@ export default function PlanYourTrip() {
             places: day.places || [],
             notes: day.notes || '',
           };
-          
+
           // Only include transport if it has a valid value (not empty string)
           if (day.transport && day.transport.trim() !== '') {
             dayData.transport = day.transport;
           }
-          
+
           return dayData;
         }),
       };
@@ -294,127 +341,6 @@ export default function PlanYourTrip() {
       setIsSubmitting(false);
     }
   };
-
-  // --- Date Range Calendar ---
-  function DateRangeCalendar({ initialStart, initialEnd, onChange, onClose }) {
-    const calRef = useRef(null);
-    const [viewMonth, setViewMonth] = useState(() => {
-      const d = initialStart ? new Date(initialStart) : new Date();
-      return new Date(d.getFullYear(), d.getMonth(), 1);
-    });
-    const [rangeStart, setRangeStart] = useState(initialStart ? new Date(initialStart) : null);
-    const [rangeEnd, setRangeEnd] = useState(initialEnd ? new Date(initialEnd) : null);
-    const [selecting, setSelecting] = useState(false);
-    const [awaitingEnd, setAwaitingEnd] = useState(false);
-
-    useEffect(() => {
-      function onDoc(e) {
-        if (calRef.current && !calRef.current.contains(e.target)) onClose();
-      }
-      document.addEventListener('mousedown', onDoc);
-      return () => document.removeEventListener('mousedown', onDoc);
-    }, [onClose]);
-
-    const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
-    const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
-
-    const formatISO = (d) => {
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    };
-
-    function buildCalendar(month) {
-      const first = startOfMonth(month);
-      const startWeekDay = first.getDay();
-      const total = daysInMonth(month.getFullYear(), month.getMonth());
-      const cells = [];
-      for (let i = 0; i < startWeekDay; i++) cells.push(null);
-      for (let d = 1; d <= total; d++) cells.push(new Date(month.getFullYear(), month.getMonth(), d));
-      return cells;
-    }
-
-    function inRange(date) {
-      if (!rangeStart || !rangeEnd) return false;
-      const a = rangeStart < rangeEnd ? rangeStart : rangeEnd;
-      const b = rangeStart < rangeEnd ? rangeEnd : rangeStart;
-      return date >= startOfDay(a) && date <= startOfDay(b);
-    }
-
-    function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-
-    function handleDayDown(d) {
-      if (awaitingEnd && rangeStart) {
-        setRangeEnd(d);
-        setAwaitingEnd(false);
-        const a = rangeStart < d ? rangeStart : d;
-        const b = rangeStart < d ? d : rangeStart;
-        onChange(formatISO(a), formatISO(b));
-        return;
-      }
-
-      setSelecting(true);
-      setRangeStart(d);
-      setRangeEnd(d);
-      setAwaitingEnd(false);
-    }
-
-    function handleDayEnter(d) {
-      if (!selecting && !awaitingEnd) return;
-      setRangeEnd(d);
-    }
-
-    function handleDayUp() {
-      setSelecting(false);
-      if (rangeStart && rangeEnd) {
-        if (startOfDay(rangeStart).getTime() === startOfDay(rangeEnd).getTime()) {
-          setAwaitingEnd(true);
-          return;
-        }
-        const a = rangeStart < rangeEnd ? rangeStart : rangeEnd;
-        const b = rangeStart < rangeEnd ? rangeEnd : rangeStart;
-        onChange(formatISO(a), formatISO(b));
-      }
-    }
-
-    const cells = buildCalendar(viewMonth);
-
-    return (
-      <div ref={calRef} className="bg-white rounded-xl shadow-lg p-4 w-[320px]">
-        <div className="flex items-center justify-between mb-3">
-          <button type="button" onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))} className="px-2 py-1">◀</button>
-          <div className="font-semibold">{viewMonth.toLocaleString(undefined, { month: 'long' })} {viewMonth.getFullYear()}</div>
-          <button type="button" onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))} className="px-2 py-1">▶</button>
-        </div>
-        <div className="grid grid-cols-7 gap-1 text-xs text-center text-gray-500 mb-2">
-          {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
-        </div>
-        <div onMouseUp={handleDayUp} className="grid grid-cols-7 gap-1">
-          {cells.map((c, i) => {
-            const isNull = c === null;
-            const isSelected = !isNull && inRange(startOfDay(c));
-            return (
-              <div key={i} className={`h-8 flex items-center justify-center ${isNull ? '' : 'cursor-pointer'}`}>
-                {isNull ? <div /> : (
-                  <div
-                    onMouseDown={() => handleDayDown(startOfDay(c))}
-                    onMouseEnter={() => handleDayEnter(startOfDay(c))}
-                    className={`w-8 h-8 rounded-md flex items-center justify-center ${isSelected ? 'bg-brand-100 text-brand-700' : 'hover:bg-gray-100'}`}
-                  >
-                    {c.getDate()}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex justify-end mt-3">
-          <button type="button" onClick={() => { onClose(); }} className="px-3 py-1 text-sm text-gray-600">Close</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 font-opensans">
@@ -481,7 +407,7 @@ export default function PlanYourTrip() {
                       <Check className="w-4 sm:w-6 h-4 sm:h-6 text-white" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900 text-sm sm:text-lg">{selectedDest.label || selectedDest}</p>
+                      <p className="font-bold text-gray-900 text-sm sm:text-lg">{destLabel(selectedDest)}</p>
                       <p className="text-xs sm:text-sm text-gray-600">Destination selected</p>
                     </div>
                   </div>
@@ -587,7 +513,7 @@ export default function PlanYourTrip() {
                       Plan Your Itinerary
                     </h2>
                     <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
-                      {duration} Days / {duration - 1} Nights in {selectedDest?.label || selectedDest || 'destination'}
+                      {duration} Days / {duration - 1} Nights in {destLabel(selectedDest) || 'destination'}
                     </p>
                   </div>
                 </div>
@@ -685,7 +611,7 @@ export default function PlanYourTrip() {
                             type="text"
                             value={itineraryDays[currentDayIndex].title || ''}
                             onChange={(e) => handleDayChange(itineraryDays[currentDayIndex].dayNumber, 'title', e.target.value)}
-                            placeholder={`e.g., Arrival in ${selectedDest?.label || selectedDest || 'destination'}`}
+                            placeholder={`e.g., Arrival in ${destLabel(selectedDest) || 'destination'}`}
                             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                             required
                           />
@@ -822,7 +748,7 @@ export default function PlanYourTrip() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Add Day Button */}
                   {itineraryDays.length < duration && (
                     <div className="flex justify-center pt-4">
@@ -836,7 +762,7 @@ export default function PlanYourTrip() {
                       </button>
                     </div>
                   )}
-                  
+
                   {/* Info message when all days are added */}
                   {itineraryDays.length === duration && duration > 0 && (
                     <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
@@ -915,7 +841,7 @@ export default function PlanYourTrip() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
                       <div>
                         <div className="text-xs text-gray-500">Destination</div>
-                        <div className="font-semibold">{selectedDest?.label || selectedDest || '—'}</div>
+                        <div className="font-semibold">{destLabel(selectedDest) || '—'}</div>
                       </div>
 
                       <div>
@@ -1022,7 +948,6 @@ export default function PlanYourTrip() {
                   setStartDate('');
                   setEndDate('');
                   setTravelers(2);
-                  setSelectedActivities([]);
                   setName('');
                   setEmail('');
                   setPhone('');

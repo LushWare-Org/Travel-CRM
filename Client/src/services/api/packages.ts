@@ -44,7 +44,7 @@ export const fetchPackageById = async (id: string) => {
 /**
  * Returns the raw, non-normalized `{ success, data }` envelope for a
  * package, exactly as the (now-deleted) pdf/apiService.js's `getPackage`
- * did via `fetch`. Only for pdf/pdfService.ts's `createPackagePdfBlob`,
+ * did via `fetch`. Only for `features/packages/pdf/pdfService.ts`'s `createPackagePdfBlob`,
  * which expects this specific raw shape — every other caller wants
  * `fetchPackageById`'s normalized shape instead.
  */
