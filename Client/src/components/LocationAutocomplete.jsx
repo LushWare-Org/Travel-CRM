@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, Loader2, X } from 'lucide-react';
+import BRANDING from '../config/branding';
 
 const LocationAutocomplete = ({
   value,
@@ -39,7 +40,7 @@ const LocationAutocomplete = ({
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5&addressdetails=1`,
         {
           headers: {
-            'User-Agent': 'Trip-Sky-Way/1.0', // Nominatim requires a User-Agent
+            'User-Agent': `${BRANDING.company.shortName}/1.0`, // Nominatim requires a User-Agent
             'Accept-Language': 'en',
           },
         }
@@ -207,7 +208,7 @@ const LocationAutocomplete = ({
   return (
     <div className="relative">
       <div className="relative">
-        <MapPin className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${iconColorClass || 'text-orange-600'}`} />
+        <MapPin className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${iconColorClass || 'text-brand-600'}`} />
         <input
           ref={inputRef}
           type="text"
@@ -220,7 +221,7 @@ const LocationAutocomplete = ({
             }
           }}
           placeholder={placeholder}
-          className={`w-full pl-10 pr-8 py-2.5 rounded-xl focus:outline-none text-sm ${inputClassName || 'border border-gray-300 focus:ring-2 focus:ring-orange-500'}`}
+          className={`w-full pl-10 pr-8 py-2.5 rounded-xl focus:outline-none text-sm ${inputClassName || 'border border-gray-300 focus:ring-2 focus:ring-brand-500'}`}
         />
         {query && (
           <button
@@ -233,7 +234,7 @@ const LocationAutocomplete = ({
         )}
         {isLoading && (
           <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
-            <Loader2 className="w-4 h-4 text-orange-600 animate-spin" />
+            <Loader2 className="w-4 h-4 text-brand-600 animate-spin" />
           </div>
         )}
       </div>
@@ -249,12 +250,12 @@ const LocationAutocomplete = ({
               key={suggestion.id}
               type="button"
               onClick={() => handleSelect(suggestion)}
-              className={`w-full px-4 py-2 text-left hover:bg-orange-50 transition-colors ${
-                index === selectedIndex ? 'bg-orange-50' : ''
+              className={`w-full px-4 py-2 text-left hover:bg-brand-50 transition-colors ${
+                index === selectedIndex ? 'bg-brand-50' : ''
               }`}
             >
               <div className="flex items-start gap-2">
-                <MapPin className={`w-4 h-4 ${iconColorClass || 'text-orange-600'} mt-0.5 flex-shrink-0`} />
+                <MapPin className={`w-4 h-4 ${iconColorClass || 'text-brand-600'} mt-0.5 flex-shrink-0`} />
                 <span className="text-sm text-gray-700">{suggestion.displayName}</span>
               </div>
             </button>
