@@ -19,13 +19,13 @@ Tracks execution of the plan approved 2026-08-27. Full plan (context, decisions,
 
 ## Phase 0 — Tooling, dependency cleanup, safety net
 
-- [ ] 0.1 Create branch + this progress file, commit first
-- [ ] 0.2 Remove 11 dead deps (`@mui/*` x4, `@emotion/*` x2, `@headlessui/react`, `@stripe/*` x2, `react-icons`, `recharts`), `npm install`, re-grep to confirm zero refs
-- [ ] 0.3 Fix broken lint tooling: add missing `@eslint/js`/`globals`/`eslint-plugin-react-hooks`/`eslint-plugin-react-refresh` deps, add `"lint"` script, wire `Client/**` into root `.lintstagedrc.mjs`
-- [ ] 0.4 Bump `vite@^4.4.0` → `^8.x`, verify build/dev
-- [ ] 0.5 Add `tsconfig.json`/`tsconfig.node.json`, rename `vite.config.js`→`.ts`, add `typecheck` script
-- [ ] 0.6 Extend `eslint.config.js` with `.ts/.tsx` block mirroring `Management`
-- [ ] 0.7 Add `vitest.config.ts` + `src/test/setup.ts`, add `test`/`test:watch` scripts
+- [x] 0.1 Create branch + this progress file, commit first
+- [x] 0.2 Remove 11 dead deps (`@mui/*` x4, `@emotion/*` x2, `@headlessui/react`, `@stripe/*` x2, `react-icons`, `recharts`), `npm install`, re-grep to confirm zero refs
+- [x] 0.3 Fix broken lint tooling: add missing `@eslint/js`/`globals`/`eslint-plugin-react-hooks`/`eslint-plugin-react-refresh` deps, add `"lint"` script, wire `Client/**` into root `.lintstagedrc.mjs`
+- [x] 0.4 Bump `vite@^4.4.0` → `^8.x`, verify build/dev
+- [x] 0.5 Add `tsconfig.json`/`tsconfig.node.json`, rename `vite.config.js`→`.ts`, add `typecheck` script
+- [x] 0.6 Extend `eslint.config.js` with `.ts/.tsx` block mirroring `Management`
+- [x] 0.7 Add `vitest.config.ts` + `src/test/setup.ts`, add `test`/`test:watch` scripts
 
 **Gate 0:** `npm run dev`/`build`/`lint`/`typecheck`/`test` all green, app pixel-identical to before.
 
@@ -100,3 +100,9 @@ Tracks execution of the plan approved 2026-08-27. Full plan (context, decisions,
 ## Last session
 
 - **2026-08-27**: Plan approved. Created branch `refactor/client-productionization` (base `microservices`) and this progress file.
+  **Phase 0 complete.** Removed 11 dead deps (0.2, confirmed 0 usages before and after via grep). Fixed lint tooling (0.3): added `@eslint/js`/`globals`/`eslint-plugin-react-hooks`/`eslint-plugin-react-refresh` as transitive/direct deps, added `"lint"` script, wired `Client/**/*.{js,jsx,ts,tsx}` into root `.lintstagedrc.mjs`. Bumped `vite@4.4.0`→`^8.1.3` (0.4) with `npm install --legacy-peer-deps` — hit one real build break: Vite 8/Rolldown requires `rollupOptions.output.manualChunks` as a function, not the old chunk-name→module-array object; rewrote `vite.config.js`→`vite.config.ts` with a function-form `manualChunks` and dropped its `@mui/*`/`@headlessui/react`/`recharts` chunk entries (now-removed deps) in the same pass (0.5). Added `tsconfig.json` (`allowJs`/`checkJs:false`/`strict:false`, `@/*` alias) + `tsconfig.node.json`, `typecheck` script. Extended `eslint.config.js` with a `.ts/.tsx` block mirroring `Management`'s exact bootstrap posture (0.6).
+  **First real lint run surfaced pre-existing debt** (lint had never actually run before — deps were missing despite the config existing): 43 errors, mostly `no-unused-vars`. One was a genuine bug, not noise — `Landing/TestimonialsSection.jsx` called `useState`/`useEffect`/`useRef` after an early `return null` (conditional hooks, `react-hooks/rules-of-hooks` violation). Fixed in place (moved the guard after the hook declarations, before the JSX return) since it's a real correctness issue independent of this plan's scope, not deferred. The remaining 43 `no-unused-vars`/`no-empty` issues are pre-existing dead-code debt in files this plan already schedules for TS conversion in Phases 3-6; downgraded to `warn` for the `.jsx` block (same bootstrap posture Management used, same reasoning: don't block Phase 0 tooling work on unrelated cleanup) — now 0 errors/44 warnings.
+  Added `vitest.config.ts` + `src/test/setup.ts` (`IntersectionObserver` polyfill) (0.7); `vitest run` exits 1 on zero test files by default, added `test.passWithNoTests: true` (removed once real tests exist).
+  Booted the full local backend stack (`cd Services && npm run dev` — gateway :3000 + all 11 microservices, shared Supabase Postgres, env files already present) for live verification going forward.
+  **Gate 0 verified**: `npm run build`/`lint`/`typecheck`/`test`/`dev` all green. Live browser check (real backend running) of `/`, `/packages`, `/package/:id`, `/contact` — zero console errors, matches pre-Phase-0 behavior.
+  Next: **Phase 1** — services/lib/config → TypeScript, HTTP consolidation with retry, the three ad-hoc-HTTP-path fixes.

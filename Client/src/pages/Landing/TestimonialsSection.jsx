@@ -4,10 +4,6 @@ import BRANDING from '../../config/branding';
 import { HEADER_TITLE, HEADER_SUBTITLE } from '../../content/testimonials';
 
 export default function TestimonialsSection() {
-  if (!BRANDING.integrations.elfsightAppId) {
-    return null;
-  }
-
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [visible, setVisible] = useState(3);
 
@@ -67,6 +63,9 @@ export default function TestimonialsSection() {
     };
   }, []);
 
+  if (!BRANDING.integrations.elfsightAppId) {
+    return null;
+  }
 
   return (
     <>
