@@ -1,10 +1,9 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import Header from './pages/Header';
-import Footer from './pages/Footer';
-import WhatsAppFloating from './components/WhatsAppFloating';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import MainLayout from './layouts/MainLayout';
 import Home from './pages/Landing/Home';
 import { AuthProvider } from './context/AuthContext';
+import { PAGE_CONFIG } from './config/pages';
 
 const DestinationsInternational = lazy(() => import('./pages/DestinationsInternational'));
 const PackageDetails = lazy(() => import('./pages/PackageDetails'));
@@ -49,28 +48,28 @@ function AppContent() {
 
   const LoadingFallback = () => <div className="min-h-screen" />;
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      <Header currentPage={currentPage} onNavigate={handleNavigate} />
-      <div className="flex-1 overflow-auto">
-        <Suspense fallback={<LoadingFallback />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
+    <Suspense fallback={<LoadingFallback />}>
+      <Routes>
+        <Route element={<MainLayout currentPage={currentPage} onNavigate={handleNavigate} />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/packages" element={<Packages />} />
+          <Route path="/package/:id" element={<PackageDetails />} />
+          <Route path="/contact" element={<Contact />} />
+          {PAGE_CONFIG.destinations.enabled && (
             <Route path="/destinations-international" element={<DestinationsInternational />} />
-            <Route path="/packages" element={<Packages />} />
-            <Route path="/planner" element={<PlanYourTrip />} />
-            <Route path="/about" element={<AboutUs />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/career" element={<Career />} />
-            <Route path="/my-account" element={<MyAccount />} />
-            <Route path="/package/:id" element={<PackageDetails />} />
+          )}
+          {PAGE_CONFIG.planner.enabled && <Route path="/planner" element={<PlanYourTrip />} />}
+          {PAGE_CONFIG.planner.enabled && (
             <Route path="/package/:id/customize" element={<CustomizePackage />} />
-            <Route path="/login" element={<Login />} />
-          </Routes>
-        </Suspense>
-      </div>
-      <Footer onNavigate={handleNavigate} />
-      <WhatsAppFloating />
-    </div>
+          )}
+          {PAGE_CONFIG.about.enabled && <Route path="/about" element={<AboutUs />} />}
+          {PAGE_CONFIG.career.enabled && <Route path="/career" element={<Career />} />}
+          {PAGE_CONFIG.account.enabled && <Route path="/my-account" element={<MyAccount />} />}
+          {PAGE_CONFIG.account.enabled && <Route path="/login" element={<Login />} />}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </Suspense>
   );
 }
 

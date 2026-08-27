@@ -1,5 +1,6 @@
 import { MapPin, Phone, Mail, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
 import BRANDING, { getCopyrightText } from '../config/branding';
+import { PAGE_CONFIG } from '../config/pages';
 
 export default function Footer({ onNavigate }) {
   return (
@@ -52,21 +53,27 @@ export default function Footer({ onNavigate }) {
                   Holiday Packages
                 </button>
               </li>
-              <li>
-                <button onClick={() => onNavigate('planner')} className="hover:text-brand-accent-400 transition">
-                  Plan Your Trip
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('career')} className="hover:text-brand-accent-400 transition">
-                  Career
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('about')} className="hover:text-brand-accent-400 transition">
-                  About Us
-                </button>
-              </li>
+              {PAGE_CONFIG.planner.enabled && (
+                <li>
+                  <button onClick={() => onNavigate('planner')} className="hover:text-brand-accent-400 transition">
+                    Plan Your Trip
+                  </button>
+                </li>
+              )}
+              {PAGE_CONFIG.career.enabled && (
+                <li>
+                  <button onClick={() => onNavigate('career')} className="hover:text-brand-accent-400 transition">
+                    Career
+                  </button>
+                </li>
+              )}
+              {PAGE_CONFIG.about.enabled && (
+                <li>
+                  <button onClick={() => onNavigate('about')} className="hover:text-brand-accent-400 transition">
+                    About Us
+                  </button>
+                </li>
+              )}
               <li>
                 <button onClick={() => onNavigate('contact')} className="hover:text-brand-accent-400 transition">
                   Contact
@@ -75,16 +82,18 @@ export default function Footer({ onNavigate }) {
             </ul>
           </div>
 
-          <div>
-            <h4 className="text-white font-semibold mb-4 font-poppins">Destinations</h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <button onClick={() => onNavigate('destinations-international')} className="hover:text-brand-accent-400 transition">
-                  International Destinations
-                </button>
-              </li>
-            </ul>
-          </div>
+          {PAGE_CONFIG.destinations.enabled && (
+            <div>
+              <h4 className="text-white font-semibold mb-4 font-poppins">Destinations</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <button onClick={() => onNavigate('destinations-international')} className="hover:text-brand-accent-400 transition">
+                    International Destinations
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
 
           <div>
             <h4 className="text-white font-semibold mb-4 font-poppins">Contact Us</h4>

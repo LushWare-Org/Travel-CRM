@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../services/api/packages';
 import { useAuth } from '../context/AuthContext';
-import LazyIcon from '../components/LazyIcon';
+import LazyIcon from '../components/shared/LazyIcon';
 import { ChevronDown } from 'lucide-react';
 import BRANDING from '../config/branding';
+import { PAGE_CONFIG } from '../config/pages';
 
 const MAX_NAV_ITEMS = 12;
 
@@ -97,6 +98,7 @@ export default function Header({ currentPage, onNavigate }) {
   }, [sideMenuOpen]);
 
   const loadDestinationsOnDemand = useCallback(() => {
+    if (!PAGE_CONFIG.destinations.enabled) return;
     if (destinationsLoadRef.current || destinationsLoaded) return;
     destinationsLoadRef.current = fetchPackages({ limit: 100 })
       .then(({ destinations }) => {
@@ -122,25 +124,27 @@ export default function Header({ currentPage, onNavigate }) {
 
   const navItems = useMemo(() => [
     { name: 'Home', page: 'home' },
-    { name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu },
-    { name: 'About Us', page: 'about' },
+    PAGE_CONFIG.destinations.enabled && { name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu },
+    PAGE_CONFIG.about.enabled && { name: 'About Us', page: 'about' },
     { name: 'Contact', page: 'contact' },
-    { name: 'Career', page: 'career' },
-    user && { name: 'My Account', page: 'my-account' },
-    !user && { name: 'Login', page: 'login' },
+    PAGE_CONFIG.career.enabled && { name: 'Career', page: 'career' },
+    PAGE_CONFIG.account.enabled && user && { name: 'My Account', page: 'my-account' },
+    PAGE_CONFIG.account.enabled && !user && { name: 'Login', page: 'login' },
   ].filter(Boolean), [user, internationalMenu]);
 
-  const leftNavItems = useMemo(() => [
-    { name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu },
-  ], [internationalMenu]);
+  const leftNavItems = useMemo(() => (
+    PAGE_CONFIG.destinations.enabled
+      ? [{ name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu }]
+      : []
+  ), [internationalMenu]);
 
   const sideMenuItems = useMemo(() => [
     { name: 'Home', page: 'home' },
-    { name: 'About Us', page: 'about' },
+    PAGE_CONFIG.about.enabled && { name: 'About Us', page: 'about' },
     { name: 'Contact', page: 'contact' },
-    { name: 'Career', page: 'career' },
-    user && { name: 'My Account', page: 'my-account' },
-    !user && { name: 'Login', page: 'login' },
+    PAGE_CONFIG.career.enabled && { name: 'Career', page: 'career' },
+    PAGE_CONFIG.account.enabled && user && { name: 'My Account', page: 'my-account' },
+    PAGE_CONFIG.account.enabled && !user && { name: 'Login', page: 'login' },
   ].filter(Boolean), [user]);
 
   const isItemActive = useCallback((item) => {
@@ -246,16 +250,18 @@ export default function Header({ currentPage, onNavigate }) {
             })}
 
             {/* Right Side */}
-            <a
-              href="/planner"
-              className="group relative overflow-hidden bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2 ml-4 flex-shrink-0"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-brand-accent-500 to-brand-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative flex items-center justify-center gap-1.5">
-                <LazyIcon name="Plane" size={14} className="w-3.5 h-3.5" />
-                <span className="text-xs">Plan Your Trip</span>
-              </div>
-            </a>
+            {PAGE_CONFIG.planner.enabled && (
+              <a
+                href="/planner"
+                className="group relative overflow-hidden bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2 ml-4 flex-shrink-0"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-brand-accent-500 to-brand-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative flex items-center justify-center gap-1.5">
+                  <LazyIcon name="Plane" size={14} className="w-3.5 h-3.5" />
+                  <span className="text-xs">Plan Your Trip</span>
+                </div>
+              </a>
+            )}
           </nav>
 
           <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
@@ -384,18 +390,20 @@ export default function Header({ currentPage, onNavigate }) {
                 </div>
               );
             })}
-            <div className="border-t border-gray-800 mt-4 pt-4">
-              <a
-                href="/planner"
-                onClick={() => {
-                  onNavigate('planner');
-                  setMobileMenuOpen(false);
-                }}
-                className="block w-full text-center py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white font-semibold text-sm hover:shadow-lg transition-all"
-              >
-                Plan Your Trip
-              </a>
-            </div>
+            {PAGE_CONFIG.planner.enabled && (
+              <div className="border-t border-gray-800 mt-4 pt-4">
+                <a
+                  href="/planner"
+                  onClick={() => {
+                    onNavigate('planner');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="block w-full text-center py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white font-semibold text-sm hover:shadow-lg transition-all"
+                >
+                  Plan Your Trip
+                </a>
+              </div>
+            )}
             {user && (
               <div className="border-t border-gray-800 mt-4 pt-4">
                 <button

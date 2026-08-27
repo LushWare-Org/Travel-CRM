@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Globe, MessageSquare, Calendar, User, ArrowRight, Sparkles, Heart, Shield, Award, Loader2, Check } from 'lucide-react';
 import { submitContactForm } from '../services/api/contact';
-import DestinationSelector from '../components/DestinationSelector';
-import LocationSelector from '../components/LocationSelector';
+import DestinationSelector from '../components/shared/DestinationSelector';
+import LocationSelector from '../components/shared/LocationSelector';
 import { useAuth } from '../context/AuthContext';
 import BRANDING from '../config/branding';
 import { HERO_TITLE, HERO_SUBTITLE, OFFICE_HOURS_TEXT } from '../content/contact';

@@ -7,8 +7,8 @@ import { fetchPackageById } from '../services/api/packages';
 import { submitCustomizationRequest } from '../services/api/customization';
 import { formatCurrency } from '../lib/currency';
 import { useAuth } from '../context/AuthContext';
-import ActivitySelector from '../components/ActivitySelector';
-import LocationSelector from '../components/LocationSelector';
+import ActivitySelector from '../components/shared/ActivitySelector';
+import LocationSelector from '../components/shared/LocationSelector';
 
 const splitTextToList = (value) => {
   if (!value) return [];

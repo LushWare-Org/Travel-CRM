@@ -22,9 +22,9 @@ import {
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../services/api/manualItinerary";
-import DestinationSelector from "../components/DestinationSelector";
-import LocationSelector from "../components/LocationSelector";
-import ActivitySelector from "../components/ActivitySelector";
+import DestinationSelector from "../components/shared/DestinationSelector";
+import LocationSelector from "../components/shared/LocationSelector";
+import ActivitySelector from "../components/shared/ActivitySelector";
 import { useAuth } from "../context/AuthContext";
 
 const transportOptions = [

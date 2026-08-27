@@ -9,15 +9,36 @@ import { Search, MapPin, Globe, ChevronDown } from 'lucide-react';
 import {
   POPULAR_INTERNATIONAL,
   OTHER_INTERNATIONAL,
-} from '../config/domainData/destinations';
+} from '../../config/domainData/destinations';
 
-const DestinationSelector = ({ value, onChange, placeholder = 'Select Destination' }) => {
+interface DestinationOption {
+  value: string;
+  label: string;
+}
+
+interface DestinationSelectorProps {
+  /** Currently selected destination — an option object or a bare label string. */
+  value?: DestinationOption | string | null;
+  /** Called with the selected destination option when the user picks one. */
+  onChange: (destination: DestinationOption) => void;
+  placeholder?: string;
+}
+
+const DestinationSelector = ({ value, onChange, placeholder = 'Select Destination' }: DestinationSelectorProps) => {
+  // `value` may be either a {value,label} option object (the shape
+  // DestinationSelector emits) or a bare label string; project both
+  // interpretations explicitly so the highlight/display logic stays faithful
+  // to the original untyped behavior.
+  const isOptionValue = typeof value === 'object' && value !== null;
+  const selectedOptionValue = isOptionValue ? value.value : undefined;
+  const selectedOptionLabel = isOptionValue ? value.label : undefined;
+
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('popular-international');
   const [customDestination, setCustomDestination] = useState('');
-  const dropdownRef = useRef(null);
-  const inputRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -82,7 +103,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
             key={dest.value}
             type="button"
             onClick={() => handleSelect(dest)}
-            className={`px-3 py-2 text-sm text-left rounded-xl transition-all ${value?.value === dest.value || value?.label === dest.label
+            className={`px-3 py-2 text-sm text-left rounded-xl transition-all ${selectedOptionValue === dest.value || selectedOptionLabel === dest.label
                 ? 'bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white font-semibold shadow-md'
                 : 'bg-gray-50 hover:bg-brand-50 text-gray-700 hover:text-brand-700 border border-gray-200 hover:border-brand-300'
               }`}
@@ -104,7 +125,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
         <div className="flex items-center gap-2 flex-1">
           <MapPin className="w-5 h-5 text-brand-600 flex-shrink-0" />
           <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>
-            {value?.label || value || placeholder}
+            {selectedOptionLabel || (typeof value === 'string' ? value : '') || placeholder}
           </span>
         </div>
         <ChevronDown

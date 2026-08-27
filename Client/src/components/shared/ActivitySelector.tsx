@@ -6,9 +6,16 @@
 
 import { useState } from 'react';
 import { Plus, X, Search } from 'lucide-react';
-import { DEFAULT_ACTIVITIES, ACTIVITY_CATEGORIES } from '../config/domainData/activities';
+import { DEFAULT_ACTIVITIES, ACTIVITY_CATEGORIES } from '../../config/domainData/activities';
 
-const ActivitySelector = ({ activities = [], onChange }) => {
+interface ActivitySelectorProps {
+  /** Selected activity labels; also accepts a comma-separated string for legacy callers. */
+  activities?: string[] | string;
+  /** Called with the full updated list of selected activity labels. */
+  onChange: (activities: string[]) => void;
+}
+
+const ActivitySelector = ({ activities = [], onChange }: ActivitySelectorProps) => {
   const [showSelector, setShowSelector] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -195,4 +202,3 @@ const ActivitySelector = ({ activities = [], onChange }) => {
 };
 
 export default ActivitySelector;
-

@@ -6,10 +6,22 @@
 
 import { useState } from 'react';
 import { Plus, X, MapPin, Search } from 'lucide-react';
-import { getLocationsForDestination, ALL_LOCATIONS } from '../config/domainData/locations';
+import { getLocationsForDestination, ALL_LOCATIONS } from '../../config/domainData/locations';
 import LocationAutocomplete from './LocationAutocomplete';
 
-const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
+/** A destination as emitted by DestinationSelector, or a bare label string. */
+type DestinationLike = string | { label?: string; value?: string } | null | undefined;
+
+interface LocationSelectorProps {
+  /** Selected location names; also accepts a comma-separated string for legacy callers. */
+  locations?: string[] | string;
+  /** Called with the full updated list of selected location names. */
+  onChange: (locations: string[]) => void;
+  /** The selected destination, used to scope the popular-locations list. */
+  destination?: DestinationLike;
+}
+
+const LocationSelector = ({ locations = [], onChange, destination = '' }: LocationSelectorProps) => {
   const [showSelector, setShowSelector] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [customLocation, setCustomLocation] = useState('');
@@ -60,7 +72,7 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
     }
   };
 
-  const handleCustomLocationSelect = (value) => {
+  const handleCustomLocationSelect = (value: string) => {
     if (value && !locationsArray.includes(value)) {
       onChange([...locationsArray, value]);
       setCustomLocation('');
@@ -227,4 +239,3 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }) => {
 };
 
 export default LocationSelector;
-

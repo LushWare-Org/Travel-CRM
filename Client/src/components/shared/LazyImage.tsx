@@ -1,4 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
+
+interface LazyImageProps {
+  /** Image URL; the real src is only applied once the placeholder scrolls into view. */
+  src?: string
+  alt?: string
+  className?: string
+  placeholderClassName?: string
+  onLoad?: (() => void) | null
+  onError?: (() => void) | null
+}
+
 export default function LazyImage({
   src,
   alt,
@@ -6,11 +17,11 @@ export default function LazyImage({
   placeholderClassName = '',
   onLoad = null,
   onError = null,
-}) {
-  const [imageSrc, setImageSrc] = useState(null)
+}: LazyImageProps) {
+  const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(false)
-  const imgRef = useRef(null)
+  const imgRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!src) {
@@ -18,6 +29,12 @@ export default function LazyImage({
       setIsLoading(false)
       return
     }
+
+    // Capture the node once: the div this ref points at is stable for the
+    // component's lifetime, and reading `imgRef.current` in the cleanup
+    // would trip the exhaustive-deps rule.
+    const node = imgRef.current
+    if (!node) return
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -33,14 +50,10 @@ export default function LazyImage({
       }
     )
 
-    if (imgRef.current) {
-      observer.observe(imgRef.current)
-    }
+    observer.observe(node)
 
     return () => {
-      if (imgRef.current) {
-        observer.unobserve(imgRef.current)
-      }
+      observer.unobserve(node)
     }
   }, [src])
 

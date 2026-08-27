@@ -1,6 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, Loader2, X } from 'lucide-react';
-import BRANDING from '../config/branding';
+import BRANDING from '../../config/branding';
+
+/**
+ * One result from the Nominatim /search endpoint. Only the fields the
+ * component reads are declared; the rest of the (much larger) payload is
+ * ignored. Unvalidated external API boundary — shape mirrors the live API.
+ */
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  name?: string;
+  lat: string;
+  lon: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    state?: string;
+    country?: string;
+  };
+}
+
+interface LocationSuggestion {
+  id: number;
+  displayName: string;
+  fullName: string;
+  lat: string;
+  lon: string;
+}
+
+interface LocationAutocompleteProps {
+  value?: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  onSelect?: (value: string) => void;
+  inputClassName?: string;
+  iconColorClass?: string;
+}
 
 const LocationAutocomplete = ({
   value,
@@ -9,15 +46,15 @@ const LocationAutocomplete = ({
   onSelect,
   inputClassName,
   iconColorClass,
-}) => {
+}: LocationAutocompleteProps) => {
   const [query, setQuery] = useState(value || '');
-  const [suggestions, setSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const inputRef = useRef(null);
-  const suggestionsRef = useRef(null);
-  const debounceTimerRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Sync with external value changes
   useEffect(() => {
@@ -25,7 +62,7 @@ const LocationAutocomplete = ({
   }, [value]);
 
   // Debounced search function
-  const searchLocations = async (searchQuery) => {
+  const searchLocations = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.trim().length < 2) {
       setSuggestions([]);
       setIsLoading(false);
@@ -50,7 +87,7 @@ const LocationAutocomplete = ({
         throw new Error('Location search failed');
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as NominatimResult[];
       
       // Format results
       const formattedSuggestions = data.map((item, index) => {
@@ -108,9 +145,7 @@ const LocationAutocomplete = ({
     setSelectedIndex(-1);
     
     // Clear previous timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
+    clearTimeout(debounceTimerRef.current);
 
     // Debounce: wait 500ms after user stops typing
     debounceTimerRef.current = setTimeout(() => {
@@ -125,7 +160,7 @@ const LocationAutocomplete = ({
   };
 
   // Handle selection
-  const handleSelect = (suggestion) => {
+  const handleSelect = (suggestion: LocationSuggestion) => {
     setQuery(suggestion.displayName);
     setSuggestions([]);
     setShowSuggestions(false);
@@ -274,4 +309,3 @@ const LocationAutocomplete = ({
 };
 
 export default LocationAutocomplete;
-
