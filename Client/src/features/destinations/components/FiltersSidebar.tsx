@@ -1,4 +1,5 @@
 import { Search, Filter, X, Globe, ChevronRight, IndianRupee, Star } from 'lucide-react';
+import { getCurrencySymbol } from '../../../lib/currency';
 
 export interface PriceRange {
   label: string;
@@ -6,15 +7,17 @@ export interface PriceRange {
   max: number;
 }
 
+const CURRENCY_SYMBOL = getCurrencySymbol();
+
 const filterOptions = {
   regions: ['All', 'Asia', 'Europe', 'Middle East', 'Oceania', 'Africa', 'Americas'],
   priceRanges: [
-    { label: 'Below ₹ 50 k', min: 0, max: 50000 },
-    { label: '₹ 50k - ₹ 75k', min: 50000, max: 75000 },
-    { label: '₹ 75k - ₹ 1 L', min: 75000, max: 100000 },
-    { label: '₹ 1 L - ₹ 1.5L', min: 100000, max: 150000 },
-    { label: '₹ 1.5L - ₹ 2 L', min: 150000, max: 200000 },
-    { label: 'Above ₹ 2L', min: 200000, max: Infinity },
+    { label: `Below ${CURRENCY_SYMBOL} 50 k`, min: 0, max: 50000 },
+    { label: `${CURRENCY_SYMBOL} 50k - ${CURRENCY_SYMBOL} 75k`, min: 50000, max: 75000 },
+    { label: `${CURRENCY_SYMBOL} 75k - ${CURRENCY_SYMBOL} 1 L`, min: 75000, max: 100000 },
+    { label: `${CURRENCY_SYMBOL} 1 L - ${CURRENCY_SYMBOL} 1.5L`, min: 100000, max: 150000 },
+    { label: `${CURRENCY_SYMBOL} 1.5L - ${CURRENCY_SYMBOL} 2 L`, min: 150000, max: 200000 },
+    { label: `Above ${CURRENCY_SYMBOL} 2L`, min: 200000, max: Infinity },
   ],
   ratings: [5, 4, 3],
 };

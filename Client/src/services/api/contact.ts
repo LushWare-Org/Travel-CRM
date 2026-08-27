@@ -1,6 +1,12 @@
+import { z } from 'zod';
 import httpClient from '../http/client';
+import { parseEnvelope } from '../http/envelope';
+import { WebsiteContactRequest, WebsiteContactResult } from '@travel-crm/contracts';
 
-export const submitContactForm = async (payload: Record<string, unknown>) => {
-  const response = await httpClient.post('/leads/website-contact', payload);
-  return response.data;
+type ContactPayload = z.infer<typeof WebsiteContactRequest>;
+
+export const submitContactForm = async (payload: ContactPayload) => {
+  const body = WebsiteContactRequest.parse(payload);
+  const response = await httpClient.post('/leads/website-contact', body);
+  return parseEnvelope(WebsiteContactResult, response.data, 'POST /leads/website-contact').data;
 };

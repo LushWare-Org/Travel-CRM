@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchPackages } from '../../../services/api/packages';
 import type { NormalizedPackage } from '../../../services/api/packages.transform';
 import { formatCurrency } from '../../../lib/currency';
+import { FALLBACK_IMAGE } from '../../../config/media';
 
 /** A category-derived card shown in the stats section carousel. */
 interface CategoryPackage {
@@ -51,7 +52,7 @@ export default function RecommendedPackagesSection() {
             id: lowestPricePackage.id,
             title: `${category} Packages`,
             categoryName: category,
-            image: lowestPricePackage.image_url || lowestPricePackage.images?.[0],
+            image: lowestPricePackage.image_url || lowestPricePackage.images?.[0] || FALLBACK_IMAGE,
             price: lowestPricePackage.price_from,
             slug: lowestPricePackage.slug,
             description: getShortDescription(lowestPricePackage.description),
@@ -221,6 +222,9 @@ export default function RecommendedPackagesSection() {
                                 src={pkg.image}
                                 alt={pkg.title}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                onError={(e) => {
+                                  e.currentTarget.src = FALLBACK_IMAGE;
+                                }}
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>

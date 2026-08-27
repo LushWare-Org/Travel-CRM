@@ -39,7 +39,7 @@ beforeAll(() => {
 beforeEach(() => {
   mocks.useAuth.mockReturnValue({ user: null });
   submitMock.mockReset();
-  submitMock.mockResolvedValue({ success: true });
+  submitMock.mockResolvedValue({ leadId: 'lead-1', manualItineraryId: 'mi-1' });
 });
 
 describe('PlanYourTripContainer', () => {

@@ -2,16 +2,26 @@ import { useState } from 'react';
 import { Check, Play, X } from 'lucide-react';
 import { REVIEW_VIDEOS } from '../../../config/media';
 
+const whyTravelWithUs = [
+  {
+    title: 'Personalized Itineraries',
+    description: 'Every journey is uniquely crafted to match your dreams and preferences',
+    video: REVIEW_VIDEOS[0],
+  },
+  {
+    title: 'Expert Local Guides',
+    description: 'Connect with authentic experiences through our expert local guides',
+    video: REVIEW_VIDEOS[1],
+  },
+  {
+    title: 'Best Price Guarantee',
+    description: 'Transparent pricing with no hidden fees, your trust matters to us',
+    video: REVIEW_VIDEOS[2],
+  },
+];
+
 export default function WhyChooseUs() {
   const [selectedVideo, setSelectedVideo] = useState<(typeof REVIEW_VIDEOS)[number] | null>(null);
-  const videos = REVIEW_VIDEOS;
-
-  const features = ['Personalized Itineraries', 'Expert Local Guides', 'Best Price Guarantee'];
-  const featureDescriptions = [
-    'Every journey is uniquely crafted to match your dreams and preferences',
-    'Connect with authentic experiences through our expert local guides',
-    'Transparent pricing with no hidden fees, your trust matters to us'
-  ];
 
   return (
     <section className="py-12 bg-brand-dark-900 relative overflow-hidden font-opensans">
@@ -29,7 +39,7 @@ export default function WhyChooseUs() {
 
         {/* Alternating Pattern Section */}
         <div className="space-y-12">
-          {videos.map((video, index) => (
+          {whyTravelWithUs.map((item, index) => (
             <div
               key={index}
               className={`grid grid-cols-1 md:grid-cols-2 gap-6 items-center ${
@@ -40,7 +50,7 @@ export default function WhyChooseUs() {
               <div className={index % 2 === 1 ? 'md:order-2' : 'md:order-1'}>
                 <div className="relative overflow-hidden rounded-xl aspect-[16/9] bg-gray-700 hover:shadow-xl transition-all duration-300 group cursor-pointer max-w-sm">
                   <video
-                    src={video.file}
+                    src={item.video.file}
                     className="w-full h-full object-cover"
                     muted
                     loop
@@ -51,7 +61,7 @@ export default function WhyChooseUs() {
                   <div className="absolute inset-0 bg-black/20 transition-all duration-300"></div>
                   {/* Play Icon */}
                   <button
-                    onClick={() => setSelectedVideo(video)}
+                    onClick={() => setSelectedVideo(item.video)}
                     className="absolute inset-0 flex items-center justify-center z-raised"
                   >
                     <div className="w-14 h-14 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/50 transition-all duration-300">
@@ -70,10 +80,10 @@ export default function WhyChooseUs() {
                     </div>
                     <div className="flex flex-col">
                       <h3 className="text-xl font-bold text-white mb-2 font-poppins text-left">
-                        {features[index]}
+                        {item.title}
                       </h3>
                       <p className="text-gray-300 text-sm text-left leading-relaxed">
-                        {featureDescriptions[index]}
+                        {item.description}
                       </p>
                     </div>
                   </div>

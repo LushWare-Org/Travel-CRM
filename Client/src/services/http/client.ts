@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { HTTP_CONFIG } from './config';
 import { computeDelayMs, shouldRetry, type RetryableRequestConfig } from './retry';
-import { getToken } from '../auth/tokenStorage';
+import { getToken, clear as clearToken } from '../auth/tokenStorage';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -20,6 +20,7 @@ httpClient.interceptors.request.use(
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`);
     }
+    config.headers.set('x-request-id', crypto.randomUUID());
     return config;
   },
   (error) => Promise.reject(error),
@@ -39,6 +40,14 @@ httpClient.interceptors.response.use(
       }
     }
 
+    if (error.response?.status === 401) {
+      const url = config?.url || '';
+      const isAuthAttempt = url.includes('/auth/login') || url.includes('/auth/register');
+      if (!isAuthAttempt) {
+        clearToken();
+        window.location.assign('/login');
+      }
+    }
     // Same error-enrichment shape the old utils/apiClient.js used — every
     // existing catch block across the app reads err.message/.status/.errors.
     const data = (error.response?.data as { message?: string; errors?: Array<{ message: string }> }) || {};

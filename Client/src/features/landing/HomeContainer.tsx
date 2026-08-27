@@ -25,18 +25,17 @@ import {
 
 /** Raw shape of a recent booking as returned by `fetchRecentBookings`. */
 interface RecentBooking {
-  package?: {
-    _id?: string;
-    name?: string;
-    images?: Array<{ url?: string }>;
-    duration?: number;
-    price?: number;
-    slug?: string;
-    destination?: string;
-  };
+  id?: string;
+  packageId?: string;
+  packageName?: string;
+  packageDestination?: string;
+  packageDuration?: number;
+  packageCoverImage?: string;
+  packageSlug?: string;
+  packagePrice?: number;
   createdAt?: string;
   numberOfTravelers?: number;
-  user?: { name?: string };
+  userName?: string;
 }
 
 /** Placeholder phrases cycled by the hero search bar's typewriter effect. */
@@ -185,9 +184,9 @@ export default function HomeContainer() {
   useEffect(() => {
     let mounted = true;
     fetchRecentBookings(8)
-      .then((bookingsData: RecentBooking[]) => {
+      .then((bookingsData) => {
         if (!mounted) return;
-        setBookings(bookingsData || []);
+        setBookings((bookingsData as RecentBooking[]) || []);
       })
       .catch((err: Error) => {
         if (!mounted) return;
@@ -221,8 +220,7 @@ export default function HomeContainer() {
     return bookings
       .map((booking, i) => {
         try {
-          const pkg = booking.package;
-          if (!pkg) return null;
+          if (!booking.packageId) return null;
 
           const timeDiffSeconds = booking.createdAt
             ? Math.floor((Date.now() - new Date(booking.createdAt).getTime()) / 1000)
@@ -251,18 +249,21 @@ export default function HomeContainer() {
           }
 
           return {
-            id: pkg._id,
-            packageName: pkg.name,
-            image: pkg.images && pkg.images[0] && pkg.images[0].url ? pkg.images[0].url : '',
-            duration: `${pkg.duration ?? 0}D/${(pkg.duration ?? 0) - 1}N`,
-            price: pkg.price,
+            id: booking.packageId,
+            packageName: booking.packageName,
+            image: booking.packageCoverImage || '',
+            duration:
+              booking.packageDuration && booking.packageDuration > 0
+                ? `${booking.packageDuration}D/${booking.packageDuration - 1}N`
+                : '',
+            price: booking.packagePrice,
             pax: booking.numberOfTravelers,
             bookedAgo: bookedAgoText,
             traveler: {
-              name: booking.user?.name || `Traveler ${i + 1}`,
-              from: pkg.destination,
+              name: booking.userName || `Traveler ${i + 1}`,
+              from: booking.packageDestination,
             },
-            slug: pkg.slug,
+            slug: booking.packageSlug,
           };
         } catch (error) {
           console.error('Error mapping booking:', error, booking);

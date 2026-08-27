@@ -1,12 +1,12 @@
 import httpClient from '../http/client';
+import { parseEnvelope } from '../http/envelope';
+import { ProfileUpdateRequest, ProfileUpdateResult } from '@travel-crm/contracts';
+import type { z } from 'zod';
 
-interface ProfilePayload {
-  name: string;
-  email: string;
-  phone: string;
-}
+type ProfilePayload = z.infer<typeof ProfileUpdateRequest>;
 
 export const updateProfile = async (payload: ProfilePayload) => {
-  const response = await httpClient.put('/users/profile', payload);
-  return response.data;
+  const body = ProfileUpdateRequest.parse(payload);
+  const response = await httpClient.put('/users/profile', body);
+  return parseEnvelope(ProfileUpdateResult, response.data, 'PUT /users/profile').data;
 };

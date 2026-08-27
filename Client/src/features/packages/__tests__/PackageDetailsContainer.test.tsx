@@ -62,6 +62,8 @@ const mockPackage = {
   },
   duration_days: 7,
   price_from: 1200,
+  currency: 'INR',
+  termsAndConditions: '',
   category: 'Adventure',
   difficulty: 'Moderate',
   rating: 4.9,
@@ -73,7 +75,7 @@ const mockPackage = {
   inclusions: ['Luxury hotel', 'Daily breakfast'],
   exclusions: ['International flights'],
   activities: ['Trekking'],
-  itinerary: [{ dayNumber: 1, title: 'Arrival', description: 'Welcome to Bali' }],
+  itinerary: [{ dayNumber: 1, title: 'Arrival', description: 'Welcome to Bali', locations: ['Denpasar'], activities: ['Airport pickup'] }],
   isFeatured: true,
   isActive: true,
   createdAt: new Date(),
@@ -99,7 +101,7 @@ beforeEach(() => {
   generateAndDownloadPDFMock.mockReset();
   fetchPackageByIdMock.mockResolvedValue(mockPackage);
   fetchPackageReviewsMock.mockResolvedValue({ reviews: [], pagination: null });
-  submitReviewMock.mockResolvedValue(null);
+  submitReviewMock.mockResolvedValue({ id: 'rev-1', rating: 5, comment: 'Great trip!' });
   submitBookingRequestMock.mockResolvedValue({ success: true });
   generateAndDownloadPDFMock.mockResolvedValue(undefined);
 });
@@ -138,7 +140,6 @@ describe('PackageDetailsContainer', () => {
       endDate: undefined,
       message: undefined,
       packageId: 'pkg-1',
-      type: 'booking',
     });
     expect(await screen.findByText('Booking Submitted Successfully!')).toBeInTheDocument();
   });

@@ -22,15 +22,15 @@ const VacancyList = ({ vacancies, loading, onApply }: VacancyListProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {vacancies.map((job) => (
               <div
-                key={job._id}
+                key={job.id}
                 className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
               >
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">{job.position}</h3>
                 <div className="space-y-2 mb-4 text-sm text-gray-600">
                   <p>{job.type}</p>
                   <p>{job.location}</p>
-                  {job.experience?.min !== undefined && (
-                    <p>{job.experience.min}+ years experience</p>
+                  {job.experienceMin !== undefined && (
+                    <p>{job.experienceMin}+ years experience</p>
                   )}
                 </div>
                 <a

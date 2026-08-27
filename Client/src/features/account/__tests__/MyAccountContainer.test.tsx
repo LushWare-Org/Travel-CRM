@@ -52,7 +52,9 @@ const loggedInUser = {
 const sampleBookings = [
   {
     _id: 'b1',
-    package: { _id: 'p1', name: 'Bali Honeymoon', destination: 'Bali, Indonesia' },
+    packageId: 'p1',
+    packageName: 'Bali Honeymoon',
+    packageDestination: 'Bali, Indonesia',
     bookingStatus: 'confirmed',
     paymentStatus: 'paid',
     totalAmount: 5000,
@@ -79,7 +81,7 @@ const sampleManualItineraries = [
   {
     _id: 'm1',
     lead: { name: 'Goa Road Trip', destination: 'Goa', numberOfTravelers: 3 },
-    days: [{}, {}, {}],
+    days: [{ dayNumber: 1 }, { dayNumber: 2 }, { dayNumber: 3 }],
     status: 'pending',
     createdAt: '2026-01-12',
   },
@@ -103,7 +105,7 @@ describe('MyAccountContainer', () => {
     fetchUserBookingsMock.mockResolvedValue(sampleBookings);
     fetchUserCustomizedPackagesMock.mockResolvedValue(sampleCustomizedPackages);
     fetchUserManualItinerariesMock.mockResolvedValue(sampleManualItineraries);
-    updateProfileMock.mockResolvedValue({});
+    updateProfileMock.mockResolvedValue({ user: { name: 'Jane Doe', email: 'jane.doe@example.com' } });
     mergeStoredUserMock.mockReturnValue({ ...loggedInUser });
   });
 

@@ -21,3 +21,7 @@ export const REVIEW_VIDEOS = [
   { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives6.mp4' },
   { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives5.mp4' },
 ];
+
+// Shared placeholder shown when a package/destination has no real image.
+// A new deployment replaces this with a branded placeholder asset.
+export const FALLBACK_IMAGE = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';

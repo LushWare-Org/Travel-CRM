@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import errorHandler from './middleware/errorHandler.js';
 import { correlationId, requestLogger } from './middleware/requestLogger.js';
 import leadRoutes from './routes/lead.routes.js';
+import customizedPackageRoutes from './routes/customizedPackage.routes.js';
+import manualItineraryRoutes from './routes/manualItinerary.routes.js';
 
 // The Express app, built without starting a server or connecting to the DB so
 // it can be imported directly by supertest. `src/index.js` owns the lifecycle.
@@ -23,6 +25,8 @@ app.get('/health', (req, res) =>
 );
 
 app.use('/api/v1/leads', leadRoutes);
+app.use('/api/v1/customized-packages', customizedPackageRoutes);
+app.use('/api/v1/manual-itineraries', manualItineraryRoutes);
 app.use((req, res) => res.status(404).json({ success: false, message: `Route not found: ${req.path}` }));
 app.use(errorHandler);
 

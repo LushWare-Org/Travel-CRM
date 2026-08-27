@@ -9,11 +9,11 @@ import { isImgbbConfigured, uploadResumeToImgbb } from './services/imageUpload';
 
 /** A job opening as returned by GET /vacancies. */
 export interface Vacancy {
-  _id: string;
+  id: string;
   position: string;
   type: string;
   location: string;
-  experience?: { min?: number };
+  experienceMin?: number;
 }
 
 /** Raw application-form field state (pre-trim/pre-submit). */
@@ -44,12 +44,6 @@ export interface ApplicationPayload extends Record<string, unknown> {
   resumeFileName: string;
 }
 
-/** Untyped response envelope from the careers API. */
-interface ApiVacanciesResponse {
-  status?: string;
-  data?: { vacancies?: Vacancy[] };
-}
-
 const EMPTY_FORM: ApplicationFormData = {
   fullName: '',
   email: '',
@@ -73,10 +67,8 @@ export default function CareerContainer() {
     const fetchVacancies = async () => {
       try {
         setLoadingVacancies(true);
-        const response = (await careerService.getActiveVacancies({
-          status: 'active',
-        })) as ApiVacanciesResponse;
-        setVacancies(response.data?.vacancies || []);
+        const vacancies = await careerService.getActiveVacancies({ status: 'active' });
+        setVacancies(vacancies);
       } catch (error) {
         console.error('Error fetching vacancies:', error);
         setVacancies([]);

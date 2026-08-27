@@ -134,7 +134,7 @@ const ApplicationForm = ({
           >
             <option value="">-- Choose a position --</option>
             {vacancies.map((pos) => (
-              <option key={pos._id} value={pos.position}>
+              <option key={pos.id} value={pos.position}>
                 {pos.position} - {pos.location}
               </option>
             ))}

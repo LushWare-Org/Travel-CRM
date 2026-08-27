@@ -49,8 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async ({ email, password }: LoginPayload): Promise<AuthUser> => {
-      const response = await apiLogin({ email, password });
-      const { token: respToken, user: respUser } = response?.data || {};
+      const { token: respToken, user: respUser } = await apiLogin({ email, password });
       if (!respUser) {
         throw new Error('Invalid login response from server');
       }
@@ -63,8 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async ({ name, email, phone, password, confirmPassword }: RegisterPayload): Promise<AuthUser> => {
-      const response = await apiRegister({ name, email, phone, password, confirmPassword });
-      const { token: respToken, user: respUser } = response?.data || {};
+      const { token: respToken, user: respUser } = await apiRegister({ name, email, phone, password, confirmPassword });
       if (!respUser) {
         throw new Error('Invalid registration response from server');
       }

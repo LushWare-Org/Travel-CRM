@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Clock, User } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
+import { FALLBACK_IMAGE } from '../../../config/media';
 
 /** One recent-booking card, as shaped by HomeContainer's `recentItems`. */
 export interface RecentBookingItem {
@@ -171,15 +172,18 @@ export default function RecentlyBookedSlider({ items = [] }: RecentlyBookedSlide
                       <div className="relative aspect-[4/3] overflow-hidden">
                        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
                         <img
-                          src={item.image}
-                          alt={item.packageName}
+                          src={item.image || FALLBACK_IMAGE}
+                          alt={item.packageName || 'Travel Package'}
+                          onError={(e) => {
+                            e.currentTarget.src = FALLBACK_IMAGE;
+                          }}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
                         <div className="absolute top-3 right-3">
                           <span className="bg-gray-200 border px-2 py-1 rounded-full text-xs font-semibold text-black">
-                            {item.bookedAgo} ago
+                            {item.bookedAgo ? `${item.bookedAgo} ago` : 'Recently'}
                           </span>
                         </div>
 
@@ -195,7 +199,7 @@ export default function RecentlyBookedSlider({ items = [] }: RecentlyBookedSlide
 
                       <div className="p-5">
                         <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-brand-accent-600 transition-colors line-clamp-2">
-                          {item.packageName}
+                          {item.packageName || 'Travel Package'}
                         </h3>
 
                         <div className="flex items-center justify-between text-xs text-gray-600 mb-4">

@@ -33,23 +33,21 @@ const submitCustomizationRequestMock = vi.mocked(submitCustomizationRequest);
 
 const rawPackage = {
   _id: 'pkg-123',
-  name: 'Sri Lanka Highlights',
+  title: 'Sri Lanka Highlights',
   description: 'A 7-day tour across Sri Lanka',
   destination: 'Sri Lanka',
-  duration: 7,
-  price: 1299,
+  durationDays: 7,
+  sellPrice: 1299,
   images: [{ url: 'https://example.com/sri-lanka.jpg' }],
-  itinerary: {
-    days: [
-      {
-        dayNumber: 1,
-        title: 'Day 1',
-        description: 'Arrival in Colombo',
-        activities: ['Beach'],
-        locations: ['Colombo'],
-      },
-    ],
-  },
+  itineraryDays: [
+    {
+      dayNumber: 1,
+      title: 'Day 1',
+      description: 'Arrival in Colombo',
+      activities: [{ activity: { name: 'Beach' } }],
+      places: [{ place: { name: 'Colombo' } }],
+    },
+  ],
 };
 
 beforeEach(() => {
@@ -58,7 +56,7 @@ beforeEach(() => {
   fetchPackageByIdMock.mockReset();
   fetchPackageByIdMock.mockResolvedValue(normalizePackage(rawPackage));
   submitCustomizationRequestMock.mockReset();
-  submitCustomizationRequestMock.mockResolvedValue({ success: true });
+  submitCustomizationRequestMock.mockResolvedValue({ customizedPackageId: 'cp-1', leadId: 'lead-1' });
 });
 
 describe('CustomizePackageContainer', () => {

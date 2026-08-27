@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
-import { FALLBACK_IMAGE } from './constants';
+import { FALLBACK_IMAGE } from '../../../config/media';
 import type { PreparedDestination } from '../DestinationsContainer';
 
 interface DestinationCardProps {

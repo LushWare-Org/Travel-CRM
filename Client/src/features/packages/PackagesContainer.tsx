@@ -10,6 +10,7 @@ import FiltersSidebar, { type RangeOption } from './components/FiltersSidebar';
 import PackageCard from './components/PackageCard';
 import PackageListItem from './components/PackageListItem';
 import Pagination from './components/Pagination';
+import { pluralize } from '../../lib/pluralize';
 
 export type SortOption = 'popularity' | 'price-low' | 'price-high' | 'duration';
 export type ViewMode = 'grid' | 'list';
@@ -196,7 +197,7 @@ export default function PackagesContainer() {
       <HeroSection
         isVisible={isVisible}
         title={categoryLabel || destinationLabel}
-        subtitle={`${categoryLabel ? categoryLabel + ' Packages' : destinationTypeLabel} • ${filteredPackages.length} packages available`}
+        subtitle={`${categoryLabel ? categoryLabel + ' Packages' : destinationTypeLabel} • ${pluralize(filteredPackages.length, 'package')} available`}
       />
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">

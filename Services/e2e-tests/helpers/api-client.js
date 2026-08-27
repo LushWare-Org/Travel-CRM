@@ -24,7 +24,16 @@ async function request(method, path, { role, body, headers = {} } = {}) {
   });
 
   const text = await res.text();
-  const json = text ? JSON.parse(text) : undefined;
+  let json;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // Non-JSON body (e.g. a plaintext rate-limit response) — surface it
+      // as-is rather than crashing the caller with a JSON.parse error.
+      json = { message: text };
+    }
+  }
   return { status: res.status, ok: res.ok, body: json };
 }
 

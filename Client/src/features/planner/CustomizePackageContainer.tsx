@@ -7,6 +7,7 @@ import { fetchPackageById } from '../../services/api/packages';
 import type { NormalizedPackage } from '../../services/api/packages.transform';
 import { submitCustomizationRequest } from '../../services/api/customization';
 import { formatCurrency } from '../../lib/currency';
+import { pluralize } from '../../lib/pluralize';
 import { useAuth } from '../../contexts/AuthContext';
 import ActivitySelector from '../../components/shared/ActivitySelector';
 import LocationSelector from '../../components/shared/LocationSelector';
@@ -75,9 +76,8 @@ export default function CustomizePackageContainer() {
         if (!isMounted) return;
         setPkg(data);
 
-        // Get itinerary days from raw data (includes activities and locations)
-        const rawItinerary = data?.raw?.itinerary;
-        const itineraryDays = rawItinerary?.days || data?.itinerary || [];
+        // Get itinerary days (activities/locations flattened by packages.transform.ts)
+        const itineraryDays = data?.itinerary || [];
 
         const initialDays = Array.isArray(itineraryDays)
           ? itineraryDays.map((day, index) => buildDayState(day, index))
@@ -160,8 +160,14 @@ export default function CustomizePackageContainer() {
       return;
     }
 
+    const packageId = pkg.id || pkg?.raw?._id;
+    if (!packageId) {
+      alert('Unable to submit customization request. Please try again later.');
+      return;
+    }
+
     const payload = {
-      packageId: pkg.id || pkg?.raw?._id,
+      packageId,
       name: contact.name?.trim() || '',
       email: contact.email.trim(),
       phone: contact.phone?.trim() || '',
@@ -253,7 +259,7 @@ export default function CustomizePackageContainer() {
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 lg:gap-6 mt-2 sm:mt-4">
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 sm:px-6 py-2 sm:py-3 border border-white/30">
                   <p className="text-xs text-white/80 uppercase tracking-wide mb-0.5 sm:mb-1">Duration</p>
-                  <p className="text-xl sm:text-2xl font-bold text-white">{pkg.duration_days} Days</p>
+                  <p className="text-xl sm:text-2xl font-bold text-white">{pluralize(pkg.duration_days, 'Day')}</p>
                 </div>
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 sm:px-6 py-2 sm:py-3 border border-white/30">
                   <p className="text-xs text-white/80 uppercase tracking-wide mb-0.5 sm:mb-1">From</p>
