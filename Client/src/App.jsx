@@ -9,10 +9,10 @@ const DestinationsInternational = lazy(() => import('./pages/DestinationsInterna
 const PackageDetails = lazy(() => import('./pages/PackageDetails'));
 const CustomizePackage = lazy(() => import('./pages/CustomizePackage'));
 const Packages = lazy(() => import('./pages/Packages'));
-const AboutUs = lazy(() => import('./pages/About'));
-const Contact = lazy(() => import('./pages/Contact'));
-const Career = lazy(() => import('./pages/Career'));
-const Login = lazy(() => import('./pages/Login'));
+const AboutUs = lazy(() => import('./pages/AboutPage'));
+const Contact = lazy(() => import('./pages/ContactPage'));
+const Career = lazy(() => import('./pages/CareerPage'));
+const Login = lazy(() => import('./pages/LoginPage'));
 const MyAccount = lazy(() => import('./pages/MyAccount'));
 const PlanYourTrip = lazy(() => import('./pages/PlanYourTrip'));
 

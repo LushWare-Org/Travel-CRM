@@ -1,16 +1,41 @@
-import { Globe, Compass } from 'lucide-react';
+import { Compass, Globe, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
-import { TEAM_MEMBERS, STORY_PARAGRAPHS } from '../content/about';
-import BRANDING from '../config/branding';
-import { HERO_VIDEOS } from '../config/media';
+import { STORY_PARAGRAPHS, TEAM_MEMBERS } from '../../content/about';
+import BRANDING from '../../config/branding';
+import { HERO_VIDEOS } from '../../config/media';
+
+// content/about.js is an untyped JS module (checkJs: false); these interfaces
+// describe the exact shapes this container consumes from it.
+interface TeamMember {
+  name: string;
+  role: string;
+  image: string;
+  bio: string;
+  social?: {
+    linkedin?: string;
+    twitter?: string;
+    email?: string;
+  };
+}
+
+interface AboutTab {
+  id: 'story' | 'mission';
+  label: string;
+  icon: LucideIcon;
+}
+
+const teamMembers: TeamMember[] = TEAM_MEMBERS;
+const storyParagraphs: string[] = STORY_PARAGRAPHS;
 
 const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v3');
 
-export default function AboutUs() {
+export default function AboutContainer() {
   const [activeTab, setActiveTab] = useState('story');
-  const [hoveredMember, setHoveredMember] = useState(null);
+  // The hovered index was declared but never read in the original About.jsx;
+  // keep the setter so the card hover handlers behave identically.
+  const [, setHoveredMember] = useState<number | null>(null);
 
-  const tabs = [
+  const tabs: AboutTab[] = [
     { id: 'story', label: 'Our Story', icon: Globe },
     { id: 'mission', label: 'Mission & Vision', icon: Compass },
   ];
@@ -19,15 +44,15 @@ export default function AboutUs() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50">
       <div className="relative h-[50vh] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/60 z-10"></div>
-          <video
-            className="absolute inset-0 w-full h-full object-cover"
-            src={heroVideo?.video}
-            autoPlay
-            muted
-            loop
-            playsInline
-            aria-hidden="true"
-          />
+        <video
+          className="absolute inset-0 w-full h-full object-cover"
+          src={heroVideo?.video}
+          autoPlay
+          muted
+          loop
+          playsInline
+          aria-hidden="true"
+        />
         <div className="relative z-20 h-full flex flex-col items-center justify-center text-white px-4">
           <div className="text-center max-w-4xl">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
@@ -41,7 +66,7 @@ export default function AboutUs() {
             </p>
           </div>
         </div>
-        </div>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 pt-10">
         <div className="flex justify-center mb-16 px-4 sm:px-0">
@@ -71,7 +96,7 @@ export default function AboutUs() {
                 Our Journey Began with a Dream
               </h2>
               <div className="space-y-6 text-md text-gray-700 leading-relaxed">
-                {STORY_PARAGRAPHS.map((paragraph, idx) => (
+                {storyParagraphs.map((paragraph, idx) => (
                   <p key={idx} className="text-justify">
                     {paragraph}
                   </p>
@@ -81,28 +106,28 @@ export default function AboutUs() {
           )}
 
           {activeTab === 'mission' && (
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-red-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
-                  <h3 className="text-3xl  font-bold mb-4 text-gray-900">Our Mission</h3>
-                  <p className="text-md text-gray-700 leading-relaxed text-justify">
-                    To inspire and enable meaningful travel experiences by combining local expertise with global reach. We're committed to making every journey seamless, memorable, and transformative, while maintaining the highest standards of service and sustainability.
-                  </p>
-                </div>
-                <div className="bg-blue-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
-                  <h3 className="text-3xl font-bold mb-4 text-gray-900">Our Vision</h3>
-                  <p className="text-md text-gray-700 leading-relaxed text-justify">
-                    To become the world's most trusted travel companion, known for creating extraordinary experiences that connect people with places and cultures. We envision a future where responsible tourism enriches both travelers and destinations alike.
-                  </p>
-                </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-red-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
+                <h3 className="text-3xl  font-bold mb-4 text-gray-900">Our Mission</h3>
+                <p className="text-md text-gray-700 leading-relaxed text-justify">
+                  To inspire and enable meaningful travel experiences by combining local expertise with global reach. We're committed to making every journey seamless, memorable, and transformative, while maintaining the highest standards of service and sustainability.
+                </p>
               </div>
+              <div className="bg-blue-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
+                <h3 className="text-3xl font-bold mb-4 text-gray-900">Our Vision</h3>
+                <p className="text-md text-gray-700 leading-relaxed text-justify">
+                  To become the world's most trusted travel companion, known for creating extraordinary experiences that connect people with places and cultures. We envision a future where responsible tourism enriches both travelers and destinations alike.
+                </p>
+              </div>
+            </div>
           )}
-          </div>
+        </div>
         <div className="mb-20">
           <div className="text-center mb-16">
             <div className="inline-block">
             </div>
             <h2 className="text-4xl font-bold mb-8 text-gray-800 font-poppins">
-             Meet Our Team
+              Meet Our Team
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Passionate professionals dedicated to turning your travel dreams into reality
@@ -110,7 +135,7 @@ export default function AboutUs() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {TEAM_MEMBERS.map((member, idx) => (
+            {teamMembers.map((member, idx) => (
               <div
                 key={idx}
                 className="group relative"
@@ -126,7 +151,7 @@ export default function AboutUs() {
                       className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    </div>
+                  </div>
 
                   {/* Info Container */}
                   <div className="p-6">

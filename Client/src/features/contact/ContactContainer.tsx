@@ -1,18 +1,71 @@
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Globe, MessageSquare, Calendar, User, ArrowRight, Sparkles, Heart, Shield, Award, Loader2, Check } from 'lucide-react';
-import { submitContactForm } from '../services/api/contact';
-import DestinationSelector from '../components/shared/DestinationSelector';
-import LocationSelector from '../components/shared/LocationSelector';
-import { useAuth } from '../context/AuthContext';
-import BRANDING from '../config/branding';
-import { HERO_TITLE, HERO_SUBTITLE, OFFICE_HOURS_TEXT } from '../content/contact';
-import { HERO_VIDEOS } from '../config/media';
+import type { ChangeEvent, FormEvent } from 'react';
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Send,
+  CheckCircle,
+  MessageSquare,
+  Calendar,
+  User,
+  ArrowRight,
+  Loader2,
+  Check,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { submitContactForm } from '../../services/api/contact';
+import DestinationSelector from '../../components/shared/DestinationSelector';
+import LocationSelector from '../../components/shared/LocationSelector';
+import { useAuth } from '../../context/AuthContext';
+import BRANDING from '../../config/branding';
+import { HERO_TITLE, HERO_SUBTITLE, OFFICE_HOURS_TEXT } from '../../content/contact';
+import { HERO_VIDEOS } from '../../config/media';
 
 const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v4');
 
-export default function ContactUs() {
+/** A destination option as emitted by DestinationSelector. */
+interface DestinationOption {
+  value: string;
+  label: string;
+}
+
+/** Raw form field state (pre-trim/pre-submit). */
+interface ContactFormData {
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  travelDate: string;
+}
+
+/** Payload sent to the POST /leads/website-contact endpoint. */
+export type ContactFormPayload = {
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  travelDate?: string;
+  destination?: string;
+  destinationCountry?: string;
+  locations?: string;
+};
+
+interface ContactMethod {
+  icon: LucideIcon;
+  title: string;
+  info: string;
+  subtext: string;
+  color: string;
+  action: string;
+}
+
+export default function ContactContainer() {
   const { user } = useAuth();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ContactFormData>({
     name: '',
     email: '',
     phone: '',
@@ -20,12 +73,11 @@ export default function ContactUs() {
     message: '',
     travelDate: '',
   });
-  const [selectedDest, setSelectedDest] = useState(null);
-  const [selectedLocations, setSelectedLocations] = useState([]);
+  const [selectedDest, setSelectedDest] = useState<DestinationOption | null>(null);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [activeContact, setActiveContact] = useState(0);
 
   // Prefill contact details for logged-in users
   useEffect(() => {
@@ -39,14 +91,14 @@ export default function ContactUs() {
     }
   }, [user]);
 
-  const contactMethods = [
+  const contactMethods: ContactMethod[] = [
     {
       icon: Phone,
       title: 'Call Us',
       info: BRANDING.contact.phone,
       subtext: BRANDING.contact.officeHours,
       color: 'from-blue-500 to-cyan-500',
-      action: `tel:${BRANDING.contact.phone}`
+      action: `tel:${BRANDING.contact.phone}`,
     },
     {
       icon: Mail,
@@ -54,7 +106,7 @@ export default function ContactUs() {
       info: BRANDING.contact.email,
       subtext: 'We reply within 24 hours',
       color: 'from-purple-500 to-pink-500',
-      action: `mailto:${BRANDING.contact.email}`
+      action: `mailto:${BRANDING.contact.email}`,
     },
     {
       icon: MapPin,
@@ -62,23 +114,23 @@ export default function ContactUs() {
       info: BRANDING.contact.address,
       subtext: 'By appointment only',
       color: 'from-brand-500 to-red-500',
-      action: ''
-    }
+      action: '',
+    },
   ];
 
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleDestinationChange = (destination) => {
+  const handleDestinationChange = (destination: DestinationOption) => {
     setSelectedDest(destination);
     // Clear locations when destination changes
     setSelectedLocations([]);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     // Validation
     if (!formData.name.trim() || !formData.email.trim() || !formData.subject.trim() || !formData.message.trim()) {
       setError('Please fill in all required fields (Name, Email, Subject, and Message).');
@@ -89,20 +141,22 @@ export default function ContactUs() {
     setError('');
 
     try {
-      const payload = {
+      // `selectedDest` is always a { value, label } option here, so the
+      // label/value fallbacks cover every reachable state.
+      const payload: ContactFormPayload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
         subject: formData.subject.trim(),
         message: formData.message.trim(),
         travelDate: formData.travelDate || undefined,
-        destination: selectedDest?.label || selectedDest?.value || selectedDest || undefined,
+        destination: selectedDest?.label || selectedDest?.value || undefined,
         destinationCountry: selectedDest?.value || undefined,
         locations: selectedLocations.length > 0 ? selectedLocations.join(', ') : undefined,
       };
 
       await submitContactForm(payload);
-      
+
       setSubmitted(true);
       // Reset form
       setFormData({
@@ -118,7 +172,7 @@ export default function ContactUs() {
       setTimeout(() => setSubmitted(false), 5000);
     } catch (err) {
       console.error('Error submitting contact form:', err);
-      setError(err.message || 'Failed to send message. Please try again later.');
+      setError(err instanceof Error ? err.message : 'Failed to send message. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
@@ -149,7 +203,7 @@ export default function ContactUs() {
                 {HERO_SUBTITLE}
               </span>
             </h1>
-            
+
             <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed mb-12">
               Have questions? Ready to book? Our travel experts are just a message away
             </p>
@@ -160,12 +214,11 @@ export default function ContactUs() {
       {/* Contact */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 relative z-20 mb-20">
         <div className="flex flex-col md:flex-row items-center justify-center gap-6 max-w-5xl mx-auto">
-          {contactMethods.slice(0,3).map((method, idx) => (
+          {contactMethods.slice(0, 3).map((method, idx) => (
             <a
               key={idx}
               href={method.action}
-              onMouseEnter={() => setActiveContact(idx)}
-                className="group relative bg-white rounded-2xl p-8 shadow-xl border border-gray-100 overflow-hidden w-full max-w-md"
+              className="group relative bg-white rounded-2xl p-8 shadow-xl border border-gray-100 overflow-hidden w-full max-w-md"
             >
               <div className="relative mb-6">
                 <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${method.color} flex items-center justify-center transform shadow-lg`}>
@@ -334,11 +387,11 @@ export default function ContactUs() {
                           <Check className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <p className="font-bold text-gray-900 text-lg">{selectedDest.label || selectedDest.value || selectedDest}</p>
+                          <p className="font-bold text-gray-900 text-lg">{selectedDest.label || selectedDest.value}</p>
                           <p className="text-sm text-gray-600">Destination selected</p>
                         </div>
                       </div>
-                      
+
                       {/* Location Selector */}
                       <div className="mt-4">
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
