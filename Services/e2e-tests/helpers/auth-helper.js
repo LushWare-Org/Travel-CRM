@@ -7,6 +7,7 @@ const SEED_USERS = {
   superAdmin: { email: 'superadmin@travelcrm.com', password: 'SuperAdmin@123' },
   admin: { email: 'alice.admin@travelcrm.com', password: 'Admin@123' },
   salesRep: { email: 'bob.sales@travelcrm.com', password: 'Sales@123' },
+  customer: { email: 'david.kumar@gmail.com', password: 'Customer@123' },
 };
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3000/api/v1';
