@@ -1,6 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Clock, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
+import { pluralize } from '../../../lib/pluralize';
+import { FALLBACK_IMAGE } from '../../../config/media';
 import type { NormalizedPackage } from '../../../services/api/packages.transform';
 
 interface FeaturedPackagesProps {
@@ -43,9 +45,12 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
               >
                 <div className="relative overflow-hidden aspect-[4/3]">
                   <img
-                    src={pkg.image_url || pkg.images?.[0]}
+                    src={pkg.image_url || pkg.images?.[0] || FALLBACK_IMAGE}
                     alt={pkg.title}
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                    onError={(e) => {
+                      e.currentTarget.src = FALLBACK_IMAGE;
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10"></div>
                     <div className="absolute top-0 left-0 right-0 p-6 text-white">
@@ -64,7 +69,7 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-brand-accent-400" />
-                          <span className="text-sm">{pkg.duration_days} Days</span>
+                        <span className="text-sm">{pluralize(pkg.duration_days, 'Day')}</span>
                         </div>
                       </div>
                     </div>

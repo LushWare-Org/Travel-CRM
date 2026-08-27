@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Clock, Sun, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
-import { FALLBACK_IMAGE } from './constants';
+import { pluralize } from '../../../lib/pluralize';
+import { FALLBACK_IMAGE } from '../../../config/media';
 import type { PreparedDestination } from '../DestinationsContainer';
 
 interface DestinationListItemProps {
@@ -47,7 +48,7 @@ export default function DestinationListItem({ dest }: DestinationListItemProps) 
             </div>
             <div className="flex items-center space-x-2">
               <Sun className="w-4 h-4" />
-              <span>{dest.packagesCount} curated packages</span>
+              <span>{pluralize(dest.packagesCount, 'curated package')}</span>
             </div>
           </div>
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
