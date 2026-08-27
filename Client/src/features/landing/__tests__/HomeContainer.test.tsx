@@ -37,6 +37,8 @@ const mockPackage = (overrides: Partial<NormalizedPackage> = {}): NormalizedPack
   },
   duration_days: 5,
   price_from: 50000,
+  currency: 'INR',
+  termsAndConditions: '',
   category: 'beach',
   difficulty: null,
   rating: 4.5,
@@ -83,18 +85,16 @@ const mockDestination = (overrides: Partial<AggregatedDestination> = {}): Aggreg
 
 const mockBookings = [
   {
-    package: {
-      _id: 'bk-pkg-1',
-      name: 'Maldives Escape',
-      images: [{ url: '/maldives.jpg' }],
-      duration: 4,
-      price: 75000,
-      slug: 'maldives-escape',
-      destination: 'Maldives',
-    },
+    packageId: 'bk-pkg-1',
+    packageName: 'Maldives Escape',
+    packageCoverImage: '/maldives.jpg',
+    packageDuration: 4,
+    packagePrice: 75000,
+    packageSlug: 'maldives-escape',
+    packageDestination: 'Maldives',
     createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     numberOfTravelers: 2,
-    user: { name: 'Alice' },
+    userName: 'Alice',
   },
 ];
 

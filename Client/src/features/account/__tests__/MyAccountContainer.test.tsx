@@ -52,7 +52,9 @@ const loggedInUser = {
 const sampleBookings = [
   {
     _id: 'b1',
-    package: { _id: 'p1', name: 'Bali Honeymoon', destination: 'Bali, Indonesia' },
+    packageId: 'p1',
+    packageName: 'Bali Honeymoon',
+    packageDestination: 'Bali, Indonesia',
     bookingStatus: 'confirmed',
     paymentStatus: 'paid',
     totalAmount: 5000,

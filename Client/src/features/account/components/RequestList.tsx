@@ -1,5 +1,6 @@
 import { ArrowRight, Calendar, Clock, MapPin, Users } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
+import { pluralize } from '../../../lib/pluralize';
 
 export type AccountTab = 'bookings' | 'customized' | 'manual';
 
@@ -16,16 +17,15 @@ export interface RequestCardItem {
   isCustomized?: boolean;
   customizedPackageId?: string | null;
   isFromBooking?: boolean;
-  package?: {
-    _id?: string;
-    id?: string;
-    name?: string;
-    destination?: string;
-    images?: { url?: string }[];
-  };
+  packageId?: string;
   packageName?: string;
+  packageDestination?: string;
+  packageDuration?: number;
+  packageCoverImage?: string;
+  packageSlug?: string;
+  packagePrice?: number;
   destination?: string;
-  coverImage?: { url?: string };
+  coverImage?: string;
   images?: { url?: string }[];
   travelDate?: string;
   numberOfTravelers?: number;
@@ -111,23 +111,31 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
           className="group bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100 hover:shadow-2xl hover:border-brand-300 transition-all duration-300"
         >
           <div className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300">
-            {item.package?.images?.[0]?.url || item.coverImage?.url || item.images?.[0]?.url ? (
-              <>
-                <img
-                  src={item.package?.images?.[0]?.url || item.coverImage?.url || item.images?.[0]?.url}
-                  alt={item.package?.name || item.name || 'Trip'}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <MapPin className="w-16 h-16 text-gray-400" />
-              </div>
-            )}
+            {(() => {
+              const imageUrl =
+                activeTab === 'bookings'
+                  ? item.packageCoverImage
+                  : activeTab === 'customized'
+                  ? item.coverImage || item.images?.[0]?.url
+                  : undefined;
+              return imageUrl ? (
+                <>
+                  <img
+                    src={imageUrl}
+                    alt={item.packageName || item.name || 'Trip'}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <MapPin className="w-16 h-16 text-gray-400" />
+                </div>
+              );
+            })()}
             <div className="absolute top-4 right-4">
               {getStatusBadge(activeTab === 'bookings' ? item.bookingStatus : item.status || 'pending')}
             </div>
@@ -138,20 +146,20 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
               <p className="text-2xl font-black text-brand-600">
                 {activeTab === 'bookings' && formatCurrency(item.totalAmount)}
                 {activeTab === 'customized' && formatCurrency(item.price)}
-                {activeTab === 'manual' && `${item.days?.length || 0} Days`}
+                {activeTab === 'manual' && pluralize(item.days?.length || 0, 'Day')}
               </p>
             </div>
           </div>
           <div className="p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
-              {activeTab === 'bookings' && (item.package?.name || item.packageName || 'Package')}
+              {activeTab === 'bookings' && (item.packageName || 'Package')}
               {activeTab === 'customized' && (item.name || 'Customized Package')}
               {activeTab === 'manual' && (item.lead?.name || 'Trip Plan')}
             </h3>
             <div className="flex items-center gap-2 text-gray-600 mb-4">
               <MapPin className="w-4 h-4 text-brand-500 flex-shrink-0" />
               <span className="line-clamp-1">
-                {activeTab === 'bookings' && (item.package?.destination || item.destination || 'N/A')}
+                {activeTab === 'bookings' && (item.packageDestination || 'N/A')}
                 {activeTab === 'customized' && (item.destination || 'N/A')}
                 {activeTab === 'manual' && (item.lead?.destination || 'N/A')}
               </span>
@@ -172,8 +180,8 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
                           })
                         : 'N/A'
                     )}
-                    {activeTab === 'customized' && `${item.duration} days`}
-                    {activeTab === 'manual' && `${item.days?.length || 0} days`}
+                    {activeTab === 'customized' && `${item.duration ?? 0} days`}
+                    {activeTab === 'manual' && pluralize(item.days?.length || 0, 'day')}
                   </span>
                 </div>
               </div>
@@ -236,7 +244,7 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
             {activeTab === 'bookings' && (
               <button
                 onClick={() => {
-                  onViewDetails(item.package?._id || item.package?.id);
+                  onViewDetails(item.packageId);
                 }}
                 className="w-full px-4 py-3 bg-black text-white rounded-lg font-bold hover:shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-2"
               >

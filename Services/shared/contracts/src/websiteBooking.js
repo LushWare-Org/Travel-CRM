@@ -23,27 +23,35 @@ export const WebsiteBookingResult = z
   })
   .passthrough();
 
+// Mirrors booking-service's getUserBookings/getRecentBookings raw-SQL rows
+// (Services/booking-service/src/controllers/booking.controller.js) — flat,
+// with package fields prefixed `package*`. There is no nested `package`
+// object on the wire. confirmedAt/userName/userEmail only appear on
+// getRecentBookings' rows; packageMarginType/etc. never survive
+// withPackageSellPrice() (replaced by packagePrice).
 export const UserBooking = z
   .object({
-    _id: z.string().optional(),
     id: z.string().optional(),
-    package: z
-      .object({
-        _id: z.string().optional(),
-        id: z.string().optional(),
-        name: z.string().optional(),
-        destination: z.string().optional(),
-        images: z.array(z.unknown()).optional(),
-      })
-      .passthrough()
-      .optional(),
-    packageName: z.string().optional(),
-    destination: z.string().optional(),
-    totalAmount: moneyField.optional(),
+    userId: z.string().optional(),
+    packageId: z.string().optional(),
     travelDate: z.string().nullable().optional(),
+    endDate: z.string().nullable().optional(),
+    confirmedAt: z.string().nullable().optional(),
     numberOfTravelers: z.number().optional(),
+    totalAmount: moneyField.optional(),
+    paidAmount: moneyField.optional(),
     paymentStatus: z.string().optional(),
     bookingStatus: z.string().optional(),
+    specialRequests: z.string().nullable().optional(),
     createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
+    packageName: z.string().nullable().optional(),
+    packageDestination: z.string().nullable().optional(),
+    packageDuration: z.number().nullable().optional(),
+    packageCoverImage: z.string().nullable().optional(),
+    packageSlug: z.string().nullable().optional(),
+    packagePrice: moneyField.nullable().optional(),
+    userName: z.string().nullable().optional(),
+    userEmail: z.string().nullable().optional(),
   })
   .passthrough();
