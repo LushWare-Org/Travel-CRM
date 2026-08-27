@@ -15,20 +15,20 @@ const fetchPackagesMock = vi.mocked(fetchPackages);
 
 const mockPackages: NormalizedPackage[] = [
   normalizePackage({
-    name: 'Bali Honeymoon Special',
+    title: 'Bali Honeymoon Special',
     description: 'Romantic beach getaway in Bali with private villa stays',
     destination: 'Bali, Indonesia',
-    duration: 5,
-    price: 45000,
+    durationDays: 5,
+    sellPrice: 45000,
     rating: 4.8,
     numReviews: 120,
   }),
   normalizePackage({
-    name: 'Swiss Alps Explorer',
+    title: 'Swiss Alps Explorer',
     description: 'Mountain trekking and scenic train rides through the Alps',
     destination: 'Interlaken, Switzerland',
-    duration: 8,
-    price: 150000,
+    durationDays: 8,
+    sellPrice: 150000,
     rating: 4.9,
     numReviews: 200,
   }),
@@ -69,7 +69,7 @@ describe('PackagesContainer', () => {
     await user.click(screen.getByRole('button', { name: /Show Filters/ }));
     await user.click(screen.getByRole('checkbox', { name: /Medium \(5-7 days\)/ }));
 
-    expect(await screen.findByText('Curated • 1 packages available')).toBeInTheDocument();
+    expect(await screen.findByText('Curated • 1 package available')).toBeInTheDocument();
     expect(screen.getByText('Bali Honeymoon Special')).toBeInTheDocument();
     expect(screen.queryByText('Swiss Alps Explorer')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Clear all/ })).toBeInTheDocument();
