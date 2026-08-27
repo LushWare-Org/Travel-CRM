@@ -1,65 +1,71 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import RecentlyBookedSlider from './RecentlyBookedSlider';
-import DestinationsSection from './DestinationsSection';
-import FeaturedPackages from './FeaturedPackages';
-import WhyChooseUs from './WhyChooseUs';
-import TestimonialsSection from './TestimonialsSection';
-import FAQSection from './FAQ';
-import KeyPartnersSection from './KeyPartners';
+import RecentlyBookedSlider from './components/RecentlyBookedSlider';
+import DestinationsSection from './components/DestinationsSection';
+import FeaturedPackages from './components/FeaturedPackages';
+import WhyChooseUs from './components/WhyChooseUs';
+import TestimonialsSection from './components/TestimonialsSection';
+import FAQSection from './components/FAQ';
+import KeyPartnersSection from './components/KeyPartners';
+import Stats from './components/Stats';
+import AboutSection from './components/AboutSection';
 import { fetchPackages } from '../../services/api/packages';
+import type { NormalizedPackage, AggregatedDestination } from '../../services/api/packages.transform';
 import { fetchRecentBookings } from '../../services/api/booking';
-import { formatCurrency } from '../../lib/currency';
-import Stats from './Stats';
-import AboutSection from './AboutSection';
 import { HERO_SLIDES } from '../../content/home';
+import { MONTHS } from './utils/constants';
+import {
+  InlineMapPin,
+  InlineCalendar,
+  InlineSearch,
+  InlineChevronLeft,
+  InlineChevronRight,
+  InlineArrowRight,
+} from './components/icons';
 
-const InlineMapPin = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
-const InlineCalendar = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
-const InlineSearch = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
-const InlineChevronLeft = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>;
-const InlineChevronRight = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>;
-const InlineX = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
-const InlineArrowRight = () => <svg className="ml-3 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>;
+/** Raw shape of a recent booking as returned by `fetchRecentBookings`. */
+interface RecentBooking {
+  package?: {
+    _id?: string;
+    name?: string;
+    images?: Array<{ url?: string }>;
+    duration?: number;
+    price?: number;
+    slug?: string;
+    destination?: string;
+  };
+  createdAt?: string;
+  numberOfTravelers?: number;
+  user?: { name?: string };
+}
 
-const MONTHS = [
-  { value: 'january', label: 'January' },
-  { value: 'february', label: 'February' },
-  { value: 'march', label: 'March' },
-  { value: 'april', label: 'April' },
-  { value: 'may', label: 'May' },
-  { value: 'june', label: 'June' },
-  { value: 'july', label: 'July' },
-  { value: 'august', label: 'August' },
-  { value: 'september', label: 'September' },
-  { value: 'october', label: 'October' },
-  { value: 'november', label: 'November' },
-  { value: 'december', label: 'December' },
-];
+/** Placeholder phrases cycled by the hero search bar's typewriter effect. */
+const destinationTexts = ['Select Destination', 'Choose Your Dream Place', 'Where To Go?', 'Pick A Location'];
+const whenTexts = ['Any Month', 'When Are You Traveling?', 'Pick a Month', 'Choose Travel Date'];
 
-export default function Home() {
+export default function HomeContainer() {
   const navigate = useNavigate();
-  const [destinations, setDestinations] = useState([]);
-  const [packages, setPackages] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [destinations, setDestinations] = useState<AggregatedDestination[]>([]);
+  const [packages, setPackages] = useState<NormalizedPackage[]>([]);
+  const [bookings, setBookings] = useState<RecentBooking[]>([]);
+  // Kept for parity with the original Home.jsx: the loading flag drives the
+  // old fetch flow but is not read in the rendered tree.
+  const [, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const totalSlides = 4;
 
   // Search
   const [searchFilters, setSearchFilters] = useState({ destination: '', when: '' });
-  const destinationTexts = ['Select Destination', 'Choose Your Dream Place', 'Where To Go?', 'Pick A Location'];
-  const whenTexts = ['Any Month', 'When Are You Traveling?', 'Pick a Month', 'Choose Travel Date'];
 
   const [destinationPlaceholder, setDestinationPlaceholder] = useState('');
   const [whenPlaceholder, setWhenPlaceholder] = useState('');
   const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
-  const monthDropdownRef = useRef(null);
+  const monthDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (monthDropdownRef.current && !monthDropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (monthDropdownRef.current && !monthDropdownRef.current.contains(e.target as Node)) {
         setMonthDropdownOpen(false);
       }
     };
@@ -72,7 +78,7 @@ export default function Home() {
     let whenIndex = 0;
     let charIndex = 0;
     let isDeleting = false;
-    let timeout;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
     const type = () => {
       const destText = destinationTexts[destIndex];
@@ -109,7 +115,9 @@ export default function Home() {
     };
 
     type();
-    return () => clearTimeout(timeout);
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
   }, []);
 
   useEffect(() => {
@@ -120,7 +128,7 @@ export default function Home() {
   }, [currentSlide, totalSlides]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') setCurrentSlide((prev) => (prev - 1 + totalSlides) % totalSlides);
       if (e.key === 'ArrowRight') setCurrentSlide((prev) => (prev + 1) % totalSlides);
     };
@@ -141,7 +149,7 @@ export default function Home() {
             setPackages(pkg);
             setDestinations(sorted);
           })
-          .catch((err) => {
+          .catch((err: Error) => {
             if (!mounted) return;
             setError(err.message || 'Failed to load travel data');
           })
@@ -160,7 +168,7 @@ export default function Home() {
             setPackages(pkg);
             setDestinations(sorted);
           })
-          .catch((err) => {
+          .catch((err: Error) => {
             if (!mounted) return;
             setError(err.message || 'Failed to load travel data');
           })
@@ -169,22 +177,26 @@ export default function Home() {
           });
       }, 0);
     }
-    return () => (mounted = false);
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
     let mounted = true;
     fetchRecentBookings(8)
-      .then((bookingsData) => {
+      .then((bookingsData: RecentBooking[]) => {
         if (!mounted) return;
         setBookings(bookingsData || []);
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (!mounted) return;
         console.error('Failed to fetch recent bookings:', err);
         setBookings([]);
       });
-    return () => (mounted = false);
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const goToNextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides);
@@ -201,76 +213,63 @@ export default function Home() {
     navigate(`/packages?${params.toString()}`);
   };
 
-  const dealItems = useMemo(() => packages.slice(0, 6).map((pkg) => ({
-    id: pkg.id,
-    destination: pkg.destination?.name || pkg.title,
-    subtitle: pkg.category ? `${pkg.category.charAt(0).toUpperCase()}${pkg.category.slice(1)} experience` : 'Limited-time offer',
-    image: pkg.image_url || pkg.images?.[0],
-    originalPrice: Math.round(pkg.price_from * 1.2),
-    discountPrice: pkg.price_from,
-    discount: Math.round(Math.random() * 30 + 20),
-    duration: pkg.duration_days ? `${pkg.duration_days} Days / ${pkg.duration_days - 1} Nights` : '',
-    inclusions: pkg.inclusions?.slice(0, 4) || ['Personalized planning', 'Support throughout', 'Curated experiences', 'Flexible payments'],
-    validUntil: new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-    savings: Math.round(pkg.price_from * 0.3),
-    slug: pkg.slug,
-  })), [packages]);
-
   const recentItems = useMemo(() => {
     if (!bookings || bookings.length === 0) {
       return [];
     }
 
-    return bookings.map((booking, i) => {
-      try {
-        const pkg = booking.package;
-        if (!pkg) return null;
+    return bookings
+      .map((booking, i) => {
+        try {
+          const pkg = booking.package;
+          if (!pkg) return null;
 
-        const timeDiffSeconds = booking.createdAt
-          ? Math.floor((new Date() - new Date(booking.createdAt)) / 1000)
-          : 0;
+          const timeDiffSeconds = booking.createdAt
+            ? Math.floor((Date.now() - new Date(booking.createdAt).getTime()) / 1000)
+            : 0;
 
-        let bookedAgoText = 'Just now';
-        if (timeDiffSeconds < 1) {
-          bookedAgoText = 'Just now';
-        } else if (timeDiffSeconds < 60) {
-          bookedAgoText = timeDiffSeconds === 1 ? '1 second' : `${timeDiffSeconds} seconds`;
-        } else if (timeDiffSeconds < 3600) {
-          const minutes = Math.floor(timeDiffSeconds / 60);
-          bookedAgoText = minutes === 1 ? '1 minute' : `${minutes} minutes`;
-        } else if (timeDiffSeconds < 86400) {
-          const hours = Math.floor(timeDiffSeconds / 3600);
-          bookedAgoText = hours === 1 ? '1 hour' : `${hours} hours`;
-        } else if (timeDiffSeconds < 2592000) {
-          const days = Math.floor(timeDiffSeconds / 86400);
-          bookedAgoText = days === 1 ? '1 day' : `${days} days`;
-        } else if (timeDiffSeconds < 31536000) {
-          const months = Math.floor(timeDiffSeconds / 2592000);
-          bookedAgoText = months === 1 ? '1 month' : `${months} months`;
-        } else {
-          const years = Math.floor(timeDiffSeconds / 31536000);
-          bookedAgoText = years === 1 ? '1 year' : `${years} years`;
+          let bookedAgoText = 'Just now';
+          if (timeDiffSeconds < 1) {
+            bookedAgoText = 'Just now';
+          } else if (timeDiffSeconds < 60) {
+            bookedAgoText = timeDiffSeconds === 1 ? '1 second' : `${timeDiffSeconds} seconds`;
+          } else if (timeDiffSeconds < 3600) {
+            const minutes = Math.floor(timeDiffSeconds / 60);
+            bookedAgoText = minutes === 1 ? '1 minute' : `${minutes} minutes`;
+          } else if (timeDiffSeconds < 86400) {
+            const hours = Math.floor(timeDiffSeconds / 3600);
+            bookedAgoText = hours === 1 ? '1 hour' : `${hours} hours`;
+          } else if (timeDiffSeconds < 2592000) {
+            const days = Math.floor(timeDiffSeconds / 86400);
+            bookedAgoText = days === 1 ? '1 day' : `${days} days`;
+          } else if (timeDiffSeconds < 31536000) {
+            const months = Math.floor(timeDiffSeconds / 2592000);
+            bookedAgoText = months === 1 ? '1 month' : `${months} months`;
+          } else {
+            const years = Math.floor(timeDiffSeconds / 31536000);
+            bookedAgoText = years === 1 ? '1 year' : `${years} years`;
+          }
+
+          return {
+            id: pkg._id,
+            packageName: pkg.name,
+            image: pkg.images && pkg.images[0] && pkg.images[0].url ? pkg.images[0].url : '',
+            duration: `${pkg.duration}D/${pkg.duration - 1}N`,
+            price: pkg.price,
+            pax: booking.numberOfTravelers,
+            bookedAgo: bookedAgoText,
+            traveler: {
+              name: booking.user?.name || `Traveler ${i + 1}`,
+              from: pkg.destination,
+            },
+            slug: pkg.slug,
+          };
+        } catch (error) {
+          console.error('Error mapping booking:', error, booking);
+          return null;
         }
-
-        return {
-          id: pkg._id,
-          packageName: pkg.name,
-          image: pkg.images && pkg.images[0] && pkg.images[0].url ? pkg.images[0].url : '',
-          duration: `${pkg.duration}D/${pkg.duration - 1}N`,
-          price: pkg.price,
-          pax: booking.numberOfTravelers,
-          bookedAgo: bookedAgoText,
-          traveler: {
-            name: booking.user?.name || `Traveler ${i + 1}`,
-            from: pkg.destination
-          },
-          slug: pkg.slug,
-        };
-      } catch (error) {
-        console.error('Error mapping booking:', error, booking);
-        return null;
-      }
-    }).filter(item => item !== null);
+      })
+      .filter((item) => item !== null);
   }, [bookings]);
 
   if (error && packages.length === 0) {
@@ -562,7 +561,7 @@ export default function Home() {
       </section> */}
 
       <RecentlyBookedSlider items={recentItems} />
-      <DestinationsSection destinations={destinations} />
+      <DestinationsSection />
       <WhyChooseUs />
       <FeaturedPackages packages={packages} />
       <TestimonialsSection />

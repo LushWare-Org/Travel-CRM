@@ -23,9 +23,9 @@ const loadElfsightScript = (): void => {
  * Lazily loads the Elfsight platform script the first time the widget
  * element scrolls into view, and only once app-wide no matter how many
  * widgets are mounted (checks for an existing <script> tag before
- * appending another). Consolidates two previously-duplicated,
- * non-idempotent inline implementations (PackageDetails.jsx,
- * Landing/TestimonialsSection.jsx) into one shared hook.
+ * appending another). Consolidates the previously-duplicated inline
+ * implementation (PackageDetails.jsx) into one shared hook, now also
+ * consumed by features/landing/components/TestimonialsSection.tsx.
  *
  * Returns a ref to attach to the widget's container element.
  */

@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   Award,
-  Users,
-  Shield,
-  Star,
-  Heart,
-  TrendingUp
+  Star
 } from 'lucide-react';
-import { TRUST_STATS, getTrustHeadline, TAGLINE } from '../../content/aboutSection';
-import BRANDING from '../../config/branding';
+import { TRUST_STATS, getTrustHeadline, TAGLINE } from '../../../content/aboutSection';
+import BRANDING from '../../../config/branding';
 
 export default function AboutSection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -48,29 +44,6 @@ export default function AboutSection() {
 
     return () => clearInterval(timer);
   }, []);
-
-  const features = [
-    {
-      icon: Users,
-      title: "Expert Travel Consultants",
-      description: "Personalized guidance from experienced travel professionals"
-    },
-    {
-      icon: Shield,
-      title: "Secure Bookings",
-      description: "Safe and protected payment processing for peace of mind"
-    },
-    {
-      icon: Heart,
-      title: "Customer Satisfaction",
-      description: "Rated 4.9/5 by thousands of happy travelers"
-    },
-    {
-      icon: TrendingUp,
-      title: "Best Price Guarantee",
-      description: "Competitive rates with transparent pricing"
-    }
-  ];
 
   return (
     <section className="py-2 bg-white relative overflow-hidden">

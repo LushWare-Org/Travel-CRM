@@ -18,7 +18,7 @@ module.exports = {
       },
       // Named stacking-order scale — replaces ad-hoc bare z-50/z-[9999]
       // values that collided across the app (WhatsApp button and modals
-      // both at z-50; Landing/Home's month picker at an arbitrary
+      // both at z-50; features/landing/HomeContainer's month picker at an arbitrary
       // z-[9999] that outranked everything, including modals).
       zIndex: {
         header: '50',

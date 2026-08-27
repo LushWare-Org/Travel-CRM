@@ -1,11 +1,11 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
-import Home from './pages/Landing/Home';
+import HomePage from './pages/HomePage';
 import { AuthProvider } from './context/AuthContext';
 import { PAGE_CONFIG } from './config/pages';
 
-const DestinationsInternational = lazy(() => import('./pages/DestinationsInternational'));
+const DestinationsInternational = lazy(() => import('./pages/DestinationsPage'));
 const PackageDetails = lazy(() => import('./pages/PackageDetails'));
 const CustomizePackage = lazy(() => import('./pages/CustomizePackage'));
 const Packages = lazy(() => import('./pages/Packages'));
@@ -13,7 +13,7 @@ const AboutUs = lazy(() => import('./pages/AboutPage'));
 const Contact = lazy(() => import('./pages/ContactPage'));
 const Career = lazy(() => import('./pages/CareerPage'));
 const Login = lazy(() => import('./pages/LoginPage'));
-const MyAccount = lazy(() => import('./pages/MyAccount'));
+const MyAccount = lazy(() => import('./pages/MyAccountPage'));
 const PlanYourTrip = lazy(() => import('./pages/PlanYourTrip'));
 
 function AppContent() {
@@ -51,7 +51,7 @@ function AppContent() {
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
         <Route element={<MainLayout currentPage={currentPage} onNavigate={handleNavigate} />}>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/packages" element={<Packages />} />
           <Route path="/package/:id" element={<PackageDetails />} />
           <Route path="/contact" element={<Contact />} />

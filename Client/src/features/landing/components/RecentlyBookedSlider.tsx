@@ -1,9 +1,26 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Clock, Star, User } from 'lucide-react';
-import { formatCurrency } from '../../lib/currency';
+import { ChevronLeft, ChevronRight, Clock, User } from 'lucide-react';
+import { formatCurrency } from '../../../lib/currency';
 
-export default function RecentlyBookedSlider({ items = [] }) {
+/** One recent-booking card, as shaped by HomeContainer's `recentItems`. */
+export interface RecentBookingItem {
+  id?: string;
+  packageName?: string;
+  image?: string;
+  duration?: string;
+  price?: number;
+  pax?: number;
+  bookedAgo?: string;
+  traveler?: { name?: string; from?: string };
+  slug?: string;
+}
+
+interface RecentlyBookedSliderProps {
+  items?: RecentBookingItem[];
+}
+
+export default function RecentlyBookedSlider({ items = [] }: RecentlyBookedSliderProps) {
   const [slideIdx, setSlideIdx] = useState(0);
   const [enableTransition, setEnableTransition] = useState(true);
   const animatingRef = useRef(false);
@@ -70,7 +87,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
     setSlideIdx(prev => prev + 1);
   };
 
-  const formatDurationString = (value) => {
+  const formatDurationString = (value?: string) => {
     if (!value) return '';
     const dn = value.match(/(\d+)\s*[Dd]\s*(\d+)\s*[Nn]/i);
     if (dn) return `${dn[1]} Days / ${dn[2]} Nights`;
@@ -100,7 +117,6 @@ export default function RecentlyBookedSlider({ items = [] }) {
     );
   }
 
-  const showControls = totalSlides > cardsPerView;
   const translateX = -(slideIdx * (100 / cardsPerView));
 
 
@@ -158,16 +174,15 @@ export default function RecentlyBookedSlider({ items = [] }) {
                           src={item.image}
                           alt={item.packageName}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          placeholderClassName="w-full h-full"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                        
+
                         <div className="absolute top-3 right-3">
                           <span className="bg-gray-200 border px-2 py-1 rounded-full text-xs font-semibold text-black">
                             {item.bookedAgo} ago
                           </span>
                         </div>
-                        
+
                         <div className="absolute bottom-3 left-4 flex items-center gap-3 text-white">
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-accent-500 to-brand-600 flex items-center justify-center shadow-lg">
                             <User className="w-6 h-6" />

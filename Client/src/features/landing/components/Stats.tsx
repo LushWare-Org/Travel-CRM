@@ -1,16 +1,26 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { fetchPackages } from '../../services/api/packages';
-import { formatCurrency } from '../../lib/currency';
-import { ALL_STATS } from '../../content/stats';
+import { fetchPackages } from '../../../services/api/packages';
+import type { NormalizedPackage } from '../../../services/api/packages.transform';
+import { formatCurrency } from '../../../lib/currency';
+
+/** A category-derived card shown in the stats section carousel. */
+interface CategoryPackage {
+  id?: string;
+  title: string;
+  categoryName: string;
+  image?: string;
+  price: number;
+  slug?: string;
+  description: string;
+}
 
 export default function RecommendedPackagesSection() {
   const navigate = useNavigate();
-  const [currentStatIndex, setCurrentStatIndex] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [categoryPackages, setCategoryPackages] = useState([]);
+  const [categoryPackages, setCategoryPackages] = useState<CategoryPackage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,7 +28,7 @@ export default function RecommendedPackagesSection() {
     fetchPackages({ limit: 100 })
       .then(({ packages }) => {
         if (!isMounted) return;
-        const grouped = {};
+        const grouped: Record<string, NormalizedPackage[]> = {};
         packages.forEach(pkg => {
           const category = pkg.category || 'Other';
           if (!grouped[category]) {
@@ -31,7 +41,7 @@ export default function RecommendedPackagesSection() {
             (pkg.price_from < min.price_from) ? pkg : min
           );
 
-          const getShortDescription = (description) => {
+          const getShortDescription = (description: string) => {
             if (!description) return '';
             const words = description.split(' ').slice(0, 5).join(' ');
             return words.length < description.length ? `${words}...` : words;
@@ -50,7 +60,7 @@ export default function RecommendedPackagesSection() {
         setCategoryPackages(categoryList);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (isMounted) {
           console.error('Failed to fetch packages:', err);
           setCategoryPackages([]);
@@ -62,11 +72,10 @@ export default function RecommendedPackagesSection() {
     };
   }, []);
 
-  // Auto-rotate stats every 4 seconds 
+  // Auto-rotate stats every 4 seconds
   useEffect(() => {
     if (categoryPackages.length === 0) return;
     const interval = setInterval(() => {
-      setCurrentStatIndex((prev) => prev + 1);
       setCurrentSlide((prev) => (prev + 1) % categoryPackages.length);
     }, 4000);
     return () => clearInterval(interval);
@@ -76,7 +85,6 @@ export default function RecommendedPackagesSection() {
     if (isAnimating || categoryPackages.length === 0) return;
     setIsAnimating(true);
     setCurrentSlide((prev) => (prev + 1) % categoryPackages.length);
-    setCurrentStatIndex((prev) => prev + 1);
     setTimeout(() => setIsAnimating(false), 1000);
   };
 
@@ -84,11 +92,10 @@ export default function RecommendedPackagesSection() {
     if (isAnimating || categoryPackages.length === 0) return;
     setIsAnimating(true);
     setCurrentSlide((prev) => (prev - 1 + categoryPackages.length) % categoryPackages.length);
-    setCurrentStatIndex((prev) => prev - 1);
     setTimeout(() => setIsAnimating(false), 1000);
   };
 
-  const handlePackageClick = (categoryName) => {
+  const handlePackageClick = (categoryName: string) => {
     navigate(`/packages?category=${encodeURIComponent(categoryName.toLowerCase())}`);
   };
 
@@ -100,10 +107,6 @@ export default function RecommendedPackagesSection() {
     }
     return packages;
   };
-  const allStatsExtended = [];
-  for (let i = 0; i < 100; i++) {
-    allStatsExtended.push(...ALL_STATS);
-  }
 
   return (
     <section className="stats-section py-10 bg-white">
@@ -111,12 +114,12 @@ export default function RecommendedPackagesSection() {
         <div className="grid grid-cols-1 gap-12 items-start">
           {/* <div className="lg:col-span-4 space-y-8 lg:ml-9">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-12 font-poppins leading-tight">
-              Excellence in 
+              Excellence in
               <span className="block mt-2 bg-gradient-to-r from-brand-600 to-red-600 bg-clip-text text-transparent">
                 Every Journey
               </span>
             </h2>
-            
+
             <div className="space-y-8">
               {[0, 1, 2].map((offset) => {
                 const displayIndex = currentStatIndex + offset;
@@ -125,9 +128,9 @@ export default function RecommendedPackagesSection() {
                     <div className="flex items-start gap-6 w-full p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 hover:shadow-lg transition-all duration-300 hover:border-brand-300">
                       <div className="flex items-center gap-0">
                         <div className="relative h-12 overflow-hidden inline-block">
-                          <div 
+                          <div
                             className="transition-transform duration-1000 ease-in-out"
-                            style={{ 
+                            style={{
                               transform: `translateY(-${displayIndex * 3}rem)`,
                             }}
                           >
@@ -141,11 +144,11 @@ export default function RecommendedPackagesSection() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="relative h-12 overflow-hidden flex-1">
-                        <div 
+                        <div
                           className="transition-transform duration-1000 ease-in-out"
-                          style={{ 
+                          style={{
                             transform: `translateY(-${displayIndex * 3}rem)`,
                           }}
                         >
@@ -218,7 +221,6 @@ export default function RecommendedPackagesSection() {
                                 src={pkg.image}
                                 alt={pkg.title}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                                placeholderClassName="w-full h-full"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>

@@ -1,13 +1,19 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Clock, Star, ArrowRight } from 'lucide-react';
-import { formatCurrency } from '../../lib/currency';
+import { Clock, ArrowRight } from 'lucide-react';
+import { formatCurrency } from '../../../lib/currency';
+import type { NormalizedPackage } from '../../../services/api/packages.transform';
 
-export default function FeaturedPackages({ packages }) {
+interface FeaturedPackagesProps {
+  packages: NormalizedPackage[];
+}
+
+export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
   const navigate = useNavigate();
     const latestPackages = packages
-    .sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt))
+    .slice()
+    .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
     .slice(0, 3);
-  
+
   const featuredPackages = latestPackages.length > 0 ? latestPackages : packages.slice(0, 3);
 
   return (
@@ -28,18 +34,18 @@ export default function FeaturedPackages({ packages }) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
             {featuredPackages.map((pkg, idx) => (
-              <Link 
-                key={pkg.id} 
-                to={`/package/${pkg.id}`} 
+              <Link
+                key={pkg.id}
+                to={`/package/${pkg.id}`}
                 className={`group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-brand-accent-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
                   featuredPackages.length === 3 && idx === 2 && 'md:col-span-2 lg:col-span-1 md:mx-auto'
                 } w-full md:max-w-sm lg:max-w-none`}
               >
                 <div className="relative overflow-hidden aspect-[4/3]">
-                  <img 
-                    src={pkg.image_url || pkg.images?.[0]} 
-                    alt={pkg.title} 
-                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" 
+                  <img
+                    src={pkg.image_url || pkg.images?.[0]}
+                    alt={pkg.title}
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10"></div>
                     <div className="absolute top-0 left-0 right-0 p-6 text-white">
@@ -51,7 +57,7 @@ export default function FeaturedPackages({ packages }) {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Bottom info display */}
                   <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                     <div className="space-y-3">
@@ -63,7 +69,7 @@ export default function FeaturedPackages({ packages }) {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="absolute inset-0 p-6 text-white flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                     <h4 className="text-lg font-bold mb-3 text-brand-accent-400">What's Included:</h4>
@@ -99,7 +105,7 @@ export default function FeaturedPackages({ packages }) {
         )}
       </div>
       <div className="text-center mt-12">
-        <button 
+        <button
           onClick={() => navigate('/packages')}
           className="group inline-flex items-center justify-center px-10 py-3.5 text-slate-800 font-semibold text-base tracking-wide border-2 border-slate-800 rounded-lg hover:border-brand-400 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
         >

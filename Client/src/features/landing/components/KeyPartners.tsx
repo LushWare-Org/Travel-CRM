@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PARTNERS } from '../../content/partners';
+import { PARTNERS } from '../../../content/partners';
 
 export default function KeyPartnersSection() {
   const [offset, setOffset] = useState(0);

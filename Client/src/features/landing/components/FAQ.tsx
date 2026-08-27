@@ -1,12 +1,12 @@
 import { ChevronDown } from 'lucide-react';
-import { FAQ_CATEGORIES, FAQS } from '../../content/faq';
+import { FAQ_CATEGORIES, FAQS } from '../../../content/faq';
 import { useState } from 'react';
 
 export default function FAQSection() {
   const [activeCategory, setActiveCategory] = useState('booking');
-  const [openQuestions, setOpenQuestions] = useState({});
+  const [openQuestions, setOpenQuestions] = useState<Record<number, boolean>>({});
 
-  const toggleQuestion = (questionIndex) => {
+  const toggleQuestion = (questionIndex: number) => {
     setOpenQuestions(prev => ({
       ...prev,
       [questionIndex]: !prev[questionIndex]
@@ -53,7 +53,7 @@ export default function FAQSection() {
         {/* FAQ Accordion */}
         <div className="max-w-4xl mx-auto">
           <div className="space-y-4">
-            {FAQS[activeCategory].map((faq, index) => {
+            {FAQS[activeCategory].map((faq: { question: string; answer: string }, index: number) => {
               const isOpen = openQuestions[index];
               return (
                 <div

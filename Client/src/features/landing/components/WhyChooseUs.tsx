@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Check, Play, X } from 'lucide-react';
-import { REVIEW_VIDEOS } from '../../config/media';
+import { REVIEW_VIDEOS } from '../../../config/media';
 
 export default function WhyChooseUs() {
-  const whyRef = useRef(null);
-  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState<(typeof REVIEW_VIDEOS)[number] | null>(null);
   const videos = REVIEW_VIDEOS;
 
   const features = ['Personalized Itineraries', 'Expert Local Guides', 'Best Price Guarantee'];
@@ -15,9 +14,9 @@ export default function WhyChooseUs() {
   ];
 
   return (
-    <section className="py-12 bg-brand-dark-900 relative overflow-hidden font-opensans" ref={whyRef}>
+    <section className="py-12 bg-brand-dark-900 relative overflow-hidden font-opensans">
       <div className="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Title Section */}
         <div className="text-center mb-20">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 font-poppins">
@@ -31,8 +30,8 @@ export default function WhyChooseUs() {
         {/* Alternating Pattern Section */}
         <div className="space-y-12">
           {videos.map((video, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className={`grid grid-cols-1 md:grid-cols-2 gap-6 items-center ${
                 index % 2 === 1 ? 'md:flex-row-reverse' : ''
               }`}
