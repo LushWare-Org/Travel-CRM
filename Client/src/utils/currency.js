@@ -1,7 +1,8 @@
 const CURRENCY_CODE = import.meta.env.VITE_CURRENCY_CODE || 'INR';
 const CURRENCY_SYMBOL = import.meta.env.VITE_CURRENCY_SYMBOL;
+const CURRENCY_LOCALE = import.meta.env.VITE_CURRENCY_LOCALE || 'en-IN';
 
-const FORMATTER = new Intl.NumberFormat('en-IN', {
+const FORMATTER = new Intl.NumberFormat(CURRENCY_LOCALE, {
   style: 'currency',
   currency: CURRENCY_CODE,
   maximumFractionDigits: 0,
@@ -16,7 +17,7 @@ export const formatCurrency = (value) => {
   }
 
   if (CURRENCY_SYMBOL) {
-    return `${CURRENCY_SYMBOL} ${numeric.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    return `${CURRENCY_SYMBOL} ${numeric.toLocaleString(CURRENCY_LOCALE, { maximumFractionDigits: 0 })}`;
   }
 
   // Some browsers might not format custom symbols correctly with Intl,
