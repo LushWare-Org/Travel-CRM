@@ -45,12 +45,13 @@ export const createWebsiteCustomizedPackage = asyncHandler(async (req, res) => {
   const pkg = await fetchPackage(packageId);
 
   const sanitizedEmail = String(email).trim().toLowerCase();
+  const sanitizedName = name?.trim() || 'Website Traveler';
 
   const result = await prisma.$transaction(async (tx) => {
     const assignedId = await autoAssignSalesRep(tx);
     const lead = await tx.lead.create({
       data: {
-        name: name.trim(),
+        name: sanitizedName,
         email: sanitizedEmail,
         phone: phone ? String(phone).replace(/\D/g, '') : null,
         source: 'website',

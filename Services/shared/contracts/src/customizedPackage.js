@@ -14,9 +14,13 @@ export const WebsiteCustomizationOverrides = z.object({
   days: z.array(z.unknown()).optional(),
 });
 
+// `name` is optional: CustomizePackageContainer.tsx's tested submit flow
+// allows an empty name (no client-side requirement), mirroring
+// WebsiteBookingRequest's identical relaxation. lead-service's
+// customizedPackageWebsiteSchema mirrors this.
 export const WebsiteCustomizationRequest = z.object({
   packageId: z.string(),
-  name: z.string().min(1),
+  name: z.string().optional(),
   email: z.string().email(),
   phone: z.string().optional(),
   travelers: z.number().int().min(1).optional(),

@@ -1,33 +1,22 @@
 import httpClient from '../http/client';
+import { parseEnvelope } from '../http/envelope';
+import { LoginRequest, RegisterRequest, AuthResult } from '@travel-crm/contracts';
+import type { z } from 'zod';
 
-interface LoginPayload {
-  email: string;
-  password: string;
-}
+type LoginPayload = z.infer<typeof LoginRequest>;
+type RegisterPayload = z.infer<typeof RegisterRequest>;
 
-interface RegisterPayload {
-  name: string;
-  email: string;
-  phone?: string;
-  password: string;
-  confirmPassword: string;
-}
-
-export const login = async ({ email, password }: LoginPayload) => {
-  const res = await httpClient.post('/auth/login', { email, password });
-  return res.data;
+export const login = async (payload: LoginPayload) => {
+  const body = LoginRequest.parse(payload);
+  const response = await httpClient.post('/auth/login', body);
+  return parseEnvelope(AuthResult, response.data, 'POST /auth/login').data;
 };
 
-export const register = async ({ name, email, phone, password, confirmPassword }: RegisterPayload) => {
+export const register = async (payload: RegisterPayload) => {
   // Backend expects a pure 10-digit phone if provided
-  const cleanedPhone = phone ? phone.replace(/\D/g, '') : undefined;
-
-  const res = await httpClient.post('/auth/register', {
-    name,
-    email,
-    phone: cleanedPhone,
-    password,
-    confirmPassword,
-  });
-  return res.data;
+  const cleanedPhone = payload.phone ? payload.phone.replace(/\D/g, '') : undefined;
+  const body = RegisterRequest.parse({ ...payload, phone: cleanedPhone });
+  const response = await httpClient.post('/auth/register', body);
+  return parseEnvelope(AuthResult, response.data, 'POST /auth/register').data;
 };
+

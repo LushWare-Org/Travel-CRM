@@ -4,9 +4,10 @@ const dayAccommodation = z
   .object({
     name: z.string().optional(),
     type: z.enum(['hotel', 'resort', 'guesthouse', 'homestay', 'camp', 'other']).optional(),
+    rating: z.number().optional(),
     address: z.string().optional(),
+    contactNumber: z.string().optional(),
   })
-  .strict()
   .nullable()
   .optional();
 
@@ -16,15 +17,11 @@ const dayMeals = z
     lunch: z.boolean().optional(),
     dinner: z.boolean().optional(),
   })
-  .strict()
   .optional();
 
-const dayPlace = z
-  .object({
-    name: z.string().min(1),
-    description: z.string().optional(),
-  })
-  .strict();
+// Places are plain location-name strings (PlanYourTripContainer's
+// ItineraryDayPayload.places: string[]), not {name,description} objects.
+const dayPlace = z.string();
 
 const daySchema = z
   .object({
@@ -43,7 +40,7 @@ const daySchema = z
 
 export const manualItineraryWebsiteSchema = z
   .object({
-    name: z.string().min(1),
+    name: z.string().optional(),
     email: z.string().email(),
     phone: z.string().optional().nullable(),
     destination: z.string().optional().nullable(),

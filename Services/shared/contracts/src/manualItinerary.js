@@ -10,7 +10,9 @@ export const ManualItineraryDay = z.object({
     .object({
       name: z.string().optional(),
       type: z.enum(['hotel', 'resort', 'guesthouse', 'homestay', 'camp', 'other']).optional(),
+      rating: z.number().optional(),
       address: z.string().optional(),
+      contactNumber: z.string().optional(),
     })
     .nullable()
     .optional(),
@@ -22,19 +24,18 @@ export const ManualItineraryDay = z.object({
     })
     .optional(),
   transport: z.enum(['flight', 'train', 'bus', 'car', 'boat', 'walk', 'other']).nullable().optional(),
-  places: z
-    .array(
-      z.object({
-        name: z.string(),
-        description: z.string().optional(),
-      }),
-    )
-    .optional(),
+  // Places are plain location-name strings (PlanYourTripContainer's
+  // ItineraryDayPayload.places: string[]), not {name,description} objects.
+  places: z.array(z.string()).optional(),
   notes: z.string().nullable().optional(),
 });
 
+// `name` is optional: PlanYourTripContainer.tsx's tested submit flow
+// allows an empty name (only email is required client-side), matching
+// WebsiteBookingRequest/WebsiteCustomizationRequest's identical
+// relaxation. lead-service's manualItineraryWebsiteSchema mirrors this.
 export const WebsiteManualItineraryRequest = z.object({
-  name: z.string().min(1),
+  name: z.string().optional(),
   email: z.string().email(),
   phone: z.string().optional(),
   destination: z.string().optional(),

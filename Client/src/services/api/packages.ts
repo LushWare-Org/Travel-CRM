@@ -1,7 +1,11 @@
+import { z } from 'zod';
 import httpClient from '../http/client';
+import { parseEnvelope } from '../http/envelope';
+import { ApiPackage, WebsiteReviewRequest, WebsiteReview, ReviewStatsResult } from '@travel-crm/contracts';
 import { aggregateDestinations, normalizePackage } from './packages.transform';
 
 const DEFAULT_LIMIT = 6;
+const ApiPackageList = z.array(ApiPackage);
 
 export const fetchPackages = async (params: Record<string, unknown> = {}) => {
   const response = await httpClient.get('/packages', {
@@ -12,8 +16,8 @@ export const fetchPackages = async (params: Record<string, unknown> = {}) => {
     },
   });
 
-  const rawPackages = Array.isArray(response.data?.data) ? response.data.data : [];
-  const normalizedPackages = rawPackages.map(normalizePackage);
+  const rawPackages = Array.isArray(response.data?.data) ? ApiPackageList.parse(response.data.data) : [];
+  const normalizedPackages = rawPackages.map((pkg) => normalizePackage(pkg as Parameters<typeof normalizePackage>[0]));
   const destinations = aggregateDestinations(normalizedPackages);
 
   return {
@@ -28,8 +32,8 @@ export const fetchFeaturedPackages = async (limit = 6) => {
     params: { limit },
   });
 
-  const rawPackages = Array.isArray(response.data?.data) ? response.data.data : [];
-  return rawPackages.map(normalizePackage);
+  const rawPackages = Array.isArray(response.data?.data) ? ApiPackageList.parse(response.data.data) : [];
+  return rawPackages.map((pkg) => normalizePackage(pkg as Parameters<typeof normalizePackage>[0]));
 };
 
 export const fetchPackageById = async (id: string) => {
@@ -38,7 +42,8 @@ export const fetchPackageById = async (id: string) => {
   }
 
   const response = await httpClient.get(`/packages/${id}`);
-  return normalizePackage(response.data?.data || {});
+  const pkg = parseEnvelope(ApiPackage, response.data, 'GET /packages/:id').data;
+  return normalizePackage(pkg as Parameters<typeof normalizePackage>[0]);
 };
 
 /**
@@ -50,29 +55,26 @@ export const fetchPackageById = async (id: string) => {
  */
 export const getPackageEnvelope = async (id: string) => {
   const response = await httpClient.get(`/packages/${id}`);
+  parseEnvelope(ApiPackage, response.data, 'GET /packages/:id (raw)');
   return response.data;
 };
 
-interface ReviewPayload {
-  name: string;
-  email?: string;
-  rating: number;
-  comment: string;
-}
+type ReviewPayload = z.infer<typeof WebsiteReviewRequest>;
 
 export const submitReview = async (packageId: string, reviewData: ReviewPayload) => {
   if (!packageId) {
     throw new Error('Package id is required');
   }
 
-  const response = await httpClient.post(`/reviews/package/${packageId}`, {
+  const body = WebsiteReviewRequest.parse({
     name: reviewData.name,
     email: reviewData.email || '',
     rating: reviewData.rating,
     comment: reviewData.comment,
   });
 
-  return response.data?.data || null;
+  const response = await httpClient.post(`/reviews/package/${packageId}`, body);
+  return parseEnvelope(WebsiteReview, response.data, 'POST /reviews/package/:id').data;
 };
 
 export const fetchPackageReviews = async (packageId: string, limit = 10, page = 1) => {
@@ -85,7 +87,7 @@ export const fetchPackageReviews = async (packageId: string, limit = 10, page = 
   });
 
   return {
-    reviews: response.data?.data || [],
+    reviews: Array.isArray(response.data?.data) ? z.array(WebsiteReview).parse(response.data.data) : [],
     pagination: response.data?.pagination || null,
   };
 };
@@ -96,5 +98,5 @@ export const fetchReviewStats = async (packageId: string) => {
   }
 
   const response = await httpClient.get(`/reviews/package/${packageId}/stats`);
-  return response.data?.data || null;
+  return parseEnvelope(ReviewStatsResult, response.data, 'GET /reviews/package/:id/stats').data;
 };

@@ -160,8 +160,14 @@ export default function CustomizePackageContainer() {
       return;
     }
 
+    const packageId = pkg.id || pkg?.raw?._id;
+    if (!packageId) {
+      alert('Unable to submit customization request. Please try again later.');
+      return;
+    }
+
     const payload = {
-      packageId: pkg.id || pkg?.raw?._id,
+      packageId,
       name: contact.name?.trim() || '',
       email: contact.email.trim(),
       phone: contact.phone?.trim() || '',

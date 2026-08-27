@@ -58,7 +58,7 @@ beforeEach(() => {
   fetchPackageByIdMock.mockReset();
   fetchPackageByIdMock.mockResolvedValue(normalizePackage(rawPackage));
   submitCustomizationRequestMock.mockReset();
-  submitCustomizationRequestMock.mockResolvedValue({ success: true });
+  submitCustomizationRequestMock.mockResolvedValue({ customizedPackageId: 'cp-1', leadId: 'lead-1' });
 });
 
 describe('CustomizePackageContainer', () => {

@@ -24,14 +24,14 @@ const uploadResumeToImgbbMock = vi.mocked(uploadResumeToImgbb);
 
 const mockVacancies = [
   {
-    _id: 'v1',
+    id: 'v1',
     position: 'Travel Consultant',
     type: 'Full-time',
     location: 'Chennai',
-    experience: { min: 2 },
+    experienceMin: 2,
   },
   {
-    _id: 'v2',
+    id: 'v2',
     position: 'Sales Executive',
     type: 'Full-time',
     location: 'Coimbatore',
@@ -40,10 +40,7 @@ const mockVacancies = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getActiveVacanciesMock.mockResolvedValue({
-    status: 'success',
-    data: { vacancies: mockVacancies },
-  });
+  getActiveVacanciesMock.mockResolvedValue(mockVacancies);
   isImgbbConfiguredMock.mockReturnValue(true);
 });
 

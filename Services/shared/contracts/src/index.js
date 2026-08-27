@@ -17,7 +17,6 @@ export { apiEnvelopeAny } from './envelope.js';
 export { LoginRequest, RegisterRequest, WebsiteUser, AuthResult, ProfileUpdateRequest, ProfileUpdateResult } from './websiteAuth.js';
 export {
   ApiPackage,
-  PackageListResult,
   ReviewStatsResult,
   WebsiteReviewRequest,
   WebsiteReview,

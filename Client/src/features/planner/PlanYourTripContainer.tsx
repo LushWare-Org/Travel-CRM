@@ -332,7 +332,7 @@ export default function PlanYourTripContainer() {
         }),
       };
 
-      await submitManualItineraryRequest(payload);
+      await submitManualItineraryRequest(payload as Parameters<typeof submitManualItineraryRequest>[0]);
       setShowSuccess(true);
     } catch (error) {
       console.error('Failed to submit manual itinerary:', error);

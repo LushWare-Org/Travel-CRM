@@ -10,7 +10,7 @@ const validDay = {
   accommodation: { name: 'Cinnamon Grand', type: 'hotel' },
   meals: { breakfast: true, lunch: false, dinner: true },
   transport: 'car',
-  places: [{ name: 'Galle Face Green', description: 'Sunset walk' }],
+  places: ['Galle Face Green'],
   notes: 'Pickup at 10am',
 };
 
@@ -33,9 +33,9 @@ describe('manualItineraryWebsiteSchema', () => {
     expect(manualItineraryWebsiteSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('accepts a minimal payload (only name/email/days required)', () => {
+  it('accepts a minimal payload (only email/days required)', () => {
     expect(
-      manualItineraryWebsiteSchema.safeParse({ name: 'Jane Doe', email: 'jane@example.com', days: [{ dayNumber: 1 }] }).success,
+      manualItineraryWebsiteSchema.safeParse({ email: 'jane@example.com', days: [{ dayNumber: 1 }] }).success,
     ).toBe(true);
   });
 

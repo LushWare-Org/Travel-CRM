@@ -39,12 +39,13 @@ export const createWebsiteManualItinerary = asyncHandler(async (req, res) => {
   const { name, email, phone, destination, destinationCountry, travelDate, numberOfTravelers, budget, message, days } = parsed.data;
 
   const sanitizedEmail = String(email).trim().toLowerCase();
+  const sanitizedName = name?.trim() || 'Website Traveler';
 
   const result = await prisma.$transaction(async (tx) => {
     const assignedId = await autoAssignSalesRep(tx);
     const lead = await tx.lead.create({
       data: {
-        name: name.trim(),
+        name: sanitizedName,
         email: sanitizedEmail,
         phone: phone ? String(phone).replace(/\D/g, '') : null,
         source: 'website',

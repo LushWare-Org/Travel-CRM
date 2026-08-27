@@ -32,7 +32,7 @@ describe('ContactContainer', () => {
   beforeEach(() => {
     mocks.useAuth.mockReturnValue({ user: null });
     submitContactFormMock.mockReset();
-    submitContactFormMock.mockResolvedValue({ success: true });
+    submitContactFormMock.mockResolvedValue({ leadId: 'lead-1' });
   });
 
   it('renders the contact form and office hours card', () => {

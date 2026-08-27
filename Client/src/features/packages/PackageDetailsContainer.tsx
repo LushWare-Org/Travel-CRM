@@ -83,10 +83,10 @@ export default function PackageDetailsContainer() {
         const fetchedReviews = Array.isArray(reviewsData.reviews)
           ? reviewsData.reviews.map((review) => ({
               id: review.id,
-              user_name: review.user_name || 'Traveler',
+              user_name: review.name || 'Traveler',
               rating: review.rating || 0,
               comment: review.comment || '',
-              created_at: review.created_at || new Date().toISOString(),
+              created_at: review.createdAt || new Date().toISOString(),
             }))
           : [];
         setReviews(fetchedReviews);
@@ -195,6 +195,11 @@ export default function PackageDetailsContainer() {
         return `${year}-${month}-${day}`;
       };
 
+      const packageId = pkg.id || pkg.raw?._id;
+      if (!packageId) {
+        throw new Error('Package id is missing; cannot submit this request');
+      }
+
       const submissionData = {
         name: formData.name?.trim() || undefined,
         email: formData.email.trim(),
@@ -203,8 +208,7 @@ export default function PackageDetailsContainer() {
         travelDate: formatDate(formData.travelDate),
         endDate: formatDate(formData.endDate) || undefined,
         message: formData.message?.trim() || undefined,
-        packageId: pkg.id || pkg.raw?._id,
-        type: submissionType,
+        packageId,
       };
       
       if (submissionType === 'booking') {
@@ -293,10 +297,10 @@ export default function PackageDetailsContainer() {
         setReviews([
           {
             id: newReview.id,
-            user_name: newReview.user_name,
+            user_name: newReview.name || 'Traveler',
             rating: newReview.rating,
             comment: newReview.comment,
-            created_at: newReview.created_at,
+            created_at: newReview.createdAt || new Date().toISOString(),
           },
           ...reviews,
         ]);

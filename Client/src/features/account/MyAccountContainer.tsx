@@ -96,9 +96,9 @@ export default function MyAccountContainer() {
             return [];
           }),
         ]);
-        setBookings(bookingsData || []);
-        setCustomizedPackages(customizedData || []);
-        setManualItineraries(manualData || []);
+        setBookings((bookingsData as RequestCardItem[]) || []);
+        setCustomizedPackages((customizedData as RequestCardItem[]) || []);
+        setManualItineraries((manualData as RequestCardItem[]) || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load your requests');
         console.error('Error loading data:', err);

@@ -1,23 +1,21 @@
 import { z } from 'zod';
 import { moneyField } from './money.js';
 
-// .passthrough(): BookingModal.tsx's exact submitted field set wasn't
-// fully enumerated when this schema was authored. Fields below are the
-// ones known to be required; extra fields the form sends pass through
-// untouched rather than being silently stripped/rejected. Prefer adding
-// named fields here over relying on passthrough long-term.
-export const WebsiteBookingRequest = z
-  .object({
-    packageId: z.string(),
-    name: z.string().min(1),
-    email: z.string().email(),
-    phone: z.string().optional(),
-    travelers: z.number().int().min(1).optional(),
-    travelDate: z.string().optional(),
-    endDate: z.string().optional(),
-    message: z.string().optional(),
-  })
-  .passthrough();
+// Confirmed against BookingModal.tsx's actual submitted payload
+// (PackageDetailsContainer.test.tsx) and booking-service's
+// createWebsiteBooking controller: `name` is optional client- and
+// server-side (backend defaults to 'Website Traveler' when absent) — do
+// not tighten it back to required without re-checking both sides.
+export const WebsiteBookingRequest = z.object({
+  packageId: z.string(),
+  name: z.string().optional(),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  travelers: z.number().int().min(1).optional(),
+  travelDate: z.string().optional(),
+  endDate: z.string().optional(),
+  message: z.string().optional(),
+});
 
 export const WebsiteBookingResult = z
   .object({

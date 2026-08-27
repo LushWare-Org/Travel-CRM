@@ -24,15 +24,11 @@ export const ApiPackage = z
   })
   .passthrough();
 
-export const PackageListResult = z
-  .object({
-    packages: z.array(ApiPackage).optional(),
-  })
-  .passthrough();
-
+// GET /reviews/package/:id/stats returns { avgRating, count } — confirmed
+// against Services/package-service's getReviewStats controller.
 export const ReviewStatsResult = z
   .object({
-    average: z.number().optional(),
+    avgRating: z.number().optional(),
     count: z.number().optional(),
   })
   .passthrough();
@@ -41,11 +37,13 @@ export const WebsiteReviewRequest = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().min(1),
   name: z.string().optional(),
+  email: z.string().optional(),
 });
 
 export const WebsiteReview = z
   .object({
     _id: z.string().optional(),
+    id: z.string(),
     rating: z.number(),
     comment: z.string(),
     name: z.string().optional(),

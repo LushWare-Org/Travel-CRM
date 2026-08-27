@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const customizedPackageWebsiteSchema = z
   .object({
     packageId: z.string().min(1),
-    name: z.string().min(1),
+    name: z.string().optional(),
     email: z.string().email(),
     phone: z.string().optional().nullable(),
     travelers: z.number().int().min(1).optional(),

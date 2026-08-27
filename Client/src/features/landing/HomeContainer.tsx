@@ -185,9 +185,9 @@ export default function HomeContainer() {
   useEffect(() => {
     let mounted = true;
     fetchRecentBookings(8)
-      .then((bookingsData: RecentBooking[]) => {
+      .then((bookingsData) => {
         if (!mounted) return;
-        setBookings(bookingsData || []);
+        setBookings((bookingsData as RecentBooking[]) || []);
       })
       .catch((err: Error) => {
         if (!mounted) return;
