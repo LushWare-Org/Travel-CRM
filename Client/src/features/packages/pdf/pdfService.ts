@@ -15,13 +15,13 @@ import { PALETTE, hexToRgb } from '../../../config/theme';
 interface PdfDay {
   dayNumber?: number | string;
   day?: number | string;
-  title?: string;
-  description?: string;
+  title?: string | null;
+  description?: string | null;
   images?: Array<{ url?: string } | string>;
-  places?: Array<{ place?: { name?: string }; customName?: string }>;
+  places?: Array<{ place?: { name?: string } | null; customName?: string | null }>;
   locations?: string[];
   location?: string;
-  activities?: Array<{ activity?: { name?: string } } | string>;
+  activities?: Array<{ activity?: { name?: string } | null } | string>;
   timeline?: Array<{
     label?: string;
     timeOfDay?: string;
@@ -61,13 +61,18 @@ export interface PdfPackageData {
   theme?: string;
   difficulty?: string;
   duration?: number | string;
+  durationDays?: number | string;
   maxGroupSize?: number | string;
   price?: number | string;
+  sellPrice?: number | string;
+  basePrice?: number | string;
+  currency?: string;
   priceNotes?: string;
   highlights?: string[];
   inclusions?: string[];
   exclusions?: string[];
   terms?: string[];
+  termsAndConditions?: string | null;
   images?: Array<{ url?: string } | string>;
   itineraryDays?: PdfDay[] | Record<string, PdfDay[]>;
   days?: PdfDay[];
@@ -242,12 +247,12 @@ export const generateAndDownloadPDF = async (pkg: PdfPackageData): Promise<void>
   }
 };
 
-// NOTE: cover-page fields below (pkg.name, pkg.price, pkg.terms, pkg.highlights,
-// pkg.maxGroupSize, pkg.duration) still reference the pre-relational package shape;
-// serializePackage() actually returns title/basePrice/sellPrice/termsAndConditions
-// (string)/inclusions/exclusions/durationDays. This degrades gracefully today
-// ("On Request", empty terms section) rather than breaking, so it was left as a
-// known gap out of scope for the itinerary-shape fix — see plan history.
+// Cover-page fields (destination title, duration, price, currency, terms) read
+// title/durationDays/sellPrice/basePrice/currency/termsAndConditions to match
+// serializePackage()'s real output. `terms` is derived from the
+// termsAndConditions string in createPackagePdfBlob before this runs.
+// pkg.highlights/pkg.maxGroupSize remain genuinely absent from the backend
+// (no corresponding package-service column) and degrade gracefully by design.
 function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
   try {
     const doc = new jsPDF();
@@ -822,15 +827,15 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
 
     const destinationTitle =
       pkg.destination ||
-      pkg.name ||
+      pkg.title ||
       pkg.country ||
       (pkg.region && `${pkg.region} Getaway`) ||
       'Signature Escape';
     const durationText =
-      typeof pkg.duration === 'string'
-        ? pkg.duration
-        : pkg.duration
-          ? `${pkg.duration} Day Trip`
+      typeof pkg.durationDays === 'string'
+        ? pkg.durationDays
+        : pkg.durationDays
+          ? `${pkg.durationDays} Day Trip`
           : `${normalizeDays().length || 5} Day Trip`;
 
     const headerBottom = drawBrandHeader(images.brandLogo);
@@ -1052,9 +1057,9 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     setFontStyle('bold');
     doc.setFontSize(28);
     doc.setTextColor(...palette.primaryText);
-    const priceText = formatCurrencyForPdf(pkg.price);
+    const priceText = formatCurrencyForPdf(pkg.sellPrice ?? pkg.basePrice);
     const sanitizedPrice = priceText.replace(/[^\d.,]/g, '');
-    const currencyCode = import.meta.env.VITE_CURRENCY_CODE || 'INR';
+    const currencyCode = pkg.currency || import.meta.env.VITE_CURRENCY_CODE || 'INR';
     doc.text(`${currencyCode} ${sanitizedPrice}`, priceLeftX, yPos + 36);
 
     if (pkg.priceNotes) {
@@ -1075,7 +1080,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
 
     addFooter();
 
-    const fileName = `${(pkg.name || destinationTitle || 'Package').replace(/[^a-z0-9]/gi, '_')}_Itinerary.pdf`;
+    const fileName = `${(pkg.title || destinationTitle || 'Package').replace(/[^a-z0-9]/gi, '_')}_Itinerary.pdf`;
     return { doc, fileName };
   } catch (error) {
     console.error('[PDF Service] PDF generation error:', error);
@@ -1104,6 +1109,9 @@ export const createPackagePdfBlob = async (
 
       if (response.success && response.data) {
         completePackage = response.data;
+        completePackage.terms = completePackage.termsAndConditions
+          ? completePackage.termsAndConditions.split(/\r?\n/).map((t) => t.trim()).filter(Boolean)
+          : [];
         console.log('[PDF Service] Fetched complete package data:', completePackage);
       }
     } catch (error) {
