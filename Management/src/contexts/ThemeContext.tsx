@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
@@ -27,13 +27,16 @@ function readStoredTheme(): ThemePreference {
   return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
 }
 
-function applyResolvedTheme(resolved: ResolvedTheme) {
+/** Handle returned by `window.setTimeout` in a browser environment. */
+type TransitionTimeoutHandle = number;
+
+function applyResolvedTheme(resolved: ResolvedTheme): TransitionTimeoutHandle {
   // Briefly enable transitions on theme-affected properties so the swap reads
   // as a shift rather than a hard cut, without adding a global transition
   // that would also animate hover/focus states.
   document.documentElement.classList.add('theme-transitioning');
   document.documentElement.classList.toggle('dark', resolved === 'dark');
-  window.setTimeout(() => {
+  return window.setTimeout(() => {
     document.documentElement.classList.remove('theme-transitioning');
   }, 200);
 }
@@ -43,24 +46,37 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     theme === 'system' ? getSystemTheme() : theme
   );
+  // Tracks the pending "remove .theme-transitioning" timer so it can be
+  // cleared on unmount/theme change — an uncleared timer would otherwise
+  // touch `document` after the component (or, in tests, the whole DOM
+  // environment) is gone.
+  const transitionTimeoutRef = useRef<TransitionTimeoutHandle | undefined>(undefined);
 
   useEffect(() => {
     const resolved = theme === 'system' ? getSystemTheme() : theme;
     setResolvedTheme(resolved);
-    applyResolvedTheme(resolved);
+    transitionTimeoutRef.current = applyResolvedTheme(resolved);
 
-    if (theme !== 'system') return;
+    let media: MediaQueryList | undefined;
+    let onChange: (() => void) | undefined;
 
-    // Only 'system' needs to keep listening — an explicit light/dark choice
-    // shouldn't silently follow the OS afterwards.
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => {
-      const next = getSystemTheme();
-      setResolvedTheme(next);
-      applyResolvedTheme(next);
+    if (theme === 'system') {
+      // Only 'system' needs to keep listening — an explicit light/dark choice
+      // shouldn't silently follow the OS afterwards.
+      media = window.matchMedia('(prefers-color-scheme: dark)');
+      onChange = () => {
+        const next = getSystemTheme();
+        setResolvedTheme(next);
+        clearTimeout(transitionTimeoutRef.current);
+        transitionTimeoutRef.current = applyResolvedTheme(next);
+      };
+      media.addEventListener('change', onChange);
+    }
+
+    return () => {
+      clearTimeout(transitionTimeoutRef.current);
+      if (media && onChange) media.removeEventListener('change', onChange);
     };
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
   }, [theme]);
 
   const setTheme = (next: ThemePreference) => {
