@@ -1,3 +1,6 @@
+import type { z } from 'zod';
+import { ApiPackage as ApiPackageSchema } from '@travel-crm/contracts';
+
 import { COUNTRY_REGION_MAP } from '../../config/domainData/destinations';
 
 const slugify = (value = ''): string =>
@@ -71,53 +74,34 @@ export const normalizeDestination = (destinationValue = ''): DestinationMeta => 
   return { raw, name, country, type, region, slug, key, nameSlug, countrySlug };
 };
 
-interface ApiPackage {
-  _id?: string;
-  id?: string;
-  slug?: string;
-  name?: string;
-  description?: string;
-  destination?: string;
-  duration?: number;
-  price?: number;
-  category?: string;
-  difficulty?: string | null;
-  rating?: number;
-  averageRating?: number;
-  numReviews?: number;
-  reviewCount?: number;
-  bookings?: number;
-  images?: Array<{ url?: string }>;
-  coverImage?: { url?: string };
-  highlights?: string[];
-  inclusions?: string[];
-  exclusions?: string[];
-  itinerary?: { days?: Array<{ dayNumber?: number; title?: string; description?: string }> };
-  isFeatured?: boolean;
-  isActive?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: unknown;
-}
+type ApiPackage = z.infer<typeof ApiPackageSchema>;
 
 interface ItineraryDay {
   dayNumber: number;
   title: string;
   description: string;
+  locations: string[];
+  activities: string[];
 }
 
-const extractItinerary = (itinerary: ApiPackage['itinerary']): ItineraryDay[] => {
-  if (!itinerary || !Array.isArray(itinerary.days)) {
+const extractItinerary = (itineraryDays: ApiPackage['itineraryDays'] = []): ItineraryDay[] => {
+  if (!Array.isArray(itineraryDays)) {
     return [];
   }
 
-  return itinerary.days
+  return itineraryDays
     .slice()
     .sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))
     .map((day) => ({
       dayNumber: day.dayNumber || 0,
       title: day.title || `Day ${day.dayNumber || ''}`,
       description: day.description || '',
+      locations: Array.isArray(day.places)
+        ? day.places.map((p) => p.place?.name || p.customName || '').filter((v): v is string => Boolean(v))
+        : [],
+      activities: Array.isArray(day.activities)
+        ? day.activities.map((a) => a.activity?.name || '').filter((v): v is string => Boolean(v))
+        : [],
     }));
 };
 
@@ -125,9 +109,11 @@ const extractImages = (
   images: ApiPackage['images'] = [],
   coverImage: ApiPackage['coverImage'],
 ): { coverImage: string; images: string[] } => {
-  const normalizedImages = Array.isArray(images) ? images.map((img) => img?.url).filter((url): url is string => Boolean(url)) : [];
+  const normalizedImages = Array.isArray(images)
+    ? images.map((img) => img.url).filter((url): url is string => Boolean(url))
+    : [];
 
-  const cover = coverImage?.url || normalizedImages[0] || '';
+  const cover = coverImage || normalizedImages[0] || '';
 
   return {
     coverImage: cover,
@@ -158,6 +144,8 @@ export interface NormalizedPackage {
   destination: DestinationMeta;
   duration_days: number;
   price_from: number;
+  currency: string;
+  termsAndConditions: string;
   category: string;
   difficulty: string | null;
   rating: number;
@@ -180,19 +168,21 @@ export interface NormalizedPackage {
 export const normalizePackage = (apiPackage: ApiPackage = {}): NormalizedPackage => {
   const destinationMeta = normalizeDestination(apiPackage.destination);
   const { coverImage, images } = extractImages(apiPackage.images, apiPackage.coverImage);
-  const itinerary = extractItinerary(apiPackage.itinerary);
+  const itinerary = extractItinerary(apiPackage.itineraryDays);
   const activities = Array.from(extractActivitiesFromPackage(apiPackage));
 
   return {
     id: apiPackage._id || apiPackage.id,
-    slug: apiPackage.slug || (apiPackage.name ? slugify(apiPackage.name) : ''),
-    title: apiPackage.name || '',
-    name: apiPackage.name || '',
+    slug: apiPackage.slug || (apiPackage.title ? slugify(apiPackage.title) : ''),
+    title: apiPackage.title || '',
+    name: apiPackage.title || '',
     description: apiPackage.description || '',
     destinationRaw: apiPackage.destination || '',
     destination: destinationMeta,
-    duration_days: apiPackage.duration || 0,
-    price_from: apiPackage.price || 0,
+    duration_days: apiPackage.durationDays || 0,
+    price_from: apiPackage.sellPrice ?? apiPackage.basePrice ?? 0,
+    currency: apiPackage.currency || '',
+    termsAndConditions: apiPackage.termsAndConditions || '',
     category: apiPackage.category || 'other',
     difficulty: apiPackage.difficulty || null,
     rating: apiPackage.rating || apiPackage.averageRating || 0,

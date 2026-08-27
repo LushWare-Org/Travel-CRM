@@ -56,11 +56,11 @@ describe('normalizePackage', () => {
   it('normalizes a raw API package into the expected shape', () => {
     const result = normalizePackage({
       _id: 'p1',
-      name: 'Maldives Escape',
+      title: 'Maldives Escape',
       description: 'A relaxing beach honeymoon in the Maldives',
       destination: 'Male, Maldives',
-      duration: 5,
-      price: 1200,
+      durationDays: 5,
+      sellPrice: 1200,
       images: [{ url: 'https://example.com/1.jpg' }],
       highlights: ['beach', 'romance'],
     });
@@ -81,8 +81,8 @@ describe('normalizePackage', () => {
 describe('aggregateDestinations', () => {
   it('groups packages by destination key and computes min price/duration', () => {
     const packages = [
-      normalizePackage({ _id: '1', name: 'A', destination: 'Male, Maldives', price: 1000, duration: 4 }),
-      normalizePackage({ _id: '2', name: 'B', destination: 'Male, Maldives', price: 800, duration: 6 }),
+      normalizePackage({ _id: '1', title: 'A', destination: 'Male, Maldives', sellPrice: 1000, durationDays: 4 }),
+      normalizePackage({ _id: '2', title: 'B', destination: 'Male, Maldives', sellPrice: 800, durationDays: 6 }),
     ];
 
     const [destination] = aggregateDestinations(packages);
@@ -93,7 +93,7 @@ describe('aggregateDestinations', () => {
   });
 
   it('skips packages with no resolvable destination key', () => {
-    const packages = [normalizePackage({ _id: '1', name: 'A', destination: '' })];
+    const packages = [normalizePackage({ _id: '1', title: 'A', destination: '' })];
     expect(aggregateDestinations(packages)).toEqual([]);
   });
 });

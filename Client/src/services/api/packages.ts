@@ -17,7 +17,7 @@ export const fetchPackages = async (params: Record<string, unknown> = {}) => {
   });
 
   const rawPackages = Array.isArray(response.data?.data) ? ApiPackageList.parse(response.data.data) : [];
-  const normalizedPackages = rawPackages.map((pkg) => normalizePackage(pkg as Parameters<typeof normalizePackage>[0]));
+  const normalizedPackages = rawPackages.map((pkg) => normalizePackage(pkg));
   const destinations = aggregateDestinations(normalizedPackages);
 
   return {
@@ -33,7 +33,7 @@ export const fetchFeaturedPackages = async (limit = 6) => {
   });
 
   const rawPackages = Array.isArray(response.data?.data) ? ApiPackageList.parse(response.data.data) : [];
-  return rawPackages.map((pkg) => normalizePackage(pkg as Parameters<typeof normalizePackage>[0]));
+  return rawPackages.map((pkg) => normalizePackage(pkg));
 };
 
 export const fetchPackageById = async (id: string) => {
@@ -43,7 +43,7 @@ export const fetchPackageById = async (id: string) => {
 
   const response = await httpClient.get(`/packages/${id}`);
   const pkg = parseEnvelope(ApiPackage, response.data, 'GET /packages/:id').data;
-  return normalizePackage(pkg as Parameters<typeof normalizePackage>[0]);
+  return normalizePackage(pkg);
 };
 
 /**
