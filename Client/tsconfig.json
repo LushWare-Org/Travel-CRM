@@ -23,8 +23,10 @@
     "allowJs": true,
     "checkJs": false,
 
-    /* Flipped to true in Phase 6 once every feature folder is migrated. */
-    "strict": false,
+    /* Full strict mode — every feature folder migrated (Phase 5), Header/
+       Footer/App/main converted (Phase 6.1), context/ renamed to
+       contexts/ (Phase 6.2). This is Phase 6.3. */
+    "strict": true,
     "noFallthroughCasesInSwitch": true,
 
     "paths": {

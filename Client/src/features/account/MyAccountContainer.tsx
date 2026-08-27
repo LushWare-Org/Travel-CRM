@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Edit2, Loader, Mail, Phone } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { fetchUserBookings } from '../../services/api/booking';
 import { fetchUserCustomizedPackages } from '../../services/api/customization';
 import { fetchUserManualItineraries } from '../../services/api/manualItinerary';
@@ -100,7 +100,7 @@ export default function MyAccountContainer() {
         setCustomizedPackages(customizedData || []);
         setManualItineraries(manualData || []);
       } catch (err) {
-        setError(err.message || 'Failed to load your requests');
+        setError(err instanceof Error ? err.message : 'Failed to load your requests');
         console.error('Error loading data:', err);
       } finally {
         setLoading(false);
@@ -121,7 +121,7 @@ export default function MyAccountContainer() {
   const customizedFromBookings = bookings.filter(booking => {
     return booking.notes && booking.notes.includes('CustomizedPackage:');
   }).map(booking => {
-    const match = booking.notes.match(/CustomizedPackage:([a-f0-9]+)/);
+    const match = booking.notes?.match(/CustomizedPackage:([a-f0-9]+)/);
     return {
       ...booking,
       customizedPackageId: match ? match[1] : null,
@@ -162,7 +162,7 @@ export default function MyAccountContainer() {
       setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
       console.error('Profile update error:', err);
-      setUpdateMessage({ type: 'error', text: err.message || 'Failed to update profile' });
+      setUpdateMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update profile' });
       setTimeout(() => setUpdateMessage(null), 5000);
     } finally {
       setIsSaving(false);
@@ -194,7 +194,7 @@ export default function MyAccountContainer() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
         </div>
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="relative z-raised max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1
             className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${
               isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
@@ -215,8 +215,8 @@ export default function MyAccountContainer() {
                 />
                 <defs>
                   <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#f97316" />
-                    <stop offset="100%" stopColor="#eab308" />
+                    <stop offset="0%" stopColor="var(--brand-500)" />
+                    <stop offset="100%" stopColor="var(--brand-accent-500)" />
                   </linearGradient>
                 </defs>
               </svg>
@@ -232,7 +232,7 @@ export default function MyAccountContainer() {
         </div>
 
         {/* Tabs Overlay */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 -bottom-12 z-20">
+        <div className="absolute left-1/2 transform -translate-x-1/2 -bottom-12 z-elevated">
           <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-1 flex justify-center gap-2 flex-wrap w-fit">
             <button
               onClick={() => setActiveTab('bookings')}
@@ -273,7 +273,7 @@ export default function MyAccountContainer() {
           {/* Left Sidebar */}
           {showStickySidebar && (
             <div className={`hidden lg:block ${sidebarCollapsed ? 'w-20' : 'w-80'} flex-shrink-0 transition-all duration-300`}>
-              <div className="fixed w-80 left-4 z-40" style={{ paddingBottom: '1000px' }} data-sticky-sidebar>
+              <div className="fixed w-80 left-4 z-header" style={{ paddingBottom: '1000px' }} data-sticky-sidebar>
                 <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">

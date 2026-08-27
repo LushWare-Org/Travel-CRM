@@ -19,7 +19,7 @@ vi.mock('../../../services/api/customization', () => ({
   submitCustomizationRequest: vi.fn(),
 }));
 
-vi.mock('../../../context/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: mocks.useAuth,
 }));
 

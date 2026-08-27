@@ -5,7 +5,7 @@ import FloatingActionStack from '../components/shared/floating-actions/FloatingA
 
 interface MainLayoutProps {
   currentPage: string;
-  onNavigate: (page: string, filter?: string | null, force?: boolean) => void;
+  onNavigate: (page: string, filter?: string | null, force?: unknown) => void;
 }
 
 /**

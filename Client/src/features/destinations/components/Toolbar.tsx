@@ -25,7 +25,7 @@ export default function Toolbar({
   destinationCount,
 }: ToolbarProps) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-4 md:mb-6 sticky top-16 z-40">
+    <div className="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-4 md:mb-6 sticky top-16 z-header">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
         <div className="flex items-center space-x-2 md:space-x-4 w-full md:w-auto">
           <button

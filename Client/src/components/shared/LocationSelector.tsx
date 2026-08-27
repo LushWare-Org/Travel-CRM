@@ -47,22 +47,23 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }: Locati
     
     if (!searchTerm) return locationsToFilter;
     
-    return locationsToFilter.filter(location =>
+    return locationsToFilter.filter((location: string) =>
       location.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
 
   const filteredLocations = getFilteredLocations();
 
-  const handleAddLocation = (location) => {
+  const handleAddLocation = (location: string) => {
     if (!locationsArray.includes(location)) {
       onChange([...locationsArray, location]);
     }
   };
 
-  const handleRemoveLocation = (locationToRemove) => {
-    onChange(locationsArray.filter(l => l !== locationToRemove));
+  const handleRemoveLocation = (locationToRemove: string) => {
+    onChange(locationsArray.filter((l) => l !== locationToRemove));
   };
+
 
   const handleAddCustomLocation = () => {
     const trimmed = customLocation.trim();
@@ -185,7 +186,7 @@ const LocationSelector = ({ locations = [], onChange, destination = '' }: Locati
             <div className="max-h-64 overflow-y-auto border border-gray-300 rounded-xl bg-white">
               {filteredLocations.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-2">
-                  {filteredLocations.map((location) => {
+                  {filteredLocations.map((location: string) => {
                     const isSelected = locationsArray.includes(location);
                     return (
                       <button

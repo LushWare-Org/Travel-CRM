@@ -26,7 +26,7 @@ export default function ReviewModal({
   onClose,
 }: ReviewModalProps) {
   return open ? (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-modal flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full review-modal-mobile p-6 lg:p-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl lg:text-2xl font-bold text-gray-900">Write a Review</h3>

@@ -4,7 +4,7 @@
  * Styled to match the PlanYourTrip form theme (orange/yellow gradient)
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Search, MapPin, Globe, ChevronDown } from 'lucide-react';
 import {
   POPULAR_INTERNATIONAL,
@@ -42,8 +42,8 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchTerm('');
       }
@@ -56,14 +56,12 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
   }, [isOpen]);
 
   // Filter destinations based on search
-  const getFilteredDestinations = (destinations) => {
+  const getFilteredDestinations = (destinations: DestinationOption[]): DestinationOption[] => {
     if (!searchTerm) return destinations;
-    return destinations.filter((dest) =>
-      dest.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    return destinations.filter((dest) => dest.label.toLowerCase().includes(searchTerm.toLowerCase()));
   };
 
-  const handleSelect = (destination) => {
+  const handleSelect = (destination: DestinationOption) => {
     onChange(destination);
     setIsOpen(false);
     setSearchTerm('');
@@ -78,14 +76,14 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
     }
   };
 
-  const handleCustomDestinationKeyPress = (e) => {
+  const handleCustomDestinationKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleCustomDestinationSubmit();
     }
   };
 
-  const renderDestinationGrid = (destinations, emptyMessage) => {
+  const renderDestinationGrid = (destinations: DestinationOption[], emptyMessage: string) => {
     const filtered = getFilteredDestinations(destinations);
 
     if (filtered.length === 0) {
@@ -136,7 +134,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute z-50 w-[calc(100vw-1rem)] sm:w-full sm:min-w-[520px] max-w-[600px] mt-2 bg-white border-2 border-brand-200 rounded-2xl shadow-2xl overflow-hidden left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0">
+        <div className="absolute z-dropdown w-[calc(100vw-1rem)] sm:w-full sm:min-w-[520px] max-w-[600px] mt-2 bg-white border-2 border-brand-200 rounded-2xl shadow-2xl overflow-hidden left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0">
           {/* Search Bar */}
           <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-brand-50 to-brand-accent-50">
             <div className="relative">

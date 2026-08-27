@@ -254,7 +254,7 @@ export default function HomeContainer() {
             id: pkg._id,
             packageName: pkg.name,
             image: pkg.images && pkg.images[0] && pkg.images[0].url ? pkg.images[0].url : '',
-            duration: `${pkg.duration}D/${pkg.duration - 1}N`,
+            duration: `${pkg.duration ?? 0}D/${(pkg.duration ?? 0) - 1}N`,
             price: pkg.price,
             pax: booking.numberOfTravelers,
             bookedAgo: bookedAgoText,
@@ -290,7 +290,7 @@ export default function HomeContainer() {
     <div className="min-h-screen with-fixed-header font-opensans">
       {/* HERO SECTION */}
       <div className="relative h-[80vh] lg:h-[80vh] bg-black">
-        <div className="absolute bottom-0 left-0 right-0 z-20 bg-black/90 backdrop-blur-sm border-t border-white/10 overflow-hidden">
+        <div className="absolute bottom-0 left-0 right-0 z-elevated bg-black/90 backdrop-blur-sm border-t border-white/10 overflow-hidden">
           <style>{`
             @keyframes scroll-left {
               0% {
@@ -382,7 +382,7 @@ export default function HomeContainer() {
           return (
             <div
               key={`video-${i}`}
-              className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
+              className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-raised' : 'opacity-0 z-base'
                 }`}
             >
               <img
@@ -413,15 +413,15 @@ export default function HomeContainer() {
           );
         })}
 
-        <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
+        <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
           <InlineChevronLeft />
         </button>
-        <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Next">
+        <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Next">
           <InlineChevronRight />
         </button>
 
         {/* Hero Content */}
-        <div className="relative z-30 h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">
+        <div className="relative z-lifted h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">
           <div className="max-w-7xl text-center mx-auto">
             <div className="max-w-4xl">
               <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-poppins">
@@ -496,11 +496,11 @@ export default function HomeContainer() {
                           {monthDropdownOpen && (
                             <>
                               <div
-                                className="fixed inset-0 z-[9998]"
+                                className="fixed inset-0 z-dropdown"
                                 onClick={() => setMonthDropdownOpen(false)}
                               />
                               {/* Dropdown */}
-                              <div className="fixed z-[9999] mt-2 w-screen left-1/2 -translate-x-1/2 md:w-96 md:absolute md:left-0 md:translate-x-0 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto">
+                              <div className="fixed z-dropdown mt-2 w-screen left-1/2 -translate-x-1/2 md:w-96 md:absolute md:left-0 md:translate-x-0 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto">
                                 <div className="p-4 grid grid-cols-3 gap-3">
                                   {MONTHS.map((month) => (
                                     <button
@@ -574,7 +574,7 @@ export default function HomeContainer() {
           <div className="absolute top-0 left-1/4 w-96 h-50 bg-blue-500/5 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-92 bg-purple-500/5 rounded-full blur-3xl"></div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
           <div className="text-center mb-6">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight font-poppins">
               Ready to Explore<br className="hidden md:block" /> the World?

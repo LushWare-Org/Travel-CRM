@@ -47,7 +47,7 @@ export default function AboutSection() {
 
   return (
     <section className="py-2 bg-white relative overflow-hidden">
-      <div className="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
         {/* Hero Banner */}
         <div className={`relative bg-gradient-to-r from-brand-500 via-brand-500 to-brand-500 rounded-3xl p-8 md:p-10 mb-20 overflow-hidden transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           <div className="absolute inset-0 bg-black/10" />

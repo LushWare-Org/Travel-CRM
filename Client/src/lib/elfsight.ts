@@ -29,8 +29,8 @@ const loadElfsightScript = (): void => {
  *
  * Returns a ref to attach to the widget's container element.
  */
-export const useElfsightWidget = (): RefObject<HTMLDivElement | null> => {
-  const elRef = useRef<HTMLDivElement | null>(null);
+export const useElfsightWidget = (): RefObject<HTMLDivElement> => {
+  const elRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = elRef.current;

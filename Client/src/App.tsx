@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import HomePage from './pages/HomePage';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { PAGE_CONFIG } from './config/pages';
 
 const DestinationsInternational = lazy(() => import('./pages/DestinationsPage'));
@@ -20,7 +20,7 @@ function AppContent() {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState('home');
 
-  const handleNavigate = (page, filter = null, force = false) => {
+  const handleNavigate = (page: string, filter: string | null = null, force: unknown = false) => {
     setCurrentPage(page);
     let path = '/';
     if (page === 'home' || page === '/') path = '/';
@@ -33,9 +33,7 @@ function AppContent() {
         if (force) navigate(url, { state: { __force: Date.now() } });
         else navigate(url);
       } else {
-        const qKey = path.includes('destinations')
-          ? 'region'
-          : /^\d+$/.test(String(filter)) ? 'id' : 'country';
+        const qKey = path.includes('destinations') ? 'region' : /^\d+$/.test(String(filter)) ? 'id' : 'country';
         const url = `${path}?${qKey}=${filter}`;
         if (force) navigate(url, { state: { __force: Date.now() } });
         else navigate(url);
@@ -46,22 +44,17 @@ function AppContent() {
     }
   };
 
-  const LoadingFallback = () => <div className="min-h-screen" />;
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense fallback={<div className="min-h-screen" />}>
       <Routes>
         <Route element={<MainLayout currentPage={currentPage} onNavigate={handleNavigate} />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/packages" element={<Packages />} />
           <Route path="/package/:id" element={<PackageDetails />} />
           <Route path="/contact" element={<Contact />} />
-          {PAGE_CONFIG.destinations.enabled && (
-            <Route path="/destinations-international" element={<DestinationsInternational />} />
-          )}
+          {PAGE_CONFIG.destinations.enabled && <Route path="/destinations-international" element={<DestinationsInternational />} />}
           {PAGE_CONFIG.planner.enabled && <Route path="/planner" element={<PlanYourTrip />} />}
-          {PAGE_CONFIG.planner.enabled && (
-            <Route path="/package/:id/customize" element={<CustomizePackage />} />
-          )}
+          {PAGE_CONFIG.planner.enabled && <Route path="/package/:id/customize" element={<CustomizePackage />} />}
           {PAGE_CONFIG.about.enabled && <Route path="/about" element={<AboutUs />} />}
           {PAGE_CONFIG.career.enabled && <Route path="/career" element={<Career />} />}
           {PAGE_CONFIG.account.enabled && <Route path="/my-account" element={<MyAccount />} />}

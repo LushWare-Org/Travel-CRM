@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 // Mock the untyped AuthContext module boundary so the container's
 // useAuth() destructuring is controllable without hitting real storage/API.
-vi.mock('../../../context/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: null,
     token: null,

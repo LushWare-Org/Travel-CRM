@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Shield, Globe } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import logo from '/logo.png';
 import BRANDING from '../../config/branding';
 
@@ -56,7 +56,7 @@ export default function LoginContainer() {
       }
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Unable to process request. Please try again.');
+      setError(err instanceof Error ? err.message : 'Unable to process request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -76,7 +76,7 @@ export default function LoginContainer() {
           <div className="absolute bottom-10 left-10 w-96 h-96 bg-brand-accent-500/10 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
           
-          <div className="relative z-10">
+          <div className="relative z-raised">
             {/* Logo */}
             <div className="flex items-center space-x-3 mb-16">
               <img src={logo} alt={`${BRANDING.company.name} Logo`} className="w-54 h-54 object-contain drop-shadow-lg" />

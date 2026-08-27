@@ -4,7 +4,7 @@
  * Styled to match Plan Your Trip theme (orange/yellow gradient)
  */
 
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { Plus, X, Search } from 'lucide-react';
 import { DEFAULT_ACTIVITIES, ACTIVITY_CATEGORIES } from '../../config/domainData/activities';
 
@@ -33,14 +33,14 @@ const ActivitySelector = ({ activities = [], onChange }: ActivitySelectorProps) 
     return matchesCategory && matchesSearch;
   });
 
-  const handleAddActivity = (activityLabel) => {
+  const handleAddActivity = (activityLabel: string) => {
     if (!activitiesArray.includes(activityLabel)) {
       onChange([...activitiesArray, activityLabel]);
     }
   };
 
-  const handleRemoveActivity = (activityToRemove) => {
-    onChange(activitiesArray.filter(a => a !== activityToRemove));
+  const handleRemoveActivity = (activityToRemove: string) => {
+    onChange(activitiesArray.filter((a) => a !== activityToRemove));
   };
 
   const handleAddCustomActivity = () => {
@@ -51,7 +51,7 @@ const ActivitySelector = ({ activities = [], onChange }: ActivitySelectorProps) 
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddCustomActivity();

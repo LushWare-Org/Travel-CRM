@@ -48,7 +48,7 @@ export default function InternationalGrid({ destinations, loading }: Internation
             onClick={() => handleDestinationClick(dest)}
             className="group relative overflow-hidden rounded-2xl aspect-[5/7] hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
           >
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
             <img
               src={dest.image_url || "/placeholder.svg"}
               alt={dest.name}

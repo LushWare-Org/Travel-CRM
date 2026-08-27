@@ -29,7 +29,7 @@ export default function RecommendedPackagesSection() {
       .then(({ packages }) => {
         if (!isMounted) return;
         const grouped: Record<string, NormalizedPackage[]> = {};
-        packages.forEach(pkg => {
+        packages.forEach((pkg: NormalizedPackage) => {
           const category = pkg.category || 'Other';
           if (!grouped[category]) {
             grouped[category] = [];
@@ -194,7 +194,7 @@ export default function RecommendedPackagesSection() {
                     <button
                       onClick={prevSlide}
                       disabled={isAnimating}
-                      className="absolute left-0 top-1/3 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                      className="absolute left-0 top-1/3 -translate-y-1/2 z-elevated bg-white/90 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
                       aria-label="Previous"
                     >
                       <ChevronLeft className="w-6 h-6" />
@@ -202,7 +202,7 @@ export default function RecommendedPackagesSection() {
                     <button
                       onClick={nextSlide}
                       disabled={isAnimating}
-                      className="absolute right-0 top-1/3 -translate-y-1/2 z-20 bg-white/90 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                      className="absolute right-0 top-1/3 -translate-y-1/2 z-elevated bg-white/90 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
                       aria-label="Next"
                     >
                       <ChevronRight className="w-6 h-6" />
@@ -216,7 +216,7 @@ export default function RecommendedPackagesSection() {
                         >
                           <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-brand-100 group h-full flex flex-col">
                             <div className="relative h-56 overflow-hidden flex-shrink-0">
-                              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+                              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
                               <img
                                 src={pkg.image}
                                 alt={pkg.title}

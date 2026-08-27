@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock('../../../context/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: mocks.useAuth,
 }));
 

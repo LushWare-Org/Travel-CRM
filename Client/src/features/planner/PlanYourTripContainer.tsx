@@ -25,7 +25,7 @@ import { submitManualItineraryRequest } from "../../services/api/manualItinerary
 import DestinationSelector from "../../components/shared/DestinationSelector";
 import LocationSelector from "../../components/shared/LocationSelector";
 import ActivitySelector from "../../components/shared/ActivitySelector";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 import DateRangeCalendar from "./components/DateRangeCalendar";
 
 const transportOptions: Array<{ value: string; label: string; icon: LucideIcon }> = [
@@ -336,7 +336,7 @@ export default function PlanYourTripContainer() {
       setShowSuccess(true);
     } catch (error) {
       console.error('Failed to submit manual itinerary:', error);
-      setValidationMsg(error.message || 'Failed to submit your itinerary request. Please try again.');
+      setValidationMsg(error instanceof Error ? error.message : 'Failed to submit your itinerary request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -454,7 +454,7 @@ export default function PlanYourTripContainer() {
                   />
                 </div>
                 {showCal && (
-                  <div className="absolute left-1/2 transform -translate-x-1/2 mt-4 z-50">
+                  <div className="absolute left-1/2 transform -translate-x-1/2 mt-4 z-dropdown">
                     <DateRangeCalendar
                       initialStart={startDate}
                       initialEnd={endDate}
@@ -928,7 +928,7 @@ export default function PlanYourTripContainer() {
 
       {/* SUCCESS MODAL */}
       {showSuccess && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 z-modal flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">

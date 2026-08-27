@@ -7,7 +7,7 @@ import { fetchPackageById } from '../../services/api/packages';
 import type { NormalizedPackage } from '../../services/api/packages.transform';
 import { submitCustomizationRequest } from '../../services/api/customization';
 import { formatCurrency } from '../../lib/currency';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import ActivitySelector from '../../components/shared/ActivitySelector';
 import LocationSelector from '../../components/shared/LocationSelector';
 import { buildDayState, splitTextToList } from './utils/formHelpers';
@@ -184,7 +184,7 @@ export default function CustomizePackageContainer() {
       setSuccessModalMessage(successMsg);
       setSuccessModalVisible(true);
     } catch (err) {
-      alert(err.message || 'Unable to submit customization request. Please try again later.');
+      alert(err instanceof Error ? err.message : 'Unable to submit customization request. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
@@ -778,7 +778,7 @@ export default function CustomizePackageContainer() {
         </div>
 
       {successModalVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all duration-300">
             <div className="px-8 py-10">
               <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">Thank you!</h2>

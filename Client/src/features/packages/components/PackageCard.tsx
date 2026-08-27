@@ -13,7 +13,7 @@ export default function PackageCard({ pkg }: PackageCardProps) {
       to={`/package/${pkg.id}`}
       className="group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 transition-all duration-300 transform flex flex-col h-full"
     >
-      <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+      <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
       <div className="relative overflow-hidden h-48">
         <picture>
           <source

@@ -43,7 +43,7 @@ export default function AboutContainer() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50">
       <div className="relative h-[50vh] overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/60 z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/60 z-raised"></div>
         <video
           className="absolute inset-0 w-full h-full object-cover"
           src={heroVideo?.video}
@@ -53,7 +53,7 @@ export default function AboutContainer() {
           playsInline
           aria-hidden="true"
         />
-        <div className="relative z-20 h-full flex flex-col items-center justify-center text-white px-4">
+        <div className="relative z-elevated h-full flex flex-col items-center justify-center text-white px-4">
           <div className="text-center max-w-4xl">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
               Crafting Dream

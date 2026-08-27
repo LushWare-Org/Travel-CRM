@@ -52,7 +52,7 @@ export default function WhyChooseUs() {
                   {/* Play Icon */}
                   <button
                     onClick={() => setSelectedVideo(video)}
-                    className="absolute inset-0 flex items-center justify-center z-10"
+                    className="absolute inset-0 flex items-center justify-center z-raised"
                   >
                     <div className="w-14 h-14 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/50 transition-all duration-300">
                       <Play className="w-6 h-6 text-white fill-white" />
@@ -86,7 +86,7 @@ export default function WhyChooseUs() {
 
       {/* Video Modal Popup */}
       {selectedVideo && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-modal p-4">
           <div className="relative w-full max-w-4xl">
             <button
               onClick={() => setSelectedVideo(null)}

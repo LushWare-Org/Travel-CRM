@@ -12,7 +12,7 @@ vi.mock('../../../services/api/contact', () => ({
   submitContactForm: vi.fn(),
 }));
 
-vi.mock('../../../context/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: mocks.useAuth,
 }));
 

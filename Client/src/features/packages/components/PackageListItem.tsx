@@ -19,7 +19,7 @@ export default function PackageListItem({ pkg }: PackageListItemProps) {
     >
       <div className="flex flex-col lg:flex-row">
         <div className="relative lg:w-80 h-64 lg:h-80 overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
           <picture>
             <source
               srcSet={(pkg.images && pkg.images[0])?.replace(/\.(jpg|jpeg|png)$/i, '.webp') || (pkg.image_url?.replace(/\.(jpg|jpeg|png)$/i, '.webp') || '')}

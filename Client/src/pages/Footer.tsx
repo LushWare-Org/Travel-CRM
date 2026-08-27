@@ -2,7 +2,11 @@ import { MapPin, Phone, Mail, Facebook, Instagram, Twitter, Youtube } from 'luci
 import BRANDING, { getCopyrightText } from '../config/branding';
 import { PAGE_CONFIG } from '../config/pages';
 
-export default function Footer({ onNavigate }) {
+export interface FooterProps {
+  onNavigate: (page: string, filter?: string | null, force?: unknown) => void;
+}
+
+export default function Footer({ onNavigate }: FooterProps) {
   return (
     <footer className="bg-gray-900 text-gray-300 font-opensans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -10,30 +14,49 @@ export default function Footer({ onNavigate }) {
           <div>
             <div className="flex items-center mb-4">
               <img src="/logo.png" alt={`${BRANDING.company.name} Logo`} className="h-12 w-auto" />
-              <div className="ml-3">
-              </div>
+              <div className="ml-3"></div>
             </div>
             <p className="text-sm mb-4">
               {`Creating unforgettable travel experiences worldwide. Your trusted partner for international holidays since ${BRANDING.company.foundedYear}.`}
             </p>
             <div className="flex gap-3">
               {BRANDING.social.facebook && (
-                <a href={BRANDING.social.facebook} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                <a
+                  href={BRANDING.social.facebook}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition"
+                >
                   <Facebook size={18} />
                 </a>
               )}
               {BRANDING.social.instagram && (
-                <a href={BRANDING.social.instagram} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                <a
+                  href={BRANDING.social.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition"
+                >
                   <Instagram size={18} />
                 </a>
               )}
               {BRANDING.social.twitter && (
-                <a href={BRANDING.social.twitter} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                <a
+                  href={BRANDING.social.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition"
+                >
                   <Twitter size={18} />
                 </a>
               )}
               {BRANDING.social.youtube && (
-                <a href={BRANDING.social.youtube} target="_blank" rel="noopener noreferrer" className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition">
+                <a
+                  href={BRANDING.social.youtube}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-gray-800 p-2 rounded-lg hover:bg-brand-accent-600 transition"
+                >
                   <Youtube size={18} />
                 </a>
               )}
@@ -123,13 +146,19 @@ export default function Footer({ onNavigate }) {
             <p>{getCopyrightText()}</p>
             <div className="flex gap-6">
               {BRANDING.legal.privacyUrl && (
-                <a href={BRANDING.legal.privacyUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">Privacy Policy</a>
+                <a href={BRANDING.legal.privacyUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">
+                  Privacy Policy
+                </a>
               )}
               {BRANDING.legal.termsUrl && (
-                <a href={BRANDING.legal.termsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">Terms of Service</a>
+                <a href={BRANDING.legal.termsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">
+                  Terms of Service
+                </a>
               )}
               {BRANDING.legal.cancellationUrl && (
-                <a href={BRANDING.legal.cancellationUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">Cancellation Policy</a>
+                <a href={BRANDING.legal.cancellationUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent-400 transition">
+                  Cancellation Policy
+                </a>
               )}
             </div>
           </div>

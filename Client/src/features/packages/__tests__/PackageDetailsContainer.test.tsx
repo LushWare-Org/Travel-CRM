@@ -32,7 +32,7 @@ vi.mock('../pdf/pdfService', () => ({
   generateAndDownloadPDF: vi.fn(),
 }));
 
-vi.mock('../../../context/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: mocks.useAuth,
 }));
 

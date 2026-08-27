@@ -70,7 +70,7 @@ const getStatusColor = (status?: string) => {
 const getStatusBadge = (status?: string) => {
   return (
     <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusColor(status)}`}>
-      {status?.charAt(0).toUpperCase() + status?.slice(1) || 'Pending'}
+      {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Pending'}
     </span>
   );
 };
@@ -221,13 +221,16 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
               <Clock className="w-4 h-4 text-brand-500" />
               <span>
                 {activeTab === 'bookings' && 'Booked on'} {(activeTab === 'customized' || activeTab === 'manual') && 'Created on'}{' '}
-                {item.createdAt || item.travelDate
-                  ? new Date(item.createdAt || item.travelDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })
-                  : 'N/A'}
+                {(() => {
+                  const dateValue = item.createdAt || item.travelDate;
+                  return dateValue
+                    ? new Date(dateValue).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                    : 'N/A';
+                })()}
               </span>
             </div>
             {activeTab === 'bookings' && (

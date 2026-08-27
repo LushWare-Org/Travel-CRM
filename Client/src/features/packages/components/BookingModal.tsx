@@ -45,7 +45,7 @@ export default function BookingModal({
   onClose,
 }: BookingModalProps) {
   return open ? (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-max-height-mobile">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-modal flex items-center justify-center p-4 modal-max-height-mobile">
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl lg:max-w-5xl w-full max-h-[95vh] overflow-y-auto modal-max-height-mobile">
             <div className="sticky top-0 bg-gradient-to-r from-brand-accent-500 to-brand-500 p-6 lg:p-8 text-white modal-header-padding-sm">
               <div className="flex items-center justify-between">

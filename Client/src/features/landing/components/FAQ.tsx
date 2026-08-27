@@ -3,7 +3,7 @@ import { FAQ_CATEGORIES, FAQS } from '../../../content/faq';
 import { useState } from 'react';
 
 export default function FAQSection() {
-  const [activeCategory, setActiveCategory] = useState('booking');
+  const [activeCategory, setActiveCategory] = useState<keyof typeof FAQS>('booking');
   const [openQuestions, setOpenQuestions] = useState<Record<number, boolean>>({});
 
   const toggleQuestion = (questionIndex: number) => {
@@ -15,7 +15,7 @@ export default function FAQSection() {
 
   return (
     <section className="py-4 bg-white relative overflow-hidden font-opensans pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
         {/* Header */}
           <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-poppins">
@@ -34,7 +34,7 @@ export default function FAQSection() {
               <button
                 key={category.id}
                 onClick={() => {
-                  setActiveCategory(category.id);
+                  setActiveCategory(category.id as keyof typeof FAQS);
                   setOpenQuestions({});
                 }}
                 className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2 ${

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import { MapPin, Loader2, X } from 'lucide-react';
 import BRANDING from '../../config/branding';
 
@@ -54,7 +54,7 @@ const LocationAutocomplete = ({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync with external value changes
   useEffect(() => {
@@ -92,7 +92,7 @@ const LocationAutocomplete = ({
       // Format results
       const formattedSuggestions = data.map((item, index) => {
         // Build a readable location string
-        const parts = [];
+        const parts: string[] = [];
         if (item.name && item.name !== item.display_name.split(',')[0]) {
           parts.push(item.name);
         }
@@ -139,13 +139,13 @@ const LocationAutocomplete = ({
   };
 
   // Debounce input
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setQuery(newValue);
     setSelectedIndex(-1);
     
     // Clear previous timer
-    clearTimeout(debounceTimerRef.current);
+    clearTimeout(debounceTimerRef.current ?? undefined);
 
     // Debounce: wait 500ms after user stops typing
     debounceTimerRef.current = setTimeout(() => {
@@ -172,7 +172,7 @@ const LocationAutocomplete = ({
   };
 
   // Handle keyboard navigation
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions || suggestions.length === 0) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -223,12 +223,12 @@ const LocationAutocomplete = ({
 
   // Close suggestions when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target) &&
+        !suggestionsRef.current.contains(event.target as Node) &&
         inputRef.current &&
-        !inputRef.current.contains(event.target)
+        !inputRef.current.contains(event.target as Node)
       ) {
         setShowSuggestions(false);
       }
@@ -278,7 +278,7 @@ const LocationAutocomplete = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+          className="absolute z-dropdown w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-60 overflow-y-auto"
         >
           {suggestions.map((suggestion, index) => (
             <button
@@ -300,7 +300,7 @@ const LocationAutocomplete = ({
 
       {/* No results message */}
       {showSuggestions && !isLoading && suggestions.length === 0 && query.trim().length >= 2 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg p-3">
+        <div className="absolute z-dropdown w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg p-3">
           <p className="text-sm text-gray-500">No locations found</p>
         </div>
       )}

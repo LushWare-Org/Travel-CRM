@@ -12,7 +12,7 @@ vi.mock('../../../services/api/manualItinerary', () => ({
   submitManualItineraryRequest: vi.fn(),
 }));
 
-vi.mock('../../../context/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: mocks.useAuth,
 }));
 

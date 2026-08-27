@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../services/api/packages';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import LazyIcon from '../components/shared/LazyIcon';
 import { ChevronDown } from 'lucide-react';
 import BRANDING from '../config/branding';
@@ -9,27 +9,44 @@ import { PAGE_CONFIG } from '../config/pages';
 
 const MAX_NAV_ITEMS = 12;
 
-export default function Header({ currentPage, onNavigate }) {
+interface DestinationMenuItem {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface NavItem {
+  name: string;
+  page: string;
+  dropdown?: DestinationMenuItem[];
+}
+
+export interface HeaderProps {
+  currentPage?: string;
+  onNavigate: (page: string, filter?: string | null, force?: unknown) => void;
+}
+
+export default function Header({ onNavigate }: HeaderProps) {
   const [scrollY, setScrollY] = useState(0);
   const isScrolled = scrollY > 50;
-  const [activeDropdown, setActiveDropdown] = useState(null);
-  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
-  const [internationalMenu, setInternationalMenu] = useState([]);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState<string | null>(null);
+  const [internationalMenu, setInternationalMenu] = useState<DestinationMenuItem[]>([]);
   const location = useLocation();
   const pathname = location.pathname;
   const searchParams = new URLSearchParams(location.search);
   const { user, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
-  const sideMenuRef = useRef(null);
+  const sideMenuRef = useRef<HTMLDivElement>(null);
   const [destinationsLoaded, setDestinationsLoaded] = useState(false);
-  const destinationsLoadRef = useRef(null);
-  const dropdownTimeoutRef = useRef(null);
+  const destinationsLoadRef = useRef<Promise<void> | null>(null);
+  const dropdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    let rafId = null;
+    let rafId: number | null = null;
     const handleScroll = () => {
       if (rafId) return;
       rafId = requestAnimationFrame(() => {
@@ -47,7 +64,7 @@ export default function Header({ currentPage, onNavigate }) {
 
   useEffect(() => {
     if (!user) return;
-    let inactivityTimer;
+    let inactivityTimer: ReturnType<typeof setTimeout>;
     const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
     const resetInactivityTimer = () => {
       clearTimeout(inactivityTimer);
@@ -58,22 +75,22 @@ export default function Header({ currentPage, onNavigate }) {
     };
     const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
-    activityEvents.forEach(event => {
+    activityEvents.forEach((event) => {
       window.addEventListener(event, resetInactivityTimer);
     });
     resetInactivityTimer();
 
     return () => {
       clearTimeout(inactivityTimer);
-      activityEvents.forEach(event => {
+      activityEvents.forEach((event) => {
         window.removeEventListener(event, resetInactivityTimer);
       });
     };
   }, [user, logout, onNavigate]);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setUserMenuOpen(false);
       }
     };
@@ -85,8 +102,8 @@ export default function Header({ currentPage, onNavigate }) {
   }, [userMenuOpen]);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (sideMenuRef.current && !sideMenuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sideMenuRef.current && !sideMenuRef.current.contains(event.target as Node)) {
         setSideMenuOpen(false);
       }
     };
@@ -104,9 +121,7 @@ export default function Header({ currentPage, onNavigate }) {
       .then(({ destinations }) => {
         const sorted = (destinations || []).slice().sort((a, b) => (b.packagesCount || 0) - (a.packagesCount || 0));
         setInternationalMenu(
-          sorted
-            .slice(0, MAX_NAV_ITEMS)
-            .map((dest) => ({ id: dest.id, name: dest.name, slug: dest.slug }))
+          sorted.slice(0, MAX_NAV_ITEMS).map((dest) => ({ id: dest.id, name: dest.name, slug: dest.slug })),
         );
         setDestinationsLoaded(true);
       })
@@ -122,45 +137,59 @@ export default function Header({ currentPage, onNavigate }) {
     loadDestinationsOnDemand();
   }, [loadDestinationsOnDemand]);
 
-  const navItems = useMemo(() => [
-    { name: 'Home', page: 'home' },
-    PAGE_CONFIG.destinations.enabled && { name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu },
-    PAGE_CONFIG.about.enabled && { name: 'About Us', page: 'about' },
-    { name: 'Contact', page: 'contact' },
-    PAGE_CONFIG.career.enabled && { name: 'Career', page: 'career' },
-    PAGE_CONFIG.account.enabled && user && { name: 'My Account', page: 'my-account' },
-    PAGE_CONFIG.account.enabled && !user && { name: 'Login', page: 'login' },
-  ].filter(Boolean), [user, internationalMenu]);
+  const navItems = useMemo<NavItem[]>(
+    () =>
+      (
+        [
+          { name: 'Home', page: 'home' },
+          PAGE_CONFIG.destinations.enabled && { name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu },
+          PAGE_CONFIG.about.enabled && { name: 'About Us', page: 'about' },
+          { name: 'Contact', page: 'contact' },
+          PAGE_CONFIG.career.enabled && { name: 'Career', page: 'career' },
+          PAGE_CONFIG.account.enabled && user && { name: 'My Account', page: 'my-account' },
+          PAGE_CONFIG.account.enabled && !user && { name: 'Login', page: 'login' },
+        ] as Array<NavItem | false>
+      ).filter((item): item is NavItem => Boolean(item)),
+    [user, internationalMenu],
+  );
 
-  const leftNavItems = useMemo(() => (
-    PAGE_CONFIG.destinations.enabled
-      ? [{ name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu }]
-      : []
-  ), [internationalMenu]);
+  const leftNavItems = useMemo<NavItem[]>(
+    () => (PAGE_CONFIG.destinations.enabled ? [{ name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu }] : []),
+    [internationalMenu],
+  );
 
-  const sideMenuItems = useMemo(() => [
-    { name: 'Home', page: 'home' },
-    PAGE_CONFIG.about.enabled && { name: 'About Us', page: 'about' },
-    { name: 'Contact', page: 'contact' },
-    PAGE_CONFIG.career.enabled && { name: 'Career', page: 'career' },
-    PAGE_CONFIG.account.enabled && user && { name: 'My Account', page: 'my-account' },
-    PAGE_CONFIG.account.enabled && !user && { name: 'Login', page: 'login' },
-  ].filter(Boolean), [user]);
+  const sideMenuItems = useMemo<NavItem[]>(
+    () =>
+      (
+        [
+          { name: 'Home', page: 'home' },
+          PAGE_CONFIG.about.enabled && { name: 'About Us', page: 'about' },
+          { name: 'Contact', page: 'contact' },
+          PAGE_CONFIG.career.enabled && { name: 'Career', page: 'career' },
+          PAGE_CONFIG.account.enabled && user && { name: 'My Account', page: 'my-account' },
+          PAGE_CONFIG.account.enabled && !user && { name: 'Login', page: 'login' },
+        ] as Array<NavItem | false>
+      ).filter((item): item is NavItem => Boolean(item)),
+    [user],
+  );
 
-  const isItemActive = useCallback((item) => {
-    if (item.page === 'home') return pathname === '/';
-    if (pathname.startsWith(`/${item.page}`)) return true;
+  const isItemActive = useCallback(
+    (item: NavItem) => {
+      if (item.page === 'home') return pathname === '/';
+      if (pathname.startsWith(`/${item.page}`)) return true;
 
-    if ((pathname === '/packages' || pathname.startsWith('/packages?'))) {
-      const destination = searchParams.get('destination');
-      if (!destination) return false;
-      if (item.page === 'destinations-international' && internationalMenu.some(d => d.slug === destination)) return true;
-    }
-    return false;
-  }, [pathname, searchParams, internationalMenu]);
+      if (pathname === '/packages' || pathname.startsWith('/packages?')) {
+        const destination = searchParams.get('destination');
+        if (!destination) return false;
+        if (item.page === 'destinations-international' && internationalMenu.some((d) => d.slug === destination)) return true;
+      }
+      return false;
+    },
+    [pathname, searchParams, internationalMenu],
+  );
 
   return (
-    <header className="relative z-50 overflow-visible transition-all duration-300 bg-black shadow-lg font-opensans">
+    <header className={`relative z-header overflow-visible transition-all duration-300 bg-black shadow-lg font-opensans ${isScrolled ? '' : ''}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
           <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
@@ -168,7 +197,7 @@ export default function Header({ currentPage, onNavigate }) {
           </a>
           <div className="flex-1" />
           <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
-            {leftNavItems.map(item => {
+            {leftNavItems.map((item) => {
               const isActive = isItemActive(item);
 
               return (
@@ -176,7 +205,7 @@ export default function Header({ currentPage, onNavigate }) {
                   key={item.page}
                   className="relative"
                   onMouseEnter={() => {
-                    if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+                    clearTimeout(dropdownTimeoutRef.current ?? undefined);
                     setActiveDropdown(item.page);
                   }}
                   onMouseLeave={() => {
@@ -193,10 +222,7 @@ export default function Header({ currentPage, onNavigate }) {
                       setActiveDropdown(null);
                     }}
                     className={`relative px-5 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap text-sm font-medium
-                      ${isActive
-                        ? 'text-brand-400 font-semibold bg-brand-900/20'
-                        : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'
-                      }
+                      ${isActive ? 'text-brand-400 font-semibold bg-brand-900/20' : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'}
                       ${item.page === 'login' ? 'border border-brand-500/50 hover:border-brand-400' : ''}
                     `}
                   >
@@ -213,9 +239,9 @@ export default function Header({ currentPage, onNavigate }) {
                   {/* Dropdown Menu */}
                   {item.dropdown && activeDropdown === item.page && (
                     <div
-                      className="absolute top-full left-0 pt-0 z-50"
+                      className="absolute top-full left-0 pt-0 z-dropdown"
                       onMouseEnter={() => {
-                        if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current);
+                        clearTimeout(dropdownTimeoutRef.current ?? undefined);
                       }}
                       onMouseLeave={() => {
                         dropdownTimeoutRef.current = setTimeout(() => setActiveDropdown(null), 80);
@@ -269,7 +295,7 @@ export default function Header({ currentPage, onNavigate }) {
               <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setUserMenuOpen(prev => !prev)}
+                  onClick={() => setUserMenuOpen((prev) => !prev)}
                   className="flex items-center gap-2 px-3 py-2 rounded-full border border-gray-700 bg-gray-900/80 backdrop-blur-sm hover:border-brand-500 transition-all"
                 >
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
@@ -282,7 +308,7 @@ export default function Header({ currentPage, onNavigate }) {
                 </button>
 
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 py-3 z-50">
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 py-3 z-dropdown">
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="text-xs text-gray-500">Signed in as</p>
                       <p className="text-sm font-semibold text-gray-900 truncate">{user.email}</p>
@@ -321,20 +347,19 @@ export default function Header({ currentPage, onNavigate }) {
         </div>
 
         {/* Mobile Menu */}
-        <div className={`fixed lg:hidden top-0 right-0 h-screen w-3/4 bg-gray-950 border-l border-gray-800 shadow-2xl z-[100] transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div
+          className={`fixed lg:hidden top-0 right-0 h-screen w-3/4 bg-gray-950 border-l border-gray-800 shadow-2xl z-modal transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
           <div className="flex items-center justify-between p-4 border-b border-gray-800">
             <h2 className="text-lg font-bold text-white">Menu</h2>
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-all"
-            >
+            <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-gray-800 rounded-lg transition-all">
               <LazyIcon name="X" size={20} className="w-5 h-5 text-white" />
             </button>
           </div>
 
           {/* Menu Items */}
           <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 70px)' }}>
-            {navItems.map(item => {
+            {navItems.map((item) => {
               const isActive = isItemActive(item);
               const isMobileDropdownOpen = mobileDropdownOpen === item.page;
               return (
@@ -342,19 +367,11 @@ export default function Header({ currentPage, onNavigate }) {
                   <div className="flex items-center">
                     <button
                       onClick={() => {
-                        if (!item.dropdown) {
-                          onNavigate(item.page, null, null);
-                          setMobileMenuOpen(false);
-                        } else {
-                          onNavigate(item.page, null, null);
-                          setMobileMenuOpen(false);
-                        }
+                        onNavigate(item.page, null, null);
+                        setMobileMenuOpen(false);
                       }}
                       className={`flex-1 text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
-                        ${isActive
-                          ? 'text-brand-400 bg-brand-900/20'
-                          : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'
-                        }
+                        ${isActive ? 'text-brand-400 bg-brand-900/20' : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'}
                       `}
                     >
                       {item.name}
@@ -372,7 +389,7 @@ export default function Header({ currentPage, onNavigate }) {
                   {/* Mobile Dropdown List */}
                   {item.dropdown && isMobileDropdownOpen && (
                     <div className="bg-gray-900/50 rounded-lg mt-1 mb-2 grid grid-cols-2 gap-2 p-3">
-                      {item.dropdown.map(dest => (
+                      {item.dropdown.map((dest) => (
                         <button
                           key={dest.id}
                           onClick={() => {
@@ -422,28 +439,23 @@ export default function Header({ currentPage, onNavigate }) {
           </nav>
         </div>
 
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 lg:hidden bg-black/40 z-[99]"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
+        {mobileMenuOpen && <div className="fixed inset-0 lg:hidden bg-black/40 z-overlay" onClick={() => setMobileMenuOpen(false)} />}
 
         {/* Side Menu */}
-        <div ref={sideMenuRef} className={`fixed top-0 right-0 h-screen w-80 bg-gray-950 border-l border-gray-800 shadow-2xl z-[100] transform transition-transform duration-300 ${sideMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div
+          ref={sideMenuRef}
+          className={`fixed top-0 right-0 h-screen w-80 bg-gray-950 border-l border-gray-800 shadow-2xl z-modal transform transition-transform duration-300 ${sideMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
           <div className="flex items-center justify-between p-4 border-b border-gray-800">
             <h2 className="text-lg font-bold text-white">Menu</h2>
-            <button
-              onClick={() => setSideMenuOpen(false)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-all"
-            >
+            <button onClick={() => setSideMenuOpen(false)} className="p-2 hover:bg-gray-800 rounded-lg transition-all">
               <LazyIcon name="X" size={20} className="w-5 h-5 text-white" />
             </button>
           </div>
 
           {/* Menu Items */}
           <nav className="p-4 space-y-2">
-            {sideMenuItems.map(item => {
+            {sideMenuItems.map((item) => {
               const isActive = isItemActive(item);
               return (
                 <button
@@ -453,10 +465,7 @@ export default function Header({ currentPage, onNavigate }) {
                     setSideMenuOpen(false);
                   }}
                   className={`w-full text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
-                    ${isActive
-                      ? 'text-brand-400 bg-brand-900/20'
-                      : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'
-                    }
+                    ${isActive ? 'text-brand-400 bg-brand-900/20' : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'}
                   `}
                 >
                   {item.name}
@@ -486,15 +495,15 @@ export default function Header({ currentPage, onNavigate }) {
           background: #f3f4f6;
         }
         .scrollbar-thin::-webkit-scrollbar-thumb {
-          background-color: #f97316;
+          background-color: var(--brand-500);
           border-radius: 10px;
         }
         .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background-color: #ea580c;
+          background-color: var(--brand-600);
         }
         .scrollbar-thin {
           scrollbar-width: thin;
-          scrollbar-color: #f97316 #f3f4f6;
+          scrollbar-color: var(--brand-500) #f3f4f6;
         }
       `}</style>
     </header>

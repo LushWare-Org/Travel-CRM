@@ -10,7 +10,7 @@ import type { PdfPackageData } from './pdf/pdfService';
 import { formatCurrency } from '../../lib/currency';
 import { useElfsightWidget } from '../../lib/elfsight';
 import { generateAndDownloadPDF as generateManagementPDF } from './pdf/pdfService';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { submitBookingRequest } from '../../services/api/booking';
 import BRANDING from '../../config/branding';
 import BookingModal from './components/BookingModal';
@@ -131,7 +131,7 @@ export default function PackageDetailsContainer() {
     setTimeout(() => setIsVisible(true), 100);
   }, []);
 
-  const validateStep = (step) => {
+  const validateStep = (step: number) => {
     const errors: Record<string, string> = {};
     if (step === 1) {
       // Step 1: Only email is required
@@ -178,7 +178,7 @@ export default function PackageDetailsContainer() {
 
     setIsSubmittingBooking(true);
     try {
-      const formatDate = (date) => {
+      const formatDate = (date: Date | string | null): string => {
         if (!date) return '';
         if (typeof date === 'string') {
           // If it's already a string, try to parse it
@@ -254,6 +254,7 @@ export default function PackageDetailsContainer() {
         ...packageData,
         _id: packageData._id || packageData.id || id,
         id: packageData.id || packageData._id || id,
+        difficulty: packageData.difficulty ?? undefined,
       };
       
       console.log('[PDF Download] Package ID:', packageWithId._id || packageWithId.id);
@@ -280,6 +281,7 @@ export default function PackageDetailsContainer() {
 
   const handleReviewSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!id) return;
     if (!reviewData.name || !reviewData.rating || !reviewData.comment) {
       alert('Please fill in all fields');
       return;
@@ -634,10 +636,10 @@ export default function PackageDetailsContainer() {
                 className={`
                   absolute inset-0 transition-all duration-1000 ease-out
                   ${isCurrent
-                    ? 'opacity-100 z-10 ken-burns-active slide-horizontal seamless-transition-in'
+                    ? 'opacity-100 z-raised ken-burns-active slide-horizontal seamless-transition-in'
                     : isNext || isPrevious
-                      ? 'opacity-0 z-5 seamless-transition-out'
-                      : 'opacity-0 scale-100 z-0'
+                      ? 'opacity-0 z-raised seamless-transition-out'
+                      : 'opacity-0 scale-100 z-base'
                   }
                 `}
               >
@@ -654,7 +656,7 @@ export default function PackageDetailsContainer() {
         </div>
         
         {/* Hero Content */}
-        <div className={`relative z-30 h-full flex items-end pb-12 transition-all duration-1000 ${
+        <div className={`relative z-lifted h-full flex items-end pb-12 transition-all duration-1000 ${
           isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}>
           <div className="max-w-7xl mx-auto px-6 lg:px-12 w-full">
@@ -701,7 +703,7 @@ export default function PackageDetailsContainer() {
             </div>
         </div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 animate-bounce">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-lifted animate-bounce">
           <div className="flex flex-col items-center gap-2 text-white/60">
             <span className="text-xs uppercase tracking-wider font-semibold">Scroll</span>
             <ChevronDown className="w-6 h-6" />
@@ -712,14 +714,14 @@ export default function PackageDetailsContainer() {
           <>
             <button
               onClick={prevImage}
-              className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 z-40 w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
+              className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 z-prominent w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
               aria-label="Previous image"
             >
               <ChevronLeft className="w-5 h-5 lg:w-6 lg:h-6" />
             </button>
             <button
               onClick={nextImage}
-              className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 z-40 w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
+              className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 z-prominent w-10 lg:w-12 h-10 lg:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-full transition-all hover:scale-110 text-white hidden lg:flex"
               aria-label="Next image"
             >
               <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6" />
@@ -729,7 +731,7 @@ export default function PackageDetailsContainer() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-8xl mx-auto px-4 lg:px-8 -mt-6 lg:-mt-6 relative py-12 lg:py-20 z-10 main-content-padding-sm">
+      <div className="max-w-8xl mx-auto px-4 lg:px-8 -mt-6 lg:-mt-6 relative py-12 lg:py-20 z-raised main-content-padding-sm">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 pb-12 lg:pb-20">
             <div className="lg:col-span-2 space-y-6 lg:space-y-8">
             <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
@@ -1028,7 +1030,7 @@ export default function PackageDetailsContainer() {
 
       {/* Success Modal - Mobile Responsive */}
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-modal flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full success-modal-mobile p-6 lg:p-8">
             <div className="text-center">
               <div className="mb-6 flex justify-center">
@@ -1085,7 +1087,7 @@ export default function PackageDetailsContainer() {
 
       {/* Review Success */}
       {showReviewSuccess && (
-        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
+        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-modal animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 lg:gap-4">
             <div className="flex-shrink-0">
               <div className="flex items-center justify-center h-10 w-10 lg:h-12 lg:w-12 rounded-full bg-white/20 backdrop-blur-sm">

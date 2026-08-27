@@ -18,7 +18,7 @@ import type { LucideIcon } from 'lucide-react';
 import { submitContactForm } from '../../services/api/contact';
 import DestinationSelector from '../../components/shared/DestinationSelector';
 import LocationSelector from '../../components/shared/LocationSelector';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import BRANDING from '../../config/branding';
 import { HERO_TITLE, HERO_SUBTITLE, OFFICE_HOURS_TEXT } from '../../content/contact';
 import { HERO_VIDEOS } from '../../config/media';
@@ -183,7 +183,7 @@ export default function ContactContainer() {
       {/* Hero Section */}
       <div className="relative overflow-hidden pt-20 pb-20">
         <video
-          className="absolute inset-0 w-full h-full object-cover z-0"
+          className="absolute inset-0 w-full h-full object-cover z-base"
           autoPlay
           muted
           loop
@@ -193,9 +193,9 @@ export default function ContactContainer() {
         >
           <source src={heroVideo?.video} type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/70 z-10" aria-hidden="true"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/70 z-raised" aria-hidden="true"></div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-elevated">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
               {HERO_TITLE}
@@ -212,7 +212,7 @@ export default function ContactContainer() {
       </div>
 
       {/* Contact */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 relative z-20 mb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12 relative z-elevated mb-20">
         <div className="flex flex-col md:flex-row items-center justify-center gap-6 max-w-5xl mx-auto">
           {contactMethods.slice(0, 3).map((method, idx) => (
             <a

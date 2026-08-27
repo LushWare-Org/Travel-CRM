@@ -133,7 +133,7 @@ export default function RecentlyBookedSlider({ items = [] }: RecentlyBookedSlide
         </div>
 
         <div className="relative max-w-6xl mx-auto">
-          <div className={`absolute -top-12 right-0 gap-3 z-10 flex ${!isTabletRange && window.innerWidth >= 1025 ? '' : 'hidden'}`}>
+          <div className={`absolute -top-12 right-0 gap-3 z-raised flex ${!isTabletRange && window.innerWidth >= 1025 ? '' : 'hidden'}`}>
             <button
               onClick={goPrev}
               className="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all border-2 border-white hover:border-brand-accent-500"
@@ -169,7 +169,7 @@ export default function RecentlyBookedSlider({ items = [] }: RecentlyBookedSlide
                       className="group block bg-white rounded-2xl border-2 border-gray-300 hover:border-brand-accent-500 hover:shadow-2xl transition-all duration-300 h-full overflow-hidden"
                     >
                       <div className="relative aspect-[4/3] overflow-hidden">
-                       <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
+                       <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
                         <img
                           src={item.image}
                           alt={item.packageName}

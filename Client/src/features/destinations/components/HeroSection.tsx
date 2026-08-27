@@ -34,7 +34,7 @@ export default function HeroSection({ isVisible, destinationCount }: HeroSection
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
       </div>
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <div className="relative z-raised max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h1
           className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
             }`}
@@ -54,8 +54,8 @@ export default function HeroSection({ isVisible, destinationCount }: HeroSection
               />
               <defs>
                 <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f97316" />
-                  <stop offset="100%" stopColor="#eab308" />
+                  <stop offset="0%" stopColor="var(--brand-500)" />
+                  <stop offset="100%" stopColor="var(--brand-accent-500)" />
                 </linearGradient>
               </defs>
             </svg>

@@ -23,7 +23,7 @@ export default function KeyPartnersSection() {
 
   return (
     <section className="py-10 relative overflow-hidden font-opensans">
-      <div className="max-w-8xl mx-auto lg:px-8 relative z-10">
+      <div className="max-w-8xl mx-auto lg:px-8 relative z-raised">
         <div className="text-center mb-8">
           <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-4 font-poppins">
            Our Trusted Travel Partners

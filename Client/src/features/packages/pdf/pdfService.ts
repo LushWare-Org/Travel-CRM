@@ -119,6 +119,7 @@ const loadImageAsBase64 = (url: string): Promise<string | null> => {
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas 2D context unavailable');
         ctx.drawImage(img, 0, 0);
         const dataURL = canvas.toDataURL('image/jpeg', 0.8);
         resolve(dataURL);
@@ -163,13 +164,13 @@ const loadPackageImages = async (pkg: PdfPackageData): Promise<PdfImages> => {
     // Load day-specific images
     const dayEntries = pkg.itineraryDays || pkg.days || pkg.itinerary?.days || [];
     if (Array.isArray(dayEntries) && dayEntries.length > 0) {
-      for (const day of dayEntries) {
+      for (const [dayIndex, day] of dayEntries.entries()) {
         if (day.images && Array.isArray(day.images) && day.images.length > 0) {
-          const dayNumber = day.dayNumber || day.day;
+          const dayNumber = day.dayNumber || day.day || dayIndex;
           const dayImageUrl = (typeof day.images[0] === 'string' ? day.images[0] : day.images[0].url) || '';
           const loadedImage = await loadImageAsBase64(dayImageUrl);
           if (loadedImage) {
-            images.dayImages[dayNumber] = loadedImage;
+            images.dayImages[String(dayNumber)] = loadedImage;
           }
         }
       }
@@ -281,8 +282,16 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     const ITINERARY_DAY_IMAGE_PADDING = 2;
     const ITINERARY_DAY_CARD_IMAGE_SIZE = 30;
 
+    // jsPDF's own idiom is `doc.setFont(undefined, style)` to change only
+    // the style while keeping the current font family — but its .d.ts
+    // requires fontName: string (no undefined overload). This wrapper
+    // reads the actual current family via getFont() and passes it back
+    // explicitly, which is the type-honest equivalent of that idiom.
+    const setFontStyle = (style: string) => {
+      doc.setFont(doc.getFont().fontName, style);
+    };
     const setBodyFont = () => {
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setTextColor(...palette.secondaryText);
       doc.setFontSize(10);
     };
@@ -301,10 +310,10 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
 
       doc.setFontSize(9);
       doc.setTextColor(...palette.secondaryText);
-      doc.setFont(undefined, 'bold');
+      setFontStyle('bold');
       doc.text(PDF_CONFIG.company, margin, footerTop + 6);
 
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setTextColor(...palette.mutedText);
       const contactText = `${PDF_CONFIG.email}  |  ${PDF_CONFIG.phone}`;
       doc.text(contactText, pageWidth - margin, footerTop + 6, { align: 'right' });
@@ -320,7 +329,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       yPos += amount;
     };
 
-    const ensureSpace = (requiredSpace) => {
+    const ensureSpace = (requiredSpace: number) => {
       const usableHeight = pageHeight - margin - bottomPadding;
       let spaceNeeded = requiredSpace;
       if (spaceNeeded > usableHeight) {
@@ -432,15 +441,15 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
         if (legacy.length) return `Meals: ${legacy.join(', ')}`;
       }
       const counts = [];
-      if (day?.breakfastCount > 0) counts.push('Breakfast');
-      if (day?.lunchCount > 0) counts.push('Lunch');
-      if (day?.dinnerCount > 0) counts.push('Dinner');
+      if ((day?.breakfastCount ?? 0) > 0) counts.push('Breakfast');
+      if ((day?.lunchCount ?? 0) > 0) counts.push('Lunch');
+      if ((day?.dinnerCount ?? 0) > 0) counts.push('Dinner');
       return counts.length ? `Meals: ${counts.join(', ')}` : null;
     };
 
-    const drawSectionHeading = (title, subtitle) => {
+    const drawSectionHeading = (title: string, subtitle?: string) => {
       ensureSpace(14);
-      doc.setFont(undefined, 'bold');
+      setFontStyle('bold');
       doc.setTextColor(...palette.primaryText);
       doc.setFontSize(15);
       doc.text(title.toUpperCase(), margin, yPos + 3);
@@ -448,7 +457,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       doc.setLineWidth(0.6);
       doc.line(margin, yPos + 4.5, margin + 60, yPos + 4.5);
       if (subtitle) {
-        doc.setFont(undefined, 'normal');
+        setFontStyle('normal');
         doc.setFontSize(10);
         doc.setTextColor(...palette.mutedText);
         const subLines = doc.splitTextToSize(subtitle, contentWidth);
@@ -460,7 +469,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       setBodyFont();
     };
 
-    const drawBulletListCard = (title, items, options: { innerPadding?: number; bulletColor?: [number, number, number] } = {}) => {
+    const drawBulletListCard = (title: string, items: unknown[], options: { innerPadding?: number; bulletColor?: [number, number, number] } = {}) => {
       const { innerPadding: customPadding, bulletColor = palette.accent } = options;
       const sanitizedItems = (items || [])
         .map((item) => String(item).trim())
@@ -473,11 +482,11 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       const innerPadding = customPadding ?? 16;
       const innerWidth = contentWidth - innerPadding * 2;
 
-      const lineSets = sanitizedItems.map((item) => doc.splitTextToSize(item, innerWidth - 12));
+      const lineSets: string[][] = sanitizedItems.map((item) => doc.splitTextToSize(item, innerWidth - 12));
 
       const headingHeight = 11;
       let contentHeight = 0;
-      lineSets.forEach((lines) => {
+      lineSets.forEach((lines: string[]) => {
         contentHeight += lines.length * 5.2 + 6;
       });
       const cardHeight = innerPadding * 2 + headingHeight + contentHeight;
@@ -490,16 +499,16 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       const textX = margin + innerPadding;
       let cursorY = yPos + innerPadding + 8;
 
-      doc.setFont(undefined, 'bold');
+      setFontStyle('bold');
       doc.setFontSize(18);
       doc.setTextColor(...palette.primaryText);
       doc.text(title, textX, cursorY);
 
       cursorY += 12;
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setFontSize(11.5);
       doc.setTextColor(...palette.secondaryText);
-      lineSets.forEach((lines) => {
+      lineSets.forEach((lines: string[]) => {
         const bulletCenterY = cursorY - 2;
         doc.setFillColor(...bulletColor);
         doc.circle(textX, bulletCenterY, 2, 'F');
@@ -512,7 +521,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       setBodyFont();
     };
 
-    const drawOverviewHighlightsCard = (overview, highlightItems, options: { innerPadding?: number } = {}) => {
+    const drawOverviewHighlightsCard = (overview: string | undefined, highlightItems: string[] | undefined, options: { innerPadding?: number } = {}) => {
       const { innerPadding: customPadding } = options;
       const summaryText =
         overview ||
@@ -529,7 +538,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
             'Dedicated travel specialist and concierge support',
           ]
       )
-        .map((item) => String(item).trim())
+        .map((item: string) => String(item).trim())
         .filter(Boolean)
         .slice(0, 6);
 
@@ -538,7 +547,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       const overviewFontSize = 13;
 
       // Trip Overview card
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setFontSize(overviewFontSize);
       const overviewLines = doc.splitTextToSize(summaryText, innerWidth);
       const overviewDimensions = doc.getTextDimensions(overviewLines);
@@ -556,13 +565,13 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       const overviewX = margin + innerPadding;
       let overviewCursorY = yPos + innerPadding + 8;
 
-      doc.setFont(undefined, 'bold');
+      setFontStyle('bold');
       doc.setFontSize(16);
       doc.setTextColor(...palette.primaryText);
       doc.text('Trip Overview', overviewX, overviewCursorY);
 
       overviewCursorY += overviewSpacing;
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setFontSize(overviewFontSize);
       doc.setTextColor(...palette.secondaryText);
       doc.text(overviewLines, overviewX, overviewCursorY, {
@@ -577,7 +586,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       return { highlightItems: sanitizedHighlights, innerPadding };
     };
 
-    const drawBrandHeader = (logoData) => {
+    const drawBrandHeader = (logoData: string | null | undefined) => {
       const headerHeight = 28;
       const headerY = Math.max(8, margin - 4);
       const headerX = margin;
@@ -606,12 +615,12 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
         }
       }
 
-      doc.setFont(undefined, 'bold');
+      setFontStyle('bold');
       doc.setFontSize(12);
       doc.setTextColor(255, 255, 255);
       doc.text(PDF_CONFIG.company, cursorX, headerY + 14);
 
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setFontSize(8.5);
       doc.setTextColor(210, 210, 210);
       doc.text(PDF_CONFIG.tagline, cursorX, headerY + 21);
@@ -701,7 +710,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       // Day badge
       doc.setFillColor(...palette.badgeBg);
       doc.circle(margin + 18, cardTop + 26, 9, 'F');
-      doc.setFont(undefined, 'bold');
+      setFontStyle('bold');
       doc.setFontSize(9);
       doc.setTextColor(...palette.badgeText);
       doc.text(`DAY ${dayNumber}`, margin + 18, cardTop + 27.5, { align: 'center' });
@@ -721,7 +730,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       } else {
         doc.setFillColor(...palette.pillBg);
         doc.roundedRect(imageX + 1.5, imageY + 1.5, imageSize - 3, imageSize - 3, 16, 16, 'F');
-        doc.setFont(undefined, 'italic');
+        setFontStyle('italic');
         doc.setFontSize(8);
         doc.setTextColor(...palette.mutedText);
         doc.text('Image\npending', imageX + imageSize / 2, imageY + imageSize / 2 - 1, {
@@ -730,19 +739,19 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       }
 
       // Day heading
-      doc.setFont(undefined, 'bold');
+      setFontStyle('bold');
       doc.setFontSize(13);
       doc.setTextColor(...palette.primaryText);
       doc.text(dayTitle, margin + 36, cardTop + 18);
       if (locationLines.length) {
-        doc.setFont(undefined, 'normal');
+        setFontStyle('normal');
         doc.setFontSize(9);
         doc.setTextColor(...palette.mutedText);
         doc.text(locationLines, margin + 36, cardTop + 26);
       }
 
       let cursorY = cardTop + 36 + locationLines.length * 4.2;
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setTextColor(...palette.secondaryText);
       doc.setFontSize(10);
 
@@ -751,12 +760,12 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
         doc.setFillColor(...palette.accent);
         doc.circle(margin + 18, markerY, 2.2, 'F');
 
-        doc.setFont(undefined, 'bold');
+        setFontStyle('bold');
         doc.setFontSize(10);
         doc.setTextColor(...palette.accentDark);
         doc.text(segment.label, margin + 36, cursorY + 4);
 
-        doc.setFont(undefined, 'normal');
+        setFontStyle('normal');
         doc.setFontSize(10);
         doc.setTextColor(...palette.secondaryText);
         doc.text(segment.lines, margin + 36, cursorY + 9);
@@ -770,12 +779,12 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       });
 
       if (supportingLines.length) {
-        doc.setFont(undefined, 'bold');
+        setFontStyle('bold');
         doc.setFontSize(9);
         doc.setTextColor(...palette.accentDark);
         doc.text('Extras', margin + 36, cursorY);
 
-        doc.setFont(undefined, 'normal');
+        setFontStyle('normal');
         doc.setFontSize(9);
         doc.setTextColor(...palette.secondaryText);
         doc.text(supportingLines, margin + 36, cursorY + 5);
@@ -783,7 +792,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
       }
 
       if (noteLines.length) {
-        doc.setFont(undefined, 'italic');
+        setFontStyle('italic');
         doc.setFontSize(8);
         doc.setTextColor(...palette.mutedText);
         doc.text(noteLines, margin + 36, cursorY + 2);
@@ -882,13 +891,13 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     // Destination text
     const overlayContentX = overlayX + accentWidth + 12;
     const overlayContentY = overlayY + 16;
-    doc.setFont(undefined, 'bold');
+    setFontStyle('bold');
     doc.setFontSize(18);
     doc.setTextColor(255, 255, 255);
     doc.text(destinationTitle.toUpperCase(), overlayContentX, overlayContentY);
 
     // Subtitle/tagline
-    doc.setFont(undefined, 'normal');
+    setFontStyle('normal');
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
     doc.text(
@@ -899,7 +908,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
 
     // Duration text
     const durationLabel = durationText.toUpperCase();
-    doc.setFont(undefined, 'bold');
+    setFontStyle('bold');
     doc.setFontSize(10);
     doc.setTextColor(...palette.primaryText);
     doc.setTextColor(255, 255, 255);
@@ -928,12 +937,12 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     const baseY = yPos + 15;
 
     // Max Group Size - Left Column
-    doc.setFont(undefined, 'bold');
+    setFontStyle('bold');
     doc.setFontSize(11.5);
     doc.setTextColor(...palette.accent);
     doc.text('MAX GROUP SIZE', leftColumnX, baseY);
 
-    doc.setFont(undefined, 'normal');
+    setFontStyle('normal');
     doc.setFontSize(12.5);
     doc.setTextColor(...palette.primaryText);
     const groupSizeValue = pkg.maxGroupSize ? `${pkg.maxGroupSize} Travelers` : 'Tailored to your preference';
@@ -941,12 +950,12 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     doc.text(groupSizeLines, leftColumnX, baseY + 9);
 
     // Trip Style - Right Column
-    doc.setFont(undefined, 'bold');
+    setFontStyle('bold');
     doc.setFontSize(11.5);
     doc.setTextColor(...palette.accent);
     doc.text('TRIP STYLE', rightColumnX, baseY);
 
-    doc.setFont(undefined, 'normal');
+    setFontStyle('normal');
     doc.setFontSize(12.5);
     doc.setTextColor(...palette.primaryText);
     const tripStyleValue =
@@ -1014,7 +1023,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     const days = normalizeDays();
     if (!days.length) {
       ensureSpace(20);
-      doc.setFont(undefined, 'italic');
+      setFontStyle('italic');
       doc.setFontSize(11);
       doc.setTextColor(...palette.mutedText);
       doc.text('Detailed day plan will be crafted once we confirm your preferences.', margin, yPos);
@@ -1035,12 +1044,12 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     const priceLeftX = margin + 14;
     const priceRightX = margin + contentWidth * 0.5 + 14;
 
-    doc.setFont(undefined, 'bold');
+    setFontStyle('bold');
     doc.setFontSize(14);
     doc.setTextColor(...palette.accent);
     doc.text('Package Price', priceLeftX, yPos + 18);
 
-    doc.setFont(undefined, 'bold');
+    setFontStyle('bold');
     doc.setFontSize(28);
     doc.setTextColor(...palette.primaryText);
     const priceText = formatCurrencyForPdf(pkg.price);
@@ -1049,7 +1058,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     doc.text(`${currencyCode} ${sanitizedPrice}`, priceLeftX, yPos + 36);
 
     if (pkg.priceNotes) {
-      doc.setFont(undefined, 'normal');
+      setFontStyle('normal');
       doc.setFontSize(9);
       doc.setTextColor(...palette.secondaryText);
       const priceNotesLines = doc.splitTextToSize(
@@ -1088,9 +1097,9 @@ export const createPackagePdfBlob = async (
 ): Promise<{ blob: Blob; fileName: string; packageData: PdfPackageData; doc?: jsPDF }> => {
   let completePackage = pkg;
 
-  if (fetchLatest && (pkg._id || pkg.id)) {
+  const packageId = pkg._id || pkg.id;
+  if (fetchLatest && packageId) {
     try {
-      const packageId = pkg._id || pkg.id;
       const response = await getPackageEnvelope(packageId);
 
       if (response.success && response.data) {

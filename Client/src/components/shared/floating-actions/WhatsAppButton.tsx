@@ -4,7 +4,7 @@ import { getWhatsAppUrl } from '../../../config/branding';
 /**
  * Moved from components/WhatsAppFloating.jsx (Phase 2) — same visual/
  * behavior, now rendered by FloatingActionStack instead of standalone in
- * App.jsx, and on the z-floating-action token instead of a bare z-50.
+ * App.jsx, and on the z-floating-action token instead of a bare numeric z-index.
  */
 const WhatsAppButton = () => {
   const [isVisible, setIsVisible] = useState(false);
