@@ -221,6 +221,8 @@ model Lead {
   statusHistory     LeadStatusHistory[]
   communicationLogs LeadCommunicationLog[]
   internalEvents    LeadInternalEvent[]
+  customizedPackages CustomizedPackage[]
+  manualItineraries  ManualItinerary[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -235,6 +237,65 @@ model Lead {
   @@index([assignmentMode])
   @@index([city])
   @@index([primarySelectionId])
+  @@schema("crm_leads")
+}
+
+// ─── Website-form ports: customized package & manual itinerary requests ──
+// Minimum viable surface ported from the legacy monolith's CustomizedPackage
+// /ManualItinerary models, following this service's own lean
+// transaction-based website-lead pattern (see createWebsiteContactLead)
+// rather than the legacy multi-document orchestration.
+
+enum CustomizationRequestStatus {
+  pending
+  confirmed
+  cancelled
+
+  @@schema("crm_leads")
+}
+
+model CustomizedPackage {
+  id                 String                     @id @default(uuid())
+  leadId             String
+  lead               Lead                       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  originalPackageId  String
+  name               String
+  description        String?
+  destination        String
+  duration           Int
+  price              Decimal                    @db.Decimal(12, 2)
+  maxGroupSize       Int                        @default(10)
+  category           String?
+  images             Json?
+  coverImage         Json?
+  inclusions         Json?
+  exclusions         Json?
+  highlights         Json?
+  terms              Json?
+  days               Json?
+  status             CustomizationRequestStatus @default(pending)
+  customizationNotes String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@index([leadId])
+  @@index([originalPackageId])
+  @@index([createdAt])
+  @@schema("crm_leads")
+}
+
+model ManualItinerary {
+  id        String                     @id @default(uuid())
+  leadId    String
+  lead      Lead                       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  days      Json
+  status    CustomizationRequestStatus @default(pending)
+  version   Int                        @default(1)
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+
+  @@index([leadId])
+  @@index([createdAt])
   @@schema("crm_leads")
 }
 

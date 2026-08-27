@@ -21,35 +21,35 @@ Tracks execution of the plan approved 2026-08-27. Full plan (context, decisions,
 
 ## Phase 1 — Shared contracts: website-facing schema surface
 
-- [ ] 1.1 `apiEnvelopeAny` helper in `envelope.js`
-- [ ] 1.2 `websiteAuth.js` (Login/Register/WebsiteUser/AuthResult/ProfileUpdate*)
-- [ ] 1.3 `apiPackage.js` (ApiPackage/PackageListResult/ReviewStatsResult/WebsiteReview*)
-- [ ] 1.4 `websiteBooking.js`
-- [ ] 1.5 `websiteContact.js`
-- [ ] 1.6 `careerApplication.js`
-- [ ] 1.7 `customizedPackage.js`
-- [ ] 1.8 `manualItinerary.js`
-- [ ] 1.9 Export all from `index.js`
+- [x] 1.1 `apiEnvelopeAny` helper in `envelope.js`
+- [x] 1.2 `websiteAuth.js` (Login/Register/WebsiteUser/AuthResult/ProfileUpdate*)
+- [x] 1.3 `apiPackage.js` (ApiPackage/PackageListResult/ReviewStatsResult/WebsiteReview*)
+- [x] 1.4 `websiteBooking.js`
+- [x] 1.5 `websiteContact.js`
+- [x] 1.6 `careerApplication.js`
+- [x] 1.7 `customizedPackage.js`
+- [x] 1.8 `manualItinerary.js`
+- [x] 1.9 Export all from `index.js`
 
 **Gate 1:** `cd Services/shared/contracts && npm run lint && npm test` green.
 
 ## Phase 2 — Backend fix: `user-service` profile update accepts `email`
 
-- [ ] 2.1 Validator: add `email` field to `updateCurrentUserProfileSchema`
-- [ ] 2.2 Controller: destructure `email`, map `P2002` → 400
-- [ ] 2.3 Tests: validator + controller
+- [x] 2.1 Validator: add `email` field to `updateCurrentUserProfileSchema`
+- [x] 2.2 Controller: destructure `email`, map `P2002` → 400
+- [x] 2.3 Tests: validator + controller
 
 **Gate 2:** `cd Services/user-service && npm test` green.
 
 ## Phase 3 — Port `CustomizedPackage` + `ManualItinerary` into `lead-service`
 
-- [ ] 3.1 Prisma schema: enum + 2 models + Lead relations, migrate + generate
-- [ ] 3.2 Validators
-- [ ] 3.3 Controllers
-- [ ] 3.4 Routes
-- [ ] 3.5 Mount in `app.js`
-- [ ] 3.6 Gateway proxy + public patterns
-- [ ] 3.7 Tests
+- [x] 3.1 Prisma schema: enum + 2 models + Lead relations, migrate + generate
+- [x] 3.2 Validators
+- [x] 3.3 Controllers
+- [x] 3.4 Routes
+- [x] 3.5 Mount in `app.js`
+- [x] 3.6 Gateway proxy + public patterns
+- [x] 3.7 Tests
 
 **Gate 3:** `cd Services/lead-service && npm test` green; manual `curl` smoke test against live stack.
 
@@ -71,4 +71,8 @@ Tracks execution of the plan approved 2026-08-27. Full plan (context, decisions,
 
 ## Last session
 
-- **2026-08-27**: Plan approved. Created branch `feat/client-backend-integration` (base `microservices`) and this progress file. Next: **Phase 1** — shared contracts schema surface.
+- **2026-08-27**: Plan approved. Created branch `feat/client-backend-integration` (base `microservices`) and this progress file.
+  **Phase 1 complete**: extended `@travel-crm/contracts` with `websiteAuth.js`/`apiPackage.js`/`websiteBooking.js`/`websiteContact.js`/`careerApplication.js`/`customizedPackage.js`/`manualItinerary.js` + `apiEnvelopeAny` helper for the `{status:'success'}` convention. Request schemas strip unknown keys; response schemas `.passthrough()`. Fixed one drafting error found via real backend code: `ProfileUpdateResult` corrected to `{user: WebsiteUser}` (user-service nests under `data.user`, not `data` directly) — confirmed by reading `user.controller.js`'s actual `res.json(...)` call. Gate 1 green (58/58 tests).
+  **Phase 2 complete**: `user-service`'s `updateCurrentUserProfileSchema` now accepts `email` (still `.strict()`); controller maps Prisma `P2002` (duplicate email) to a 400 `AppError`. 4 new tests (2 validator, 2 controller). Gate 2 green (209/209 tests, up from 205).
+  **Phase 3 complete**: ported `CustomizedPackage`+`ManualItinerary` into `lead-service`. Real deviations from the plan's draft, found by reading the actual codebase before writing: (1) reused lead-service's existing `fetchPackage()` helper (`services/lead-draft.service.js`) instead of hand-rolling a new fetch — already the established package-lookup idiom, used by 3 other lead-service call sites; (2) new route files needed `router.use(extractUser)` — not applied globally in `app.js`, only per-route-file, confirmed by reading `lead.routes.js`; (3) `updateCurrentUserProfileSchema`'s `phoneField` was already `.optional().nullable()`, no manual normalization needed. Non-interactive `prisma migrate dev` isn't supported in this sandbox — generated the migration SQL via `migrate diff --from-schema-datasource`, hit a live-DB baseline gap (`_prisma_migrations` had no rows for lead-service's own prior 4 migrations despite their tables already existing), resolved via `migrate resolve --applied` for each pre-existing migration (verified the "pending" `whatsapp` enum value was in fact already live via a direct query, so baselining it was safe/correct) then `migrate deploy` for the new migration only. New Prisma models/enum, 2 validators, 2 controllers (transaction-based, mirroring `createWebsiteContactLead`), 2 route files, `app.js` mount, 2 Gateway proxy lines + 2 `PUBLIC_PATTERNS` entries, 4 new test files (24 new tests). Gate 3 green (301/301 tests; `migrate status` clean).
+  Next: **Phase 4** — Client integration layer (dependencies, `envelope.ts`, `client.ts` 401/correlation-id, rewrite `services/api/*.ts`).

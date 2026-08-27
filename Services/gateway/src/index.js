@@ -75,6 +75,8 @@ const PUBLIC_PATTERNS = [
   [/^\/api\/v1\/bookings\/website$/, 'POST'],
   [/^\/api\/v1\/bookings\/recent$/, 'GET'],
   [/^\/api\/v1\/leads\/website-contact$/, 'POST'],
+  [/^\/api\/v1\/customized-packages\/website$/, 'POST'],
+  [/^\/api\/v1\/manual-itineraries\/website$/, 'POST'],
   [/^\/api\/v1\/careers\/apply$/, 'POST'],
   [/^\/api\/v1\/vacancies\/?$/, 'GET'],
   [/^\/api\/v1\/vacancies\/admin\/all$/, 'GET'],
@@ -185,6 +187,8 @@ app.use(`${V1}/upload`,      proxy(SERVICES.package));
 
 // Leads → lead-service
 app.use(`${V1}/leads`, proxy(SERVICES.lead));
+app.use(`${V1}/customized-packages`, proxy(SERVICES.lead));
+app.use(`${V1}/manual-itineraries`, proxy(SERVICES.lead));
 
 // Bookings → booking-service
 app.use(`${V1}/bookings`, proxy(SERVICES.booking));
