@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Play, X } from 'lucide-react';
+import { REVIEW_VIDEOS } from '../../config/media';
 
 export default function WhyChooseUs() {
   const whyRef = useRef(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
-  const [videos] = useState([
-    { name: "Thailand Tour", location: "Thailand", file: "/reviews/maldives7.mp4" },
-    { name: "Bali Tour", location: "Bali", file: "/reviews/mauritius.mp4" },
-    { name: "Maldives Tour", location: "Maldives", file: "/reviews/maldives1.mp4" },
-  ]);
+  const videos = REVIEW_VIDEOS;
 
   const features = ['Personalized Itineraries', 'Expert Local Guides', 'Best Price Guarantee'];
   const featureDescriptions = [
@@ -18,7 +15,7 @@ export default function WhyChooseUs() {
   ];
 
   return (
-    <section className="py-12 bg-[#012a4a] relative overflow-hidden font-opensans" ref={whyRef}>
+    <section className="py-12 bg-brand-dark-900 relative overflow-hidden font-opensans" ref={whyRef}>
       <div className="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Title Section */}

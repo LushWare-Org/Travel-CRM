@@ -105,7 +105,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
 
 
   return (
-    <section className="py-16 bg-[#051C35] relative overflow-hidden font-opensans">
+    <section className="py-16 bg-brand-dark-950 relative overflow-hidden font-opensans">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
@@ -120,14 +120,14 @@ export default function RecentlyBookedSlider({ items = [] }) {
           <div className={`absolute -top-12 right-0 gap-3 z-10 flex ${!isTabletRange && window.innerWidth >= 1025 ? '' : 'hidden'}`}>
             <button
               onClick={goPrev}
-              className="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all border-2 border-white hover:border-yellow-500"
+              className="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all border-2 border-white hover:border-brand-accent-500"
               aria-label="Previous"
             >
               <ChevronLeft className="w-5 h-5 text-gray-700" />
             </button>
             <button
               onClick={goNext}
-              className="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all border-2 border-white hover:border-yellow-500"
+              className="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all border-2 border-white hover:border-brand-accent-500"
               aria-label="Next"
             >
               <ChevronRight className="w-5 h-5 text-gray-700" />
@@ -150,7 +150,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
                   >
                     <Link
                       to={`/package/${item.id}`}
-                      className="group block bg-white rounded-2xl border-2 border-gray-300 hover:border-yellow-500 hover:shadow-2xl transition-all duration-300 h-full overflow-hidden"
+                      className="group block bg-white rounded-2xl border-2 border-gray-300 hover:border-brand-accent-500 hover:shadow-2xl transition-all duration-300 h-full overflow-hidden"
                     >
                       <div className="relative aspect-[4/3] overflow-hidden">
                        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10 pointer-events-none"></div>
@@ -169,7 +169,7 @@ export default function RecentlyBookedSlider({ items = [] }) {
                         </div>
                         
                         <div className="absolute bottom-3 left-4 flex items-center gap-3 text-white">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center shadow-lg">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-accent-500 to-brand-600 flex items-center justify-center shadow-lg">
                             <User className="w-6 h-6" />
                           </div>
                           <div>
@@ -179,21 +179,21 @@ export default function RecentlyBookedSlider({ items = [] }) {
                       </div>
 
                       <div className="p-5">
-                        <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-yellow-600 transition-colors line-clamp-2">
+                        <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-brand-accent-600 transition-colors line-clamp-2">
                           {item.packageName}
                         </h3>
 
                         <div className="flex items-center justify-between text-xs text-gray-600 mb-4">
                           <div className="flex items-center gap-4">
                             <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4 text-yellow-500" />
+                              <Clock className="w-4 h-4 text-brand-accent-500" />
                               <span>{formatDurationString(item.duration)}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                          <span className="text-xl font-bold text-orange-600">
+                          <span className="text-xl font-bold text-brand-600">
                             {formatCurrency(item.price)}
                           </span>
                           <button className="px-4 py-2 bg-black text-white text-sm font-semibold rounded-lg transition-all">

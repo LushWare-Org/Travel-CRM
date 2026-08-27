@@ -12,6 +12,7 @@ import { fetchRecentBookings } from '../../utils/bookingApi';
 import { formatCurrency } from '../../utils/currency';
 import Stats from './Stats';
 import AboutSection from './AboutSection';
+import { HERO_SLIDES } from '../../content/home';
 
 const InlineMapPin = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 const InlineCalendar = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
@@ -20,18 +21,6 @@ const InlineChevronLeft = () => <svg className="w-6 h-6" fill="none" stroke="cur
 const InlineChevronRight = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>;
 const InlineX = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
 const InlineArrowRight = () => <svg className="ml-3 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>;
-
-const heroSlides = [
-  { title: 'Discover Your Dream Destination', subtitle: 'Explore the world with our curated travel experiences' },
-  { title: 'Experience the World Differently', subtitle: 'Discover hidden gems and authentic adventures beyond the ordinary' },
-  { title: 'Create Your Perfect Getaway', subtitle: 'Customize every moment of your trip with our tailor-made packages' },
-  { title: 'Unforgettable Adventures Await', subtitle: 'Book your dream vacation with exclusive deals and offers' },
-];
-
-const BANNER_IMAGES = [
-  'https://i.postimg.cc/k4MRXkFx/maldives-3793871_1280.jpg',
-  'https://i.postimg.cc/8CYsNjcV/pexels-asadphoto-3426880.jpg',
-];
 
 const MONTHS = [
   { value: 'january', label: 'January' },
@@ -222,7 +211,7 @@ export default function Home() {
     discount: Math.round(Math.random() * 30 + 20),
     duration: pkg.duration_days ? `${pkg.duration_days} Days / ${pkg.duration_days - 1} Nights` : '',
     inclusions: pkg.inclusions?.slice(0, 4) || ['Personalized planning', 'Support throughout', 'Curated experiences', 'Flexible payments'],
-    validUntil: 'December 31, 2025',
+    validUntil: new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
     savings: Math.round(pkg.price_from * 0.3),
     slug: pkg.slug,
   })), [packages]);
@@ -290,7 +279,7 @@ export default function Home() {
         <div className="max-w-md">
           <h2 className="text-2xl font-bold mb-4">We couldn't load travel experiences</h2>
           <p className="text-gray-600 mb-6">{error}</p>
-          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700">
             Try again
           </button>
         </div>
@@ -335,54 +324,54 @@ export default function Home() {
           {/* Tags */}
           {/* <div className="flex items-center">
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Globe className="w-5 h-5 text-orange-400 flex-shrink-0" /> Explore 100+ Destinations
+                <Globe className="w-5 h-5 text-brand-400 flex-shrink-0" /> Explore 100+ Destinations
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Zap className="w-5 h-5 text-orange-400 flex-shrink-0" /> Exclusive Deals Up to 40% Off
+                <Zap className="w-5 h-5 text-brand-400 flex-shrink-0" /> Exclusive Deals Up to 40% Off
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Target className="w-5 h-5 text-orange-400 flex-shrink-0" /> Personalized Itineraries
+                <Target className="w-5 h-5 text-brand-400 flex-shrink-0" /> Personalized Itineraries
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Crown className="w-5 h-5 text-orange-400 flex-shrink-0" /> Premium Travel Experiences
+                <Crown className="w-5 h-5 text-brand-400 flex-shrink-0" /> Premium Travel Experiences
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Award className="w-5 h-5 text-orange-400 flex-shrink-0" /> Award-Winning Service
+                <Award className="w-5 h-5 text-brand-400 flex-shrink-0" /> Award-Winning Service
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Headphones className="w-5 h-5 text-orange-400 flex-shrink-0" /> 24/7 Customer Support
+                <Headphones className="w-5 h-5 text-brand-400 flex-shrink-0" /> 24/7 Customer Support
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Gift className="w-5 h-5 text-orange-400 flex-shrink-0" /> Special Group Discounts
+                <Gift className="w-5 h-5 text-brand-400 flex-shrink-0" /> Special Group Discounts
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Plane className="w-5 h-5 text-orange-400 flex-shrink-0" /> Hassle-Free Bookings
+                <Plane className="w-5 h-5 text-brand-400 flex-shrink-0" /> Hassle-Free Bookings
               </span>
             </div>
             <div className="flex items-center">
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Globe className="w-5 h-5 text-orange-400 flex-shrink-0" /> Explore 100+ Destinations
+                <Globe className="w-5 h-5 text-brand-400 flex-shrink-0" /> Explore 100+ Destinations
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Zap className="w-5 h-5 text-orange-400 flex-shrink-0" /> Exclusive Deals Up to 40% Off
+                <Zap className="w-5 h-5 text-brand-400 flex-shrink-0" /> Exclusive Deals Up to 40% Off
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Target className="w-5 h-5 text-orange-400 flex-shrink-0" /> Personalized Itineraries
+                <Target className="w-5 h-5 text-brand-400 flex-shrink-0" /> Personalized Itineraries
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Crown className="w-5 h-5 text-orange-400 flex-shrink-0" /> Premium Travel Experiences
+                <Crown className="w-5 h-5 text-brand-400 flex-shrink-0" /> Premium Travel Experiences
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Award className="w-5 h-5 text-orange-400 flex-shrink-0" /> Award-Winning Service
+                <Award className="w-5 h-5 text-brand-400 flex-shrink-0" /> Award-Winning Service
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Headphones className="w-5 h-5 text-orange-400 flex-shrink-0" /> 24/7 Customer Support
+                <Headphones className="w-5 h-5 text-brand-400 flex-shrink-0" /> 24/7 Customer Support
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Gift className="w-5 h-5 text-orange-400 flex-shrink-0" /> Special Group Discounts
+                <Gift className="w-5 h-5 text-brand-400 flex-shrink-0" /> Special Group Discounts
               </span>
               <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Plane className="w-5 h-5 text-orange-400 flex-shrink-0" /> Hassle-Free Bookings
+                <Plane className="w-5 h-5 text-brand-400 flex-shrink-0" /> Hassle-Free Bookings
               </span>
             </div> */}
           {/* </div> */}
@@ -425,25 +414,6 @@ export default function Home() {
           );
         })}
 
-        {/* Image Slides */}
-        {/* <div className="absolute inset-0">
-          {BANNER_IMAGES.map((img, i) => {
-            const idx = i + 5;
-            const active = idx === currentSlide;
-            const next = idx === (currentSlide + 1) % totalSlides;
-            const prev = idx === (currentSlide - 1 + totalSlides) % totalSlides;
-            return (
-              <div
-                key={`banner-${i}`}
-                className={`absolute inset-0 transition-all duration-700 ease-in-out ${active ? 'translate-x-0 opacity-100 z-10' : next ? 'translate-x-full opacity-100 z-5' : prev ? '-translate-x-full opacity-100 z-5' : 'translate-x-full opacity-0 z-0'}`}
-              >
-                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${img})` }} />
-                <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/50 to-black/10" />
-              </div>
-            );
-          })}
-        </div> */}
-
         <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-40 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
           <InlineChevronLeft />
         </button>
@@ -457,23 +427,23 @@ export default function Home() {
             <div className="max-w-4xl">
               <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-poppins">
                 {(() => {
-                  const { title } = heroSlides[currentSlide % 4];
+                  const { title } = HERO_SLIDES[currentSlide % 4];
                   const words = title.split(' ');
                   const last = words.pop();
                   return (
                     <>
                       {words.join(' ')}{' '}
-                      <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">{last}</span>
+                      <span className="bg-gradient-to-r from-brand-accent-400 to-brand-400 bg-clip-text text-transparent">{last}</span>
                     </>
                   );
                 })()}
               </h1>
-              <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{heroSlides[currentSlide % 4].subtitle}</p>
+              <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{HERO_SLIDES[currentSlide % 4].subtitle}</p>
 
               {/* Search bar */}
               <div className="relative mt-16 md:mt-15 lg:mt-15">
                 <div className="bg-white/99 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 overflow-visible">
-                  <div className="h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 animate-gradient-x" />
+                  <div className="h-1 bg-gradient-to-r from-brand-accent-400 via-brand-500 to-red-500 animate-gradient-x" />
                   <div className="p-4 sm:p-5 overflow-visible">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
                       <div className="lg:col-span-5 relative group">
@@ -484,7 +454,7 @@ export default function Home() {
                           <select
                             value={searchFilters.destination}
                             onChange={(e) => setSearchFilters(p => ({ ...p, destination: e.target.value }))}
-                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium text-sm sm:text-base appearance-none cursor-pointer transition-all focus:border-orange-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
+                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium text-sm sm:text-base appearance-none cursor-pointer transition-all focus:border-brand-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
                           >
                             <option value="" disabled hidden>{destinationPlaceholder || 'Select Destination'}</option>
                             <optgroup label="🌏 Destinations">
@@ -496,7 +466,7 @@ export default function Home() {
                             </optgroup>
                           </select>
                           <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg className="w-5 h-5 text-orange-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5 text-brand-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                           </div>
@@ -511,14 +481,14 @@ export default function Home() {
                           <button
                             type="button"
                             onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
-                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-left text-gray-900 font-medium text-sm sm:text-base flex items-center justify-between transition-all focus:border-orange-500 focus:bg-white hover:border-gray-300"
+                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-left text-gray-900 font-medium text-sm sm:text-base flex items-center justify-between transition-all focus:border-brand-500 focus:bg-white hover:border-gray-300"
                           >
                             <span>
                               {searchFilters.when
                                 ? MONTHS.find(m => m.value === searchFilters.when)?.label || 'Any Month'
                                 : whenPlaceholder || 'Any Month'}
                             </span>
-                            <svg className={`w-5 h-5 text-orange-800 transition-transform ${monthDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className={`w-5 h-5 text-brand-800 transition-transform ${monthDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                           </button>
@@ -541,7 +511,7 @@ export default function Home() {
                                         setMonthDropdownOpen(false);
                                       }}
                                       className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${searchFilters.when === month.value
-                                          ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg'
+                                          ? 'bg-gradient-to-r from-brand-500 to-red-500 text-white shadow-lg'
                                           : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
                                         }`}
                                     >
@@ -559,7 +529,7 @@ export default function Home() {
                       <div className="lg:col-span-3">
                         <button
                           onClick={handleSearch}
-                          className="w-full group relative overflow-hidden px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-black rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+                          className="w-full group relative overflow-hidden px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-brand-accent-400 to-brand-500 text-black rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
                         >
                           <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
                           <span className="relative flex items-center justify-center space-x-2">
@@ -616,7 +586,7 @@ export default function Home() {
           </div>
           <div className="w-full max-w-3xl mx-auto rounded-2xl py-2 px-0 lg:py-6">
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-              <Link to="/planner" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+              <Link to="/planner" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-brand-accent-600 to-brand-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
                 Customize Your Trip <InlineArrowRight />
               </Link>
               <Link to="/contact" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold shadow-sm border border-gray-200 hover:shadow-lg hover:border-gray-300 transform hover:scale-105 transition-all duration-300">

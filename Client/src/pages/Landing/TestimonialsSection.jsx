@@ -1,7 +1,13 @@
 import { Star } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
+import BRANDING from '../../config/branding';
+import { HEADER_TITLE, HEADER_SUBTITLE } from '../../content/testimonials';
 
 export default function TestimonialsSection() {
+  if (!BRANDING.integrations.elfsightAppId) {
+    return null;
+  }
+
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [visible, setVisible] = useState(3);
 
@@ -69,16 +75,16 @@ export default function TestimonialsSection() {
         <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-poppins">
-              Loved by Travelers Across the Globe
+              {HEADER_TITLE}
             </h2>
             <p className="text-lg text-gray-600">
-              Honest reviews from clients who’ve explored the world with us
+              {HEADER_SUBTITLE}
             </p>
           </div>
           <div className="flex justify-center">
             <div
               ref={elRef}
-              className="elfsight-app-73d66682-048c-42cd-bfa6-d33c02611cb3"
+              className={`elfsight-app-${BRANDING.integrations.elfsightAppId}`}
               data-elfsight-app-lazy
             ></div>
           </div>
