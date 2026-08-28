@@ -22,6 +22,9 @@ import type { LucideIcon } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../../services/api/manualItinerary";
+import { useAIItineraryGenerator } from "./hooks/useAIItineraryGenerator";
+import { buildItineraryDayFromAIDay } from "./utils/formHelpers";
+import type { DayAccommodation, DayMeals, ItineraryDay } from "./utils/formHelpers";
 import { pluralize } from "../../lib/pluralize";
 import DestinationSelector from "../../components/shared/DestinationSelector";
 import LocationSelector from "../../components/shared/LocationSelector";
@@ -63,32 +66,6 @@ const destValue = (dest: DestinationLike): string => {
   return typeof dest === 'string' ? dest : '';
 };
 
-interface DayAccommodation {
-  name: string;
-  type: string;
-  rating: number;
-  address: string;
-  contactNumber: string;
-}
-
-interface DayMeals {
-  breakfast: boolean;
-  lunch: boolean;
-  dinner: boolean;
-}
-
-interface ItineraryDay {
-  dayNumber: number;
-  title: string;
-  locations: string[];
-  activities: string[];
-  accommodation: DayAccommodation;
-  meals: DayMeals;
-  transport: string;
-  places: string[];
-  notes: string;
-}
-
 /** The day object serialized into the manual-itinerary request payload. */
 interface ItineraryDayPayload {
   dayNumber: number;
@@ -121,6 +98,15 @@ export default function PlanYourTripContainer() {
   const [itineraryDays, setItineraryDays] = useState<ItineraryDay[]>([]);
   const [currentDayIndex, setCurrentDayIndex] = useState(0); // Index of currently visible day (0-based)
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [preferences, setPreferences] = useState('');
+  const aiGenerator = useAIItineraryGenerator<ItineraryDay>({
+    hasExistingDays: () => itineraryDays.length > 0,
+    mapDay: buildItineraryDayFromAIDay,
+    onGenerated: (days) => {
+      setItineraryDays(days);
+      setCurrentDayIndex(0);
+    },
+  });
 
   // Prefill contact details for logged-in users
   useEffect(() => {
@@ -301,7 +287,7 @@ export default function PlanYourTripContainer() {
         endDate: endDate,
         numberOfTravelers: travelers,
         budget: '',
-        message: '',
+        message: preferences.trim(),
         days: itineraryDays.map(day => {
           const dayData: ItineraryDayPayload = {
             dayNumber: day.dayNumber,
@@ -498,6 +484,17 @@ export default function PlanYourTripContainer() {
                   </button>
                 </div>
               </div>
+
+              <div className="mt-4 sm:mt-6">
+                <label className="block text-xs sm:text-sm font-semibold mb-2 sm:mb-3">Trip preferences (optional)</label>
+                <textarea
+                  value={preferences}
+                  onChange={(e) => setPreferences(e.target.value)}
+                  placeholder="e.g., Include water sports, prefer beachside hotels, need vegetarian food options..."
+                  rows={3}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white"
+                />
+              </div>
             </div>
           )}
 
@@ -520,6 +517,12 @@ export default function PlanYourTripContainer() {
                 </div>
               </div>
 
+              {aiGenerator.error && (
+                <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-red-700 text-xs sm:text-sm font-medium">{aiGenerator.error}</p>
+                </div>
+              )}
+
               {duration === 0 ? (
                 <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                   <p className="text-xs sm:text-sm text-gray-600 mb-2">Please select travel dates first</p>
@@ -534,17 +537,58 @@ export default function PlanYourTripContainer() {
               ) : itineraryDays.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                   <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">Start planning your itinerary</p>
-                  <button
-                    type="button"
-                    onClick={handleAddDay}
-                    className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white text-xs sm:text-sm rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-all font-semibold shadow-md flex items-center gap-2 mx-auto"
-                  >
-                    <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
-                    Add Day 1
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleAddDay}
+                      className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white text-xs sm:text-sm rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-all font-semibold shadow-md flex items-center gap-2"
+                    >
+                      <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
+                      Add Day 1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => aiGenerator.generate({ destination: destLabel(selectedDest), duration, travelers, preferences: preferences || undefined })}
+                      disabled={aiGenerator.isGenerating}
+                      className="px-4 sm:px-6 py-2 sm:py-3 bg-white border-2 border-brand-500 text-brand-600 text-xs sm:text-sm rounded-xl hover:bg-brand-50 transition-all font-semibold shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {aiGenerator.isGenerating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
+                          Generate itinerary with AI
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4 sm:space-y-6" data-itinerary-form>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => aiGenerator.generate({ destination: destLabel(selectedDest), duration, travelers, preferences: preferences || undefined })}
+                      disabled={aiGenerator.isGenerating}
+                      className="px-3 sm:px-4 py-2 bg-white border-2 border-brand-500 text-brand-600 text-xs sm:text-sm rounded-xl hover:bg-brand-50 transition-all font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {aiGenerator.isGenerating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4" />
+                          Regenerate with AI
+                        </>
+                      )}
+                    </button>
+                  </div>
+
                   {/* Navigation and Progress - Only show if more than one day */}
                   {itineraryDays.length > 1 && (
                     <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4 p-3 sm:p-4 bg-gradient-to-r from-brand-50 to-brand-accent-50 rounded-xl border border-brand-200">
@@ -593,7 +637,8 @@ export default function PlanYourTripContainer() {
                           <button
                             type="button"
                             onClick={() => handleRemoveDay(itineraryDays[currentDayIndex].dayNumber)}
-                            className="p-2 hover:bg-red-500 rounded-lg transition-colors"
+                            disabled={aiGenerator.isGenerating}
+                            className="p-2 hover:bg-red-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Remove this day"
                           >
                             <Trash2 className="w-5 h-5 text-white" />
@@ -602,7 +647,7 @@ export default function PlanYourTripContainer() {
                       </div>
 
                       {/* Day Content */}
-                      <div className="p-6 space-y-4 bg-white">
+                      <div className={`p-6 space-y-4 bg-white ${aiGenerator.isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                         {/* Title */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -756,7 +801,8 @@ export default function PlanYourTripContainer() {
                       <button
                         type="button"
                         onClick={handleAddDay}
-                        className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-all font-semibold shadow-md flex items-center gap-2"
+                        disabled={aiGenerator.isGenerating}
+                        className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-all font-semibold shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Plus className="w-5 h-5" />
                         Add Day {itineraryDays.length + 1}
