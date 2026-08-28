@@ -30,8 +30,8 @@ export interface DayOverrideState {
 
 interface RawDay {
   dayNumber?: number;
-  title?: string;
-  description?: string;
+  title?: string | null;
+  description?: string | null;
   activities?: string[] | string;
   locations?: string[] | string;
 }
@@ -57,3 +57,76 @@ export const buildDayState = (day: RawDay | null | undefined, index: number): Da
       : [],
   };
 };
+
+// ── PlanYourTripContainer day shape ──────────────────────────────
+
+export interface DayAccommodation {
+  name: string;
+  type: string;
+  rating: number;
+  address: string;
+  contactNumber: string;
+}
+
+export interface DayMeals {
+  breakfast: boolean;
+  lunch: boolean;
+  dinner: boolean;
+}
+
+export interface ItineraryDay {
+  dayNumber: number;
+  title: string;
+  locations: string[];
+  activities: string[];
+  accommodation: DayAccommodation;
+  meals: DayMeals;
+  transport: string;
+  places: string[];
+  notes: string;
+}
+
+/** An AI-generated day, shaped like the shared ManualItineraryDay contract. */
+interface RawAIDay {
+  dayNumber?: number;
+  title?: string | null;
+  description?: string | null;
+  locations?: string[];
+  activities?: string[];
+  accommodation?: {
+    name?: string;
+    type?: string;
+    rating?: number;
+    address?: string;
+    contactNumber?: string;
+  } | null;
+  meals?: {
+    breakfast?: boolean;
+    lunch?: boolean;
+    dinner?: boolean;
+  } | null;
+  transport?: string | null;
+}
+
+/** Normalizes an AI-generated day into PlanYourTripContainer's editable ItineraryDay state. */
+export const buildItineraryDayFromAIDay = (aiDay: RawAIDay, index: number): ItineraryDay => ({
+  dayNumber: aiDay?.dayNumber || index + 1,
+  title: aiDay?.title || `Day ${index + 1}`,
+  locations: aiDay?.locations || [],
+  activities: aiDay?.activities || [],
+  accommodation: {
+    name: aiDay?.accommodation?.name || '',
+    type: aiDay?.accommodation?.type || 'hotel',
+    rating: aiDay?.accommodation?.rating ?? 4,
+    address: aiDay?.accommodation?.address || '',
+    contactNumber: aiDay?.accommodation?.contactNumber || '',
+  },
+  meals: {
+    breakfast: aiDay?.meals?.breakfast ?? false,
+    lunch: aiDay?.meals?.lunch ?? false,
+    dinner: aiDay?.meals?.dinner ?? false,
+  },
+  transport: aiDay?.transport || '',
+  places: [], // Never populated from AI (or manual entry) — locations is the only user/AI-editable place field.
+  notes: aiDay?.description || '',
+});
