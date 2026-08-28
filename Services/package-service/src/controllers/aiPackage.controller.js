@@ -9,6 +9,7 @@ import { generateStructured } from '../ai/geminiClient.js';
 import { buildGeneratePackagePrompt, generatePackageResponseSchema } from '../ai/prompts/generatePackage.v1.js';
 import { buildGenerateFromTitlePrompt, generateFromTitleResponseSchema } from '../ai/prompts/generateFromTitle.v1.js';
 import { buildPackageMarketingContentPrompt, packageMarketingContentResponseSchema } from '../ai/prompts/packageMarketingContent.v1.js';
+import { buildGenerateItineraryPreviewPrompt, generateItineraryPreviewResponseSchema } from '../ai/prompts/generateItineraryPreview.v1.js';
 
 // Map frontend display categories to valid PackageCategory enum values.
 const CATEGORY_MAP = {
@@ -68,6 +69,29 @@ async function buildAIContent(pkg) {
   return generateStructured({ prompt, schema: packageMarketingContentResponseSchema });
 }
 
+// Scale the token budget with duration instead of a fixed cap (a long
+// itinerary's full JSON can exceed a small fixed cap and get silently
+// truncated by Gemini's constrained decoder), capped under the model's real
+// ceiling; geminiClient escalates further on its own if this still isn't
+// enough. Pads the result to exactly `duration` days as a last-resort safety
+// net for a model that returns a handful fewer days than asked without
+// tripping truncation detection upstream.
+async function generateDaysArray({ prompt, schema, duration, tokenBudgetBase }) {
+  const d = Number(duration);
+  const maxOutputTokens = Math.min(60000, tokenBudgetBase + d * 700);
+  const data = await generateStructured({ prompt, schema, maxOutputTokens });
+  const days = Array.isArray(data.days) ? data.days.slice(0, d) : [];
+  const shortfall = d - days.length;
+  while (days.length < d) {
+    const n = days.length + 1;
+    days.push({ dayNumber: n, title: `Day ${n}`, description: '', locations: [], activities: [], meals: { breakfast: true, dinner: true } });
+  }
+  if (shortfall > 0) {
+    logger.warn({ requestedDuration: d, shortfall }, 'AI returned fewer days than requested — padded with blank placeholder days');
+  }
+  return { data, days };
+}
+
 // ── Create a full package + itinerary days from scratch ───────
 
 export const generateAIPackage = asyncHandler(async (req, res) => {
@@ -86,34 +110,18 @@ export const generateAIPackage = asyncHandler(async (req, res) => {
     preferences: preferences || description,
   });
 
-  // A fixed token budget doesn't scale with the day count — a long itinerary's
-  // full JSON (locations/activities/meals/transport × N days) can exceed a
-  // small fixed cap and get silently truncated by Gemini's constrained
-  // decoder. Scale with duration instead, capped under the model's real
-  // ceiling (65536); geminiClient escalates further on its own if this still
-  // isn't enough.
-  const maxOutputTokens = Math.min(60000, 1500 + Number(duration) * 700);
-  const packageData = await generateStructured({ prompt, schema: generatePackageResponseSchema, maxOutputTokens });
-
-  const { days: aiDays, ...pkgBody } = packageData;
+  const { data: packageData, days } = await generateDaysArray({
+    prompt,
+    schema: generatePackageResponseSchema,
+    duration,
+    tokenBudgetBase: 1500,
+  });
+  const pkgBody = { ...packageData };
+  delete pkgBody.days;
   const d = Number(duration);
-  const days = Array.isArray(aiDays) ? aiDays.slice(0, d) : [];
-
-  // Last-resort safety net for a model that returns a handful fewer days than
-  // asked without tripping truncation detection upstream — pad to the exact
-  // count so the editor always shows the requested day grid.
-  const shortfall = d - days.length;
-  while (days.length < d) {
-    const n = days.length + 1;
-    days.push({ dayNumber: n, title: `Day ${n}`, description: '', locations: [], activities: [], meals: { breakfast: true, dinner: true }, transport: '' });
-  }
-  if (shortfall > 0) {
-    logger.warn({ destination, requestedDuration: d, shortfall }, 'AI returned fewer days than requested — padded with blank placeholder days');
-  }
 
   const normalizedDays = normalizeAIDays(days);
   const { days: resolvedDays } = await resolveActivityCatalogIds(normalizedDays);
-
   const slug = slugify(pkgBody.title || packageData.title || 'package', { lower: true, strict: true }) + '-' + Date.now();
 
   const pkg = await prisma.package.create({
@@ -141,6 +149,20 @@ export const generateAIPackage = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({ success: true, data: serializePackage(pkg) });
+});
+
+// ── Public: non-persisting customer-facing itinerary preview ──
+
+export const generateItineraryPreview = asyncHandler(async (req, res) => {
+  const { destination, duration, travelers, budget, preferences } = req.body;
+  const prompt = buildGenerateItineraryPreviewPrompt({ destination, duration, travelers, budget, preferences });
+  const { days } = await generateDaysArray({
+    prompt,
+    schema: generateItineraryPreviewResponseSchema,
+    duration,
+    tokenBudgetBase: 800,
+  });
+  res.json({ success: true, data: { days } });
 });
 
 // ── Generate content from title — does NOT create anything ────

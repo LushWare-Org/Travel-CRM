@@ -233,3 +233,80 @@ describe('POST /api/v1/packages/generate-from-title', () => {
     expect(mockGenerateStructured).not.toHaveBeenCalled();
   });
 });
+
+describe('POST /api/v1/packages/generate-itinerary-preview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const previewDays = [
+    { dayNumber: 1, title: 'Arrival', locations: ['Denpasar'], activities: ['Beach Walk'], meals: { dinner: true }, transport: 'car' },
+    { dayNumber: 2, title: 'Snorkeling', locations: ['Nusa Dua'], activities: ['Snorkeling Tour'], meals: { breakfast: true }, transport: 'boat' },
+  ];
+
+  it('returns 200 with days on success, with no Authorization header (genuinely public)', async () => {
+    mockGenerateStructured.mockResolvedValue({ days: previewDays });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-itinerary-preview')
+      .send({ destination: 'Bali', duration: 2 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.days).toHaveLength(2);
+    expect(res.body.data.days[0].locations).toEqual(['Denpasar']);
+  });
+
+  it('never persists — package.create is never called', async () => {
+    mockGenerateStructured.mockResolvedValue({ days: previewDays });
+
+    await request(app)
+      .post('/api/v1/packages/generate-itinerary-preview')
+      .send({ destination: 'Bali', duration: 2 });
+
+    expect(mockPrisma.package.create).not.toHaveBeenCalled();
+  });
+
+  it('pads to exactly duration days when the model returns fewer', async () => {
+    mockGenerateStructured.mockResolvedValue({ days: [previewDays[0]] });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-itinerary-preview')
+      .send({ destination: 'Bali', duration: 2 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.days).toHaveLength(2);
+    expect(res.body.data.days[1]).toMatchObject({ dayNumber: 2, title: 'Day 2' });
+  });
+
+  it('returns 400 when destination is missing', async () => {
+    const res = await request(app)
+      .post('/api/v1/packages/generate-itinerary-preview')
+      .send({ duration: 2 });
+
+    expect(res.status).toBe(400);
+    expect(mockGenerateStructured).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when the AI client reports it is not configured', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI generation is not configured'), { statusCode: 503 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-itinerary-preview')
+      .send({ destination: 'Bali', duration: 2 });
+
+    expect(res.status).toBe(503);
+    expect(mockPrisma.package.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 when the model output fails schema/JSON validation', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI did not return valid JSON'), { statusCode: 502 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-itinerary-preview')
+      .send({ destination: 'Bali', duration: 2 });
+
+    expect(res.status).toBe(502);
+    expect(mockPrisma.package.create).not.toHaveBeenCalled();
+  });
+});
