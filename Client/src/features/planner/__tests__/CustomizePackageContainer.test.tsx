@@ -5,10 +5,12 @@ import CustomizePackageContainer from '../CustomizePackageContainer';
 import { fetchPackageById } from '../../../services/api/packages';
 import { submitCustomizationRequest } from '../../../services/api/customization';
 import { normalizePackage } from '../../../services/api/packages.transform';
+import { generateItineraryPreview } from '../../../services/api/aiItinerary';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   useNavigate: vi.fn(),
+  swalFire: vi.fn(),
 }));
 
 vi.mock('../../../services/api/packages', () => ({
@@ -17,6 +19,14 @@ vi.mock('../../../services/api/packages', () => ({
 
 vi.mock('../../../services/api/customization', () => ({
   submitCustomizationRequest: vi.fn(),
+}));
+
+vi.mock('../../../services/api/aiItinerary', () => ({
+  generateItineraryPreview: vi.fn(),
+}));
+
+vi.mock('sweetalert2', () => ({
+  default: { fire: mocks.swalFire },
 }));
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -30,6 +40,7 @@ vi.mock('react-router-dom', () => ({
 
 const fetchPackageByIdMock = vi.mocked(fetchPackageById);
 const submitCustomizationRequestMock = vi.mocked(submitCustomizationRequest);
+const generateItineraryPreviewMock = vi.mocked(generateItineraryPreview);
 
 const rawPackage = {
   _id: 'pkg-123',
@@ -53,10 +64,12 @@ const rawPackage = {
 beforeEach(() => {
   mocks.useAuth.mockReturnValue({ user: null });
   mocks.useNavigate.mockReturnValue(vi.fn());
+  mocks.swalFire.mockReset();
   fetchPackageByIdMock.mockReset();
   fetchPackageByIdMock.mockResolvedValue(normalizePackage(rawPackage));
   submitCustomizationRequestMock.mockReset();
   submitCustomizationRequestMock.mockResolvedValue({ customizedPackageId: 'cp-1', leadId: 'lead-1' });
+  generateItineraryPreviewMock.mockReset();
 });
 
 describe('CustomizePackageContainer', () => {
@@ -117,5 +130,96 @@ describe('CustomizePackageContainer', () => {
       screen.getByRole('button', { name: 'Browse other packages' }),
     ).toBeInTheDocument();
     expect(submitCustomizationRequestMock).not.toHaveBeenCalled();
+  });
+
+  it('clicking "Regenerate with AI" shows the confirm dialog — canceling leaves the existing day untouched', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    expect(screen.getByText('Day 1')).toBeInTheDocument();
+
+    mocks.swalFire.mockResolvedValue({ isConfirmed: false });
+    await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
+
+    expect(mocks.swalFire).toHaveBeenCalledTimes(1);
+    expect(generateItineraryPreviewMock).not.toHaveBeenCalled();
+    expect(screen.getByText('Day 1')).toBeInTheDocument();
+  });
+
+  it('confirming "Regenerate with AI" calls the API with the package-derived params and replaces the day cards', async () => {
+    const user = userEvent.setup();
+    mocks.swalFire.mockResolvedValue({ isConfirmed: true });
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Ella Hike', locations: ['Ella'], activities: ['Nine Arch Bridge'] }],
+    });
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
+
+    expect(generateItineraryPreviewMock).toHaveBeenCalledWith({
+      destination: 'Sri Lanka',
+      duration: 7,
+      travelers: 2,
+      preferences: undefined,
+    });
+    expect(await screen.findByText('Ella Hike')).toBeInTheDocument();
+  });
+
+  it('a rejected generateItineraryPreview call shows the AI error banner and leaves "Add Day" usable', async () => {
+    const user = userEvent.setup();
+    mocks.swalFire.mockResolvedValue({ isConfirmed: true });
+    generateItineraryPreviewMock.mockRejectedValue(new Error('AI generation failed'));
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
+
+    expect(await screen.findByText('AI generation failed')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add Day' }));
+    expect(screen.getByText('Day 2')).toBeInTheDocument();
+  });
+
+  it("handleSubmit's overrides.days mapping (dayNumber, activities, locations only) is unchanged for AI-populated days", async () => {
+    const user = userEvent.setup();
+    mocks.swalFire.mockResolvedValue({ isConfirmed: true });
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Ella Hike', description: 'A scenic hike', locations: ['Ella'], activities: ['Nine Arch Bridge'] }],
+    });
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
+    await screen.findByText('Ella Hike');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+
+    expect(submitCustomizationRequestMock).toHaveBeenCalledTimes(1);
+    expect(submitCustomizationRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        overrides: {
+          days: [{ dayNumber: 1, activities: ['Nine Arch Bridge'], locations: ['Ella'] }],
+        },
+      }),
+    );
   });
 });
