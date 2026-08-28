@@ -36,3 +36,7 @@ export {
   WebsiteManualItineraryResult,
   ManualItinerarySummary,
 } from './manualItinerary.js';
+export {
+  GenerateItineraryPreviewRequest,
+  GenerateItineraryPreviewResult,
+} from './aiItineraryPreview.js';

@@ -186,6 +186,14 @@ export const generateFromTitleSchema = z.object({
   category: z.string().max(50).optional(),
 });
 
+export const generateItineraryPreviewSchema = z.object({
+  destination: z.string().min(1, 'Destination is required').max(255),
+  duration: z.coerce.number().int().min(1).max(30),
+  travelers: z.coerce.number().int().min(1).max(50).optional(),
+  budget: z.string().max(100).optional(),
+  preferences: z.string().max(1000).optional(),
+});
+
 // ─── Place / Activity sub-schemas ─────────────────────────────
 
 export const createPlaceSchema = z.object({

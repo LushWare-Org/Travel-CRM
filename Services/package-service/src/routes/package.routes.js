@@ -10,6 +10,7 @@ import {
   setPackageCoverSchema,
   generateAIPackageSchema,
   generateFromTitleSchema,
+  generateItineraryPreviewSchema,
 } from '../validators/package.schema.js';
 import * as packageController from '../controllers/package.controller.js';
 import * as packageImageController from '../controllers/packageImage.controller.js';
@@ -18,6 +19,7 @@ import {
   generateContentFromTitle,
   generateAndSaveAIContent,
   previewAIContent,
+  generateItineraryPreview,
 } from '../controllers/aiPackage.controller.js';
 import { downloadAIPdf } from '../controllers/aiPdf.controller.js';
 
@@ -40,6 +42,8 @@ router.get('/:id', validateParams(packageIdParamSchema), packageController.getPa
 // ── AI: full-package generation ───────────────────────────────────────────────
 router.post('/generate-ai',         requireAuth, authorize('admin', 'staff'), validateBody(generateAIPackageSchema),  generateAIPackage);
 router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), validateBody(generateFromTitleSchema), generateContentFromTitle);
+// Public: non-persisting customer-facing itinerary preview — no DB write, rate-limited at the gateway.
+router.post('/generate-itinerary-preview', validateBody(generateItineraryPreviewSchema), generateItineraryPreview);
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 router.post('/calculate-price', requireAuth, packageController.calculatePrice);

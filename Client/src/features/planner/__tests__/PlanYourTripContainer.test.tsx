@@ -3,13 +3,23 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PlanYourTripContainer from '../PlanYourTripContainer';
 import { submitManualItineraryRequest } from '../../../services/api/manualItinerary';
+import { generateItineraryPreview } from '../../../services/api/aiItinerary';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
+  swalFire: vi.fn(),
 }));
 
 vi.mock('../../../services/api/manualItinerary', () => ({
   submitManualItineraryRequest: vi.fn(),
+}));
+
+vi.mock('../../../services/api/aiItinerary', () => ({
+  generateItineraryPreview: vi.fn(),
+}));
+
+vi.mock('sweetalert2', () => ({
+  default: { fire: mocks.swalFire },
 }));
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -17,6 +27,7 @@ vi.mock('../../../contexts/AuthContext', () => ({
 }));
 
 const submitMock = vi.mocked(submitManualItineraryRequest);
+const generateItineraryPreviewMock = vi.mocked(generateItineraryPreview);
 
 /** Day numbers for the current month that exist in every month (1..28+). */
 const CURRENT_MONTH_DAY_A = 15;
@@ -38,8 +49,10 @@ beforeAll(() => {
 
 beforeEach(() => {
   mocks.useAuth.mockReturnValue({ user: null });
+  mocks.swalFire.mockReset();
   submitMock.mockReset();
   submitMock.mockResolvedValue({ leadId: 'lead-1', manualItineraryId: 'mi-1' });
+  generateItineraryPreviewMock.mockReset();
 });
 
 describe('PlanYourTripContainer', () => {
@@ -153,5 +166,114 @@ describe('PlanYourTripContainer', () => {
 
     expect(await screen.findByText('Server unreachable')).toBeInTheDocument();
     expect(submitMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicking "Generate itinerary with AI" at the empty Step 3 state calls it with the derived params, populates the day grid, and the submitted payload matches the AI-mapped day', async () => {
+    const user = userEvent.setup();
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Ella Hike', locations: ['Ella'], activities: ['Nine Arch Bridge'] }],
+    });
+    const { container } = render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    const startDate = currentMonthDay(CURRENT_MONTH_DAY_A);
+    const endDate = currentMonthDay(CURRENT_MONTH_DAY_B);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: /Generate itinerary with AI/ }));
+
+    expect(generateItineraryPreviewMock).toHaveBeenCalledWith({
+      destination: 'Bali, Indonesia',
+      duration: 5,
+      travelers: 2,
+      preferences: undefined,
+    });
+    expect(await screen.findByDisplayValue('Ella Hike')).toBeInTheDocument();
+    expect(mocks.swalFire).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    const emailInput = container.querySelector('input[type="email"]') as HTMLInputElement;
+    await user.type(emailInput, 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: 'Submit Itinerary' }));
+
+    expect(await screen.findByText('Successfully Submitted!')).toBeInTheDocument();
+    expect(submitMock).toHaveBeenCalledTimes(1);
+    expect(submitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        travelDate: startDate,
+        endDate,
+        days: [
+          {
+            dayNumber: 1,
+            title: 'Ella Hike',
+            locations: ['Ella'],
+            activities: ['Nine Arch Bridge'],
+            accommodation: { name: '', type: 'hotel', rating: 4, address: '', contactNumber: '' },
+            meals: { breakfast: false, lunch: false, dinner: false },
+            places: [],
+            notes: '',
+          },
+        ],
+      }),
+    );
+  });
+
+  it('with a day already added, clicking "Regenerate with AI" confirms via SweetAlert2 before replacing days', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+
+    // Canceling leaves the existing day untouched.
+    mocks.swalFire.mockResolvedValue({ isConfirmed: false });
+    await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
+    expect(mocks.swalFire).toHaveBeenCalledTimes(1);
+    expect(generateItineraryPreviewMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+
+    // Confirming replaces the days with the AI-generated ones.
+    mocks.swalFire.mockResolvedValue({ isConfirmed: true });
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Ella Hike', locations: [], activities: [] }],
+    });
+    await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
+
+    expect(await screen.findByDisplayValue('Ella Hike')).toBeInTheDocument();
+  });
+
+  it('a rejected generateItineraryPreview call shows the AI error banner and leaves the manual "Add Day 1" path usable', async () => {
+    const user = userEvent.setup();
+    generateItineraryPreviewMock.mockRejectedValue(new Error('AI generation failed'));
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: /Generate itinerary with AI/ }));
+
+    expect(await screen.findByText('AI generation failed')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
   });
 });

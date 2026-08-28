@@ -13,6 +13,7 @@ import ActivitySelector from '../../components/shared/ActivitySelector';
 import LocationSelector from '../../components/shared/LocationSelector';
 import { buildDayState, splitTextToList } from './utils/formHelpers';
 import type { DayOverrideState } from './utils/formHelpers';
+import { useAIItineraryGenerator } from './hooks/useAIItineraryGenerator';
 
 interface ContactState {
   name: string;
@@ -50,6 +51,11 @@ export default function CustomizePackageContainer() {
 
   const [message, setMessage] = useState('');
   const [dayOverrides, setDayOverrides] = useState<DayOverrideState[]>([]);
+  const aiGenerator = useAIItineraryGenerator<DayOverrideState>({
+    hasExistingDays: () => dayOverrides.length > 0,
+    mapDay: buildDayState,
+    onGenerated: setDayOverrides,
+  });
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 5;
 
@@ -510,18 +516,52 @@ export default function CustomizePackageContainer() {
                             Share activities and locations you'd like for each day (optional)
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleAddDay}
-                          className="px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white rounded-xl bg-brand-600 hover:bg-brand-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center sm:justify-start"
-                        >
-                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                          </svg>
-                          <span>Add Day</span>
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              aiGenerator.generate({
+                                destination: pkg?.destination?.name || pkg?.destinationRaw || '',
+                                duration: pkg?.duration_days ?? 0,
+                                travelers: Number(travelPrefs.travelers) || undefined,
+                                preferences: message || undefined,
+                              })
+                            }
+                            disabled={aiGenerator.isGenerating}
+                            className="px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-brand-600 rounded-xl bg-white border-2 border-brand-500 hover:bg-brand-50 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 whitespace-nowrap flex-1 sm:flex-none justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {aiGenerator.isGenerating ? (
+                              <>
+                                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                                <span>Generating...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <span>Regenerate with AI</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAddDay}
+                            disabled={aiGenerator.isGenerating}
+                            className="px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white rounded-xl bg-brand-600 hover:bg-brand-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap flex-1 sm:flex-none justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Add Day</span>
+                          </button>
+                        </div>
                       </div>
-                  <div className="space-y-4 sm:space-y-5">
+
+                      {aiGenerator.error && (
+                        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+                          <p className="text-red-700 text-xs sm:text-sm font-medium">{aiGenerator.error}</p>
+                        </div>
+                      )}
+                  <div className={`space-y-4 sm:space-y-5 ${aiGenerator.isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                     {dayOverrides.map((day, index) => (
                       <div key={day.id} className="border border-gray-200 rounded-2xl p-4 sm:p-6 bg-gradient-to-br from-white to-gray-50/50 shadow-sm hover:shadow-md transition-all duration-200">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">

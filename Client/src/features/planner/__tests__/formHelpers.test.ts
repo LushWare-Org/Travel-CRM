@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDayState,
+  buildItineraryDayFromAIDay,
   combineListToText,
   sanitizeNumber,
   splitTextToList,
@@ -145,5 +146,73 @@ describe('buildDayState', () => {
       dayNumber: 2,
       title: 'Day 2',
     });
+  });
+});
+
+describe('buildItineraryDayFromAIDay', () => {
+  it('maps a full AI day correctly', () => {
+    expect(
+      buildItineraryDayFromAIDay(
+        {
+          dayNumber: 2,
+          title: 'Beach Day',
+          description: 'Relax by the sea',
+          locations: ['Galle'],
+          activities: ['Snorkeling'],
+          accommodation: {
+            name: 'Galle Fort Hotel',
+            type: 'resort',
+            rating: 5,
+            address: '1 Fort Rd',
+            contactNumber: '+94123456',
+          },
+          meals: { breakfast: true, lunch: false, dinner: true },
+          transport: 'boat',
+        },
+        0,
+      ),
+    ).toEqual({
+      dayNumber: 2,
+      title: 'Beach Day',
+      locations: ['Galle'],
+      activities: ['Snorkeling'],
+      accommodation: {
+        name: 'Galle Fort Hotel',
+        type: 'resort',
+        rating: 5,
+        address: '1 Fort Rd',
+        contactNumber: '+94123456',
+      },
+      meals: { breakfast: true, lunch: false, dinner: true },
+      transport: 'boat',
+      places: [],
+      notes: 'Relax by the sea',
+    });
+  });
+
+  it('falls back to handleAddDay defaults when accommodation/meals/transport are missing', () => {
+    expect(
+      buildItineraryDayFromAIDay({ dayNumber: 1, title: 'Arrival', locations: [], activities: [] }, 0),
+    ).toEqual({
+      dayNumber: 1,
+      title: 'Arrival',
+      locations: [],
+      activities: [],
+      accommodation: { name: '', type: 'hotel', rating: 4, address: '', contactNumber: '' },
+      meals: { breakfast: false, lunch: false, dinner: false },
+      transport: '',
+      places: [],
+      notes: '',
+    });
+  });
+
+  it('falls back to index-based dayNumber/title when missing, and places is always []', () => {
+    const result = buildItineraryDayFromAIDay(
+      { locations: ['Kandy'], activities: ['Temple visit'], places: ['ignored'] } as never,
+      2,
+    );
+    expect(result.dayNumber).toBe(3);
+    expect(result.title).toBe('Day 3');
+    expect(result.places).toEqual([]);
   });
 });
