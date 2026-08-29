@@ -19,8 +19,8 @@ locals {
       secrets = ["${var.env}-jwt-secret"]
       plain_env = {
         NODE_ENV       = "production"
-        CLIENT_URL     = "https://client-${var.env}.web.app"
-        MANAGEMENT_URL = "https://management-${var.env}.web.app"
+        CLIENT_URL     = "https://lush-ware-client-${var.env}.web.app"
+        MANAGEMENT_URL = "https://lush-ware-management-${var.env}.web.app"
       }
       allow_unauthenticated = true
     }
@@ -29,7 +29,7 @@ locals {
       memory                = "512Mi"
       cpu                   = "1"
       secrets               = ["${var.env}-database-url", "${var.env}-direct-url", "${var.env}-jwt-secret", "${var.env}-internal-events-token"]
-      plain_env             = { NODE_ENV = "production", CLIENT_URL = "https://client-${var.env}.web.app" }
+      plain_env             = { NODE_ENV = "production", CLIENT_URL = "https://lush-ware-client-${var.env}.web.app" }
       allow_unauthenticated = false
     }
     user-service = {
@@ -74,7 +74,7 @@ locals {
       secrets = ["${var.env}-database-url", "${var.env}-direct-url"]
       plain_env = {
         NODE_ENV   = "production"
-        CLIENT_URL = "https://client-${var.env}.web.app"
+        CLIENT_URL = "https://lush-ware-client-${var.env}.web.app"
       }
       allow_unauthenticated = false
     }
@@ -142,8 +142,8 @@ locals {
       secrets = ["${var.env}-database-url", "${var.env}-direct-url", "${var.env}-duffel-access-token", "${var.env}-travelport-client-id", "${var.env}-travelport-client-secret", "${var.env}-travelport-token-url", "${var.env}-travelport-api-base-url", "${var.env}-travelport-access-group"]
       plain_env = {
         NODE_ENV             = "production"
-        CLIENT_URL           = "https://client-${var.env}.web.app"
-        MANAGEMENT_URL       = "https://management-${var.env}.web.app"
+        CLIENT_URL           = "https://lush-ware-client-${var.env}.web.app"
+        MANAGEMENT_URL       = "https://lush-ware-management-${var.env}.web.app"
         TRAVELPORT_MOCK_MODE = "true"
       }
       allow_unauthenticated = false
@@ -155,7 +155,7 @@ locals {
       secrets = ["${var.env}-database-url", "${var.env}-direct-url"]
       plain_env = {
         NODE_ENV   = "production"
-        CLIENT_URL = "https://client-${var.env}.web.app"
+        CLIENT_URL = "https://lush-ware-client-${var.env}.web.app"
       }
       allow_unauthenticated = false
     }
