@@ -143,3 +143,10 @@ CLAUDE.local.md
 .claude/settings.local.json
 
 planning/
+# Terraform (infra/terraform — per-company deployments; tfvars hold secrets)
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+*.tfvars
+!*.tfvars.example

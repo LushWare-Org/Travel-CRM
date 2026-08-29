@@ -1,0 +1,89 @@
+# prod environment — Terraform variables for one company's fork.
+# Copy this file to terraform.tfvars and fill in real values
+# (terraform.tfvars is gitignored; never commit real secrets).
+
+env         = "prod"
+company_slug = "<company-slug>"
+project_id   = "<gcp-project-id>"
+region       = "asia-south1"
+image_tag    = "<git-sha>"
+
+# URL of THIS environment's lead-service Cloud Run instance, consumed by
+# notification-service (LEAD_SERVICE_URL). Fill in after the first apply —
+# same pattern as GATEWAY_URL in the GitHub Environments.
+notification_lead_service_url = "https://prod-lead-service-<hash>.run.app"
+
+# URL of THIS environment's billing-service Cloud Run instance, consumed by
+# lead-service (BILLING_SERVICE_URL). Fill in after the first apply — same
+# cycle-breaker pattern as notification_lead_service_url above.
+lead_billing_service_url = "https://prod-billing-service-<hash>.run.app"
+
+# Plain company-specific config
+cloudinary_cloud_name        = "<cloudinary-cloud-name>"
+email_from                   = "noreply@<company-domain>"
+whatsapp_phone_number_id     = "<whatsapp-phone-number-id>"
+whatsapp_business_account_id = "<whatsapp-business-account-id>"
+
+# --- Secret Manager secrets (all required, all sensitive) ---
+database_url               = "postgresql://postgres.<project-ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+direct_url                 = "postgresql://postgres.<project-ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres"
+jwt_secret                 = "<jwt-secret>"
+internal_service_key       = "<internal-service-key>"
+internal_events_token      = "<internal-events-token>"
+cloudinary_api_key         = "<cloudinary-api-key>"
+cloudinary_api_secret      = "<cloudinary-api-secret>"
+gemini_api_key             = "<gemini-api-key>"
+email_user                 = "<email-user>"
+email_password             = "<email-password>"
+whatsapp_access_token      = "<whatsapp-access-token>"
+whatsapp_app_secret        = "<whatsapp-app-secret>"
+whatsapp_verify_token      = "<whatsapp-verify-token>"
+facebook_verify_token      = "<facebook-verify-token>"
+facebook_app_secret        = "<facebook-app-secret>"
+facebook_page_access_token = "<facebook-page-access-token>"
+duffel_access_token        = "<duffel-access-token>"
+travelport_client_id       = "<travelport-client-id>"
+travelport_client_secret   = "<travelport-client-secret>"
+travelport_token_url       = "<travelport-token-url>"
+travelport_api_base_url    = "<travelport-api-base-url>"
+travelport_access_group    = "<travelport-access-group>"
+
+# LiteAPI hotel-search key
+liteapi_api_key = "<liteapi-api-key>"
+
+# Branding / invoice / bank / admin-email plain config
+company_name                  = "<company-name>"
+company_short_name            = "<company-short-name>"
+company_legal_name            = "<company-legal-name>"
+company_tagline                = "<company-tagline>"
+company_logo                   = "<company-logo>"
+company_address                = "<company-address>"
+company_gst_number             = "<company-gst-number>"
+company_email                  = "<company-email>"
+sales_email                    = "<sales-email>"
+company_phone                  = "<company-phone>"
+company_whatsapp               = "<company-whatsapp>"
+company_website                = "<company-website>"
+quotation_rating_tagline       = "<quotation-rating-tagline>"
+brand_ink                      = "<brand-ink>"
+brand_muted                    = "<brand-muted>"
+brand_accent                   = "<brand-accent>"
+brand_accent_dark              = "<brand-accent-dark>"
+quotation_default_terms        = "<quotation-default-terms>"
+quotation_cancellation_policy  = "<quotation-cancellation-policy>"
+invoice_payment_terms          = "<invoice-payment-terms>"
+invoice_payment_instructions   = "<invoice-payment-instructions>"
+bank_name                      = "<bank-name>"
+bank_account_name              = "<bank-account-name>"
+bank_account_number            = "<bank-account-number>"
+bank_ifsc_code                 = "<bank-ifsc-code>"
+bank_swift_code                = "<bank-swift-code>"
+bank_branch                    = "<bank-branch>"
+bank_account_type              = "<bank-account-type>"
+upi_id                         = "<upi-id>"
+whatsapp_template_language     = "<whatsapp-template-language>"
+whatsapp_template_quotation    = "<whatsapp-template-quotation>"
+whatsapp_template_invoice      = "<whatsapp-template-invoice>"
+whatsapp_template_receipt      = "<whatsapp-template-receipt>"
+whatsapp_template_voucher      = "<whatsapp-template-voucher>"
+admin_emails                   = "<admin-emails>"
