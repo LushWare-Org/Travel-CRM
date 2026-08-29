@@ -8,6 +8,7 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import { correlationId, requestLogger } from './middleware/requestLogger.js';
 import logger from './config/logger.js';
+import { GoogleAuth } from 'google-auth-library';
 
 const app = express();
 
@@ -45,6 +46,11 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 // Stricter than authLimiter: each request is a real, billed Gemini call, not a login attempt.
 const aiItineraryPreviewLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
 app.use(globalLimiter);
+
+// ─── Health check ──────────────────────────────────────────────────────────────
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', service: 'api-gateway', timestamp: new Date().toISOString() })
+);
 
 // ─── Service URLs ──────────────────────────────────────────────────────────────
 const SERVICES = {
@@ -129,6 +135,23 @@ app.use((req, res, next) => {
   }
 });
 
+// ─── Cloud Run backend auth ────────────────────────────────────────────────────
+// Backend Cloud Run services are deployed with allow_unauthenticated = false;
+// only the gateway's service account holds run.invoker. Each proxied request
+// therefore needs a Google-signed ID token for the target service's audience.
+const googleAuth = new GoogleAuth();
+const idTokenClients = new Map();
+
+const getAuthHeader = async (target) => {
+  if (!process.env.K_SERVICE) return null; // not running on Cloud Run (local/dev/CI) — behave exactly as today
+  if (!idTokenClients.has(target)) {
+    idTokenClients.set(target, await googleAuth.getIdTokenClient(target));
+  }
+  const client = idTokenClients.get(target);
+  const headers = await client.getRequestHeaders(target);
+  return headers['Authorization'];
+};
+
 // ─── Proxy factory ─────────────────────────────────────────────────────────────
 // pathRewrite restores req.originalUrl because Express strips the mount prefix
 // from req.url before passing control to the middleware (e.g. app.use('/api/v1/auth/login', ...)
@@ -138,6 +161,14 @@ const proxy = (target) => createProxyMiddleware({
   changeOrigin: true,
   pathRewrite: (_path, req) => req.originalUrl,
   on: {
+    proxyReq: async (proxyReq, req) => {
+      try {
+        const header = await getAuthHeader(target);
+        if (header) proxyReq.setHeader('Authorization', header);
+      } catch (err) {
+        (req.log || logger).error({ err, target, requestId: req.requestId }, 'Failed to mint Cloud Run ID token');
+      }
+    },
     proxyRes: (proxyRes) => {
       // Strip service-level CORS headers so the gateway's cors() middleware wins.
       // Services set their own Access-Control-Allow-Origin (often hardcoded to one
@@ -156,11 +187,6 @@ const proxy = (target) => createProxyMiddleware({
     },
   },
 });
-
-// ─── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (req, res) =>
-  res.json({ status: 'ok', service: 'api-gateway', timestamp: new Date().toISOString() })
-);
 
 // ─── Route table ───────────────────────────────────────────────────────────────
 const V1 = '/api/v1';
