@@ -156,37 +156,42 @@ const getAuthHeader = async (target) => {
 // pathRewrite restores req.originalUrl because Express strips the mount prefix
 // from req.url before passing control to the middleware (e.g. app.use('/api/v1/auth/login', ...)
 // makes req.url === '/' inside the handler). Services expect the full path.
-const proxy = (target) => createProxyMiddleware({
-  target,
-  changeOrigin: true,
-  pathRewrite: (_path, req) => req.originalUrl,
-  on: {
-    proxyReq: async (proxyReq, req) => {
-      try {
-        const header = await getAuthHeader(target);
-        if (header) proxyReq.setHeader('Authorization', header);
-      } catch (err) {
-        (req.log || logger).error({ err, target, requestId: req.requestId }, 'Failed to mint Cloud Run ID token');
-      }
+const proxy = (target) => {
+  const middleware = createProxyMiddleware({
+    target,
+    changeOrigin: true,
+    pathRewrite: (_path, req) => req.originalUrl,
+    on: {
+      proxyReq: (proxyReq, req) => {
+        if (req.cloudRunAuthHeader) proxyReq.setHeader('Authorization', req.cloudRunAuthHeader);
+      },
+      proxyRes: (proxyRes) => {
+        // Strip service-level CORS headers so the gateway's cors() middleware wins.
+        // Services set their own Access-Control-Allow-Origin (often hardcoded to one
+        // origin); leaving those headers in the proxied response would override the
+        // gateway's correctly-reflected origin and block other allowed clients.
+        delete proxyRes.headers['access-control-allow-origin'];
+        delete proxyRes.headers['access-control-allow-credentials'];
+        delete proxyRes.headers['access-control-allow-methods'];
+        delete proxyRes.headers['access-control-allow-headers'];
+      },
+      error: (err, req, res) => {
+        (req.log || logger).error({ err, target, requestId: req.requestId }, 'Proxy error');
+        if (!res.headersSent) {
+          res.status(502).json({ success: false, message: 'Service temporarily unavailable' });
+        }
+      },
     },
-    proxyRes: (proxyRes) => {
-      // Strip service-level CORS headers so the gateway's cors() middleware wins.
-      // Services set their own Access-Control-Allow-Origin (often hardcoded to one
-      // origin); leaving those headers in the proxied response would override the
-      // gateway's correctly-reflected origin and block other allowed clients.
-      delete proxyRes.headers['access-control-allow-origin'];
-      delete proxyRes.headers['access-control-allow-credentials'];
-      delete proxyRes.headers['access-control-allow-methods'];
-      delete proxyRes.headers['access-control-allow-headers'];
-    },
-    error: (err, req, res) => {
-      (req.log || logger).error({ err, target, requestId: req.requestId }, 'Proxy error');
-      if (!res.headersSent) {
-        res.status(502).json({ success: false, message: 'Service temporarily unavailable' });
-      }
-    },
-  },
-});
+  });
+  return async (req, res, next) => {
+    try {
+      req.cloudRunAuthHeader = await getAuthHeader(target);
+    } catch (err) {
+      (req.log || logger).error({ err, target, requestId: req.requestId }, 'Failed to mint Cloud Run ID token');
+    }
+    return middleware(req, res, next);
+  };
+};
 
 // ─── Route table ───────────────────────────────────────────────────────────────
 const V1 = '/api/v1';
