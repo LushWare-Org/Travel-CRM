@@ -1,0 +1,182 @@
+name: Deploy to GCP
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy to
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  push:
+    branches: [microservices]
+
+env:
+  NODE_VERSION: '20.x'
+  # workflow_dispatch carries the chosen environment; a push to
+  # microservices auto-deploys the lowest-stakes environment only.
+  TARGET_ENV: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  build-and-push:
+    name: Build and push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    environment: ${{ env.TARGET_ENV }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - user-service
+          - package-service
+          - lead-service
+          - booking-service
+          - billing-service
+          - career-service
+          - flight-service
+          - analytics-service
+          - notification-service
+          - gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
+
+      - name: Build and push image
+        run: |
+          IMAGE=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${{ github.sha }}
+          docker build -f Services/${{ matrix.service }}/Dockerfile -t "$IMAGE" Services/
+          docker push "$IMAGE"
+
+  migrate:
+    name: Run database migrations
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: ${{ env.TARGET_ENV }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # migrate-all.mjs runs `npx prisma migrate deploy` inside each
+      # Prisma-backed service, so every service's own node_modules must
+      # exist for npx to resolve the prisma version locked in its
+      # package.json rather than downloading an unpinned one.
+      - name: Install Prisma-backed services
+        working-directory: Services
+        run: |
+          for service in auth-service user-service package-service lead-service booking-service billing-service career-service flight-service; do
+            (cd "$service" && npm ci)
+          done
+
+      # One shared database per environment — never matrixed, so
+      # migrations can't race each other.
+      - name: Run migrations
+        env:
+          DIRECT_URL: ${{ secrets.SUPABASE_DIRECT_URL }}
+        run: node Services/migrate-all.mjs
+
+  deploy:
+    name: Deploy ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: migrate
+    environment: ${{ env.TARGET_ENV }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - user-service
+          - package-service
+          - lead-service
+          - booking-service
+          - billing-service
+          - career-service
+          - flight-service
+          - analytics-service
+          - notification-service
+          - gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      # Image tag only, no env/secret flags — Terraform remains the sole
+      # source of truth for env vars and secrets, so CI and Terraform
+      # never fight over ownership.
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.TARGET_ENV }}-${{ matrix.service }} \
+            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${{ github.sha }} \
+            --region ${{ vars.GCP_REGION }}
+
+  deploy-hosting:
+    name: Deploy Firebase Hosting sites
+    runs-on: ubuntu-latest
+    environment: ${{ env.TARGET_ENV }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            Client/package-lock.json
+            Management/package-lock.json
+
+      - name: Install and build Client
+        working-directory: Client
+        env:
+          VITE_API_URL: ${{ vars.GATEWAY_URL }}
+        run: npm ci --legacy-peer-deps && npm run build
+
+      - name: Install and build Management
+        working-directory: Management
+        env:
+          VITE_API_URL: ${{ vars.GATEWAY_URL }}
+        run: npm ci --legacy-peer-deps && npm run build
+
+      - name: Authenticate to Google Cloud with Firebase service account
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Firebase Hosting
+        run: npx --yes firebase-tools@latest deploy --only hosting:client-${{ env.TARGET_ENV }},hosting:management-${{ env.TARGET_ENV }}
