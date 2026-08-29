@@ -1,6 +1,6 @@
 # Travel-CRM Infrastructure
 
-Terraform-managed GCP infrastructure for Travel-CRM's microservices backend. This document describes **only what is currently deployed and verified working** — see "Not deployed" below for everything that's configured in code but not live yet.
+Terraform-managed GCP infrastructure for Travel-CRM's microservices backend, plus the Firebase-hosted frontends. This document describes **only what is currently deployed and verified working** — see "Not deployed" below for everything that's configured in code but not live yet.
 
 ## Live right now
 
@@ -26,23 +26,34 @@ Terraform-managed GCP infrastructure for Travel-CRM's microservices backend. Thi
 
 Only the gateway is publicly invocable (`allUsers` on `run.invoker`). Every other service accepts requests only from the `dev-gateway` service account's identity token — calling any backend URL directly returns `403`, by design.
 
-Verified: `GET /health` on the gateway returns `200 {"status":"ok","service":"api-gateway"}`.
+Verified: `GET /health` on the gateway returns `200 {"status":"ok","service":"api-gateway"}`, and `GET /api/v1/packages` returns real proxied data (see "Gateway ID-token race fix" below).
 
-**Image tag currently deployed:** `dev-b6cb79d` (built from `Services/` at commit `b6cb79d`), pushed to the shared Artifact Registry repo.
+**Image tag currently deployed:** `dev-6a91c15` (all 11 services built from `Services/` at commit `6a91c15`), pushed to the shared Artifact Registry repo.
+
+**Frontend (Client, Management):** both apps are built and deployed to Firebase Hosting.
+
+| App | URL |
+|---|---|
+| Client | https://lush-ware-client-dev.web.app |
+| Management | https://lush-ware-management-dev.web.app |
+
+Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`, deployed via `firebase deploy --only hosting:client-dev,hosting:management-dev --project travelcrm-506818` using an operator account with `roles/firebase.admin` (not via the CI service account — that path is still blocked, see below). Verified live in a real browser: Client loads with zero console errors and live package data; Management's superadmin login (`superadmin@travelcrm.com` / seeded password) reaches the full dashboard.
+
+`.firebaserc` maps the `client-dev`/`management-dev` targets in `firebase.json` to the real Firebase Hosting site IDs `lush-ware-client-dev`/`lush-ware-management-dev`. Backend `CLIENT_URL`/`MANAGEMENT_URL` env vars now point at these real domains (previously `https://client-dev.web.app` / `https://management-dev.web.app`, which were never-created placeholders).
+
+### Gateway ID-token race fix
+
+`Services/gateway/src/index.js`'s proxy previously minted each backend's Cloud Run ID token inside an `async proxyReq` handler. `http-proxy-middleware` sends the proxied request before that promise resolves, so every call to a protected backend (`auth`, `packages`, `bookings`, etc.) went out unauthenticated, Cloud Run's own IAM 403'd it, and the gateway silently forwarded that 403 back to the client — with `ERR_HTTP_HEADERS_SENT` logged server-side as the only trace. Fixed by pre-minting the token in an awaited middleware wrapper before the proxy dispatches, so `proxyReq` only ever does a synchronous header set. Confirmed via Cloud Run logs (`Failed to mint Cloud Run ID token` / `ERR_HTTP_HEADERS_SENT`) before the fix, and a clean `200` with real proxied data after.
 
 ## Not deployed
 
-- **Frontend (Client, Management).** No live site exists for either app. `firebase.json` at the repo root defines hosting targets (`client-dev`, `management-dev`, etc.) but:
-  - `.firebaserc` (which maps those targets to real Firebase Hosting site IDs) does not exist.
-  - The `firebasehosting.googleapis.com` API is disabled on `travelcrm-506818` — Firebase Hosting has never been initialized for this project.
-  - The Firebase CLI isn't installed in this environment.
-  - `Client/dist` and `Management/dist` build output exists locally but has never been pushed anywhere.
+- **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates). No Firebase Hosting sites exist for `client-staging`/`client-prod`/`management-staging`/`management-prod` either.
 
-  The backend's `CLIENT_URL`/`MANAGEMENT_URL` env vars (`https://client-dev.web.app`, `https://management-dev.web.app`) are placeholders for domains that don't exist yet — CORS/redirects referencing them will fail until Firebase Hosting is set up and deployed.
+- **CI/CD.** `.github/workflows/deploy.yml`'s `build-and-push`/`migrate`/`deploy` jobs need `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `vars.GCP_PROJECT_ID`, `vars.GCP_REGION`, and `SUPABASE_DIRECT_URL`, all currently unset. The `deploy-hosting` job additionally needs:
+  - `roles/firebasehosting.admin` granted to `firebase-hosting-deployer@travelcrm-506818.iam.gserviceaccount.com` — blocked because the operator account lacks `resourcemanager.projects.setIamPolicy` on `travelcrm-506818` (needs Owner/`projectIamAdmin`).
+  - The `dev` GitHub Environment created (for `FIREBASE_SERVICE_ACCOUNT`/`GATEWAY_URL` to be settable) — blocked because the operator's GitHub token has repo `maintain`, not `admin`.
 
-- **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates).
-
-- **CI/CD.** Everything above was built, pushed, and applied manually from a local shell. There is no pipeline that rebuilds images or re-applies Terraform on merge.
+  Everything live above was built, pushed, and applied manually from a local shell using the operator's own `roles/firebase.admin`/Editor grants — not via CI.
 
 ## Known placeholder / inactive config in `dev`
 
@@ -104,6 +115,8 @@ terraform apply tf.plan
 ```
 
 Build context is `Services/` (not the individual service folder) — every Dockerfile `COPY`s from `shared/*` before the service directory.
+
+**`image_tag` is one variable shared by all 11 services** (`cloud_run.tf`: `image = "...<service>:${var.env}-${var.image_tag}"`). Bumping it after building/pushing only one service will make `terraform plan` want to move the other 10 to a tag that doesn't exist in Artifact Registry yet, and `apply` will fail their revision create. Either build+push all 11 under the same new tag (what CI's `build-and-push` matrix does unconditionally on every run — safe even for unchanged services, just a fresh identical-content revision) before bumping `image_tag`, or `gcloud run deploy <service> --image=<repo>/<service>:<one-off-tag>` a single service out-of-band and defer the `image_tag` bump/`terraform apply` until the next full rebuild.
 
 ### Inspect current state / drift
 
