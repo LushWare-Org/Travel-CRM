@@ -40,7 +40,7 @@ export default function DestinationListItem({ dest }: DestinationListItemProps) 
               </h3>
             </div>
           </div>
-          <p className="text-gray-600 mb-5 line-clamp-2">{dest.description}</p>
+          <p className="text-gray-600 text-sm mb-5 line-clamp-2">{dest.description}</p>
           <div className="flex flex-wrap gap-6 text-sm text-gray-600 mb-6">
             <div className="flex items-center space-x-2">
               <Clock className="w-4 h-4" />
@@ -54,12 +54,12 @@ export default function DestinationListItem({ dest }: DestinationListItemProps) 
           <div className="flex items-center justify-between pt-4 border-t border-gray-200">
             <div>
               <p className="text-xs text-gray-500 mb-1">Starting Price</p>
-              <p className="text-3xl font-bold text-brand-600">{formatCurrency(dest.price)}</p>
+              <p className="text-lg font-bold text-brand-600">{formatCurrency(dest.price)}</p>
             </div>
             <Link
               to={`/packages?destination=${dest.slug}`}
               onClick={(e) => e.stopPropagation()}
-              className="px-8 py-3 bg-black hover:bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
+              className="px-8 py-3 bg-black hover:bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-xl font-semibold text-sm hover:shadow-lg transition-all flex items-center space-x-2"
             >
               <span>View Packages</span>
               <ArrowRight className="w-5 h-5" />

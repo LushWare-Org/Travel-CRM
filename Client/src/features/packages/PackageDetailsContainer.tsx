@@ -812,7 +812,7 @@ export default function PackageDetailsContainer() {
                     </div>
 
                     <div>
-                      <p className="text-base lg:text-lg text-gray-700 leading-relaxed">{pkg.description}</p>
+                      <p className="text-sm lg:text-base text-gray-700 leading-relaxed">{pkg.description}</p>
                     </div>
                     {pkg.highlights && pkg.highlights.length > 0 && (
                       <div>
@@ -856,7 +856,7 @@ export default function PackageDetailsContainer() {
                               </div>
                               <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-brand-accent-300 hover:shadow-xl transition-all itinerary-padding-sm">
                                 <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2 lg:mb-3">{day.title}</h3>
-                                <p className="text-gray-700 leading-relaxed text-base lg:text-lg">{day.description}</p>
+                                <p className="text-gray-700 leading-relaxed text-sm lg:text-base">{day.description}</p>
                               </div>
                             </div>
                           </div>

@@ -306,16 +306,16 @@ export default function MyAccountContainer() {
                         <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
                           <Mail className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                           <div className="min-w-0 flex-1">
-                            <p className="text-md text-gray-600 font-semibold">Email:</p>
-                            <p className="text-md text-gray-900 truncate font-medium">{user?.email}</p>
+                            <p className="text-sm text-gray-600 font-semibold">Email:</p>
+                            <p className="text-sm text-gray-900 truncate font-medium">{user?.email}</p>
                           </div>
                         </div>
                         {user?.phone && (
                           <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
                             <Phone className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                             <div className="min-w-0 flex-1">
-                              <p className="text-md text-gray-600 font-semibold">Phone: </p>
-                              <p className="text-md text-gray-900 truncate font-medium">{user.phone}</p>
+                              <p className="text-sm text-gray-600 font-semibold">Phone:</p>
+                              <p className="text-sm text-gray-900 truncate font-medium">{user.phone}</p>
                             </div>
                           </div>
                         )}
@@ -352,16 +352,16 @@ export default function MyAccountContainer() {
                   <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
                     <Mail className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-md text-gray-600 font-semibold">Email:</p>
-                      <p className="text-md text-gray-900 truncate font-medium">{user?.email}</p>
+                      <p className="text-sm text-gray-600 font-semibold">Email:</p>
+                      <p className="text-sm text-gray-900 truncate font-medium">{user?.email}</p>
                     </div>
                   </div>
                   {user?.phone && (
                     <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
                       <Phone className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
-                        <p className="text-md text-gray-600 font-semibold">Phone: </p>
-                        <p className="text-md text-gray-900 truncate font-medium">{user.phone}</p>
+                        <p className="text-sm text-gray-600 font-semibold">Phone:</p>
+                        <p className="text-sm text-gray-900 truncate font-medium">{user.phone}</p>
                       </div>
                     </div>
                   )}
