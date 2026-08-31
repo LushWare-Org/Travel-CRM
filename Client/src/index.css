@@ -12,9 +12,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Make headings use Poppins by default */
+/* Headings use the active theme's display font (see config/theme.ts) */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', 'Open Sans', sans-serif;
+  font-family: var(--font-display), var(--font-body), sans-serif;
 }
 
 code {
@@ -230,4 +230,34 @@ code {
 
 .react-datepicker__navigation:hover *::before {
   border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Header dropdown styles — shared by Header.tsx and LushHeader.tsx */
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--brand-500);
+  border-radius: 10px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--brand-600);
+}
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-500) #f3f4f6;
 }

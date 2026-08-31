@@ -1,7 +1,9 @@
 import { Outlet } from 'react-router-dom';
 import Header from '../pages/Header';
+import LushHeader from '../components/lush/LushHeader';
 import Footer from '../pages/Footer';
 import FloatingActionStack from '../components/shared/floating-actions/FloatingActionStack';
+import { isLushTheme } from '../config/activeTheme';
 
 interface MainLayoutProps {
   currentPage: string;
@@ -18,7 +20,11 @@ interface MainLayoutProps {
  */
 const MainLayout = ({ currentPage, onNavigate }: MainLayoutProps) => (
   <div className="flex flex-col min-h-screen bg-gray-50">
-    <Header currentPage={currentPage} onNavigate={onNavigate} />
+    {isLushTheme ? (
+      <LushHeader currentPage={currentPage} onNavigate={onNavigate} />
+    ) : (
+      <Header currentPage={currentPage} onNavigate={onNavigate} />
+    )}
     <div className="flex-1 overflow-auto">
       <Outlet />
     </div>
