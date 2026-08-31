@@ -15,6 +15,7 @@ export interface Branding {
     tagline: string;
     legalName: string;
     foundedYear: number;
+    logoPath: string;
   };
   contact: {
     email: string;
@@ -53,6 +54,8 @@ export interface Branding {
   };
 }
 
+const logoPath = import.meta.env.VITE_LOGO_PATH || '/logo.png';
+
 const BRANDING: Branding = {
   company: {
     name: import.meta.env.VITE_COMPANY_NAME || 'Your Company',
@@ -60,6 +63,7 @@ const BRANDING: Branding = {
     tagline: import.meta.env.VITE_COMPANY_TAGLINE || 'Your Travel Partner',
     legalName: import.meta.env.VITE_COMPANY_LEGAL_NAME || 'Your Company',
     foundedYear: Number(import.meta.env.VITE_COMPANY_FOUNDED_YEAR) || new Date().getFullYear(),
+    logoPath,
   },
   contact: {
     email: import.meta.env.VITE_COMPANY_EMAIL || 'info@example.com',
@@ -94,7 +98,7 @@ const BRANDING: Branding = {
     email: import.meta.env.VITE_COMPANY_EMAIL || 'info@example.com',
     phone: import.meta.env.VITE_COMPANY_PHONE || '+1-800-000-0000',
     website: import.meta.env.VITE_COMPANY_WEBSITE || 'https://www.example.com',
-    logoPath: '/logo.png',
+    logoPath,
   },
 };
 

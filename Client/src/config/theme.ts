@@ -1,13 +1,24 @@
 /**
  * Brand theme helpers.
  *
- * PALETTE mirrors brandPalette.json (which tailwind.config.js also reads).
- * A new company re-themes by editing src/config/brandPalette.json; these
- * helpers expose the same values to JS (PDF generation) and CSS variables.
+ * PALETTE mirrors palettes/<theme>.json (which tailwind.config.js also
+ * reads, independently, for its own Node/CJS load context). A new company
+ * re-themes by editing src/config/palettes/generic.json; these helpers
+ * expose the same values to JS (PDF generation) and CSS variables.
  */
-import PALETTE from './brandPalette.json';
+import generic from './palettes/generic.json';
+import lush from './palettes/lush.json';
+import { isLushTheme } from './activeTheme';
 
-export { PALETTE };
+interface PaletteShades {
+  brand: Record<string, string>;
+  brandAccent: Record<string, string>;
+  brandDark: Record<string, string>;
+  neutral?: Record<string, string>;
+  fonts: { display: string; body: string };
+}
+
+export const PALETTE: PaletteShades = isLushTheme ? lush : generic;
 
 export const hexToRgb = (hex: string): [number, number, number] => {
   const cleaned = String(hex || '').replace(/^#/, '');
@@ -32,4 +43,9 @@ export const applyCssVariables = (): void => {
   setShade('brand', PALETTE.brand);
   setShade('brand-accent', PALETTE.brandAccent);
   setShade('brand-dark', PALETTE.brandDark);
+  if (PALETTE.neutral) {
+    setShade('neutral', PALETTE.neutral);
+  }
+  root.style.setProperty('--font-display', PALETTE.fonts.display);
+  root.style.setProperty('--font-body', PALETTE.fonts.body);
 };

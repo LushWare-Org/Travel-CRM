@@ -1,27 +1,18 @@
-// Media asset manifest for hero and review videos.
-// A new deployment replaces the files under Client/public/ and edits this manifest.
+// Theme-driven media manifest selector. Generic keeps its video hero
+// carousel; Lush swaps in curated photography. See media.generic.ts /
+// media.lush.ts for the per-theme manifests.
+import { isLushTheme } from './activeTheme';
+import * as generic from './media.generic';
+import * as lush from './media.lush';
 
-export const HERO_VIDEOS = [
-  { id: 'v3', video: '/v3.mp4', poster: '/v3-poster.webp' },
-  { id: 'v4', video: '/v4.mp4', poster: '/v4-poster.webp' },
-];
+export type HeroMediaItem =
+  | { id: string; kind: 'video'; video: string; poster: string }
+  | { id: string; kind: 'image'; src: string };
 
-export const REVIEW_VIDEOS = [
-  { name: 'Bali Tour', location: 'Bali', file: '/reviews/bali.mp4' },
-  { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives7.mp4' },
-  { name: 'Thailand Tour', location: 'Thailand', file: '/reviews/thailand2.mp4' },
-  { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives3.mp4' },
-  { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives2.mp4' },
-  { name: 'Dubai Tour', location: 'Dubai', file: '/reviews/dubai.mp4' },
-  { name: 'Machachafushi Tour', location: 'Machachafushi', file: '/reviews/machachafushi.mp4' },
-  { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives1.mp4' },
-  { name: 'Thailand Tour', location: 'Thailand', file: '/reviews/thailand.mp4' },
-  { name: 'Mauritius Tour', location: 'Mauritius', file: '/reviews/mauritius.mp4' },
-  { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives4.mp4' },
-  { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives6.mp4' },
-  { name: 'Maldives Tour', location: 'Maldives', file: '/reviews/maldives5.mp4' },
-];
+const active = isLushTheme ? lush : generic;
 
-// Shared placeholder shown when a package/destination has no real image.
-// A new deployment replaces this with a branded placeholder asset.
-export const FALLBACK_IMAGE = 'https://via.placeholder.com/1200x800?text=Trip+Sky+Way';
+export const HERO_MEDIA: HeroMediaItem[] = active.HERO_MEDIA;
+export const FALLBACK_IMAGE: string = active.FALLBACK_IMAGE;
+// Only ever consumed by the generic-only ReviewsVideoSlider, so it never
+// needs a Lush variant.
+export const REVIEW_VIDEOS = generic.REVIEW_VIDEOS;

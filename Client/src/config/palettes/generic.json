@@ -11,5 +11,6 @@
   },
   "brandDark": {
     "800": "#003566", "900": "#001d3d", "950": "#000814"
-  }
+  },
+  "fonts": { "display": "Poppins", "body": "Open Sans" }
 }
