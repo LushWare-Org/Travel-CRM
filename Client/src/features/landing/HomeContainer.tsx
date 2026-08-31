@@ -14,6 +14,11 @@ import type { NormalizedPackage, AggregatedDestination } from '../../services/ap
 import { fetchRecentBookings } from '../../services/api/booking';
 import { HERO_SLIDES } from '../../content/home';
 import { MONTHS } from './utils/constants';
+import { HERO_MEDIA } from '../../config/media';
+import HeroBackground from '../../components/shared/HeroBackground';
+import { isLushTheme } from '../../config/activeTheme';
+import SustainabilityStrip from './components/SustainabilityStrip';
+import AIPlanningExplainer from './components/AIPlanningExplainer';
 import {
   InlineMapPin,
   InlineCalendar,
@@ -287,256 +292,202 @@ export default function HomeContainer() {
     );
   }
 
-  return (
-    <div className="min-h-screen with-fixed-header font-opensans">
-      {/* HERO SECTION */}
-      <div className="relative h-[80vh] lg:h-[80vh] bg-black">
-        <div className="absolute bottom-0 left-0 right-0 z-elevated bg-black/90 backdrop-blur-sm border-t border-white/10 overflow-hidden">
-          <style>{`
-            @keyframes scroll-left {
-              0% {
-                transform: translateX(0);
-              }
-              100% {
-                transform: translateX(-100%);
-              }
-            }
-            .animate-scroll-continuous {
-              animation: scroll-left 20s linear infinite;
-            }
-            .animate-scroll-continuous:hover {
-              animation-play-state: paused;
-            }
-            @media (min-width: 768px) and (max-width: 1024px) {
-              .relative.h-\\[80vh\\] {
-                height: 65vh;
-              }
-              button[aria-label="Previous"],
-              button[aria-label="Next"] {
-                display: none !important;
-              }
-              .relative.mt-16 {
-                margin-top: 2rem;
-              }
-            }
-          `}</style>
-          {/* <div className="flex animate-scroll-continuous whitespace-nowrap py-5"> */}
-          {/* Tags */}
-          {/* <div className="flex items-center">
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Globe className="w-5 h-5 text-brand-400 flex-shrink-0" /> Explore 100+ Destinations
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Zap className="w-5 h-5 text-brand-400 flex-shrink-0" /> Exclusive Deals Up to 40% Off
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Target className="w-5 h-5 text-brand-400 flex-shrink-0" /> Personalized Itineraries
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Crown className="w-5 h-5 text-brand-400 flex-shrink-0" /> Premium Travel Experiences
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Award className="w-5 h-5 text-brand-400 flex-shrink-0" /> Award-Winning Service
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Headphones className="w-5 h-5 text-brand-400 flex-shrink-0" /> 24/7 Customer Support
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Gift className="w-5 h-5 text-brand-400 flex-shrink-0" /> Special Group Discounts
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Plane className="w-5 h-5 text-brand-400 flex-shrink-0" /> Hassle-Free Bookings
-              </span>
-            </div>
-            <div className="flex items-center">
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Globe className="w-5 h-5 text-brand-400 flex-shrink-0" /> Explore 100+ Destinations
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Zap className="w-5 h-5 text-brand-400 flex-shrink-0" /> Exclusive Deals Up to 40% Off
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Target className="w-5 h-5 text-brand-400 flex-shrink-0" /> Personalized Itineraries
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Crown className="w-5 h-5 text-brand-400 flex-shrink-0" /> Premium Travel Experiences
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Award className="w-5 h-5 text-brand-400 flex-shrink-0" /> Award-Winning Service
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Headphones className="w-5 h-5 text-brand-400 flex-shrink-0" /> 24/7 Customer Support
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Gift className="w-5 h-5 text-brand-400 flex-shrink-0" /> Special Group Discounts
-              </span>
-              <span className="inline-flex items-center px-6 text-white/90 font-medium text-md gap-2">
-                <Plane className="w-5 h-5 text-brand-400 flex-shrink-0" /> Hassle-Free Bookings
-              </span>
-            </div> */}
-          {/* </div> */}
+  const heroTitle = HERO_SLIDES[currentSlide % 4].title;
+  const heroSubtitle = HERO_SLIDES[currentSlide % 4].subtitle;
+  const heroWords = heroTitle.split(' ');
+  const heroLastWord = heroWords.pop();
+  const heroHeadline = (
+    <>
+      {heroWords.join(' ')}{' '}
+      <span className="bg-gradient-to-r from-brand-accent-400 to-brand-400 bg-clip-text text-transparent">{heroLastWord}</span>
+    </>
+  );
+
+  const searchControls = (
+    <>
+      <div className="lg:col-span-5 relative group">
+        <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
+          <InlineMapPin /> Where to?
+        </label>
+        <div className="relative">
+          <select
+            value={searchFilters.destination}
+            onChange={(e) => setSearchFilters(p => ({ ...p, destination: e.target.value }))}
+            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium text-sm sm:text-base appearance-none cursor-pointer transition-all focus:border-brand-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
+          >
+            <option value="" disabled hidden>{destinationPlaceholder || 'Select Destination'}</option>
+            <optgroup label="🌏 Destinations">
+              {destinations.slice(0, 30).map((d) => (
+                <option key={d.id} value={d.name.toLowerCase()}>
+                  {d.name} {d.packagesCount ? `(${d.packagesCount} packages)` : ''}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+            <svg className="w-5 h-5 text-brand-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </div>
-        {/* Video Slides */}
-        {[0, 1, 2, 3].map((i) => {
-          const isActive = i === currentSlide;
+      </div>
 
-          return (
-            <div
-              key={`video-${i}`}
-              className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-raised' : 'opacity-0 z-base'
-                }`}
-            >
-              <img
-                src={`/v${i + 1}-poster.webp`}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
-                loading={i === 0 ? 'eager' : 'lazy'}
-                decoding={i === 0 ? 'auto' : 'async'}
+      <div className="lg:col-span-4 relative group" ref={monthDropdownRef}>
+        <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
+          <InlineCalendar /> When?
+        </label>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
+            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-left text-gray-900 font-medium text-sm sm:text-base flex items-center justify-between transition-all focus:border-brand-500 focus:bg-white hover:border-gray-300"
+          >
+            <span>
+              {searchFilters.when
+                ? MONTHS.find(m => m.value === searchFilters.when)?.label || 'Any Month'
+                : whenPlaceholder || 'Any Month'}
+            </span>
+            <svg className={`w-5 h-5 text-brand-800 transition-transform ${monthDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Month */}
+          {monthDropdownOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-dropdown"
+                onClick={() => setMonthDropdownOpen(false)}
               />
+              {/* Dropdown */}
+              <div className="absolute z-dropdown mt-2 w-full sm:w-96 left-0 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto">
+                <div className="p-4 grid grid-cols-3 gap-3">
+                  {MONTHS.map((month) => (
+                    <button
+                      key={month.value}
+                      onClick={() => {
+                        setSearchFilters(p => ({ ...p, when: month.value }));
+                        setMonthDropdownOpen(false);
+                      }}
+                      className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${searchFilters.when === month.value
+                          ? 'bg-gradient-to-r from-brand-500 to-red-500 text-white shadow-lg'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                        }`}
+                    >
+                      {month.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
-              {/* Video loads */}
-              {isActive && (
-                <video
-                  className="absolute inset-0 w-full h-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="none"
-                >
-                  <source src={`/v${i + 1}.mp4`} type="video/mp4" />
-                </video>
-              )}
+      {/* Search button */}
+      <div className="lg:col-span-3">
+        <button
+          onClick={handleSearch}
+          className="w-full group relative overflow-hidden px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-brand-accent-400 to-brand-500 text-black rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+        >
+          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+          <span className="relative flex items-center justify-center space-x-2">
+            <InlineSearch />
+            <span>Search</span>
+          </span>
+        </button>
+      </div>
+    </>
+  );
 
-              <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
-              <div className="absolute inset-0 bg-black/20" />
-            </div>
-          );
-        })}
+  return (
+    <div className="min-h-screen font-body">
+      {/* HERO SECTION */}
+      <div className="relative z-base h-[80vh] lg:h-[80vh] bg-brand-dark-950">
+        <style>{`
+          @media (min-width: 768px) and (max-width: 1024px) {
+            .relative.h-\\[80vh\\] {
+              height: 65vh;
+            }
+            button[aria-label="Previous"],
+            button[aria-label="Next"] {
+              display: none !important;
+            }
+            .relative.mt-16 {
+              margin-top: 2rem;
+            }
+          }
+        `}</style>
+        {/* Media Slides — clipped to the hero's own box via a dedicated
+            overflow-hidden wrapper (not the hero root itself), so the Ken
+            Burns zoom stays contained without also clipping popups (e.g. the
+            "When?" dropdown below) anchored to the hero's edge. */}
+        <div className="absolute inset-0 overflow-hidden z-base">
+          {[0, 1, 2, 3].map((i) => {
+            const isActive = i === currentSlide;
+            const item = HERO_MEDIA.find((m) => m.id === `v${i + 1}`);
 
-        <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
+            return (
+              <div
+                key={`media-${i}`}
+                className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-raised' : 'opacity-0 z-base'
+                  }`}
+              >
+                {item && <HeroBackground item={item} isActive={isActive} eager={i === 0} />}
+
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
+                <div className="absolute inset-0 bg-black/20" />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Lush's headline is bottom-anchored and left-aligned (unlike generic's
+            centered block), so it can grow upward into a vertically-centered
+            arrow's band on longer slides — anchor Lush's arrows in the gap
+            between the search bar top (137px) and the headline block's
+            bottom edge (pushed to bottom-64/256px below, from bottom-44's
+            176px, to make that gap wide enough for the arrow). */}
+        <button onClick={goToPrevSlide} className={`absolute left-4 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex ${isLushTheme ? 'bottom-40' : 'top-1/2 -translate-y-1/2'}`} aria-label="Previous">
           <InlineChevronLeft />
         </button>
-        <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Next">
+        <button onClick={goToNextSlide} className={`absolute right-4 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex ${isLushTheme ? 'bottom-40' : 'top-1/2 -translate-y-1/2'}`} aria-label="Next">
           <InlineChevronRight />
         </button>
 
         {/* Hero Content */}
-        <div className="relative z-lifted h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">
-          <div className="max-w-7xl text-center mx-auto">
-            <div className="max-w-4xl">
-              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-poppins">
-                {(() => {
-                  const { title } = HERO_SLIDES[currentSlide % 4];
-                  const words = title.split(' ');
-                  const last = words.pop();
-                  return (
-                    <>
-                      {words.join(' ')}{' '}
-                      <span className="bg-gradient-to-r from-brand-accent-400 to-brand-400 bg-clip-text text-transparent">{last}</span>
-                    </>
-                  );
-                })()}
+        {isLushTheme ? (
+          <>
+            <div className="absolute bottom-64 left-0 max-w-2xl px-6 md:px-16 z-lifted">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
+                {heroHeadline}
               </h1>
-              <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{HERO_SLIDES[currentSlide % 4].subtitle}</p>
+              <p className="text-lg sm:text-xl md:text-xl text-gray-200 leading-relaxed">{heroSubtitle}</p>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 w-full bg-brand-dark-950/70 backdrop-blur-md border-t border-white/10 z-lifted">
+              <div className="max-w-7xl mx-auto pl-6 pr-20 md:pl-16 md:pr-24 2xl:px-16 py-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+                  {searchControls}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="relative z-lifted h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">
+            <div className="max-w-7xl text-center mx-auto">
+              <div className="max-w-4xl">
+                <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-display">
+                  {heroHeadline}
+                </h1>
+                <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{heroSubtitle}</p>
 
-              {/* Search bar */}
-              <div className="relative mt-16 md:mt-15 lg:mt-15">
-                <div className="bg-white/99 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 overflow-visible">
-                  <div className="h-1 bg-gradient-to-r from-brand-accent-400 via-brand-500 to-red-500 animate-gradient-x" />
-                  <div className="p-4 sm:p-5 overflow-visible">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-                      <div className="lg:col-span-5 relative group">
-                        <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
-                          <InlineMapPin /> Where to?
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={searchFilters.destination}
-                            onChange={(e) => setSearchFilters(p => ({ ...p, destination: e.target.value }))}
-                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium text-sm sm:text-base appearance-none cursor-pointer transition-all focus:border-brand-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
-                          >
-                            <option value="" disabled hidden>{destinationPlaceholder || 'Select Destination'}</option>
-                            <optgroup label="🌏 Destinations">
-                              {destinations.slice(0, 30).map((d) => (
-                                <option key={d.id} value={d.name.toLowerCase()}>
-                                  {d.name} {d.packagesCount ? `(${d.packagesCount} packages)` : ''}
-                                </option>
-                              ))}
-                            </optgroup>
-                          </select>
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <svg className="w-5 h-5 text-brand-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="lg:col-span-4 relative group" ref={monthDropdownRef}>
-                        <label className="flex items-center text-sm sm:text-base font-semibold text-white mb-3">
-                          <InlineCalendar /> When?
-                        </label>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
-                            className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-left text-gray-900 font-medium text-sm sm:text-base flex items-center justify-between transition-all focus:border-brand-500 focus:bg-white hover:border-gray-300"
-                          >
-                            <span>
-                              {searchFilters.when
-                                ? MONTHS.find(m => m.value === searchFilters.when)?.label || 'Any Month'
-                                : whenPlaceholder || 'Any Month'}
-                            </span>
-                            <svg className={`w-5 h-5 text-brand-800 transition-transform ${monthDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-
-                          {/* Month */}
-                          {monthDropdownOpen && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-dropdown"
-                                onClick={() => setMonthDropdownOpen(false)}
-                              />
-                              {/* Dropdown */}
-                              <div className="fixed z-dropdown mt-2 w-screen left-1/2 -translate-x-1/2 md:w-96 md:absolute md:left-0 md:translate-x-0 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto">
-                                <div className="p-4 grid grid-cols-3 gap-3">
-                                  {MONTHS.map((month) => (
-                                    <button
-                                      key={month.value}
-                                      onClick={() => {
-                                        setSearchFilters(p => ({ ...p, when: month.value }));
-                                        setMonthDropdownOpen(false);
-                                      }}
-                                      className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${searchFilters.when === month.value
-                                          ? 'bg-gradient-to-r from-brand-500 to-red-500 text-white shadow-lg'
-                                          : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
-                                        }`}
-                                    >
-                                      {month.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Search button */}
-                      <div className="lg:col-span-3">
-                        <button
-                          onClick={handleSearch}
-                          className="w-full group relative overflow-hidden px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-brand-accent-400 to-brand-500 text-black rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
-                        >
-                          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-                          <span className="relative flex items-center justify-center space-x-2">
-                            <InlineSearch />
-                            <span>Search</span>
-                          </span>
-                        </button>
+                {/* Search bar */}
+                <div className="relative mt-16 md:mt-15 lg:mt-15">
+                  <div className="bg-white/99 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 overflow-visible">
+                    <div className="h-1 bg-gradient-to-r from-brand-accent-400 via-brand-500 to-red-500 animate-gradient-x" />
+                    <div className="p-4 sm:p-5 overflow-visible">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+                        {searchControls}
                       </div>
                     </div>
                   </div>
@@ -544,17 +495,18 @@ export default function HomeContainer() {
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       <Stats />
+      {isLushTheme && <SustainabilityStrip />}
       <AboutSection />
 
       {/* Deals of the Month */}
-      {/* <section className="py-16 bg-white relative overflow-hidden font-opensans">
+      {/* <section className="py-16 bg-white relative overflow-hidden font-body">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-poppins">Deals of the Month</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-display">Deals of the Month</h2>
             <p className="text-lg text-gray-600">Exclusive offers you won't find anywhere else</p>
           </div>
           <DealSlider deals={dealItems} />
@@ -564,20 +516,21 @@ export default function HomeContainer() {
       <RecentlyBookedSlider items={recentItems} />
       <DestinationsSection />
       <WhyChooseUs />
+      {isLushTheme && <AIPlanningExplainer />}
       <FeaturedPackages packages={packages} />
       <TestimonialsSection />
       <FAQSection />
       <KeyPartnersSection />
 
       {/* CTA */}
-      <section className="py-12 bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-950 relative overflow-hidden font-opensans">
+      <section className={`py-12 relative overflow-hidden font-body ${isLushTheme ? 'bg-gradient-to-br from-brand-dark-950 via-brand-dark-900 to-brand-800' : 'bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-950'}`}>
         <div className="absolute inset-0">
           <div className="absolute top-0 left-1/4 w-96 h-50 bg-blue-500/5 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-92 bg-purple-500/5 rounded-full blur-3xl"></div>
         </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
           <div className="text-center mb-6">
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight font-poppins">
+            <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight font-display">
               Ready to Explore<br className="hidden md:block" /> the World?
             </h2>
             <p className="text-lg text-gray-300 max-w-3xl mx-auto leading-snug mb-6">

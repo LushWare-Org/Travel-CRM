@@ -110,68 +110,14 @@ export default function RecommendedPackagesSection() {
   };
 
   return (
-    <section className="stats-section py-10 bg-white">
+    <section className="stats-section py-section-sm bg-white">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-12 items-start">
-          {/* <div className="lg:col-span-4 space-y-8 lg:ml-9">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-12 font-poppins leading-tight">
-              Excellence in
-              <span className="block mt-2 bg-gradient-to-r from-brand-600 to-red-600 bg-clip-text text-transparent">
-                Every Journey
-              </span>
-            </h2>
-
-            <div className="space-y-8">
-              {[0, 1, 2].map((offset) => {
-                const displayIndex = currentStatIndex + offset;
-                return (
-                  <div key={offset} className="h-[70px] flex items-center group">
-                    <div className="flex items-start gap-6 w-full p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-gray-200 hover:shadow-lg transition-all duration-300 hover:border-brand-300">
-                      <div className="flex items-center gap-0">
-                        <div className="relative h-12 overflow-hidden inline-block">
-                          <div
-                            className="transition-transform duration-1000 ease-in-out"
-                            style={{
-                              transform: `translateY(-${displayIndex * 3}rem)`,
-                            }}
-                          >
-                            {allStatsExtended.map((stat, index) => (
-                              <div key={index} className="h-12 flex items-center">
-                                <span className="text-4xl font-bold bg-gradient-to-r from-brand-600 to-red-600 bg-clip-text text-transparent leading-none">
-                                  {stat.value.toLocaleString()}{stat.suffix}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="relative h-12 overflow-hidden flex-1">
-                        <div
-                          className="transition-transform duration-1000 ease-in-out"
-                          style={{
-                            transform: `translateY(-${displayIndex * 3}rem)`,
-                          }}
-                        >
-                          {allStatsExtended.map((stat, index) => (
-                            <div key={index} className="h-12 flex items-center">
-                              <p className="text-lg font-semibold text-gray-700">{stat.label}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div> */}
-
           {/* Right Side */}
           <div className="lg:col-span-8 relative">
             <div className="mb-6">
               <div className="mb-12 text-center">
-                <h2 className="text-4xl font-bold text-gray-900 font-poppins mb-4">
+                <h2 className="text-4xl font-bold text-gray-900 font-display mb-4">
                   Discover Your Perfect Holiday
                 </h2>
                 <p className="text-lg text-gray-600 md-2">From relaxing escapes to thrilling adventures - find your ideal trip here.</p>

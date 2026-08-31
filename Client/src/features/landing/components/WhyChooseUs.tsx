@@ -1,35 +1,18 @@
 import { useState } from 'react';
 import { Check, Play, X } from 'lucide-react';
-import { REVIEW_VIDEOS } from '../../../config/media';
-
-const whyTravelWithUs = [
-  {
-    title: 'Personalized Itineraries',
-    description: 'Every journey is uniquely crafted to match your dreams and preferences',
-    video: REVIEW_VIDEOS[0],
-  },
-  {
-    title: 'Expert Local Guides',
-    description: 'Connect with authentic experiences through our expert local guides',
-    video: REVIEW_VIDEOS[1],
-  },
-  {
-    title: 'Best Price Guarantee',
-    description: 'Transparent pricing with no hidden fees, your trust matters to us',
-    video: REVIEW_VIDEOS[2],
-  },
-];
+import { WHY_CHOOSE_US_ITEMS, type WhyChooseUsItem } from '../../../content/whyChooseUs';
+import { isLushTheme } from '../../../config/activeTheme';
 
 export default function WhyChooseUs() {
-  const [selectedVideo, setSelectedVideo] = useState<(typeof REVIEW_VIDEOS)[number] | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<Extract<WhyChooseUsItem['media'], { kind: 'video' }> | null>(null);
 
   return (
-    <section className="py-12 bg-brand-dark-900 relative overflow-hidden font-opensans">
+    <section className="py-12 bg-brand-dark-900 relative overflow-hidden font-body">
       <div className="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Title Section */}
-        <div className="text-center mb-20">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 font-poppins">
+        <div className={`text-center ${isLushTheme ? 'mb-12' : 'mb-20'}`}>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 font-display">
             Why Travel With Us?
           </h2>
           <p className="text-lg text-white">
@@ -39,35 +22,48 @@ export default function WhyChooseUs() {
 
         {/* Alternating Pattern Section */}
         <div className="space-y-12">
-          {whyTravelWithUs.map((item, index) => (
+          {WHY_CHOOSE_US_ITEMS.map((item, index) => (
             <div
               key={index}
               className={`grid grid-cols-1 md:grid-cols-2 gap-6 items-center ${
                 index % 2 === 1 ? 'md:flex-row-reverse' : ''
               }`}
             >
-              {/* Video - Left/Right */}
+              {/* Media - Left/Right */}
               <div className={index % 2 === 1 ? 'md:order-2' : 'md:order-1'}>
                 <div className="relative overflow-hidden rounded-xl aspect-[16/9] bg-gray-700 hover:shadow-xl transition-all duration-300 group cursor-pointer max-w-sm">
-                  <video
-                    src={item.video.file}
-                    className="w-full h-full object-cover"
-                    muted
-                    loop
-                    playsInline
-                    controlsList="nodownload"
-                    style={{ pointerEvents: 'none' }}
-                  />
-                  <div className="absolute inset-0 bg-black/20 transition-all duration-300"></div>
-                  {/* Play Icon */}
-                  <button
-                    onClick={() => setSelectedVideo(item.video)}
-                    className="absolute inset-0 flex items-center justify-center z-raised"
-                  >
-                    <div className="w-14 h-14 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/50 transition-all duration-300">
-                      <Play className="w-6 h-6 text-white fill-white" />
-                    </div>
-                  </button>
+                  {(() => {
+                    const media = item.media;
+                    return media.kind === 'video' ? (
+                      <>
+                        <video
+                          src={media.file}
+                          className="w-full h-full object-cover"
+                          muted
+                          loop
+                          playsInline
+                          controlsList="nodownload"
+                          style={{ pointerEvents: 'none' }}
+                        />
+                        <div className="absolute inset-0 bg-black/20 transition-all duration-300"></div>
+                        {/* Play Icon */}
+                        <button
+                          onClick={() => setSelectedVideo(media)}
+                          className="absolute inset-0 flex items-center justify-center z-raised"
+                        >
+                          <div className="w-14 h-14 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center group-hover:bg-white/50 transition-all duration-300">
+                            <Play className="w-6 h-6 text-white fill-white" />
+                          </div>
+                        </button>
+                      </>
+                    ) : (
+                      <img
+                        src={media.src}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -79,7 +75,7 @@ export default function WhyChooseUs() {
                       <Check className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex flex-col">
-                      <h3 className="text-xl font-bold text-white mb-2 font-poppins text-left">
+                      <h3 className="text-xl font-bold text-white mb-2 font-display text-left">
                         {item.title}
                       </h3>
                       <p className="text-gray-300 text-sm text-left leading-relaxed">

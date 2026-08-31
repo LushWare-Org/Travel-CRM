@@ -13,13 +13,15 @@ describe('KeyPartnersSection', () => {
     vi.useRealTimers();
   });
 
-  it('renders the section title and partner names', () => {
+  it('renders the section title and partner logos', () => {
     render(<KeyPartnersSection />);
 
     expect(
       screen.getByRole('heading', { name: /Our Trusted Travel Partners/ })
     ).toBeInTheDocument();
-    // Partners are duplicated 4x for the seamless marquee loop.
-    expect(screen.getAllByText('Booking.com').length).toBe(4);
+    // Partners are duplicated 4x for the seamless marquee loop; the flat
+    // trust-strip design renders each partner as a logo image (no visible
+    // name text), so partners are identified by alt text.
+    expect(screen.getAllByAltText('Booking.com').length).toBe(4);
   });
 });
