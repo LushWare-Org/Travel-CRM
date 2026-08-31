@@ -213,7 +213,7 @@ export default function PackagesContainer() {
           onViewModeChange={setViewMode}
         />
         {showFilters && (
-          <div className="block 2xl:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-overlay" onClick={() => setShowFilters(false)} />
+          <div className="block 2xl:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-elevated" onClick={() => setShowFilters(false)} />
         )}
 
         <div className="flex flex-col md:flex-row gap-4 md:gap-8 relative">

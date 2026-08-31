@@ -1,5 +1,6 @@
 import { SlidersHorizontal, X, Grid, List } from 'lucide-react';
 import type { SortOption, ViewMode } from '../DestinationsContainer';
+import StickyToolbar from '../../../components/shared/StickyToolbar';
 
 interface ToolbarProps {
   showFilters: boolean;
@@ -25,7 +26,7 @@ export default function Toolbar({
   destinationCount,
 }: ToolbarProps) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-3 md:p-4 mb-4 md:mb-6 sticky top-16 z-header">
+    <StickyToolbar>
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
         <div className="flex items-center space-x-2 md:space-x-4 w-full md:w-auto">
           <button
@@ -84,6 +85,6 @@ export default function Toolbar({
           <div className="text-gray-600 font-medium text-sm md:text-base whitespace-nowrap">{destinationCount} destinations</div>
         </div>
       </div>
-    </div>
+    </StickyToolbar>
   );
 }

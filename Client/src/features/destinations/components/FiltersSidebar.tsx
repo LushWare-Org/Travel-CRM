@@ -1,5 +1,6 @@
 import { Search, Filter, X, Globe, ChevronRight, IndianRupee, Star } from 'lucide-react';
 import { getCurrencySymbol } from '../../../lib/currency';
+import FilterPanelShell from '../../../components/shared/FilterPanelShell';
 
 export interface PriceRange {
   label: string;
@@ -52,8 +53,8 @@ export default function FiltersSidebar({
   onClose,
 }: FiltersSidebarProps) {
   return (
-    <div className="w-72 fixed top-0 left-0 max-h-screen z-modal md:w-96 md:flex-shrink-0 md:fixed md:top-0 md:left-0 md:bottom-0 md:right-auto md:h-screen md:rounded-none 2xl:static 2xl:w-72 2xl:h-auto 2xl:inset-auto 2xl:rounded-2xl">
-      <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-screen md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-32 2xl:rounded-2xl 2xl:h-auto overflow-y-auto">
+    <FilterPanelShell>
+      <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-[calc(100vh-70px)] md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-32 2xl:rounded-2xl 2xl:h-auto overflow-y-auto">
         <div className="flex items-center justify-between mb-6 2xl:mb-6">
           <h3 className="text-xl font-bold flex items-center gap-2">
             <Filter className="w-5 h-5 text-brand-600" />
@@ -181,6 +182,6 @@ export default function FiltersSidebar({
           </div>
         </div>
       </div>
-    </div>
+    </FilterPanelShell>
   );
 }

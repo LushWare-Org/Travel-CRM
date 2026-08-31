@@ -1142,7 +1142,7 @@ export default function PackageDetailsContainer() {
 
       {/* Review Success */}
       {showReviewSuccess && (
-        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-modal animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
+        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-overlay animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 lg:gap-4">
             <div className="flex-shrink-0">
               <div className="flex items-center justify-center h-10 w-10 lg:h-12 lg:w-12 rounded-full bg-white/20 backdrop-blur-sm">

@@ -25,7 +25,17 @@ const MainLayout = ({ currentPage, onNavigate }: MainLayoutProps) => (
     ) : (
       <Header currentPage={currentPage} onNavigate={onNavigate} />
     )}
-    <div className="flex-1 overflow-auto">
+    {/* No overflow-auto here: this div's parent is min-h-screen (grows with
+        content, not a fixed height), so overflow-auto never actually shows
+        its own scrollbar — the window scrolls instead. But per spec, any
+        `overflow` other than visible still makes this the containing block
+        for `position: sticky` descendants, which silently breaks every
+        sticky element inside <Outlet/> (page toolbars, filter sidebars,
+        booking summary panels) since they end up stuck relative to this
+        div's (never-moving) internal scroll instead of the real window
+        scroll. Plain flow lets sticky descendants track the window like the
+        header (a sibling here, not nested inside this div) already does. */}
+    <div className="flex-1">
       <Outlet />
     </div>
     <Footer onNavigate={onNavigate} />
