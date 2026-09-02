@@ -2,7 +2,6 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Shield, Globe } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import logo from '/logo.png';
 import BRANDING from '../../config/branding';
 
 interface LoginFormState {
@@ -79,7 +78,7 @@ export default function LoginContainer() {
           <div className="relative z-raised">
             {/* Logo */}
             <div className="flex items-center space-x-3 mb-16">
-              <img src={logo} alt={`${BRANDING.company.name} Logo`} className="w-54 h-54 object-contain drop-shadow-lg" />
+              <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="w-54 h-54 object-contain drop-shadow-lg" />
             </div>
             <div className="mb-16">
               <h1 className="text-3xl font-bold text-white mb-6 leading-tight">
