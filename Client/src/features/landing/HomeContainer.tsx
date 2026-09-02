@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import RecentlyBookedSlider from './components/RecentlyBookedSlider';
 import DestinationsSection from './components/DestinationsSection';
@@ -66,16 +67,34 @@ export default function HomeContainer() {
   const [whenPlaceholder, setWhenPlaceholder] = useState('');
   const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
   const monthDropdownRef = useRef<HTMLDivElement | null>(null);
+  const monthButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownPanelRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (monthDropdownRef.current && !monthDropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideTrigger = monthDropdownRef.current?.contains(target);
+      const insidePanel = dropdownPanelRef.current?.contains(target);
+      if (!insideTrigger && !insidePanel) {
         setMonthDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!monthDropdownOpen) return;
+    const updatePosition = () => {
+      const rect = monthButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    return () => window.removeEventListener('resize', updatePosition);
+  }, [monthDropdownOpen]);
 
   useEffect(() => {
     let destIndex = 0;
@@ -339,6 +358,7 @@ export default function HomeContainer() {
         <div className="relative">
           <button
             type="button"
+            ref={monthButtonRef}
             onClick={() => setMonthDropdownOpen(!monthDropdownOpen)}
             className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-left text-gray-900 font-medium text-sm sm:text-base flex items-center justify-between transition-all focus:border-brand-500 focus:bg-white hover:border-gray-300"
           >
@@ -353,33 +373,39 @@ export default function HomeContainer() {
           </button>
 
           {/* Month */}
-          {monthDropdownOpen && (
+          {monthDropdownOpen && dropdownPos && createPortal(
             <>
               <div
                 className="fixed inset-0 z-dropdown"
                 onClick={() => setMonthDropdownOpen(false)}
               />
-              {/* Dropdown */}
-              <div className="absolute z-dropdown mt-2 w-full sm:w-96 left-0 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto">
-                <div className="p-4 grid grid-cols-3 gap-3">
-                  {MONTHS.map((month) => (
-                    <button
-                      key={month.value}
-                      onClick={() => {
-                        setSearchFilters(p => ({ ...p, when: month.value }));
-                        setMonthDropdownOpen(false);
-                      }}
-                      className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${searchFilters.when === month.value
-                          ? 'bg-gradient-to-r from-brand-500 to-red-500 text-white shadow-lg'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
-                        }`}
-                    >
-                      {month.label}
-                    </button>
-                  ))}
+              <div
+                ref={dropdownPanelRef}
+                className="absolute z-dropdown"
+                style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+              >
+                <div className="mt-2 w-full sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto">
+                  <div className="p-4 grid grid-cols-3 gap-3">
+                    {MONTHS.map((month) => (
+                      <button
+                        key={month.value}
+                        onClick={() => {
+                          setSearchFilters(p => ({ ...p, when: month.value }));
+                          setMonthDropdownOpen(false);
+                        }}
+                        className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${searchFilters.when === month.value
+                            ? 'bg-gradient-to-r from-brand-500 to-red-500 text-white shadow-lg'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                          }`}
+                      >
+                        {month.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </>
+            </>,
+            document.body
           )}
         </div>
       </div>
