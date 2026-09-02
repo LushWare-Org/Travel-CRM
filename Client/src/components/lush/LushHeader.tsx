@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../../services/api/packages';
 import { useAuth } from '../../contexts/AuthContext';
@@ -171,7 +172,8 @@ export default function LushHeader({ onNavigate }: HeaderProps) {
   );
 
   return (
-    <header
+    <>
+      <header
       className={`sticky top-0 z-header transition-colors duration-300 font-body ${
         isScrolled ? 'bg-brand-dark-950/95 backdrop-blur-md shadow-lg' : 'bg-brand-dark-950'
       }`}
@@ -320,8 +322,13 @@ export default function LushHeader({ onNavigate }: HeaderProps) {
           </button>
         </div>
       </div>
+      </header>
 
-      {/* Single full-screen mobile menu — the only menu/hamburger on Lush. */}
+      {/* Single full-screen mobile menu — the only menu/hamburger on Lush,
+          portaled to document.body so it escapes the sticky header's own
+          stacking context (z-header) and always renders above siblings
+          like FloatingActionStack, regardless of their z-index. */}
+      {createPortal(
       <div
         className={`fixed inset-0 lg:hidden bg-brand-dark-950 z-modal flex flex-col transition-transform duration-300 ${
           mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
@@ -456,6 +463,9 @@ export default function LushHeader({ onNavigate }: HeaderProps) {
           </div>
         </div>
       </div>
-    </header>
+        ,
+        document.body,
+      )}
+    </>
   );
 }

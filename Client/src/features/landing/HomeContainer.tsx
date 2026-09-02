@@ -429,18 +429,15 @@ export default function HomeContainer() {
   return (
     <div className="min-h-screen font-body">
       {/* HERO SECTION */}
-      <div className="relative z-base h-[80vh] lg:h-[80vh] bg-brand-dark-950">
+      <div className={`relative z-base min-h-[80vh] lg:min-h-[80vh] bg-brand-dark-950 flex flex-col ${isLushTheme ? 'justify-end' : 'justify-start'}`}>
         <style>{`
           @media (min-width: 768px) and (max-width: 1024px) {
-            .relative.h-\\[80vh\\] {
-              height: 65vh;
+            .relative.min-h-\\[80vh\\] {
+              min-height: 65vh;
             }
             button[aria-label="Previous"],
             button[aria-label="Next"] {
               display: none !important;
-            }
-            .relative.mt-16 {
-              margin-top: 2rem;
             }
           }
         `}</style>
@@ -468,55 +465,52 @@ export default function HomeContainer() {
           })}
         </div>
 
-        {/* Lush's headline is bottom-anchored and left-aligned (unlike generic's
-            centered block), so it can grow upward into a vertically-centered
-            arrow's band on longer slides — anchor Lush's arrows in the gap
-            between the search bar top (137px) and the headline block's
-            bottom edge (pushed to bottom-64/256px below, from bottom-44's
-            176px, to make that gap wide enough for the arrow). */}
-        <button onClick={goToPrevSlide} className={`absolute left-4 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex ${isLushTheme ? 'bottom-40' : 'top-1/2 -translate-y-1/2'}`} aria-label="Previous">
+        <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
           <InlineChevronLeft />
         </button>
-        <button onClick={goToNextSlide} className={`absolute right-4 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex ${isLushTheme ? 'bottom-40' : 'top-1/2 -translate-y-1/2'}`} aria-label="Next">
+        <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Next">
           <InlineChevronRight />
         </button>
 
         {/* Hero Content */}
         {isLushTheme ? (
-          <>
-            <div className="absolute bottom-64 left-0 max-w-2xl px-6 md:px-16 z-lifted">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
-                {heroHeadline}
-              </h1>
-              <p className="text-lg sm:text-xl md:text-xl text-gray-200 leading-relaxed">{heroSubtitle}</p>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 w-full bg-brand-dark-950/70 backdrop-blur-md border-t border-white/10 z-lifted">
-              <div className="max-w-7xl mx-auto pl-6 pr-20 md:pl-16 md:pr-24 2xl:px-16 py-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-                  {searchControls}
-                </div>
-              </div>
-            </div>
-          </>
+          <div className="relative z-lifted max-w-2xl px-6 md:px-16 pb-12 md:pb-16">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
+              {heroHeadline}
+            </h1>
+            <p className="text-lg sm:text-xl md:text-xl text-gray-200 leading-relaxed">{heroSubtitle}</p>
+          </div>
         ) : (
-          <div className="relative z-lifted h-full flex flex-col items-center justify-start pt-28 md:pt-25 px-4">
+          <div className="relative z-lifted flex flex-col items-center pt-28 md:pt-25 px-4 pb-10 md:pb-12">
             <div className="max-w-7xl text-center mx-auto">
               <div className="max-w-4xl">
                 <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-display">
                   {heroHeadline}
                 </h1>
-                <p className="text-lg sm:text-xl md:text-xl text-gray-200 mb-6 sm:mb-7 md:mb-8 px-2 sm:px-0 leading-relaxed">{heroSubtitle}</p>
+                <p className="text-lg sm:text-xl md:text-xl text-gray-200 px-2 sm:px-0 leading-relaxed">{heroSubtitle}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
-                {/* Search bar */}
-                <div className="relative mt-16 md:mt-15 lg:mt-15">
-                  <div className="bg-white/99 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/20 overflow-visible">
-                    <div className="h-1 bg-gradient-to-r from-brand-accent-400 via-brand-500 to-red-500 animate-gradient-x" />
-                    <div className="p-4 sm:p-5 overflow-visible">
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-                        {searchControls}
-                      </div>
-                    </div>
-                  </div>
+      {/* SEARCH BAR — its own section directly below the hero image, never
+          overlapping it, so the hero stays fully uncovered at every viewport
+          height. */}
+      <div className={isLushTheme ? 'relative z-base bg-brand-dark-950 border-t border-white/10' : 'relative z-base bg-white py-8 md:py-10'}>
+        {isLushTheme ? (
+          <div className="max-w-7xl mx-auto pl-6 pr-20 md:pl-16 md:pr-24 2xl:px-16 py-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+              {searchControls}
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-gray-200 overflow-visible">
+              <div className="h-1 bg-gradient-to-r from-brand-accent-400 via-brand-500 to-red-500 animate-gradient-x" />
+              <div className="p-4 sm:p-5 overflow-visible">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+                  {searchControls}
                 </div>
               </div>
             </div>

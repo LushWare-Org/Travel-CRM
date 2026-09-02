@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../services/api/packages';
 import { useAuth } from '../contexts/AuthContext';
@@ -170,8 +171,9 @@ export default function Header({ onNavigate }: HeaderProps) {
   );
 
   return (
-    <header className="relative z-header overflow-visible transition-all duration-300 shadow-lg font-body bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
+    <>
+      <header className="relative z-header overflow-visible transition-all duration-300 shadow-lg font-body bg-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
           <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
             <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-10 w-auto" />
@@ -326,7 +328,15 @@ export default function Header({ onNavigate }: HeaderProps) {
             {mobileMenuOpen ? <LazyIcon name="X" size={20} className="w-5 h-5" /> : <LazyIcon name="Menu" size={20} className="w-5 h-5" />}
           </button>
         </div>
+      </div>
+      </header>
 
+      {/* Mobile menu, backdrop, and side menu — portaled to document.body so
+          they escape the header's own stacking context (z-header) and
+          always render above siblings like FloatingActionStack, regardless
+          of their z-index. */}
+      {createPortal(
+        <>
         {/* Mobile Menu */}
         <div
           className={`fixed lg:hidden top-0 right-0 h-screen w-3/4 bg-gray-950 border-l border-gray-800 shadow-2xl z-modal transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}
@@ -455,7 +465,9 @@ export default function Header({ onNavigate }: HeaderProps) {
             })}
           </nav>
         </div>
-      </div>
-    </header>
+        </>,
+        document.body,
+      )}
+    </>
   );
 }
