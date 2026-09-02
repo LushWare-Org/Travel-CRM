@@ -376,12 +376,12 @@ export default function HomeContainer() {
           {monthDropdownOpen && dropdownPos && createPortal(
             <>
               <div
-                className="fixed inset-0 z-dropdown"
+                className="fixed inset-0 z-prominent"
                 onClick={() => setMonthDropdownOpen(false)}
               />
               <div
                 ref={dropdownPanelRef}
-                className="absolute z-dropdown"
+                className="absolute z-prominent"
                 style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
               >
                 <div className="mt-2 w-full sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-80 overflow-y-auto">
