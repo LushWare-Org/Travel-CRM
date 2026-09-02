@@ -3,6 +3,7 @@ import { Clock, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
 import { pluralize } from '../../../lib/pluralize';
 import { FALLBACK_IMAGE } from '../../../config/media';
+import { isLushTheme } from '../../../config/activeTheme';
 import type { NormalizedPackage } from '../../../services/api/packages.transform';
 
 interface FeaturedPackagesProps {
@@ -19,10 +20,10 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
   const featuredPackages = latestPackages.length > 0 ? latestPackages : packages.slice(0, 3);
 
   return (
-    <section className="py-16 bg-gray-50 font-opensans">
+    <section className="py-section-md bg-gray-50 font-body">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-poppins">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-display">
            Featured Packages You’ll Love
           </h2>
           <p className="text-lg text-gray-600">
@@ -34,16 +35,18 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
             <p>No packages available yet. Please check back soon.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
+          <div className={isLushTheme ? "grid grid-cols-1 sm:grid-cols-3 gap-6" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch"}>
             {featuredPackages.map((pkg, idx) => (
               <Link
                 key={pkg.id}
                 to={`/package/${pkg.id}`}
-                className={`group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-brand-accent-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
+                className={isLushTheme
+                  ? "group bg-white overflow-hidden rounded-3xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 w-full"
+                  : `group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-brand-accent-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
                   featuredPackages.length === 3 && idx === 2 && 'md:col-span-2 lg:col-span-1 md:mx-auto'
                 } w-full md:max-w-sm lg:max-w-none`}
               >
-                <div className="relative overflow-hidden aspect-[4/3]">
+                <div className={`relative overflow-hidden ${isLushTheme ? 'aspect-[3/4]' : 'aspect-[4/3]'}`}>
                   <img
                     src={pkg.image_url || pkg.images?.[0] || FALLBACK_IMAGE}
                     alt={pkg.title}
@@ -78,7 +81,7 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   <div className="absolute inset-0 p-6 text-white flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                     <h4 className="text-lg font-bold mb-3 text-brand-accent-400">What's Included:</h4>
-                    <ul className="text-md space-y-2">
+                    <ul className="text-sm space-y-2">
                       {pkg.inclusions && pkg.inclusions.slice(0, 5).map((inclusion, idx) => (
                         <li key={idx} className="flex items-start">
                           <span className="text-brand-accent-400 mr-2">✓</span>
@@ -89,17 +92,17 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
                   </div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-brand-accent-600 transition-colors font-poppins">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4 group-hover:text-brand-accent-600 transition-colors font-display">
                     {pkg.name}
                   </h3>
                   <p className="text-gray-600 text-sm mb-6 line-clamp-2">{pkg.description}</p>
                   <div className="flex items-center justify-between pt-4 border-t-2 border-gray-200">
                    <div>
-                      <div className="text-2xl font-bold text-brand-600 font-poppins">
+                      <div className="text-2xl font-bold text-brand-600 font-display">
                         {formatCurrency(pkg.price_from)}
                     </div>
                     </div>
-                    <button className="px-6 py-2 bg-black text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-brand-accent-600 hover:to-brand-600 hover:shadow-lg transition-all duration-300 font-opensans">
+                    <button className={`px-6 py-2 ${isLushTheme ? 'bg-brand-800' : 'bg-black'} text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-brand-accent-600 hover:to-brand-600 hover:shadow-lg transition-all duration-300 font-body`}>
                       View Details
                     </button>
                   </div>

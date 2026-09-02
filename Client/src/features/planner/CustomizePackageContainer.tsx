@@ -310,8 +310,12 @@ export default function CustomizePackageContainer() {
           </div>
         </div>
 
-        {/* Step-by-Step Form - Full Width */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+        {/* Step-by-Step Form - Full Width. No overflow-hidden here — nothing
+            inside touches this card's edge (every nested block has its own
+            rounded corners within the form's own padding), and this card
+            hosts the Locations/Stops field's LocationSelector dropdown,
+            which would otherwise risk being clipped near the bottom edge. */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200">
           <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 lg:p-8">
                 {/* Progress Indicator */}
                 <div className="mb-8 sm:mb-10">

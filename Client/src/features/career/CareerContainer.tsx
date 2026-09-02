@@ -264,7 +264,7 @@ export default function CareerContainer() {
                 </div>
                 <div className="p-8 space-y-7">
                   <div>
-                    <ul className="space-y-3 text-gray-700">
+                    <ul className="space-y-3 text-sm text-gray-700">
                       {HIRING_PERKS.map((perk) => (
                         <li key={perk} className="flex items-start gap-3">
                           <span className="text-brand-600 mt-1">✓</span>

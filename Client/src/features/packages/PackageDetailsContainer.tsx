@@ -812,7 +812,7 @@ export default function PackageDetailsContainer() {
                     </div>
 
                     <div>
-                      <p className="text-base lg:text-lg text-gray-700 leading-relaxed">{pkg.description}</p>
+                      <p className="text-sm lg:text-base text-gray-700 leading-relaxed">{pkg.description}</p>
                     </div>
                     {pkg.highlights && pkg.highlights.length > 0 && (
                       <div>
@@ -856,7 +856,7 @@ export default function PackageDetailsContainer() {
                               </div>
                               <div className="flex-1 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 lg:p-8 border border-gray-200 hover:border-brand-accent-300 hover:shadow-xl transition-all itinerary-padding-sm">
                                 <h3 className="text-xl lg:text-2xl font-black text-gray-900 mb-2 lg:mb-3">{day.title}</h3>
-                                <p className="text-gray-700 leading-relaxed text-base lg:text-lg">{day.description}</p>
+                                <p className="text-gray-700 leading-relaxed text-sm lg:text-base">{day.description}</p>
                               </div>
                             </div>
                           </div>
@@ -1142,7 +1142,7 @@ export default function PackageDetailsContainer() {
 
       {/* Review Success */}
       {showReviewSuccess && (
-        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-modal animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
+        <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:right-6 z-overlay animate-in fade-in slide-in-from-bottom-5 duration-300 max-w-sm mx-auto">
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-2xl p-4 flex items-center gap-3 lg:gap-4">
             <div className="flex-shrink-0">
               <div className="flex items-center justify-center h-10 w-10 lg:h-12 lg:w-12 rounded-full bg-white/20 backdrop-blur-sm">

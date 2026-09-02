@@ -27,8 +27,6 @@ export interface HeaderProps {
 }
 
 export default function Header({ onNavigate }: HeaderProps) {
-  const [scrollY, setScrollY] = useState(0);
-  const isScrolled = scrollY > 50;
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState<string | null>(null);
   const [internationalMenu, setInternationalMenu] = useState<DestinationMenuItem[]>([]);
@@ -44,23 +42,6 @@ export default function Header({ onNavigate }: HeaderProps) {
   const [destinationsLoaded, setDestinationsLoaded] = useState(false);
   const destinationsLoadRef = useRef<Promise<void> | null>(null);
   const dropdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    let rafId: number | null = null;
-    const handleScroll = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        setScrollY(window.scrollY);
-        rafId = null;
-      });
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -189,11 +170,11 @@ export default function Header({ onNavigate }: HeaderProps) {
   );
 
   return (
-    <header className={`relative z-header overflow-visible transition-all duration-300 bg-black shadow-lg font-opensans ${isScrolled ? '' : ''}`}>
+    <header className="relative z-header overflow-visible transition-all duration-300 shadow-lg font-body bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
           <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
-            <img src="/logo.png" alt={`${BRANDING.company.name} Logo`} className="h-10 w-auto" />
+            <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-10 w-auto" />
           </a>
           <div className="flex-1" />
           <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
@@ -475,37 +456,6 @@ export default function Header({ onNavigate }: HeaderProps) {
           </nav>
         </div>
       </div>
-
-      <style>{`
-        @keyframes fadeInRight {
-          from {
-            opacity: 0;
-            transform: translateX(-12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 5px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: #f3f4f6;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background-color: var(--brand-500);
-          border-radius: 10px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background-color: var(--brand-600);
-        }
-        .scrollbar-thin {
-          scrollbar-width: thin;
-          scrollbar-color: var(--brand-500) #f3f4f6;
-        }
-      `}</style>
     </header>
   );
 }

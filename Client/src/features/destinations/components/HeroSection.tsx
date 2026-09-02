@@ -1,8 +1,9 @@
 import { Star } from 'lucide-react';
-import { HERO_VIDEOS } from '../../../config/media';
+import { HERO_MEDIA } from '../../../config/media';
+import HeroBackground from '../../../components/shared/HeroBackground';
 import { pluralize } from '../../../lib/pluralize';
 
-const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v3');
+const heroMedia = HERO_MEDIA.find((m) => m.id === 'v3');
 
 interface HeroSectionProps {
   isVisible: boolean;
@@ -13,25 +14,7 @@ export default function HeroSection({ isVisible, destinationCount }: HeroSection
   return (
     <div className="relative w-full py-24 overflow-hidden">
       <div className="absolute inset-0">
-        <img
-          src={heroVideo?.poster}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-          loading="eager"
-          decoding="auto"
-          fetchPriority="high"
-          sizes="100vw"
-        />
-        <video
-          className="absolute inset-0 w-full h-full object-cover"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="none"
-        >
-          <source src={heroVideo?.video} type="video/mp4" />
-        </video>
+        {heroMedia && <HeroBackground item={heroMedia} eager />}
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
       </div>

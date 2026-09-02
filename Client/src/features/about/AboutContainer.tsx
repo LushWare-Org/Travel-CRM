@@ -2,7 +2,8 @@ import { Compass, Globe, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { STORY_PARAGRAPHS, TEAM_MEMBERS } from '../../content/about';
 import BRANDING from '../../config/branding';
-import { HERO_VIDEOS } from '../../config/media';
+import { HERO_MEDIA } from '../../config/media';
+import HeroBackground from '../../components/shared/HeroBackground';
 
 // content/about.js is an untyped JS module (checkJs: false); these interfaces
 // describe the exact shapes this container consumes from it.
@@ -27,7 +28,7 @@ interface AboutTab {
 const teamMembers: TeamMember[] = TEAM_MEMBERS;
 const storyParagraphs: string[] = STORY_PARAGRAPHS;
 
-const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v3');
+const heroMedia = HERO_MEDIA.find((m) => m.id === 'v3');
 
 export default function AboutContainer() {
   const [activeTab, setActiveTab] = useState('story');
@@ -44,15 +45,7 @@ export default function AboutContainer() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50">
       <div className="relative h-[50vh] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/60 z-raised"></div>
-        <video
-          className="absolute inset-0 w-full h-full object-cover"
-          src={heroVideo?.video}
-          autoPlay
-          muted
-          loop
-          playsInline
-          aria-hidden="true"
-        />
+        {heroMedia && <HeroBackground item={heroMedia} eager />}
         <div className="relative z-elevated h-full flex flex-col items-center justify-center text-white px-4">
           <div className="text-center max-w-4xl">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
@@ -95,7 +88,7 @@ export default function AboutContainer() {
               <h2 className="text-4xl font-bold mb-6 bg-clip-text text-transparent bg-black">
                 Our Journey Began with a Dream
               </h2>
-              <div className="space-y-6 text-md text-gray-700 leading-relaxed">
+              <div className="space-y-6 text-sm lg:text-base text-gray-700 leading-relaxed">
                 {storyParagraphs.map((paragraph, idx) => (
                   <p key={idx} className="text-justify">
                     {paragraph}
@@ -109,13 +102,13 @@ export default function AboutContainer() {
             <div className="grid md:grid-cols-2 gap-6">
               <div className="bg-red-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
                 <h3 className="text-3xl  font-bold mb-4 text-gray-900">Our Mission</h3>
-                <p className="text-md text-gray-700 leading-relaxed text-justify">
+                <p className="text-sm lg:text-base text-gray-700 leading-relaxed text-justify">
                   To inspire and enable meaningful travel experiences by combining local expertise with global reach. We're committed to making every journey seamless, memorable, and transformative, while maintaining the highest standards of service and sustainability.
                 </p>
               </div>
               <div className="bg-blue-50 border border-gray-300 p-8 rounded-2xl shadow-sm">
                 <h3 className="text-3xl font-bold mb-4 text-gray-900">Our Vision</h3>
-                <p className="text-md text-gray-700 leading-relaxed text-justify">
+                <p className="text-sm lg:text-base text-gray-700 leading-relaxed text-justify">
                   To become the world's most trusted travel companion, known for creating extraordinary experiences that connect people with places and cultures. We envision a future where responsible tourism enriches both travelers and destinations alike.
                 </p>
               </div>
@@ -126,7 +119,7 @@ export default function AboutContainer() {
           <div className="text-center mb-16">
             <div className="inline-block">
             </div>
-            <h2 className="text-4xl font-bold mb-8 text-gray-800 font-poppins">
+            <h2 className="text-4xl font-bold mb-8 text-gray-800 font-display">
               Meet Our Team
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">

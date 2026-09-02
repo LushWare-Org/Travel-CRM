@@ -14,11 +14,11 @@ export default function FAQSection() {
   };
 
   return (
-    <section className="py-4 bg-white relative overflow-hidden font-opensans pb-20">
+    <section className="pt-4 pb-section-lg bg-white relative overflow-hidden font-body">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
         {/* Header */}
           <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-poppins">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-display">
             Got Questions? We've Got Answers
           </h2>
           <p className="text-lg text-gray-600">
@@ -64,7 +64,7 @@ export default function FAQSection() {
                     onClick={() => toggleQuestion(index)}
                     className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors duration-200"
                   >
-                    <span className="text-lg font-semibold text-gray-900 pr-8 font-poppins">
+                    <span className="text-lg font-semibold text-gray-900 pr-8 font-display">
                       {faq.question}
                     </span>
                     <div
@@ -82,7 +82,7 @@ export default function FAQSection() {
                   >
                     <div className="px-6 pb-6">
                       <div className="pt-2 pb-2 border-t border-gray-200">
-                        <p className="text-gray-600 leading-relaxed font-opensans">
+                        <p className="text-gray-600 leading-relaxed font-body">
                           {faq.answer}
                         </p>
                       </div>

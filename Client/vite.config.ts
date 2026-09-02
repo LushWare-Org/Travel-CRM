@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
@@ -25,7 +25,14 @@ const manualChunks = (id: string): string | undefined => {
   return undefined;
 };
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  // tailwind.config.js (loaded separately by PostCSS, in the same Node
+  // process) reads process.env.VITE_THEME to pick a palette — Vite does not
+  // expose VITE_* vars to process.env for config-adjacent tooling by
+  // default, so this factory does it explicitly. See src/config/activeTheme.ts.
+  process.env.VITE_THEME = env.VITE_THEME || 'generic';
+  return {
   plugins: [react()],
   resolve: {
     alias: {
@@ -59,4 +66,5 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'axios', 'date-fns', 'lodash', 'framer-motion'],
   },
+  };
 });

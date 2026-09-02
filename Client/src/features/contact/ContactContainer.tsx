@@ -21,9 +21,10 @@ import LocationSelector from '../../components/shared/LocationSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import BRANDING from '../../config/branding';
 import { HERO_TITLE, HERO_SUBTITLE, OFFICE_HOURS_TEXT } from '../../content/contact';
-import { HERO_VIDEOS } from '../../config/media';
+import { HERO_MEDIA } from '../../config/media';
+import HeroBackground from '../../components/shared/HeroBackground';
 
-const heroVideo = HERO_VIDEOS.find((v) => v.id === 'v4');
+const heroMedia = HERO_MEDIA.find((m) => m.id === 'v4');
 
 /** A destination option as emitted by DestinationSelector. */
 interface DestinationOption {
@@ -182,17 +183,7 @@ export default function ContactContainer() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 font-sans">
       {/* Hero Section */}
       <div className="relative overflow-hidden pt-20 pb-20">
-        <video
-          className="absolute inset-0 w-full h-full object-cover z-base"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          aria-hidden="true"
-        >
-          <source src={heroVideo?.video} type="video/mp4" />
-        </video>
+        {heroMedia && <HeroBackground item={heroMedia} eager />}
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/70 z-raised" aria-hidden="true"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-elevated">
@@ -230,7 +221,7 @@ export default function ContactContainer() {
               <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-brand-600 group-hover:to-brand-accent-600 transition-all duration-300">
                 {method.title}
               </h3>
-              <p className="text-md font-semibold text-gray-700 mb-1">{method.info}</p>
+              <p className="text-sm font-semibold text-gray-700 mb-1">{method.info}</p>
               <p className="text-sm text-gray-500">{method.subtext}</p>
               <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
                 <ArrowRight className="w-6 h-6 text-brand-600" />

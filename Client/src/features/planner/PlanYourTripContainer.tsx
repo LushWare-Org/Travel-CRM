@@ -330,7 +330,7 @@ export default function PlanYourTripContainer() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 font-opensans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 font-body">
       <div className="w-full mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-5xl">
         <form onSubmit={(e) => { e.preventDefault(); next(); }}>
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-4 sm:p-5 md:p-6 mb-4 sm:mb-5 md:mb-6">
@@ -371,7 +371,7 @@ export default function PlanYourTripContainer() {
                 <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-brand-500 to-brand-accent-500 rounded-xl flex items-center justify-center">
                   <MapPin className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-poppins">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-display">
                   Where do you want to go?
                 </h2>
               </div>
@@ -410,7 +410,7 @@ export default function PlanYourTripContainer() {
                 <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
                   <Calendar className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-poppins">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 font-display">
                   When & How Many?
                 </h2>
               </div>
@@ -472,7 +472,7 @@ export default function PlanYourTripContainer() {
                     <ChevronLeft className="w-4 sm:w-5 h-4 sm:h-5" />
                   </button>
                   <div className="flex-1 text-center">
-                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 font-poppins">{travelers}</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-gray-900 font-display">{travelers}</div>
                     <div className="text-xs sm:text-sm text-gray-600">Person(s)</div>
                   </div>
                   <button
@@ -507,7 +507,7 @@ export default function PlanYourTripContainer() {
                     <Zap className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg sm:text-2xl font-bold text-gray-900 font-poppins">
+                    <h2 className="text-lg sm:text-2xl font-bold text-gray-900 font-display">
                       Plan Your Itinerary
                     </h2>
                     <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
@@ -627,10 +627,13 @@ export default function PlanYourTripContainer() {
 
                   {/* Current Day Form - Only show one day at a time */}
                   {itineraryDays[currentDayIndex] && (
-                    <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50">
-                      {/* Day Header */}
-                      <div className="bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white px-6 py-4 flex items-center justify-between">
-                        <h3 className="font-bold text-lg font-poppins">
+                    <div className="border-2 border-gray-200 rounded-xl bg-gray-50">
+                      {/* Day Header — rounds its own top corners (instead of
+                          the card wrapper clipping via overflow-hidden) so
+                          the Locations field's LocationSelector dropdown,
+                          further down this same card, is never clipped. */}
+                      <div className="bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white px-6 py-4 rounded-t-xl flex items-center justify-between">
+                        <h3 className="font-bold text-lg font-display">
                           Day {itineraryDays[currentDayIndex].dayNumber}
                         </h3>
                         {itineraryDays.length > 1 && (
@@ -647,7 +650,7 @@ export default function PlanYourTripContainer() {
                       </div>
 
                       {/* Day Content */}
-                      <div className={`p-6 space-y-4 bg-white ${aiGenerator.isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div className={`p-6 space-y-4 bg-white rounded-b-xl ${aiGenerator.isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                         {/* Title */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -831,7 +834,7 @@ export default function PlanYourTripContainer() {
                 <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
                   <Users className="w-7 h-7 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 font-poppins">Your Contact Details</h2>
+                <h2 className="text-2xl font-bold text-gray-900 font-display">Your Contact Details</h2>
               </div>
 
               <div className="grid md:grid-cols-2 gap-6 mb-6">

@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
-const brandPalette = require('./src/config/brandPalette.json');
+const activeTheme = process.env.VITE_THEME === 'lush' ? 'lush' : 'generic'; // mirrors src/config/activeTheme.ts; see comment there
+const brandPalette = require(`./src/config/palettes/${activeTheme}.json`);
 
 module.exports = {
   content: [
@@ -8,13 +9,29 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        poppins: ['Poppins', 'sans-serif'],
-        opensans: ['"Open Sans"', 'sans-serif'],
+        display: [brandPalette.fonts.display, 'serif'],
+        body: [brandPalette.fonts.body, 'sans-serif'],
+      },
+      fontSize: { ...(brandPalette.typeScale || {}) },
+      // Section-level vertical rhythm tokens (py-section-sm/md/lg) — a small,
+      // shared set of tiers so landing sections converge on a consistent
+      // spacing scale instead of each picking its own py-* value.
+      spacing: {
+        'section-sm': '2.5rem',
+        'section-md': '4rem',
+        'section-lg': '5rem',
       },
       colors: {
         brand: brandPalette.brand,
         'brand-accent': brandPalette.brandAccent,
         'brand-dark': brandPalette.brandDark,
+        ...(brandPalette.neutral ? { gray: brandPalette.neutral } : {}),
+      },
+      keyframes: {
+        kenburns: { '0%': { transform: 'scale(1)' }, '100%': { transform: 'scale(1.12)' } },
+      },
+      animation: {
+        kenburns: 'kenburns 20s ease-out forwards',
       },
       // Named stacking-order scale — replaces ad-hoc bare z-50/z-[9999]
       // values that collided across the app (WhatsApp button and modals

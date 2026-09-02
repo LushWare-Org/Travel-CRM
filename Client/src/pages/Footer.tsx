@@ -8,12 +8,12 @@ export interface FooterProps {
 
 export default function Footer({ onNavigate }: FooterProps) {
   return (
-    <footer className="bg-gray-900 text-gray-300 font-opensans">
+    <footer className="bg-gray-900 text-gray-300 font-body">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center mb-4">
-              <img src="/logo.png" alt={`${BRANDING.company.name} Logo`} className="h-12 w-auto" />
+              <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-12 w-auto" />
               <div className="ml-3"></div>
             </div>
             <p className="text-sm mb-4">
@@ -64,7 +64,7 @@ export default function Footer({ onNavigate }: FooterProps) {
           </div>
 
           <div className="lg:ml-16">
-            <h4 className="text-white font-semibold mb-4 font-poppins">Quick Links</h4>
+            <h4 className="text-white font-semibold mb-4 font-display">Quick Links</h4>
             <ul className="space-y-3 text-sm">
               <li>
                 <button onClick={() => onNavigate('home')} className="hover:text-brand-accent-400 transition">
@@ -107,7 +107,7 @@ export default function Footer({ onNavigate }: FooterProps) {
 
           {PAGE_CONFIG.destinations.enabled && (
             <div>
-              <h4 className="text-white font-semibold mb-4 font-poppins">Destinations</h4>
+              <h4 className="text-white font-semibold mb-4 font-display">Destinations</h4>
               <ul className="space-y-2 text-sm">
                 <li>
                   <button onClick={() => onNavigate('destinations-international')} className="hover:text-brand-accent-400 transition">
@@ -119,7 +119,7 @@ export default function Footer({ onNavigate }: FooterProps) {
           )}
 
           <div>
-            <h4 className="text-white font-semibold mb-4 font-poppins">Contact Us</h4>
+            <h4 className="text-white font-semibold mb-4 font-display">Contact Us</h4>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2">
                 <MapPin size={18} className="mt-0.5 flex-shrink-0 text-brand-accent-400" />
