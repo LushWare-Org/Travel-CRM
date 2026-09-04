@@ -24,7 +24,8 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../../services/api/manualItinerary";
 import { useAIItineraryGenerator } from "./hooks/useAIItineraryGenerator";
-import { buildItineraryDayFromAIDay, computeDurationDays } from "./utils/formHelpers";
+import { useAIDayGenerator } from "./hooks/useAIDayGenerator";
+import { buildItineraryDayFromAIDay, computeDurationDays, computeMissingDayNumbers, mergeDayByNumber, mergeDaysByNumber, toExistingDayContext } from "./utils/formHelpers";
 import type { DayAccommodation, DayMeals, ItineraryDay } from "./utils/formHelpers";
 import { pluralize } from "../../lib/pluralize";
 import DestinationSelector from "../../components/shared/DestinationSelector";
@@ -34,6 +35,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import DateRangeCalendar from "./components/DateRangeCalendar";
 import ItineraryChatPanel from "./components/ItineraryChatPanel";
 import TripWizardPanel from "./components/TripWizardPanel";
+import RegenerationToast from "./components/RegenerationToast";
 
 const transportOptions: Array<{ value: string; label: string; icon: LucideIcon }> = [
   { value: "flight", label: "Flight", icon: Plane },
@@ -111,6 +113,39 @@ export default function PlanYourTripContainer() {
       setCurrentDayIndex(0);
     },
   });
+  const [regenToast, setRegenToast] = useState<{ message: string; undo: () => void } | null>(null);
+  const aiDayGenerator = useAIDayGenerator<ItineraryDay>({
+    getContext: () => ({
+      destination: destLabel(selectedDest),
+      totalDuration: duration,
+      travelers,
+      preferences: preferences || undefined,
+      existingDays: itineraryDays.map(toExistingDayContext),
+    }),
+    mapDay: (aiDay, dayNumber) => buildItineraryDayFromAIDay(aiDay, dayNumber - 1),
+    onDayGenerated: (day, dayNumber) => {
+      setItineraryDays((prev) => {
+        // Snapshot-based, not dayNumber-keyed: handleRemoveDay renumbers
+        // every later day, and remove/add stay enabled during the 6s toast
+        // window, so "restore whatever day now holds this number" can
+        // silently delete a different, unrelated manual day. Restoring the
+        // exact pre-merge array is correct regardless of what happened to
+        // day numbers afterward.
+        const snapshot = prev;
+        setRegenToast({ message: `Day ${dayNumber} regenerated`, undo: () => setItineraryDays(snapshot) });
+        return mergeDayByNumber(prev, day);
+      });
+    },
+    onDaysGenerated: (days, requestedDayNumbers) => {
+      setItineraryDays((prev) => {
+        const snapshot = prev;
+        if (days.length === requestedDayNumbers.length) {
+          setRegenToast({ message: `${pluralize(days.length, 'day')} generated`, undo: () => setItineraryDays(snapshot) });
+        }
+        return mergeDaysByNumber(prev, days);
+      });
+    },
+  });
 
   // Prefill contact details for logged-in users
   useEffect(() => {
@@ -122,6 +157,11 @@ export default function PlanYourTripContainer() {
   }, [user]);
 
   const duration = computeDurationDays(startDate, endDate);
+  // Days not yet planned — always a contiguous tail here since handleAddDay
+  // only appends and handleRemoveDay renumbers, but computed via the same
+  // set-difference helper CustomizePackageContainer needs (its days can
+  // have gaps), so both containers share one implementation.
+  const missingDayNumbers = computeMissingDayNumbers(duration, itineraryDays.map((d) => d.dayNumber));
 
   // Clear itinerary days when duration becomes 0 or decreases
   useEffect(() => {
@@ -340,6 +380,16 @@ export default function PlanYourTripContainer() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 font-body">
+      {regenToast && (
+        <RegenerationToast
+          message={regenToast.message}
+          onUndo={() => {
+            regenToast.undo();
+            setRegenToast(null);
+          }}
+          onDismiss={() => setRegenToast(null)}
+        />
+      )}
       <div className="w-full mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-5xl">
         <form onSubmit={(e) => { e.preventDefault(); next(); }}>
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-4 sm:p-5 md:p-6 mb-4 sm:mb-5 md:mb-6">
@@ -551,6 +601,12 @@ export default function PlanYourTripContainer() {
                 </div>
               )}
 
+              {aiDayGenerator.error && (
+                <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-red-700 text-xs sm:text-sm font-medium">{aiDayGenerator.error}</p>
+                </div>
+              )}
+
               {duration === 0 ? (
                 <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                   <p className="text-xs sm:text-sm text-gray-600 mb-2">Please select travel dates first</p>
@@ -577,7 +633,7 @@ export default function PlanYourTripContainer() {
                     <button
                       type="button"
                       onClick={() => aiGenerator.generate({ destination: destLabel(selectedDest), duration, travelers, preferences: preferences || undefined })}
-                      disabled={aiGenerator.isGenerating}
+                      disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
                       className="px-4 sm:px-6 py-2 sm:py-3 bg-white border-2 border-brand-500 text-brand-600 text-xs sm:text-sm rounded-xl hover:bg-brand-50 transition-all font-semibold shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {aiGenerator.isGenerating ? (
@@ -600,7 +656,7 @@ export default function PlanYourTripContainer() {
                     <button
                       type="button"
                       onClick={() => aiGenerator.generate({ destination: destLabel(selectedDest), duration, travelers, preferences: preferences || undefined })}
-                      disabled={aiGenerator.isGenerating}
+                      disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
                       className="px-3 sm:px-4 py-2 bg-white border-2 border-brand-500 text-brand-600 text-xs sm:text-sm rounded-xl hover:bg-brand-50 transition-all font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {aiGenerator.isGenerating ? (
@@ -664,21 +720,50 @@ export default function PlanYourTripContainer() {
                         <h3 className="font-bold text-lg font-display">
                           Day {itineraryDays[currentDayIndex].dayNumber}
                         </h3>
-                        {itineraryDays.length > 1 && (
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => handleRemoveDay(itineraryDays[currentDayIndex].dayNumber)}
-                            disabled={aiGenerator.isGenerating}
-                            className="p-2 hover:bg-red-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Remove this day"
+                            onClick={() => aiDayGenerator.generateDay(itineraryDays[currentDayIndex].dayNumber)}
+                            disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
+                            aria-label={`Regenerate day ${itineraryDays[currentDayIndex].dayNumber}`}
+                            title={`Regenerate day ${itineraryDays[currentDayIndex].dayNumber}`}
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Trash2 className="w-5 h-5 text-white" />
+                            <Sparkles className="w-5 h-5 text-white" />
                           </button>
-                        )}
+                          {itineraryDays.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDay(itineraryDays[currentDayIndex].dayNumber)}
+                              disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
+                              className="p-2 hover:bg-red-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Remove this day"
+                            >
+                              <Trash2 className="w-5 h-5 text-white" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Day Content */}
-                      <div className={`p-6 space-y-4 bg-white rounded-b-xl ${aiGenerator.isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div
+                        className={`relative p-6 space-y-4 bg-white rounded-b-xl ${
+                          aiGenerator.isGenerating || aiDayGenerator.generatingDayNumber === itineraryDays[currentDayIndex].dayNumber
+                            ? 'opacity-50 pointer-events-none'
+                            : ''
+                        }`}
+                        aria-busy={aiDayGenerator.generatingDayNumber === itineraryDays[currentDayIndex].dayNumber}
+                      >
+                        {aiDayGenerator.generatingDayNumber === itineraryDays[currentDayIndex].dayNumber && (
+                          <div
+                            className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 rounded-b-xl"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
+                            <span className="sr-only">Regenerating day {itineraryDays[currentDayIndex].dayNumber}…</span>
+                          </div>
+                        )}
                         {/* Title */}
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -832,11 +917,35 @@ export default function PlanYourTripContainer() {
                       <button
                         type="button"
                         onClick={handleAddDay}
-                        disabled={aiGenerator.isGenerating}
+                        disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
                         className="px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl hover:from-brand-600 hover:to-brand-accent-600 transition-all font-semibold shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Plus className="w-5 h-5" />
                         Add Day {itineraryDays.length + 1}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Fill remaining days with AI — subtle secondary action, shown whenever unfilled slots exist */}
+                  {missingDayNumbers.length > 0 && (
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => aiDayGenerator.generateDays(missingDayNumbers)}
+                        disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
+                        className="min-h-[44px] px-4 py-2 text-brand-600 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {aiDayGenerator.isGenerating && aiDayGenerator.generatingDayNumber === null ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Generating {pluralize(missingDayNumbers.length, 'day')}...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            Generate remaining {pluralize(missingDayNumbers.length, 'day')} with AI
+                          </>
+                        )}
                       </button>
                     </div>
                   )}

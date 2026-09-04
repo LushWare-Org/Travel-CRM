@@ -5,8 +5,12 @@ import {
   buildItineraryDayFromAIDay,
   combineListToText,
   computeDurationDays,
+  computeMissingDayNumbers,
+  mergeDayByNumber,
+  mergeDaysByNumber,
   sanitizeNumber,
   splitTextToList,
+  toExistingDayContext,
 } from '../utils/formHelpers';
 
 describe('splitTextToList', () => {
@@ -240,5 +244,109 @@ describe('addDaysISO', () => {
 
   it('adds days correctly including a month rollover', () => {
     expect(addDaysISO('2026-01-30', 3)).toBe('2026-02-02');
+  });
+});
+
+describe('mergeDayByNumber', () => {
+  const days = [
+    { dayNumber: 1, title: 'Arrival' },
+    { dayNumber: 3, title: 'Beach' },
+  ];
+
+  it('replaces the entry with a matching dayNumber, leaving others untouched', () => {
+    const result = mergeDayByNumber(days, { dayNumber: 1, title: 'AI Arrival' });
+    expect(result).toEqual([{ dayNumber: 1, title: 'AI Arrival' }, { dayNumber: 3, title: 'Beach' }]);
+    expect(result).not.toBe(days);
+  });
+
+  it('appends and sorts when no existing day has that number (mid-list gap fill)', () => {
+    const result = mergeDayByNumber(days, { dayNumber: 2, title: 'Waterfalls' });
+    expect(result).toEqual([
+      { dayNumber: 1, title: 'Arrival' },
+      { dayNumber: 2, title: 'Waterfalls' },
+      { dayNumber: 3, title: 'Beach' },
+    ]);
+  });
+
+  it('appends at the end and sorts when the new day number is higher than all existing', () => {
+    const result = mergeDayByNumber(days, { dayNumber: 5, title: 'Departure' });
+    expect(result.map((d) => d.dayNumber)).toEqual([1, 3, 5]);
+  });
+});
+
+describe('mergeDaysByNumber', () => {
+  it('folds a batch of new days into an existing gapped list, replacing and inserting as needed', () => {
+    const days = [{ dayNumber: 1, title: 'Arrival' }, { dayNumber: 4, title: 'Departure' }];
+    const result = mergeDaysByNumber(days, [
+      { dayNumber: 2, title: 'Waterfalls' },
+      { dayNumber: 3, title: 'Beach' },
+    ]);
+    expect(result).toEqual([
+      { dayNumber: 1, title: 'Arrival' },
+      { dayNumber: 2, title: 'Waterfalls' },
+      { dayNumber: 3, title: 'Beach' },
+      { dayNumber: 4, title: 'Departure' },
+    ]);
+  });
+
+  it('returns the original array unchanged when given an empty batch', () => {
+    const days = [{ dayNumber: 1, title: 'Arrival' }];
+    expect(mergeDaysByNumber(days, [])).toEqual(days);
+  });
+});
+
+describe('computeMissingDayNumbers', () => {
+  it('returns the contiguous tail when existing days are 1..N', () => {
+    expect(computeMissingDayNumbers(5, [1, 2])).toEqual([3, 4, 5]);
+  });
+
+  it('returns every day number when none exist yet', () => {
+    expect(computeMissingDayNumbers(3, [])).toEqual([1, 2, 3]);
+  });
+
+  it('returns an empty array when every day is already present', () => {
+    expect(computeMissingDayNumbers(3, [1, 2, 3])).toEqual([]);
+  });
+
+  it('computes a real set difference for a non-contiguous list — a middle gap left by an index-based delete', () => {
+    // Mirrors CustomizePackageContainer's handleRemoveDay, which removes by
+    // array index without renumbering: deleting the middle of [1,2,3,4,5,6,7]
+    // leaves a gap at day 3, not a contiguous tail.
+    expect(computeMissingDayNumbers(7, [1, 2, 4, 5, 6, 7])).toEqual([3]);
+  });
+
+  it('ignores existing day numbers beyond totalDuration', () => {
+    expect(computeMissingDayNumbers(3, [1, 2, 3, 99])).toEqual([]);
+  });
+
+  it('never offers a day number beyond the AI endpoints\' 30-day cap, even on a longer trip', () => {
+    // The per-day/range AI endpoints reject dayNumber/totalDuration > 30
+    // (Services/shared/contracts) — a 35-day trip with no days planned yet
+    // must only ever be offered days 1..30, never 31..35.
+    const result = computeMissingDayNumbers(35, []);
+    expect(result).toHaveLength(30);
+    expect(result[result.length - 1]).toBe(30);
+  });
+});
+
+describe('toExistingDayContext', () => {
+  it('projects dayNumber/title/locations/activities and drops other fields', () => {
+    const day = {
+      dayNumber: 2,
+      title: 'Waterfalls',
+      description: 'A scenic hike',
+      locations: ['Tegenungan Waterfall'],
+      activities: ['Waterfall hike'],
+    };
+    expect(toExistingDayContext(day)).toEqual({
+      dayNumber: 2,
+      title: 'Waterfalls',
+      locations: ['Tegenungan Waterfall'],
+      activities: ['Waterfall hike'],
+    });
+  });
+
+  it('normalizes a null title to undefined', () => {
+    expect(toExistingDayContext({ dayNumber: 1, title: null }).title).toBeUndefined();
   });
 });

@@ -1,9 +1,10 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PlanYourTripContainer from '../PlanYourTripContainer';
 import { submitManualItineraryRequest } from '../../../services/api/manualItinerary';
 import { generateItineraryPreview } from '../../../services/api/aiItinerary';
+import { generateDayPreview, generateDaysRangePreview } from '../../../services/api/aiDayGeneration';
 import { sendItineraryChatMessage } from '../../../services/api/itineraryChat';
 
 const mocks = vi.hoisted(() => ({
@@ -17,6 +18,11 @@ vi.mock('../../../services/api/manualItinerary', () => ({
 
 vi.mock('../../../services/api/aiItinerary', () => ({
   generateItineraryPreview: vi.fn(),
+}));
+
+vi.mock('../../../services/api/aiDayGeneration', () => ({
+  generateDayPreview: vi.fn(),
+  generateDaysRangePreview: vi.fn(),
 }));
 
 vi.mock('../../../services/api/itineraryChat', () => ({
@@ -33,6 +39,8 @@ vi.mock('../../../contexts/AuthContext', () => ({
 
 const submitMock = vi.mocked(submitManualItineraryRequest);
 const generateItineraryPreviewMock = vi.mocked(generateItineraryPreview);
+const generateDayPreviewMock = vi.mocked(generateDayPreview);
+const generateDaysRangePreviewMock = vi.mocked(generateDaysRangePreview);
 const sendItineraryChatMessageMock = vi.mocked(sendItineraryChatMessage);
 
 /** Day numbers for the current month that exist in every month (1..28+). */
@@ -59,6 +67,8 @@ beforeEach(() => {
   submitMock.mockReset();
   submitMock.mockResolvedValue({ leadId: 'lead-1', manualItineraryId: 'mi-1' });
   generateItineraryPreviewMock.mockReset();
+  generateDayPreviewMock.mockReset();
+  generateDaysRangePreviewMock.mockReset();
   sendItineraryChatMessageMock.mockReset();
 });
 
@@ -361,5 +371,269 @@ describe('PlanYourTripContainer', () => {
     expect(await screen.findByText('offline')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(generateItineraryPreviewMock).not.toHaveBeenCalled();
+  });
+
+  it('clicking the sparkle button on a day regenerates only that day, leaving other days untouched', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    // Add two days manually; handleAddDay navigates to the newly added day.
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+    await user.click(screen.getByRole('button', { name: 'Add Day 2' }));
+    const day2Title = screen.getByPlaceholderText(/e\.g\., Arrival in/);
+    await user.clear(day2Title);
+    await user.type(day2Title, 'Manual Day 2');
+
+    // Navigate back to day 1 and regenerate just that day.
+    await user.click(screen.getByRole('button', { name: /Previous/ }));
+    expect(screen.getByText(/Day 1 of 2/)).toBeInTheDocument();
+
+    generateDayPreviewMock.mockResolvedValue({
+      day: { dayNumber: 1, title: 'AI Day 1', locations: ['Ubud'], activities: ['Temple visit'] },
+    });
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+
+    expect(generateDayPreviewMock).toHaveBeenCalledWith({
+      destination: 'Bali, Indonesia',
+      dayNumber: 1,
+      totalDuration: 5,
+      travelers: 2,
+      preferences: undefined,
+      existingDays: [
+        { dayNumber: 1, title: 'Day 1', locations: [], activities: [] },
+        { dayNumber: 2, title: 'Manual Day 2', locations: [], activities: [] },
+      ],
+    });
+    expect(await screen.findByDisplayValue('AI Day 1')).toBeInTheDocument();
+
+    // Day 2's manual edit survives the day-1-only regeneration. Scope to the
+    // day-nav container: the page also has an unrelated step-Next button
+    // with the same accessible name.
+    const dayNavContainer = screen.getByRole('button', { name: /Previous/ }).closest('div') as HTMLElement;
+    await user.click(within(dayNavContainer).getByRole('button', { name: /Next/ }));
+    expect(screen.getByDisplayValue('Manual Day 2')).toBeInTheDocument();
+  });
+
+  it('after a per-day regeneration, clicking Undo in the toast restores the day\'s prior content', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+
+    generateDayPreviewMock.mockResolvedValue({
+      day: { dayNumber: 1, title: 'AI Day 1', locations: ['Ubud'], activities: ['Temple visit'] },
+    });
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+    expect(await screen.findByDisplayValue('AI Day 1')).toBeInTheDocument();
+
+    expect(screen.getByText('Day 1 regenerated')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(screen.getByDisplayValue('Day 1')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('AI Day 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Day 1 regenerated')).not.toBeInTheDocument();
+  });
+
+  it('clicking "Generate remaining days with AI" fills every unplanned day and keeps the manually-added day', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [
+        { dayNumber: 2, title: 'Ubud', locations: [], activities: [] },
+        { dayNumber: 3, title: 'Waterfalls', locations: [], activities: [] },
+        { dayNumber: 4, title: 'Beach', locations: [], activities: [] },
+        { dayNumber: 5, title: 'Departure', locations: [], activities: [] },
+      ],
+    });
+
+    await user.click(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ }));
+
+    expect(generateDaysRangePreviewMock).toHaveBeenCalledWith({
+      destination: 'Bali, Indonesia',
+      dayNumbers: [2, 3, 4, 5],
+      totalDuration: 5,
+      travelers: 2,
+      preferences: undefined,
+      existingDays: [{ dayNumber: 1, title: 'Day 1', locations: [], activities: [] }],
+    });
+
+    expect(await screen.findByText('✓ All 5 days have been added to your itinerary')).toBeInTheDocument();
+  });
+
+  it('after a bulk-fill, clicking Undo in the toast removes exactly the newly-generated days', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [
+        { dayNumber: 2, title: 'Ubud', locations: [], activities: [] },
+        { dayNumber: 3, title: 'Waterfalls', locations: [], activities: [] },
+        { dayNumber: 4, title: 'Beach', locations: [], activities: [] },
+        { dayNumber: 5, title: 'Departure', locations: [], activities: [] },
+      ],
+    });
+    await user.click(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ }));
+    await screen.findByText('✓ All 5 days have been added to your itinerary');
+
+    expect(screen.getByText('4 days generated')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(screen.queryByText('✓ All 5 days have been added to your itinerary')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ })).toBeInTheDocument();
+  });
+
+  it('removing a pre-existing manual day during the toast window never leaves AI content mislabeled — Undo fully restores the pre-fill snapshot', async () => {
+    // Regression test: dayNumber-keyed undo used to filter the CURRENT array
+    // by the original requested day numbers. Once handleRemoveDay renumbers
+    // everything after a manual delete, a surviving AI-generated day can
+    // shift onto a number outside that filter and survive undo mislabeled,
+    // while an unrelated manual day is gone for good. Snapshot-based undo
+    // must restore the exact pre-fill state (both manual days, no AI content)
+    // regardless of what was removed in between.
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    // Two pre-existing manual days.
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+    await user.click(screen.getByRole('button', { name: 'Add Day 2' }));
+
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [
+        { dayNumber: 3, title: 'Waterfalls', locations: [], activities: [] },
+        { dayNumber: 4, title: 'Beach', locations: [], activities: [] },
+        { dayNumber: 5, title: 'Departure', locations: [], activities: [] },
+      ],
+    });
+    await user.click(screen.getByRole('button', { name: /Generate remaining 3 days with AI/ }));
+    await screen.findByText('✓ All 5 days have been added to your itinerary');
+
+    // Remove day 2 (the second manual day) inside the still-open 6s toast
+    // window — this renumbers days 3,4,5 down to 2,3,4, shifting the
+    // AI-generated "Waterfalls" day onto number 2.
+    await user.click(screen.getByRole('button', { name: 'Remove this day' }));
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    // Fully reverted: both original manual days back, no AI content
+    // survives mislabeled, and the bulk CTA re-offers the same 3 days.
+    expect(screen.getByDisplayValue('Day 2')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Waterfalls')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 3 days with AI/ })).toBeInTheDocument();
+  });
+
+  it('a rejected per-day regeneration shows the per-day error banner and leaves the day content untouched', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+
+    generateDayPreviewMock.mockRejectedValue(new Error('Network Error'));
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+
+    expect(await screen.findByText('Network Error')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Day 1')).toBeInTheDocument();
+    expect(screen.queryByText('Day 1 regenerated')).not.toBeInTheDocument();
+  });
+
+  it('a partial bulk-fill shows the "N of M days generated" note and the CTA re-shows for the rest', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 2, title: 'Ubud', locations: [], activities: [] }],
+    });
+    await user.click(screen.getByRole('button', { name: /Generate remaining 4 days with AI/ }));
+
+    expect(await screen.findByText('1 of 4 days generated. Click again to fill the rest.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 3 days with AI/ })).toBeInTheDocument();
+  });
+
+  it('while a per-day regeneration is in flight, the whole-trip regenerate and Add Day buttons are disabled', async () => {
+    const user = userEvent.setup();
+    let resolveGenerate: (value: { day: { dayNumber: number; title: string; locations: string[]; activities: string[] } }) => void = () => {};
+    // Executor form (not Promise.withResolvers) — this project's tsconfig
+    // targets ES2020/lib ES2020, which predates withResolvers.
+    generateDayPreviewMock.mockReturnValue(new Promise((resolve) => { resolveGenerate = resolve; }));
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+
+    expect(screen.getByRole('button', { name: /Regenerate with AI/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Add Day 2/ })).toBeDisabled();
+
+    await act(async () => {
+      resolveGenerate({ day: { dayNumber: 1, title: 'AI Day 1', locations: [], activities: [] } });
+      await Promise.resolve();
+    });
   });
 });

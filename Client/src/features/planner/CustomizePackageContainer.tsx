@@ -11,9 +11,11 @@ import { pluralize } from '../../lib/pluralize';
 import { useAuth } from '../../contexts/AuthContext';
 import ActivitySelector from '../../components/shared/ActivitySelector';
 import LocationSelector from '../../components/shared/LocationSelector';
-import { buildDayState, splitTextToList } from './utils/formHelpers';
+import { buildDayState, computeMissingDayNumbers, mergeDayByNumber, mergeDaysByNumber, splitTextToList, toExistingDayContext } from './utils/formHelpers';
 import type { DayOverrideState } from './utils/formHelpers';
 import { useAIItineraryGenerator } from './hooks/useAIItineraryGenerator';
+import { useAIDayGenerator } from './hooks/useAIDayGenerator';
+import RegenerationToast from './components/RegenerationToast';
 
 interface ContactState {
   name: string;
@@ -65,6 +67,40 @@ export default function CustomizePackageContainer() {
     hasExistingDays: () => dayOverrides.length > 0,
     mapDay: buildDayState,
     onGenerated: setDayOverrides,
+  });
+  const totalDurationDays = pkg?.duration_days ?? 0;
+  const missingDayNumbers = computeMissingDayNumbers(totalDurationDays, dayOverrides.map((d) => d.dayNumber));
+  const [regenToast, setRegenToast] = useState<{ message: string; undo: () => void } | null>(null);
+  const aiDayGenerator = useAIDayGenerator<DayOverrideState>({
+    getContext: () => ({
+      destination: pkg?.destination?.name || pkg?.destinationRaw || '',
+      totalDuration: totalDurationDays,
+      travelers: Number(travelPrefs.travelers) || undefined,
+      preferences: message || undefined,
+      existingDays: dayOverrides.map(toExistingDayContext),
+    }),
+    mapDay: (aiDay, dayNumber) => buildDayState(aiDay, dayNumber - 1),
+    onDayGenerated: (day, dayNumber) => {
+      setDayOverrides((prev) => {
+        // Snapshot-based, not dayNumber-keyed: restoring "whatever day now
+        // holds this number" is unsound if the day list changes shape
+        // between generation and Undo (see PlanYourTripContainer, which
+        // hits this directly via handleRemoveDay's renumbering). Restoring
+        // the exact pre-merge array is correct regardless.
+        const snapshot = prev;
+        setRegenToast({ message: `Day ${dayNumber} regenerated`, undo: () => setDayOverrides(snapshot) });
+        return mergeDayByNumber(prev, day);
+      });
+    },
+    onDaysGenerated: (days, requestedDayNumbers) => {
+      setDayOverrides((prev) => {
+        const snapshot = prev;
+        if (days.length === requestedDayNumbers.length) {
+          setRegenToast({ message: `${pluralize(days.length, 'day')} generated`, undo: () => setDayOverrides(snapshot) });
+        }
+        return mergeDaysByNumber(prev, days);
+      });
+    },
   });
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 5;
@@ -243,6 +279,16 @@ export default function CustomizePackageContainer() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50">
+      {regenToast && (
+        <RegenerationToast
+          message={regenToast.message}
+          onUndo={() => {
+            regenToast.undo();
+            setRegenToast(null);
+          }}
+          onDismiss={() => setRegenToast(null)}
+        />
+      )}
       <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10">
         <button
           type="button"
@@ -541,7 +587,7 @@ export default function CustomizePackageContainer() {
                                 preferences: message || undefined,
                               })
                             }
-                            disabled={aiGenerator.isGenerating}
+                            disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
                             className="px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-brand-600 rounded-xl bg-white border-2 border-brand-500 hover:bg-brand-50 shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 whitespace-nowrap flex-1 sm:flex-none justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {aiGenerator.isGenerating ? (
@@ -559,7 +605,7 @@ export default function CustomizePackageContainer() {
                           <button
                             type="button"
                             onClick={handleAddDay}
-                            disabled={aiGenerator.isGenerating}
+                            disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
                             className="px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white rounded-xl bg-brand-600 hover:bg-brand-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap flex-1 sm:flex-none justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -575,9 +621,20 @@ export default function CustomizePackageContainer() {
                           <p className="text-red-700 text-xs sm:text-sm font-medium">{aiGenerator.error}</p>
                         </div>
                       )}
+                      {aiDayGenerator.error && (
+                        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+                          <p className="text-red-700 text-xs sm:text-sm font-medium">{aiDayGenerator.error}</p>
+                        </div>
+                      )}
                   <div className={`space-y-4 sm:space-y-5 ${aiGenerator.isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                     {dayOverrides.map((day, index) => (
-                      <div key={day.id} className="border border-gray-200 rounded-2xl p-4 sm:p-6 bg-gradient-to-br from-white to-gray-50/50 shadow-sm hover:shadow-md transition-all duration-200">
+                      <div key={day.id} className="relative border border-gray-200 rounded-2xl p-4 sm:p-6 bg-gradient-to-br from-white to-gray-50/50 shadow-sm hover:shadow-md transition-all duration-200" aria-busy={aiDayGenerator.generatingDayNumber === day.dayNumber}>
+                        {aiDayGenerator.generatingDayNumber === day.dayNumber && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 rounded-2xl" role="status" aria-live="polite">
+                            <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
+                            <span className="sr-only">Regenerating day {day.dayNumber}…</span>
+                          </div>
+                        )}
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-5">
                           <div className="flex items-center gap-3 sm:gap-4">
                             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-brand-600 text-white font-bold text-base sm:text-lg flex items-center justify-center shadow-md flex-shrink-0">
@@ -590,15 +647,27 @@ export default function CustomizePackageContainer() {
                               )}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDay(index)}
-                            className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-black hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors duration-200"
-                          >
-                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => aiDayGenerator.generateDay(day.dayNumber)}
+                              disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
+                              aria-label={`Regenerate day ${day.dayNumber}`}
+                              title={`Regenerate day ${day.dayNumber}`}
+                              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-black hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDay(index)}
+                              className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium text-black hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors duration-200"
+                            >
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                           <div className="space-y-2">
@@ -643,6 +712,28 @@ export default function CustomizePackageContainer() {
                           className="px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700 shadow-md hover:shadow-lg transition-all duration-200"
                         >
                           Add Your First Day
+                        </button>
+                      </div>
+                    )}
+                    {missingDayNumbers.length > 0 && (
+                      <div className="flex justify-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => aiDayGenerator.generateDays(missingDayNumbers)}
+                          disabled={aiGenerator.isGenerating || aiDayGenerator.isGenerating}
+                          className="min-h-[44px] px-4 py-2 text-brand-600 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {aiDayGenerator.isGenerating && aiDayGenerator.generatingDayNumber === null ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Generating {pluralize(missingDayNumbers.length, 'day')}...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              Generate remaining {pluralize(missingDayNumbers.length, 'day')} with AI
+                            </>
+                          )}
                         </button>
                       </div>
                     )}

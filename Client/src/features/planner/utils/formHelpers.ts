@@ -145,3 +145,63 @@ export const addDaysISO = (isoDate: string, days: number): string => {
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 };
+
+// ── Per-day AI generation helpers (regenerate one day / fill remaining) ──
+
+/** A minimal day shape carrying only what the per-day AI endpoints need for
+ * prompt context — reduces PlanYourTripContainer's ItineraryDay and
+ * CustomizePackageContainer's DayOverrideState to one common wire shape. */
+export interface ExistingDayContext {
+  dayNumber: number;
+  title?: string;
+  locations?: string[];
+  activities?: string[];
+}
+
+/** Projects a container's day-state shape (ItineraryDay or DayOverrideState —
+ * anything with at least these fields) down to the wire shape the per-day
+ * AI endpoints expect as prompt context. Shared so both containers' existingDays
+ * mapping stays aligned with ExistingDayContext in one place. */
+export const toExistingDayContext = (day: { dayNumber: number; title?: string | null; locations?: string[]; activities?: string[] }): ExistingDayContext => ({
+  dayNumber: day.dayNumber,
+  title: day.title ?? undefined,
+  locations: day.locations,
+  activities: day.activities,
+});
+
+/** Replaces the entry whose dayNumber matches `day`, or appends it (sorted)
+ * if no existing day has that number. The shared merge used by per-day and
+ * bulk AI regeneration so unrelated days are never touched, and so it works
+ * correctly even when dayNumbers aren't contiguous (see
+ * CustomizePackageContainer's handleRemoveDay, which doesn't renumber). */
+export const mergeDayByNumber = <T extends { dayNumber: number }>(days: T[], day: T): T[] => {
+  const index = days.findIndex((d) => d.dayNumber === day.dayNumber);
+  if (index === -1) return [...days, day].sort((a, b) => a.dayNumber - b.dayNumber);
+  const next = [...days];
+  next[index] = day;
+  return next;
+};
+
+/** Folds `mergeDayByNumber` over a batch of newly-generated days. */
+export const mergeDaysByNumber = <T extends { dayNumber: number }>(days: T[], newDays: T[]): T[] =>
+  newDays.reduce((acc, day) => mergeDayByNumber(acc, day), days);
+
+/** The per-day/range AI endpoints reject dayNumber/totalDuration above 30
+ * (Services/shared/contracts) — a trip longer than this can't use per-day
+ * or bulk AI generation at all. Shared here so both containers cap what
+ * they offer instead of rendering a CTA that fails validation client-side. */
+export const AI_DAY_GENERATION_MAX_DAY = 30;
+
+/** Day numbers in `1..totalDuration` not present in `existingDayNumbers` —
+ * a real set difference, not a naive tail computation, because
+ * CustomizePackageContainer's day list can have gaps in the middle. Capped
+ * at AI_DAY_GENERATION_MAX_DAY so bulk-fill never requests a day number the
+ * server would reject. */
+export const computeMissingDayNumbers = (totalDuration: number, existingDayNumbers: number[]): number[] => {
+  const existing = new Set(existingDayNumbers);
+  const missing: number[] = [];
+  for (let n = 1; n <= Math.min(totalDuration, AI_DAY_GENERATION_MAX_DAY); n += 1) {
+    if (!existing.has(n)) missing.push(n);
+  }
+  return missing;
+};
