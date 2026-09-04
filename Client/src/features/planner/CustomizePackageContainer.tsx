@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
@@ -27,10 +27,20 @@ interface TravelPrefsState {
   travelDate: string;
 }
 
+/** Optional prefill carried via navigate() state — set by TripWizardPanel's
+ * complete_wizard exit path. Absent for every other entry point (e.g. the
+ * package details page's "Customize" link), which keeps existing defaults. */
+interface WizardPrefillState {
+  travelers?: number;
+  preferences?: string;
+}
+
 export default function CustomizePackageContainer() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const wizardPrefill = (location.state as WizardPrefillState | null) || null;
   const [pkg, setPkg] = useState<NormalizedPackage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,11 +55,11 @@ export default function CustomizePackageContainer() {
   });
 
   const [travelPrefs, setTravelPrefs] = useState<TravelPrefsState>({
-    travelers: 2,
+    travelers: wizardPrefill?.travelers ?? 2,
     travelDate: '',
   });
 
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(wizardPrefill?.preferences ?? '');
   const [dayOverrides, setDayOverrides] = useState<DayOverrideState[]>([]);
   const aiGenerator = useAIItineraryGenerator<DayOverrideState>({
     hasExistingDays: () => dayOverrides.length > 0,

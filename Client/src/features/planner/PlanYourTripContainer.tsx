@@ -17,6 +17,7 @@ import {
   Coffee,
   UtensilsCrossed,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
@@ -32,6 +33,7 @@ import ActivitySelector from "../../components/shared/ActivitySelector";
 import { useAuth } from "../../contexts/AuthContext";
 import DateRangeCalendar from "./components/DateRangeCalendar";
 import ItineraryChatPanel from "./components/ItineraryChatPanel";
+import TripWizardPanel from "./components/TripWizardPanel";
 
 const transportOptions: Array<{ value: string; label: string; icon: LucideIcon }> = [
   { value: "flight", label: "Flight", icon: Plane },
@@ -100,7 +102,7 @@ export default function PlanYourTripContainer() {
   const [currentDayIndex, setCurrentDayIndex] = useState(0); // Index of currently visible day (0-based)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [preferences, setPreferences] = useState('');
-  const [entryMode, setEntryMode] = useState<'manual' | 'chat'>('manual');
+  const [entryMode, setEntryMode] = useState<'manual' | 'chat' | 'wizard'>('manual');
   const aiGenerator = useAIItineraryGenerator<ItineraryDay>({
     hasExistingDays: () => itineraryDays.length > 0,
     mapDay: buildItineraryDayFromAIDay,
@@ -390,9 +392,14 @@ export default function PlanYourTripContainer() {
                 <button type="button" onClick={() => setEntryMode('chat')} className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${entryMode === 'chat' ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                   <Zap className="w-3.5 h-3.5" /> Chat with AI
                 </button>
+                <button type="button" onClick={() => setEntryMode('wizard')} className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${entryMode === 'wizard' ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  <Sparkles className="w-3.5 h-3.5" /> Find a Package with AI
+                </button>
               </div>
               {entryMode === 'chat' ? (
                 <ItineraryChatPanel onReady={handleChatReady} />
+              ) : entryMode === 'wizard' ? (
+                <TripWizardPanel />
               ) : (
                 <>
                   <div className="mb-4">

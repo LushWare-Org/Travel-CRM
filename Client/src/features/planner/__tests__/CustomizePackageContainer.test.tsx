@@ -10,6 +10,7 @@ import { generateItineraryPreview } from '../../../services/api/aiItinerary';
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   useNavigate: vi.fn(),
+  useLocation: vi.fn(),
   swalFire: vi.fn(),
 }));
 
@@ -36,6 +37,7 @@ vi.mock('../../../contexts/AuthContext', () => ({
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 'pkg-123' }),
   useNavigate: () => mocks.useNavigate(),
+  useLocation: () => mocks.useLocation(),
 }));
 
 const fetchPackageByIdMock = vi.mocked(fetchPackageById);
@@ -64,6 +66,7 @@ const rawPackage = {
 beforeEach(() => {
   mocks.useAuth.mockReturnValue({ user: null });
   mocks.useNavigate.mockReturnValue(vi.fn());
+  mocks.useLocation.mockReturnValue({ state: null });
   mocks.swalFire.mockReset();
   fetchPackageByIdMock.mockReset();
   fetchPackageByIdMock.mockResolvedValue(normalizePackage(rawPackage));
@@ -71,6 +74,7 @@ beforeEach(() => {
   submitCustomizationRequestMock.mockResolvedValue({ customizedPackageId: 'cp-1', leadId: 'lead-1' });
   generateItineraryPreviewMock.mockReset();
 });
+
 
 describe('CustomizePackageContainer', () => {
   it('shows a loading state, then renders the package customization form', async () => {
@@ -84,6 +88,25 @@ describe('CustomizePackageContainer', () => {
     expect(
       screen.getByRole('button', { name: /Next/ }),
     ).toBeInTheDocument();
+  });
+
+  it('prefills travelers and preferences from wizard navigation state, and submits them', async () => {
+    mocks.useLocation.mockReturnValue({ state: { travelers: 4, preferences: 'love hiking' } });
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+
+    expect(submitCustomizationRequestMock).toHaveBeenCalledWith(expect.objectContaining({
+      travelers: 4,
+      message: 'love hiking',
+    }));
   });
 
   it('submits the exact expected payload after stepping through the form', async () => {
