@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.0.0] - 2026-09-04
+
+### Added
+- The trip-planning chatbot now asks for a way to reach you (email, phone, or WhatsApp) once it knows your destination and trip length, then automatically hands your conversation to the team as a lead — no more re-explaining your trip to an agent from scratch.
+- Sales reps can see and claim customer conversations coming from the chatbot in a distinct "Pending Verification" queue in Management, visible to any rep until someone claims it, with the full conversation transcript attached.
+- New filter controls in the lead list for filtering by source and platform, including the chatbot as a filterable source.
+
+### Changed
+- Leads created by the chatbot always start in a "Pending Verification" state and require a sales rep to actively claim them before entering the normal sales pipeline — the chatbot never books, confirms, or prices anything on its own.
+
+### Fixed
+- The lead list's source and platform filters, which previously had no effect, now actually filter results.
+
 ## [0.1.0.0] - 2026-09-04
 
 ### Added
