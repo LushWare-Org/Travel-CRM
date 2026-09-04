@@ -11,6 +11,8 @@ import {
   generateAIPackageSchema,
   generateFromTitleSchema,
   generateItineraryPreviewSchema,
+  generateDayPreviewSchema,
+  generateDaysRangePreviewSchema,
   itineraryChatSchema,
   wizardTurnSchema,
 } from '../validators/package.schema.js';
@@ -22,6 +24,8 @@ import {
   generateAndSaveAIContent,
   previewAIContent,
   generateItineraryPreview,
+  generateDayPreview,
+  generateDaysRangePreview,
   itineraryChat,
 } from '../controllers/aiPackage.controller.js';
 import { downloadAIPdf } from '../controllers/aiPdf.controller.js';
@@ -52,6 +56,10 @@ router.post('/generate-itinerary-preview', validateBody(generateItineraryPreview
 router.post('/itinerary-chat', validateBody(itineraryChatSchema), itineraryChat);
 // Public: non-persisting trip-planning wizard turn — no DB write, rate-limited at the gateway.
 router.post('/wizard-turn', validateBody(wizardTurnSchema), wizardTurn);
+// Public: non-persisting single-day itinerary preview — no DB write, rate-limited at the gateway.
+router.post('/generate-day-preview', validateBody(generateDayPreviewSchema), generateDayPreview);
+// Public: non-persisting multi-day (sub-range) itinerary preview — no DB write, rate-limited at the gateway.
+router.post('/generate-days-preview', validateBody(generateDaysRangePreviewSchema), generateDaysRangePreview);
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 router.post('/calculate-price', requireAuth, packageController.calculatePrice);

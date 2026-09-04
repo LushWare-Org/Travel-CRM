@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CustomizePackageContainer from '../CustomizePackageContainer';
 import { fetchPackageById } from '../../../services/api/packages';
 import { submitCustomizationRequest } from '../../../services/api/customization';
 import { normalizePackage } from '../../../services/api/packages.transform';
 import { generateItineraryPreview } from '../../../services/api/aiItinerary';
+import { generateDayPreview, generateDaysRangePreview } from '../../../services/api/aiDayGeneration';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -26,6 +27,11 @@ vi.mock('../../../services/api/aiItinerary', () => ({
   generateItineraryPreview: vi.fn(),
 }));
 
+vi.mock('../../../services/api/aiDayGeneration', () => ({
+  generateDayPreview: vi.fn(),
+  generateDaysRangePreview: vi.fn(),
+}));
+
 vi.mock('sweetalert2', () => ({
   default: { fire: mocks.swalFire },
 }));
@@ -43,6 +49,8 @@ vi.mock('react-router-dom', () => ({
 const fetchPackageByIdMock = vi.mocked(fetchPackageById);
 const submitCustomizationRequestMock = vi.mocked(submitCustomizationRequest);
 const generateItineraryPreviewMock = vi.mocked(generateItineraryPreview);
+const generateDayPreviewMock = vi.mocked(generateDayPreview);
+const generateDaysRangePreviewMock = vi.mocked(generateDaysRangePreview);
 
 const rawPackage = {
   _id: 'pkg-123',
@@ -73,6 +81,8 @@ beforeEach(() => {
   submitCustomizationRequestMock.mockReset();
   submitCustomizationRequestMock.mockResolvedValue({ customizedPackageId: 'cp-1', leadId: 'lead-1' });
   generateItineraryPreviewMock.mockReset();
+  generateDayPreviewMock.mockReset();
+  generateDaysRangePreviewMock.mockReset();
 });
 
 
@@ -244,5 +254,201 @@ describe('CustomizePackageContainer', () => {
         },
       }),
     );
+  });
+
+  it('clicking the sparkle button on a day regenerates only that day, leaving other days untouched through submit', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    expect(screen.getByText('Day 1')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add Day' }));
+    expect(screen.getByText('Day 2')).toBeInTheDocument();
+
+    generateDayPreviewMock.mockResolvedValue({
+      day: { dayNumber: 1, title: 'AI Colombo Day', locations: ['Galle Face'], activities: ['Sunset walk'] },
+    });
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+
+    expect(generateDayPreviewMock).toHaveBeenCalledWith({
+      destination: 'Sri Lanka',
+      dayNumber: 1,
+      totalDuration: 7,
+      travelers: 2,
+      preferences: undefined,
+      existingDays: [
+        { dayNumber: 1, title: 'Day 1', locations: ['Colombo'], activities: ['Beach'] },
+        { dayNumber: 2, title: 'Day 2', locations: [], activities: [] },
+      ],
+    });
+    expect(await screen.findByText('AI Colombo Day')).toBeInTheDocument();
+
+    // Day 2 survives the day-1-only regeneration untouched — prove it via
+    // the final submit payload (dayNumber 2, still blank, still present).
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+
+    expect(submitCustomizationRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        overrides: {
+          days: [
+            { dayNumber: 1, activities: ['Sunset walk'], locations: ['Galle Face'] },
+            { dayNumber: 2, activities: [], locations: [] },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('clicking "Generate remaining days with AI" fills every unplanned day up to the package duration', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [2, 3, 4, 5, 6, 7].map((dayNumber) => ({
+        dayNumber,
+        title: `AI Day ${dayNumber}`,
+        locations: [],
+        activities: [],
+      })),
+    });
+
+    await user.click(screen.getByRole('button', { name: /Generate remaining 6 days with AI/ }));
+
+    expect(generateDaysRangePreviewMock).toHaveBeenCalledWith({
+      destination: 'Sri Lanka',
+      dayNumbers: [2, 3, 4, 5, 6, 7],
+      totalDuration: 7,
+      travelers: 2,
+      preferences: undefined,
+      existingDays: [{ dayNumber: 1, title: 'Day 1', locations: ['Colombo'], activities: ['Beach'] }],
+    });
+
+    expect(await screen.findByText('AI Day 7')).toBeInTheDocument();
+    expect(screen.getByText('Day 7')).toBeInTheDocument();
+    expect(screen.queryByText(/Generate remaining/)).not.toBeInTheDocument();
+  });
+
+  it('after a per-day regeneration, clicking Undo in the toast restores the day\'s prior content', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    generateDayPreviewMock.mockResolvedValue({
+      day: { dayNumber: 1, title: 'AI Colombo Day', locations: ['Galle Face'], activities: ['Sunset walk'] },
+    });
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+    expect(await screen.findByText('AI Colombo Day')).toBeInTheDocument();
+    expect(screen.getByText('Day 1 regenerated')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(screen.queryByText('AI Colombo Day')).not.toBeInTheDocument();
+    expect(screen.queryByText('Day 1 regenerated')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+
+    expect(submitCustomizationRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        overrides: { days: [{ dayNumber: 1, activities: ['Beach'], locations: ['Colombo'] }] },
+      }),
+    );
+  });
+
+  it('after a bulk-fill, clicking Undo in the toast removes exactly the newly-generated days', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [2, 3, 4, 5, 6, 7].map((dayNumber) => ({ dayNumber, title: `AI Day ${dayNumber}`, locations: [], activities: [] })),
+    });
+    await user.click(screen.getByRole('button', { name: /Generate remaining 6 days with AI/ }));
+    await screen.findByText('AI Day 7');
+    expect(screen.getByText('6 days generated')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(screen.queryByText('Day 7')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 6 days with AI/ })).toBeInTheDocument();
+  });
+
+  it('a rejected per-day regeneration shows the per-day error banner and leaves the day content untouched', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    generateDayPreviewMock.mockRejectedValue(new Error('Network Error'));
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+
+    expect(await screen.findByText('Network Error')).toBeInTheDocument();
+    expect(screen.queryByText('AI Colombo Day')).not.toBeInTheDocument();
+    expect(screen.queryByText('Day 1 regenerated')).not.toBeInTheDocument();
+  });
+
+  it('a partial bulk-fill shows the "N of M days generated" note and the CTA re-shows for the rest', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    generateDaysRangePreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 2, title: 'Ubud', locations: [], activities: [] }],
+    });
+    await user.click(screen.getByRole('button', { name: /Generate remaining 6 days with AI/ }));
+
+    expect(await screen.findByText('1 of 6 days generated. Click again to fill the rest.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate remaining 5 days with AI/ })).toBeInTheDocument();
+  });
+
+  it('while a per-day regeneration is in flight, the whole-trip regenerate and Add Day buttons are disabled', async () => {
+    const user = userEvent.setup();
+    let resolveGenerate: (value: { day: { dayNumber: number; title: string; locations: string[]; activities: string[] } }) => void = () => {};
+    // Executor form (not Promise.withResolvers) — this project's tsconfig
+    // targets ES2020/lib ES2020, which predates withResolvers.
+    generateDayPreviewMock.mockReturnValue(new Promise((resolve) => { resolveGenerate = resolve; }));
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
+
+    expect(screen.getByRole('button', { name: /Regenerate with AI/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add Day' })).toBeDisabled();
+
+    await act(async () => {
+      resolveGenerate({ day: { dayNumber: 1, title: 'AI Colombo Day', locations: [], activities: [] } });
+      await Promise.resolve();
+    });
   });
 });

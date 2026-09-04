@@ -194,6 +194,42 @@ export const generateItineraryPreviewSchema = z.object({
   preferences: z.string().max(1000).optional(),
 });
 
+// ─── Per-day / range AI generation (public, non-persisting) ────
+// existingDays carries the trip's other days as prompt context so the model
+// avoids duplicating already-planned locations/activities. Permissive
+// (passthrough, only dayNumber required) since the client sends its full
+// editable day-state shape, of which only dayNumber/title/locations/activities
+// feed the prompt. Bounds are deliberately tight (well under a real day's
+// content) — this is public and unauthenticated, sharing itineraryChatLimiter
+// with the chat endpoints, so a padded existingDays array must not let one
+// request balloon the billed prompt far past what a real trip needs.
+const existingDayContextSchema = z.object({
+  dayNumber: z.coerce.number().int().min(1).max(30),
+  title: z.string().max(100).optional().nullable(),
+  locations: z.array(z.string().max(100)).max(15).optional(),
+  activities: z.array(z.string().max(100)).max(15).optional(),
+}).passthrough();
+
+export const generateDayPreviewSchema = z.object({
+  destination: z.string().min(1, 'Destination is required').max(255),
+  dayNumber: z.coerce.number().int().min(1).max(30),
+  totalDuration: z.coerce.number().int().min(1).max(30),
+  travelers: z.coerce.number().int().min(1).max(50).optional(),
+  budget: z.string().max(100).optional(),
+  preferences: z.string().max(1000).optional(),
+  existingDays: z.array(existingDayContextSchema).max(30).optional(),
+});
+
+export const generateDaysRangePreviewSchema = z.object({
+  destination: z.string().min(1, 'Destination is required').max(255),
+  dayNumbers: z.array(z.coerce.number().int().min(1).max(30)).min(1).max(30),
+  totalDuration: z.coerce.number().int().min(1).max(30),
+  travelers: z.coerce.number().int().min(1).max(50).optional(),
+  budget: z.string().max(100).optional(),
+  preferences: z.string().max(1000).optional(),
+  existingDays: z.array(existingDayContextSchema).max(30).optional(),
+});
+
 // ─── Conversational itinerary chat (public, non-persisting) ────
 
 const itineraryChatMessageSchema = z.object({

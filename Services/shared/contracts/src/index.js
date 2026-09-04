@@ -46,3 +46,11 @@ export {
   ItineraryChatRequest,
   ItineraryChatResult,
 } from './itineraryChat.js';
+export {
+  GenerateDayPreviewRequest,
+  GenerateDayPreviewResult,
+} from './generateDayPreview.js';
+export {
+  GenerateDaysRangePreviewRequest,
+  GenerateDaysRangePreviewResult,
+} from './generateDaysRangePreview.js';
