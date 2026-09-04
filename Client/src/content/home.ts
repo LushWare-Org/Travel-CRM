@@ -1,5 +1,8 @@
-import { isLushTheme } from '../config/activeTheme';
-import { HERO_SLIDES as GENERIC_HERO_SLIDES } from './home.generic';
-import { HERO_SLIDES as LUSH_HERO_SLIDES } from './home.lush';
-
-export const HERO_SLIDES = isLushTheme ? LUSH_HERO_SLIDES : GENERIC_HERO_SLIDES;
+// Per-company marketing content: home-page hero slides.
+// Index-aligned with config/media.ts's HERO_MEDIA (v1..v4 = beach/mountain/safari/temple).
+export const HERO_SLIDES = [
+  { title: 'Where Turquoise Tides Meet Timeless Journeys', subtitle: 'Immersive escapes crafted for those who travel with intention' },
+  { title: 'Chase Horizons, Not Itineraries', subtitle: "Hand-crafted adventures through the world's most breathtaking landscapes" },
+  { title: 'Wild at Heart, Refined in Every Detail', subtitle: 'Luxury safaris and nature encounters curated by local experts' },
+  { title: 'Ancient Wonders, Modern Comfort', subtitle: 'Cultural journeys that honor the places you visit' },
+];

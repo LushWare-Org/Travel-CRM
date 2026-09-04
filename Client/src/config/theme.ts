@@ -1,24 +1,14 @@
 /**
  * Brand theme helpers.
  *
- * PALETTE mirrors palettes/<theme>.json (which tailwind.config.js also
- * reads, independently, for its own Node/CJS load context). A new company
- * re-themes by editing src/config/palettes/generic.json; these helpers
- * expose the same values to JS (PDF generation) and CSS variables.
+ * PALETTE mirrors palettes/lush.json (which tailwind.config.js also reads,
+ * independently, for its own Node/CJS load context). A new deployment
+ * re-themes by editing src/config/palettes/lush.json; these helpers expose
+ * the same values to JS (PDF generation) and CSS variables.
  */
-import generic from './palettes/generic.json';
-import lush from './palettes/lush.json';
-import { isLushTheme } from './activeTheme';
+import PALETTE from './palettes/lush.json';
 
-interface PaletteShades {
-  brand: Record<string, string>;
-  brandAccent: Record<string, string>;
-  brandDark: Record<string, string>;
-  neutral?: Record<string, string>;
-  fonts: { display: string; body: string };
-}
-
-export const PALETTE: PaletteShades = isLushTheme ? lush : generic;
+export { PALETTE };
 
 export const hexToRgb = (hex: string): [number, number, number] => {
   const cleaned = String(hex || '').replace(/^#/, '');
