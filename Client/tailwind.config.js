@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-const activeTheme = process.env.VITE_THEME === 'lush' ? 'lush' : 'generic'; // mirrors src/config/activeTheme.ts; see comment there
-const brandPalette = require(`./src/config/palettes/${activeTheme}.json`);
+const brandPalette = require('./src/config/palettes/lush.json');
 
 module.exports = {
   content: [
