@@ -196,8 +196,10 @@ describe('HomeContainer', () => {
     const trigger = within(whenField).getByRole('button');
     fireEvent.click(trigger);
 
-    fireEvent.click(within(whenField).getByRole('button', { name: 'January' }));
-
+    // The dropdown panel is portaled to document.body (see
+    // HomeContainer's createPortal usage), so its options aren't inside
+    // whenField's DOM subtree — query them via screen, not within(whenField).
+    fireEvent.click(screen.getByRole('button', { name: 'January' }));
     expect(within(whenField).getByRole('button', { name: 'January' })).toBeInTheDocument();
   });
 });

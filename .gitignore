@@ -151,3 +151,7 @@ planning/
 crash.log
 *.tfvars
 !*.tfvars.example
+
+# Local scratch / IDE / customer PII exports — never commit
+.idea/
+secret/
