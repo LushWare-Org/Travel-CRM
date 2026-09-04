@@ -11,6 +11,8 @@ import { buildGenerateFromTitlePrompt, generateFromTitleResponseSchema } from '.
 import { buildPackageMarketingContentPrompt, packageMarketingContentResponseSchema } from '../ai/prompts/packageMarketingContent.v1.js';
 import { buildGenerateItineraryPreviewPrompt, generateItineraryPreviewResponseSchema } from '../ai/prompts/generateItineraryPreview.v1.js';
 import { buildItineraryChatPrompt, itineraryChatResponseSchema } from '../ai/prompts/itineraryChat.v1.js';
+import { buildGenerateDayPreviewPrompt, generateDayPreviewResponseSchema } from '../ai/prompts/generateDayPreview.v1.js';
+import { buildGenerateDaysRangePrompt, generateDaysRangeResponseSchema } from '../ai/prompts/generateDaysRange.v1.js';
 
 // Map frontend display categories to valid PackageCategory enum values.
 const CATEGORY_MAP = {
@@ -70,16 +72,23 @@ async function buildAIContent(pkg) {
   return generateStructured({ prompt, schema: packageMarketingContentResponseSchema });
 }
 
-// Scale the token budget with duration instead of a fixed cap (a long
-// itinerary's full JSON can exceed a small fixed cap and get silently
+// Scale the token budget with duration/day-count instead of a fixed cap (a
+// long itinerary's full JSON can exceed a small fixed cap and get silently
 // truncated by Gemini's constrained decoder), capped under the model's real
 // ceiling; geminiClient escalates further on its own if this still isn't
-// enough. Pads the result to exactly `duration` days as a last-resort safety
+// enough. Shared by generateDaysArray (full-trip/head-anchored generation)
+// and generateDaysRangePreview (sub-range generation) so the 700-tokens-
+// per-day slope and 60000 ceiling live in exactly one place.
+function dayTokenBudget(dayCount, base) {
+  return Math.min(60000, base + Number(dayCount) * 700);
+}
+
+// Pads the result to exactly `duration` days as a last-resort safety
 // net for a model that returns a handful fewer days than asked without
 // tripping truncation detection upstream.
 async function generateDaysArray({ prompt, schema, duration, tokenBudgetBase }) {
   const d = Number(duration);
-  const maxOutputTokens = Math.min(60000, tokenBudgetBase + d * 700);
+  const maxOutputTokens = dayTokenBudget(d, tokenBudgetBase);
   const data = await generateStructured({ prompt, schema, maxOutputTokens });
   const days = Array.isArray(data.days) ? data.days.slice(0, d) : [];
   const shortfall = d - days.length;
@@ -163,6 +172,50 @@ export const generateItineraryPreview = asyncHandler(async (req, res) => {
     duration,
     tokenBudgetBase: 800,
   });
+  res.json({ success: true, data: { days } });
+});
+
+// ── Public: non-persisting single-day itinerary preview ───────
+
+export const generateDayPreview = asyncHandler(async (req, res) => {
+  const { destination, dayNumber, totalDuration, travelers, budget, preferences, existingDays } = req.body;
+  const prompt = buildGenerateDayPreviewPrompt({ destination, dayNumber, totalDuration, travelers, budget, preferences, existingDays });
+  // Single day is cheap relative to a full trip — the small fixed budget
+  // below (vs. generateDaysArray's duration-scaled formula) is intentional.
+  const data = await generateStructured({ prompt, schema: generateDayPreviewResponseSchema, maxOutputTokens: 1500 });
+  // Force dayNumber to the requested slot regardless of what the model
+  // returned — the client's positional merge depends on this, not on
+  // trusting model output.
+  const day = { ...data.day, dayNumber };
+  res.json({ success: true, data: { day } });
+});
+
+// ── Public: non-persisting multi-day (sub-range) itinerary preview ─
+
+export const generateDaysRangePreview = asyncHandler(async (req, res) => {
+  const { destination, dayNumbers, totalDuration, travelers, budget, preferences, existingDays } = req.body;
+  const prompt = buildGenerateDaysRangePrompt({ destination, dayNumbers, totalDuration, travelers, budget, preferences, existingDays });
+  const maxOutputTokens = dayTokenBudget(dayNumbers.length, 800);
+  const data = await generateStructured({ prompt, schema: generateDaysRangeResponseSchema, maxOutputTokens });
+  // generateDaysArray is NOT reusable here: its shortfall-padding logic
+  // numbers placeholders from `days.length + 1` (head-anchored), which
+  // corrupts non-head-anchored ranges (e.g. filling days 4-7 when the model
+  // returns only 3 days would produce a placeholder numbered 4, duplicating
+  // an existing day). Map returned days positionally onto the requested
+  // dayNumbers instead; an unfilled slot on shortfall is simply omitted —
+  // the client re-shows the CTA rather than getting a blank placeholder.
+  //
+  // Sort first: buildGenerateDaysRangePrompt always asks the model for days
+  // in ascending order regardless of request order, so positionally mapping
+  // onto the RAW request order (e.g. dayNumbers: [5, 4]) would silently
+  // swap day content between slots. The client's merge is keyed by
+  // dayNumber (a Map lookup), not array position, so returning the days
+  // pre-sorted here is fully compatible with any request order.
+  const sortedDayNumbers = [...dayNumbers].sort((a, b) => a - b);
+  const returned = Array.isArray(data.days) ? data.days : [];
+  const days = sortedDayNumbers
+    .map((dayNumber, i) => (returned[i] ? { ...returned[i], dayNumber } : null))
+    .filter(Boolean);
   res.json({ success: true, data: { days } });
 });
 

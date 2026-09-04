@@ -11,6 +11,8 @@ import {
   createActivitySchema,
   generateAIPackageSchema,
   generateFromTitleSchema,
+  generateDayPreviewSchema,
+  generateDaysRangePreviewSchema,
 } from '../package.schema.js';
 
 const UUID_1 = 'b0000000-0000-4000-8000-000000000001';
@@ -442,5 +444,94 @@ describe('generateFromTitleSchema', () => {
 
   it('rejects an empty title', () => {
     expect(generateFromTitleSchema.safeParse({ title: '' }).success).toBe(false);
+  });
+});
+
+describe('generateDayPreviewSchema', () => {
+  const base = { destination: 'Kandy', dayNumber: 3, totalDuration: 7 };
+
+  it('accepts a minimal payload', () => {
+    expect(generateDayPreviewSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('accepts existingDays context entries', () => {
+    const result = generateDayPreviewSchema.safeParse({
+      ...base,
+      existingDays: [{ dayNumber: 1, title: 'Arrival', locations: ['Ubud'], activities: ['Temple visit'] }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing destination', () => {
+    expect(generateDayPreviewSchema.safeParse({ dayNumber: 3, totalDuration: 7 }).success).toBe(false);
+  });
+
+  it('rejects dayNumber above the 30-day cap', () => {
+    expect(generateDayPreviewSchema.safeParse({ ...base, dayNumber: 31 }).success).toBe(false);
+  });
+
+  it('rejects a zero dayNumber', () => {
+    expect(generateDayPreviewSchema.safeParse({ ...base, dayNumber: 0 }).success).toBe(false);
+  });
+
+  it('rejects totalDuration above the 30-day cap', () => {
+    expect(generateDayPreviewSchema.safeParse({ ...base, totalDuration: 31 }).success).toBe(false);
+  });
+
+  it('coerces numeric-string dayNumber/totalDuration, matching how they arrive over JSON', () => {
+    const result = generateDayPreviewSchema.safeParse({ destination: 'Kandy', dayNumber: '3', totalDuration: '7' });
+    expect(result.success).toBe(true);
+    expect(result.data.dayNumber).toBe(3);
+    expect(result.data.totalDuration).toBe(7);
+  });
+
+  it('rejects an existingDays entry exceeding the 15-location cap', () => {
+    const result = generateDayPreviewSchema.safeParse({
+      ...base,
+      existingDays: [{ dayNumber: 1, locations: Array.from({ length: 16 }, (_, i) => `Place ${i}`) }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an existingDays entry with a location string over 100 chars', () => {
+    const result = generateDayPreviewSchema.safeParse({
+      ...base,
+      existingDays: [{ dayNumber: 1, locations: ['x'.repeat(101)] }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an existingDays entry missing dayNumber', () => {
+    const result = generateDayPreviewSchema.safeParse({ ...base, existingDays: [{ title: 'Arrival' }] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('generateDaysRangePreviewSchema', () => {
+  const base = { destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 };
+
+  it('accepts a minimal payload', () => {
+    expect(generateDaysRangePreviewSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('accepts non-contiguous dayNumbers', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: [2, 5, 6] }).success).toBe(true);
+  });
+
+  it('rejects dayNumbers: []', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: [] }).success).toBe(false);
+  });
+
+  it('rejects a dayNumbers array longer than 30', () => {
+    const result = generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: Array.from({ length: 31 }, (_, i) => i + 1) });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a dayNumbers entry of 0', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, dayNumbers: [0, 1] }).success).toBe(false);
+  });
+
+  it('rejects totalDuration above the 30-day cap', () => {
+    expect(generateDaysRangePreviewSchema.safeParse({ ...base, totalDuration: 31 }).success).toBe(false);
   });
 });

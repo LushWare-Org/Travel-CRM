@@ -403,3 +403,204 @@ describe('POST /api/v1/packages/itinerary-chat', () => {
     expect(res.status).toBe(502);
   });
 });
+
+describe('POST /api/v1/packages/generate-day-preview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const aiDay = { dayNumber: 3, title: 'Waterfalls', locations: ['Tegenungan Waterfall'], activities: ['Waterfall hike'], meals: { lunch: true }, transport: 'car' };
+
+  it('returns 200 with a single day on success, with no Authorization header (genuinely public)', async () => {
+    mockGenerateStructured.mockResolvedValue({ day: aiDay });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-day-preview')
+      .send({ destination: 'Bali', dayNumber: 3, totalDuration: 7 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.day).toMatchObject({ dayNumber: 3, title: 'Waterfalls', locations: ['Tegenungan Waterfall'] });
+  });
+
+  it('forces dayNumber to the requested value even when the model returns a different one', async () => {
+    mockGenerateStructured.mockResolvedValue({ day: { ...aiDay, dayNumber: 99 } });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-day-preview')
+      .send({ destination: 'Bali', dayNumber: 3, totalDuration: 7 });
+
+    expect(res.body.data.day.dayNumber).toBe(3);
+  });
+
+  it('excludes the target day from the existingDays context sent to the prompt, even if the client includes it', async () => {
+    mockGenerateStructured.mockResolvedValue({ day: aiDay });
+
+    await request(app)
+      .post('/api/v1/packages/generate-day-preview')
+      .send({
+        destination: 'Bali',
+        dayNumber: 3,
+        totalDuration: 7,
+        existingDays: [
+          { dayNumber: 1, title: 'Arrival', locations: ['Ubud'], activities: ['Temple visit'] },
+          { dayNumber: 3, title: 'Stale Day 3', locations: ['Old Location'], activities: ['Old Activity'] },
+        ],
+      });
+
+    const promptArg = mockGenerateStructured.mock.calls[0][0].prompt;
+    expect(promptArg).toContain('Ubud');
+    expect(promptArg).not.toContain('Old Location');
+  });
+
+  it('never persists — package.create is never called', async () => {
+    mockGenerateStructured.mockResolvedValue({ day: aiDay });
+
+    await request(app)
+      .post('/api/v1/packages/generate-day-preview')
+      .send({ destination: 'Bali', dayNumber: 3, totalDuration: 7 });
+
+    expect(mockPrisma.package.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when dayNumber is missing', async () => {
+    const res = await request(app)
+      .post('/api/v1/packages/generate-day-preview')
+      .send({ destination: 'Bali', totalDuration: 7 });
+
+    expect(res.status).toBe(400);
+    expect(mockGenerateStructured).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when the AI client reports it is not configured', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI generation is not configured'), { statusCode: 503 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-day-preview')
+      .send({ destination: 'Bali', dayNumber: 3, totalDuration: 7 });
+
+    expect(res.status).toBe(503);
+  });
+
+  it('returns 502 when the model output fails schema/JSON validation', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI did not return valid JSON'), { statusCode: 502 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-day-preview')
+      .send({ destination: 'Bali', dayNumber: 3, totalDuration: 7 });
+
+    expect(res.status).toBe(502);
+  });
+});
+
+describe('POST /api/v1/packages/generate-days-preview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const rangeDays = [
+    { dayNumber: 4, title: 'Beach Day', locations: ['Seminyak Beach'], activities: ['Surfing lesson'] },
+    { dayNumber: 5, title: 'Departure', locations: ['Airport'], activities: ['Souvenir shopping'] },
+  ];
+
+  it('returns 200 with days mapped positionally onto the requested dayNumbers, with no Authorization header (genuinely public)', async () => {
+    mockGenerateStructured.mockResolvedValue({ days: rangeDays });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.days).toEqual([
+      expect.objectContaining({ dayNumber: 4, title: 'Beach Day' }),
+      expect.objectContaining({ dayNumber: 5, title: 'Departure' }),
+    ]);
+  });
+
+  it('maps positionally onto requested dayNumbers even when the model mislabels dayNumber', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      days: [
+        { ...rangeDays[0], dayNumber: 1 },
+        { ...rangeDays[1], dayNumber: 2 },
+      ],
+    });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 });
+
+    expect(res.body.data.days.map((d) => d.dayNumber)).toEqual([4, 5]);
+  });
+
+  it('sorts unsorted dayNumbers before positional mapping — [5, 4] never swaps day content between slots', async () => {
+    // buildGenerateDaysRangePrompt always asks the model for days in
+    // ascending order regardless of request order, so the model naturally
+    // returns day4-content first, day5-content second here.
+    mockGenerateStructured.mockResolvedValue({
+      days: [
+        { dayNumber: 4, title: 'Beach Day', locations: ['Seminyak Beach'], activities: ['Surfing lesson'] },
+        { dayNumber: 5, title: 'Departure', locations: ['Airport'], activities: ['Souvenir shopping'] },
+      ],
+    });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [5, 4], totalDuration: 7 });
+
+    expect(res.body.data.days).toEqual([
+      expect.objectContaining({ dayNumber: 4, title: 'Beach Day' }),
+      expect.objectContaining({ dayNumber: 5, title: 'Departure' }),
+    ]);
+  });
+
+  it('on shortfall, omits unfilled slots instead of padding with placeholders', async () => {
+    mockGenerateStructured.mockResolvedValue({ days: [rangeDays[0]] });
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 });
+
+    expect(res.body.data.days).toHaveLength(1);
+    expect(res.body.data.days[0].dayNumber).toBe(4);
+  });
+
+  it('never persists — package.create is never called', async () => {
+    mockGenerateStructured.mockResolvedValue({ days: rangeDays });
+
+    await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 });
+
+    expect(mockPrisma.package.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when dayNumbers is an empty array', async () => {
+    const res = await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [], totalDuration: 7 });
+
+    expect(res.status).toBe(400);
+    expect(mockGenerateStructured).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when the AI client reports it is not configured', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI generation is not configured'), { statusCode: 503 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 });
+
+    expect(res.status).toBe(503);
+  });
+
+  it('returns 502 when the model output fails schema/JSON validation', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI did not return valid JSON'), { statusCode: 502 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/generate-days-preview')
+      .send({ destination: 'Bali', dayNumbers: [4, 5], totalDuration: 7 });
+
+    expect(res.status).toBe(502);
+  });
+});
