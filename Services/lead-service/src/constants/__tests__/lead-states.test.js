@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { LIFECYCLE_STATUSES, TERMINAL_STATUSES, REQUIRES_LOST_REASON, ALLOWED_TRANSITIONS } from '../lead-states.js';
 
 describe('lead-states constants', () => {
-  it('LIFECYCLE_STATUSES has exactly 10 entries', () => {
-    expect(LIFECYCLE_STATUSES).toHaveLength(10);
+  it('LIFECYCLE_STATUSES has exactly 11 entries', () => {
+    expect(LIFECYCLE_STATUSES).toHaveLength(11);
   });
 
   it('LIFECYCLE_STATUSES contains all expected values', () => {
+    expect(LIFECYCLE_STATUSES).toContain('PENDING_VERIFICATION');
     expect(LIFECYCLE_STATUSES).toContain('NEW');
-    expect(LIFECYCLE_STATUSES).toContain('DRAFTING');
     expect(LIFECYCLE_STATUSES).toContain('QUOTED');
     expect(LIFECYCLE_STATUSES).toContain('REVISION');
     expect(LIFECYCLE_STATUSES).toContain('APPROVED');

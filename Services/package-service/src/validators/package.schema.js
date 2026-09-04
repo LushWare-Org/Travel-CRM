@@ -237,6 +237,19 @@ const itineraryChatMessageSchema = z.object({
   content: z.string().min(1).max(2000),
 });
 
+// Wizard-turn messages additionally carry a stable per-message id and the
+// time it was sent, so the intake payload's transcript can be diffed against
+// what lead-service already stored (see docs/designs/chatbot-inbound-lead-intake.md).
+// `id` must be a STABLE per-message id the client assigns once and reuses every
+// time that message reappears in the resent sliding window. itineraryChatMessageSchema
+// is intentionally NOT changed — itinerary-chat has no server-side transcript diffing.
+const wizardTurnMessageSchema = z.object({
+  id: z.string().min(1).max(255),
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1).max(2000),
+  at: z.string().datetime(),
+});
+
 const itineraryChatSlotsSchema = z.object({
   destination: z.string().max(255).optional(),
   duration: z.coerce.number().int().min(1).max(30).optional(),
@@ -259,11 +272,18 @@ export const itineraryChatSchema = z.object({
 const wizardStateSchema = z.object({
   slots: itineraryChatSlotsSchema.optional(),
   selectedPackageId: z.string().optional(),
+  contact: z.object({
+    name: z.string().max(255).optional(),
+    email: z.string().max(255).optional(),
+    phone: z.string().max(50).optional(),
+    whatsapp: z.string().max(50).optional(),
+  }).optional(),
 });
 
 export const wizardTurnSchema = z.object({
   wizardState: wizardStateSchema.optional(),
-  messages: z.array(itineraryChatMessageSchema).min(1).max(20),
+  sessionId: z.string().min(1).max(255).optional(),
+  messages: z.array(wizardTurnMessageSchema).min(1).max(20),
 });
 
 // ─── Place / Activity sub-schemas ─────────────────────────────

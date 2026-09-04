@@ -71,6 +71,7 @@ const LeadManagement = () => {
   const [filterTravelDateStart, setFilterTravelDateStart] = useState("");
   const [filterTravelDateEnd, setFilterTravelDateEnd] = useState("");
   const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
+  const [filterSources, setFilterSources] = useState<string[]>([]);
 
   const [statsSummary, setStatsSummary] = useState<any>(null);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ all: 0 });
@@ -170,7 +171,7 @@ const LeadManagement = () => {
   useEffect(() => {
     fetchLeads();
     fetchLeadStats();
-  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, currentPage]);
+  }, [debouncedSearch, filterStatus, filterTravelDateStart, filterTravelDateEnd, filterPlatforms, filterSources, currentPage]);
 
   useEffect(() => {
     fetchSalesReps();
@@ -204,9 +205,19 @@ const LeadManagement = () => {
       };
 
       if (debouncedSearch) params.query = debouncedSearch; // The backend uses ?query= for search
-      if (filterStatus !== "all") params.status = filterStatus;
+      if (filterStatus !== "all") {
+        // PENDING_VERIFICATION is a carve-out visible to any salesRep — the
+        // backend gates it behind ?lifecycleStatus= (design doc #8), not the
+        // ownership-filtered ?status= path.
+        if (filterStatus === 'PENDING_VERIFICATION') {
+          params.lifecycleStatus = filterStatus;
+        } else {
+          params.status = filterStatus;
+        }
+      }
       if (filterTravelDateStart) params['travelDate[gte]'] = filterTravelDateStart;
       if (filterTravelDateEnd) params['travelDate[lte]'] = filterTravelDateEnd;
+      if (filterSources.length > 0) params.source = filterSources.join(',');
       if (filterPlatforms.length > 0) params.platform = filterPlatforms.join(',');
 
       // Note: backend search uses leadAPI.searchLeads for query, but standard filters for standard endpoint.
@@ -363,6 +374,18 @@ const LeadManagement = () => {
     setStatusLead(null);
   };
 
+  const handleClaimLead = async (lead: any) => {
+    try {
+      const leadId = lead._id || lead.id;
+      await leadAPI.claimLead(leadId);
+      toast.success("Lead claimed successfully");
+      fetchLeads();
+      fetchLeadStats();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to claim lead");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -420,6 +443,10 @@ const LeadManagement = () => {
           filterStatus={filterStatus}
           setFilterStatus={setFilterStatus}
           statusCounts={statusCounts}
+          filterSources={filterSources}
+          setFilterSources={setFilterSources}
+          filterPlatforms={filterPlatforms}
+          setFilterPlatforms={setFilterPlatforms}
           onAdvancedFilterClick={() => setShowFilterDialog(true)}
         />
 
@@ -467,6 +494,7 @@ const LeadManagement = () => {
             totalLeads={totalLeads}
             highlightedLeadId={highlightedLeadId}
             canDelete={canDelete}
+            onClaimClick={handleClaimLead}
             onDeleteClick={handleDeleteLead}
           />
         )}

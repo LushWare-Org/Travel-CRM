@@ -1,5 +1,6 @@
 export type LifecycleStatus =
   | 'NEW'
+  | 'PENDING_VERIFICATION'
   | 'DRAFTING'
   | 'QUOTED'
   | 'REVISION'
@@ -17,6 +18,7 @@ export type LifecycleStatus =
 // so pairs share meaning deliberately rather than each getting a unique hue.
 export const LIFECYCLE_STATUS_COLORS: Record<LifecycleStatus, string> = {
   NEW: 'bg-muted text-muted-foreground border-border',
+  PENDING_VERIFICATION: 'bg-warning/10 text-warning border-warning/20',
   DRAFTING: 'bg-muted text-muted-foreground border-border',
   QUOTED: 'bg-primary/10 text-primary border-primary/20',
   BOOKING_IN_PROGRESS: 'bg-primary/10 text-primary border-primary/20',
@@ -30,6 +32,7 @@ export const LIFECYCLE_STATUS_COLORS: Record<LifecycleStatus, string> = {
 
 export const LIFECYCLE_STATUS_LABELS: Record<LifecycleStatus, string> = {
   NEW: 'New',
+  PENDING_VERIFICATION: 'Pending Verification',
   DRAFTING: 'Drafting',
   QUOTED: 'Quoted',
   REVISION: 'Revision',
@@ -43,6 +46,7 @@ export const LIFECYCLE_STATUS_LABELS: Record<LifecycleStatus, string> = {
 
 export const LIFECYCLE_STATUS_INFO: Record<LifecycleStatus, string> = {
   NEW: 'Fresh lead, not yet drafted',
+  PENDING_VERIFICATION: 'Machine-created lead, awaiting agent verification',
   DRAFTING: 'Actively customizing itinerary and costs',
   QUOTED: 'Formal proposal sent to client',
   REVISION: 'Client requested changes to the quote',

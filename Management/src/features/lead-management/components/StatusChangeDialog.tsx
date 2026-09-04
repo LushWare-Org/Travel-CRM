@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 
 const ALLOWED_TRANSITIONS: Record<LifecycleStatus, LifecycleStatus[]> = {
   NEW: ['DRAFTING', 'CLOSED_LOST'],
+  PENDING_VERIFICATION: ['NEW', 'CLOSED_LOST'],
   DRAFTING: ['QUOTED', 'CLOSED_LOST'],
   QUOTED: ['REVISION', 'APPROVED', 'CLOSED_LOST'],
   REVISION: ['DRAFTING', 'QUOTED', 'APPROVED', 'CLOSED_LOST'],

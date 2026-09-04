@@ -412,13 +412,15 @@ describe('getLeadsByStatus / searchLeads — ownership scoping', () => {
     }));
   });
 
-  it('scopes searchLeads to the caller’s own leads when role is salesRep', async () => {
+  it('scopes searchLeads to the caller’s own leads plus the visible PENDING_VERIFICATION queue when role is salesRep', async () => {
     const req = { query: { query: 'jane' }, user: salesRepUser };
     const res = { json: vi.fn() };
     await searchLeads(req, res, vi.fn());
 
     const calledWhere = mockLeadFindMany.mock.calls[0][0].where;
-    expect(calledWhere.AND).toContainEqual({ assignedToId: 'rep-1' });
+    expect(calledWhere.AND).toContainEqual({
+      OR: [{ assignedToId: 'rep-1' }, { lifecycleStatus: 'PENDING_VERIFICATION' }],
+    });
   });
 
   it('does not scope searchLeads when role is admin', async () => {
@@ -659,7 +661,10 @@ describe('getLeadStats — assigned/unassigned/conversionRate summary', () => {
 
     const assignedCountCall = mockLeadCount.mock.calls[0][0];
     expect(assignedCountCall.where).toEqual({
-      AND: [{ assignedToId: 'rep-self' }, { assignedToId: { not: null } }],
+      AND: [
+        { OR: [{ assignedToId: 'rep-self' }, { lifecycleStatus: 'PENDING_VERIFICATION' }] },
+        { assignedToId: { not: null } },
+      ],
     });
 
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({

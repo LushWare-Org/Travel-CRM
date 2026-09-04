@@ -137,11 +137,23 @@ export const createLead = asyncHandler(async (req, res) => {
 
 export const getLeads = asyncHandler(async (req, res) => {
   const { user } = req;
-  const { page = 1, limit = 10, search, status, sortBy = 'createdAt', order = 'desc' } = req.query;
+  const { page = 1, limit = 10, search, status, lifecycleStatus, source, platform, sortBy = 'createdAt', order = 'desc' } = req.query;
 
   const where = { AND: [] };
-  if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
-  if (status) where.AND.push({ lifecycleStatus: status });
+  // The PENDING_VERIFICATION queue is visible to any salesRep regardless of
+  // ownership — an unassigned, unclaimed lead must be listable before it can be
+  // claimed (see the claim endpoint). Every other status keeps the normal
+  // own-leads filter. Computed from the MERGED filter (not just lifecycleStatus)
+  // so ?status=PENDING_VERIFICATION and ?lifecycleStatus=PENDING_VERIFICATION
+  // behave identically — these are two aliases for the same DB column.
+  const statusFilter = lifecycleStatus || status;
+  const isPendingVerificationQueue = statusFilter === 'PENDING_VERIFICATION';
+  if (user.role === 'salesRep' && !isPendingVerificationQueue) where.AND.push({ assignedToId: user.id });
+  if (statusFilter) where.AND.push({ lifecycleStatus: statusFilter });
+  // Comma-separated multi-select, matching how filterSources/filterPlatforms
+  // are sent from Management's LeadFilters chips.
+  if (source) where.AND.push({ source: { in: source.split(',') } });
+  if (platform) where.AND.push({ platform: { in: platform.split(',') } });
 
   if (search) {
     where.AND.push({
@@ -202,7 +214,11 @@ export const getLead = asyncHandler(async (req, res) => {
   const { user } = req;
   const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
   if (!canManage && user.role === 'salesRep' && lead.assignedToId !== user.id) {
-    throw new AppError('Not authorized to access this lead', 403);
+    // A salesRep may view an unclaimed PENDING_VERIFICATION lead — it must be
+    // openable before it can be claimed. Any other status stays ownership-gated.
+    if (lead.lifecycleStatus !== 'PENDING_VERIFICATION') {
+      throw new AppError('Not authorized to access this lead', 403);
+    }
   }
 
   const packageSelections = lead.packageSelections.map((selection) => ({
@@ -264,12 +280,18 @@ export const updateLead = asyncHandler(async (req, res) => {
       throw new AppError('Use POST /:id/packages/:selectionId/quote to quote a specific package', 400);
     }
     const primarySelection = await loadPrimarySelection(lead);
-    validateTransition({
-      currentStatus: lead.lifecycleStatus,
-      nextStatus: validatedBody.lifecycleStatus,
-      pricing: gatekeeperInputs(primarySelection?.pricing, primarySelection?.costLines),
-      lostReason: validatedBody.lostReason || lead.lostReason,
-    });
+    try {
+      validateTransition({
+        currentStatus: lead.lifecycleStatus,
+        nextStatus: validatedBody.lifecycleStatus,
+        pricing: gatekeeperInputs(primarySelection?.pricing, primarySelection?.costLines),
+        lostReason: validatedBody.lostReason || lead.lostReason,
+      });
+    } catch (err) {
+      // State-machine gatekeeper failures are client errors (e.g. CLOSED_LOST
+      // without a lostReason) — surface them as 400, not an unhandled 500.
+      throw new AppError(err.message, 400);
+    }
     statusHistoryCreate.push({
       status: validatedBody.lifecycleStatus,
       actor: 'USER',
@@ -417,7 +439,9 @@ export const getLeadsByStatus = asyncHandler(async (req, res) => {
   const { user } = req;
   const status = req.params.status;
   const where = { AND: [{ lifecycleStatus: status }] };
-  if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
+  // Mirrors getLeads' carve-out (line ~151): PENDING_VERIFICATION is an
+  // unassigned, unclaimed queue visible to any salesRep.
+  if (user.role === 'salesRep' && status !== 'PENDING_VERIFICATION') where.AND.push({ assignedToId: user.id });
 
   const leads = await prisma.lead.findMany({
     where,
@@ -432,7 +456,14 @@ export const getMyLeads = asyncHandler(async (req, res) => {
 });
 
 export const getLeadStats = asyncHandler(async (req, res) => {
-  const where = req.user.role === 'salesRep' ? { assignedToId: req.user.id } : {};
+  const { user } = req;
+  // PENDING_VERIFICATION is an unassigned, unclaimed queue visible to any
+  // salesRep regardless of ownership — stats must include it the same way
+  // getLeads/getLead do, or the tab's badge count silently disagrees with
+  // the rows the tab actually lists.
+  const where = user.role === 'salesRep'
+    ? { OR: [{ assignedToId: user.id }, { lifecycleStatus: 'PENDING_VERIFICATION' }] }
+    : {};
   const [byStatus, totals, assigned, confirmed] = await Promise.all([
     prisma.lead.groupBy({ by: ['lifecycleStatus'], _count: true, where }),
     prisma.lead.aggregate({ _count: true, where }),
@@ -471,7 +502,11 @@ export const searchLeads = asyncHandler(async (req, res) => {
       },
     ],
   };
-  if (user.role === 'salesRep') where.AND.push({ assignedToId: user.id });
+  // Mirrors getLeads' carve-out: a salesRep searching still sees the visible
+  // PENDING_VERIFICATION queue, not just their own leads.
+  if (user.role === 'salesRep') {
+    where.AND.push({ OR: [{ assignedToId: user.id }, { lifecycleStatus: 'PENDING_VERIFICATION' }] });
+  }
 
   const leads = await prisma.lead.findMany({ where, take: 20 });
   res.json({ success: true, count: leads.length, data: leads });

@@ -8,6 +8,8 @@ import { assembleWhere, buildInclude, serializePackage, serializePackageList } f
 import { fetchPolicyDocuments } from '../config/policyDocuments.js';
 import { retrieveSnippets } from '../services/policyRetrieval.js';
 import { getOrgSettings } from '../config/orgSettings.js';
+import { submitLeadIntake } from '../services/leadIntake.client.js';
+import { LeadIntakeRequest } from '@travel-crm/contracts';
 
 const FALLBACK_POLICY_MESSAGE = "I don't have a confirmed answer to that — please reach out and our team will help.";
 
@@ -24,7 +26,7 @@ function latestUserMessage(messages) {
 // this handler executes the server-side work that tool implies and never
 // trusts model-authored text for inventory, pricing, or policy quotes.
 export const wizardTurn = asyncHandler(async (req, res) => {
-  const { wizardState = {}, messages } = req.body;
+  const { wizardState = {}, messages, sessionId } = req.body;
 
   // Policy retrieval is deterministic and cheap (no LLM cost) — always run
   // it against the latest message so a single generateStructured call can
@@ -109,8 +111,79 @@ export const wizardTurn = asyncHandler(async (req, res) => {
       break;
     }
 
+    case 'capture_contact': {
+      // Server-validated merge of the model's extracted contact fields into
+      // wizardState.contact — only defined, non-empty string fields are kept
+      // (same spirit as sanitizeSlots, but no numeric coercion: name/email/
+      // phone/whatsapp are all strings). Whatever the traveler already gave
+      // from a previous turn is preserved.
+      const argsContact = args.contact || {};
+      const currentContact = wizardState.contact || {};
+      const mergedContact = { ...currentContact };
+      for (const [field, value] of Object.entries(argsContact)) {
+        if (typeof value === 'string' && value.length > 0) {
+          mergedContact[field] = value;
+        }
+      }
+      updatedWizardState = { ...wizardState, contact: mergedContact };
+      uiComponent = 'contactPrompt';
+      break;
+    }
+
     default:
       throw new AppError('AI returned an unrecognized tool', 502);
+  }
+
+  // Durable-signal check: once the traveler has provided a real way to reach
+  // them (email/phone/whatsapp) alongside meaningful trip intent (destination
+  // plus either duration or a selected package), persist a PENDING_VERIFICATION
+  // Lead in lead-service on EVERY turn where the condition holds — not just on
+  // complete_wizard. Informational plumbing only: any intake failure is caught
+  // here (the client never throws) and must never change what is returned to
+  // the customer, so the result is deliberately not added to the response body.
+  const contact = updatedWizardState.contact || {};
+  const slots = updatedWizardState.slots || {};
+  const hasContactMethod = Boolean(contact.email || contact.phone || contact.whatsapp);
+  const hasDestination = Boolean(slots.destination);
+  const hasTripIntent = Boolean(slots.duration || updatedWizardState.selectedPackageId);
+  if (sessionId && hasContactMethod && hasDestination && hasTripIntent) {
+    const payloadResult = LeadIntakeRequest.safeParse({
+      channel: 'chatbot',
+      sessionId,
+      contact: {
+        ...(contact.name ? { name: contact.name } : {}),
+        ...(contact.email ? { email: contact.email } : {}),
+        ...(contact.phone ? { phone: contact.phone } : {}),
+        ...(contact.whatsapp ? { whatsapp: contact.whatsapp } : {}),
+      },
+      slots: {
+        ...(slots.destination ? { destination: slots.destination } : {}),
+        ...(slots.duration ? { duration: slots.duration } : {}),
+        ...(slots.travelers ? { travelers: slots.travelers } : {}),
+        ...(slots.budget ? { budget: slots.budget } : {}),
+        ...(slots.preferences ? { preferences: slots.preferences } : {}),
+      },
+      transcript: (messages || []).map((m) => ({ id: m.id, role: m.role, content: m.content, at: m.at })),
+      ...(updatedWizardState.selectedPackageId ? { selectedPackageId: updatedWizardState.selectedPackageId } : {}),
+    });
+    if (payloadResult.success) {
+      // Deliberately awaited (not fire-and-forget), bounded by the client's
+      // own 2s AbortController timeout — a considered eng-review tradeoff
+      // (docs/designs/chatbot-inbound-lead-intake.md, Architecture finding
+      // #3): awaiting bounds worst-case wizard-turn latency to a known
+      // constant while keeping the failure log correlated to the exact turn
+      // that triggered it. Pure fire-and-forget would remove all latency
+      // cost here, but a timeout fires detached from the request lifecycle
+      // and loses that correlation. Result is still discarded either way —
+      // it never changes what's returned to the customer.
+      try {
+        await submitLeadIntake(payloadResult.data);
+      } catch (err) {
+        // Defense in depth — the client already logs and returns { ok: false },
+        // so this should never fire; kept so an intake failure can never bubble
+        // up and change the customer-facing turn.
+      }
+    }
   }
 
   res.json({

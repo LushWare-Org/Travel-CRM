@@ -39,6 +39,7 @@ enum LeadSource {
   referral
   walk_in      @map("walk-in")
   other
+  chatbot
 
   @@schema("crm_leads")
 }
@@ -52,11 +53,13 @@ enum LeadPlatform {
   Email        @map("Email")
   Referral     @map("Referral")
   Walk_in      @map("Walk-in")
+  Chatbot_Wizard @map("Chatbot Wizard")
 
   @@schema("crm_leads")
 }
 
 enum LeadLifecycleStatus {
+  PENDING_VERIFICATION
   NEW
   DRAFTING
   QUOTED
@@ -177,6 +180,8 @@ model Lead {
   city               String?
   source             LeadSource   @default(manual)
   platform           LeadPlatform @default(Manual_Entry)
+  intakeChannel     String?
+  intakeSessionId   String?
   fromCountry        String?
   destinationCountry String?
   destination        String?
@@ -227,6 +232,7 @@ model Lead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([intakeChannel, intakeSessionId])
   @@index([lifecycleStatus, createdAt])
   @@index([assignedToId, lifecycleStatus, createdAt])
   @@index([followUpDate])
@@ -237,6 +243,9 @@ model Lead {
   @@index([assignmentMode])
   @@index([city])
   @@index([primarySelectionId])
+  @@index([email])
+  @@index([phone])
+  @@index([whatsapp])
   @@schema("crm_leads")
 }
 
@@ -380,8 +389,10 @@ model LeadCommunicationLog {
   date   DateTime              @default(now())
   type   CommunicationLogType?
   notes  String?
+  externalMessageId String?
   byId   String? // → users.User.id
 
+  @@unique([leadId, externalMessageId])
   @@index([leadId])
   @@schema("crm_leads")
 }

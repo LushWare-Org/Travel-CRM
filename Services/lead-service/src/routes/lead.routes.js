@@ -1,5 +1,6 @@
 import express from 'express';
 import { extractUser, requireAuth, authorize } from '../middleware/auth.js';
+import { intakeLead, claimLead } from '../controllers/leadIntake.controller.js';
 import {
   createLead, getLeads, getLead, updateLead, deleteLead,
   addRemark, getLeadRemarks, assignLead, unassignLead,
@@ -36,6 +37,7 @@ const internalTokenAuth = (req, res, next) => {
 router.post('/internal/events', internalTokenAuth, handleInternalEvent);
 router.post('/internal/facebook-lead', internalTokenAuth, handleFacebookLeadEvent);
 router.post('/internal/communication-logs', internalTokenAuth, logCommunication);
+router.post('/internal/intake', internalTokenAuth, intakeLead);
 
 // Protected
 router.use(requireAuth);
@@ -55,6 +57,7 @@ router.patch('/:id/assign', authorize('admin', 'salesRep'), assignLead);
 router.patch('/:id/unassign', authorize('admin', 'salesRep'), unassignLead);
 router.get('/:id/itinerary/pdf', authorize('admin', 'salesRep'), downloadLeadItineraryPDF);
 router.post('/:id/whatsapp-reply', authorize('admin', 'salesRep'), sendWhatsappReply);
+router.post('/:id/claim', authorize('admin', 'salesRep'), claimLead);
 
 // Per-package selections — a lead can hold many packages (plus one manual
 // slot) at once; each owns its own itinerary/cost-lines/pricing/quote state.

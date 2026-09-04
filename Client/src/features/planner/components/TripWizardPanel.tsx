@@ -11,6 +11,10 @@ const GREETING =
 export default function TripWizardPanel() {
   const wizard = useTripWizard();
   const [input, setInput] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactWhatsapp, setContactWhatsapp] = useState('');
   const navigate = useNavigate();
 
   // complete_wizard always terminates on a real, server-validated package —
@@ -30,6 +34,22 @@ export default function TripWizardPanel() {
     const text = input;
     setInput('');
     void wizard.send(text);
+  };
+
+  const hasContactMethod = Boolean(contactEmail.trim() || contactPhone.trim() || contactWhatsapp.trim());
+
+  const handleContactSubmit = () => {
+    const parts: string[] = [];
+    if (contactName.trim()) parts.push(`my name is ${contactName.trim()}`);
+    if (contactEmail.trim()) parts.push(`my email is ${contactEmail.trim()}`);
+    if (contactPhone.trim()) parts.push(`my phone number is ${contactPhone.trim()}`);
+    if (contactWhatsapp.trim()) parts.push(`my WhatsApp is ${contactWhatsapp.trim()}`);
+    if (parts.length === 0) return;
+    void wizard.send(`Here's my contact info: ${parts.join(', ')}.`);
+    setContactName('');
+    setContactEmail('');
+    setContactPhone('');
+    setContactWhatsapp('');
   };
 
   return (
@@ -100,6 +120,57 @@ export default function TripWizardPanel() {
             ))
           )}
         </div>
+      )}
+
+      {wizard.contactPrompt && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleContactSubmit();
+          }}
+          className="p-4 border-t border-gray-200 bg-blue-50 space-y-2"
+        >
+          <p className="text-sm font-medium text-gray-800">How should we reach you with the best options?</p>
+          <input
+            type="text"
+            value={contactName}
+            onChange={(e) => setContactName(e.target.value)}
+            placeholder="Your name (optional)"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          />
+          <input
+            type="email"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+            placeholder="Email"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder="Phone"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              value={contactWhatsapp}
+              onChange={(e) => setContactWhatsapp(e.target.value)}
+              placeholder="WhatsApp"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={!hasContactMethod || wizard.isSending}
+              className="px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white disabled:opacity-50"
+            >
+              Send contact info
+            </button>
+          </div>
+        </form>
       )}
 
       <div className="p-3 border-t border-gray-200 bg-white flex gap-2">
