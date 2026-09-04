@@ -11,6 +11,7 @@ import {
   generateAIPackageSchema,
   generateFromTitleSchema,
   generateItineraryPreviewSchema,
+  itineraryChatSchema,
 } from '../validators/package.schema.js';
 import * as packageController from '../controllers/package.controller.js';
 import * as packageImageController from '../controllers/packageImage.controller.js';
@@ -20,6 +21,7 @@ import {
   generateAndSaveAIContent,
   previewAIContent,
   generateItineraryPreview,
+  itineraryChat,
 } from '../controllers/aiPackage.controller.js';
 import { downloadAIPdf } from '../controllers/aiPdf.controller.js';
 
@@ -44,6 +46,8 @@ router.post('/generate-ai',         requireAuth, authorize('admin', 'staff'), va
 router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), validateBody(generateFromTitleSchema), generateContentFromTitle);
 // Public: non-persisting customer-facing itinerary preview — no DB write, rate-limited at the gateway.
 router.post('/generate-itinerary-preview', validateBody(generateItineraryPreviewSchema), generateItineraryPreview);
+// Public: non-persisting conversational turn — no DB write, rate-limited at the gateway.
+router.post('/itinerary-chat', validateBody(itineraryChatSchema), itineraryChat);
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 router.post('/calculate-price', requireAuth, packageController.calculatePrice);

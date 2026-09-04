@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:ci": "vitest run --exclude '**/hotels.live.workflow.test.js' --exclude '**/hotels.liteapi.live.test.js' --exclude '**/aiPackage.generateAI.live.test.js' --exclude '**/generateItineraryPreview.live.test.js'",
+    "test:ci": "vitest run --exclude '**/hotels.live.workflow.test.js' --exclude '**/hotels.liteapi.live.test.js' --exclude '**/aiPackage.generateAI.live.test.js' --exclude '**/generateItineraryPreview.live.test.js' --exclude '**/itineraryChat.live.test.js'",
     "lint": "eslint ."
   },
   "dependencies": {

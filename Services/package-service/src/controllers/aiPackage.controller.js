@@ -10,6 +10,7 @@ import { buildGeneratePackagePrompt, generatePackageResponseSchema } from '../ai
 import { buildGenerateFromTitlePrompt, generateFromTitleResponseSchema } from '../ai/prompts/generateFromTitle.v1.js';
 import { buildPackageMarketingContentPrompt, packageMarketingContentResponseSchema } from '../ai/prompts/packageMarketingContent.v1.js';
 import { buildGenerateItineraryPreviewPrompt, generateItineraryPreviewResponseSchema } from '../ai/prompts/generateItineraryPreview.v1.js';
+import { buildItineraryChatPrompt, itineraryChatResponseSchema } from '../ai/prompts/itineraryChat.v1.js';
 
 // Map frontend display categories to valid PackageCategory enum values.
 const CATEGORY_MAP = {
@@ -163,6 +164,47 @@ export const generateItineraryPreview = asyncHandler(async (req, res) => {
     tokenBudgetBase: 800,
   });
   res.json({ success: true, data: { days } });
+});
+
+// ── Public: non-persisting conversational itinerary-chat turn ─
+
+export function pickDefined(obj) {
+  return Object.fromEntries(Object.entries(obj || {}).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+}
+
+// Re-validates the model's newly-learned slots against the same bounds the
+// request schema enforces (duration 1-30, string lengths) before merging
+// them into what's already known. A slot outside these bounds is dropped
+// (treated as not-yet-known) rather than surfaced as a 502, so one odd
+// model output degrades to "ask again next turn" instead of failing the turn.
+// Exported (not just used by itineraryChat below) because the Approach-C
+// trip-planning wizard's set_slot tool call reuses the exact same merge
+// path rather than inventing a second one — see wizard.controller.js.
+export function sanitizeSlots(rawSlots, previousSlots) {
+  const merged = { ...(previousSlots || {}), ...pickDefined(rawSlots) };
+  if (merged.duration !== undefined) {
+    const d = Number(merged.duration);
+    if (!Number.isInteger(d) || d < 1 || d > 30) delete merged.duration;
+    else merged.duration = d;
+  }
+  if (merged.travelers !== undefined) {
+    const t = Number(merged.travelers);
+    if (!Number.isInteger(t) || t < 1 || t > 50) delete merged.travelers;
+    else merged.travelers = t;
+  }
+  if (merged.destination !== undefined) merged.destination = String(merged.destination).slice(0, 255);
+  if (merged.budget !== undefined) merged.budget = String(merged.budget).slice(0, 100);
+  if (merged.preferences !== undefined) merged.preferences = String(merged.preferences).slice(0, 1000);
+  return merged;
+}
+
+export const itineraryChat = asyncHandler(async (req, res) => {
+  const { messages, slots } = req.body;
+  const prompt = buildItineraryChatPrompt({ messages, slots });
+  const data = await generateStructured({ prompt, schema: itineraryChatResponseSchema, maxOutputTokens: 1024 });
+  const mergedSlots = sanitizeSlots(data.slots, slots);
+  const readyToGenerate = Boolean(mergedSlots.destination && mergedSlots.duration);
+  res.json({ success: true, data: { reply: data.reply, slots: mergedSlots, readyToGenerate } });
 });
 
 // ── Generate content from title — does NOT create anything ────
