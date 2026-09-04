@@ -36,6 +36,8 @@ describe('getOrgSettings', () => {
       contactPhone: '+960 555 0100',
       contactEmail: 'info@lushtravel.example',
       website: 'https://www.lushtravel.example',
+      supportEmail: 'support@lushtravel.example',
+      whatsappNumber: '+960 555 0200',
     }));
     const settings = await getOrgSettings({ fetchImpl });
     expect(settings.tagline).toBe('Your Journey, Our Passion');
@@ -44,6 +46,8 @@ describe('getOrgSettings', () => {
     expect(settings.contactPhone).toBe('+960 555 0100');
     expect(settings.contactEmail).toBe('info@lushtravel.example');
     expect(settings.website).toBe('https://www.lushtravel.example');
+    expect(settings.supportEmail).toBe('support@lushtravel.example');
+    expect(settings.whatsappNumber).toBe('+960 555 0200');
   });
 
   it('falls back to static defaults for branding fields the response omits', async () => {
@@ -55,6 +59,8 @@ describe('getOrgSettings', () => {
     expect(settings.contactPhone).toBe('');
     expect(settings.contactEmail).toBe('');
     expect(settings.website).toBe('');
+    expect(settings.supportEmail).toBe('');
+    expect(settings.whatsappNumber).toBe('');
   });
 
   it('serves the cached value on a second call within the TTL, without refetching', async () => {

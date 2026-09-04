@@ -12,6 +12,7 @@ import {
   generateFromTitleSchema,
   generateItineraryPreviewSchema,
   itineraryChatSchema,
+  wizardTurnSchema,
 } from '../validators/package.schema.js';
 import * as packageController from '../controllers/package.controller.js';
 import * as packageImageController from '../controllers/packageImage.controller.js';
@@ -24,6 +25,7 @@ import {
   itineraryChat,
 } from '../controllers/aiPackage.controller.js';
 import { downloadAIPdf } from '../controllers/aiPdf.controller.js';
+import { wizardTurn } from '../controllers/wizard.controller.js';
 
 const router = Router();
 
@@ -48,6 +50,8 @@ router.post('/generate-from-title', requireAuth, authorize('admin', 'staff'), va
 router.post('/generate-itinerary-preview', validateBody(generateItineraryPreviewSchema), generateItineraryPreview);
 // Public: non-persisting conversational turn — no DB write, rate-limited at the gateway.
 router.post('/itinerary-chat', validateBody(itineraryChatSchema), itineraryChat);
+// Public: non-persisting trip-planning wizard turn — no DB write, rate-limited at the gateway.
+router.post('/wizard-turn', validateBody(wizardTurnSchema), wizardTurn);
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 router.post('/calculate-price', requireAuth, packageController.calculatePrice);

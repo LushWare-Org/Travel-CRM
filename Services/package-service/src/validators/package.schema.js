@@ -214,6 +214,22 @@ export const itineraryChatSchema = z.object({
   slots: itineraryChatSlotsSchema.optional(),
 });
 
+// ─── Trip-planning wizard (public, non-persisting) ──────────────
+// wizardState carries the same slot shape as itineraryChatSlotsSchema, plus
+// an optional selectedPackageId the client sets deterministically when the
+// traveler picks a proposed package (never parsed out of free text by the
+// model) — see wizard.controller.js's complete_wizard handling.
+
+const wizardStateSchema = z.object({
+  slots: itineraryChatSlotsSchema.optional(),
+  selectedPackageId: z.string().optional(),
+});
+
+export const wizardTurnSchema = z.object({
+  wizardState: wizardStateSchema.optional(),
+  messages: z.array(itineraryChatMessageSchema).min(1).max(20),
+});
+
 // ─── Place / Activity sub-schemas ─────────────────────────────
 
 export const createPlaceSchema = z.object({
