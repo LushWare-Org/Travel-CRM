@@ -40,3 +40,9 @@ export {
   GenerateItineraryPreviewRequest,
   GenerateItineraryPreviewResult,
 } from './aiItineraryPreview.js';
+export {
+  ItineraryChatMessage,
+  ItineraryChatSlots,
+  ItineraryChatRequest,
+  ItineraryChatResult,
+} from './itineraryChat.js';
