@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { fetchPackages } from '../services/api/packages';
 import { useAuth } from '../contexts/AuthContext';
 import LazyIcon from '../components/shared/LazyIcon';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Phone, Mail, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
 import BRANDING from '../config/branding';
 import { PAGE_CONFIG } from '../config/pages';
 
@@ -26,7 +27,11 @@ export interface HeaderProps {
   onNavigate: (page: string, filter?: string | null, force?: unknown) => void;
 }
 
+/**
+ * Site header. Single row, sticky, one hamburger -> one full-screen menu.
+ */
 export default function Header({ onNavigate }: HeaderProps) {
+  const [isScrolled, setIsScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState<string | null>(null);
   const [internationalMenu, setInternationalMenu] = useState<DestinationMenuItem[]>([]);
@@ -37,11 +42,26 @@ export default function Header({ onNavigate }: HeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sideMenuOpen, setSideMenuOpen] = useState(false);
-  const sideMenuRef = useRef<HTMLDivElement>(null);
   const [destinationsLoaded, setDestinationsLoaded] = useState(false);
   const destinationsLoadRef = useRef<Promise<void> | null>(null);
   const dropdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let rafId: number | null = null;
+    const handleScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        setIsScrolled(window.scrollY > 24);
+        rafId = null;
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -82,18 +102,16 @@ export default function Header({ onNavigate }: HeaderProps) {
     }
   }, [userMenuOpen]);
 
+  // Full-screen mobile menu — lock body scroll while it's open.
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (sideMenuRef.current && !sideMenuRef.current.contains(event.target as Node)) {
-        setSideMenuOpen(false);
-      }
-    };
-
-    if (sideMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+    if (mobileMenuOpen) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = previousOverflow;
+      };
     }
-  }, [sideMenuOpen]);
+  }, [mobileMenuOpen]);
 
   const loadDestinationsOnDemand = useCallback(() => {
     if (!PAGE_CONFIG.destinations.enabled) return;
@@ -118,6 +136,8 @@ export default function Header({ onNavigate }: HeaderProps) {
     loadDestinationsOnDemand();
   }, [loadDestinationsOnDemand]);
 
+  // Full nav list, used by the mobile full-screen menu (includes Home,
+  // since the logo isn't reachable while that menu covers the screen).
   const navItems = useMemo<NavItem[]>(
     () =>
       (
@@ -134,25 +154,8 @@ export default function Header({ onNavigate }: HeaderProps) {
     [user, internationalMenu],
   );
 
-  const leftNavItems = useMemo<NavItem[]>(
-    () => (PAGE_CONFIG.destinations.enabled ? [{ name: 'Destinations', page: 'destinations-international', dropdown: internationalMenu }] : []),
-    [internationalMenu],
-  );
-
-  const sideMenuItems = useMemo<NavItem[]>(
-    () =>
-      (
-        [
-          { name: 'Home', page: 'home' },
-          PAGE_CONFIG.about.enabled && { name: 'About Us', page: 'about' },
-          { name: 'Contact', page: 'contact' },
-          PAGE_CONFIG.career.enabled && { name: 'Career', page: 'career' },
-          PAGE_CONFIG.account.enabled && user && { name: 'My Account', page: 'my-account' },
-          PAGE_CONFIG.account.enabled && !user && { name: 'Login', page: 'login' },
-        ] as Array<NavItem | false>
-      ).filter((item): item is NavItem => Boolean(item)),
-    [user],
-  );
+  // Desktop inline nav omits Home — the logo already covers that.
+  const desktopNavItems = useMemo(() => navItems.filter((item) => item.page !== 'home'), [navItems]);
 
   const isItemActive = useCallback(
     (item: NavItem) => {
@@ -170,15 +173,20 @@ export default function Header({ onNavigate }: HeaderProps) {
   );
 
   return (
-    <header className="relative z-header overflow-visible transition-all duration-300 shadow-lg font-body bg-black">
+    <>
+      <header
+      className={`sticky top-0 z-header transition-colors duration-300 font-body ${
+        isScrolled ? 'bg-brand-dark-950/95 backdrop-blur-md shadow-lg' : 'bg-brand-dark-950'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-4">
         <div className="flex items-center justify-between gap-4 lg:gap-8 py-4 h-[70px]">
           <a href="/" className="flex items-center cursor-pointer flex-shrink-0">
-            <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-10 w-auto" />
+            <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-14 w-auto" />
           </a>
-          <div className="flex-1" />
-          <nav className="hidden lg:flex items-center space-x-1 flex-shrink-0">
-            {leftNavItems.map((item) => {
+
+          <nav className="hidden lg:flex items-center space-x-2 flex-shrink-0">
+            {desktopNavItems.map((item) => {
               const isActive = isItemActive(item);
 
               return (
@@ -186,10 +194,12 @@ export default function Header({ onNavigate }: HeaderProps) {
                   key={item.page}
                   className="relative"
                   onMouseEnter={() => {
+                    if (!item.dropdown) return;
                     clearTimeout(dropdownTimeoutRef.current ?? undefined);
                     setActiveDropdown(item.page);
                   }}
                   onMouseLeave={() => {
+                    if (!item.dropdown) return;
                     dropdownTimeoutRef.current = setTimeout(() => {
                       setActiveDropdown(null);
                     }, 80);
@@ -202,9 +212,9 @@ export default function Header({ onNavigate }: HeaderProps) {
                       onNavigate(item.page, null, item.dropdown);
                       setActiveDropdown(null);
                     }}
-                    className={`relative px-5 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap text-sm font-medium
-                      ${isActive ? 'text-brand-400 font-semibold bg-brand-900/20' : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'}
-                      ${item.page === 'login' ? 'border border-brand-500/50 hover:border-brand-400' : ''}
+                    className={`relative px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap text-[15px] font-medium
+                      ${isActive ? 'text-brand-accent-400 font-semibold bg-white/5' : 'text-brand-50/90 hover:text-brand-accent-400 hover:bg-white/5'}
+                      ${item.page === 'login' ? 'border border-brand-accent-500/50 hover:border-brand-accent-400' : ''}
                     `}
                   >
                     {item.name}
@@ -217,19 +227,16 @@ export default function Header({ onNavigate }: HeaderProps) {
                     )}
                   </a>
 
-                  {/* Dropdown Menu */}
                   {item.dropdown && activeDropdown === item.page && (
                     <div
                       className="absolute top-full left-0 pt-0 z-dropdown"
-                      onMouseEnter={() => {
-                        clearTimeout(dropdownTimeoutRef.current ?? undefined);
-                      }}
+                      onMouseEnter={() => clearTimeout(dropdownTimeoutRef.current ?? undefined)}
                       onMouseLeave={() => {
                         dropdownTimeoutRef.current = setTimeout(() => setActiveDropdown(null), 80);
                       }}
                     >
                       <div className="bg-white border border-gray-200 rounded-xl shadow-xl min-w-[240px] max-w-[340px] overflow-hidden mt-1">
-                        <div className="py-2 max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-500/60 scrollbar-track-gray-100">
+                        <div className="py-2 max-h-[420px] overflow-y-auto scrollbar-thin">
                           {item.dropdown.map((sub, idx) => (
                             <a
                               key={sub.id}
@@ -240,9 +247,7 @@ export default function Header({ onNavigate }: HeaderProps) {
                                 setActiveDropdown(null);
                               }}
                               className="group flex items-center gap-3 px-4 py-2.5 text-gray-800 hover:text-brand-600 hover:bg-brand-50 transition-colors rounded-lg mx-1.5"
-                              style={{
-                                animation: `fadeInRight 0.35s ease-out ${idx * 0.035}s both`,
-                              }}
+                              style={{ animation: `fadeInRight 0.35s ease-out ${idx * 0.035}s both` }}
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-brand-400/60 group-hover:bg-brand-500 transition-colors flex-shrink-0" />
                               <span className="text-sm font-medium truncate">{sub.name}</span>
@@ -255,12 +260,13 @@ export default function Header({ onNavigate }: HeaderProps) {
                 </div>
               );
             })}
+          </nav>
 
-            {/* Right Side */}
+          <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
             {PAGE_CONFIG.planner.enabled && (
               <a
                 href="/planner"
-                className="group relative overflow-hidden bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-3 py-2 ml-4 flex-shrink-0"
+                className="group relative overflow-hidden bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-full font-semibold text-xs shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center px-4 py-2.5"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-brand-accent-500 to-brand-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <div className="relative flex items-center justify-center gap-1.5">
@@ -269,23 +275,20 @@ export default function Header({ onNavigate }: HeaderProps) {
                 </div>
               </a>
             )}
-          </nav>
-
-          <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
             {user && (
               <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-full border border-gray-700 bg-gray-900/80 backdrop-blur-sm hover:border-brand-500 transition-all"
+                  className="flex items-center gap-2 px-3 py-2 rounded-full border border-white/15 bg-white/5 backdrop-blur-sm hover:border-brand-accent-400 transition-all"
                 >
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
                     {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-sm font-medium text-gray-200 max-w-[100px] truncate">
+                  <span className="text-sm font-medium text-brand-50/90 max-w-[100px] truncate">
                     {user.name?.split(' ')[0] || user.email || 'User'}
                   </span>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-brand-50/60 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {userMenuOpen && (
@@ -309,153 +312,161 @@ export default function Header({ onNavigate }: HeaderProps) {
                 )}
               </div>
             )}
-            {/* Side Menu Button */}
-            <button
-              onClick={() => setSideMenuOpen(!sideMenuOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-brand-500 transition-all flex-shrink-0"
-              aria-label="Toggle side menu"
-            >
-              {sideMenuOpen ? <LazyIcon name="X" size={20} className="w-5 h-5" /> : <LazyIcon name="Menu" size={20} className="w-5 h-5" />}
-            </button>
           </div>
+
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-gray-900/80 border border-gray-700 text-white hover:border-brand-500 transition-all"
-            aria-label="Toggle menu"
+            onClick={() => setMobileMenuOpen(true)}
+            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-white/5 border border-white/15 text-white hover:border-brand-accent-400 transition-all"
+            aria-label="Open menu"
           >
-            {mobileMenuOpen ? <LazyIcon name="X" size={20} className="w-5 h-5" /> : <LazyIcon name="Menu" size={20} className="w-5 h-5" />}
+            <LazyIcon name="Menu" size={20} className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+      </header>
+
+      {/* Single full-screen mobile menu — the only menu/hamburger on Lush,
+          portaled to document.body so it escapes the sticky header's own
+          stacking context (z-header) and always renders above siblings
+          like FloatingActionStack, regardless of their z-index. */}
+      {createPortal(
+      <div
+        className={`fixed inset-0 lg:hidden bg-brand-dark-950 z-modal flex flex-col transition-transform duration-300 ${
+          mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
+          <img src={BRANDING.company.logoPath} alt={`${BRANDING.company.name} Logo`} className="h-12 w-auto" />
+          <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-white/5 rounded-lg transition-all" aria-label="Close menu">
+            <LazyIcon name="X" size={22} className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        {/* Mobile Menu */}
-        <div
-          className={`fixed lg:hidden top-0 right-0 h-screen w-3/4 bg-gray-950 border-l border-gray-800 shadow-2xl z-modal transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-gray-800">
-            <h2 className="text-lg font-bold text-white">Menu</h2>
-            <button onClick={() => setMobileMenuOpen(false)} className="p-2 hover:bg-gray-800 rounded-lg transition-all">
-              <LazyIcon name="X" size={20} className="w-5 h-5 text-white" />
-            </button>
-          </div>
-
-          {/* Menu Items */}
-          <nav className="p-4 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 70px)' }}>
-            {navItems.map((item) => {
-              const isActive = isItemActive(item);
-              const isMobileDropdownOpen = mobileDropdownOpen === item.page;
-              return (
-                <div key={item.page}>
-                  <div className="flex items-center">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = isItemActive(item);
+            const isMobileDropdownOpen = mobileDropdownOpen === item.page;
+            return (
+              <div key={item.page}>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => {
+                      if (item.dropdown) {
+                        setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page);
+                        return;
+                      }
+                      onNavigate(item.page, null, null);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex-1 text-left px-4 py-3 rounded-lg transition-all text-base font-medium
+                      ${isActive ? 'text-brand-accent-400 bg-white/5' : 'text-brand-50/90 hover:text-brand-accent-400 hover:bg-white/5'}
+                    `}
+                  >
+                    {item.name}
+                  </button>
+                  {item.dropdown && (
                     <button
-                      onClick={() => {
-                        onNavigate(item.page, null, null);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`flex-1 text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
-                        ${isActive ? 'text-brand-400 bg-brand-900/20' : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'}
-                      `}
+                      onClick={() => setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page)}
+                      className="px-3 py-3 text-brand-50/70 hover:text-brand-accent-400 transition-all"
+                      aria-label={`Toggle ${item.name} submenu`}
                     >
-                      {item.name}
+                      <LazyIcon name="ChevronDown" size={18} className={`transition-transform ${isMobileDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
-                    {item.dropdown && (
-                      <button
-                        onClick={() => setMobileDropdownOpen(isMobileDropdownOpen ? null : item.page)}
-                        className="px-3 py-3 text-gray-300 hover:text-brand-400 transition-all"
-                      >
-                        <LazyIcon name="ChevronDown" size={16} className={`transition-transform ${isMobileDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Mobile Dropdown List */}
-                  {item.dropdown && isMobileDropdownOpen && (
-                    <div className="bg-gray-900/50 rounded-lg mt-1 mb-2 grid grid-cols-2 gap-2 p-3">
-                      {item.dropdown.map((dest) => (
-                        <button
-                          key={dest.id}
-                          onClick={() => {
-                            onNavigate('packages', `destination=${dest.slug}`);
-                            setMobileMenuOpen(false);
-                            setMobileDropdownOpen(null);
-                          }}
-                          className="text-left px-3 py-2 text-xs rounded-lg bg-gray-800/50 text-gray-300 hover:text-brand-400 hover:bg-brand-900/20 transition-all"
-                        >
-                          {dest.name}
-                        </button>
-                      ))}
-                    </div>
                   )}
                 </div>
-              );
-            })}
-            {PAGE_CONFIG.planner.enabled && (
-              <div className="border-t border-gray-800 mt-4 pt-4">
-                <a
-                  href="/planner"
-                  onClick={() => {
-                    onNavigate('planner');
-                    setMobileMenuOpen(false);
-                  }}
-                  className="block w-full text-center py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white font-semibold text-sm hover:shadow-lg transition-all"
-                >
-                  Plan Your Trip
-                </a>
-              </div>
-            )}
-            {user && (
-              <div className="border-t border-gray-800 mt-4 pt-4">
-                <button
-                  onClick={() => {
-                    logout();
-                    setMobileMenuOpen(false);
-                    onNavigate('home');
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-brand-400 hover:bg-white/5 rounded-lg transition-all flex items-center gap-3"
-                >
-                  <LazyIcon name="LogOut" size={16} className="w-4 h-4" />
-                  <span>Logout</span>
-                </button>
-              </div>
-            )}
-          </nav>
-        </div>
 
-        {mobileMenuOpen && <div className="fixed inset-0 lg:hidden bg-black/40 z-overlay" onClick={() => setMobileMenuOpen(false)} />}
+                {item.dropdown && isMobileDropdownOpen && (
+                  <div className="bg-white/5 rounded-lg mt-1 mb-2 grid grid-cols-2 gap-2 p-3">
+                    {item.dropdown.map((dest) => (
+                      <button
+                        key={dest.id}
+                        onClick={() => {
+                          onNavigate('packages', `destination=${dest.slug}`);
+                          setMobileMenuOpen(false);
+                          setMobileDropdownOpen(null);
+                        }}
+                        className="text-left px-3 py-2 text-xs rounded-lg bg-white/5 text-brand-50/80 hover:text-brand-accent-400 hover:bg-white/10 transition-all"
+                      >
+                        {dest.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
-        {/* Side Menu */}
-        <div
-          ref={sideMenuRef}
-          className={`fixed top-0 right-0 h-screen w-80 bg-gray-950 border-l border-gray-800 shadow-2xl z-modal transform transition-transform duration-300 ${sideMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-gray-800">
-            <h2 className="text-lg font-bold text-white">Menu</h2>
-            <button onClick={() => setSideMenuOpen(false)} className="p-2 hover:bg-gray-800 rounded-lg transition-all">
-              <LazyIcon name="X" size={20} className="w-5 h-5 text-white" />
-            </button>
+          {PAGE_CONFIG.planner.enabled && (
+            <div className="border-t border-white/10 mt-4 pt-4">
+              <a
+                href="/planner"
+                onClick={() => {
+                  onNavigate('planner');
+                  setMobileMenuOpen(false);
+                }}
+                className="block w-full text-center py-3 rounded-lg bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white font-semibold text-sm hover:shadow-lg transition-all"
+              >
+                Plan Your Trip
+              </a>
+            </div>
+          )}
+
+          {user && (
+            <div className="border-t border-white/10 mt-4 pt-4">
+              <button
+                onClick={() => {
+                  logout();
+                  setMobileMenuOpen(false);
+                  onNavigate('home');
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-brand-50/90 hover:text-brand-accent-400 hover:bg-white/5 rounded-lg transition-all flex items-center gap-3"
+              >
+                <LazyIcon name="LogOut" size={16} className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
+          )}
+        </nav>
+
+        {/* Contact + socials — the mobile-reachable home for TopUtilityBar's old content. */}
+        <div className="flex-shrink-0 border-t border-white/10 p-4 space-y-3">
+          <div className="flex flex-col gap-2 text-sm text-brand-50/80">
+            <a href={`tel:${BRANDING.contact.phone}`} className="flex items-center gap-2 hover:text-brand-accent-400 transition">
+              <Phone size={14} />
+              {BRANDING.contact.phone}
+            </a>
+            <a href={`mailto:${BRANDING.contact.email}`} className="flex items-center gap-2 hover:text-brand-accent-400 transition">
+              <Mail size={14} />
+              {BRANDING.contact.email}
+            </a>
           </div>
-
-          {/* Menu Items */}
-          <nav className="p-4 space-y-2">
-            {sideMenuItems.map((item) => {
-              const isActive = isItemActive(item);
-              return (
-                <button
-                  key={item.page}
-                  onClick={() => {
-                    onNavigate(item.page, null, item.dropdown);
-                    setSideMenuOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all text-sm font-medium
-                    ${isActive ? 'text-brand-400 bg-brand-900/20' : 'text-gray-300 hover:text-brand-400 hover:bg-white/5'}
-                  `}
-                >
-                  {item.name}
-                </button>
-              );
-            })}
-          </nav>
+          <div className="flex items-center gap-4">
+            {BRANDING.social.facebook && (
+              <a href={BRANDING.social.facebook} target="_blank" rel="noopener noreferrer" className="text-brand-50/70 hover:text-brand-accent-400 transition">
+                <Facebook size={16} />
+              </a>
+            )}
+            {BRANDING.social.instagram && (
+              <a href={BRANDING.social.instagram} target="_blank" rel="noopener noreferrer" className="text-brand-50/70 hover:text-brand-accent-400 transition">
+                <Instagram size={16} />
+              </a>
+            )}
+            {BRANDING.social.twitter && (
+              <a href={BRANDING.social.twitter} target="_blank" rel="noopener noreferrer" className="text-brand-50/70 hover:text-brand-accent-400 transition">
+                <Twitter size={16} />
+              </a>
+            )}
+            {BRANDING.social.youtube && (
+              <a href={BRANDING.social.youtube} target="_blank" rel="noopener noreferrer" className="text-brand-50/70 hover:text-brand-accent-400 transition">
+                <Youtube size={16} />
+              </a>
+            )}
+          </div>
         </div>
       </div>
-    </header>
+        ,
+        document.body,
+      )}
+    </>
   );
 }

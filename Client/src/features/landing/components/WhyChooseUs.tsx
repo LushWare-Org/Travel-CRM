@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Check, Play, X } from 'lucide-react';
 import { WHY_CHOOSE_US_ITEMS, type WhyChooseUsItem } from '../../../content/whyChooseUs';
-import { isLushTheme } from '../../../config/activeTheme';
 
 export default function WhyChooseUs() {
   const [selectedVideo, setSelectedVideo] = useState<Extract<WhyChooseUsItem['media'], { kind: 'video' }> | null>(null);
@@ -11,7 +10,7 @@ export default function WhyChooseUs() {
       <div className="max-w-[1000px] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Title Section */}
-        <div className={`text-center ${isLushTheme ? 'mb-12' : 'mb-20'}`}>
+        <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 font-display">
             Why Travel With Us?
           </h2>

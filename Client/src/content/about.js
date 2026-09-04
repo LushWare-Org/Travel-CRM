@@ -49,7 +49,7 @@ export const TEAM_MEMBERS = [
     role: 'Founder & CEO',
     image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
     bio: 'Visionary leader with 15+ years in travel industry',
-    social: { linkedin: '#', twitter: '#', email: 'rajesh@tripskyway.com' }
+    social: { linkedin: '#', twitter: '#', email: 'rajesh@lushware.org' }
   },
   {
     name: 'Priya Sharma',

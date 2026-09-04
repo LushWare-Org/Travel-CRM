@@ -4,8 +4,6 @@ import { ArrowRight } from 'lucide-react';
 import { fetchPackages } from '../../../services/api/packages';
 import type { AggregatedDestination } from '../../../services/api/packages.transform';
 import InternationalGrid from './InternationalGrid';
-import ReviewsVideoSlider from './ReviewsVideoSlider';
-import { isLushTheme } from '../../../config/activeTheme';
 
 export default function DestinationsSection() {
   const navigate = useNavigate();
@@ -36,7 +34,7 @@ export default function DestinationsSection() {
         }
       `}</style>
       {/* Destinations Section */}
-      <section className={`${isLushTheme ? 'py-section-lg' : 'py-28'} bg-gradient-to-b from-gray-50 to-white relative overflow-hidden`}>
+      <section className="py-section-lg bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
         <div className="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
           <div className="mb-12 text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Explore the World Without Limits</h2>
@@ -54,7 +52,6 @@ export default function DestinationsSection() {
         </div>
       </section>
 
-      {!isLushTheme && <ReviewsVideoSlider />}
     </div>
   );
 }

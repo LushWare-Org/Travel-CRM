@@ -10,7 +10,7 @@ interface FilterPanelShellProps {
  * previously duplicated this wrapper, both with the same bug: `top-0
  * z-modal` put the panel above *and* starting behind the sticky header
  * instead of below it. `top-[70px]` (the header's own height, see
- * LushHeader.tsx/Header.tsx `h-[70px]`) starts the panel below the header;
+ * Header.tsx's `h-[70px]`) starts the panel below the header;
  * `z-prominent` keeps it below `z-header` so the header always wins.
  */
 export default function FilterPanelShell({ children }: FilterPanelShellProps) {

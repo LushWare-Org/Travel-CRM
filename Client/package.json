@@ -4,11 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "dev:lush": "vite --mode lush",
     "build": "vite build",
-    "build:lush": "vite build --mode lush",
     "preview": "vite preview",
-    "preview:lush": "vite preview --mode lush",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",

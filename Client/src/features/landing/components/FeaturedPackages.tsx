@@ -3,7 +3,6 @@ import { Clock, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
 import { pluralize } from '../../../lib/pluralize';
 import { FALLBACK_IMAGE } from '../../../config/media';
-import { isLushTheme } from '../../../config/activeTheme';
 import type { NormalizedPackage } from '../../../services/api/packages.transform';
 
 interface FeaturedPackagesProps {
@@ -35,18 +34,14 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
             <p>No packages available yet. Please check back soon.</p>
           </div>
         ) : (
-          <div className={isLushTheme ? "grid grid-cols-1 sm:grid-cols-3 gap-6" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch"}>
-            {featuredPackages.map((pkg, idx) => (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {featuredPackages.map((pkg) => (
               <Link
                 key={pkg.id}
                 to={`/package/${pkg.id}`}
-                className={isLushTheme
-                  ? "group bg-white overflow-hidden rounded-3xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 w-full"
-                  : `group bg-white rounded-2xl overflow-hidden border-2 border-gray-200 hover:border-brand-accent-500 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
-                  featuredPackages.length === 3 && idx === 2 && 'md:col-span-2 lg:col-span-1 md:mx-auto'
-                } w-full md:max-w-sm lg:max-w-none`}
+                className="group bg-white overflow-hidden rounded-3xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 w-full"
               >
-                <div className={`relative overflow-hidden ${isLushTheme ? 'aspect-[3/4]' : 'aspect-[4/3]'}`}>
+                <div className="relative overflow-hidden aspect-[3/4]">
                   <img
                     src={pkg.image_url || pkg.images?.[0] || FALLBACK_IMAGE}
                     alt={pkg.title}
@@ -102,7 +97,7 @@ export default function FeaturedPackages({ packages }: FeaturedPackagesProps) {
                         {formatCurrency(pkg.price_from)}
                     </div>
                     </div>
-                    <button className={`px-6 py-2 ${isLushTheme ? 'bg-brand-800' : 'bg-black'} text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-brand-accent-600 hover:to-brand-600 hover:shadow-lg transition-all duration-300 font-body`}>
+                    <button className="px-6 py-2 bg-brand-800 text-white rounded-lg font-semibold hover:bg-gradient-to-r hover:from-brand-accent-600 hover:to-brand-600 hover:shadow-lg transition-all duration-300 font-body">
                       View Details
                     </button>
                   </div>

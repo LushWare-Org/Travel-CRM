@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { MessageSquareText, Sparkles, CalendarCheck } from 'lucide-react';
-import { isLushTheme } from '../../../config/activeTheme';
 
 const STEPS = [
   {
@@ -21,7 +20,6 @@ const STEPS = [
 ];
 
 export default function AIPlanningExplainer() {
-  if (!isLushTheme) return null;
 
   return (
     <section className="py-section-md bg-white font-body">

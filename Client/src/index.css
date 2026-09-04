@@ -232,7 +232,7 @@ code {
   border-color: rgba(255, 255, 255, 0.8) !important;
 }
 
-/* Header dropdown styles — shared by Header.tsx and LushHeader.tsx */
+/* Header dropdown styles */
 @keyframes fadeInRight {
   from {
     opacity: 0;
