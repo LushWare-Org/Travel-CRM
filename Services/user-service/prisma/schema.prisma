@@ -197,3 +197,24 @@ model OrganizationSettings {
 
   @@schema("crm_users")
 }
+
+// ─── Policy documents (RAG-retrievable, admin-editable) ─────────
+// Extends OrganizationSettings' existing single-string cancellationPolicy
+// pattern into multiple, citable documents — what makes server-verified
+// snippet citation possible for the trip-planning wizard's
+// answer_policy_question tool (docs/designs/ai-trip-planning-assistant.md).
+// Owner of editing these docs is the same admin/superAdmin role that already
+// edits cancellationPolicy via PUT /admin/settings — no new role.
+model PolicyDocument {
+  id    String @id @default(uuid())
+  title String @db.VarChar(255)
+  body  String @db.Text
+
+  updatedById String? // → users.User.id
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([title])
+  @@schema("crm_users")
+}

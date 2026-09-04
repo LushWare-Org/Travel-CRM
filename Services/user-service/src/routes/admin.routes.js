@@ -7,6 +7,10 @@ import {
   listSuperAdmins, createStaff, getSettings, updateSettings, getInternalOrganizationSettings,
   getOrganizationBranding,
 } from '../controllers/admin.controller.js';
+import {
+  getPolicyDocuments, getPolicyDocument, postPolicyDocument, putPolicyDocument,
+  deletePolicyDocumentHandler, getInternalPolicyDocuments,
+} from '../controllers/policyDocuments.controller.js';
 
 const router = express.Router();
 
@@ -22,6 +26,17 @@ router.get('/internal/organization-settings', (req, res, next) => {
   next();
 }, getInternalOrganizationSettings);
 
+// Service-to-service (token-authenticated) — consumed by package-service's
+// trip-planning wizard; see getInternalOrganizationSettings above for the
+// same convention.
+router.get('/internal/policy-documents', (req, res, next) => {
+  const token = req.headers['x-internal-token'];
+  if (!token || token !== process.env.INTERNAL_SERVICE_KEY) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  next();
+}, getInternalPolicyDocuments);
+
 // Any logged-in Management user — see getOrganizationBranding for why this
 // isn't behind the admin/superAdmin gate below.
 router.get('/organization-branding', requireAuth, getOrganizationBranding);
@@ -31,6 +46,9 @@ router.use(requireAuth, authorize('admin', 'superAdmin'));
 router.get('/stats', getDashboardStats);
 router.get('/settings', getSettings);
 router.put('/settings', updateSettings);
+
+router.route('/policy-documents').get(getPolicyDocuments).post(postPolicyDocument);
+router.route('/policy-documents/:id').get(getPolicyDocument).put(putPolicyDocument).delete(deletePolicyDocumentHandler);
 router.get('/permissions/available', getAvailablePermissions);
 
 router.route('/users').get(getAllUsers).post(createStaff);
