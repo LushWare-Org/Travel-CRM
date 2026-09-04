@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDaysISO,
   buildDayState,
   buildItineraryDayFromAIDay,
   combineListToText,
+  computeDurationDays,
   sanitizeNumber,
   splitTextToList,
 } from '../utils/formHelpers';
@@ -214,5 +216,29 @@ describe('buildItineraryDayFromAIDay', () => {
     expect(result.dayNumber).toBe(3);
     expect(result.title).toBe('Day 3');
     expect(result.places).toEqual([]);
+  });
+});
+
+describe('computeDurationDays', () => {
+  it('returns 0 when start is missing', () => {
+    expect(computeDurationDays('', '2026-01-05')).toBe(0);
+  });
+
+  it('returns 0 when end is missing', () => {
+    expect(computeDurationDays('2026-01-01', '')).toBe(0);
+  });
+
+  it('returns the correct day count for a real range', () => {
+    expect(computeDurationDays('2026-01-01', '2026-01-06')).toBe(5);
+  });
+});
+
+describe('addDaysISO', () => {
+  it('adds days correctly within a month', () => {
+    expect(addDaysISO('2026-01-10', 3)).toBe('2026-01-13');
+  });
+
+  it('adds days correctly including a month rollover', () => {
+    expect(addDaysISO('2026-01-30', 3)).toBe('2026-02-02');
   });
 });

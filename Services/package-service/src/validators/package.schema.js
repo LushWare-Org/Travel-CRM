@@ -194,6 +194,42 @@ export const generateItineraryPreviewSchema = z.object({
   preferences: z.string().max(1000).optional(),
 });
 
+// ─── Conversational itinerary chat (public, non-persisting) ────
+
+const itineraryChatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1).max(2000),
+});
+
+const itineraryChatSlotsSchema = z.object({
+  destination: z.string().max(255).optional(),
+  duration: z.coerce.number().int().min(1).max(30).optional(),
+  travelers: z.coerce.number().int().min(1).max(50).optional(),
+  budget: z.string().max(100).optional(),
+  preferences: z.string().max(1000).optional(),
+});
+
+export const itineraryChatSchema = z.object({
+  messages: z.array(itineraryChatMessageSchema).min(1).max(20),
+  slots: itineraryChatSlotsSchema.optional(),
+});
+
+// ─── Trip-planning wizard (public, non-persisting) ──────────────
+// wizardState carries the same slot shape as itineraryChatSlotsSchema, plus
+// an optional selectedPackageId the client sets deterministically when the
+// traveler picks a proposed package (never parsed out of free text by the
+// model) — see wizard.controller.js's complete_wizard handling.
+
+const wizardStateSchema = z.object({
+  slots: itineraryChatSlotsSchema.optional(),
+  selectedPackageId: z.string().optional(),
+});
+
+export const wizardTurnSchema = z.object({
+  wizardState: wizardStateSchema.optional(),
+  messages: z.array(itineraryChatMessageSchema).min(1).max(20),
+});
+
 // ─── Place / Activity sub-schemas ─────────────────────────────
 
 export const createPlaceSchema = z.object({

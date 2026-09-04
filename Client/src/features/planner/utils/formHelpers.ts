@@ -130,3 +130,18 @@ export const buildItineraryDayFromAIDay = (aiDay: RawAIDay, index: number): Itin
   places: [], // Never populated from AI (or manual entry) — locations is the only user/AI-editable place field.
   notes: aiDay?.description || '',
 });
+
+// ── Date helpers shared by the manual duration calc and the chat panel ──
+
+/** Whole-day count between two ISO date strings, 0 if either is empty. */
+export const computeDurationDays = (start: string, end: string): number =>
+  start && end
+    ? Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+/** Adds `days` whole days to an ISO date string, returning an ISO date string. */
+export const addDaysISO = (isoDate: string, days: number): string => {
+  const d = new Date(isoDate);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};

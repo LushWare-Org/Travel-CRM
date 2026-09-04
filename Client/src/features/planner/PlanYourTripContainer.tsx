@@ -17,13 +17,14 @@ import {
   Coffee,
   UtensilsCrossed,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../../services/api/manualItinerary";
 import { useAIItineraryGenerator } from "./hooks/useAIItineraryGenerator";
-import { buildItineraryDayFromAIDay } from "./utils/formHelpers";
+import { buildItineraryDayFromAIDay, computeDurationDays } from "./utils/formHelpers";
 import type { DayAccommodation, DayMeals, ItineraryDay } from "./utils/formHelpers";
 import { pluralize } from "../../lib/pluralize";
 import DestinationSelector from "../../components/shared/DestinationSelector";
@@ -31,6 +32,8 @@ import LocationSelector from "../../components/shared/LocationSelector";
 import ActivitySelector from "../../components/shared/ActivitySelector";
 import { useAuth } from "../../contexts/AuthContext";
 import DateRangeCalendar from "./components/DateRangeCalendar";
+import ItineraryChatPanel from "./components/ItineraryChatPanel";
+import TripWizardPanel from "./components/TripWizardPanel";
 
 const transportOptions: Array<{ value: string; label: string; icon: LucideIcon }> = [
   { value: "flight", label: "Flight", icon: Plane },
@@ -99,6 +102,7 @@ export default function PlanYourTripContainer() {
   const [currentDayIndex, setCurrentDayIndex] = useState(0); // Index of currently visible day (0-based)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [preferences, setPreferences] = useState('');
+  const [entryMode, setEntryMode] = useState<'manual' | 'chat' | 'wizard'>('manual');
   const aiGenerator = useAIItineraryGenerator<ItineraryDay>({
     hasExistingDays: () => itineraryDays.length > 0,
     mapDay: buildItineraryDayFromAIDay,
@@ -117,13 +121,7 @@ export default function PlanYourTripContainer() {
     }
   }, [user]);
 
-  const duration =
-    startDate && endDate
-      ? Math.ceil(
-          (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-            (1000 * 60 * 60 * 24)
-        )
-      : 0;
+  const duration = computeDurationDays(startDate, endDate);
 
   // Clear itinerary days when duration becomes 0 or decreases
   useEffect(() => {
@@ -329,6 +327,17 @@ export default function PlanYourTripContainer() {
     }
   };
 
+  const handleChatReady = async (params: { destination: string; startDate: string; endDate: string; travelers?: number; preferences?: string }) => {
+    setSelectedDest({ value: params.destination, label: params.destination });
+    setStartDate(params.startDate);
+    setEndDate(params.endDate);
+    if (params.travelers) setTravelers(params.travelers);
+    if (params.preferences) setPreferences(params.preferences);
+    const chatDuration = computeDurationDays(params.startDate, params.endDate);
+    await aiGenerator.generate({ destination: params.destination, duration: chatDuration, travelers: params.travelers, preferences: params.preferences || undefined });
+    setStep(3);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 font-body">
       <div className="w-full mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-5xl">
@@ -376,29 +385,48 @@ export default function PlanYourTripContainer() {
                 </h2>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-                  Select or type your destination
-                </label>
-                <DestinationSelector
-                  value={selectedDest}
-                  onChange={handleDestinationChange}
-                  placeholder="Choose your destination..."
-                />
+              <div className="flex gap-2 mb-4 sm:mb-6">
+                <button type="button" onClick={() => setEntryMode('manual')} className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${entryMode === 'manual' ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  Enter manually
+                </button>
+                <button type="button" onClick={() => setEntryMode('chat')} className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${entryMode === 'chat' ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  <Zap className="w-3.5 h-3.5" /> Chat with AI
+                </button>
+                <button type="button" onClick={() => setEntryMode('wizard')} className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${entryMode === 'wizard' ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  <Sparkles className="w-3.5 h-3.5" /> Find a Package with AI
+                </button>
               </div>
-
-              {selectedDest && (
-                <div className="mt-4 p-3 sm:p-4 bg-gradient-to-br from-brand-50 to-brand-accent-50 border border-brand-200 rounded-xl">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gradient-to-r from-brand-500 to-brand-accent-500 rounded-full flex items-center justify-center">
-                      <Check className="w-4 sm:w-6 h-4 sm:h-6 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900 text-sm sm:text-lg">{destLabel(selectedDest)}</p>
-                      <p className="text-xs sm:text-sm text-gray-600">Destination selected</p>
-                    </div>
+              {entryMode === 'chat' ? (
+                <ItineraryChatPanel onReady={handleChatReady} />
+              ) : entryMode === 'wizard' ? (
+                <TripWizardPanel />
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+                      Select or type your destination
+                    </label>
+                    <DestinationSelector
+                      value={selectedDest}
+                      onChange={handleDestinationChange}
+                      placeholder="Choose your destination..."
+                    />
                   </div>
-                </div>
+
+                  {selectedDest && (
+                    <div className="mt-4 p-3 sm:p-4 bg-gradient-to-br from-brand-50 to-brand-accent-50 border border-brand-200 rounded-xl">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gradient-to-r from-brand-500 to-brand-accent-500 rounded-full flex items-center justify-center">
+                          <Check className="w-4 sm:w-6 h-4 sm:h-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm sm:text-lg">{destLabel(selectedDest)}</p>
+                          <p className="text-xs sm:text-sm text-gray-600">Destination selected</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

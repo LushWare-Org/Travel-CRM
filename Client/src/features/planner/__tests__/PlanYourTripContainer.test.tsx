@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import PlanYourTripContainer from '../PlanYourTripContainer';
 import { submitManualItineraryRequest } from '../../../services/api/manualItinerary';
 import { generateItineraryPreview } from '../../../services/api/aiItinerary';
+import { sendItineraryChatMessage } from '../../../services/api/itineraryChat';
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -18,6 +19,10 @@ vi.mock('../../../services/api/aiItinerary', () => ({
   generateItineraryPreview: vi.fn(),
 }));
 
+vi.mock('../../../services/api/itineraryChat', () => ({
+  sendItineraryChatMessage: vi.fn(),
+}));
+
 vi.mock('sweetalert2', () => ({
   default: { fire: mocks.swalFire },
 }));
@@ -28,6 +33,7 @@ vi.mock('../../../contexts/AuthContext', () => ({
 
 const submitMock = vi.mocked(submitManualItineraryRequest);
 const generateItineraryPreviewMock = vi.mocked(generateItineraryPreview);
+const sendItineraryChatMessageMock = vi.mocked(sendItineraryChatMessage);
 
 /** Day numbers for the current month that exist in every month (1..28+). */
 const CURRENT_MONTH_DAY_A = 15;
@@ -53,6 +59,7 @@ beforeEach(() => {
   submitMock.mockReset();
   submitMock.mockResolvedValue({ leadId: 'lead-1', manualItineraryId: 'mi-1' });
   generateItineraryPreviewMock.mockReset();
+  sendItineraryChatMessageMock.mockReset();
 });
 
 describe('PlanYourTripContainer', () => {
@@ -275,5 +282,84 @@ describe('PlanYourTripContainer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
     expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+  });
+
+  it('Step 1 still defaults to "Enter manually" active with the existing destination selector visible', () => {
+    render(<PlanYourTripContainer />);
+    expect(screen.getByRole('button', { name: 'Enter manually' })).toBeInTheDocument();
+    expect(screen.getByText('Choose your destination...')).toBeInTheDocument();
+  });
+
+  it('clicking "Chat with AI" hides the destination selector and shows the chat greeting + input', async () => {
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
+
+    expect(screen.queryByText('Choose your destination...')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Tell us about your trip...')).toBeInTheDocument();
+  });
+
+  it('typing a message and sending it calls sendItineraryChatMessage and renders the mocked reply', async () => {
+    sendItineraryChatMessageMock.mockResolvedValue({ reply: 'How long is your trip?', slots: {}, readyToGenerate: false });
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
+    const input = screen.getByPlaceholderText('Tell us about your trip...');
+    await user.type(input, 'A trip to Kandy');
+    await user.click(input.parentElement!.querySelector('button') as HTMLButtonElement);
+
+    expect(sendItineraryChatMessageMock).toHaveBeenCalledWith({
+      messages: [{ role: 'user', content: 'A trip to Kandy' }],
+      slots: {},
+    });
+    expect(await screen.findByText('How long is your trip?')).toBeInTheDocument();
+  });
+
+  it('completing the chat and inline calendar advances directly to Step 3 with the AI-generated day visible', async () => {
+    sendItineraryChatMessageMock.mockResolvedValue({
+      reply: 'Sounds great!',
+      slots: { destination: 'Bali', duration: 5 },
+      readyToGenerate: true,
+    });
+    generateItineraryPreviewMock.mockResolvedValue({
+      days: [{ dayNumber: 1, title: 'Ella Hike', locations: ['Ella'], activities: ['Nine Arch Bridge'] }],
+    });
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
+    const input = screen.getByPlaceholderText('Tell us about your trip...');
+    await user.type(input, '5 days in Bali');
+    await user.click(input.parentElement!.querySelector('button') as HTMLButtonElement);
+    await screen.findByText(/Sounds like a 5-day trip to Bali!/);
+
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+
+    expect(generateItineraryPreviewMock).toHaveBeenCalledWith({
+      destination: 'Bali',
+      duration: 5,
+      travelers: undefined,
+      preferences: undefined,
+    });
+    expect(await screen.findByText('Plan Your Itinerary')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Ella Hike')).toBeInTheDocument();
+  });
+
+  it('a rejected sendItineraryChatMessage shows the error banner with a working Retry button and never calls generateItineraryPreview', async () => {
+    sendItineraryChatMessageMock.mockRejectedValue(new Error('offline'));
+    const user = userEvent.setup();
+    render(<PlanYourTripContainer />);
+
+    await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
+    const input = screen.getByPlaceholderText('Tell us about your trip...');
+    await user.type(input, 'Hi');
+    await user.click(input.parentElement!.querySelector('button') as HTMLButtonElement);
+
+    expect(await screen.findByText('offline')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(generateItineraryPreviewMock).not.toHaveBeenCalled();
   });
 });

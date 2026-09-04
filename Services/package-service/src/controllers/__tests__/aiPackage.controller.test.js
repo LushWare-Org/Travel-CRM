@@ -310,3 +310,96 @@ describe('POST /api/v1/packages/generate-itinerary-preview', () => {
     expect(mockPrisma.package.create).not.toHaveBeenCalled();
   });
 });
+
+describe('POST /api/v1/packages/itinerary-chat', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 200 with reply/slots/readyToGenerate: true, with no Authorization header (genuinely public)', async () => {
+    mockGenerateStructured.mockResolvedValue({ reply: 'Great, a 3-day Kandy trip!', slots: { destination: 'Kandy', duration: 3 } });
+
+    const res = await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [{ role: 'user', content: 'I want a 3 day trip to Kandy' }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual({
+      reply: 'Great, a 3-day Kandy trip!',
+      slots: { destination: 'Kandy', duration: 3 },
+      readyToGenerate: true,
+    });
+  });
+
+  it('returns readyToGenerate: false when only destination is known (no duration)', async () => {
+    mockGenerateStructured.mockResolvedValue({ reply: 'How long is your trip?', slots: { destination: 'Kandy' } });
+
+    const res = await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [{ role: 'user', content: 'I want to go to Kandy' }] });
+
+    expect(res.body.data.readyToGenerate).toBe(false);
+  });
+
+  it('merges with previously-known slots from the request body', async () => {
+    mockGenerateStructured.mockResolvedValue({ reply: 'Great, 3 days it is!', slots: { duration: 3 } });
+
+    const res = await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [{ role: 'user', content: '3 days' }], slots: { destination: 'Kandy' } });
+
+    expect(res.body.data.slots).toEqual({ destination: 'Kandy', duration: 3 });
+    expect(res.body.data.readyToGenerate).toBe(true);
+  });
+
+  it('drops an out-of-range duration from the model', async () => {
+    mockGenerateStructured.mockResolvedValue({ reply: 'Got it!', slots: { destination: 'Kandy', duration: 45 } });
+
+    const res = await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [{ role: 'user', content: 'A very long trip to Kandy' }] });
+
+    expect(res.body.data.slots).toEqual({ destination: 'Kandy' });
+    expect(res.body.data.readyToGenerate).toBe(false);
+  });
+
+  it('never persists — package.create is never called', async () => {
+    mockGenerateStructured.mockResolvedValue({ reply: 'Great!', slots: { destination: 'Kandy', duration: 3 } });
+
+    await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [{ role: 'user', content: 'Kandy, 3 days' }] });
+
+    expect(mockPrisma.package.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when messages: []', async () => {
+    const res = await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [] });
+
+    expect(res.status).toBe(400);
+    expect(mockGenerateStructured).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when the AI client reports it is not configured', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI generation is not configured'), { statusCode: 503 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [{ role: 'user', content: 'Kandy, 3 days' }] });
+
+    expect(res.status).toBe(503);
+  });
+
+  it('returns 502 when the model output fails schema/JSON validation', async () => {
+    mockGenerateStructured.mockRejectedValue(Object.assign(new Error('AI did not return valid JSON'), { statusCode: 502 }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/itinerary-chat')
+      .send({ messages: [{ role: 'user', content: 'Kandy, 3 days' }] });
+
+    expect(res.status).toBe(502);
+  });
+});

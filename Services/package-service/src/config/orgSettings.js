@@ -2,10 +2,11 @@
 // (Services/billing-service/src/config/orgSettings.js) — package-service only
 // needs the identity/branding fields the package PDF's header, footer and
 // page-1 letterhead render (company name, tagline, logo, address, contact),
+// plus supportEmail/whatsappNumber for the trip-planning wizard's
+// answer_policy_question fallback (docs/designs/ai-trip-planning-assistant.md),
 // not the full billing branding shape (bank details, payment terms, reviews,
-// etc.), so this only fetches and exposes those fields. Duplicated rather
-// than shared: these are independently deployable services with no shared
-// workspace.
+// etc.). Duplicated rather than shared: these are independently deployable
+// services with no shared workspace.
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3002';
 const INTERNAL_SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY || '';
@@ -21,6 +22,8 @@ const FALLBACK = {
   contactPhone: process.env.COMPANY_PHONE || '',
   contactEmail: process.env.COMPANY_EMAIL || '',
   website: process.env.COMPANY_WEBSITE || '',
+  supportEmail: process.env.COMPANY_SUPPORT_EMAIL || '',
+  whatsappNumber: process.env.COMPANY_WHATSAPP_NUMBER || '',
 };
 
 let cache = null; // { value, expiresAt }
@@ -55,6 +58,8 @@ export async function getOrgSettings({ fetchImpl = fetch } = {}) {
       contactPhone: settings.contactPhone || FALLBACK.contactPhone,
       contactEmail: settings.contactEmail || FALLBACK.contactEmail,
       website: settings.website || FALLBACK.website,
+      supportEmail: settings.supportEmail || FALLBACK.supportEmail,
+      whatsappNumber: settings.whatsappNumber || FALLBACK.whatsappNumber,
     };
     cache = { value, expiresAt: now + CACHE_TTL_MS };
     return value;
