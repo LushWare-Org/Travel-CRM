@@ -132,4 +132,42 @@ describe('TripWizardPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Back online!')).toBeInTheDocument();
   });
+
+  it('a contactPrompt turn renders the contact form; submitting sends the contact info as a user message', async () => {
+    sendWizardTurnMock.mockResolvedValueOnce({
+      toolCall: { tool: 'capture_contact', args: {} },
+      serverResult: null,
+      updatedWizardState: { contact: { email: '' } },
+      uiComponent: 'contactPrompt',
+      message: 'How can we reach you?',
+    });
+    sendWizardTurnMock.mockResolvedValueOnce({
+      toolCall: { tool: 'set_slot', args: {} },
+      serverResult: null,
+      updatedWizardState: { contact: { email: 'a@b.com' } },
+      uiComponent: 'slotPrompt',
+      message: 'Thanks!',
+    });
+
+    const user = userEvent.setup();
+    render(<TripWizardPanel />);
+
+    await user.type(screen.getByPlaceholderText('Tell us about your trip...'), 'Bali');
+    await user.click(getSendButton());
+
+    // The contactPrompt uiComponent surfaces the inline contact-capture form.
+    expect(await screen.findByText('How can we reach you?')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send contact info' })).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText('Email'), 'a@b.com');
+    await user.click(screen.getByRole('button', { name: 'Send contact info' }));
+
+    expect(sendWizardTurnMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      messages: expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: expect.stringContaining('a@b.com') }),
+      ]),
+    }));
+    expect(await screen.findByText('Thanks!')).toBeInTheDocument();
+  });
 });

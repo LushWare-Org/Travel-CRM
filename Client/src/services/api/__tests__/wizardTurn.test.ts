@@ -5,6 +5,8 @@ vi.mock('../../http/client', () => ({ default: { post: mockPost } }));
 
 import { sendWizardTurn } from '../wizardTurn';
 
+const MESSAGE = { id: 'msg-1', role: 'user' as const, content: 'Bali', at: '2026-01-01T00:00:00.000Z' };
+
 beforeEach(() => {
   mockPost.mockReset();
 });
@@ -24,12 +26,12 @@ describe('sendWizardTurn', () => {
       },
     });
 
-    const result = await sendWizardTurn({ messages: [{ role: 'user', content: 'Bali' }] });
+    const result = await sendWizardTurn({ messages: [MESSAGE] });
 
     expect(result.uiComponent).toBe('slotPrompt');
     expect(result.updatedWizardState.slots?.destination).toBe('Bali');
     expect(mockPost).toHaveBeenCalledWith('/packages/wizard-turn', {
-      messages: [{ role: 'user', content: 'Bali' }],
+      messages: [MESSAGE],
     });
   });
 
@@ -46,6 +48,6 @@ describe('sendWizardTurn', () => {
       },
     });
 
-    await expect(sendWizardTurn({ messages: [{ role: 'user', content: 'hi' }] })).rejects.toThrow();
+    await expect(sendWizardTurn({ messages: [MESSAGE] })).rejects.toThrow();
   });
 });

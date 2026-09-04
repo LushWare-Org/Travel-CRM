@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 
-const { mockGenerateStructured, mockPrisma, mockFetchPolicyDocuments, mockGetOrgSettings } = vi.hoisted(() => ({
+const { mockGenerateStructured, mockPrisma, mockFetchPolicyDocuments, mockGetOrgSettings, mockSubmitLeadIntake } = vi.hoisted(() => ({
   mockGenerateStructured: vi.fn(),
   mockPrisma: {
     package: { findMany: vi.fn(), findUnique: vi.fn() },
   },
   mockFetchPolicyDocuments: vi.fn(),
   mockGetOrgSettings: vi.fn(),
+  mockSubmitLeadIntake: vi.fn(),
 }));
 
 vi.mock('../../ai/geminiClient.js', () => ({
@@ -20,6 +21,7 @@ vi.mock('../../ai/geminiClient.js', () => ({
 vi.mock('../../db/client.js', () => ({ default: mockPrisma }));
 vi.mock('../../config/policyDocuments.js', () => ({ fetchPolicyDocuments: mockFetchPolicyDocuments }));
 vi.mock('../../config/orgSettings.js', () => ({ getOrgSettings: mockGetOrgSettings }));
+vi.mock('../../services/leadIntake.client.js', () => ({ submitLeadIntake: mockSubmitLeadIntake }));
 
 const { default: app } = await import('../../app.js');
 
@@ -52,10 +54,18 @@ function basePackageRow(overrides = {}) {
   };
 }
 
+// Wizard-turn messages must carry a stable id and an ISO timestamp (see the
+// extended WizardTurnRequest contract). Content is used as the id so each
+// fixture is unique and stable across the resent sliding window.
+function wizardMsg(content, role = 'user') {
+  return { id: `m-${content}`, role, content, at: '2026-09-04T00:00:00.000Z' };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockFetchPolicyDocuments.mockResolvedValue([]);
   mockGetOrgSettings.mockResolvedValue({ supportEmail: 'support@lushtravel.example', whatsappNumber: '+960 555 0200' });
+  mockSubmitLeadIntake.mockResolvedValue({ ok: true });
 });
 
 describe('POST /api/v1/packages/wizard-turn', () => {
@@ -67,7 +77,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: '5 days in Bali' }] });
+      .send({ messages: [wizardMsg('5 days in Bali')] });
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -86,7 +96,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ wizardState: { slots: { destination: 'Bali', duration: 5 } }, messages: [{ role: 'user', content: 'Show me options' }] });
+      .send({ wizardState: { slots: { destination: 'Bali', duration: 5 } }, messages: [wizardMsg('Show me options')] });
 
     expect(res.status).toBe(200);
     expect(mockPrisma.package.findMany).toHaveBeenCalledWith(expect.objectContaining({
@@ -104,7 +114,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: 'Show me options' }] });
+      .send({ messages: [wizardMsg('Show me options')] });
 
     expect(res.body.data.serverResult.packages).toEqual([]);
   });
@@ -115,7 +125,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: 'Show me options' }] });
+      .send({ messages: [wizardMsg('Show me options')] });
 
     expect(res.status).toBe(500);
   });
@@ -131,7 +141,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: 'Is my trip refundable if I cancel within 30 days?' }] });
+      .send({ messages: [wizardMsg('Is my trip refundable if I cancel within 30 days?')] });
 
     expect(res.body.data.serverResult.answered).toBe(true);
     expect(res.body.data.serverResult.snippets[0].quote).toBe(
@@ -149,7 +159,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: 'What is your refund policy?' }] });
+      .send({ messages: [wizardMsg('What is your refund policy?')] });
 
     expect(res.body.data.serverResult.answered).toBe(false);
     expect(res.body.data.serverResult.fallbackMessage).toMatch(/don't have a confirmed answer/);
@@ -167,7 +177,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: 'What is your refund policy for cancellations?' }] });
+      .send({ messages: [wizardMsg('What is your refund policy for cancellations?')] });
 
     expect(res.body.data.serverResult.snippets[0].quote).toBe(
       'Full refunds are issued for cancellations made more than 30 days before departure.',
@@ -185,7 +195,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ wizardState: { selectedPackageId: 'pkg-1' }, messages: [{ role: 'user', content: "I'll take it" }] });
+      .send({ wizardState: { selectedPackageId: 'pkg-1' }, messages: [wizardMsg("I'll take it")] });
 
     expect(res.body.data.uiComponent).toBe('complete');
     expect(res.body.data.serverResult.package.id).toBe('pkg-1');
@@ -197,11 +207,126 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ wizardState: { selectedPackageId: 'gone' }, messages: [{ role: 'user', content: "I'll take it" }] });
+      .send({ wizardState: { selectedPackageId: 'gone' }, messages: [wizardMsg("I'll take it")] });
 
     expect(res.status).toBe(200);
     expect(res.body.data.uiComponent).toBe('error');
     expect(res.body.data.serverResult.error).toBe('PACKAGE_NOT_FOUND');
+  });
+
+  it('complete_wizard: deactivated (unpublished) package also returns PACKAGE_NOT_FOUND', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'complete_wizard', args: { selectedPackageId: 'pkg-1' } });
+    mockPrisma.package.findUnique.mockResolvedValue(basePackageRow({ isActive: false }));
+
+    const res = await request(app)
+      .post('/api/v1/packages/wizard-turn')
+      .send({ wizardState: { selectedPackageId: 'pkg-1' }, messages: [wizardMsg("I'll take it")] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.uiComponent).toBe('error');
+    expect(res.body.data.serverResult.error).toBe('PACKAGE_NOT_FOUND');
+  });
+
+  it('capture_contact: merges contact fields into wizardState and returns uiComponent contactPrompt', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'capture_contact',
+      args: { contact: { email: 'traveler@example.com', phone: '+960 555 0100' }, message: 'How can we reach you?' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/packages/wizard-turn')
+      .send({
+        wizardState: { slots: { destination: 'Bali', duration: 5 }, contact: { name: 'Alex' } },
+        messages: [wizardMsg('You can email me')],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.updatedWizardState.contact).toEqual({
+      name: 'Alex',
+      email: 'traveler@example.com',
+      phone: '+960 555 0100',
+    });
+    expect(res.body.data.uiComponent).toBe('contactPrompt');
+    expect(mockSubmitLeadIntake).not.toHaveBeenCalled();
+  });
+
+  it('persists the lead via intake when the durable signal is met (contact + destination + duration)', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'answer_policy_question',
+      args: { selectedSnippetIds: ['snippet-0'], message: "Here's what our policy says:" },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/packages/wizard-turn')
+      .send({
+        wizardState: { slots: { destination: 'Bali', duration: 5 }, contact: { email: 'traveler@example.com' } },
+        sessionId: 'session-1',
+        messages: [wizardMsg('I want Bali for 5 days')],
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockSubmitLeadIntake).toHaveBeenCalledTimes(1);
+    expect(mockSubmitLeadIntake).toHaveBeenCalledWith({
+      channel: 'chatbot',
+      sessionId: 'session-1',
+      contact: { email: 'traveler@example.com' },
+      slots: { destination: 'Bali', duration: 5 },
+      transcript: [{ id: 'm-I want Bali for 5 days', role: 'user', content: 'I want Bali for 5 days', at: '2026-09-04T00:00:00.000Z' }],
+    });
+  });
+
+  it('persists the lead when trip intent comes from selectedPackageId alone, with no duration given', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'answer_policy_question',
+      args: { selectedSnippetIds: ['snippet-0'], message: "Here's what our policy says:" },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/packages/wizard-turn')
+      .send({
+        wizardState: { slots: { destination: 'Bali' }, contact: { email: 'traveler@example.com' }, selectedPackageId: 'b0000000-0000-4000-8000-000000000001' },
+        sessionId: 'session-1',
+        messages: [wizardMsg('I want the Bali package')],
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockSubmitLeadIntake).toHaveBeenCalledTimes(1);
+    expect(mockSubmitLeadIntake).toHaveBeenCalledWith(expect.objectContaining({
+      selectedPackageId: 'b0000000-0000-4000-8000-000000000001',
+      slots: { destination: 'Bali' },
+    }));
+  });
+  it('never calls intake when no contact has been captured yet (durable signal not met)', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'answer_policy_question', args: { selectedSnippetIds: ['snippet-0'] } });
+
+    const res = await request(app)
+      .post('/api/v1/packages/wizard-turn')
+      .send({
+        wizardState: { slots: { destination: 'Bali', duration: 5 } },
+        sessionId: 'session-1',
+        messages: [wizardMsg('I want Bali for 5 days')],
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockSubmitLeadIntake).not.toHaveBeenCalled();
+  });
+
+  it('still returns the normal 200 response when the intake call fails', async () => {
+    mockGenerateStructured.mockResolvedValue({ tool: 'answer_policy_question', args: { selectedSnippetIds: [] } });
+    mockSubmitLeadIntake.mockRejectedValue(new Error('timeout'));
+
+    const res = await request(app)
+      .post('/api/v1/packages/wizard-turn')
+      .send({
+        wizardState: { slots: { destination: 'Bali', duration: 5 }, contact: { email: 'traveler@example.com' } },
+        sessionId: 'session-1',
+        messages: [wizardMsg('I want Bali for 5 days')],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(mockSubmitLeadIntake).toHaveBeenCalledTimes(1);
+    expect(res.body.data).not.toHaveProperty('leadId');
   });
 
   it('returns 502 when the model returns an unrecognized tool', async () => {
@@ -209,7 +334,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: 'hi' }] });
+      .send({ messages: [wizardMsg('hi')] });
 
     expect(res.status).toBe(502);
   });
@@ -228,7 +353,7 @@ describe('POST /api/v1/packages/wizard-turn', () => {
 
     const res = await request(app)
       .post('/api/v1/packages/wizard-turn')
-      .send({ messages: [{ role: 'user', content: 'hi' }] });
+      .send({ messages: [wizardMsg('hi')] });
 
     expect(res.status).toBe(503);
   });

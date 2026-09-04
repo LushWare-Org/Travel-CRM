@@ -9,8 +9,11 @@ vi.mock('../../../../services/api/wizardTurn', () => ({
 
 import { useTripWizard } from '../useTripWizard';
 
+const SESSION_KEY = 'travel-crm.wizardSessionId';
+
 beforeEach(() => {
   mockSendWizardTurn.mockReset();
+  localStorage.clear();
 });
 
 describe('useTripWizard', () => {
@@ -29,10 +32,9 @@ describe('useTripWizard', () => {
       await result.current.send('Bali');
     });
 
-    expect(result.current.messages).toEqual([
-      { role: 'user', content: 'Bali' },
-      { role: 'assistant', content: 'How long is your trip?' },
-    ]);
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[0]).toEqual(expect.objectContaining({ role: 'user', content: 'Bali' }));
+    expect(result.current.messages[1]).toEqual(expect.objectContaining({ role: 'assistant', content: 'How long is your trip?' }));
     expect(result.current.wizardState).toEqual({ slots: { destination: 'Bali' } });
   });
 
@@ -133,10 +135,137 @@ describe('useTripWizard', () => {
       result.current.retry();
     });
 
-    expect(result.current.messages).toEqual([
-      { role: 'user', content: 'Hi' },
-      { role: 'assistant', content: 'Got it!' },
-    ]);
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[0]).toEqual(expect.objectContaining({ role: 'user', content: 'Hi' }));
+    expect(result.current.messages[1]).toEqual(expect.objectContaining({ role: 'assistant', content: 'Got it!' }));
     expect(result.current.error).toBe('');
+  });
+
+  it('generates a sessionId once, persists it to localStorage, and reuses it across sends', async () => {
+    mockSendWizardTurn.mockResolvedValue({
+      toolCall: { tool: 'set_slot', args: {} },
+      serverResult: null,
+      updatedWizardState: {},
+      uiComponent: 'slotPrompt',
+      message: 'ok',
+    });
+
+    const { result } = renderHook(() => useTripWizard());
+
+    await act(async () => {
+      await result.current.send('Bali');
+    });
+    await act(async () => {
+      await result.current.send('Paris');
+    });
+
+    const sessionIds = mockSendWizardTurn.mock.calls.map((c) => c[0].sessionId);
+    expect(sessionIds).toHaveLength(2);
+    expect(typeof sessionIds[0]).toBe('string');
+    expect(sessionIds[0]).toBe(sessionIds[1]);
+    expect(sessionIds[0]).toBe(localStorage.getItem(SESSION_KEY));
+  });
+
+  it('reads an existing sessionId from localStorage instead of generating a new one', async () => {
+    localStorage.setItem(SESSION_KEY, 'seeded-session');
+    mockSendWizardTurn.mockResolvedValue({
+      toolCall: { tool: 'set_slot', args: {} },
+      serverResult: null,
+      updatedWizardState: {},
+      uiComponent: 'slotPrompt',
+      message: 'ok',
+    });
+
+    const { result } = renderHook(() => useTripWizard());
+    await act(async () => {
+      await result.current.send('Bali');
+    });
+
+    expect(mockSendWizardTurn).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'seeded-session' }));
+    expect(localStorage.getItem(SESSION_KEY)).toBe('seeded-session');
+  });
+
+  it('gives every message a stable id and ISO at timestamp', async () => {
+    mockSendWizardTurn.mockResolvedValue({
+      toolCall: { tool: 'set_slot', args: {} },
+      serverResult: null,
+      updatedWizardState: {},
+      uiComponent: 'slotPrompt',
+      message: 'Got it',
+    });
+
+    const { result } = renderHook(() => useTripWizard());
+    await act(async () => {
+      await result.current.send('Bali');
+    });
+
+    const sent = mockSendWizardTurn.mock.calls[0][0].messages;
+    expect(sent[0]).toEqual(expect.objectContaining({ role: 'user', content: 'Bali' }));
+    expect(typeof sent[0].id).toBe('string');
+    expect(sent[0].id.length).toBeGreaterThan(0);
+    expect(sent[0].at).toMatch(/Z$/);
+    expect(new Date(sent[0].at).toISOString()).toBe(sent[0].at);
+
+    const assistant = result.current.messages[1];
+    expect(assistant).toEqual(expect.objectContaining({ role: 'assistant', content: 'Got it' }));
+    expect(typeof assistant.id).toBe('string');
+    expect(typeof assistant.at).toBe('string');
+  });
+
+  it('resends the same earlier message with its original id in a later turn window', async () => {
+    mockSendWizardTurn.mockResolvedValue({
+      toolCall: { tool: 'set_slot', args: {} },
+      serverResult: null,
+      updatedWizardState: {},
+      uiComponent: 'slotPrompt',
+      message: 'ok',
+    });
+
+    const { result } = renderHook(() => useTripWizard());
+    await act(async () => {
+      await result.current.send('Bali');
+    });
+    const firstUser = mockSendWizardTurn.mock.calls[0][0].messages[0];
+
+    await act(async () => {
+      await result.current.send('Paris');
+    });
+    const secondWindow = mockSendWizardTurn.mock.calls[1][0].messages;
+
+    expect(secondWindow.map((m: { id: string }) => m.id)).toContain(firstUser.id);
+    const resent = secondWindow.find((m: { id: string }) => m.id === firstUser.id);
+    expect(resent?.at).toBe(firstUser.at);
+    expect(resent?.content).toBe('Bali');
+
+    expect(result.current.messages[1]).toEqual(expect.objectContaining({ role: 'assistant', content: 'ok' }));
+  });
+
+  it('a contactPrompt response sets contactPrompt state and clears it on the next turn', async () => {
+    mockSendWizardTurn.mockResolvedValueOnce({
+      toolCall: { tool: 'capture_contact', args: {} },
+      serverResult: null,
+      updatedWizardState: { contact: { email: 'a@b.com' } },
+      uiComponent: 'contactPrompt',
+      message: 'How can we reach you?',
+    });
+    mockSendWizardTurn.mockResolvedValueOnce({
+      toolCall: { tool: 'set_slot', args: {} },
+      serverResult: null,
+      updatedWizardState: { contact: { email: 'a@b.com' } },
+      uiComponent: 'slotPrompt',
+      message: 'Thanks!',
+    });
+
+    const { result } = renderHook(() => useTripWizard());
+    await act(async () => {
+      await result.current.send('Bali');
+    });
+    expect(result.current.contactPrompt).toBe(true);
+    expect(result.current.wizardState.contact).toEqual({ email: 'a@b.com' });
+
+    await act(async () => {
+      await result.current.send('Here is my contact info');
+    });
+    expect(result.current.contactPrompt).toBe(false);
   });
 });

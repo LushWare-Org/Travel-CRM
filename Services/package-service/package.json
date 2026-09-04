@@ -21,6 +21,7 @@
     "@google/genai": "^1.30.0",
     "@prisma/client": "^5.22.0",
     "@travel-crm/constants": "file:../shared/constants",
+    "@travel-crm/contracts": "file:../shared/contracts",
     "axios": "^1.19.0",
     "cloudinary": "^2.4.0",
     "cookie-parser": "^1.4.6",

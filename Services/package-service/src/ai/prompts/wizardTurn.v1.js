@@ -5,7 +5,7 @@
 // trusts model-authored text for anything that touches real inventory,
 // pricing, or policy quotes.
 
-const TOOLS = ['set_slot', 'propose_packages', 'answer_policy_question', 'complete_wizard'];
+const TOOLS = ['set_slot', 'propose_packages', 'answer_policy_question', 'complete_wizard', 'capture_contact'];
 
 export function buildWizardTurnPrompt({ wizardState, messages, candidateSnippets }) {
   const slots = wizardState?.slots || {};
@@ -24,6 +24,7 @@ export function buildWizardTurnPrompt({ wizardState, messages, candidateSnippets
 
 Known so far (may be incomplete or empty): ${JSON.stringify(slots)}.
 ${selectedPackageId ? `The traveler has already selected package id ${selectedPackageId} from a previous propose_packages result.` : ''}
+${wizardState?.contact ? `Contact captured so far: ${JSON.stringify(wizardState.contact)}.` : ''}
 
 Conversation so far:
 ${transcript}
@@ -33,6 +34,7 @@ Tool choreography — pick exactly one per turn:
 2. propose_packages — args: { criteria: { destination?, minPrice?, maxPrice?, preferences? }, message }. Use this once destination and duration are both known and the traveler asks to see options, confirms they are ready, or has just confirmed their travel dates. The server queries real inventory server-side from your criteria — never invent a package.
 3. answer_policy_question — args: { selectedSnippetIds: string[], message }. Use this whenever the traveler asks a policy-style question (refunds, cancellations, baggage, etc.), regardless of what slots are known. Pick the id(s) from the "Possible relevant policy snippets" list above that answer the question — never write the quoted policy text yourself, only reference it by id. If no listed snippet actually answers the question, or none were provided, return an empty selectedSnippetIds array. "message" is a short lead-in sentence only (e.g. "Here's what our policy says:") — never the quote itself.
 4. complete_wizard — args: { selectedPackageId, message }. Use this ONLY when the traveler has selected a package (see "already selected package id" above) and is confirming they want to proceed. Echo the exact package id already selected — never invent or guess one.
+5. capture_contact — args: { contact: { name?, email?, phone?, whatsapp? }, message }. Use this when destination is known AND (duration is known OR a package is already selected) AND no email/phone/whatsapp has been captured yet, to ask how the traveler can be reached. "message" must ask a single, natural question for the next missing piece (e.g. "How can we reach you — email or WhatsApp?"). Include only the contact fields the traveler actually provided this turn, as non-empty strings; the caller merges them with what it already knows. Call it even if the traveler only gives part of the contact info, and do not keep asking once an email, phone, or WhatsApp is captured.
 
 Respond with the single best tool call for this turn as { tool, args }.`;
 }
@@ -63,8 +65,15 @@ export const wizardTurnResponseSchema = {
             preferences: { type: 'string' },
           },
         },
-        selectedSnippetIds: { type: 'array', items: { type: 'string' } },
-        selectedPackageId: { type: 'string' },
+        contact: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            email: { type: 'string' },
+            phone: { type: 'string' },
+            whatsapp: { type: 'string' },
+          },
+        },
         message: { type: 'string' },
       },
     },

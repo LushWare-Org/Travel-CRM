@@ -13,6 +13,7 @@ import {
   generateFromTitleSchema,
   generateDayPreviewSchema,
   generateDaysRangePreviewSchema,
+  wizardTurnSchema,
 } from '../package.schema.js';
 
 const UUID_1 = 'b0000000-0000-4000-8000-000000000001';
@@ -533,5 +534,46 @@ describe('generateDaysRangePreviewSchema', () => {
 
   it('rejects totalDuration above the 30-day cap', () => {
     expect(generateDaysRangePreviewSchema.safeParse({ ...base, totalDuration: 31 }).success).toBe(false);
+  });
+});
+
+describe('wizardTurnSchema', () => {
+  const baseMessage = { id: 'm1', role: 'user', content: 'hi', at: new Date().toISOString() };
+
+  it('accepts a minimal valid turn', () => {
+    const result = wizardTurnSchema.safeParse({ messages: [baseMessage] });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an optional sessionId and contact on wizardState', () => {
+    const result = wizardTurnSchema.safeParse({
+      sessionId: 'sess-1',
+      wizardState: { contact: { email: 'a@b.com', phone: '555' } },
+      messages: [baseMessage],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a message missing id', () => {
+    const { id, ...noId } = baseMessage;
+    const result = wizardTurnSchema.safeParse({ messages: [noId] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a message missing at', () => {
+    const { at, ...noAt } = baseMessage;
+    const result = wizardTurnSchema.safeParse({ messages: [noAt] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a non-ISO at timestamp', () => {
+    const result = wizardTurnSchema.safeParse({ messages: [{ ...baseMessage, at: 'not-a-date' }] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a 21-message array (over the max(20) cap)', () => {
+    const messages = Array.from({ length: 21 }, (_, i) => ({ ...baseMessage, id: `m${i}` }));
+    const result = wizardTurnSchema.safeParse({ messages });
+    expect(result.success).toBe(false);
   });
 });

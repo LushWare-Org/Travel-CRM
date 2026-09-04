@@ -5,6 +5,7 @@ import { buildPackageMarketingContentPrompt } from '../packageMarketingContent.v
 import { buildHotelSuggestionPrompt } from '../hotelSuggestion.v1.js';
 import { buildGenerateDayPreviewPrompt, generateDayPreviewResponseSchema } from '../generateDayPreview.v1.js';
 import { buildGenerateDaysRangePrompt, generateDaysRangeResponseSchema } from '../generateDaysRange.v1.js';
+import { buildWizardTurnPrompt, wizardTurnResponseSchema } from '../wizardTurn.v1.js';
 
 describe('buildGeneratePackagePrompt', () => {
   it('includes the exact day count and the special-requirements text', () => {
@@ -145,6 +146,34 @@ describe('buildGenerateDaysRangePrompt', () => {
   it('response schema requires the day-level fields the mapper depends on', () => {
     expect(generateDaysRangeResponseSchema.properties.days.items.required).toEqual(
       expect.arrayContaining(['dayNumber', 'title', 'locations', 'activities']),
+    );
+  });
+});
+
+describe('buildWizardTurnPrompt', () => {
+  it('includes capture_contact in the tool vocabulary listed to the model', () => {
+    const prompt = buildWizardTurnPrompt({ wizardState: {}, messages: [], candidateSnippets: [] });
+    expect(prompt).toContain('capture_contact');
+  });
+
+  it('surfaces already-captured contact fields to the model', () => {
+    const prompt = buildWizardTurnPrompt({
+      wizardState: { contact: { email: 'a@b.com' } },
+      messages: [],
+      candidateSnippets: [],
+    });
+    expect(prompt).toContain('a@b.com');
+  });
+});
+
+describe('wizardTurnResponseSchema', () => {
+  it('includes capture_contact in the tool enum', () => {
+    expect(wizardTurnResponseSchema.properties.tool.enum).toContain('capture_contact');
+  });
+
+  it('args.contact accepts name/email/phone/whatsapp', () => {
+    expect(Object.keys(wizardTurnResponseSchema.properties.args.properties.contact.properties)).toEqual(
+      expect.arrayContaining(['name', 'email', 'phone', 'whatsapp']),
     );
   });
 });

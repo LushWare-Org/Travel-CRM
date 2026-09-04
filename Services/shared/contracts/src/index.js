@@ -54,3 +54,12 @@ export {
   GenerateDaysRangePreviewRequest,
   GenerateDaysRangePreviewResult,
 } from './generateDaysRangePreview.js';
+export {
+  LeadIntakeChannel,
+  LeadIntakeContact,
+  LeadIntakeSlots,
+  LeadIntakeTranscriptMessage,
+  LeadIntakeRequest,
+  LeadIntakeResult,
+  LeadClaimResult,
+} from './leadIntake.js';

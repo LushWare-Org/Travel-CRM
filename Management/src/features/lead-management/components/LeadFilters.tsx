@@ -14,6 +14,7 @@ type FilterKey = 'all' | LifecycleStatus;
 const STATUSES: { key: FilterKey; label: string; shortLabel: string; dot: string }[] = [
   { key: 'all', label: 'All', shortLabel: 'All', dot: 'bg-muted-foreground' },
   { key: 'NEW', label: 'New', shortLabel: 'New', dot: 'bg-muted-foreground' },
+  { key: 'PENDING_VERIFICATION', label: 'Pending Verification', shortLabel: 'Pend.', dot: 'bg-warning' },
   { key: 'DRAFTING', label: 'Drafting', shortLabel: 'Draft', dot: 'bg-muted-foreground' },
   { key: 'QUOTED', label: 'Quoted', shortLabel: 'Quot.', dot: 'bg-primary' },
   { key: 'APPROVED', label: 'Approved', shortLabel: 'Appr.', dot: 'bg-success' },
@@ -22,12 +23,38 @@ const STATUSES: { key: FilterKey; label: string; shortLabel: string; dot: string
   { key: 'CLOSED_LOST', label: 'Lost', shortLabel: 'Lost', dot: 'bg-destructive' },
 ];
 
+const SOURCE_OPTIONS = [
+  { id: 'website', label: 'Website' },
+  { id: 'social_media', label: 'Social Media' },
+  { id: 'phone_call', label: 'Phone Call' },
+  { id: 'email', label: 'Email' },
+  { id: 'referral', label: 'Referral' },
+  { id: 'walk_in', label: 'Walk-in' },
+  { id: 'booking', label: 'Booking' },
+  { id: 'chatbot', label: 'Chatbot' },
+  { id: 'other', label: 'Other' },
+];
+
+const PLATFORM_OPTIONS = [
+  { id: 'Website_Form', label: 'Website' },
+  { id: 'Social_Media', label: 'Social' },
+  { id: 'Phone_Call', label: 'Phone' },
+  { id: 'Referral', label: 'Referral' },
+  { id: 'Email', label: 'Email' },
+  { id: 'Walk_in', label: 'Walk-in' },
+  { id: 'Chatbot_Wizard', label: 'Chatbot' },
+];
+
 interface LeadFiltersProps {
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   filterStatus: FilterKey;
   setFilterStatus: (value: FilterKey) => void;
   statusCounts: Record<string, number>;
+  filterSources: string[];
+  setFilterSources: (value: string[]) => void;
+  filterPlatforms: string[];
+  setFilterPlatforms: (value: string[]) => void;
   onAdvancedFilterClick: () => void;
 }
 
@@ -37,6 +64,10 @@ const LeadFilters = ({
   filterStatus,
   setFilterStatus,
   statusCounts,
+  filterSources,
+  setFilterSources,
+  filterPlatforms,
+  setFilterPlatforms,
   onAdvancedFilterClick,
 }: LeadFiltersProps) => {
   return (
@@ -90,6 +121,61 @@ const LeadFilters = ({
             <Filter className="w-4 h-4" />
             Filters
           </Button>
+        </div>
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-foreground mb-2">Source</label>
+            <div className="flex flex-wrap gap-2">
+              {SOURCE_OPTIONS.map((opt) => {
+                const isSelected = filterSources.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() =>
+                      setFilterSources(
+                        isSelected
+                          ? filterSources.filter((v) => v !== opt.id)
+                          : [...filterSources, opt.id]
+                      )
+                    }
+                    className={`h-8 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-foreground mb-2">Platform</label>
+            <div className="flex flex-wrap gap-2">
+              {PLATFORM_OPTIONS.map((opt) => {
+                const isSelected = filterPlatforms.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() =>
+                      setFilterPlatforms(
+                        isSelected
+                          ? filterPlatforms.filter((v) => v !== opt.id)
+                          : [...filterPlatforms, opt.id]
+                      )
+                    }
+                    className={`h-8 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </Card>

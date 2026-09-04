@@ -43,6 +43,7 @@ interface LeadTableProps {
   onStatusClick?: (lead: any) => void;
   onSectionClick?: (lead: any) => void;
   onDeleteClick?: (lead: any) => void;
+  onClaimClick?: (lead: any) => void;
   canDelete?: boolean;
   viewMode?: 'grid' | 'table';
 }
@@ -73,6 +74,7 @@ const LeadTable = ({
   onStatusClick,
   onSectionClick,
   onDeleteClick,
+  onClaimClick,
   canDelete,
   viewMode = 'grid',
 }: LeadTableProps) => {
@@ -232,6 +234,18 @@ const LeadTable = ({
                       >
                         {statusLabel}
                       </button>
+                      {displayStatus === 'PENDING_VERIFICATION' && onClaimClick && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClaimClick(lead);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20"
+                          title="Claim Lead"
+                        >
+                          Claim
+                        </button>
+                      )}
                       {canDelete && (
                         <button
                           onClick={(e) => {
@@ -558,6 +572,18 @@ const LeadTable = ({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex flex-wrap items-center gap-1">
+                      {displayStatus === 'PENDING_VERIFICATION' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClaimClick?.(lead);
+                          }}
+                          className="p-2 transition-colors bg-warning/10 text-warning rounded-lg hover:bg-warning/20"
+                          title="Claim Lead"
+                        >
+                          <span className="text-xs font-medium">Claim</span>
+                        </button>
+                      )}
                       <button onClick={() => onEditClick?.(lead)} className={docActionClass} title="Edit Lead">
                         <Edit className={docIconClass} />
                       </button>

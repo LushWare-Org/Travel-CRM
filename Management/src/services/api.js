@@ -281,6 +281,11 @@ export const leadAPI = {
     const api = new ApiService();
     return api.put(`/leads/${id}`, { lifecycleStatus: status });
   },
+  // Claim a PENDING_VERIFICATION lead (salesRep/admin): PENDING_VERIFICATION -> NEW
+  claimLead: async (id) => {
+    const api = new ApiService();
+    return api.post(`/leads/${id}/claim`);
+  },
 
   // Send a free-form WhatsApp reply to the lead (only valid within Meta's
   // 24h session window — the caller/UI is responsible for that check).
