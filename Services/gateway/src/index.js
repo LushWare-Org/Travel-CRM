@@ -45,6 +45,11 @@ const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300 });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 // Stricter than authLimiter: each request is a real, billed Gemini call, not a login attempt.
 const aiItineraryPreviewLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
+// Higher ceiling than aiItineraryPreviewLimiter: a single conversation to
+// "ready" plus a couple of follow-up messages is several billed Gemini
+// calls, not one — 30/15min gives roughly 3x a typical conversation's
+// turn count while still bounding cost per IP.
+const itineraryChatLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30 });
 app.use(globalLimiter);
 
 // ─── Health check ──────────────────────────────────────────────────────────────
@@ -86,6 +91,7 @@ const PUBLIC_PATTERNS = [
   [/^\/api\/v1\/customized-packages\/website$/, 'POST'],
   [/^\/api\/v1\/manual-itineraries\/website$/, 'POST'],
   [/^\/api\/v1\/packages\/generate-itinerary-preview$/, 'POST'],
+  [/^\/api\/v1\/packages\/itinerary-chat$/, 'POST'],
   [/^\/api\/v1\/careers\/apply$/, 'POST'],
   [/^\/api\/v1\/vacancies\/?$/, 'GET'],
   [/^\/api\/v1\/vacancies\/admin\/all$/, 'GET'],
@@ -213,6 +219,7 @@ app.use(`${V1}/vendors`,    proxy(SERVICES.user));
 
 // Packages → package-service
 app.use(`${V1}/packages/generate-itinerary-preview`, aiItineraryPreviewLimiter, proxy(SERVICES.package));
+app.use(`${V1}/packages/itinerary-chat`, itineraryChatLimiter, proxy(SERVICES.package));
 app.use(`${V1}/packages`,    proxy(SERVICES.package));
 app.use(`${V1}/reviews`,     proxy(SERVICES.package));
 app.use(`${V1}/places`,      proxy(SERVICES.package));
