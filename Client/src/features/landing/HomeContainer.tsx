@@ -17,7 +17,6 @@ import { HERO_SLIDES } from '../../content/home';
 import { MONTHS } from './utils/constants';
 import { HERO_MEDIA } from '../../config/media';
 import HeroBackground from '../../components/shared/HeroBackground';
-import { isLushTheme } from '../../config/activeTheme';
 import SustainabilityStrip from './components/SustainabilityStrip';
 import AIPlanningExplainer from './components/AIPlanningExplainer';
 import {
@@ -429,7 +428,7 @@ export default function HomeContainer() {
   return (
     <div className="min-h-screen font-body">
       {/* HERO SECTION */}
-      <div className={`relative z-base min-h-[80vh] lg:min-h-[80vh] bg-brand-dark-950 flex flex-col ${isLushTheme ? 'justify-end' : 'justify-start'}`}>
+      <div className="relative z-base min-h-[80vh] lg:min-h-[80vh] bg-brand-dark-950 flex flex-col justify-end">
         <style>{`
           @media (min-width: 768px) and (max-width: 1024px) {
             .relative.min-h-\\[80vh\\] {
@@ -473,53 +472,27 @@ export default function HomeContainer() {
         </button>
 
         {/* Hero Content */}
-        {isLushTheme ? (
-          <div className="relative z-lifted max-w-2xl px-6 md:px-16 pb-12 md:pb-16">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
-              {heroHeadline}
-            </h1>
-            <p className="text-lg sm:text-xl md:text-xl text-gray-200 leading-relaxed">{heroSubtitle}</p>
-          </div>
-        ) : (
-          <div className="relative z-lifted flex flex-col items-center pt-28 md:pt-25 px-4 pb-10 md:pb-12">
-            <div className="max-w-7xl text-center mx-auto">
-              <div className="max-w-4xl">
-                <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-4 sm:mb-5 md:mb-6 leading-tight font-display">
-                  {heroHeadline}
-                </h1>
-                <p className="text-lg sm:text-xl md:text-xl text-gray-200 px-2 sm:px-0 leading-relaxed">{heroSubtitle}</p>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="relative z-lifted max-w-2xl px-6 md:px-16 pb-12 md:pb-16">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
+            {heroHeadline}
+          </h1>
+          <p className="text-lg sm:text-xl md:text-xl text-gray-200 leading-relaxed">{heroSubtitle}</p>
+        </div>
       </div>
 
       {/* SEARCH BAR — its own section directly below the hero image, never
           overlapping it, so the hero stays fully uncovered at every viewport
           height. */}
-      <div className={isLushTheme ? 'relative z-base bg-brand-dark-950 border-t border-white/10' : 'relative z-base bg-white py-8 md:py-10'}>
-        {isLushTheme ? (
-          <div className="max-w-7xl mx-auto pl-6 pr-20 md:pl-16 md:pr-24 2xl:px-16 py-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-              {searchControls}
-            </div>
+      <div className="relative z-base bg-brand-dark-950 border-t border-white/10">
+        <div className="max-w-7xl mx-auto pl-6 pr-20 md:pl-16 md:pr-24 2xl:px-16 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+            {searchControls}
           </div>
-        ) : (
-          <div className="max-w-4xl mx-auto px-4">
-            <div className="bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-gray-200 overflow-visible">
-              <div className="h-1 bg-gradient-to-r from-brand-accent-400 via-brand-500 to-red-500 animate-gradient-x" />
-              <div className="p-4 sm:p-5 overflow-visible">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-                  {searchControls}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       <Stats />
-      {isLushTheme && <SustainabilityStrip />}
+      <SustainabilityStrip />
       <AboutSection />
 
       {/* Deals of the Month */}
@@ -536,14 +509,14 @@ export default function HomeContainer() {
       <RecentlyBookedSlider items={recentItems} />
       <DestinationsSection />
       <WhyChooseUs />
-      {isLushTheme && <AIPlanningExplainer />}
+      <AIPlanningExplainer />
       <FeaturedPackages packages={packages} />
       <TestimonialsSection />
       <FAQSection />
       <KeyPartnersSection />
 
       {/* CTA */}
-      <section className={`py-12 relative overflow-hidden font-body ${isLushTheme ? 'bg-gradient-to-br from-brand-dark-950 via-brand-dark-900 to-brand-800' : 'bg-gradient-to-br from-blue-950 via-indigo-950 to-slate-950'}`}>
+      <section className="py-12 relative overflow-hidden font-body bg-gradient-to-br from-brand-dark-950 via-brand-dark-900 to-brand-800">
         <div className="absolute inset-0">
           <div className="absolute top-0 left-1/4 w-96 h-50 bg-blue-500/5 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-1/4 w-96 h-92 bg-purple-500/5 rounded-full blur-3xl"></div>

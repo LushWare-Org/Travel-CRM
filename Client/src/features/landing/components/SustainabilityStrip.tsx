@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { Leaf, HeartHandshake, Recycle } from 'lucide-react';
-import { isLushTheme } from '../../../config/activeTheme';
 
 const VALUES = [
   {
@@ -24,7 +23,6 @@ const VALUES = [
 ];
 
 export default function SustainabilityStrip() {
-  if (!isLushTheme) return null;
 
   return (
     <section className="py-section-md bg-brand-50 font-body">

@@ -140,7 +140,7 @@ describe('HomeContainer', () => {
     await flushAsyncWork();
 
     expect(
-      screen.getByRole('heading', { name: /Discover Your Dream Destination/ })
+      screen.getByRole('heading', { name: /Where Turquoise Tides Meet Timeless Journeys/ })
     ).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Bali (4 packages)' })).toBeInTheDocument();
     expect(screen.getByText('Featured Packages You’ll Love')).toBeInTheDocument();
