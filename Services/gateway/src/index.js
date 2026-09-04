@@ -92,6 +92,7 @@ const PUBLIC_PATTERNS = [
   [/^\/api\/v1\/manual-itineraries\/website$/, 'POST'],
   [/^\/api\/v1\/packages\/generate-itinerary-preview$/, 'POST'],
   [/^\/api\/v1\/packages\/itinerary-chat$/, 'POST'],
+  [/^\/api\/v1\/packages\/wizard-turn$/, 'POST'],
   [/^\/api\/v1\/careers\/apply$/, 'POST'],
   [/^\/api\/v1\/vacancies\/?$/, 'GET'],
   [/^\/api\/v1\/vacancies\/admin\/all$/, 'GET'],
@@ -220,6 +221,10 @@ app.use(`${V1}/vendors`,    proxy(SERVICES.user));
 // Packages → package-service
 app.use(`${V1}/packages/generate-itinerary-preview`, aiItineraryPreviewLimiter, proxy(SERVICES.package));
 app.use(`${V1}/packages/itinerary-chat`, itineraryChatLimiter, proxy(SERVICES.package));
+// Reuses itineraryChatLimiter (not a separate, stricter ceiling): a wizard
+// walkthrough is several turns, same order of magnitude as a chat
+// conversation — see docs/designs/ai-trip-planning-assistant.md.
+app.use(`${V1}/packages/wizard-turn`, itineraryChatLimiter, proxy(SERVICES.package));
 app.use(`${V1}/packages`,    proxy(SERVICES.package));
 app.use(`${V1}/reviews`,     proxy(SERVICES.package));
 app.use(`${V1}/places`,      proxy(SERVICES.package));
