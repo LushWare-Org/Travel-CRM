@@ -100,4 +100,18 @@
 **Priority:** P3
 **Depends on:** None
 
+## AI Infrastructure
+
+### Honor Gemini's RetryInfo.retryDelay on 429 quota errors
+
+**What:** `generateStructured`'s retry loop (`Services/package-service/src/ai/geminiClient.js`) treats `429` as retryable and backs off with a fixed `2^(attempt-1) * 500ms + jitter` (≈500ms then ≈1s, capped at `MAX_ATTEMPTS = 3`), regardless of what Gemini actually asks for. A quota-exhausted `429` response includes a `RetryInfo.retryDelay` (e.g. `"27s"`) in `err.details` — the fixed backoff is nowhere close, so all 3 attempts are exhausted well before the quota window Google names, and the request fails with a generic "AI generation failed" every time a quota 429 occurs, rather than actually waiting the suggested duration and succeeding.
+
+**Why:** Observed live: `gemini-3.5-flash` free-tier quota (20 requests/day) exhausted mid-development, both `wizard-turn` and `itinerary-chat` 502'd identically with no indication in the client-facing error that this was a quota issue vs. a real failure, and the retry loop's backoff couldn't have survived it even if attempts were unlimited (they're capped at 3).
+
+**Context:** Reported by the user against the running dev stack (real `429 RESOURCE_EXHAUSTED` log from `Services/package-service`), not related to the chatbot-lead-intake feature — `geminiClient.js` wasn't touched by that PR. Fix direction: parse `err.details` for a `type.googleapis.com/google.rpc.RetryInfo` entry's `retryDelay` and sleep that duration (with a sane cap, e.g. 60s) instead of the fixed backoff specifically for 429s; consider distinguishing "quota exhausted for the day" (not worth retrying at all within the same request) from a short-lived rate-limit blip.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
 ## Completed
