@@ -4,6 +4,7 @@ import MainLayout from './layouts/MainLayout';
 import HomePage from './pages/HomePage';
 import { AuthProvider } from './contexts/AuthContext';
 import { PAGE_CONFIG } from './config/pages';
+import AssistantWidget from './features/assistant/components/AssistantWidget';
 
 const DestinationsInternational = lazy(() => import('./pages/DestinationsPage'));
 const PackageDetails = lazy(() => import('./pages/PackageDetailsPage'));
@@ -45,24 +46,31 @@ function AppContent() {
   };
 
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
-      <Routes>
-        <Route element={<MainLayout currentPage={currentPage} onNavigate={handleNavigate} />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/packages" element={<Packages />} />
-          <Route path="/package/:id" element={<PackageDetails />} />
-          <Route path="/contact" element={<Contact />} />
-          {PAGE_CONFIG.destinations.enabled && <Route path="/destinations-international" element={<DestinationsInternational />} />}
-          {PAGE_CONFIG.planner.enabled && <Route path="/planner" element={<PlanYourTrip />} />}
-          {PAGE_CONFIG.planner.enabled && <Route path="/package/:id/customize" element={<CustomizePackage />} />}
-          {PAGE_CONFIG.about.enabled && <Route path="/about" element={<AboutUs />} />}
-          {PAGE_CONFIG.career.enabled && <Route path="/career" element={<Career />} />}
-          {PAGE_CONFIG.account.enabled && <Route path="/my-account" element={<MyAccount />} />}
-          {PAGE_CONFIG.account.enabled && <Route path="/login" element={<Login />} />}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </Suspense>
+    <>
+      <Suspense fallback={<div className="min-h-screen" />}>
+        <Routes>
+          <Route element={<MainLayout currentPage={currentPage} onNavigate={handleNavigate} />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/packages" element={<Packages />} />
+            <Route path="/package/:id" element={<PackageDetails />} />
+            <Route path="/contact" element={<Contact />} />
+            {PAGE_CONFIG.destinations.enabled && <Route path="/destinations-international" element={<DestinationsInternational />} />}
+            {PAGE_CONFIG.planner.enabled && <Route path="/planner" element={<PlanYourTrip />} />}
+            {PAGE_CONFIG.planner.enabled && <Route path="/package/:id/customize" element={<CustomizePackage />} />}
+            {PAGE_CONFIG.about.enabled && <Route path="/about" element={<AboutUs />} />}
+            {PAGE_CONFIG.career.enabled && <Route path="/career" element={<Career />} />}
+            {PAGE_CONFIG.account.enabled && <Route path="/my-account" element={<MyAccount />} />}
+            {PAGE_CONFIG.account.enabled && <Route path="/login" element={<Login />} />}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </Suspense>
+      {/* Site-wide floating assistant: mounted unconditionally (it self-excludes
+          by route internally — see isAssistantExcludedPath), and deliberately
+          OUTSIDE the Suspense boundary so lazy route loads never unmount/remount
+          it and re-fire impression telemetry. */}
+      <AssistantWidget />
+    </>
   );
 }
 
