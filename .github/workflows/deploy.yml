@@ -24,7 +24,7 @@ jobs:
   build-and-push:
     name: Build and push ${{ matrix.service }}
     runs-on: ubuntu-latest
-    environment: ${{ env.TARGET_ENV }}
+    environment: ${{ github.event.inputs.environment || 'dev' }}
     permissions:
       contents: read
       id-token: write
@@ -71,7 +71,7 @@ jobs:
     name: Run database migrations
     runs-on: ubuntu-latest
     needs: build-and-push
-    environment: ${{ env.TARGET_ENV }}
+    environment: ${{ github.event.inputs.environment || 'dev' }}
     permissions:
       contents: read
     steps:
@@ -103,7 +103,7 @@ jobs:
     name: Deploy ${{ matrix.service }}
     runs-on: ubuntu-latest
     needs: migrate
-    environment: ${{ env.TARGET_ENV }}
+    environment: ${{ github.event.inputs.environment || 'dev' }}
     permissions:
       contents: read
       id-token: write
@@ -149,7 +149,7 @@ jobs:
   deploy-hosting:
     name: Deploy Firebase Hosting sites
     runs-on: ubuntu-latest
-    environment: ${{ env.TARGET_ENV }}
+    environment: ${{ github.event.inputs.environment || 'dev' }}
     permissions:
       contents: read
       id-token: write
