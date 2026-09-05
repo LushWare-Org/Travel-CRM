@@ -8,13 +8,13 @@ Status: accepted. This document is the durable architecture record for Travel-CR
 |---|---|---|
 | Client SPA | Firebase Hosting — one site per environment (`Client/dist`) | First-party customer-facing SPA served as a static build; gets real custom domains (`lushtravelcloud.com`, `www.lushtravelcloud.com`) via Firebase Hosting's region-independent, free custom-domain feature. |
 | Management SPA | Firebase Hosting — one site per environment (`Management/dist`) | First-party admin SPA served as a static build; gets `manage.lushtravelcloud.com` the same way; no server-side compute. |
-| Services (gateway + 10 microservices) | Cloud Run ×11 + Supabase Postgres | All stateless Express apps — one Cloud Run service per `Services/*` directory (10 services) plus `Services/gateway`; they share one Supabase Postgres database with one schema per service, matching the existing `schema.prisma` `schemas` arrays with zero schema changes. |
+| Services (gateway + 11 microservices) | Cloud Run ×12 + Supabase Postgres | All stateless Express apps — one Cloud Run service per `Services/*` directory (11 services) plus `Services/gateway`; they share one Supabase Postgres database with one schema per service, matching the existing `schema.prisma` `schemas` arrays with zero schema changes. |
 
-**Compute.** Cloud Run, one service per `Services/*` directory (10 services) + `Services/gateway` = 11 Cloud Run services. All are stateless Express apps; no code changes needed for Cloud Run compatibility except the gateway ID-token change (see "Service exposure").
+**Compute.** Cloud Run, one service per `Services/*` directory (11 services) + `Services/gateway` = 12 Cloud Run services. All are stateless Express apps; no code changes needed for Cloud Run compatibility except the gateway ID-token change (see "Service exposure").
 
 **Static hosting.** Firebase Hosting, two sites in one Firebase project — `Client/dist` and `Management/dist`.
 
-**Database.** Supabase Postgres (not Cloud SQL) — external managed Postgres, region `ap-south-1` (Mumbai) to match Cloud Run region `asia-south1`. Single database, one Postgres schema per service (`crm_auth`, `crm_users`, `crm_packages`, `crm_leads`, `crm_bookings`, `crm_billing`, `crm_careers`, `crm_flights`), exactly matching the existing `schema.prisma` `schemas` arrays — zero schema changes. Supabase's Supavisor pooler (port 6543, `?pgbouncer=true`) is `DATABASE_URL`; the direct connection (port 5432) is `DIRECT_URL`, used only by `prisma migrate deploy`. This is not new design — `Services/booking-service/.env.example`, `Services/flight-service/.env.example`, and `Services/analytics-service/.env.example` already document exactly this pattern; the other 6 DB-backed services' `.env.example` files are stale and were brought in line by this plan.
+**Database.** Supabase Postgres (not Cloud SQL) — external managed Postgres, region `ap-south-1` (Mumbai) to match Cloud Run region `asia-south1`. Single database, one Postgres schema per service (`crm_assistant`, `crm_auth`, `crm_users`, `crm_packages`, `crm_leads`, `crm_bookings`, `crm_billing`, `crm_careers`, `crm_flights`), exactly matching the existing `schema.prisma` `schemas` arrays — zero schema changes. Supabase's Supavisor pooler (port 6543, `?pgbouncer=true`) is `DATABASE_URL`; the direct connection (port 5432) is `DIRECT_URL`, used only by `prisma migrate deploy`. This is not new design — `Services/booking-service/.env.example`, `Services/flight-service/.env.example`, and `Services/analytics-service/.env.example` already document exactly this pattern; the other 6 DB-backed services' `.env.example` files are stale and were brought in line by this plan.
 
 ## 2. Why not X
 
@@ -22,19 +22,19 @@ Status: accepted. This document is the durable architecture record for Travel-CR
 Cloud SQL was rejected in favor of Supabase because every `schema.prisma`'s `directUrl = env("DIRECT_URL")` already matches Supabase's Prisma pooling pattern.
 
 ### GCP API Gateway → gateway kept
-GCP API Gateway was rejected. The gateway's core job — decode a custom HS256 JWT (`jwt.sign(..., process.env.JWT_SECRET)`, confirmed in `Services/auth-service/src/controllers/auth.controller.js`) and turn it into trusted `x-user-*` headers for 10 downstream services, plus a hand-tuned public-route allowlist — has no managed GCP equivalent without switching to RS256/JWKS (a real auth-architecture change, out of scope). GCP API Gateway's native JWT auth requires exactly that switch, so it is rejected for this pass. The gateway is kept, not replaced by GCP API Gateway or a bare load balancer.
+GCP API Gateway was rejected. The gateway's core job — decode a custom HS256 JWT (`jwt.sign(..., process.env.JWT_SECRET)`, confirmed in `Services/auth-service/src/controllers/auth.controller.js`) and turn it into trusted `x-user-*` headers for 11 downstream services, plus a hand-tuned public-route allowlist — has no managed GCP equivalent without switching to RS256/JWKS (a real auth-architecture change, out of scope). GCP API Gateway's native JWT auth requires exactly that switch, so it is rejected for this pass. The gateway is kept, not replaced by GCP API Gateway or a bare load balancer.
 
 ### External Load Balancer + Cloud Armor → deferred
 Deferred (not rejected outright) because Cloud Run domain mapping is unsupported in `asia-south1` (confirmed: supported only in `us-central1`, `us-east1`, `europe-west1`, `asia-northeast1`), and a Global HTTPS LB + Cloud Armor costs a fixed ~$28+/mo this "first stage of app" doesn't need. Instead, the gateway is invoked directly at its default `*.run.app` URL (Cloud Run's built-in HTTPS endpoint, works in every region, $0 extra) — `Client`/`Management` call it via `VITE_API_URL` set to that URL, with no custom `api.` domain for stage 1. Edge WAF/rate limiting (Cloud Armor's job) is not replaced by anything for stage 1 — accepted risk, documented with an explicit revisit trigger (see "Deferred, with revisit triggers"). Cloudflare in front of the Firebase Hosting domains is noted as an optional $0 future add, not built now.
 
 ## 3. Service exposure
 
-The 10 non-gateway Cloud Run services are deployed with `ingress = all` (required — Cloud Run's `internal` ingress only admits traffic from resources actually attached to a VPC connector, which nothing in this architecture has) but `allow_unauthenticated = false`, with Cloud Run IAM invoker (`roles/run.invoker`) granted **only** to the gateway's service account. This closes the gap that public ingress would otherwise open: without an additional check, any caller who discovers a backend's `*.run.app` URL could bypass the gateway's JWT check entirely. The gateway must therefore mint a Google-signed ID token per backend call — a required code change, not optional hardening:
+The 11 non-gateway Cloud Run services are deployed with `ingress = all` (required — Cloud Run's `internal` ingress only admits traffic from resources actually attached to a VPC connector, which nothing in this architecture has) but `allow_unauthenticated = false`, with Cloud Run IAM invoker (`roles/run.invoker`) granted **only** to the gateway's service account. This closes the gap that public ingress would otherwise open: without an additional check, any caller who discovers a backend's `*.run.app` URL could bypass the gateway's JWT check entirely. The gateway must therefore mint a Google-signed ID token per backend call — a required code change, not optional hardening:
 
 - New gateway dependency: `google-auth-library` (`^9.15.0`).
 - A module-level `GoogleAuth` instance plus an `IdTokenClient` cache keyed by backend target URL (`getIdTokenClient` internally handles token refresh, so one client per target is correct and avoids re-fetching metadata-server credentials on every request); a `getAuthHeader(target)` async helper returns the ready-to-use `Authorization: Bearer <id_token>` header for that target's audience.
 - Env-var gate: `K_SERVICE` is a Cloud Run-only auto-injected env var. When it is unset (local dev / docker-compose / CI test runs), `getAuthHeader` returns `null` and the proxy behaves exactly as today — local dev keeps working unauthenticated.
-- No changes to any of the 10 backend services — Cloud Run's platform-level IAM invoker check rejects unauthorized requests before they reach the Express app, so there is nothing for the backends to validate.
+- No changes to any of the 11 backend services — Cloud Run's platform-level IAM invoker check rejects unauthorized requests before they reach the Express app, so there is nothing for the backends to validate.
 
 The gateway itself is invoked at its default `*.run.app` URL. `Client`/`Management` call it via `VITE_API_URL` set to that URL; the two SPAs still get real custom domains (`lushtravelcloud.com`, `www.lushtravelcloud.com`, `manage.lushtravelcloud.com`) via Firebase Hosting's own custom-domain feature, which is region-independent and free.
 
@@ -46,17 +46,17 @@ All secrets live in Secret Manager. Because all three environments share one GCP
 
 | Secret ID | Env var | Consumers |
 |---|---|---|
-| `database-url` | `DATABASE_URL` | auth, user, package, lead, booking, billing, career, flight, analytics |
-| `direct-url` | `DIRECT_URL` | auth, user, package, lead, booking, billing, career, flight, analytics |
+| `database-url` | `DATABASE_URL` | auth, user, package, lead, booking, billing, career, flight, analytics, assistant |
+| `direct-url` | `DIRECT_URL` | auth, user, package, lead, booking, billing, career, flight, analytics, assistant |
 | `jwt-secret` | `JWT_SECRET` | gateway, auth |
-| `internal-service-key` | `INTERNAL_SERVICE_KEY` | user, package, billing |
+| `internal-service-key` | `INTERNAL_SERVICE_KEY` | user, package, billing, assistant |
 | `internal-events-token` | `INTERNAL_EVENTS_TOKEN` | billing, lead, notification |
 | `cloudinary-api-key` | `CLOUDINARY_API_KEY` | package, billing, career |
 | `cloudinary-api-secret` | `CLOUDINARY_API_SECRET` | package, billing, career |
 | `stripe-secret-key` | `STRIPE_SECRET_KEY` | billing |
 | `razorpay-key-id` | `RAZORPAY_KEY_ID` | billing |
 | `razorpay-key-secret` | `RAZORPAY_KEY_SECRET` | billing |
-| `gemini-api-key` | `GEMINI_API_KEY` | package |
+| `gemini-api-key` | `GEMINI_API_KEY` | package, assistant |
 | `email-user` | `EMAIL_USER` | notification, booking |
 | `email-password` | `EMAIL_PASSWORD` (notification) / `EMAIL_PASS` (booking — differing var name, confirmed from each service's own `.env.example`) | notification, booking |
 | `whatsapp-access-token` | `WHATSAPP_ACCESS_TOKEN` | notification |
@@ -75,7 +75,7 @@ All secrets live in Secret Manager. Because all three environments share one GCP
 
 Plain env vars (set directly on the Cloud Run service, not Secret Manager):
 
-- `NODE_ENV=production` — all 11 services.
+- `NODE_ENV=production` — all 12 services.
 - `CLIENT_URL` / `MANAGEMENT_URL` — that environment's two Firebase Hosting site URLs (gateway, booking, analytics).
 - `CLOUDINARY_CLOUD_NAME` — package, billing, career (not a secret; it's part of every public Cloudinary asset URL).
 - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`/absent, `EMAIL_FROM` — notification, booking.
