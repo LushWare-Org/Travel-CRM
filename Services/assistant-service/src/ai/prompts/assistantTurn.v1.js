@@ -30,7 +30,21 @@ export const assistantTurnResponseJsonSchema = {
   type: 'object',
   properties: {
     tool: { type: 'string', enum: ASSISTANT_TOOLS },
-    args: { type: 'object' },
+    // Flat, merged-across-tools shape (same convention as
+    // wizardTurn.v1.js's wizardTurnResponseSchema) — explicit properties are
+    // required for Gemini's structured output to reliably fill args at all;
+    // an empty `{ type: 'object' }` (no properties) makes the model return
+    // args: {} on every turn regardless of tool, since it has no declared
+    // slots to populate (found while verifying a live end-to-end turn).
+    args: {
+      type: 'object',
+      properties: {
+        route: { type: 'string' },
+        question: { type: 'string' },
+        selectedSnippetIds: { type: 'array', items: { type: 'string' } },
+        message: { type: 'string' },
+      },
+    },
   },
   required: ['tool', 'args'],
 };
