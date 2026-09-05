@@ -31,9 +31,10 @@ describe('FloatingActionStack', () => {
     expect(screen.queryByLabelText('Call us')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Scroll to top')).toBeInTheDocument();
 
-    // WhatsApp stays at index 0 (bottom: 16px); with Call disabled,
-    // ScrollTop moves into index 1's slot (bottom: 16 + 68 = 84px) instead
-    // of index 2's (152px) — confirms no gap is left in the stack.
+    // Call is disabled; WhatsApp is now the sole remaining item ahead of
+    // ScrollTop in stack order, so it takes index 0's slot (bottom: 16px)
+    // and ScrollTop moves into index 1's slot (16 + 68 = 84px) instead of
+    // index 2's (152px) — confirms no gap is left in the stack.
     const scrollTopWrapper = screen.getByLabelText('Scroll to top').parentElement;
     expect(scrollTopWrapper).toHaveStyle({ bottom: '84px' });
   });

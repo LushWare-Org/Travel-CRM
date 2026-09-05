@@ -5,6 +5,7 @@ import { useAssistantChat } from '../hooks/useAssistantChat';
 import type { AssistantTurnData } from '../hooks/useAssistantChat';
 import type { AssistantTurnMessageT } from '../../../services/api/assistantTurn';
 import { sendAssistantEvent } from '../../../services/api/assistantEvents';
+import { ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX } from '../../../config/floatingActions';
 
 // Routes where the floating assistant deliberately does not mount — exactly
 // the design doc's Target User exclusions: /planner owns its own in-tab chat
@@ -30,8 +31,11 @@ const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + ro
 const GREETING =
   "Hi! I'm the site assistant — ask me to take you to a page, or ask a question about our policies.";
 
+// Bigger and bolder than the icon-only Call/WhatsApp/ScrollTop buttons below
+// it in the stack — size and shadow are the priority cue, not an animation.
 const LAUNCHER_CLASS =
-  'pointer-events-auto inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-brand-600 to-brand-accent-600 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105';
+  'pointer-events-auto inline-flex items-center gap-2.5 rounded-full bg-gradient-to-br from-brand-600 to-brand-accent-600 px-6 py-4 text-base font-bold text-white transition-transform hover:scale-105 active:scale-95';
+const LAUNCHER_SHADOW = { boxShadow: '0 20px 45px 0 rgba(44, 112, 72, 0.45), 0 8px 20px 0 rgba(0, 0, 0, 0.15)' };
 const PANEL_CLASS =
   'pointer-events-auto w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl';
 const CHIP_CLASS =
@@ -111,10 +115,12 @@ const MessageRow = memo(function MessageRow({ message, turnData, onNavigate }: M
  * Mounted once in AppContent — self-excludes by route (see
  * isAssistantExcludedPath), so it can sit unconditionally next to <Routes>.
  *
- * Placement is deliberately bottom-LEFT (`fixed left-3 bottom-3`, same
- * z-floating-action token as FloatingActionStack) so it never computes
- * z-order or offsets against the existing bottom-right WhatsApp/Call/
- * scroll-top stack, which must never be obscured (design doc Constraints).
+ * Placement is bottom-RIGHT (`fixed right-3`, same z-floating-action token
+ * as FloatingActionStack), stacked as the priority action one step above
+ * the existing Call/WhatsApp/ScrollTop stack — never covering it — via
+ * ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX. Sized larger than the stack's icon
+ * buttons (bigger padding/text, bolder shadow) so it reads as the primary
+ * CTA, not just another item in the list.
  */
 export default function AssistantWidget() {
   const location = useLocation();
@@ -179,7 +185,10 @@ export default function AssistantWidget() {
   };
 
   return (
-    <div className="fixed left-3 bottom-3 z-floating-action flex flex-col items-start gap-3 pointer-events-none">
+    <div
+      className="fixed right-3 z-floating-action flex flex-col items-end gap-3 pointer-events-none"
+      style={{ bottom: `${ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX}px` }}
+    >
       {isOpen && (
         <div role="dialog" aria-label="Travel assistant panel" className={PANEL_CLASS}>
           <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-brand-600 to-brand-accent-600 px-4 py-3 text-white">
@@ -240,8 +249,15 @@ export default function AssistantWidget() {
         </div>
       )}
 
-      <button type="button" onClick={handleToggleOpen} aria-expanded={isOpen} aria-label="Travel assistant" className={LAUNCHER_CLASS}>
-        <Bot className="w-5 h-5" />
+      <button
+        type="button"
+        onClick={handleToggleOpen}
+        aria-expanded={isOpen}
+        aria-label="Travel assistant"
+        className={LAUNCHER_CLASS}
+        style={LAUNCHER_SHADOW}
+      >
+        <Bot className="w-6 h-6" />
         Ask us
       </button>
     </div>
