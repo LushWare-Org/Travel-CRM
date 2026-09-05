@@ -69,6 +69,7 @@ const SERVICES = {
   career:       process.env.CAREER_SERVICE_URL        || 'http://localhost:3007',
   notification: process.env.NOTIFICATION_SERVICE_URL  || 'http://localhost:3008',
   analytics:    process.env.ANALYTICS_SERVICE_URL     || 'http://localhost:3009',
+  assistant:    process.env.ASSISTANT_SERVICE_URL     || 'http://localhost:3011',
 };
 
 // ─── Public routes (no JWT required) ──────────────────────────────────────────
@@ -95,6 +96,8 @@ const PUBLIC_PATTERNS = [
   [/^\/api\/v1\/packages\/wizard-turn$/, 'POST'],
   [/^\/api\/v1\/packages\/generate-day-preview$/, 'POST'],
   [/^\/api\/v1\/packages\/generate-days-preview$/, 'POST'],
+  [/^\/api\/v1\/assistant\/turn$/, 'POST'],
+  [/^\/api\/v1\/assistant\/events$/, 'POST'],
   [/^\/api\/v1\/careers\/apply$/, 'POST'],
   [/^\/api\/v1\/vacancies\/?$/, 'GET'],
   [/^\/api\/v1\/vacancies\/admin\/all$/, 'GET'],
@@ -266,6 +269,13 @@ app.use(`${V1}/notifications`, proxy(SERVICES.notification));
 // Analytics & dashboard → analytics-service
 app.use(`${V1}/analytics`, proxy(SERVICES.analytics));
 app.use(`${V1}/dashboard`, proxy(SERVICES.analytics));
+
+// Site-wide floating assistant → assistant-service. Reuses itineraryChatLimiter
+// (not a separate ceiling): a turn here is the same order of magnitude billed
+// Gemini cost as a wizard-turn call — see docs/designs/site-wide-floating-assistant.md.
+// /events is telemetry-only (no Gemini call), left on the default globalLimiter.
+app.use(`${V1}/assistant/turn`, itineraryChatLimiter, proxy(SERVICES.assistant));
+app.use(`${V1}/assistant`, proxy(SERVICES.assistant));
 
 // ─── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) =>
