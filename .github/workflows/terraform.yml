@@ -138,7 +138,7 @@ jobs:
         working-directory: infra/terraform/deployments/${{ github.event.inputs.environment }}
         run: |
           cat > terraform.tfvars << 'TFVARS_EOF'
-          ${{ secrets[format('TF_VARS_{0}', toUpper(github.event.inputs.environment))] }}
+          ${{ secrets[fromJSON('{"dev":"TF_VARS_DEV","staging":"TF_VARS_STAGING","prod":"TF_VARS_PROD"}')[github.event.inputs.environment]] }}
           TFVARS_EOF
 
       - name: Terraform init
