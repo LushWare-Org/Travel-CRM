@@ -8,7 +8,7 @@ Terraform-managed GCP infrastructure for Travel-CRM's microservices backend, plu
 
 **GCP project:** `travelcrm-506818` (region `asia-south1`)
 
-**Backend API:** all 11 microservices are deployed to Cloud Run and healthy.
+**Backend API:** all 12 microservices are deployed to Cloud Run and healthy.
 
 | Service | URL |
 |---|---|
@@ -23,12 +23,13 @@ Terraform-managed GCP infrastructure for Travel-CRM's microservices backend, plu
 | flight-service | https://dev-flight-service-fbystisnzq-el.a.run.app |
 | analytics-service | https://dev-analytics-service-fbystisnzq-el.a.run.app |
 | notification-service | https://dev-notification-service-fbystisnzq-el.a.run.app |
+| assistant-service | https://dev-assistant-service-fbystisnzq-el.a.run.app |
 
 Only the gateway is publicly invocable (`allUsers` on `run.invoker`). Every other service accepts requests only from the `dev-gateway` service account's identity token — calling any backend URL directly returns `403`, by design.
 
 Verified: `GET /health` on the gateway returns `200 {"status":"ok","service":"api-gateway"}`, and `GET /api/v1/packages` returns real proxied data (see "Gateway ID-token race fix" below).
 
-**Image tag currently deployed:** `dev-6a91c15` (all 11 services built from `Services/` at commit `6a91c15`), pushed to the shared Artifact Registry repo.
+**Image tag currently deployed:** `dev-a1c28de` (all 12 services built from `Services/` at commit `a1c28de`, pushed via CI's `build-and-push` job), pushed to the shared Artifact Registry repo.
 
 **Frontend (Client, Management):** both apps are built and deployed to Firebase Hosting.
 
@@ -37,7 +38,7 @@ Verified: `GET /health` on the gateway returns `200 {"status":"ok","service":"ap
 | Client | https://lush-ware-client-dev.web.app |
 | Management | https://lush-ware-management-dev.web.app |
 
-Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`, deployed via `firebase deploy --only hosting:client-dev,hosting:management-dev --project travelcrm-506818` using an operator account with `roles/firebase.admin` (not via the CI service account — that path is still blocked, see below). Verified live in a real browser: Client loads with zero console errors and live package data; Management's superadmin login (`superadmin@travelcrm.com` / seeded password) reaches the full dashboard.
+Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`. Deployed both manually (`firebase deploy --only hosting:client-dev,hosting:management-dev`) and via CI's `deploy-hosting` job (WIF-authenticated, no stored key). Verified live in a real browser: Client loads with zero console errors and live package data; Management's superadmin login (`superadmin@travelcrm.com` / seeded password) reaches the full dashboard.
 
 `.firebaserc` maps the `client-dev`/`management-dev` targets in `firebase.json` to the real Firebase Hosting site IDs `lush-ware-client-dev`/`lush-ware-management-dev`. Backend `CLIENT_URL`/`MANAGEMENT_URL` env vars now point at these real domains (previously `https://client-dev.web.app` / `https://management-dev.web.app`, which were never-created placeholders).
 
@@ -45,15 +46,19 @@ Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`, de
 
 `Services/gateway/src/index.js`'s proxy previously minted each backend's Cloud Run ID token inside an `async proxyReq` handler. `http-proxy-middleware` sends the proxied request before that promise resolves, so every call to a protected backend (`auth`, `packages`, `bookings`, etc.) went out unauthenticated, Cloud Run's own IAM 403'd it, and the gateway silently forwarded that 403 back to the client — with `ERR_HTTP_HEADERS_SENT` logged server-side as the only trace. Fixed by pre-minting the token in an awaited middleware wrapper before the proxy dispatches, so `proxyReq` only ever does a synchronous header set. Confirmed via Cloud Run logs (`Failed to mint Cloud Run ID token` / `ERR_HTTP_HEADERS_SENT`) before the fix, and a clean `200` with real proxied data after.
 
+### CI/CD
+
+`.github/workflows/deploy.yml` is fully wired and validated end-to-end for `dev` — first successful run: `build-and-push` (12 services) → `migrate` → `deploy` (12 services) → `deploy-hosting`, all green. Full setup runbook: `infra/CI-CD-SETUP.md`.
+
+- **Auth:** Workload Identity Federation only — no stored JSON keys anywhere in the pipeline. `github-actions-deployer` (roles: `run.admin`, `artifactregistry.writer`, `iam.serviceAccountUser`) handles build/deploy; `firebase-hosting-deployer` (role: `firebasehosting.admin`) handles Hosting. Both bound to a WIF pool scoped to exactly `LushWare-Org/Travel-CRM`.
+- **Secrets/vars:** repo-level (`GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `SUPABASE_DATABASE_URL`, `SUPABASE_DIRECT_URL` as secrets; `GCP_PROJECT_ID`, `GCP_REGION`, `GATEWAY_URL` as variables) — no GitHub Environment needed, repo-level values are visible as a fallback to every job regardless of `environment:` target.
+- **Image tags:** short 7-char SHA (`${GITHUB_SHA:0:7}`), matching the manual/Terraform convention exactly — `github.sha` (full 40-char) was tried first and fixed after confirming it would silently diverge from `terraform.tfvars`'s `image_tag`.
+- **Bugs found and fixed during first real run** (all pre-existing in the workflow, unrelated to WIF): job-level `environment:` can't reference the `env` context (every prior run had failed at parse time, 0s duration, forever); `migrate` needed both `DATABASE_URL` and `DIRECT_URL` (Prisma validates the whole datasource block even though only `directUrl` is used for the connection); `deploy-hosting`'s Client/Management builds needed an explicit `npm ci` inside `Services/shared/contracts` first, since that `file:`-linked package's own deps (`zod`) are never installed by `npm ci` in Client/Management alone.
+- **Database migration bookkeeping baseline:** the very first real `migrate deploy` run surfaced that `crm_auth`, `crm_bookings`, `crm_careers`, `crm_billing`, and `crm_flights` schemas already had their tables/types/columns from before Prisma migration tracking existed for them — every affected service's own migration history had to be baselined once with `prisma migrate resolve --applied <name>` (verified each object already existed before resolving, never blind). One-time; `migrate deploy` runs clean now.
+
 ## Not deployed
 
-- **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates). No Firebase Hosting sites exist for `client-staging`/`client-prod`/`management-staging`/`management-prod` either.
-
-- **CI/CD.** `.github/workflows/deploy.yml`'s `build-and-push`/`migrate`/`deploy` jobs need `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `vars.GCP_PROJECT_ID`, `vars.GCP_REGION`, and `SUPABASE_DIRECT_URL`, all currently unset. The `deploy-hosting` job additionally needs:
-  - `roles/firebasehosting.admin` granted to `firebase-hosting-deployer@travelcrm-506818.iam.gserviceaccount.com` — blocked because the operator account lacks `resourcemanager.projects.setIamPolicy` on `travelcrm-506818` (needs Owner/`projectIamAdmin`).
-  - The `dev` GitHub Environment created (for `FIREBASE_SERVICE_ACCOUNT`/`GATEWAY_URL` to be settable) — blocked because the operator's GitHub token has repo `maintain`, not `admin`.
-
-  Everything live above was built, pushed, and applied manually from a local shell using the operator's own `roles/firebase.admin`/Editor grants — not via CI.
+- **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates). No Firebase Hosting sites exist for `client-staging`/`client-prod`/`management-staging`/`management-prod` either. `infra/CI-CD-SETUP.md`'s WIF setup would need repeating per-environment (new pool/provider or per-env SAs) before CI could target them.
 
 ## Known placeholder / inactive config in `dev`
 
