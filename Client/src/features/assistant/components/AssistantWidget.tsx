@@ -6,25 +6,7 @@ import type { AssistantTurnData } from '../hooks/useAssistantChat';
 import type { AssistantTurnMessageT } from '../../../services/api/assistantTurn';
 import { sendAssistantEvent } from '../../../services/api/assistantEvents';
 import { ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX } from '../../../config/floatingActions';
-
-// Routes where the floating assistant deliberately does not mount — exactly
-// the design doc's Target User exclusions: /planner owns its own in-tab chat
-// surface, /package/:id/customize is the planner-gated conversion funnel the
-// widget must not compete with, and /login + /my-account are auth-adjacent.
-export const isAssistantExcludedPath = (pathname: string): boolean => {
-  // React Router matches "/planner" and "/planner/" identically when
-  // resolving which page renders, but this file's own exact-string check
-  // didn't — a trailing-slash URL would leave the widget mounted directly
-  // over the excluded page it exists to avoid (found in /ship's Codex
-  // adversarial review). Normalize before comparing.
-  const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
-  return (
-    normalized === '/planner' ||
-    /^\/package\/[^/]+\/customize$/.test(normalized) ||
-    normalized === '/login' ||
-    normalized === '/my-account'
-  );
-};
+import { isAssistantExcludedPath } from '../../../config/assistantRoutes';
 
 const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + route.slice(1);
 
@@ -116,11 +98,12 @@ const MessageRow = memo(function MessageRow({ message, turnData, onNavigate }: M
  * isAssistantExcludedPath), so it can sit unconditionally next to <Routes>.
  *
  * Placement is bottom-RIGHT (`fixed right-3`, same z-floating-action token
- * as FloatingActionStack), stacked as the priority action one step above
- * the existing Call/WhatsApp/ScrollTop stack — never covering it — via
- * ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX. Sized larger than the stack's icon
- * buttons (bigger padding/text, bolder shadow) so it reads as the primary
- * CTA, not just another item in the list.
+ * as FloatingActionStack), stacked bottom-to-top as: Call, WhatsApp, this
+ * launcher, then ScrollTop — never covering any of them — via
+ * ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX (FloatingActionStack reserves this
+ * same slot so ScrollTop shifts up instead of colliding with it). Sized
+ * larger than the stack's icon buttons (bigger padding/text, bolder shadow)
+ * so it reads as the priority CTA, not just another item in the list.
  */
 export default function AssistantWidget() {
   const location = useLocation();

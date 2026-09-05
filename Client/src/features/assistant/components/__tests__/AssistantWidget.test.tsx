@@ -75,15 +75,15 @@ describe('AssistantWidget', () => {
     expect(launcher()).toBeInTheDocument();
   });
 
-  it('renders bottom-right, stacked one slot above the Call/WhatsApp/ScrollTop stack', () => {
+  it('renders bottom-right, stacked above Call/WhatsApp and below ScrollTop', () => {
     renderAt('/');
     const wrapper = launcher().parentElement;
     expect(wrapper).toHaveClass('right-3');
     expect(wrapper).not.toHaveClass('left-3');
-    // Call/WhatsApp/ScrollTop occupy slots 0-2 (16px/84px/152px, all enabled
-    // by default) — the launcher must sit above all three, at slot 3 (220px),
-    // so it's never covering (or covered by) that stack.
-    expect(wrapper).toHaveStyle({ bottom: '220px' });
+    // Call/WhatsApp occupy slots 0-1 (16px/84px) — the launcher sits right
+    // above both, at 152px, one step below ScrollTop (which shifts up to
+    // 220px to make room — see FloatingActionStack's own tests).
+    expect(wrapper).toHaveStyle({ bottom: '152px' });
   });
 
   it.each([
