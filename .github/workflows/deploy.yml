@@ -61,9 +61,14 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
 
+      # Short SHA to match the convention used everywhere else in this repo
+      # (infra/README.md's manual rebuild steps, terraform.tfvars image_tag)
+      # -- github.sha is the full 40-char hash and would never match what
+      # Terraform expects, so a later `terraform apply` would silently roll
+      # every service back to whatever short-SHA tag it already has in state.
       - name: Build and push image
         run: |
-          IMAGE=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${{ github.sha }}
+          IMAGE=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${GITHUB_SHA:0:7}
           docker build -f Services/${{ matrix.service }}/Dockerfile -t "$IMAGE" Services/
           docker push "$IMAGE"
 
@@ -96,6 +101,7 @@ jobs:
       # migrations can't race each other.
       - name: Run migrations
         env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           DIRECT_URL: ${{ secrets.SUPABASE_DIRECT_URL }}
         run: node Services/migrate-all.mjs
 
@@ -143,7 +149,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.TARGET_ENV }}-${{ matrix.service }} \
-            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${{ github.sha }} \
+            --image ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/travel-crm/${{ matrix.service }}:${{ env.TARGET_ENV }}-${GITHUB_SHA:0:7} \
             --region ${{ vars.GCP_REGION }}
 
   deploy-hosting:
@@ -163,6 +169,14 @@ jobs:
           cache-dependency-path: |
             Client/package-lock.json
             Management/package-lock.json
+
+      # Client/Management depend on @travel-crm/contracts via a `file:`
+      # link into Services/shared/contracts — npm ci in Client/Management
+      # only installs *their* deps, it never installs the linked package's
+      # own deps (zod), so that has to happen explicitly first.
+      - name: Install shared contracts package
+        working-directory: Services/shared/contracts
+        run: npm ci
 
       - name: Install and build Client
         working-directory: Client
