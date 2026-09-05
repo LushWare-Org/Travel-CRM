@@ -57,6 +57,22 @@ resource "google_cloud_run_v2_service" "this" {
       }
     }
   }
+
+  # CI (github-actions-deployer, via `gcloud run deploy --image=...`) is the
+  # sole owner of which image tag is live -- Terraform sets it only once, at
+  # first creation, then must never touch it again. Without this, an
+  # unrelated `terraform apply` (a secret rotation, a memory bump, anything)
+  # would silently roll every service back to whatever `image_tag` happens
+  # to be in terraform.tfvars, undoing every deploy CI has done since.
+  # `client`/`client_version` are metadata gcloud stamps on every CLI
+  # deploy; ignored too, purely to keep `terraform plan` free of noise.
+  lifecycle {
+    ignore_changes = [
+      client,
+      client_version,
+      template[0].containers[0].image,
+    ]
+  }
 }
 
 # Public ingress only for the gateway (the two SPAs call it directly).

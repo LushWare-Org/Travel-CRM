@@ -238,6 +238,83 @@ change needed in that job.
 
 ---
 
+## Part 5 — Terraform CI (`terraform.yml`): plan automatic, apply manual-only
+
+A third service account, separate from the two above on purpose: `github-actions-deployer`
+and `firebase-hosting-deployer` are deliberately scoped to "push images / deploy revisions" —
+giving either of them Terraform's actual needs (create service accounts, set IAM policy on
+secrets and Cloud Run services, manage Secret Manager) would quietly undo that least-privilege
+split. Terraform gets its own identity and its own blast radius.
+
+### 5.1 Create the Terraform service account
+
+```bash
+gcloud iam service-accounts create terraform-deployer \
+  --project=travelcrm-506818 \
+  --display-name="GitHub Actions Terraform deployer (infra plan/apply)"
+```
+
+### 5.2 Grant it the same role set the human operator has used all along
+
+`infra/README.md`'s own "Prerequisites" section documents these four as sufficient for
+everything this Terraform module does (Cloud Run, Secret Manager, per-service SAs, IAM
+bindings on both) — proven by every `terraform apply` run manually this session:
+
+```bash
+PROJECT=travelcrm-506818
+SA=terraform-deployer@${PROJECT}.iam.gserviceaccount.com
+for ROLE in roles/editor roles/run.admin roles/secretmanager.admin roles/iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding $PROJECT --member="serviceAccount:${SA}" --role="$ROLE"
+done
+```
+
+### 5.3 Bind it to the existing WIF pool (same repo scope as the other two SAs)
+
+```bash
+PROJECT_NUMBER=288052100062
+MEMBER="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool/attribute.repository/LushWare-Org/Travel-CRM"
+gcloud iam service-accounts add-iam-policy-binding terraform-deployer@travelcrm-506818.iam.gserviceaccount.com \
+  --project=travelcrm-506818 --role="roles/iam.workloadIdentityUser" --member="$MEMBER"
+```
+
+### 5.4 GitHub secrets
+
+| Name | Value |
+|---|---|
+| `GCP_TERRAFORM_SA` | `terraform-deployer@travelcrm-506818.iam.gserviceaccount.com` |
+| `TF_VARS_DEV` | the entire contents of `infra/terraform/deployments/dev/terraform.tfvars` (gitignored locally) — CI writes it to disk verbatim before `terraform init`. Extending to staging/prod later is just adding `TF_VARS_STAGING`/`TF_VARS_PROD` the same way. |
+
+```bash
+gh secret set GCP_TERRAFORM_SA --repo LushWare-Org/Travel-CRM --body "terraform-deployer@travelcrm-506818.iam.gserviceaccount.com"
+gh secret set TF_VARS_DEV --repo LushWare-Org/Travel-CRM < infra/terraform/deployments/dev/terraform.tfvars
+```
+
+### 5.5 The pipeline itself (`.github/workflows/terraform.yml`)
+
+- **`plan`** — runs on every PR and push to `microservices` touching `infra/terraform/**`.
+  Read-only: `terraform plan`, posted as a PR comment. Hardcoded to `dev` (the only
+  environment with state and a `TF_VARS_*` secret today).
+- **`apply`** — `workflow_dispatch` only. A human picks an environment in the Actions UI
+  and triggers it; nothing else ever calls this job. Runs a fresh `plan` + `apply` in the
+  same run (never applies a plan file from a separate, possibly-stale run).
+
+**Why the image never gets reverted by `apply`, automatic or manual:** the shared
+`modules/deployment/modules/cloud-run-service/main.tf` has a
+`lifecycle { ignore_changes = [...] }` block excluding the container `image` field
+entirely. Terraform sets it once at first creation; after that, CI's `gcloud run deploy`
+(in `deploy.yml`) is the sole owner of what's live, regardless of what `image_tag` says
+in `terraform.tfvars`. Verified live: temporarily set `image_tag` to a nonsense value and
+`terraform plan` still reported "No changes."
+
+**Achievable gate today vs. the ideal one:** the strongest version of "apply is manual"
+is a GitHub Environment with a required reviewer — someone has to click approve, not
+just trigger. That needs repo-admin GitHub permissions this operator doesn't have (same
+wall as the `dev` GitHub Environment in Part 3 — retested, still 403). `workflow_dispatch`-only
+is what's achievable now; upgrade to a required-reviewer Environment once repo admin is
+available.
+
+---
+
 ## Sequence summary (as run for `dev`)
 
 1. ~~**Owner** runs Part 1~~ — done: `kevinxsanjula@gmail.com` had `roles/owner`, ran all 7 steps directly.

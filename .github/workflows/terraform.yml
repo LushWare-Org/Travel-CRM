@@ -1,0 +1,154 @@
+name: Terraform
+
+# Two separate concerns, two separate blast radii:
+#
+# - `plan` runs automatically on any infra/terraform/** change (PR or direct
+#   push) and is pure read-only visibility -- it never mutates real
+#   infrastructure. Hardcoded to `dev`, the only environment that actually
+#   has state and a terraform.tfvars secret today; extend to
+#   staging/prod by adding TF_VARS_STAGING/TF_VARS_PROD secrets and turning
+#   this into a matrix once those environments are actually provisioned.
+#
+# - `apply` only ever runs via a human manually dispatching this workflow
+#   and picking an environment. Nothing in this file, on any push or PR,
+#   auto-applies infrastructure changes -- that's a deliberate, one-way-door
+#   action a person has to trigger.
+#
+# Cloud Run's `image` field is explicitly excluded from Terraform's view
+# (see modules/deployment/modules/cloud-run-service/main.tf's
+# `lifecycle.ignore_changes`), so an apply here -- automatic or manual --
+# never rolls back whatever image deploy.yml's CI most recently shipped.
+
+on:
+  pull_request:
+    branches: [microservices]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  push:
+    branches: [microservices]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to apply
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  TF_VERSION: '1.16.0'
+
+jobs:
+  plan:
+    name: Terraform plan (dev)
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Write terraform.tfvars
+        working-directory: infra/terraform/deployments/dev
+        run: |
+          cat > terraform.tfvars << 'TFVARS_EOF'
+          ${{ secrets.TF_VARS_DEV }}
+          TFVARS_EOF
+
+      - name: Terraform init
+        working-directory: infra/terraform/deployments/dev
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        id: plan
+        working-directory: infra/terraform/deployments/dev
+        run: terraform plan -input=false -no-color -lock-timeout=60s | tee plan-output.txt
+        continue-on-error: true
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('infra/terraform/deployments/dev/plan-output.txt', 'utf8');
+            const plan = raw.length > 60000 ? raw.slice(-60000) : raw;
+            const outcome = '${{ steps.plan.outcome }}';
+            const body = [
+              `#### Terraform Plan (dev) — ${outcome === 'success' ? '✅ succeeded' : '❌ failed'}`,
+              '<details><summary>Show plan</summary>',
+              '',
+              '```',
+              plan,
+              '```',
+              '</details>',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+      - name: Fail the job if plan errored
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  apply:
+    name: Terraform apply (${{ github.event.inputs.environment }})
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Write terraform.tfvars
+        working-directory: infra/terraform/deployments/${{ github.event.inputs.environment }}
+        run: |
+          cat > terraform.tfvars << 'TFVARS_EOF'
+          ${{ secrets[fromJSON('{"dev":"TF_VARS_DEV","staging":"TF_VARS_STAGING","prod":"TF_VARS_PROD"}')[github.event.inputs.environment]] }}
+          TFVARS_EOF
+
+      - name: Terraform init
+        working-directory: infra/terraform/deployments/${{ github.event.inputs.environment }}
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        working-directory: infra/terraform/deployments/${{ github.event.inputs.environment }}
+        run: terraform plan -input=false -lock-timeout=60s -out=tf.plan
+
+      - name: Terraform apply
+        working-directory: infra/terraform/deployments/${{ github.event.inputs.environment }}
+        run: terraform apply -input=false -auto-approve tf.plan
