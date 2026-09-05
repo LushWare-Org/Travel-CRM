@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.0.1] - 2026-09-05
+
+### Fixed
+- Fixed a real risk in the deploy infrastructure: an unrelated infrastructure change (e.g. a secret rotation or a memory limit bump) could have silently reverted every backend service to an older, already-superseded container image the next time infrastructure changes were applied — verified this can no longer happen.
+
+### Added
+- Infrastructure changes (Terraform) now get an automatic, read-only preview posted on every pull request, so a reviewer can see exactly what would change in the cloud environment before merging.
+- Applying infrastructure changes for real now always requires a person to deliberately trigger it — nothing applies automatically on merge.
+
 ## [0.3.0.0] - 2026-09-05
 
 ### Added
