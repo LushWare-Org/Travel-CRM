@@ -28,7 +28,7 @@ Only the gateway is publicly invocable (`allUsers` on `run.invoker`). Every othe
 
 Verified: `GET /health` on the gateway returns `200 {"status":"ok","service":"api-gateway"}`, and `GET /api/v1/packages` returns real proxied data (see "Gateway ID-token race fix" below).
 
-**Image tag currently deployed:** `dev-6a91c15` (all 11 services built from `Services/` at commit `6a91c15`), pushed to the shared Artifact Registry repo.
+**Image tag currently deployed:** `dev-3c8a7c5` (all 11 services built from `Services/` at commit `3c8a7c5`, includes granular AI itinerary generation + wizard-turn/itinerary-chat/policyDocuments features), pushed to the shared Artifact Registry repo.
 
 **Frontend (Client, Management):** both apps are built and deployed to Firebase Hosting.
 
@@ -49,11 +49,9 @@ Built with `VITE_API_URL=https://dev-gateway-fbystisnzq-el.a.run.app/api/v1`, de
 
 - **`staging` and `prod` environments.** Config is written and mirrors `dev` exactly, but no `terraform apply` has ever run against either. `terraform.tfvars` doesn't exist for them (only `.tfvars.example` templates). No Firebase Hosting sites exist for `client-staging`/`client-prod`/`management-staging`/`management-prod` either.
 
-- **CI/CD.** `.github/workflows/deploy.yml`'s `build-and-push`/`migrate`/`deploy` jobs need `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `vars.GCP_PROJECT_ID`, `vars.GCP_REGION`, and `SUPABASE_DIRECT_URL`, all currently unset. The `deploy-hosting` job additionally needs:
-  - `roles/firebasehosting.admin` granted to `firebase-hosting-deployer@travelcrm-506818.iam.gserviceaccount.com` — blocked because the operator account lacks `resourcemanager.projects.setIamPolicy` on `travelcrm-506818` (needs Owner/`projectIamAdmin`).
-  - The `dev` GitHub Environment created (for `FIREBASE_SERVICE_ACCOUNT`/`GATEWAY_URL` to be settable) — blocked because the operator's GitHub token has repo `maintain`, not `admin`.
+- **`assistant-service` (12th microservice).** `infra/terraform/modules/deployment/{locals,cloud_run}.tf` define it (merged via PR #42, `feat/site-wide-assistant`), but `terraform apply` has never run against the updated config — `gcloud run services list` shows only the original 11 services live. Needs: build+push its image under the current shared `image_tag`, then `terraform apply` in `infra/terraform/deployments/dev` to actually create `dev-assistant-service` (with its real env vars/secrets/service account) *before* CI's `deploy` job ever targets it — CI's `gcloud run deploy` step is image-tag-only and assumes Terraform already established the service's full config; running it first would create a live-but-unconfigured Cloud Run service.
 
-  Everything live above was built, pushed, and applied manually from a local shell using the operator's own `roles/firebase.admin`/Editor grants — not via CI.
+- **CI/CD is now wired for `dev`** (see `infra/CI-CD-SETUP.md` for the full setup). `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `GCP_PROJECT_ID`, `GCP_REGION`, `GATEWAY_URL`, `SUPABASE_DIRECT_URL` are all set as repo-level GitHub secrets/variables (no GitHub Environment needed — repo-level values are visible to every job regardless of `environment:` target). Both GCP service accounts (`github-actions-deployer`, `firebase-hosting-deployer`) authenticate via Workload Identity Federation — no stored JSON keys anywhere in the pipeline. Not yet validated end-to-end with a real workflow run.
 
 ## Known placeholder / inactive config in `dev`
 
