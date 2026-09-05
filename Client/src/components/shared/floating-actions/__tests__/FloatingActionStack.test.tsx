@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 // FLOATING_ACTIONS_CONFIG reads import.meta.env at module-evaluation time,
 // so each test stubs env and re-imports both the config and the component
 // fresh via vi.resetModules() (see config/__tests__/pages.test.ts for the
 // same pattern — dynamic import is intentional here for the same reason).
-const renderStack = async () => {
+// FloatingActionStack reads the route via useLocation (to reserve the
+// assistant's slot), so every render needs a Router ancestor.
+const renderStack = async (path = '/') => {
   const { default: FloatingActionStack } = await import('../FloatingActionStack');
-  render(<FloatingActionStack />);
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <FloatingActionStack />
+    </MemoryRouter>
+  );
 };
 
 describe('FloatingActionStack', () => {
@@ -23,6 +30,22 @@ describe('FloatingActionStack', () => {
     expect(screen.getByLabelText('Scroll to top')).toBeInTheDocument();
   });
 
+  it('reserves the assistant launcher slot, pushing ScrollTop above it, on a route where the assistant mounts', async () => {
+    await renderStack('/');
+    // Call(0)/WhatsApp(1) take slots 16px/84px; the assistant launcher
+    // (rendered separately by AssistantWidget) reserves slot 152px; ScrollTop
+    // shifts up to 220px instead of colliding with it.
+    const scrollTopWrapper = screen.getByLabelText('Scroll to top').parentElement;
+    expect(scrollTopWrapper).toHaveStyle({ bottom: '220px' });
+  });
+
+  it('does not reserve the assistant slot on a route where the assistant is excluded', async () => {
+    await renderStack('/planner');
+    // No reservation: ScrollTop stays at its plain index-2 slot (152px).
+    const scrollTopWrapper = screen.getByLabelText('Scroll to top').parentElement;
+    expect(scrollTopWrapper).toHaveStyle({ bottom: '152px' });
+  });
+
   it('renders the remaining buttons without a gap when one is disabled', async () => {
     vi.stubEnv('VITE_FEATURE_CALL_BUTTON', 'false');
     await renderStack();
@@ -31,11 +54,13 @@ describe('FloatingActionStack', () => {
     expect(screen.queryByLabelText('Call us')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Scroll to top')).toBeInTheDocument();
 
-    // WhatsApp stays at index 0 (bottom: 16px); with Call disabled,
-    // ScrollTop moves into index 1's slot (bottom: 16 + 68 = 84px) instead
-    // of index 2's (152px) — confirms no gap is left in the stack.
+    // Call is disabled; WhatsApp is now the sole remaining item ahead of
+    // ScrollTop in stack order, taking index 0's slot (bottom: 16px).
+    // ScrollTop would move into index 1's slot (84px), but the assistant's
+    // reserved slot (this test's route, '/', is not excluded) still adds
+    // one more step: 16 + 68 + 68 = 152px — no gap, no collision.
     const scrollTopWrapper = screen.getByLabelText('Scroll to top').parentElement;
-    expect(scrollTopWrapper).toHaveStyle({ bottom: '84px' });
+    expect(scrollTopWrapper).toHaveStyle({ bottom: '152px' });
   });
 
   it('renders nothing when every toggle is disabled', async () => {

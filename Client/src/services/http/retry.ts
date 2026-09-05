@@ -1,6 +1,18 @@
 import type { AxiosError, AxiosResponse } from 'axios';
 import type { HttpConfig } from './config';
 
+// Module augmentation so any caller of httpClient.{get,post,...} can pass
+// `{ retry: false }` (or `true`) as a properly-typed request option, not
+// just an untyped object the interceptor happens to read off `error.config`
+// at runtime — e.g. sendAssistantTurn opts a non-idempotent, billed AI call
+// out of the default retry-on-timeout behavior.
+declare module 'axios' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  export interface AxiosRequestConfig<D = any> {
+    retry?: boolean;
+  }
+}
+
 // Extra fields axios doesn't declare but a request config can legitimately
 // carry: our own retry-eligibility override and the interceptor's private
 // attempt counter.

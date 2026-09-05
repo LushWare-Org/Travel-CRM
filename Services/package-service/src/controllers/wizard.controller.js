@@ -5,13 +5,10 @@ import { generateStructured } from '../ai/geminiClient.js';
 import { buildWizardTurnPrompt, wizardTurnResponseSchema } from '../ai/prompts/wizardTurn.v1.js';
 import { sanitizeSlots } from './aiPackage.controller.js';
 import { assembleWhere, buildInclude, serializePackage, serializePackageList } from '../services/package.service.js';
-import { fetchPolicyDocuments } from '../config/policyDocuments.js';
-import { retrieveSnippets } from '../services/policyRetrieval.js';
+import { fetchPolicyDocuments, retrieveSnippets, FALLBACK_POLICY_MESSAGE } from '@travel-crm/policy-retrieval';
 import { getOrgSettings } from '../config/orgSettings.js';
 import { submitLeadIntake } from '../services/leadIntake.client.js';
 import { LeadIntakeRequest } from '@travel-crm/contracts';
-
-const FALLBACK_POLICY_MESSAGE = "I don't have a confirmed answer to that — please reach out and our team will help.";
 
 function latestUserMessage(messages) {
   for (let i = (messages || []).length - 1; i >= 0; i -= 1) {

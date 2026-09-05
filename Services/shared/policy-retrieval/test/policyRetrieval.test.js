@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { retrieveSnippets } from '../policyRetrieval.js';
+import { retrieveSnippets } from '../src/index.js';
 
 const documents = [
   {

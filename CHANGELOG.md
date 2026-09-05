@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.0.0] - 2026-09-05
+
+### Added
+- A floating "Ask us" assistant button now appears on every public page (home, packages, destinations, about, contact, career) — visitors can ask it to take them to a page or answer a policy/FAQ question (refunds, cancellations, baggage, etc.) without leaving the page they're on.
+- The assistant can navigate you to any enabled page on the site by name, and answers policy questions by quoting the company's actual published policy text — it never invents an answer; when it doesn't have a confirmed answer, it says so and points you to the team.
+- Anonymous usage telemetry (widget shown, opened, message sent, reply received, page-navigation clicked) now feeds a new internal event log, used to measure whether this assistant is worth expanding.
+
+### Changed
+- The trip-planning chatbot's policy-answer engine is now shared code reused by the new site-wide assistant, so a future policy-wording fix only has to happen in one place instead of two.
+- Gemini API calls across the trip-planning chatbot and the new assistant now wait the exact amount of time Google's API asks for after a rate-limit response, instead of a fixed guess — quota-limited requests now recover instead of failing outright.
+
 ## [0.2.0.0] - 2026-09-04
 
 ### Added

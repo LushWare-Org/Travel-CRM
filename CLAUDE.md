@@ -1,12 +1,12 @@
 # Travel CRM
 
-Monorepo with two React frontends (Client + Management), an API gateway, and 10 Express/Prisma microservices behind it. The `Server/` directory is the legacy Express/MongoDB monolith being migrated away from.
+Monorepo with two React frontends (Client + Management), an API gateway, and 11 Express/Prisma microservices behind it. The `Server/` directory is the legacy Express/MongoDB monolith being migrated away from.
 
 ## Architecture
 
 ```
 Client (React/Vite :5173) ──┐
-Management (React/Vite :5174) ─┤─→ Gateway (:3000) ──→ microservices (:3001–:3010)
+Management (React/Vite :5174) ─┤─→ Gateway (:3000) ──→ microservices (:3001–:3011)
                                                                 └── Server legacy (:5000, MongoDB)
 ```
 
@@ -23,9 +23,10 @@ Management (React/Vite :5174) ─┤─→ Gateway (:3000) ──→ microservic
 | notification-service | 3008 | pg (raw) |
 | analytics-service | 3009 | pg (raw) |
 | flight-service | 3010 | Prisma/PostgreSQL |
+| assistant-service | 3011 | Prisma/PostgreSQL |
 | Server (legacy monolith) | 5000 | MongoDB/Mongoose |
 
-Gateway handles JWT verification, rate limiting, CORS, and downstream CORS-stripping. Public routes: auth, GET packages/reviews/itineraries, contact forms, career applications, webhooks.
+Gateway handles JWT verification, rate limiting, CORS, and downstream CORS-stripping. Public routes: auth, GET packages/reviews/itineraries, contact forms, career applications, webhooks, site-wide assistant turn/events.
 
 ## Commands
 
@@ -47,14 +48,14 @@ Each service has its own `package.json` — there is no root workspace. Commands
 - **Migrate status:** `cd Services/<name> && npm run db:migrate:status`
 - **Studio:** `cd Services/<name> && npm run db:studio`
 
-**Shared database, per-service schemas:** all 8 Prisma services (auth, user, package, lead, booking, billing, career, flight) connect to the **same physical Postgres database** (one Supabase instance) — each just owns its own Postgres schema namespace (`crm_auth`, `crm_billing`, `crm_flights`, etc.) via `@@schema(...)`. Because of this, Prisma's `_prisma_migrations` bookkeeping table is shared: running `prisma migrate status` inside any one service will list every other service's migration names too — that's expected, not drift. `migrate deploy`/`migrate status` only ever act on the migrations declared in that service's own `prisma/migrations/` folder, so this is safe to ignore. Never run `prisma migrate dev` against this shared remote database — use `db:migrate:deploy` (or `migrate-all.mjs`) instead, which only ever applies pending migrations and never resets/drops anything.
+**Shared database, per-service schemas:** all 9 Prisma services (auth, user, package, lead, booking, billing, career, flight, assistant) connect to the **same physical Postgres database** (one Supabase instance) — each just owns its own Postgres schema namespace (`crm_auth`, `crm_billing`, `crm_flights`, etc.) via `@@schema(...)`. Because of this, Prisma's `_prisma_migrations` bookkeeping table is shared: running `prisma migrate status` inside any one service will list every other service's migration names too — that's expected, not drift. `migrate deploy`/`migrate status` only ever act on the migrations declared in that service's own `prisma/migrations/` folder, so this is safe to ignore. Never run `prisma migrate dev` against this shared remote database — use `db:migrate:deploy` (or `migrate-all.mjs`) instead, which only ever applies pending migrations and never resets/drops anything.
 
 ### Testing
 - **Flight service:** `cd Services/flight-service && npm test` (vitest), `npm run test:watch`, `npm run test:coverage`, `npm run test:unit`, `npm run test:integration`
 - **Server (legacy):** `cd Server && npm test` (jest), `npm run test:watch`, `npm run lint`
 
 ### Seed / scripts
-- `cd Services && node migrate-all.mjs` — apply pending migrations across all 8 Prisma services in one pass (safe to re-run; no-ops when nothing's pending)
+- `cd Services && node migrate-all.mjs` — apply pending migrations across all 9 Prisma services in one pass (safe to re-run; no-ops when nothing's pending)
 - `cd Services && node seed.mjs` — seed PostgreSQL databases
 - `cd Services && node seed-extended.mjs` — extended seed
 - `cd Services && node update-passwords.mjs` — password migration
