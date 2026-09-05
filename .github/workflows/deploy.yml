@@ -152,6 +152,7 @@ jobs:
     environment: ${{ env.TARGET_ENV }}
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -178,7 +179,8 @@ jobs:
       - name: Authenticate to Google Cloud with Firebase service account
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: firebase-hosting-deployer@travelcrm-506818.iam.gserviceaccount.com
 
       - name: Deploy to Firebase Hosting
         run: npx --yes firebase-tools@latest deploy --only hosting:client-${{ env.TARGET_ENV }},hosting:management-${{ env.TARGET_ENV }}
