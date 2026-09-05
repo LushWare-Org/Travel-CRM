@@ -48,6 +48,11 @@ output "analytics_service_url" {
   value       = module.analytics_service.uri
 }
 
+output "assistant_service_url" {
+  description = "URL of this environment's assistant-service Cloud Run service."
+  value       = module.assistant_service.uri
+}
+
 output "notification_service_url" {
   description = "URL of this environment's notification-service Cloud Run service."
   value       = module.notification_service.uri

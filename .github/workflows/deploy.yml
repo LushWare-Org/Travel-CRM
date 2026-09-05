@@ -42,6 +42,7 @@ jobs:
           - flight-service
           - analytics-service
           - notification-service
+          - assistant-service
           - gateway
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +88,7 @@ jobs:
       - name: Install Prisma-backed services
         working-directory: Services
         run: |
-          for service in auth-service user-service package-service lead-service booking-service billing-service career-service flight-service; do
+          for service in auth-service user-service package-service lead-service booking-service billing-service career-service flight-service assistant-service; do
             (cd "$service" && npm ci)
           done
 
@@ -120,6 +121,7 @@ jobs:
           - flight-service
           - analytics-service
           - notification-service
+          - assistant-service
           - gateway
     steps:
       - uses: actions/checkout@v4

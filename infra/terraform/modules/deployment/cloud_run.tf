@@ -52,6 +52,7 @@ module "gateway" {
     CAREER_SERVICE_URL       = module.career_service.uri
     NOTIFICATION_SERVICE_URL = module.notification_service.uri
     ANALYTICS_SERVICE_URL    = module.analytics_service.uri
+    ASSISTANT_SERVICE_URL    = module.assistant_service.uri
   })
   memory                = local.services.gateway.memory
   cpu                   = local.services.gateway.cpu
@@ -298,6 +299,33 @@ module "analytics_service" {
   memory                = local.services.analytics-service.memory
   cpu                   = local.services.analytics-service.cpu
   allow_unauthenticated = local.services.analytics-service.allow_unauthenticated
+  min_instances         = 0
+  max_instances         = 10
+  env                   = var.env
+  company_slug          = var.company_slug
+  depends_on            = [google_secret_manager_secret_version.secrets]
+}
+
+module "assistant_service" {
+  source = "./modules/cloud-run-service"
+
+  name                  = local.services.assistant-service.name
+  project_id            = var.project_id
+  region                = var.region
+  image                 = "${var.region}-docker.pkg.dev/${var.project_id}/travel-crm/assistant-service:${var.env}-${var.image_tag}"
+  service_account_email = google_service_account.services["assistant-service"].email
+  secrets = [
+    for id in local.services.assistant-service.secrets : {
+      secret_id = id
+      env_var   = local.secret_env_names[id]
+    }
+  ]
+  plain_env = merge(local.services.assistant-service.plain_env, {
+    USER_SERVICE_URL = module.user_service.uri
+  })
+  memory                = local.services.assistant-service.memory
+  cpu                   = local.services.assistant-service.cpu
+  allow_unauthenticated = local.services.assistant-service.allow_unauthenticated
   min_instances         = 0
   max_instances         = 10
   env                   = var.env

@@ -106,6 +106,14 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_invoker_analytics" {
   member   = "serviceAccount:${google_service_account.services["gateway"].email}"
 }
 
+resource "google_cloud_run_v2_service_iam_member" "gateway_invoker_assistant" {
+  project  = var.project_id
+  location = var.region
+  name     = module.assistant_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["gateway"].email}"
+}
+
 resource "google_cloud_run_v2_service_iam_member" "gateway_invoker_notification" {
   project  = var.project_id
   location = var.region
