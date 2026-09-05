@@ -19,7 +19,10 @@ vi.mock('../../ai/geminiClient.js', () => ({
 // app.js pulls in package.routes.js → db/client.js, which constructs a real
 // PrismaClient at import time; mock it so this suite doesn't need DATABASE_URL.
 vi.mock('../../db/client.js', () => ({ default: mockPrisma }));
-vi.mock('../../config/policyDocuments.js', () => ({ fetchPolicyDocuments: mockFetchPolicyDocuments }));
+vi.mock('@travel-crm/policy-retrieval', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, fetchPolicyDocuments: mockFetchPolicyDocuments };
+});
 vi.mock('../../config/orgSettings.js', () => ({ getOrgSettings: mockGetOrgSettings }));
 vi.mock('../../services/leadIntake.client.js', () => ({ submitLeadIntake: mockSubmitLeadIntake }));
 

@@ -55,6 +55,34 @@ function extractStatus(err) {
   return err?.status ?? err?.response?.status ?? err?.code;
 }
 
+// TODOS.md: "Honor Gemini's RetryInfo.retryDelay on 429 quota errors" — the
+// @google/genai SDK's ApiError carries no structured `.details`; the raw
+// Gemini error body (which DOES include RetryInfo when Google names a
+// concrete retry window) is JSON-stringified into `err.message` by the
+// SDK's throwErrorIfNotOK (see node_modules/@google/genai dist, "got status"
+// / JSON.stringify(errorBody) path — confirmed against the installed SDK,
+// not guessed). Parses that back out; returns null on any shape mismatch so
+// callers always have a safe fallback to the existing fixed backoff.
+const MAX_RETRY_DELAY_MS = 60_000;
+
+function extractRetryDelayMs(err) {
+  try {
+    const parsed = JSON.parse(err?.message ?? '');
+    const details = parsed?.error?.details;
+    if (!Array.isArray(details)) return null;
+    const retryInfo = details.find(
+      (d) => typeof d?.['@type'] === 'string' && d['@type'].endsWith('RetryInfo'),
+    );
+    const raw = retryInfo?.retryDelay; // e.g. "27s"
+    if (typeof raw !== 'string') return null;
+    const seconds = parseFloat(raw.replace(/s$/, ''));
+    if (!Number.isFinite(seconds) || seconds < 0) return null;
+    return Math.min(seconds * 1000, MAX_RETRY_DELAY_MS);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Calls Gemini with a JSON-Schema-constrained response and returns the parsed
  * object. Retries transient failures (429/503, and client-side timeouts) with
@@ -127,8 +155,9 @@ export async function generateStructured({
         currentMaxOutputTokens = Math.min(MAX_OUTPUT_TOKENS_CEILING, Math.ceil(currentMaxOutputTokens * 1.5));
         logger.warn({ attempt, newMaxOutputTokens: currentMaxOutputTokens }, 'Retrying Gemini request with a larger token budget after truncation');
       } else {
-        const backoffMs = 2 ** (attempt - 1) * 500 + Math.random() * 250;
-        logger.warn({ status, attempt, backoffMs }, 'Retrying Gemini request after transient failure');
+        const retryDelayMs = status === 429 ? extractRetryDelayMs(err) : null;
+        const backoffMs = retryDelayMs ?? (2 ** (attempt - 1) * 500 + Math.random() * 250);
+        logger.warn({ status, attempt, backoffMs, usedRetryInfo: retryDelayMs != null }, 'Retrying Gemini request after transient failure');
         await sleep(backoffMs);
       }
     }

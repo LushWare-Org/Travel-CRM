@@ -64,6 +64,56 @@ describe('geminiClient', () => {
     expect(mockGenerateContent).toHaveBeenCalledTimes(2);
   });
 
+  it('honors RetryInfo.retryDelay from a 429 quota response instead of the fixed backoff', async () => {
+    vi.useFakeTimers();
+    const quotaErrorBody = JSON.stringify({
+      error: {
+        code: 429,
+        message: 'Quota exceeded',
+        status: 'RESOURCE_EXHAUSTED',
+        details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '5s' }],
+      },
+    });
+    mockGenerateContent
+      .mockRejectedValueOnce(Object.assign(new Error(quotaErrorBody), { status: 429 }))
+      .mockResolvedValueOnce({ text: '{"ok":true}' });
+    const { generateStructured } = await import('../geminiClient.js');
+
+    const resultPromise = generateStructured({ prompt: 'p', schema: {} });
+    // Fixed backoff for attempt 1 would be ~500-750ms; advancing exactly 5s
+    // (the RetryInfo value) proves the sleep used retryDelay, not the fixed
+    // schedule, since a bug here would have already resolved by 750ms.
+    await vi.advanceTimersByTimeAsync(5_000);
+    const result = await resultPromise;
+
+    expect(result).toEqual({ ok: true });
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('caps an honored RetryInfo.retryDelay at 60s', async () => {
+    vi.useFakeTimers();
+    const quotaErrorBody = JSON.stringify({
+      error: {
+        code: 429,
+        message: 'Quota exceeded',
+        status: 'RESOURCE_EXHAUSTED',
+        details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '300s' }],
+      },
+    });
+    mockGenerateContent
+      .mockRejectedValueOnce(Object.assign(new Error(quotaErrorBody), { status: 429 }))
+      .mockResolvedValueOnce({ text: '{"ok":true}' });
+    const { generateStructured } = await import('../geminiClient.js');
+
+    const resultPromise = generateStructured({ prompt: 'p', schema: {} });
+    await vi.advanceTimersByTimeAsync(60_000);
+    const result = await resultPromise;
+
+    expect(result).toEqual({ ok: true });
+    vi.useRealTimers();
+  });
+
   it('gives up after exhausting retries on repeated 503s', async () => {
     mockGenerateContent.mockRejectedValue(Object.assign(new Error('unavailable'), { status: 503 }));
     const { generateStructured } = await import('../geminiClient.js');

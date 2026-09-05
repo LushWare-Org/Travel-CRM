@@ -13,10 +13,12 @@ COPY shared/constants ./shared/constants
 COPY shared/pricing-engine ./shared/pricing-engine
 COPY shared/contracts ./shared/contracts
 COPY shared/lead-pricing-engine ./shared/lead-pricing-engine
+COPY shared/policy-retrieval ./shared/policy-retrieval
 RUN npm ci --prefix ./shared/constants \
     && npm ci --prefix ./shared/pricing-engine \
     && npm ci --prefix ./shared/contracts \
-    && npm ci --prefix ./shared/lead-pricing-engine
+    && npm ci --prefix ./shared/lead-pricing-engine \
+    && npm ci --prefix ./shared/policy-retrieval
 
 COPY package-service ./package-service
 WORKDIR /app/package-service
