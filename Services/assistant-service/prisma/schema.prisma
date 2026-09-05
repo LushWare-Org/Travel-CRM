@@ -1,0 +1,39 @@
+// =============================================================
+// assistant-service — PostgreSQL schema: "crm_assistant"
+// Shared DB, isolated namespace.
+//
+// Design decisions:
+//   • AssistantEvent is a telemetry sink only (impression/opened/turn/
+//     response/nav_click/error) — the turn protocol itself is stateless,
+//     per docs/designs/site-wide-floating-assistant.md Eng Review Decisions.
+//   • eventType is a plain String (validated at the Zod layer, not a
+//     Postgres enum) so new event types can be added without a migration.
+//   • No cross-schema FKs — sessionId is opaque client-generated.
+// =============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["crm_assistant"]
+}
+
+// ─── AssistantEvent (site-wide assistant telemetry) ───────────
+
+model AssistantEvent {
+  id        String   @id @default(uuid())
+  sessionId String
+  eventType String
+  tool      String?
+  route     String?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@schema("crm_assistant")
+}
