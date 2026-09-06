@@ -2,11 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Clock, User } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
-import { FALLBACK_IMAGE } from '../../../config/media';
-import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
+import PackageCard from '../../../components/shared/PackageCard';
 /** One recent-booking card, as shaped by HomeContainer's `recentItems`. */
 export interface RecentBookingItem {
   id?: string;
@@ -189,58 +187,32 @@ export default function RecentlyBookedSlider({ items = [] }: RecentlyBookedSlide
                     className="flex-shrink-0 px-2"
                     style={{ width: `${100 / cardsPerView}%` }}
                   >
-                    <Link
-                      to={`/package/${item.id}`}
-                      className="group block h-full"
-                    >
-                      <Card className="flex h-full flex-col gap-0 overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 ring-0 transition-colors duration-300 group-hover:border-gray-300">
-                        <div className="relative aspect-[4/3] shrink-0 overflow-hidden bg-gray-100">
-                          <img
-                            src={item.image || FALLBACK_IMAGE}
-                            alt={item.packageName || 'Travel Package'}
-                            loading="lazy"
-                            onError={(e) => {
-                              e.currentTarget.src = FALLBACK_IMAGE;
-                            }}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-
-                          <div className="absolute right-3 top-3">
-                            <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-gray-800">
-                              {item.bookedAgo ? `${item.bookedAgo} ago` : 'Recently'}
-                            </span>
+                    <PackageCard
+                      href={`/package/${item.id}`}
+                      image={item.image}
+                      title={item.packageName || 'Travel Package'}
+                      price={formatCurrency(item.price)}
+                      imageClassName="aspect-[4/3]"
+                      badge={
+                        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-gray-800">
+                          {item.bookedAgo ? `${item.bookedAgo} ago` : 'Recently'}
+                        </span>
+                      }
+                      overlayMeta={
+                        <>
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-700">
+                            <User className="size-5" />
                           </div>
-
-                          <div className="absolute bottom-3 left-4 flex items-center gap-3 text-white">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-700">
-                              <User className="size-5" />
-                            </div>
-                            <p className="text-sm font-semibold drop-shadow-sm">{travelerName}</p>
-                          </div>
+                          <p className="text-sm font-semibold drop-shadow-sm">{travelerName}</p>
+                        </>
+                      }
+                      meta={
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                          <Clock className="size-4 text-brand-accent-600" />
+                          <span>{formatDurationString(item.duration)}</span>
                         </div>
-
-                        <div className="flex flex-1 flex-col p-5">
-                          <h3 className="mb-3 line-clamp-2 text-lg font-bold text-gray-900 transition-colors duration-300 group-hover:text-brand-600">
-                            {item.packageName || 'Travel Package'}
-                          </h3>
-
-                          <div className="mb-4 flex items-center gap-1.5 text-sm text-gray-600">
-                            <Clock className="size-4 text-brand-accent-600" />
-                            <span>{formatDurationString(item.duration)}</span>
-                          </div>
-
-                          <div className="mt-auto flex items-center justify-between border-t border-gray-200 pt-4">
-                            <span className="font-display text-xl font-bold text-brand-600">
-                              {formatCurrency(item.price)}
-                            </span>
-                            <span className="inline-flex items-center rounded-xl bg-brand-800 px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 group-hover:bg-brand-900">
-                              View Details
-                            </span>
-                          </div>
-                        </div>
-                      </Card>
-                    </Link>
+                      }
+                    />
                   </div>
                 );
               })}
