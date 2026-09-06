@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { HTTP_CONFIG } from './config';
 import { computeDelayMs, shouldRetry, type RetryableRequestConfig } from './retry';
-import { getToken, clear as clearToken } from '../auth/tokenStorage';
+import { getToken, clear as clearToken, setPostLoginRedirect } from '../auth/tokenStorage';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -45,6 +45,7 @@ httpClient.interceptors.response.use(
       const isAuthAttempt = url.includes('/auth/login') || url.includes('/auth/register');
       if (!isAuthAttempt) {
         clearToken();
+        setPostLoginRedirect(window.location.pathname + window.location.search);
         window.location.assign('/login');
       }
     }

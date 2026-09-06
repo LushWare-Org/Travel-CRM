@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { clear, getToken, getUser, mergeStoredUser, persist } from '../tokenStorage';
+import { clear, consumePostLoginRedirect, getToken, getUser, mergeStoredUser, persist, setPostLoginRedirect } from '../tokenStorage';
 
 const STORAGE_KEY = 'tsw_auth';
 
@@ -79,5 +79,26 @@ describe('mergeStoredUser', () => {
   it('returns null and writes nothing when no user is currently stored', () => {
     expect(mergeStoredUser({ name: 'Nobody' })).toBeNull();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('setPostLoginRedirect / consumePostLoginRedirect', () => {
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('round-trips a stored path', () => {
+    setPostLoginRedirect('/planner?step=3');
+    expect(consumePostLoginRedirect()).toBe('/planner?step=3');
+  });
+
+  it('clears the path after one read (consumed once)', () => {
+    setPostLoginRedirect('/my-account');
+    consumePostLoginRedirect();
+    expect(consumePostLoginRedirect()).toBeNull();
+  });
+
+  it('returns null when nothing was stored', () => {
+    expect(consumePostLoginRedirect()).toBeNull();
   });
 });
