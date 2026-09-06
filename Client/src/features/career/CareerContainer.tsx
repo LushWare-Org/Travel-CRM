@@ -239,7 +239,7 @@ export default function CareerContainer() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <section className="relative py-16 overflow-hidden bg-black text-white">
+      <section className="relative py-16 overflow-hidden bg-brand-dark-900 text-white">
         <div className="relative max-w-7xl mx-auto px-6 text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">{HERO_TITLE}</h1>
           <p className="text-xl max-w-3xl mx-auto opacity-95">
@@ -255,8 +255,8 @@ export default function CareerContainer() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-3 gap-12">
             <div className="space-y-8">
-              <div className="bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
-                <div className="bg-gradient-to-br from-brand-600 to-brand-accent-400 text-white px-8 py-5">
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="bg-brand-600 text-white px-8 py-5">
                   <h3 className="text-3xl font-bold flex items-center gap-3">
                     <Briefcase className="w-8 h-8" />
                     We're Hiring!

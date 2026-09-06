@@ -23,7 +23,7 @@ const VacancyList = ({ vacancies, loading, onApply }: VacancyListProps) => {
             {vacancies.map((job) => (
               <div
                 key={job.id}
-                className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                className="bg-white border border-gray-200 rounded-2xl p-6 hover:border-gray-300 transition-colors"
               >
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">{job.position}</h3>
                 <div className="space-y-2 mb-4 text-sm text-gray-600">

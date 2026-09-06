@@ -38,7 +38,7 @@ const ApplicationForm = ({
   onSubmit,
 }: ApplicationFormProps) => {
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 lg:p-12">
+    <div className="bg-white rounded-2xl border border-gray-200 p-8 lg:p-12">
       <h2 className="text-3xl font-bold text-gray-900 mb-3">Apply Now</h2>
       <p className="text-gray-600 mb-8">Fill out the form below to apply for your desired position</p>
 
@@ -230,7 +230,7 @@ const ApplicationForm = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 bg-black text-white font-bold rounded-xl shadow-lg transition hover:bg-gray-800 disabled:opacity-60 flex items-center justify-center gap-3"
+            className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
           >
             {isSubmitting ? (
               <>
