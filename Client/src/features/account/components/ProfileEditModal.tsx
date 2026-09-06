@@ -1,5 +1,13 @@
 import type { ChangeEvent } from 'react';
 import { Save, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 /** Editable profile fields, mirroring the shape accepted by services/api/account's updateProfile. */
 export type ProfileFormData = {
@@ -32,19 +40,29 @@ export default function ProfileEditModal({
   updateMessage,
 }: ProfileEditModalProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-modal flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex items-center justify-between rounded-t-3xl">
-          <h3 className="text-2xl font-bold text-gray-900">Edit Profile</h3>
-          <button
-            onClick={onCancel}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+    <Dialog open onOpenChange={(nextOpen) => { if (!nextOpen) onCancel(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex flex-col rounded-3xl bg-white p-0 text-gray-900 shadow-modal ring-1 ring-gray-200 max-w-lg"
+      >
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-gray-200 px-8 py-6 max-sm:px-5 max-sm:py-5 rounded-t-3xl">
+          <div className="min-w-0">
+            <DialogTitle className="text-2xl font-bold text-gray-900 leading-tight">
+              Edit Profile
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600">
+              Update your personal details
+            </DialogDescription>
+          </div>
+          <DialogClose
+            aria-label="Close edit profile dialog"
+            className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
             <X className="w-6 h-6 text-gray-500" />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
-        <div className="px-8 py-6">
+        <div className="px-8 py-6 max-sm:px-5">
           {updateMessage && (
             <div className={`mb-6 p-4 rounded-xl text-sm ${updateMessage.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
               {updateMessage.text}
@@ -59,7 +77,7 @@ export default function ProfileEditModal({
                 name="name"
                 value={formData.name}
                 onChange={onChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-600 transition-colors bg-white"
                 placeholder="Enter your name"
               />
             </div>
@@ -70,7 +88,7 @@ export default function ProfileEditModal({
                 name="email"
                 value={formData.email}
                 onChange={onChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-600 transition-colors bg-white"
                 placeholder="Enter your email"
               />
             </div>
@@ -81,17 +99,17 @@ export default function ProfileEditModal({
                 name="phone"
                 value={formData.phone}
                 onChange={onChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-100 focus:border-brand-600 transition-colors bg-white"
                 placeholder="Enter your phone number"
               />
             </div>
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 px-8 py-6 flex gap-4 rounded-b-3xl border-t border-gray-200">
+        <div className="bg-gray-50 px-8 py-6 flex gap-4 rounded-b-3xl border-t border-gray-200 max-sm:px-5">
           <button
             onClick={onCancel}
-            className="flex-1 px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+            className="flex-1 px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
           >
             <X className="w-4 h-4" />
             Cancel
@@ -99,13 +117,13 @@ export default function ProfileEditModal({
           <button
             onClick={onSave}
             disabled={isSaving}
-            className="flex-1 px-6 py-3 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 px-6 py-3 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <Save className="w-4 h-4" />
             {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
