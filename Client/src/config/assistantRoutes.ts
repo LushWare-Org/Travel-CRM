@@ -25,8 +25,9 @@ export const ASSISTANT_ROUTES: { name: string; path: string; enabled: boolean }[
 // surface, /package/:id/customize is the planner-gated conversion funnel the
 // widget must not compete with, and /login + /my-account are auth-adjacent.
 // Lives here (not in AssistantWidget.tsx) so FloatingActionStack can also
-// read it — reserving the assistant's stack slot on the same routes it
-// actually renders on — without importing the whole widget component tree.
+// read it — hiding the assistant's launcher menu item on the same routes
+// the widget actually renders nothing on — without importing the whole
+// widget component tree.
 export const isAssistantExcludedPath = (pathname: string): boolean => {
   // React Router matches "/planner" and "/planner/" identically when
   // resolving which page renders, but an exact-string check wouldn't — a
@@ -41,6 +42,18 @@ export const isAssistantExcludedPath = (pathname: string): boolean => {
     normalized === '/my-account'
   );
 };
+
+// Launcher visibility scope (Phase 1, added by /plan-design-review): on app
+// pages — /planner, /package/:id/customize, the booking modal context,
+// /my-account, /login — the floating launcher is ALWAYS visible. On
+// marketing pages (/, /about, /contact, /destinations-international, …) it
+// fades in only after FLOATING_ACTION_SCROLL_THRESHOLD_PX so it never
+// renders inside the hero's first viewport. The app-page set is exactly the
+// assistant-excluded set above (those transactional pages own their
+// in-page assistance and have no marketing hero to compete with), so this
+// is intentionally an alias of isAssistantExcludedPath — not a second
+// hand-rolled route matcher that can drift from the first.
+export const isLauncherAlwaysVisiblePath = (pathname: string): boolean => isAssistantExcludedPath(pathname);
 
 // Wire shape the assistant API contract needs ({ name, path } only — the
 // `enabled` flag is a client-side visibility concern, not a per-request one).
