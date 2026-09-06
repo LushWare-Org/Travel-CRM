@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PackageDetailsContainer from '../PackageDetailsContainer';
@@ -115,6 +115,42 @@ describe('PackageDetailsContainer', () => {
     expect(screen.getByText(/1,200/)).toBeInTheDocument();
     expect(fetchPackageByIdMock).toHaveBeenCalledWith('pkg-1');
     expect(fetchPackageReviewsMock).toHaveBeenCalledWith('pkg-1', 50, 1);
+  });
+
+  it('keeps the gallery loading state up until every hero image has loaded', async () => {
+    renderContainer();
+    await screen.findByText('Bali, Indonesia');
+
+    // jsdom never fires image load events on its own, so the loading cover is up.
+    expect(screen.getByTestId('package-gallery-loading')).toBeInTheDocument();
+
+    fireEvent.load(screen.getByAltText('Bali Bliss - 1'));
+
+    expect(screen.queryByTestId('package-gallery-loading')).not.toBeInTheDocument();
+  });
+
+  it('swaps a broken gallery image for the shared fallback image', async () => {
+    renderContainer();
+    await screen.findByText('Bali, Indonesia');
+
+    const heroImage = screen.getByAltText('Bali Bliss - 1') as HTMLImageElement;
+    fireEvent.error(heroImage);
+
+    expect(heroImage.src).toContain('/lush/fallback.jpg');
+    expect(screen.queryByTestId('package-gallery-loading')).not.toBeInTheDocument();
+  });
+
+  it('renders the shared fallback image when the package has no gallery images', async () => {
+    fetchPackageByIdMock.mockResolvedValueOnce({
+      ...mockPackage,
+      image_url: '',
+      images: [],
+    });
+    renderContainer();
+    await screen.findByText('Bali, Indonesia');
+
+    const heroImage = screen.getByAltText('Bali Bliss - 1') as HTMLImageElement;
+    expect(heroImage.src).toContain('/lush/fallback.jpg');
   });
 
   it('opens the booking modal and submits the exact booking payload', async () => {
