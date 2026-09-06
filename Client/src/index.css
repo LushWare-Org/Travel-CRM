@@ -2,6 +2,31 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Phase 8: self-hosted variable fonts (weight-axis only — the site uses no
+   italic and no optical-size tuning), replacing the runtime Google Fonts
+   stylesheet URL (VITE_GOOGLE_FONTS_URL, removed from index.html in this
+   same change). font-display: swap is built into every @font-face fontsource
+   generates. Same @fontsource-variable pattern Management already uses for
+   Archivo/Public Sans/JetBrains Mono. */
+@import "@fontsource-variable/fraunces/wght.css";
+@import "@fontsource-variable/inter/wght.css";
+
+/* Metric-matched fallback for Inter, so the pre-load/pre-swap fallback text
+   occupies the same box as the real font (minimizes layout shift on swap).
+   Values are Inter's own published fallback-metric overrides for Arial
+   (https://github.com/rsms/inter — "Fallback font metrics"), not invented.
+   No equivalently-published metric override exists for Fraunces (a display
+   serif with no standard system equivalent), so its fallback stack below is
+   a plain generic serif list rather than a fabricated metric override. */
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial');
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+  size-adjust: 107.12%;
+}
+
 /*
   Design tokens — see DESIGN.md. Ported from src/config/palettes/lush.json
   (Phase 0 of the Client rewamp, docs/CLIENT-REWAMP-PLAN.md). A new
@@ -66,8 +91,8 @@
   --color-gray-900: #2B241C;
   --color-gray-950: #1A1610;
 
-  --font-display: 'Fraunces', serif;
-  --font-body: 'Inter', sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter Variable', 'Inter Fallback', system-ui, -apple-system, sans-serif;
 
   --text-hero: 4.75rem;
   --text-hero--line-height: 1.02;
@@ -100,6 +125,15 @@
      first needs them). */
   --shadow-floating: 0 8px 24px rgb(10 31 20 / 0.10), 0 2px 6px rgb(10 31 20 / 0.06);
   --shadow-modal: 0 24px 64px rgb(6 11 8 / 0.24), 0 4px 16px rgb(6 11 8 / 0.10);
+
+  /* Phase 8 fix: `HeroBackground.tsx` applies `animate-kenburns` to every
+     hero image, but Tailwind v4 only generates an `animate-<name>` utility
+     from a `--animate-<name>` token declared here — this token never
+     existed, so the class resolved to nothing and the site's one sanctioned
+     hero animation (DESIGN.md's motion budget) has never actually run on
+     any hero, sitewide (confirmed: `.animate-kenburns` is absent from the
+     built CSS entirely). This registers it for real. */
+  --animate-kenburns: kenburns 20s ease-out forwards;
 }
 
 @keyframes kenburns {
@@ -197,12 +231,27 @@
 
 body {
   margin: 0;
-  /* Use Open Sans as the site body font (loaded in index.html). Falls back to system sans-serif */
-  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Phase 8 motion audit: DESIGN.md's motion budget (Ken Burns hero zoom,
+   hover/reveal states, scroll-linked section entrances) is intentional, not
+   decorative filler, but none of it respected prefers-reduced-motion before
+   this rule -- confirmed by grep, zero matches anywhere in the app. This is
+   the standard global override: near-zero-duration every animation/
+   transition for visitors who've asked the OS for reduced motion, covering
+   every current and future animated element (the hero zoom, header dropdown
+   fade, card hover transitions, spinners) in one rule instead of chasing
+   each one individually. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Headings use the brand display font (see DESIGN.md) */
@@ -322,7 +371,7 @@ code {
 }
 
 .react-datepicker {
-  font-family: 'Open Sans', sans-serif !important;
+  font-family: var(--font-body), sans-serif !important;
   border: 2px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: 1rem !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
