@@ -87,6 +87,24 @@ describe('PackagesContainer', () => {
     expect(titles[1]).toHaveTextContent('Bali Honeymoon Special');
   });
 
+  it('shows a clear-filters action in the zero-results state that restores packages', async () => {
+    const user = userEvent.setup();
+    renderContainer();
+    await screen.findByText('Bali Honeymoon Special');
+
+    await user.click(screen.getByRole('button', { name: /Show Filters/ }));
+    await user.click(screen.getByRole('checkbox', { name: /Short \(1-4 days\)/ }));
+
+    expect(await screen.findByText('No packages found')).toBeInTheDocument();
+    expect(screen.queryByText('Bali Honeymoon Special')).not.toBeInTheDocument();
+    expect(screen.queryByText('Swiss Alps Explorer')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear all filters' }));
+
+    expect(screen.getByText('Bali Honeymoon Special')).toBeInTheDocument();
+    expect(screen.getByText('Swiss Alps Explorer')).toBeInTheDocument();
+  });
+
   it('shows the error state with the API message when loading fails', async () => {
     fetchPackagesMock.mockRejectedValue(new Error('Server unreachable'));
     renderContainer();
