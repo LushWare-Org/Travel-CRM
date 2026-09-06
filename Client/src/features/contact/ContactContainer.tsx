@@ -60,7 +60,6 @@ interface ContactMethod {
   title: string;
   info: string;
   subtext: string;
-  color: string;
   action: string;
 }
 
@@ -98,7 +97,6 @@ export default function ContactContainer() {
       title: 'Call Us',
       info: BRANDING.contact.phone,
       subtext: BRANDING.contact.officeHours,
-      color: 'from-blue-500 to-cyan-500',
       action: `tel:${BRANDING.contact.phone}`,
     },
     {
@@ -106,7 +104,6 @@ export default function ContactContainer() {
       title: 'Email Us',
       info: BRANDING.contact.email,
       subtext: 'We reply within 24 hours',
-      color: 'from-purple-500 to-pink-500',
       action: `mailto:${BRANDING.contact.email}`,
     },
     {
@@ -114,7 +111,6 @@ export default function ContactContainer() {
       title: 'Visit Us',
       info: BRANDING.contact.address,
       subtext: 'By appointment only',
-      color: 'from-brand-500 to-red-500',
       action: '',
     },
   ];
@@ -180,7 +176,7 @@ export default function ContactContainer() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 font-sans">
+    <div className="min-h-screen bg-gray-50 font-sans">
       {/* Hero Section */}
       <div className="relative overflow-hidden pt-20 pb-20">
         {heroMedia && <HeroBackground item={heroMedia} eager />}
@@ -190,7 +186,7 @@ export default function ContactContainer() {
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
               {HERO_TITLE}
-              <span className="block bg-clip-text text-transparent bg-gradient-to-r from-brand-400 via-brand-accent-400 to-brand-accent-400">
+              <span className="block text-brand-accent-300">
                 {HERO_SUBTITLE}
               </span>
             </h1>
@@ -209,16 +205,16 @@ export default function ContactContainer() {
             <a
               key={idx}
               href={method.action}
-              className="group relative bg-white rounded-2xl p-8 shadow-xl border border-gray-100 overflow-hidden w-full max-w-md"
+              className="group relative bg-white rounded-2xl p-8 border border-gray-200 overflow-hidden hover:border-gray-300 transition-colors duration-300 w-full max-w-md"
             >
               <div className="relative mb-6">
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${method.color} flex items-center justify-center transform shadow-lg`}>
-                  <method.icon className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 rounded-2xl bg-brand-100 flex items-center justify-center">
+                  <method.icon className="w-8 h-8 text-brand-600" />
                 </div>
               </div>
 
               {/* Content */}
-              <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-brand-600 group-hover:to-brand-accent-600 transition-all duration-300">
+              <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-brand-600 transition-colors duration-300">
                 {method.title}
               </h3>
               <p className="text-sm font-semibold text-gray-700 mb-1">{method.info}</p>
@@ -235,7 +231,7 @@ export default function ContactContainer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <div className="grid lg:grid-cols-5 gap-12">
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 border border-gray-100">
+            <div className="bg-white rounded-3xl p-8 md:p-12 border border-gray-200">
               <div className="mb-8">
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
                   Send Us a Message
@@ -247,14 +243,14 @@ export default function ContactContainer() {
 
               {submitted ? (
                 <div className="text-center py-16">
-                  <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                  <div className="w-20 h-20 bg-brand-600 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-12 h-12 text-white" />
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-3">Message Sent Successfully!</h3>
                   <p className="text-gray-600 mb-6">We'll get back to you shortly</p>
                   <button
                     onClick={() => setSubmitted(false)}
-                    className="px-8 py-3 bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+                    className="px-8 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold transition-colors duration-300"
                   >
                     Send Another Message
                   </button>
@@ -372,9 +368,9 @@ export default function ContactContainer() {
 
                   {/* Show selected destination confirmation */}
                   {selectedDest && (
-                    <div className="p-4 bg-gradient-to-br from-brand-50 to-brand-accent-50 border border-brand-200 rounded-xl">
+                    <div className="p-4 bg-brand-50 border border-brand-200 rounded-xl">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-brand-500 to-brand-accent-500 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-brand-600 rounded-full flex items-center justify-center">
                           <Check className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -415,9 +411,8 @@ export default function ContactContainer() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full group relative overflow-hidden bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full group bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-brand-accent-600 to-brand-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     <div className="relative px-8 py-5 flex items-center justify-center space-x-3">
                       {isSubmitting ? (
                         <>
@@ -439,10 +434,10 @@ export default function ContactContainer() {
 
           <div className="lg:col-span-2 space-y-6">
             {/* Office Hours Card */}
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 border border-blue-100 shadow-lg">
+            <div className="bg-white rounded-2xl p-8 border border-gray-200">
               <div className="flex items-start space-x-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Clock className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-6 h-6 text-brand-600" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{OFFICE_HOURS_TEXT.title}</h3>
@@ -453,7 +448,7 @@ export default function ContactContainer() {
                 {OFFICE_HOURS_TEXT.rows.map((row, idx) => (
                   <div
                     key={row.days}
-                    className={`flex justify-between items-center py-3 ${idx < OFFICE_HOURS_TEXT.rows.length - 1 ? 'border-b border-blue-200' : ''}`}
+                    className={`flex justify-between items-center py-3 ${idx < OFFICE_HOURS_TEXT.rows.length - 1 ? 'border-b border-gray-200' : ''}`}
                   >
                     <span className="font-semibold text-gray-700">{row.days}</span>
                     <span className={`font-bold ${row.hours === 'Closed' ? 'text-red-700' : 'text-gray-900'}`}>{row.hours}</span>
