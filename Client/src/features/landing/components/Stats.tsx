@@ -26,15 +26,18 @@ function CategoryCard({ pkg, className }: { pkg: CategoryPackage; className?: st
     >
       <Card className="flex h-full flex-col gap-0 overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 ring-0 transition-colors duration-300 group-hover:border-gray-300">
         <div className="relative aspect-[4/3] shrink-0 overflow-hidden bg-gray-100">
-          <img
-            src={pkg.image}
-            alt={pkg.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-            onError={(e) => {
-              e.currentTarget.src = FALLBACK_IMAGE;
-            }}
-          />
+          <picture>
+            <source srcSet={pkg.image?.replace(/\.(jpg|jpeg|png)$/i, '.webp')} type="image/webp" />
+            <img
+              src={pkg.image}
+              alt={pkg.title}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+              onError={(e) => {
+                e.currentTarget.src = FALLBACK_IMAGE;
+              }}
+            />
+          </picture>
         </div>
         <div className="flex flex-1 flex-col p-5">
           <h3 className="mb-3 text-lg font-semibold text-gray-900 transition-colors duration-300 group-hover:text-brand-600">

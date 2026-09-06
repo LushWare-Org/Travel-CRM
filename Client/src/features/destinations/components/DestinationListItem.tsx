@@ -33,13 +33,19 @@ export default function DestinationListItem({ dest }: DestinationListItemProps) 
     >
       <div className="flex flex-col lg:flex-row">
         <div className="relative h-64 shrink-0 overflow-hidden bg-gray-100 lg:h-auto lg:w-80">
-          <img
-            src={dest.image_url || FALLBACK_IMAGE}
-            alt={dest.name}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-          />
+          <picture>
+            <source
+              srcSet={(dest.image_url || FALLBACK_IMAGE)?.replace(/\.(jpg|jpeg|png)$/i, '.webp')}
+              type="image/webp"
+            />
+            <img
+              src={dest.image_url || FALLBACK_IMAGE}
+              alt={dest.name}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+            />
+          </picture>
         </div>
         <div className="flex flex-1 flex-col p-5 lg:p-6">
           <h3 className="mb-2 text-xl font-bold text-gray-900 transition-colors duration-300 group-hover:text-brand-600 lg:text-2xl">
