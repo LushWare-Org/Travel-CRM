@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   MapPin,
   Calendar,
@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { submitManualItineraryRequest } from "../../services/api/manualItinerary";
@@ -29,9 +30,12 @@ import { buildItineraryDayFromAIDay, computeDurationDays, computeMissingDayNumbe
 import type { DayAccommodation, DayMeals, ItineraryDay } from "./utils/formHelpers";
 import { pluralize } from "../../lib/pluralize";
 import DestinationSelector from "../../components/shared/DestinationSelector";
+import Stepper from "../../components/shared/Stepper";
 import LocationSelector from "../../components/shared/LocationSelector";
 import ActivitySelector from "../../components/shared/ActivitySelector";
 import { useAuth } from "../../contexts/AuthContext";
+import { fetchUserBookings } from "../../services/api/booking";
+import { ALL_DESTINATIONS } from "../../config/domainData/destinations";
 import DateRangeCalendar from "./components/DateRangeCalendar";
 import ItineraryChatPanel from "./components/ItineraryChatPanel";
 import TripWizardPanel from "./components/TripWizardPanel";
@@ -71,6 +75,70 @@ const destValue = (dest: DestinationLike): string => {
   return typeof dest === 'string' ? dest : '';
 };
 
+/** Longest trip window the wizard accepts — the Dates & Travelers
+ * "window too long" rule. 90 days keeps a sane planning horizon for the
+ * manual itinerary flow. */
+const MAX_TRIP_DAYS = 90;
+
+/** User-facing copy shown for any submit rejection. Deliberately generic —
+ * booking-service has no availability check today, so the UI must never
+ * claim a specific "sold out"/"conflict" state. */
+const SUBMIT_FAILURE_MESSAGE = "Couldn't complete your booking — please try again or contact us.";
+
+/** Parses a raw `?step=` value into the 1..4 wizard range (1 when absent or
+ * not a finite number, clamped when out of range). */
+const parseStepParam = (value: string | null): number => {
+  const parsed = value === null ? Number.NaN : Number(value);
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.min(4, Math.max(1, Math.trunc(parsed)));
+};
+
+/** Normalizes a booking date value to a YYYY-MM-DD day (raw DB rows may
+ * carry a full timestamp); '' when absent or unparseable. */
+const isoDateOnly = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
+  return match ? match[1] : '';
+};
+
+/** Subset of the UserBooking contract row the returning-visitor pre-fill
+ * reads. Structural so the container never depends on the wire type. */
+interface BookingPrefillSource {
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  travelDate?: string | null;
+  endDate?: string | null;
+  numberOfTravelers?: number;
+  packageDestination?: string | null;
+  packageName?: string | null;
+}
+
+/** Projects a past booking's destination fields onto a DestinationSelector
+ * option (value/label exact match first; then an embedded value match on
+ * the package name, e.g. "5-Day Bali Escape" → Bali). null when nothing
+ * matches — the step then stays unfilled for the visitor to choose. */
+const matchDestinationOption = (booking: BookingPrefillSource): DestinationLike => {
+  for (const candidate of [booking.packageDestination, booking.packageName]) {
+    const raw = (candidate ?? '').trim().toLowerCase();
+    if (!raw) continue;
+    const exact = ALL_DESTINATIONS.find(
+      (d) => d.value.toLowerCase() === raw || d.label.toLowerCase() === raw,
+    );
+    if (exact) return exact;
+    const embedded = ALL_DESTINATIONS.find(
+      (d) => d.value.length >= 3 && raw.includes(d.value.toLowerCase()),
+    );
+    if (embedded) return embedded;
+  }
+  return null;
+};
+
+/** Most-recent-first ordering key for bookings (createdAt, else updatedAt). */
+const bookingRecencyKey = (booking: BookingPrefillSource): number => {
+  const parsed = Date.parse(booking.createdAt ?? booking.updatedAt ?? '');
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 /** The day object serialized into the manual-itinerary request payload. */
 interface ItineraryDayPayload {
   dayNumber: number;
@@ -86,7 +154,8 @@ interface ItineraryDayPayload {
 
 export default function PlanYourTripContainer() {
   const { user } = useAuth();
-  const [step, setStep] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [step, setStepState] = useState<number>(() => parseStepParam(searchParams.get('step')));
   const [selectedDest, setSelectedDest] = useState<DestinationLike>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -155,6 +224,48 @@ export default function PlanYourTripContainer() {
       setPhone((prev) => prev || user.phone || "");
     }
   }, [user]);
+  // Returning-visitor pre-fill (CLIENT-REWAMP-PLAN: most-recent-booking
+  // defaults, zero new backend work): when a logged-in user has bookings,
+  // seed destination/dates/travelers from the most recent one. Purely an
+  // initial convenience — every set below keeps a value the visitor has
+  // already chosen, and fetch errors / empty results fall back silently to
+  // the empty defaults (no error banner; this is not a required flow).
+  const prefillUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const userId = user.id ?? user.email ?? 'anonymous';
+    if (prefillUserIdRef.current === userId) return;
+    prefillUserIdRef.current = userId;
+    let cancelled = false;
+    (async () => {
+      try {
+        const bookings = await fetchUserBookings();
+        if (cancelled || bookings.length === 0) return;
+        const latest = [...bookings].sort(
+          (a, b) => bookingRecencyKey(b as BookingPrefillSource) - bookingRecencyKey(a as BookingPrefillSource),
+        )[0] as BookingPrefillSource;
+        const destination = matchDestinationOption(latest);
+        if (destination) {
+          setSelectedDest((prev) => (prev === null ? destination : prev));
+        }
+        const start = isoDateOnly(latest.travelDate);
+        const end = isoDateOnly(latest.endDate);
+        if (start && end && end >= start) {
+          setStartDate((prev) => (prev === '' ? start : prev));
+          setEndDate((prev) => (prev === '' ? end : prev));
+        }
+        const travelerCount = latest.numberOfTravelers;
+        if (typeof travelerCount === 'number' && Number.isInteger(travelerCount) && travelerCount >= 1) {
+          setTravelers((prev) => (prev === 2 ? travelerCount : prev));
+        }
+      } catch {
+        // Silent: pre-fill is a convenience, not a required flow.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const duration = computeDurationDays(startDate, endDate);
   // Days not yet planned — always a contiguous tail here since handleAddDay
@@ -162,6 +273,33 @@ export default function PlanYourTripContainer() {
   // set-difference helper CustomizePackageContainer needs (its days can
   // have gaps), so both containers share one implementation.
   const missingDayNumbers = computeMissingDayNumbers(duration, itineraryDays.map((d) => d.dayNumber));
+  // Dates & Travelers field-level validation (state table: invalid range /
+  // past date / window too long, inline under the specific field). The
+  // date-range calendar sorts any picked pair, so an end-before-start value
+  // can only arrive via pre-fill or a programmatic set — it is validated
+  // here all the same.
+  const dateFieldErrors = (() => {
+    const errors: { start?: string; end?: string } = {};
+    if (startDate && endDate) {
+      const now = new Date();
+      const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (startDate < todayISO) errors.start = 'Start date cannot be in the past.';
+      if (endDate < todayISO) errors.end = 'End date cannot be in the past.';
+      else if (endDate < startDate) errors.end = 'End date must be on or after the start date.';
+      if (computeDurationDays(startDate, endDate) > MAX_TRIP_DAYS) {
+        errors.end = `Trip length cannot exceed ${MAX_TRIP_DAYS} days.`;
+      }
+    }
+    return errors;
+  })();
+  const hasDateErrors = Boolean(dateFieldErrors.start || dateFieldErrors.end);
+
+  const nextDisabled =
+    isSubmitting ||
+    (step === 1 && !selectedDest) ||
+    (step === 2 && (!startDate || !endDate || hasDateErrors)) ||
+    (step === 3 && duration === 0) ||
+    (step === 4 && !email);
 
   // Clear itinerary days when duration becomes 0 or decreases
   useEffect(() => {
@@ -267,6 +405,23 @@ export default function PlanYourTripContainer() {
     setSelectedDest(destination);
     setValidationMsg('');
   };
+  /** Moves the wizard onto the given step and mirrors it to `?step=` so the
+   * transition is history-addressable (browser back/forward restore the
+   * step; see the sync effect below). The only sanctioned step setter. */
+  const goToStep = (next: number) => {
+    const clamped = Math.min(4, Math.max(1, next));
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('step', String(clamped));
+    setSearchParams(nextParams);
+    setStepState(clamped);
+  };
+
+  // Keep the displayed step in sync when the URL changes underneath the
+  // wizard — history back/forward, a manual ?step= edit, or a deep link —
+  // so the URL is the source of truth, not just an initial hint.
+  useEffect(() => {
+    setStepState(parseStepParam(searchParams.get('step')));
+  }, [searchParams]);
 
   const next = () => {
     // validations
@@ -278,6 +433,10 @@ export default function PlanYourTripContainer() {
       setValidationMsg('Please select travel dates before continuing.');
       return;
     }
+    if (step === 2 && hasDateErrors) {
+      setValidationMsg('Please fix the highlighted dates before continuing.');
+      return;
+    }
     if (step === 3 && duration === 0) {
       setValidationMsg('Please select valid travel dates first.');
       return;
@@ -287,15 +446,19 @@ export default function PlanYourTripContainer() {
       return;
     }
     setValidationMsg('');
-    if (step < 4) setStep(step + 1);
+    if (step < 4) goToStep(step + 1);
     else {
       handleSubmit();
     }
   };
 
-  const back = () => step > 1 && setStep(step - 1);
+  const back = () => step > 1 && goToStep(step - 1);
 
   const handleSubmit = async () => {
+    // Double-submit guard: an early return (not just `disabled` on the
+    // button) so a second Enter/click before the first response resolves
+    // can never fire a duplicate request.
+    if (isSubmitting) return;
     if (!email) {
       setValidationMsg('Please fill in your email address to submit.');
       return;
@@ -361,7 +524,9 @@ export default function PlanYourTripContainer() {
       setShowSuccess(true);
     } catch (error) {
       console.error('Failed to submit manual itinerary:', error);
-      setValidationMsg(error instanceof Error ? error.message : 'Failed to submit your itinerary request. Please try again.');
+      // Generic copy only — booking-service has no availability check, so
+      // the UI never claims a specific "sold out"/"conflict" state.
+      setValidationMsg(SUBMIT_FAILURE_MESSAGE);
     } finally {
       setIsSubmitting(false);
     }
@@ -375,7 +540,7 @@ export default function PlanYourTripContainer() {
     if (params.preferences) setPreferences(params.preferences);
     const chatDuration = computeDurationDays(params.startDate, params.endDate);
     await aiGenerator.generate({ destination: params.destination, duration: chatDuration, travelers: params.travelers, preferences: params.preferences || undefined });
-    setStep(3);
+    goToStep(3);
   };
 
   return (
@@ -392,40 +557,22 @@ export default function PlanYourTripContainer() {
       )}
       <div className="w-full mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-5xl">
         <form onSubmit={(e) => { e.preventDefault(); next(); }}>
-          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-md p-4 sm:p-5 md:p-6 mb-4 sm:mb-5 md:mb-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 p-4 sm:p-5 md:p-6 mb-4 sm:mb-5 md:mb-6">
             <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-8">
-              <div className="flex items-start justify-between gap-1 sm:gap-2">
-                {[1, 2, 3, 4].map((s, idx) => (
-                  <div key={s} className="flex items-start" style={{ flex: s < 4 ? '1 1 0%' : '0 0 auto' }}>
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all ${
-                          s <= step
-                            ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white'
-                            : 'bg-gray-200 text-gray-500'
-                        }`}
-                      >
-                        {s}
-                      </div>
-                      <div className="mt-1 sm:mt-2 text-xs text-center text-gray-600 font-medium whitespace-nowrap">
-                        {['Destination', 'Dates & Travelers', 'Plan Itinerary', 'Contact Info'][idx]}
-                      </div>
-                    </div>
-                    {s < 4 && (
-                      <div
-                        className={`flex-1 h-0.5 sm:h-1 mx-1 sm:mx-2 md:mx-4 mt-4 sm:mt-5 transition-all ${
-                          s < step ? 'bg-gradient-to-r from-brand-600 to-brand-accent-600' : 'bg-gray-200'
-                        }`}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
+              <Stepper
+                steps={[
+                  { label: 'Destination' },
+                  { label: 'Dates & Travelers' },
+                  { label: 'Plan Itinerary' },
+                  { label: 'Contact Info' },
+                ]}
+                currentStep={step}
+              />
             </div>
           </div>
           {/* ==== STEP 1 : Destination ==== */}
           {step === 1 && (
-            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-gray-100">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 p-4 sm:p-6 md:p-8">
               <div className="flex items-center space-x-3 mb-4 sm:mb-6">
                 <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-brand-500 to-brand-accent-500 rounded-xl flex items-center justify-center">
                   <MapPin className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
@@ -483,7 +630,7 @@ export default function PlanYourTripContainer() {
 
           {/* ==== STEP 2 : Dates & Travelers ==== */}
           {step === 2 && (
-            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-gray-100">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 p-4 sm:p-6 md:p-8">
               <div className="flex items-center space-x-3 mb-4 sm:mb-6">
                 <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
                   <Calendar className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
@@ -502,9 +649,16 @@ export default function PlanYourTripContainer() {
                     value={startDate || ""}
                     onClick={() => setShowCal(true)}
                     placeholder="Select start date"
+                    aria-invalid={Boolean(dateFieldErrors.start)}
+                    aria-describedby={dateFieldErrors.start ? 'start-date-error' : undefined}
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white cursor-pointer"
                     required
                   />
+                  {dateFieldErrors.start && (
+                    <p id="start-date-error" className="mt-1.5 text-xs font-medium text-red-600">
+                      {dateFieldErrors.start}
+                    </p>
+                  )}
                 </div>
                 <div className="relative">
                   <label className="block text-xs sm:text-sm font-semibold mb-2">End Date</label>
@@ -514,9 +668,16 @@ export default function PlanYourTripContainer() {
                     value={endDate || ""}
                     onClick={() => setShowCal(true)}
                     placeholder="Select end date"
+                    aria-invalid={Boolean(dateFieldErrors.end)}
+                    aria-describedby={dateFieldErrors.end ? 'end-date-error' : undefined}
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white cursor-pointer"
                     required
                   />
+                  {dateFieldErrors.end && (
+                    <p id="end-date-error" className="mt-1.5 text-xs font-medium text-red-600">
+                      {dateFieldErrors.end}
+                    </p>
+                  )}
                 </div>
                 {showCal && (
                   <div className="absolute left-1/2 transform -translate-x-1/2 mt-4 z-dropdown">
@@ -578,7 +739,7 @@ export default function PlanYourTripContainer() {
 
           {/* ==== STEP 3 : Day-by-Day Itinerary ==== */}
           {step === 3 && (
-            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 border border-gray-100 space-y-4 sm:space-y-6">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
               <div className="flex items-start sm:items-center justify-between mb-4 sm:mb-6 gap-2">
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
@@ -598,6 +759,16 @@ export default function PlanYourTripContainer() {
               {aiGenerator.error && (
                 <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
                   <p className="text-red-700 text-xs sm:text-sm font-medium">{aiGenerator.error}</p>
+                  {itineraryDays.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={handleAddDay}
+                      className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm rounded-xl font-semibold transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Continue with manual entry
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -612,7 +783,7 @@ export default function PlanYourTripContainer() {
                   <p className="text-xs sm:text-sm text-gray-600 mb-2">Please select travel dates first</p>
                   <button
                     type="button"
-                    onClick={() => setStep(2)}
+                    onClick={() => goToStep(2)}
                     className="text-sm sm:text-base text-brand-600 hover:text-brand-700 font-semibold"
                   >
                     Go to Dates & Travelers →
@@ -966,7 +1137,7 @@ export default function PlanYourTripContainer() {
 
           {/* ==== STEP 4 : Contact ==== */}
           {step === 4 && (
-            <div className="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+            <div className="bg-white rounded-3xl border border-gray-200 p-8">
               <div className="flex items-center space-x-3 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
                   <Users className="w-7 h-7 text-white" />
@@ -1080,21 +1251,11 @@ export default function PlanYourTripContainer() {
             <button
               type="button"
               onClick={next}
-              disabled={
-                isSubmitting ||
-                (step === 1 && !selectedDest) ||
-                (step === 2 && (!startDate || !endDate)) ||
-                (step === 3 && duration === 0) ||
-                (step === 4 && !email)
-              }
-              className={`flex-1 px-6 py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all ${
-                isSubmitting ||
-                (step === 1 && !selectedDest) ||
-                (step === 2 && (!startDate || !endDate)) ||
-                (step === 3 && duration === 0) ||
-                (step === 4 && !email)
+              disabled={nextDisabled}
+              className={`flex-1 px-6 py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors ${
+                nextDisabled
                   ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white hover:shadow-xl transform hover:scale-[1.02]'
+                  : 'bg-brand-600 hover:bg-brand-700 text-white'
               }`}
             >
               {isSubmitting ? (
@@ -1130,7 +1291,7 @@ export default function PlanYourTripContainer() {
               <button
                 onClick={() => {
                   setShowSuccess(false);
-                  setStep(1);
+                  goToStep(1);
                   setSelectedDest(null);
                   setStartDate('');
                   setEndDate('');
