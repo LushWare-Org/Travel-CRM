@@ -4,27 +4,23 @@ import { Link, useNavigate } from 'react-router-dom';
 import RecentlyBookedSlider from './components/RecentlyBookedSlider';
 import DestinationsSection from './components/DestinationsSection';
 import FeaturedPackages from './components/FeaturedPackages';
-import WhyChooseUs from './components/WhyChooseUs';
 import TestimonialsSection from './components/TestimonialsSection';
 import FAQSection from './components/FAQ';
 import KeyPartnersSection from './components/KeyPartners';
 import Stats from './components/Stats';
-import AboutSection from './components/AboutSection';
+import TrustSection from './components/TrustSection';
 import { fetchPackages } from '../../services/api/packages';
 import type { NormalizedPackage, AggregatedDestination } from '../../services/api/packages.transform';
 import { fetchRecentBookings } from '../../services/api/booking';
-import { HERO_SLIDES } from '../../content/home';
+import { HERO_CONTENT } from '../../content/home';
 import { MONTHS } from './utils/constants';
 import { HERO_MEDIA } from '../../config/media';
 import HeroBackground from '../../components/shared/HeroBackground';
-import SustainabilityStrip from './components/SustainabilityStrip';
 import AIPlanningExplainer from './components/AIPlanningExplainer';
 import {
   InlineMapPin,
   InlineCalendar,
   InlineSearch,
-  InlineChevronLeft,
-  InlineChevronRight,
   InlineArrowRight,
 } from './components/icons';
 
@@ -43,10 +39,6 @@ interface RecentBooking {
   userName?: string;
 }
 
-/** Placeholder phrases cycled by the hero search bar's typewriter effect. */
-const destinationTexts = ['Select Destination', 'Choose Your Dream Place', 'Where To Go?', 'Pick A Location'];
-const whenTexts = ['Any Month', 'When Are You Traveling?', 'Pick a Month', 'Choose Travel Date'];
-
 export default function HomeContainer() {
   const navigate = useNavigate();
   const [destinations, setDestinations] = useState<AggregatedDestination[]>([]);
@@ -56,14 +48,9 @@ export default function HomeContainer() {
   // old fetch flow but is not read in the rendered tree.
   const [, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const totalSlides = 4;
 
   // Search
   const [searchFilters, setSearchFilters] = useState({ destination: '', when: '' });
-
-  const [destinationPlaceholder, setDestinationPlaceholder] = useState('');
-  const [whenPlaceholder, setWhenPlaceholder] = useState('');
   const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
   const monthDropdownRef = useRef<HTMLDivElement | null>(null);
   const monthButtonRef = useRef<HTMLButtonElement>(null);
@@ -94,69 +81,6 @@ export default function HomeContainer() {
     window.addEventListener('resize', updatePosition);
     return () => window.removeEventListener('resize', updatePosition);
   }, [monthDropdownOpen]);
-
-  useEffect(() => {
-    let destIndex = 0;
-    let whenIndex = 0;
-    let charIndex = 0;
-    let isDeleting = false;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-
-    const type = () => {
-      const destText = destinationTexts[destIndex];
-      const whenText = whenTexts[whenIndex];
-
-      if (!isDeleting) {
-        const destChar = destText.substring(0, charIndex + 1);
-        const whenChar = whenText.substring(0, charIndex + 1);
-        setDestinationPlaceholder(destChar);
-        setWhenPlaceholder(whenChar);
-        charIndex++;
-
-        if (charIndex > Math.max(destText.length, whenText.length)) {
-          isDeleting = true;
-          timeout = setTimeout(type, 1800);
-          return;
-        }
-      } else {
-        const destChar = destText.substring(0, charIndex - 1);
-        const whenChar = whenText.substring(0, charIndex - 1);
-        setDestinationPlaceholder(destChar);
-        setWhenPlaceholder(whenChar);
-        charIndex--;
-
-        if (charIndex === 0) {
-          isDeleting = false;
-          destIndex = (destIndex + 1) % destinationTexts.length;
-          whenIndex = (whenIndex + 1) % whenTexts.length;
-          timeout = setTimeout(type, 400);
-          return;
-        }
-      }
-      timeout = setTimeout(type, isDeleting ? 50 : 100);
-    };
-
-    type();
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % totalSlides);
-    }, currentSlide < 5 ? 5000 : 2500);
-    return () => clearInterval(timer);
-  }, [currentSlide, totalSlides]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') setCurrentSlide((prev) => (prev - 1 + totalSlides) % totalSlides);
-      if (e.key === 'ArrowRight') setCurrentSlide((prev) => (prev + 1) % totalSlides);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [totalSlides]);
 
   useEffect(() => {
     let mounted = true;
@@ -220,9 +144,6 @@ export default function HomeContainer() {
       mounted = false;
     };
   }, []);
-
-  const goToNextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides);
-  const goToPrevSlide = () => setCurrentSlide((prev) => (prev - 1 + totalSlides) % totalSlides);
 
   const handleSearch = () => {
     const params = new URLSearchParams();
@@ -310,14 +231,12 @@ export default function HomeContainer() {
     );
   }
 
-  const heroTitle = HERO_SLIDES[currentSlide % 4].title;
-  const heroSubtitle = HERO_SLIDES[currentSlide % 4].subtitle;
-  const heroWords = heroTitle.split(' ');
+  const heroWords = HERO_CONTENT.title.split(' ');
   const heroLastWord = heroWords.pop();
   const heroHeadline = (
     <>
       {heroWords.join(' ')}{' '}
-      <span className="bg-gradient-to-r from-brand-accent-400 to-brand-400 bg-clip-text text-transparent">{heroLastWord}</span>
+      <span className="text-brand-accent-400">{heroLastWord}</span>
     </>
   );
 
@@ -333,7 +252,7 @@ export default function HomeContainer() {
             onChange={(e) => setSearchFilters(p => ({ ...p, destination: e.target.value }))}
             className="w-full px-4 sm:px-5 py-2.5 sm:py-3 bg-gray-100/80 border-2 border-gray-200 rounded-2xl text-gray-900 font-medium text-sm sm:text-base appearance-none cursor-pointer transition-all focus:border-brand-500 focus:bg-white focus:shadow-lg hover:border-gray-300"
           >
-            <option value="" disabled hidden>{destinationPlaceholder || 'Select Destination'}</option>
+            <option value="" disabled hidden>Select Destination</option>
             <optgroup label="🌏 Destinations">
               {destinations.slice(0, 30).map((d) => (
                 <option key={d.id} value={d.name.toLowerCase()}>
@@ -364,7 +283,7 @@ export default function HomeContainer() {
             <span>
               {searchFilters.when
                 ? MONTHS.find(m => m.value === searchFilters.when)?.label || 'Any Month'
-                : whenPlaceholder || 'Any Month'}
+                : 'Any Month'}
             </span>
             <svg className={`w-5 h-5 text-brand-800 transition-transform ${monthDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -393,7 +312,7 @@ export default function HomeContainer() {
                           setMonthDropdownOpen(false);
                         }}
                         className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-center ${searchFilters.when === month.value
-                            ? 'bg-gradient-to-r from-brand-500 to-red-500 text-white shadow-lg'
+                            ? 'bg-brand-600 text-white shadow-lg'
                             : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
                           }`}
                       >
@@ -413,9 +332,8 @@ export default function HomeContainer() {
       <div className="lg:col-span-3">
         <button
           onClick={handleSearch}
-          className="w-full group relative overflow-hidden px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-brand-accent-400 to-brand-500 text-black rounded-2xl font-bold text-sm sm:text-base shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+          className="w-full px-6 sm:px-8 py-2.5 sm:py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-2xl font-bold text-sm sm:text-base shadow-floating transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
         >
-          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
           <span className="relative flex items-center justify-center space-x-2">
             <InlineSearch />
             <span>Search</span>
@@ -427,75 +345,53 @@ export default function HomeContainer() {
 
   return (
     <div className="min-h-screen font-body">
-      {/* HERO SECTION */}
+      {/* HERO SECTION — one static composition (Phase 2 rewamp): single
+          headline + subline + integrated search, replacing the old
+          4-slide auto-rotating carousel with a detached search section
+          below it (an outside design review's hard rejection — a message
+          rotation with no narrative purpose). The Ken Burns background
+          zoom is the hero's only motion (DESIGN.md motion budget). */}
       <div className="relative z-base min-h-[80vh] lg:min-h-[80vh] bg-brand-dark-950 flex flex-col justify-end">
         <style>{`
           @media (min-width: 768px) and (max-width: 1024px) {
             .relative.min-h-\\[80vh\\] {
               min-height: 65vh;
             }
-            button[aria-label="Previous"],
-            button[aria-label="Next"] {
-              display: none !important;
-            }
           }
           /* Short viewports (common on phones in landscape or small
-             devices): the fixed-position floating action stack (Ask us /
-             WhatsApp / Call) is anchored to the viewport bottom in raw
-             pixels, not vh, so it can sit on top of the hero subtitle once
-             the 80vh hero shrinks below ~700px tall. Reserve extra bottom
-             space in that case regardless of viewport width. */
+             devices): the fixed-position floating action launcher is
+             anchored to the viewport bottom in raw pixels, not vh, so it
+             can sit on top of the hero subtitle once the 80vh hero shrinks
+             below ~700px tall. Reserve extra bottom space in that case
+             regardless of viewport width. */
           @media (max-height: 700px) {
             .hero-content {
               padding-bottom: 9rem;
             }
           }
         `}</style>
-        {/* Media Slides — clipped to the hero's own box via a dedicated
+        {/* Background — clipped to the hero's own box via a dedicated
             overflow-hidden wrapper (not the hero root itself), so the Ken
-            Burns zoom stays contained without also clipping popups (e.g. the
-            "When?" dropdown below) anchored to the hero's edge. */}
+            Burns zoom stays contained without also clipping popups (e.g.
+            the "When?" dropdown below) anchored to the hero's edge. */}
         <div className="absolute inset-0 overflow-hidden z-base">
-          {[0, 1, 2, 3].map((i) => {
-            const isActive = i === currentSlide;
-            const item = HERO_MEDIA.find((m) => m.id === `v${i + 1}`);
-
-            return (
-              <div
-                key={`media-${i}`}
-                className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? 'opacity-100 z-raised' : 'opacity-0 z-base'
-                  }`}
-              >
-                {item && <HeroBackground item={item} isActive={isActive} eager={i === 0} />}
-
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
-                <div className="absolute inset-0 bg-black/20" />
-              </div>
-            );
-          })}
+          {(() => {
+            const heroMedia = HERO_MEDIA.find((m) => m.id === 'v1');
+            return heroMedia ? <HeroBackground item={heroMedia} eager /> : null;
+          })()}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/20" />
+          <div className="absolute inset-0 bg-black/20" />
         </div>
 
-        <button onClick={goToPrevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Previous">
-          <InlineChevronLeft />
-        </button>
-        <button onClick={goToNextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 z-prominent bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition-all hover:scale-110 hidden md:flex" aria-label="Next">
-          <InlineChevronRight />
-        </button>
-
-        {/* Hero Content */}
-        <div className="hero-content relative z-lifted max-w-2xl px-6 md:px-16 pb-28 sm:pb-12 md:pb-16">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
+        {/* Hero Content — headline, subline, and search integrated into
+            the hero itself, not a separate section beneath it. */}
+        <div className="hero-content relative z-lifted max-w-4xl px-6 md:px-16 pb-10 sm:pb-12 md:pb-16">
+          <h1 className="max-w-2xl text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
             {heroHeadline}
           </h1>
-          <p className="text-lg sm:text-xl md:text-xl text-gray-200 leading-relaxed">{heroSubtitle}</p>
-        </div>
-      </div>
-
-      {/* SEARCH BAR — its own section directly below the hero image, never
-          overlapping it, so the hero stays fully uncovered at every viewport
-          height. */}
-      <div className="relative z-base bg-brand-dark-950 border-t border-white/10">
-        <div className="max-w-7xl mx-auto pl-6 pr-20 md:pl-16 md:pr-24 2xl:px-16 py-6">
+          <p className="max-w-2xl text-lg sm:text-xl md:text-xl text-gray-200 leading-relaxed mb-8">
+            {HERO_CONTENT.subtitle}
+          </p>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
             {searchControls}
           </div>
@@ -503,23 +399,9 @@ export default function HomeContainer() {
       </div>
 
       <Stats />
-      <SustainabilityStrip />
-      <AboutSection />
-
-      {/* Deals of the Month */}
-      {/* <section className="py-16 bg-white relative overflow-hidden font-body">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-display">Deals of the Month</h2>
-            <p className="text-lg text-gray-600">Exclusive offers you won't find anywhere else</p>
-          </div>
-          <DealSlider deals={dealItems} />
-        </div>
-      </section> */}
-
+      <TrustSection />
       <RecentlyBookedSlider items={recentItems} />
       <DestinationsSection />
-      <WhyChooseUs />
       <AIPlanningExplainer />
       <FeaturedPackages packages={packages} />
       <TestimonialsSection />
@@ -527,11 +409,7 @@ export default function HomeContainer() {
       <KeyPartnersSection />
 
       {/* CTA */}
-      <section className="py-12 relative overflow-hidden font-body bg-gradient-to-br from-brand-dark-950 via-brand-dark-900 to-brand-800">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-96 h-50 bg-blue-500/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-1/4 w-96 h-92 bg-purple-500/5 rounded-full blur-3xl"></div>
-        </div>
+      <section className="py-12 relative overflow-hidden font-body bg-brand-dark-950">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
           <div className="text-center mb-6">
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight font-display">
@@ -543,10 +421,10 @@ export default function HomeContainer() {
           </div>
           <div className="w-full max-w-3xl mx-auto rounded-2xl py-2 px-0 lg:py-6">
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-              <Link to="/planner" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-brand-accent-600 to-brand-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+              <Link to="/planner" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold shadow-floating transform hover:scale-105 transition-all duration-300">
                 Customize Your Trip <InlineArrowRight />
               </Link>
-              <Link to="/contact" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold shadow-sm border border-gray-200 hover:shadow-lg hover:border-gray-300 transform hover:scale-105 transition-all duration-300">
+              <Link to="/contact" className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold border border-gray-200 hover:border-gray-300 transform hover:scale-105 transition-all duration-300">
                 Still Have Questions?
               </Link>
             </div>
