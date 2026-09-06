@@ -83,13 +83,26 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
     }
   };
 
-  const renderDestinationGrid = (destinations: DestinationOption[], emptyMessage: string) => {
+  const renderDestinationGrid = (destinations: DestinationOption[]) => {
     const filtered = getFilteredDestinations(destinations);
 
     if (filtered.length === 0) {
       return (
         <div className="text-center py-8 text-gray-500 text-sm">
-          {emptyMessage}
+          {searchTerm ? (
+            <>
+              <p>No destinations match "{searchTerm}".</p>
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="mt-2 text-brand-600 hover:text-brand-700 font-semibold underline underline-offset-2"
+              >
+                Clear search
+              </button>
+            </>
+          ) : (
+            'No destinations found'
+          )}
         </div>
       );
     }
@@ -185,10 +198,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
                   <Globe size={12} className="text-brand-600" />
                   Popular International Destinations
                 </div>
-                {renderDestinationGrid(
-                  POPULAR_INTERNATIONAL,
-                  'No destinations found'
-                )}
+                {renderDestinationGrid(POPULAR_INTERNATIONAL)}
               </div>
             )}
 
@@ -198,10 +208,7 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
                   <Globe size={12} className="text-brand-600" />
                   More International Destinations
                 </div>
-                {renderDestinationGrid(
-                  OTHER_INTERNATIONAL,
-                  'No destinations found'
-                )}
+                {renderDestinationGrid(OTHER_INTERNATIONAL)}
               </div>
             )}
           </div>

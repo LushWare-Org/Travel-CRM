@@ -168,6 +168,7 @@ export default function PackageDetailsContainer() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmittingBooking) return; // Double-submit guard: a disabled button alone can double-fire before React re-renders (fast repeat Enter/click).
     if (!pkg) return;
 
     // Validate final step

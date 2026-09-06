@@ -47,4 +47,19 @@ describe('DestinationSelector', () => {
     );
     expect(screen.getByText('Bali, Indonesia')).toBeInTheDocument();
   });
+
+  it('shows a query-specific empty state with a clear-search action when the filter matches nothing', async () => {
+    const user = userEvent.setup();
+    render(<DestinationSelector onChange={vi.fn()} />);
+
+    await user.click(screen.getByText('Select Destination'));
+    await user.type(screen.getByPlaceholderText('Search destinations...'), 'Nonexistent Place XYZ');
+
+    expect(screen.getByText('No destinations match "Nonexistent Place XYZ".')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear search' }));
+
+    expect(screen.queryByText(/No destinations match/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bali, Indonesia' })).toBeInTheDocument();
+  });
 });

@@ -1,7 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
+import { MemoryRouter, createMemoryRouter, RouterProvider } from 'react-router-dom';
 import PlanYourTripContainer from '../PlanYourTripContainer';
+import { fetchUserBookings } from '../../../services/api/booking';
 import { submitManualItineraryRequest } from '../../../services/api/manualItinerary';
 import { generateItineraryPreview } from '../../../services/api/aiItinerary';
 import { generateDayPreview, generateDaysRangePreview } from '../../../services/api/aiDayGeneration';
@@ -28,6 +30,9 @@ vi.mock('../../../services/api/aiDayGeneration', () => ({
 vi.mock('../../../services/api/itineraryChat', () => ({
   sendItineraryChatMessage: vi.fn(),
 }));
+vi.mock('../../../services/api/booking', () => ({
+  fetchUserBookings: vi.fn(),
+}));
 
 vi.mock('sweetalert2', () => ({
   default: { fire: mocks.swalFire },
@@ -42,16 +47,67 @@ const generateItineraryPreviewMock = vi.mocked(generateItineraryPreview);
 const generateDayPreviewMock = vi.mocked(generateDayPreview);
 const generateDaysRangePreviewMock = vi.mocked(generateDaysRangePreview);
 const sendItineraryChatMessageMock = vi.mocked(sendItineraryChatMessage);
+const fetchUserBookingsMock = vi.mocked(fetchUserBookings);
 
-/** Day numbers for the current month that exist in every month (1..28+). */
+/** Day numbers for the month the tests pick dates in (exist in every month). */
 const CURRENT_MONTH_DAY_A = 15;
 const CURRENT_MONTH_DAY_B = 20;
 
+/**
+ * ISO string for `day` in the month AFTER the real current month — the month
+ * every step-2 date pick navigates the calendar to (see openStep2Calendar).
+ * The old helper used the current month, whose days 15/20 fall in the past —
+ * now rejected with an inline error — whenever the suite runs after the 14th
+ * of a month; a fixed future month keeps the suite deterministic on any run
+ * date.
+ */
 const currentMonthDay = (day: number): string => {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const next = new Date();
+  next.setDate(1);
+  next.setMonth(next.getMonth() + 1);
+  const yyyy = next.getFullYear();
+  const mm = String(next.getMonth() + 1).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+/** Navigates the already-open step-2 range calendar to the fixed future
+ * month the date helpers above agree on (its initial view is the real
+ * current month, whose past days the wizard now rejects). */
+async function openStep2Calendar(user: UserEvent) {
+  // One month ahead of the real current month.
+  await user.click(screen.getByText('▶'));
+}
+
+/** Renders the container inside a router — it reads/writes `?step=` via
+ * useSearchParams, which requires router context. */
+const renderContainer = (initialEntry = '/planner') =>
+  render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <PlanYourTripContainer />
+    </MemoryRouter>,
+  );
+
+/** Data-router render for tests that drive history back/forward and assert
+ * the URL — returns the router (navigate(-1)/navigate(1),
+ * router.state.location.search) plus an unmount for same-test re-renders. */
+const renderWithRouter = (initialEntry = '/planner') => {
+  const router = createMemoryRouter(
+    [{ path: '/planner', element: <PlanYourTripContainer /> }],
+    { initialEntries: [initialEntry] },
+  );
+  const view = render(<RouterProvider router={router} />);
+  return { router, unmount: view.unmount };
+};
+
+/** Deterministic future ISO date (today + offset days) for fixtures that
+ * must stay future-valid on any run date. */
+const isoDaysFromToday = (offsetDays: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 };
 
@@ -70,11 +126,12 @@ beforeEach(() => {
   generateDayPreviewMock.mockReset();
   generateDaysRangePreviewMock.mockReset();
   sendItineraryChatMessageMock.mockReset();
+  fetchUserBookingsMock.mockReset();
 });
 
 describe('PlanYourTripContainer', () => {
   it('renders the first step of the trip planner', () => {
-    render(<PlanYourTripContainer />);
+    renderContainer();
     expect(
       screen.getByRole('heading', { name: 'Where do you want to go?' }),
     ).toBeInTheDocument();
@@ -83,7 +140,7 @@ describe('PlanYourTripContainer', () => {
   });
 
   it('shows a validation message when submitted without a destination and never calls the API', () => {
-    const { container } = render(<PlanYourTripContainer />);
+    const { container } = renderContainer();
     fireEvent.submit(container.querySelector('form') as HTMLFormElement);
 
     expect(
@@ -94,7 +151,7 @@ describe('PlanYourTripContainer', () => {
 
   it('submits the exact expected payload after completing all four steps', async () => {
     const user = userEvent.setup();
-    const { container } = render(<PlanYourTripContainer />);
+    const { container } = renderContainer();
 
     // Step 1: pick a destination.
     await user.click(screen.getByText('Choose your destination...'));
@@ -104,6 +161,7 @@ describe('PlanYourTripContainer', () => {
 
     // Step 2: pick a date range through the calendar and confirm state updated.
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
 
@@ -159,15 +217,16 @@ describe('PlanYourTripContainer', () => {
     });
   });
 
-  it('shows the API error message when submission fails', async () => {
+  it('shows the generic failure message (never a raw server or availability claim) when submission fails', async () => {
     const user = userEvent.setup();
-    const { container } = render(<PlanYourTripContainer />);
+    const { container } = renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -181,7 +240,10 @@ describe('PlanYourTripContainer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Submit Itinerary' }));
 
-    expect(await screen.findByText('Server unreachable')).toBeInTheDocument();
+    expect(
+      await screen.findByText("Couldn't complete your booking — please try again or contact us."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Server unreachable')).not.toBeInTheDocument();
     expect(submitMock).toHaveBeenCalledTimes(1);
   });
 
@@ -190,13 +252,14 @@ describe('PlanYourTripContainer', () => {
     generateItineraryPreviewMock.mockResolvedValue({
       days: [{ dayNumber: 1, title: 'Ella Hike', locations: ['Ella'], activities: ['Nine Arch Bridge'] }],
     });
-    const { container } = render(<PlanYourTripContainer />);
+    const { container } = renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     const startDate = currentMonthDay(CURRENT_MONTH_DAY_A);
@@ -243,12 +306,13 @@ describe('PlanYourTripContainer', () => {
 
   it('with a day already added, clicking "Regenerate with AI" confirms via SweetAlert2 before replacing days', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -276,12 +340,13 @@ describe('PlanYourTripContainer', () => {
   it('a rejected generateItineraryPreview call shows the AI error banner and leaves the manual "Add Day 1" path usable', async () => {
     const user = userEvent.setup();
     generateItineraryPreviewMock.mockRejectedValue(new Error('AI generation failed'));
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -295,14 +360,14 @@ describe('PlanYourTripContainer', () => {
   });
 
   it('Step 1 still defaults to "Enter manually" active with the existing destination selector visible', () => {
-    render(<PlanYourTripContainer />);
+    renderContainer();
     expect(screen.getByRole('button', { name: 'Enter manually' })).toBeInTheDocument();
     expect(screen.getByText('Choose your destination...')).toBeInTheDocument();
   });
 
   it('clicking "Chat with AI" hides the destination selector and shows the chat greeting + input', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
 
@@ -313,7 +378,7 @@ describe('PlanYourTripContainer', () => {
   it('typing a message and sending it calls sendItineraryChatMessage and renders the mocked reply', async () => {
     sendItineraryChatMessageMock.mockResolvedValue({ reply: 'How long is your trip?', slots: {}, readyToGenerate: false });
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
     const input = screen.getByPlaceholderText('Tell us about your trip...');
@@ -337,7 +402,7 @@ describe('PlanYourTripContainer', () => {
       days: [{ dayNumber: 1, title: 'Ella Hike', locations: ['Ella'], activities: ['Nine Arch Bridge'] }],
     });
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
     const input = screen.getByPlaceholderText('Tell us about your trip...');
@@ -361,7 +426,7 @@ describe('PlanYourTripContainer', () => {
   it('a rejected sendItineraryChatMessage shows the error banner with a working Retry button and never calls generateItineraryPreview', async () => {
     sendItineraryChatMessageMock.mockRejectedValue(new Error('offline'));
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByRole('button', { name: /Chat with AI/ }));
     const input = screen.getByPlaceholderText('Tell us about your trip...');
@@ -375,12 +440,13 @@ describe('PlanYourTripContainer', () => {
 
   it('clicking the sparkle button on a day regenerates only that day, leaving other days untouched', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -424,12 +490,13 @@ describe('PlanYourTripContainer', () => {
 
   it('after a per-day regeneration, clicking Undo in the toast restores the day\'s prior content', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -452,12 +519,13 @@ describe('PlanYourTripContainer', () => {
 
   it('clicking "Generate remaining days with AI" fills every unplanned day and keeps the manually-added day', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -489,12 +557,13 @@ describe('PlanYourTripContainer', () => {
 
   it('after a bulk-fill, clicking Undo in the toast removes exactly the newly-generated days', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -528,12 +597,13 @@ describe('PlanYourTripContainer', () => {
     // must restore the exact pre-fill state (both manual days, no AI content)
     // regardless of what was removed in between.
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -568,12 +638,13 @@ describe('PlanYourTripContainer', () => {
 
   it('a rejected per-day regeneration shows the per-day error banner and leaves the day content untouched', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -589,12 +660,13 @@ describe('PlanYourTripContainer', () => {
 
   it('a partial bulk-fill shows the "N of M days generated" note and the CTA re-shows for the rest', async () => {
     const user = userEvent.setup();
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -615,12 +687,13 @@ describe('PlanYourTripContainer', () => {
     // Executor form (not Promise.withResolvers) — this project's tsconfig
     // targets ES2020/lib ES2020, which predates withResolvers.
     generateDayPreviewMock.mockReturnValue(new Promise((resolve) => { resolveGenerate = resolve; }));
-    render(<PlanYourTripContainer />);
+    renderContainer();
 
     await user.click(screen.getByText('Choose your destination...'));
     await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
     await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
     await user.click(screen.getByRole('button', { name: /Next/ }));
@@ -635,5 +708,252 @@ describe('PlanYourTripContainer', () => {
       resolveGenerate({ day: { dayNumber: 1, title: 'AI Day 1', locations: [], activities: [] } });
       await Promise.resolve();
     });
+  });
+
+  it('renders the shared Stepper above the manual flow with the four wizard steps', () => {
+    renderContainer();
+    const progress = screen.getByRole('list', { name: 'Progress' });
+    for (const label of ['Destination', 'Dates & Travelers', 'Plan Itinerary', 'Contact Info']) {
+      expect(within(progress).getByText(label)).toBeInTheDocument();
+    }
+    // Step 1 is active and renders its number (no check mark yet).
+    const activeStep = within(progress).getByText('Destination').closest('li') as HTMLElement;
+    expect(activeStep).toHaveAttribute('aria-current', 'step');
+    expect(within(activeStep).getByText('1')).toBeInTheDocument();
+  });
+
+  it('writes ?step= on forward and back transitions and reads it on deep-link mount', async () => {
+    const user = userEvent.setup();
+    const { router } = renderWithRouter('/planner');
+    expect(router.state.location.search).toBe('');
+
+    // Forward: step 1 → 2.
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(router.state.location.search).toBe('?step=2');
+    expect(screen.getByRole('heading', { name: 'When & How Many?' })).toBeInTheDocument();
+
+    // Back button: step 2 → 1 (URL follows).
+    await user.click(screen.getByRole('button', { name: /Back/ }));
+    expect(router.state.location.search).toBe('?step=1');
+    expect(screen.getByRole('heading', { name: 'Where do you want to go?' })).toBeInTheDocument();
+  });
+
+  it('restores the correct step content on browser back/forward through ?step= history', async () => {
+    const user = userEvent.setup();
+    const { router } = renderWithRouter('/planner');
+
+    // Real UI transitions to step 3 (each pushes a distinct ?step= entry).
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(router.state.location.search).toBe('?step=3');
+    expect(screen.getByRole('heading', { name: 'Plan Your Itinerary' })).toBeInTheDocument();
+
+    // Back to step 2: URL pops AND the step-2 content (with the previously
+    // entered dates still in the fields) is what renders — not just a state
+    // variable flip.
+    await act(async () => {
+      router.navigate(-1);
+    });
+    expect(router.state.location.search).toBe('?step=2');
+    expect(screen.getByRole('heading', { name: 'When & How Many?' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Select start date')).toHaveValue(currentMonthDay(CURRENT_MONTH_DAY_A));
+    expect(screen.getByPlaceholderText('Select end date')).toHaveValue(currentMonthDay(CURRENT_MONTH_DAY_B));
+
+    // Back to step 1 — the pre-step-2 URL is the bare initial entry (no
+    // ?step= written on mount), which still renders step 1's content.
+    await act(async () => {
+      router.navigate(-1);
+    });
+    expect(router.state.location.search).toBe('');
+    expect(screen.getByRole('heading', { name: 'Where do you want to go?' })).toBeInTheDocument();
+
+    // Forward again returns to step 2 with its content.
+    await act(async () => {
+      router.navigate(1);
+    });
+    expect(router.state.location.search).toBe('?step=2');
+    expect(screen.getByRole('heading', { name: 'When & How Many?' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Select start date')).toHaveValue(currentMonthDay(CURRENT_MONTH_DAY_A));
+  });
+
+  it('mounts on a deep-linked ?step= and clamps out-of-range or invalid values', () => {
+    const { unmount } = renderWithRouter('/planner?step=3');
+    expect(screen.getByRole('heading', { name: 'Plan Your Itinerary' })).toBeInTheDocument();
+    unmount();
+
+    // Clamp above range → step 4.
+    const { unmount: unmountStep4 } = renderWithRouter('/planner?step=9');
+    expect(screen.getByRole('heading', { name: 'Your Contact Details' })).toBeInTheDocument();
+    unmountStep4();
+
+    // Non-numeric → default to step 1.
+    const { unmount: unmountDefault } = renderWithRouter('/planner?step=abc');
+    expect(screen.getByRole('heading', { name: 'Where do you want to go?' })).toBeInTheDocument();
+    unmountDefault();
+  });
+
+  const loggedInUser = { id: 'u1', name: 'Traveller', email: 'travel@example.com', phone: null };
+  const makeBooking = (overrides: Record<string, unknown> = {}) => ({
+    id: 'b1',
+    createdAt: isoDaysFromToday(-3),
+    travelDate: isoDaysFromToday(30),
+    endDate: isoDaysFromToday(35),
+    numberOfTravelers: 3,
+    packageDestination: 'Bali',
+    ...overrides,
+  });
+
+  it('pre-fills destination, dates and travelers from the most recent booking of a logged-in visitor', async () => {
+    const user = userEvent.setup();
+    mocks.useAuth.mockReturnValue({ user: loggedInUser });
+    // Older booking (Sri Lanka) must lose to the more recent one (Bali).
+    fetchUserBookingsMock.mockResolvedValue([
+      makeBooking({ id: 'b-old', createdAt: isoDaysFromToday(-60), packageDestination: 'Sri Lanka' }),
+      makeBooking({ id: 'b-new' }),
+    ]);
+
+    renderContainer();
+
+    // Step 1 shows the prefilled destination, ready to edit.
+    expect(await screen.findByText('Destination selected')).toBeInTheDocument();
+    expect(screen.getAllByText('Bali, Indonesia').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Sri Lanka')).not.toBeInTheDocument();
+
+    // Step 2 shows the prefilled future dates + traveler count, no errors.
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(screen.getByPlaceholderText('Select start date')).toHaveValue(isoDaysFromToday(30));
+    expect(screen.getByPlaceholderText('Select end date')).toHaveValue(isoDaysFromToday(35));
+    expect(screen.getByText('5 Days / 4 Nights')).toBeInTheDocument();
+    expect(screen.queryByText(/cannot be in the past/i)).not.toBeInTheDocument();
+    expect(fetchUserBookingsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails silently to the empty defaults when the pre-fill request rejects', async () => {
+    mocks.useAuth.mockReturnValue({ user: loggedInUser });
+    fetchUserBookingsMock.mockRejectedValue(new Error('offline'));
+
+    renderContainer();
+
+    expect(screen.getByRole('heading', { name: 'Where do you want to go?' })).toBeInTheDocument();
+    expect(await screen.findByText('Choose your destination...')).toBeInTheDocument();
+    // No error banner for a convenience pre-fill, and nothing was chosen.
+    expect(screen.queryByText('Destination selected')).not.toBeInTheDocument();
+    expect(screen.queryByText(/offline/i)).not.toBeInTheDocument();
+    expect(fetchUserBookingsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the empty defaults when the visitor has no bookings', async () => {
+    mocks.useAuth.mockReturnValue({ user: loggedInUser });
+    fetchUserBookingsMock.mockResolvedValue([]);
+
+    renderContainer();
+
+    expect(await screen.findByText('Choose your destination...')).toBeInTheDocument();
+    expect(screen.queryByText('Destination selected')).not.toBeInTheDocument();
+    expect(fetchUserBookingsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never overwrites a destination the visitor already chose when the pre-fill resolves later', async () => {
+    type Bookings = Awaited<ReturnType<typeof fetchUserBookings>>;
+    let resolveFetch: (bookings: Bookings) => void = () => {};
+    fetchUserBookingsMock.mockReturnValue(new Promise<Bookings>((resolve) => { resolveFetch = resolve; }));
+    mocks.useAuth.mockReturnValue({ user: loggedInUser });
+    const user = userEvent.setup();
+
+    renderContainer();
+
+    // The visitor picks Bali before the slow pre-fill returns (Sri Lanka).
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await act(async () => {
+      resolveFetch([makeBooking({ packageDestination: 'Sri Lanka' })]);
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Destination selected')).toBeInTheDocument();
+    expect(screen.getAllByText('Bali, Indonesia').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Sri Lanka')).not.toBeInTheDocument();
+  });
+
+  it('shows inline per-field past-date errors for a prefilled past trip and blocks Next', async () => {
+    const user = userEvent.setup();
+    mocks.useAuth.mockReturnValue({ user: loggedInUser });
+    fetchUserBookingsMock.mockResolvedValue([
+      makeBooking({ travelDate: isoDaysFromToday(-20), endDate: isoDaysFromToday(-15), numberOfTravelers: 2 }),
+    ]);
+
+    renderContainer();
+    await user.click(await screen.findByRole('button', { name: /Next/ }));
+
+    expect(screen.getByText('Start date cannot be in the past.')).toBeInTheDocument();
+    expect(screen.getByText('End date cannot be in the past.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
+  });
+
+  it('shows the inline "window too long" error for a >90-day trip and blocks Next', async () => {
+    const user = userEvent.setup();
+    mocks.useAuth.mockReturnValue({ user: loggedInUser });
+    fetchUserBookingsMock.mockResolvedValue([
+      makeBooking({ travelDate: isoDaysFromToday(10), endDate: isoDaysFromToday(110), numberOfTravelers: 2 }),
+    ]);
+
+    renderContainer();
+    await user.click(await screen.findByRole('button', { name: /Next/ }));
+
+    expect(screen.getByText('Trip length cannot exceed 90 days.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
+  });
+
+  it('offers a "Continue with manual entry" action when whole-trip AI generation fails on the empty state', async () => {
+    const user = userEvent.setup();
+    generateItineraryPreviewMock.mockRejectedValue(new Error('AI generation failed'));
+    renderContainer();
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: /Generate itinerary with AI/ }));
+    expect(await screen.findByText('AI generation failed')).toBeInTheDocument();
+
+    // The failure affordance drops the visitor onto the manual day form of
+    // this same step — no progress reset, no AI retry required.
+    await user.click(screen.getByRole('button', { name: /Continue with manual entry/ }));
+    expect(screen.getByRole('heading', { name: 'Plan Your Itinerary' })).toBeInTheDocument();
+    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
+  });
+
+  it('keeps the manual "Add Day 1" path usable next to the new failure affordance', async () => {
+    const user = userEvent.setup();
+    generateItineraryPreviewMock.mockRejectedValue(new Error('AI generation failed'));
+    renderContainer();
+
+    await user.click(screen.getByText('Choose your destination...'));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByPlaceholderText('Select start date'));
+    await openStep2Calendar(user);
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_A)));
+    await user.click(screen.getByText(String(CURRENT_MONTH_DAY_B)));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: /Generate itinerary with AI/ }));
+    await screen.findByText('AI generation failed');
+
+    await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
+    expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
   });
 });
