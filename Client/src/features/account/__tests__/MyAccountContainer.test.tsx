@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import MyAccountContainer from '../MyAccountContainer';
 import { fetchUserBookings } from '../../../services/api/booking';
 import { fetchUserCustomizedPackages } from '../../../services/api/customization';
@@ -173,5 +173,43 @@ describe('MyAccountContainer', () => {
     expect(await screen.findByText('Server unreachable')).toBeInTheDocument();
     expect(updateProfileMock).toHaveBeenCalledTimes(1);
     expect(mergeStoredUserMock).not.toHaveBeenCalled();
+  });
+
+  it('redirects to /login carrying the current location so login can return the visitor here', async () => {
+    mocks.useAuth.mockReturnValue({ user: null, loading: false });
+
+    const LoginProbe = () => {
+      const location = useLocation();
+      const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+      const fromPath = from ? from.pathname + (from.search ?? '') : 'no-from';
+      return <div>{`login-screen:${fromPath}`}</div>;
+    };
+
+    render(
+      <MemoryRouter initialEntries={['/my-account?tab=customized']}>
+        <Routes>
+          <Route path="/my-account" element={<MyAccountContainer />} />
+          <Route path="/login" element={<LoginProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('login-screen:/my-account?tab=customized')).toBeInTheDocument();
+  });
+
+  it('shows an inline error banner with a working retry when the request data fails to load', async () => {
+    const user = userEvent.setup();
+    fetchUserBookingsMock.mockRejectedValueOnce(new Error('Network unreachable'));
+    fetchUserCustomizedPackagesMock.mockRejectedValueOnce(new Error('Network unreachable'));
+    fetchUserManualItinerariesMock.mockRejectedValueOnce(new Error('Network unreachable'));
+    renderContainer();
+
+    expect(await screen.findByText('Error Loading Requests')).toBeInTheDocument();
+    expect(screen.getByText('Network unreachable')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /try again/i }));
+
+    expect(await screen.findByText('Bali Honeymoon')).toBeInTheDocument();
+    expect(screen.queryByText('Error Loading Requests')).not.toBeInTheDocument();
   });
 });
