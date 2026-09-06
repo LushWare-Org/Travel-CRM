@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { fetchPackages } from '../../../services/api/packages';
 import type { NormalizedPackage } from '../../../services/api/packages.transform';
 import { formatCurrency } from '../../../lib/currency';
 import { FALLBACK_IMAGE } from '../../../config/media';
+import { Card } from '@/components/ui/card';
 
 /** A category-derived card shown in the stats section carousel. */
 interface CategoryPackage {
@@ -17,8 +18,45 @@ interface CategoryPackage {
   description: string;
 }
 
+function CategoryCard({ pkg, className }: { pkg: CategoryPackage; className?: string }) {
+  return (
+    <Link
+      to={`/packages?category=${encodeURIComponent(pkg.categoryName.toLowerCase())}`}
+      className={`group block h-full ${className ?? ''}`}
+    >
+      <Card className="flex h-full flex-col gap-0 overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 text-gray-900 ring-0 transition-colors duration-300 group-hover:border-gray-300">
+        <div className="relative aspect-[4/3] shrink-0 overflow-hidden bg-gray-100">
+          <img
+            src={pkg.image}
+            alt={pkg.title}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+            onError={(e) => {
+              e.currentTarget.src = FALLBACK_IMAGE;
+            }}
+          />
+        </div>
+        <div className="flex flex-1 flex-col p-5">
+          <h3 className="mb-3 text-lg font-semibold text-gray-900 transition-colors duration-300 group-hover:text-brand-600">
+            {pkg.categoryName.charAt(0).toUpperCase() + pkg.categoryName.slice(1)} Packages
+          </h3>
+          <p className="mb-4 line-clamp-2 flex-1 text-sm leading-relaxed text-gray-600">
+            {pkg.description}
+          </p>
+          <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-3">
+            <span className="text-sm text-gray-600">Starting from</span>
+            <span className="font-display text-xl font-bold text-brand-600">
+              {formatCurrency(pkg.price)}
+            </span>
+          </div>
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
 export default function RecommendedPackagesSection() {
-  const navigate = useNavigate();
+  const mobileScrollerRef = useRef<HTMLDivElement>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [categoryPackages, setCategoryPackages] = useState<CategoryPackage[]>([]);
@@ -96,10 +134,6 @@ export default function RecommendedPackagesSection() {
     setTimeout(() => setIsAnimating(false), 1000);
   };
 
-  const handlePackageClick = (categoryName: string) => {
-    navigate(`/packages?category=${encodeURIComponent(categoryName.toLowerCase())}`);
-  };
-
   const getVisiblePackages = () => {
     if (categoryPackages.length === 0) return [];
     const packages = [];
@@ -109,96 +143,97 @@ export default function RecommendedPackagesSection() {
     return packages;
   };
 
+  // Mobile (< md) uses a native snap-scroll rail; the arrow buttons drive the
+  // rail on small screens and the rotating desktop track from md up.
+  const handleArrow = (direction: 1 | -1) => {
+    const rail = mobileScrollerRef.current;
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 767px)').matches &&
+      rail
+    ) {
+      const card = rail.querySelector<HTMLElement>('[data-carousel-card]');
+      const step = card ? card.offsetWidth + 16 : rail.clientWidth * 0.85;
+      rail.scrollBy({ left: direction * step, behavior: 'smooth' });
+      return;
+    }
+    if (direction > 0) {
+      nextSlide();
+    } else {
+      prevSlide();
+    }
+  };
+
+  const arrowClasses =
+    'absolute top-1/2 z-elevated -translate-y-1/2 rounded-full border border-gray-200 bg-white text-gray-700 shadow-floating transition-colors duration-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:pointer-events-none disabled:opacity-40';
+
   return (
-    <section className="stats-section py-section-sm bg-white">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-12 items-start">
-          {/* Right Side */}
-          <div className="lg:col-span-8 relative">
-            <div className="mb-6">
-              <div className="mb-12 text-center">
-                <h2 className="text-4xl font-bold text-gray-900 font-display mb-4">
-                  Discover Your Perfect Holiday
-                </h2>
-                <p className="text-lg text-gray-600 md-2">From relaxing escapes to thrilling adventures - find your ideal trip here.</p>
+    <section className="stats-section bg-white py-section-md">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-12 text-center">
+          <h2 className="mb-4 font-display text-3xl font-bold text-gray-900 md:text-4xl">
+            Discover Your Perfect Holiday
+          </h2>
+          <p className="mx-auto max-w-2xl text-lg leading-relaxed text-gray-600">
+            From relaxing escapes to thrilling adventures - find your ideal trip here.
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex h-64 items-center justify-center">
+            <div className="h-12 w-12 animate-spin rounded-full border-t-4 border-b-4 border-brand-500" role="status" aria-label="Loading categories" />
+          </div>
+        ) : categoryPackages.length === 0 ? (
+          <div className="mx-auto max-w-xl text-center">
+            <p className="text-gray-500">No packages available at the moment.</p>
+          </div>
+        ) : (
+          <div className="relative">
+            {/* Mobile rail — native horizontal snap scroll (swipeable). */}
+            <div
+              ref={mobileScrollerRef}
+              className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 md:hidden"
+            >
+              {categoryPackages.map((pkg) => (
+                <div key={pkg.id ?? pkg.categoryName} data-carousel-card className="w-[85%] shrink-0 snap-start sm:w-[48%]">
+                  <CategoryCard pkg={pkg} />
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop/tablet rotation — slide window of 4 (2 on sm→md). */}
+            <div className="hidden md:block">
+              <div className="flex gap-4">
+                {getVisiblePackages().map((pkg, index) => (
+                  <div
+                    key={`${pkg.id}-${currentSlide}-${index}`}
+                    className="w-full shrink-0 sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)]"
+                  >
+                    <CategoryCard pkg={pkg} />
+                  </div>
+                ))}
               </div>
             </div>
 
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-brand-500"></div>
-              </div>
-            ) : categoryPackages.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <p>No packages available at the moment.</p>
-              </div>
-            ) : (
-              <div className="relative overflow-hidden">
-
-                {/* Carousel Container */}
-                <div className="overflow-hidden">
-                  <div className="flex gap-4 transition-transform duration-1000 ease-in-out relative">
-                    <button
-                      onClick={prevSlide}
-                      disabled={isAnimating}
-                      className="absolute left-0 top-1/3 -translate-y-1/2 z-elevated bg-white/90 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
-                      aria-label="Previous"
-                    >
-                      <ChevronLeft className="w-6 h-6" />
-                    </button>
-                    <button
-                      onClick={nextSlide}
-                      disabled={isAnimating}
-                      className="absolute right-0 top-1/3 -translate-y-1/2 z-elevated bg-white/90 hover:bg-white text-gray-800 p-3 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
-                      aria-label="Next"
-                    >
-                      <ChevronRight className="w-6 h-6" />
-                    </button>
-                    {getVisiblePackages().map((pkg, index) => {
-                      return (
-                        <div
-                          key={`${pkg.id}-${currentSlide}-${index}`}
-                          className="flex-shrink-0 w-full sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)] cursor-pointer"
-                          onClick={() => handlePackageClick(pkg.categoryName)}
-                        >
-                          <div className="bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-brand-100 group h-full flex flex-col">
-                            <div className="relative h-56 overflow-hidden flex-shrink-0">
-                              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
-                              <img
-                                src={pkg.image}
-                                alt={pkg.title}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                                onError={(e) => {
-                                  e.currentTarget.src = FALLBACK_IMAGE;
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                            </div>
-                            <div className="p-5 flex-1 flex flex-col">
-                              <h3 className="text-xl font-bold text-gray-900 mb-3">
-                                {pkg.categoryName.charAt(0).toUpperCase() + pkg.categoryName.slice(1)} Packages
-                              </h3>
-                              <p className="text-sm text-gray-600 mb-3 line-clamp-2 flex-1">
-                                {pkg.description}
-                              </p>
-                              <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
-                                <span className="text-sm text-gray-600">Starting from</span>
-                                <span className="text-xl font-bold bg-gradient-to-r from-brand-600 to-red-600 bg-clip-text text-transparent">
-                                  {formatCurrency(pkg.price)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => handleArrow(-1)}
+              className={`${arrowClasses} left-1`}
+              aria-label="Previous"
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleArrow(1)}
+              className={`${arrowClasses} right-1`}
+              aria-label="Next"
+            >
+              <ChevronRight className="size-5" />
+            </button>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

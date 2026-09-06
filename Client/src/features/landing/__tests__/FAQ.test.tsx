@@ -8,7 +8,7 @@ describe('FAQSection', () => {
     render(<FAQSection />);
 
     expect(screen.getByRole('heading', { name: "Got Questions? We've Got Answers" })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Booking & Payment' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Booking & Payment' })).toBeInTheDocument();
     expect(screen.getByText('How do I book a travel package?')).toBeInTheDocument();
   });
 
@@ -16,7 +16,7 @@ describe('FAQSection', () => {
     const user = userEvent.setup();
     const { container } = render(<FAQSection />);
 
-    await user.click(screen.getByRole('button', { name: 'Pricing & Deals' }));
+    await user.click(screen.getByRole('tab', { name: 'Pricing & Deals' }));
     expect(screen.getByText('Are there any hidden costs?')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Are there any hidden costs?' }));

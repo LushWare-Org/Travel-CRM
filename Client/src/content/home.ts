@@ -1,8 +1,13 @@
-// Per-company marketing content: home-page hero slides.
-// Index-aligned with config/media.ts's HERO_MEDIA (v1..v4 = beach/mountain/safari/temple).
-export const HERO_SLIDES = [
-  { title: 'Where Turquoise Tides Meet Timeless Journeys', subtitle: 'Immersive escapes crafted for those who travel with intention' },
-  { title: 'Chase Horizons, Not Itineraries', subtitle: "Hand-crafted adventures through the world's most breathtaking landscapes" },
-  { title: 'Wild at Heart, Refined in Every Detail', subtitle: 'Luxury safaris and nature encounters curated by local experts' },
-  { title: 'Ancient Wonders, Modern Comfort', subtitle: 'Cultural journeys that honor the places you visit' },
-];
+// Per-company marketing content: home-page hero.
+//
+// Phase 2 of the Client rewamp (docs/CLIENT-REWAMP-PLAN.md): the hero used
+// to auto-rotate through 4 unrelated headline/subtitle pairs every 5s with
+// the search bar detached in a separate section below — flagged as a hard
+// rejection by an outside design review (a message-rotation carousel with
+// no narrative purpose). Replaced with one static composition; the Ken
+// Burns background zoom (config/media.ts's HERO_MEDIA, v1/beach) is the
+// hero's only motion.
+export const HERO_CONTENT = {
+  title: 'Where Turquoise Tides Meet Timeless Journeys',
+  subtitle: 'Immersive escapes crafted for those who travel with intention',
+};
