@@ -23,6 +23,22 @@ const manualChunks = (id: string): string | undefined => {
   if (id.includes('lucide-react') || id.includes('react-phone-number-input')) {
     return 'icons-vendor';
   }
+  // Phase 8 bundle check: the shadcn/Base UI primitives ported across Phases
+  // 0-5 (Button, Dialog, Sheet, Form, ...) plus class-variance-authority had
+  // no bucket, so Rollup's default chunking folded them into the shared
+  // main entry chunk. Splitting them into their own vendor chunk keeps that
+  // entry chunk smaller and lets the browser cache this rarely-changing
+  // dependency code separately from app code.
+  if (id.includes('@base-ui/react') || id.includes('class-variance-authority')) {
+    return 'ui-vendor';
+  }
+  // react-hook-form/@hookform/resolvers/zod are only exercised by the form-
+  // heavy routes (login/register, booking, contact, career) -- their own
+  // chunk avoids pulling form-validation code into routes that never render
+  // a form.
+  if (id.includes('react-hook-form') || id.includes('@hookform/resolvers') || id.includes('/zod/')) {
+    return 'form-vendor';
+  }
   return undefined;
 };
 

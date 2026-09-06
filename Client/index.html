@@ -15,26 +15,9 @@
     <meta name="description" content="LUSH Ware — sustainable, expertly curated journeys around the world." />
     <link rel="icon" type="image/png" href="/logo.png" />
 
-    <!-- Fonts: non-blocking. URL hardcoded rather than a %VITE_GOOGLE_FONTS_URL%
-         placeholder -- same unresolved-placeholder bug as title/description/favicon
-         above, and a font stylesheet can't be corrected at runtime without a
-         flash of unstyled text, so it needs a real value in the static HTML. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
-      media="print"
-      onload="this.media='all'; this.onload=null;"
-    />
-
-    <noscript>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
-    </noscript>
+    <!-- Fonts: self-hosted via @fontsource-variable/{fraunces,inter} (Phase 8,
+         see src/index.css) -- no runtime Google Fonts stylesheet, no
+         render-blocking cross-origin request, no external-host dependency. -->
 
   </head>
   <body>

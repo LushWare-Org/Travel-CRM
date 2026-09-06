@@ -628,16 +628,19 @@ export default function PackageDetailsContainer() {
                   }
                 `}
               >
-                <img
-                  src={img}
-                  alt={`${pkg.title} - ${idx + 1}`}
-                  className="w-full h-full object-cover"
-                  onLoad={() => markGalleryImageLoaded(img)}
-                  onError={(e) => {
-                    e.currentTarget.src = FALLBACK_IMAGE;
-                    markGalleryImageLoaded(img);
-                  }}
-                />
+                <picture>
+                  <source srcSet={img?.replace(/\.(jpg|jpeg|png)$/i, '.webp')} type="image/webp" />
+                  <img
+                    src={img}
+                    alt={`${pkg.title} - ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    onLoad={() => markGalleryImageLoaded(img)}
+                    onError={(e) => {
+                      e.currentTarget.src = FALLBACK_IMAGE;
+                      markGalleryImageLoaded(img);
+                    }}
+                  />
+                </picture>
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/40" />
               </div>
