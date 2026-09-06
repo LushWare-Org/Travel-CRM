@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Filter } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
 import { fetchPackages } from '../../services/api/packages';
 import type { AggregatedDestination } from '../../services/api/packages.transform';
 import HeroSection from './components/HeroSection';
@@ -144,7 +144,7 @@ export default function DestinationsContainer() {
   const totalPages = Math.ceil(filteredDestinations.length / itemsPerPage);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-500" /></div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load destinations</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700">Try again</button></div></div>;
+  if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">Unable to load destinations</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700">Try again</button></div></div>;
 
   return (
     <div className="min-h-screen bg-white">
@@ -187,10 +187,17 @@ export default function DestinationsContainer() {
 
           <div className="flex-1">
             {filteredDestinations.length === 0 ? (
-              <div className="text-center py-24 bg-gray-50 rounded-2xl">
+              <div className="text-center px-6 py-24 bg-gray-50 rounded-2xl">
                 <Filter className="w-16 h-16 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">No destinations found</h3>
-                <p className="text-gray-600">Try adjusting your filters</p>
+                <p className="text-gray-600 mb-6">Try adjusting your filters</p>
+                <button
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors duration-300"
+                >
+                  <X className="w-4 h-4" />
+                  Clear all filters
+                </button>
               </div>
             ) : viewMode === 'grid' ? (
               <div className={`grid gap-4 md:gap-5 lg:gap-6 ${showFilters ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
@@ -211,7 +218,7 @@ export default function DestinationsContainer() {
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-6 py-3 bg-gray-100 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
+                  className="px-6 py-3 bg-gray-100 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-xl font-semibold transition-colors duration-300"
                 >
                   ← Previous
                 </button>
@@ -220,8 +227,8 @@ export default function DestinationsContainer() {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${currentPage === page
-                          ? 'bg-brand-600 text-white shadow-lg'
+                      className={`w-10 h-10 rounded-xl font-semibold transition-colors duration-300 ${currentPage === page
+                          ? 'bg-brand-600 text-white'
                           : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                         }`}
                     >
@@ -232,7 +239,7 @@ export default function DestinationsContainer() {
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-6 py-3 bg-gray-100 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-lg font-semibold transition-all duration-300"
+                  className="px-6 py-3 bg-gray-100 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 hover:text-white rounded-xl font-semibold transition-colors duration-300"
                 >
                   Next →
                 </button>
@@ -242,15 +249,6 @@ export default function DestinationsContainer() {
         </div>
       </div>
 
-      <style>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0; transform: scale(0.5); }
-          50% { opacity: 1; transform: scale(1); }
-        }
-        .animate-twinkle {
-          animation: twinkle 4s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }

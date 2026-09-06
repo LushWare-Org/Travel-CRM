@@ -94,7 +94,7 @@ describe('DestinationsContainer', () => {
     await user.click(screen.getByRole('button', { name: /Show Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Asia' }));
 
-    expect(await screen.findByText('1 destinations')).toBeInTheDocument();
+    expect(await screen.findByText('1 destination')).toBeInTheDocument();
     expect(screen.getByText('Bali, Indonesia')).toBeInTheDocument();
     expect(screen.queryByText('Paris, France')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Clear/ })).toBeInTheDocument();
