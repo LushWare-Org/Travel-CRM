@@ -16,6 +16,13 @@ const Career = lazy(() => import('./pages/CareerPage'));
 const Login = lazy(() => import('./pages/LoginPage'));
 const MyAccount = lazy(() => import('./pages/MyAccountPage'));
 const PlanYourTrip = lazy(() => import('./pages/PlanYourTripPage'));
+// Dev-only verification page (Phase 0 design-system style guide). Vite
+// statically replaces `import.meta.env.DEV`, so in production builds this
+// ternary folds to `null` and the lazy import (and the whole page chunk)
+// is tree-shaken away — the route below never exists outside `npm run dev`.
+const DevStyleGuide = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevStyleGuidePage'))
+  : null;
 
 function AppContent() {
   const navigate = useNavigate();
@@ -49,6 +56,10 @@ function AppContent() {
     <>
       <Suspense fallback={<div className="min-h-screen" />}>
         <Routes>
+          {/* Dev-only style guide (Phase 0): mounted OUTSIDE MainLayout so it
+              renders without header/footer, and gated by `import.meta.env.DEV`
+              so production builds drop the route and page chunk entirely. */}
+          {DevStyleGuide && <Route path="/dev/style-guide" element={<DevStyleGuide />} />}
           <Route element={<MainLayout currentPage={currentPage} onNavigate={handleNavigate} />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/packages" element={<Packages />} />

@@ -210,6 +210,32 @@
 **Priority:** P3
 **Depends on:** None
 
+## Client Rewamp
+
+### booking-service: real availability check + cross-service rollback
+
+**What:** `createWebsiteBooking` (`Services/booking-service/src/controllers/booking.controller.js:180-281`) has no availability/inventory check before creating a booking — no query against remaining slots or date conflicts. Its only rollback is a manual `booking.delete` if `createLead` throws, which doesn't cover the auto-assign-sales-rep or email side effects, and there is no cross-service saga at all.
+
+**Why:** Flagged during `/plan-eng-review` on `docs/CLIENT-REWAMP-PLAN.md` (Client rewamp Phase 4). The rewamp plan's own state table originally specified UI for "availability conflict" and "full success or full rollback," but the backend has neither — Phase 4's UI has been scoped down to a generic retry message instead of a false specific claim, pending this fix.
+
+**Context:** `Services/booking-service/src/controllers/booking.controller.js`, potentially `Services/billing-service`, `Services/lead-service` for the cross-service saga piece. Needs a real availability check (against package capacity/date blocking, if that concept exists elsewhere in package-service) and either a proper compensating-transaction saga or an idempotency-key + reconciliation approach across the three services involved in one booking.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** None
+
+### user-service: saved-traveler-profile for returning-visitor pre-fill
+
+**What:** No saved-traveler or past-destination data model exists on `user-service` today (searched `Services/user-service/src` — no matches for `savedTraveler`/`pastDestination`/`preferredDestination`/`travelerProfile`).
+
+**Why:** Flagged during `/plan-eng-review` on `docs/CLIENT-REWAMP-PLAN.md`. The rewamp's Journey section wants a logged-in returning visitor's planner to pre-fill from their account. Phase 4 ships a narrower version now (pre-fill from the visitor's most recent booking via `booking-service`'s existing `getUserBookings`, zero new backend work) — this TODO is the fuller version: an explicit saved-traveler profile (name/DOB/passport-adjacent fields, preferred destination) beyond what one past booking implies.
+
+**Context:** `Services/user-service`. New schema + endpoints. Not blocking Phase 4 — the most-recent-booking pre-fill ships without it.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
 ## Completed
 
 ### Honor Gemini's RetryInfo.retryDelay on 429 quota errors

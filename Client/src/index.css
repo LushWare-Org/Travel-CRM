@@ -1,6 +1,179 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/*
+  Design tokens — see DESIGN.md. Ported from src/config/palettes/lush.json
+  (Phase 0 of the Client rewamp, docs/CLIENT-REWAMP-PLAN.md). A new
+  deployment re-themes by editing this block (mirrors the lush.json
+  values); keep both in sync until a future phase removes the JSON
+  duplication.
+
+  Custom theme names declared inside @theme below both generate utility
+  classes (bg-brand-500, font-display, text-hero, ...) AND are usable
+  directly as CSS custom properties, so no separate JS runtime injection
+  is needed anymore (removed: config/theme.ts applyCssVariables(),
+  previously called from main.tsx). NOTE: avoid writing namespace
+  wildcard patterns like "--color-*" in comments in this file — a
+  confirmed Tailwind v4 (4.3.3) @theme-scanner quirk: a literal
+  "--word-*" token sequence inside a comment silently breaks responsive
+  variant generation (lg:, md:, etc.) for every custom utility in the
+  file, while bare (non-variant) utilities keep working — verified via
+  @tailwindcss/node's compile() API directly, isolated to this exact
+  pattern.
+*/
+@theme {
+  --color-brand-50: #F0F7F3;
+  --color-brand-100: #DCEEE2;
+  --color-brand-200: #BADFC8;
+  --color-brand-300: #8FC9A6;
+  --color-brand-400: #5FAD7E;
+  --color-brand-500: #3B8F5E;
+  --color-brand-600: #2C7048;
+  --color-brand-700: #235939;
+  --color-brand-800: #1B4332;
+  --color-brand-900: #123020;
+  --color-brand-950: #0A1F14;
+
+  --color-brand-accent-50: #FBF6EC;
+  --color-brand-accent-100: #F6EAD1;
+  --color-brand-accent-200: #ECD5A3;
+  --color-brand-accent-300: #E0BC72;
+  --color-brand-accent-400: #D4AD5A;
+  --color-brand-accent-500: #C9A24B;
+  --color-brand-accent-600: #AD8536;
+  --color-brand-accent-700: #8C6A2B;
+  --color-brand-accent-800: #6E5322;
+  --color-brand-accent-900: #574218;
+  --color-brand-accent-950: #332610;
+
+  --color-brand-dark-800: #16261E;
+  --color-brand-dark-900: #0D1712;
+  --color-brand-dark-950: #060B08;
+
+  /* Overrides the default Tailwind gray-* palette (bg-gray-500 etc.) with
+     the brand neutral scale — matches the old tailwind.config.js
+     `colors: { gray: brandPalette.neutral }` extension. */
+  --color-gray-50: #FAF8F4;
+  --color-gray-100: #F3EFE6;
+  --color-gray-200: #E7E0D2;
+  --color-gray-300: #D6CBB5;
+  --color-gray-400: #B9AA8C;
+  --color-gray-500: #9C8B6C;
+  --color-gray-600: #7C6E56;
+  --color-gray-700: #5F5341;
+  --color-gray-800: #443A2E;
+  --color-gray-900: #2B241C;
+  --color-gray-950: #1A1610;
+
+  --font-display: 'Fraunces', serif;
+  --font-body: 'Inter', sans-serif;
+
+  --text-hero: 4.75rem;
+  --text-hero--line-height: 1.02;
+  --text-hero--letter-spacing: -0.02em;
+  --text-hero--font-weight: 600;
+  --text-display-lg: 3rem;
+  --text-display-lg--line-height: 1.1;
+  --text-display-md: 2.25rem;
+  --text-display-md--line-height: 1.18;
+
+  /* Motion budget (see DESIGN.md) — hero background zoom is the only
+     sitewide entrance/ambient animation token; hover/reveal and
+     scroll-linked entrance are handled per-component, not as shared tokens. */
+  --animate-kenburns: kenburns 20s ease-out forwards;
+}
+
+@keyframes kenburns {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.12);
+  }
+}
+
+/*
+  Named stacking-order scale — replaces ad-hoc bare z-50/z-[9999] values
+  that collided across the app (see the old tailwind.config.js comment this
+  block is ported from). z-index is not one of the Tailwind v4 @theme-driven
+  utility namespaces, so these are declared as fixed custom utilities
+  instead (the documented v4 mechanism for utilities outside the default
+  namespaces).
+
+  Two tiers, deliberately distinct:
+  - Global app-chrome tokens (header/dropdown/floating-action/overlay/
+    modal): for elements that escape their local layout (fixed
+    positioning, portals) and can visually compete with OTHER components
+    app-wide.
+  - Local tokens (base/raised/elevated/lifted/prominent): for decorative
+    within-component layering that never leaves its own relative/absolute
+    containing block and never competes with another components stacking.
+*/
+@utility z-base {
+  z-index: 0;
+}
+@utility z-raised {
+  z-index: 10;
+}
+@utility z-elevated {
+  z-index: 20;
+}
+@utility z-lifted {
+  z-index: 30;
+}
+@utility z-prominent {
+  z-index: 40;
+}
+@utility z-header {
+  z-index: 50;
+}
+@utility z-dropdown {
+  z-index: 60;
+}
+@utility z-floating-action {
+  z-index: 70;
+}
+@utility z-overlay {
+  z-index: 90;
+}
+@utility z-modal {
+  z-index: 100;
+}
+
+/*
+  Legacy unprefixed CSS var aliases — kept for existing hand-written CSS
+  (below) and inline SVG gradient stopColors in page code
+  (MyAccountContainer.tsx, destinations/HeroSection.tsx,
+  packages/HeroSection.tsx) that reference var(--brand-500) etc. directly.
+  Phase 0 intentionally does not touch page code (docs/CLIENT-REWAMP-PLAN.md),
+  so these aliases exist rather than renaming those call sites; a later
+  phase touching those specific files may migrate them to
+  var(--color-brand-500) and drop the alias for that shade.
+*/
+:root {
+  --brand-50: #F0F7F3;
+  --brand-100: #DCEEE2;
+  --brand-200: #BADFC8;
+  --brand-300: #8FC9A6;
+  --brand-400: #5FAD7E;
+  --brand-500: #3B8F5E;
+  --brand-600: #2C7048;
+  --brand-700: #235939;
+  --brand-800: #1B4332;
+  --brand-900: #123020;
+  --brand-950: #0A1F14;
+
+  --brand-accent-50: #FBF6EC;
+  --brand-accent-100: #F6EAD1;
+  --brand-accent-200: #ECD5A3;
+  --brand-accent-300: #E0BC72;
+  --brand-accent-400: #D4AD5A;
+  --brand-accent-500: #C9A24B;
+  --brand-accent-600: #AD8536;
+  --brand-accent-700: #8C6A2B;
+  --brand-accent-800: #6E5322;
+  --brand-accent-900: #574218;
+  --brand-accent-950: #332610;
+}
 
 body {
   margin: 0;
@@ -12,7 +185,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Headings use the active theme's display font (see config/theme.ts) */
+/* Headings use the brand display font (see DESIGN.md) */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display), var(--font-body), sans-serif;
 }
@@ -36,7 +209,7 @@ code {
 
 .phone-input-wrapper .PhoneInput:focus-within {
   border-color: var(--brand-600) !important;
-  box-shadow: 0 0 0 2px rgba(var(--brand-600-rgb), 0.5) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-600) 50%, transparent) !important;
   outline: none !important;
 }
 
@@ -121,7 +294,7 @@ code {
 .react-datepicker__input-container input:focus {
   outline: none !important;
   border-color: var(--brand-600) !important;
-  box-shadow: 0 0 0 4px rgba(var(--brand-600-rgb), 0.1) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-600) 10%, transparent) !important;
 }
 
 .react-datepicker__input-container input:hover {
