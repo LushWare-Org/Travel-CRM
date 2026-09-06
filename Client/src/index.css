@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 /*
   Design tokens — see DESIGN.md. Ported from src/config/palettes/lush.json
@@ -88,10 +90,16 @@
   --spacing-section-md: 4rem;
   --spacing-section-lg: 5rem;
 
-  /* Motion budget (see DESIGN.md) — hero background zoom is the only
-     sitewide entrance/ambient animation token; hover/reveal and
-     scroll-linked entrance are handled per-component, not as shared tokens. */
-  --animate-kenburns: kenburns 20s ease-out forwards;
+  /* Elevation tokens (see DESIGN.md) — shadow is reserved for the three
+     genuinely floating classes of element (dropdown/popover, the
+     floating-action launcher, modal/drawer surfaces); in-flow cards are
+     elevated by border/contrast, never by box-shadow. Warm green-black tint
+     bases (brand-950/brand-dark-950-adjacent) keep shadows warm, not gray.
+     Landing here with Phase 1: the launcher/panel chrome is the first
+     consumer (the DESIGN.md comment says these land with the phase that
+     first needs them). */
+  --shadow-floating: 0 8px 24px rgb(10 31 20 / 0.10), 0 2px 6px rgb(10 31 20 / 0.06);
+  --shadow-modal: 0 24px 64px rgb(6 11 8 / 0.24), 0 4px 16px rgb(6 11 8 / 0.10);
 }
 
 @keyframes kenburns {
