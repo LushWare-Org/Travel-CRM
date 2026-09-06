@@ -110,5 +110,44 @@ export const getWhatsAppUrl = (message?: string): string => {
 export const getCopyrightText = (year: number = new Date().getFullYear()): string =>
   `© ${year} ${BRANDING.company.name}. All rights reserved.`;
 
+/**
+ * Default SEO description, used as the runtime fallback for the <meta
+ * name="description"> tag applied by `applyBranding()` below.
+ */
+export const META_DESCRIPTION =
+  import.meta.env.VITE_META_DESCRIPTION ||
+  `${BRANDING.company.name} — sustainable, expertly curated journeys around the world.`;
+
+/**
+ * Sets the document title, meta description, and favicon from `BRANDING`
+ * at runtime, in JS, instead of relying on Vite's `index.html` %VITE_X%
+ * placeholder substitution.
+ *
+ * Why: Vite only resolves `%VITE_X%` in index.html when the matching env
+ * var is actually defined at build time, with NO fallback for a missing
+ * one — it ships the literal, unresolved `%VITE_X%` string into the built
+ * HTML instead (confirmed: a production build run without `VITE_COMPANY_NAME`
+ * set produced `<title>%VITE_COMPANY_NAME%</title>` verbatim). Every other
+ * branding value above already guards against this with `|| 'fallback'`;
+ * the HTML placeholders had no equivalent guard. Call this once, before
+ * first paint, so head tags always resolve to a real value.
+ */
+export const applyBranding = (): void => {
+  document.title = BRANDING.company.name;
+
+  let descriptionTag = document.querySelector('meta[name="description"]');
+  if (!descriptionTag) {
+    descriptionTag = document.createElement('meta');
+    descriptionTag.setAttribute('name', 'description');
+    document.head.appendChild(descriptionTag);
+  }
+  descriptionTag.setAttribute('content', META_DESCRIPTION);
+
+  const faviconTag = document.querySelector('link[rel="icon"]');
+  if (faviconTag) {
+    faviconTag.setAttribute('href', BRANDING.company.logoPath);
+  }
+};
+
 
 export default BRANDING;

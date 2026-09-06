@@ -3,16 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>%VITE_COMPANY_NAME%</title>
-    <meta name="description" content="%VITE_META_DESCRIPTION%" />
-    <link rel="icon" type="image/png" href="%VITE_LOGO_PATH%" />
+    <!-- title/description/favicon: static defaults, matching src/config/branding.ts's
+         fallbacks. src/config/branding.ts's applyBranding() overwrites these from
+         VITE_COMPANY_NAME/VITE_META_DESCRIPTION/VITE_LOGO_PATH at runtime when those
+         are actually set. Previously these were %VITE_X%() index.html placeholders,
+         but Vite has no fallback for an unset one -- it ships the literal unresolved
+         "%VITE_X%" string into production HTML instead (reproduced: a build without
+         VITE_COMPANY_NAME set, exactly CI's current Client build step, shipped
+         <title>%VITE_COMPANY_NAME%</title> verbatim). -->
+    <title>LUSH Ware</title>
+    <meta name="description" content="LUSH Ware — sustainable, expertly curated journeys around the world." />
+    <link rel="icon" type="image/png" href="/logo.png" />
 
-    <!-- Fonts: non-blocking -->
+    <!-- Fonts: non-blocking. URL hardcoded rather than a %VITE_GOOGLE_FONTS_URL%
+         placeholder -- same unresolved-placeholder bug as title/description/favicon
+         above, and a font stylesheet can't be corrected at runtime without a
+         flash of unstyled text, so it needs a real value in the static HTML. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <link
-      href="%VITE_GOOGLE_FONTS_URL%"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
       rel="stylesheet"
       media="print"
       onload="this.media='all'; this.onload=null;"
@@ -20,7 +31,7 @@
 
     <noscript>
       <link
-        href="%VITE_GOOGLE_FONTS_URL%"
+        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet"
       />
     </noscript>
