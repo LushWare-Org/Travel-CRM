@@ -230,12 +230,13 @@ const ApplicationForm = ({
           <button
             type="submit"
             disabled={isSubmitting}
+            aria-busy={isSubmitting}
             className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-3"
           >
             {isSubmitting ? (
               <>
-                <Loader className="w-6 h-6 animate-spin" />
-                Submitting Application...
+                <Loader className="w-6 h-6 animate-spin" aria-hidden="true" />
+                <span aria-live="polite">Submitting Application...</span>
               </>
             ) : (
               <>

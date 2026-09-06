@@ -411,13 +411,14 @@ export default function ContactContainer() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
+                    aria-busy={isSubmitting}
                     className="w-full group bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-lg transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="relative px-8 py-5 flex items-center justify-center space-x-3">
                       {isSubmitting ? (
                         <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          <span>Sending...</span>
+                          <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                          <span aria-live="polite">Sending...</span>
                         </>
                       ) : (
                         <>

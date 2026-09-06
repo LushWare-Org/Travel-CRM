@@ -183,8 +183,8 @@ export default function PackagesContainer() {
     setMinRating(0);
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-500" /></div>;
-  if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">We ran into an issue</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700">Try again</button></div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50" role="status" aria-label="Loading packages"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-500" /></div>;
+  if (error) return <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4" role="alert"><div className="max-w-md text-center"><h2 className="text-2xl font-bold text-gray-900 mb-4">We ran into an issue</h2><p className="text-gray-600 mb-6">{error}</p><button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700">Try again</button></div></div>;
 
   const destinationLabel = selectedDestination?.name || 'All Destinations';
   const destinationTypeLabel = selectedDestination

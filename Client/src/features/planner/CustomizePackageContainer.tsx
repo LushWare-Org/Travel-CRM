@@ -941,12 +941,13 @@ export default function CustomizePackageContainer() {
                         <button
                           type="submit"
                           disabled={isSubmitting}
+                          aria-busy={isSubmitting}
                           className="w-full px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg text-white bg-brand-600 hover:bg-brand-700 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSubmitting ? (
                             <>
                               <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" aria-hidden="true" />
-                              <span>Creating Your Request...</span>
+                              <span aria-live="polite">Creating Your Request...</span>
                             </>
                           ) : (
                             <>

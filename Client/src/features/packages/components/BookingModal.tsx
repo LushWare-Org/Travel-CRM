@@ -418,13 +418,16 @@ export default function BookingModal({
                   <button
                     type="submit"
                     disabled={isSubmittingBooking}
+                    aria-busy={isSubmittingBooking}
                     className={`flex-1 bg-brand-600 text-white py-4 rounded-xl font-black text-base lg:text-lg hover:bg-brand-700 transition-colors flex items-center justify-center gap-3 ${
                       isSubmittingBooking ? 'opacity-70 cursor-not-allowed' : ''
                     }`}
                   >
-                    {isSubmittingBooking
-                      ? 'Submitting...'
-                      : 'Submit Booking Request'}
+                    <span aria-live="polite">
+                      {isSubmittingBooking
+                        ? 'Submitting...'
+                        : 'Submit Booking Request'}
+                    </span>
                     <ArrowRight className="w-5 h-5 lg:w-6 lg:h-6" />
                   </button>
                 </div>

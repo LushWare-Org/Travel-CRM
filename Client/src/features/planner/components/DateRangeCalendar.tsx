@@ -89,14 +89,48 @@ export default function DateRangeCalendar({ initialStart, initialEnd, onChange, 
     }
   }
 
+  // Keyboard-only equivalent of the mouse down->up two-click range
+  // selection above. Deliberately independent of handleDayDown/handleDayEnter/
+  // handleDayUp (which model a mouse drag gesture with a separate down/move/up
+  // phase that has no keyboard analogue) so this is purely additive: it
+  // cannot change or regress the existing, already-tested mouse behavior.
+  function handleDaySelect(d: Date) {
+    const day = startOfDay(d);
+    if (awaitingEnd && rangeStart) {
+      setRangeEnd(day);
+      setAwaitingEnd(false);
+      const a = rangeStart < day ? rangeStart : day;
+      const b = rangeStart < day ? day : rangeStart;
+      onChange(formatISO(a), formatISO(b));
+      return;
+    }
+    setRangeStart(day);
+    setRangeEnd(day);
+    setAwaitingEnd(true);
+  }
+
   const cells = buildCalendar(viewMonth);
 
   return (
-    <div ref={calRef} className="bg-white rounded-xl shadow-lg p-4 w-[320px]">
+    <div ref={calRef} className="bg-white rounded-xl shadow-lg p-4 w-[320px]" role="group" aria-label="Choose travel dates">
       <div className="flex items-center justify-between mb-3">
-        <button type="button" onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))} className="px-2 py-1">◀</button>
+        <button
+          type="button"
+          onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
+          className="px-2 py-1"
+          aria-label="Previous month"
+        >
+          ◀
+        </button>
         <div className="font-semibold">{viewMonth.toLocaleString(undefined, { month: 'long' })} {viewMonth.getFullYear()}</div>
-        <button type="button" onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))} className="px-2 py-1">▶</button>
+        <button
+          type="button"
+          onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
+          className="px-2 py-1"
+          aria-label="Next month"
+        >
+          ▶
+        </button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-xs text-center text-gray-500 mb-2">
         {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d}>{d}</div>)}
@@ -111,7 +145,17 @@ export default function DateRangeCalendar({ initialStart, initialEnd, onChange, 
                 <div
                   onMouseDown={() => handleDayDown(startOfDay(c))}
                   onMouseEnter={() => handleDayEnter(startOfDay(c))}
-                  className={`w-8 h-8 rounded-md flex items-center justify-center ${isSelected ? 'bg-brand-100 text-brand-700' : 'hover:bg-gray-100'}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleDaySelect(c);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  aria-label={c.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                  className={`w-8 h-8 rounded-md flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${isSelected ? 'bg-brand-100 text-brand-700' : 'hover:bg-gray-100'}`}
                 >
                   {c.getDate()}
                 </div>
