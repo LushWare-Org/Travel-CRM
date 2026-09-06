@@ -235,7 +235,7 @@ export default function Header({ onNavigate }: HeaderProps) {
                         dropdownTimeoutRef.current = setTimeout(() => setActiveDropdown(null), 80);
                       }}
                     >
-                      <div className="bg-white border border-gray-200 rounded-xl shadow-xl min-w-[240px] max-w-[340px] overflow-hidden mt-1">
+                      <div className="bg-white border border-gray-200 rounded-2xl shadow-xl min-w-[240px] max-w-[340px] overflow-hidden mt-1">
                         <div className="py-2 max-h-[420px] overflow-y-auto scrollbar-thin">
                           {item.dropdown.map((sub, idx) => (
                             <a

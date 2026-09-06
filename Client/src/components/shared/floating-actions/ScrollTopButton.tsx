@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
-
-const SCROLL_THRESHOLD_PX = 400;
+import { FLOATING_ACTION_SCROLL_THRESHOLD_PX } from '../../../config/floatingActions';
 
 /**
- * Same visual language as WhatsAppButton/CallButton — visible once the page
- * has scrolled past SCROLL_THRESHOLD_PX, scrolls smoothly to top on click.
+ * Page-scroll utility, kept separate from the contact/assistant launcher
+ * (Phase 1 decision): it is not a contact channel, so it stays an
+ * independent, smaller, always-present affordance that appears once the
+ * page has scrolled past the shared hero threshold — never part of the
+ * launcher's expandable menu. Neutral white + hairline border per the
+ * DESIGN.md elevation policy (in-flow chrome elevated by border/contrast;
+ * only the floating shadow marks it as chrome).
  */
 const ScrollTopButton = () => {
   const [isVisible, setIsVisible] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => setIsVisible(window.scrollY > SCROLL_THRESHOLD_PX);
+    const handleScroll = () => setIsVisible(window.scrollY > FLOATING_ACTION_SCROLL_THRESHOLD_PX);
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -27,18 +30,11 @@ const ScrollTopButton = () => {
       type="button"
       onClick={scrollToTop}
       aria-label="Scroll to top"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`relative bg-gradient-to-br from-gray-600 to-gray-800 hover:from-gray-700 hover:to-gray-900 rounded-full shadow-xl p-4 flex items-center justify-center transition-all duration-300 transform ${
+      className={`flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-floating transition-all duration-300 hover:border-gray-300 hover:text-brand-700 ${
         isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0 pointer-events-none'
-      } ${isHovered ? 'scale-110 shadow-2xl' : 'scale-100 hover:scale-105'}`}
-      style={{
-        boxShadow: isHovered
-          ? '0 20px 40px 0 rgba(55, 65, 81, 0.4), 0 0 30px 0 rgba(55, 65, 81, 0.3)'
-          : '0 8px 32px 0 rgba(55, 65, 81, 0.3), 0 4px 16px 0 rgba(0, 0, 0, 0.1)',
-      }}
+      }`}
     >
-      <ArrowUp className={`w-[26px] h-[26px] text-white drop-shadow-sm transition-transform duration-300 ${isHovered ? 'scale-110' : 'scale-100'}`} />
+      <ArrowUp className="h-5 w-5" />
     </button>
   );
 };

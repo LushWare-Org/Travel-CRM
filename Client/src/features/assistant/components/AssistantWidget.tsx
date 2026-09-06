@@ -5,25 +5,21 @@ import { useAssistantChat } from '../hooks/useAssistantChat';
 import type { AssistantTurnData } from '../hooks/useAssistantChat';
 import type { AssistantTurnMessageT } from '../../../services/api/assistantTurn';
 import { sendAssistantEvent } from '../../../services/api/assistantEvents';
-import { ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX } from '../../../config/floatingActions';
+import { ASSISTANT_PANEL_BOTTOM_OFFSET_PX } from '../../../config/floatingActions';
 import { isAssistantExcludedPath } from '../../../config/assistantRoutes';
+import { setAssistantLauncherOpen, useAssistantLauncherOpen } from '../../../components/shared/floating-actions/assistantLauncherState';
 
 const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + route.slice(1);
 
 const GREETING =
   "Hi! I'm the site assistant — ask me to take you to a page, or ask a question about our policies.";
 
-// Bigger and bolder than the icon-only Call/WhatsApp/ScrollTop buttons below
-// it in the stack — size and shadow are the priority cue, not an animation.
-const LAUNCHER_CLASS =
-  'pointer-events-auto inline-flex items-center gap-2.5 rounded-full bg-gradient-to-br from-brand-600 to-brand-accent-600 px-6 py-4 text-base font-bold text-white transition-transform hover:scale-105 active:scale-95';
-const LAUNCHER_SHADOW = { boxShadow: '0 20px 45px 0 rgba(44, 112, 72, 0.45), 0 8px 20px 0 rgba(0, 0, 0, 0.15)' };
 const PANEL_CLASS =
-  'pointer-events-auto w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl';
+  'pointer-events-auto w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-floating';
 const CHIP_CLASS =
   'inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-sm transition-colors hover:bg-brand-50';
 const SEND_BUTTON_CLASS =
-  'w-11 h-11 rounded-xl bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white flex items-center justify-center disabled:opacity-50';
+  'w-11 h-11 rounded-xl bg-brand-600 text-white flex items-center justify-center transition-colors hover:bg-brand-700 disabled:opacity-50 disabled:hover:bg-brand-600';
 const INPUT_CLASS =
   'flex-1 px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50';
 
@@ -93,23 +89,24 @@ const MessageRow = memo(function MessageRow({ message, turnData, onNavigate }: M
 });
 
 /**
- * Site-wide floating assistant (Phase 1: navigation + FAQ/policy answers).
- * Mounted once in AppContent — self-excludes by route (see
- * isAssistantExcludedPath), so it can sit unconditionally next to <Routes>.
+ * Site-wide floating assistant chat PANEL (Phase 1: navigation + FAQ/policy
+ * answers). Mounted once in AppContent — deliberately OUTSIDE the route
+ * Suspense boundary so lazy page loads never unmount/remount it and re-fire
+ * impression telemetry.
  *
- * Placement is bottom-RIGHT (`fixed right-3`, same z-floating-action token
- * as FloatingActionStack), stacked bottom-to-top as: Call, WhatsApp, this
- * launcher, then ScrollTop — never covering any of them — via
- * ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX (FloatingActionStack reserves this
- * same slot so ScrollTop shifts up instead of colliding with it). Sized
- * larger than the stack's icon buttons (bigger padding/text, bolder shadow)
- * so it reads as the priority CTA, not just another item in the list.
+ * Phase 1 collapse: the widget no longer renders its own launcher button.
+ * The single bottom-right launcher (FloatingActionStack, rendered by
+ * MainLayout) owns that anchor and opens this panel through the shared
+ * assistantLauncherState store; this component only renders the chat panel,
+ * floating just above the launcher anchor (ASSISTANT_PANEL_BOTTOM_OFFSET_PX),
+ * while the store is open on a route where the assistant is not excluded.
+ * Self-exclusion and close-on-excluded-route are unchanged.
  */
 export default function AssistantWidget() {
   const location = useLocation();
   const navigate = useNavigate();
   const chat = useAssistantChat();
-  const [isOpen, setIsOpen] = useState(false);
+  const isOpen = useAssistantLauncherOpen();
   const [input, setInput] = useState('');
   const openedEventFired = useRef(false);
   const mountPathname = useRef(location.pathname);
@@ -125,21 +122,36 @@ export default function AssistantWidget() {
   }, [chat.sessionId]);
 
   // The component never unmounts on an excluded route (it just renders null
-  // below, since it's mounted unconditionally in App.tsx), so `isOpen` state
-  // would otherwise survive a visit to /planner or /login and silently pop
-  // the panel back open on return (found in /ship's Claude adversarial
-  // review). Close it the moment the route becomes excluded.
+  // below, since it's mounted unconditionally in App.tsx), so the store's
+  // open state would otherwise survive a visit to /planner or /login and
+  // silently pop the panel back open on return (found in /ship's Claude
+  // adversarial review). Close it the moment the route becomes excluded.
   useEffect(() => {
-    if (isAssistantExcludedPath(location.pathname)) setIsOpen(false);
+    if (isAssistantExcludedPath(location.pathname)) {
+      setAssistantLauncherOpen(false);
+    }
   }, [location.pathname]);
+
+  // The launcher no longer lives here (Phase 1), so "user opened the
+  // assistant" is now the store's false→true transition instead of a local
+  // button click — but the telemetry contract is unchanged: one `opened`
+  // event per widget mount, however many times the panel is later
+  // closed/reopened. Guarded on the excluded route too: a panel that cannot
+  // render (it returns null there) must not fire the event either.
+  useEffect(() => {
+    if (isOpen && !openedEventFired.current && !isAssistantExcludedPath(location.pathname)) {
+      openedEventFired.current = true;
+      void sendAssistantEvent({ sessionId: chat.sessionId, eventType: 'opened', tool: null, route: null });
+    }
+  }, [isOpen, location.pathname, chat.sessionId]);
 
   // Client-side navigation only: the widget's own router executes the
   // resolved path, and the route name the server validated goes as
-  // telemetry. Declared before the early return below — every hook call
-  // (useCallback included) must run unconditionally on every render, or a
-  // live transition into an excluded route (this hook would otherwise be
-  // skipped) throws "Rendered fewer hooks than expected" (caught by this
-  // file's own test suite when it started exercising that transition).
+  // telemetry. Declared before the early returns below — every hook call
+  // must run unconditionally on every render, or a live transition into an
+  // excluded route (this callback would otherwise be skipped) throws
+  // "Rendered fewer hooks than expected" (caught by this file's own test
+  // suite when it started exercising that transition).
   const handleChipClick = useCallback(
     (route: string, path: string) => {
       void sendAssistantEvent({ sessionId: chat.sessionId, eventType: 'nav_click', tool: 'navigate', route });
@@ -149,17 +161,9 @@ export default function AssistantWidget() {
   );
 
   if (isAssistantExcludedPath(location.pathname)) return null;
+  if (!isOpen) return null;
 
-  const handleToggleOpen = () => {
-    const next = !isOpen;
-    setIsOpen(next);
-    if (next && !openedEventFired.current) {
-      openedEventFired.current = true;
-      void sendAssistantEvent({ sessionId: chat.sessionId, eventType: 'opened', tool: null, route: null });
-    }
-  };
-
-  const handleClose = () => setIsOpen(false);
+  const handleClose = () => setAssistantLauncherOpen(false);
 
   const handleSend = () => {
     const text = input;
@@ -169,80 +173,66 @@ export default function AssistantWidget() {
 
   return (
     <div
-      className="fixed right-3 z-floating-action flex flex-col items-end gap-3 pointer-events-none"
-      style={{ bottom: `${ASSISTANT_LAUNCHER_BOTTOM_OFFSET_PX}px` }}
+      className="fixed right-3 z-floating-action pointer-events-none"
+      style={{ bottom: `${ASSISTANT_PANEL_BOTTOM_OFFSET_PX}px` }}
     >
-      {isOpen && (
-        <div role="dialog" aria-label="Travel assistant panel" className={PANEL_CLASS}>
-          <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-brand-600 to-brand-accent-600 px-4 py-3 text-white">
-            <div className="flex items-center gap-2 min-w-0">
-              <Bot className="w-5 h-5 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold leading-tight">Travel Assistant</p>
-                <p className="text-xs text-white/80 leading-tight">Navigation help &amp; FAQ answers</p>
-              </div>
+      <div role="dialog" aria-label="Travel assistant panel" className={PANEL_CLASS}>
+        <div className="flex items-center justify-between gap-2 bg-brand-800 px-4 py-3 text-white">
+          <div className="flex items-center gap-2 min-w-0">
+            <Bot className="w-5 h-5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight">Travel Assistant</p>
+              <p className="text-xs text-white/80 leading-tight">Navigation help &amp; FAQ answers</p>
             </div>
-            <button
-              type="button"
-              onClick={handleClose}
-              aria-label="Close assistant panel"
-              className="rounded-full p-1.5 transition-colors hover:bg-white/20 shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </button>
           </div>
-
-          <div className="max-h-80 overflow-y-auto space-y-3 bg-gray-50 p-4">
-            <div className="flex items-start gap-2">
-              <Bot className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" />
-              <p className="text-sm bg-white rounded-xl px-3 py-2 shadow-sm">{GREETING}</p>
-            </div>
-            {chat.messages.map((message) => (
-              <MessageRow key={message.id} message={message} turnData={turnByMessageId.get(message.id)} onNavigate={handleChipClick} />
-            ))}
-            {chat.isSending && <Loader2 className="w-4 h-4 animate-spin text-brand-600" />}
-          </div>
-
-          {chat.error && (
-            <div className="px-4 py-2 bg-red-50 border-t border-red-200">
-              <p className="text-xs text-red-700">{chat.error}</p>
-            </div>
-          )}
-
-          <div className="flex gap-2 border-t border-gray-200 bg-white p-3">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask me to help you navigate..."
-              maxLength={2000}
-              disabled={chat.isSending}
-              className={INPUT_CLASS}
-            />
-            <button type="button" onClick={handleSend} disabled={chat.isSending || !input.trim()} aria-label="Send message" className={SEND_BUTTON_CLASS}>
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="Close assistant panel"
+            className="rounded-full p-1.5 transition-colors hover:bg-white/20 shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      )}
 
-      <button
-        type="button"
-        onClick={handleToggleOpen}
-        aria-expanded={isOpen}
-        aria-label="Travel assistant"
-        className={LAUNCHER_CLASS}
-        style={LAUNCHER_SHADOW}
-      >
-        <Bot className="w-6 h-6" />
-        Ask us
-      </button>
+        <div className="max-h-80 overflow-y-auto space-y-3 bg-gray-50 p-4">
+          <div className="flex items-start gap-2">
+            <Bot className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" />
+            <p className="text-sm bg-white rounded-xl px-3 py-2 shadow-sm">{GREETING}</p>
+          </div>
+          {chat.messages.map((message) => (
+            <MessageRow key={message.id} message={message} turnData={turnByMessageId.get(message.id)} onNavigate={handleChipClick} />
+          ))}
+          {chat.isSending && <Loader2 className="w-4 h-4 animate-spin text-brand-600" />}
+        </div>
+
+        {chat.error && (
+          <div className="px-4 py-2 bg-red-50 border-t border-red-200">
+            <p className="text-xs text-red-700">{chat.error}</p>
+          </div>
+        )}
+
+        <div className="flex gap-2 border-t border-gray-200 bg-white p-3">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="Ask me to help you navigate..."
+            maxLength={2000}
+            disabled={chat.isSending}
+            className={INPUT_CLASS}
+          />
+          <button type="button" onClick={handleSend} disabled={chat.isSending || !input.trim()} aria-label="Send message" className={SEND_BUTTON_CLASS}>
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -12,3 +12,16 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
     }
   } as unknown as typeof IntersectionObserver;
 }
+// jsdom 25 has no PointerEvent. base-ui's Checkbox (used by RangeFilterGroup,
+// which both filter sidebars now consume) re-dispatches a PointerEvent on its
+// hidden native input when clicked, so clicking a filter checkbox without
+// this polyfill throws. RangeFilterGroup.test.tsx carries a private copy with
+// the same guard; this makes it available to container tests that drive the
+// filter sidebars too.
+if (typeof globalThis.PointerEvent === 'undefined') {
+  globalThis.PointerEvent = class PointerEvent extends MouseEvent {
+    constructor(type: string, params?: PointerEventInit) {
+      super(type, params);
+    }
+  } as unknown as typeof PointerEvent;
+}

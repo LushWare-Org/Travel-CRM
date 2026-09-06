@@ -1,6 +1,7 @@
 import { Filter, X, Banknote, Clock, Star } from 'lucide-react';
 import { getCurrencySymbol } from '../../../lib/currency';
 import FilterPanelShell from '../../../components/shared/FilterPanelShell';
+import RangeFilterGroup from '../../../components/shared/RangeFilterGroup';
 
 const CURRENCY_SYMBOL = getCurrencySymbol();
 
@@ -47,100 +48,69 @@ export default function FiltersSidebar({
   onClose,
 }: FiltersSidebarProps) {
   return (
-    <FilterPanelShell>
-      <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6 border border-gray-100 h-[calc(100vh-70px)] md:rounded-none md:h-full md:overflow-y-auto md:flex md:flex-col 2xl:sticky 2xl:top-24 2xl:rounded-2xl 2xl:h-[calc(100vh-8rem)] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6 2xl:mb-6">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Filter className="w-5 h-5 text-brand-600" />
-          </h3>
-          <button
-            onClick={onClose}
-            className="2xl:hidden p-1 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-600 hover:text-gray-900" />
-          </button>
-        </div>
+    <FilterPanelShell onClose={onClose}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold flex items-center gap-2">
+          <Filter className="w-5 h-5 text-brand-600" />
+        </h3>
+        <button
+          onClick={onClose}
+          aria-label="Close filters"
+          className="lg:hidden p-1 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-600 hover:text-gray-900" />
+        </button>
+      </div>
 
-        {/* Price Range */}
-        <div className="mb-6">
-          <h4 className="font-semibold mb-3 flex items-center gap-2">
-            <Banknote className="w-4 h-4 text-gray-600" />
-            <span className="text-gray-900">Budget</span>
-          </h4>
-          <div className="space-y-2">
-            {filterOptions.priceRanges.map(range => (
-              <label
-                key={range.label}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedPriceRange?.label === range.label}
-                  onChange={() => onPriceRangeChange(selectedPriceRange?.label === range.label ? null : range)}
-                  className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
-                />
-                <span className="text-gray-700 font-medium">{range.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+      {/* Price Range */}
+      <RangeFilterGroup
+        label="Budget"
+        icon={<Banknote />}
+        options={filterOptions.priceRanges}
+        selected={selectedPriceRange}
+        onChange={onPriceRangeChange}
+      />
 
-        {/* Duration */}
-        <div className="mb-6">
-          <h4 className="font-semibold mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-gray-600" />
-            <span className="text-gray-900">Trip Duration</span>
-          </h4>
-          <div className="space-y-2">
-            {filterOptions.durations.map(dur => (
-              <label
-                key={dur.label}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedDuration?.label === dur.label}
-                  onChange={() => onDurationChange(selectedDuration?.label === dur.label ? null : dur)}
-                  className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
-                />
-                <span className="text-gray-700 font-medium">{dur.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+      {/* Trip Duration */}
+      <RangeFilterGroup
+        label="Trip Duration"
+        icon={<Clock />}
+        options={filterOptions.durations}
+        selected={selectedDuration}
+        onChange={onDurationChange}
+      />
 
-        {/* Rating */}
-        <div className="mb-6">
-          <h4 className="font-semibold mb-3 flex items-center gap-2">
-            <Star className="w-4 h-4 text-gray-600" />
-            <span className="text-gray-900">Hotel Rating</span>
-          </h4>
-          <div className="space-y-2">
-            {filterOptions.ratings.map((starCount) => (
-              <label
-                key={starCount}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"
-              >
-                <input
-                  type="checkbox"
-                  checked={minRating === starCount}
-                  onChange={() => onMinRatingChange(minRating === starCount ? 0 : starCount)}
-                  className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
-                />
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-0.5">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${i < starCount ? 'fill-brand-accent-400 text-brand-accent-400' : 'text-gray-300'}`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-gray-700 font-medium text-sm">{starCount} Star{starCount !== 1 ? 's' : ''}</span>
+      {/* Rating */}
+      <div className="mb-6">
+        <h4 className="font-semibold mb-3 flex items-center gap-2">
+          <Star className="w-4 h-4 text-gray-600" />
+          <span className="text-gray-900">Hotel Rating</span>
+        </h4>
+        <div className="space-y-2">
+          {filterOptions.ratings.map((starCount) => (
+            <label
+              key={starCount}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-brand-50/50 cursor-pointer transition-all duration-200"
+            >
+              <input
+                type="checkbox"
+                checked={minRating === starCount}
+                onChange={() => onMinRatingChange(minRating === starCount ? 0 : starCount)}
+                className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 focus:ring-2"
+              />
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-4 h-4 ${i < starCount ? 'fill-brand-accent-400 text-brand-accent-400' : 'text-gray-300'}`}
+                    />
+                  ))}
                 </div>
-              </label>
-            ))}
-          </div>
+                <span className="text-gray-700 font-medium text-sm">{starCount} Star{starCount !== 1 ? 's' : ''}</span>
+              </div>
+            </label>
+          ))}
         </div>
       </div>
     </FilterPanelShell>
