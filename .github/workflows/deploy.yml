@@ -182,6 +182,17 @@ jobs:
         working-directory: Client
         env:
           VITE_API_URL: ${{ vars.GATEWAY_URL }}
+          # Non-secret branding constants (same values as Client/.env's local
+          # defaults). CI never had these set, so index.html's %VITE_X%
+          # placeholders shipped to production unresolved, e.g. a literal
+          # "%VITE_COMPANY_NAME%" browser tab title -- see
+          # src/config/branding.ts's applyBranding() doc comment. That runtime
+          # fallback keeps a future missing var from ever regressing to a raw
+          # placeholder again, but these should still resolve to the real
+          # company name here, not the generic "Your Company" fallback.
+          VITE_COMPANY_NAME: 'LUSH Ware'
+          VITE_META_DESCRIPTION: 'LUSH Ware — sustainable, expertly curated journeys around the world.'
+          VITE_LOGO_PATH: '/logo.png'
         run: npm ci --legacy-peer-deps && npm run build
 
       - name: Install and build Management
