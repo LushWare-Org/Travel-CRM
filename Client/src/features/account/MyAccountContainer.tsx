@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Edit2, Loader, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchUserBookings } from '../../services/api/booking';
@@ -15,6 +15,7 @@ import type { AccountTab, RequestCardItem } from './components/RequestList';
 
 export default function MyAccountContainer() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState<RequestCardItem[]>([]);
   const [customizedPackages, setCustomizedPackages] = useState<RequestCardItem[]>([]);
@@ -65,12 +66,51 @@ export default function MyAccountContainer() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const loadRequests = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const settled = await Promise.all([
+      fetchUserBookings().then(
+        data => ({ data: data as RequestCardItem[] }),
+        err => {
+          console.error('Error loading bookings:', err);
+          return { error: err instanceof Error ? err.message : 'Failed to load your bookings' };
+        },
+      ),
+      fetchUserCustomizedPackages().then(
+        data => ({ data: data as RequestCardItem[] }),
+        err => {
+          console.error('Error loading customized packages:', err);
+          return { error: err instanceof Error ? err.message : 'Failed to load your customized packages' };
+        },
+      ),
+      fetchUserManualItineraries().then(
+        data => ({ data: data as RequestCardItem[] }),
+        err => {
+          console.error('Error loading manual itineraries:', err);
+          return { error: err instanceof Error ? err.message : 'Failed to load your manual itineraries' };
+        },
+      ),
+    ]);
+    const [bookingsResult, customizedResult, manualResult] = settled;
+    if ('data' in bookingsResult) setBookings(bookingsResult.data);
+    if ('data' in customizedResult) setCustomizedPackages(customizedResult.data);
+    if ('data' in manualResult) setManualItineraries(manualResult.data);
+    const failures = settled.filter(
+      (result): result is { error: string } => 'error' in result,
+    );
+    if (failures.length > 0) {
+      setError(failures[0].error);
+    }
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     if (authLoading) {
       return;
     }
     if (!user) {
-      navigate('/login');
+      navigate('/login', { state: { from: location } });
       return;
     }
     setFormData({
@@ -78,36 +118,8 @@ export default function MyAccountContainer() {
       email: user?.email || '',
       phone: user?.phone || '',
     });
-    const loadAllData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [bookingsData, customizedData, manualData] = await Promise.all([
-          fetchUserBookings().catch(err => {
-            console.error('Error loading bookings:', err);
-            return [];
-          }),
-          fetchUserCustomizedPackages().catch(err => {
-            console.error('Error loading customized packages:', err);
-            return [];
-          }),
-          fetchUserManualItineraries().catch(err => {
-            console.error('Error loading manual itineraries:', err);
-            return [];
-          }),
-        ]);
-        setBookings((bookingsData as RequestCardItem[]) || []);
-        setCustomizedPackages((customizedData as RequestCardItem[]) || []);
-        setManualItineraries((manualData as RequestCardItem[]) || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load your requests');
-        console.error('Error loading data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadAllData();
-  }, [user, navigate, authLoading]);
+    loadRequests();
+  }, [user, navigate, authLoading, location, loadRequests]);
 
   useEffect(() => {
     setIsVisible(true);
@@ -180,7 +192,7 @@ export default function MyAccountContainer() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
       <div className="relative w-full py-28 overflow-visible">
         <div className="absolute inset-0">
@@ -191,8 +203,7 @@ export default function MyAccountContainer() {
             loop
             muted
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
         </div>
         <div className="relative z-raised max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1
@@ -203,22 +214,16 @@ export default function MyAccountContainer() {
           >
             Welcome Back,{' '}
             <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-brand-400 via-brand-accent-400 to-brand-accent-400 bg-clip-text text-transparent">
+              <span className="text-white">
                 {user?.name || 'Traveler'}
               </span>
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
+              <svg className="absolute -bottom-2 left-0 w-full text-brand-accent-400" viewBox="0 0 300 12" fill="none" aria-hidden="true">
                 <path
                   d="M2 10C50 2 100 2 150 6C200 10 250 10 298 4"
-                  stroke="url(#gradient)"
+                  stroke="currentColor"
                   strokeWidth="3"
                   strokeLinecap="round"
                 />
-                <defs>
-                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="var(--brand-500)" />
-                    <stop offset="100%" stopColor="var(--brand-accent-500)" />
-                  </linearGradient>
-                </defs>
               </svg>
             </span>
           </h1>
@@ -233,12 +238,12 @@ export default function MyAccountContainer() {
 
         {/* Tabs Overlay */}
         <div className="absolute left-1/2 transform -translate-x-1/2 -bottom-12 z-elevated">
-          <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-1 flex justify-center gap-2 flex-wrap w-fit">
+          <div className="bg-white rounded-2xl border border-gray-200 p-1 flex justify-center gap-2 flex-wrap w-fit">
             <button
               onClick={() => setActiveTab('bookings')}
               className={`px-6 py-4 font-bold text-sm md:text-base whitespace-nowrap rounded-xl transition-all ${
                 activeTab === 'bookings'
-                  ? 'bg-gradient-to-r from-brand-400 to-brand-accent-500 text-black shadow-lg'
+                  ? 'bg-brand-600 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -248,7 +253,7 @@ export default function MyAccountContainer() {
               onClick={() => setActiveTab('customized')}
               className={`px-6 py-3 font-bold text-sm md:text-base whitespace-nowrap rounded-xl transition-all ${
                 activeTab === 'customized'
-                  ? 'bg-gradient-to-r from-brand-400 to-brand-accent-500 text-black shadow-lg'
+                  ? 'bg-brand-600 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -258,7 +263,7 @@ export default function MyAccountContainer() {
               onClick={() => setActiveTab('manual')}
               className={`px-6 py-3 font-bold text-sm md:text-base whitespace-nowrap rounded-xl transition-all ${
                 activeTab === 'manual'
-                  ? 'bg-gradient-to-r from-brand-400 to-brand-accent-500 text-black shadow-lg'
+                  ? 'bg-brand-600 text-white'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -274,10 +279,10 @@ export default function MyAccountContainer() {
           {showStickySidebar && (
             <div className={`hidden lg:block ${sidebarCollapsed ? 'w-20' : 'w-80'} flex-shrink-0 transition-all duration-300`}>
               <div className="fixed w-80 left-4 z-header" style={{ paddingBottom: '1000px' }} data-sticky-sidebar>
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <div className="bg-white rounded-2xl border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg flex-shrink-0">
+                      <div className="w-16 h-16 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
                         {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                       </div>
                       {!sidebarCollapsed && (
@@ -324,7 +329,7 @@ export default function MyAccountContainer() {
                       {/* Edit Button */}
                       <button
                         onClick={() => setIsEditMode(true)}
-                        className="w-full px-4 py-2 bg-black text-white rounded-lg font-semibold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2 mb-4"
+                        className="w-full px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mb-4"
                       >
                         <Edit2 className="w-3 h-3" />
                         Edit Profile
@@ -337,9 +342,9 @@ export default function MyAccountContainer() {
           )}
           {!showStickySidebar && (
             <div className={`hidden lg:block ${sidebarCollapsed ? 'w-20' : 'w-80'} flex-shrink-0 transition-all duration-300`}>
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+              <div className="bg-white rounded-2xl border border-gray-200 p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg flex-shrink-0">
+                  <div className="w-16 h-16 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
                     {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -368,7 +373,7 @@ export default function MyAccountContainer() {
                 </div>
                 <button
                   onClick={() => setIsEditMode(true)}
-                  className="w-full px-4 py-2 bg-black text-white rounded-lg font-semibold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2 mb-4"
+                  className="w-full px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mb-4"
                 >
                   <Edit2 className="w-3 h-3" />
                   Edit Profile
@@ -390,9 +395,16 @@ export default function MyAccountContainer() {
                   </div>
                 </div>
               ) : error ? (
-                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-12 text-center">
-                  <p className="text-red-600 font-semibold text-lg mb-2">Error Loading Requests</p>
-                  <p className="text-red-500">{error}</p>
+                <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-10 text-center">
+                  <p className="text-red-700 font-semibold text-lg mb-2">Error Loading Requests</p>
+                  <p className="text-red-600 mb-6">{error}</p>
+                  <button
+                    type="button"
+                    onClick={() => { void loadRequests(); }}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold transition-colors"
+                  >
+                    Try Again
+                  </button>
                 </div>
               ) : (
                 <RequestList

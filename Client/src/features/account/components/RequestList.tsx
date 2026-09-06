@@ -55,13 +55,13 @@ interface RequestListProps {
 const getStatusColor = (status?: string) => {
   switch (status?.toLowerCase()) {
     case 'confirmed':
-      return 'bg-green-100 text-green-800';
+      return 'bg-brand-100 text-brand-800';
     case 'pending':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-brand-accent-100 text-brand-accent-800';
     case 'cancelled':
-      return 'bg-red-100 text-red-800';
+      return 'bg-red-100 text-red-700';
     case 'completed':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-brand-100 text-brand-800';
     default:
       return 'bg-gray-100 text-gray-800';
   }
@@ -78,7 +78,7 @@ const getStatusBadge = (status?: string) => {
 export default function RequestList({ activeTab, items, onExplorePackages, onViewDetails }: RequestListProps) {
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-16 text-center">
+      <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
         <div className="mb-6">
           <Calendar className="w-20 h-20 text-gray-300 mx-auto" />
         </div>
@@ -94,7 +94,7 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
         </p>
         <button
           onClick={onExplorePackages}
-          className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-brand-500 to-brand-accent-500 text-white rounded-xl font-bold text-lg hover:shadow-lg transform hover:scale-105 transition-all"
+          className="inline-flex items-center gap-2 px-8 py-4 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-lg transition-colors"
         >
           Explore Packages
           <ArrowRight className="w-5 h-5" />
@@ -108,9 +108,9 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
       {items.map((item) => (
         <div
           key={item._id || item.id}
-          className="group bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100 hover:shadow-2xl hover:border-brand-300 transition-all duration-300"
+          className="group bg-white rounded-2xl overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors duration-300"
         >
-          <div className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300">
+          <div className="relative h-64 overflow-hidden bg-gray-200">
             {(() => {
               const imageUrl =
                 activeTab === 'bookings'
@@ -123,7 +123,7 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
                   <img
                     src={imageUrl}
                     alt={item.packageName || item.name || 'Trip'}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    className="w-full h-full object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                     }}
@@ -151,7 +151,7 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
             </div>
           </div>
           <div className="p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
+            <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 transition-colors duration-300 group-hover:text-brand-600">
               {activeTab === 'bookings' && (item.packageName || 'Package')}
               {activeTab === 'customized' && (item.name || 'Customized Package')}
               {activeTab === 'manual' && (item.lead?.name || 'Trip Plan')}
@@ -164,7 +164,7 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
                 {activeTab === 'manual' && (item.lead?.destination || 'N/A')}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-6 py-4 border-t border-b border-gray-100">
+            <div className="grid grid-cols-2 gap-3 mb-6 py-4 border-t border-b border-gray-200">
               <div>
                 <p className="text-xs text-gray-500 uppercase font-semibold mb-1">
                   {activeTab === 'bookings' ? 'Travel Date' : activeTab === 'customized' ? 'Duration' : 'Days'}
@@ -208,12 +208,12 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
                   className={`w-3 h-3 rounded-full ${
                     activeTab === 'bookings'
                       ? item.paymentStatus === 'paid'
-                        ? 'bg-green-500'
+                        ? 'bg-brand-500'
                         : item.paymentStatus === 'partial'
                         ? 'bg-brand-accent-500'
-                        : 'bg-red-500'
+                        : 'bg-red-600'
                       : item.status === 'confirmed' || item.status === 'completed'
-                      ? 'bg-green-500'
+                      ? 'bg-brand-500'
                       : item.status === 'pending'
                       ? 'bg-brand-accent-500'
                       : 'bg-gray-500'
@@ -246,7 +246,7 @@ export default function RequestList({ activeTab, items, onExplorePackages, onVie
                 onClick={() => {
                   onViewDetails(item.packageId);
                 }}
-                className="w-full px-4 py-3 bg-black text-white rounded-lg font-bold hover:shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-2"
+                className="w-full px-4 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
               >
                 View Details
                 <ArrowRight className="w-4 h-4" />

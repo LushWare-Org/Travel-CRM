@@ -57,3 +57,30 @@ export const mergeStoredUser = (partialUser: Partial<AuthUser>): AuthUser | null
   persist(mergedUser, envelope.token);
   return mergedUser;
 };
+
+// Session-expiry redirect memory. On a 401, services/http/client.ts hard-
+// navigates to /login (window.location.assign, losing all React state) --
+// this is the only place that survives that reload. LoginContainer reads
+// it back after a successful sign-in so the visitor lands where they left
+// off (e.g. `/planner?step=3`) instead of always landing on `/`.
+const REDIRECT_KEY = 'tsw_post_login_redirect';
+
+export const setPostLoginRedirect = (path: string): void => {
+  try {
+    sessionStorage.setItem(REDIRECT_KEY, path);
+  } catch {
+    // sessionStorage unavailable (privacy mode) -- redirect memory is a
+    // convenience, not a hard requirement; fall through silently.
+  }
+};
+
+/** Reads and clears the stored redirect path in one step, so it's only ever consumed once. */
+export const consumePostLoginRedirect = (): string | null => {
+  try {
+    const path = sessionStorage.getItem(REDIRECT_KEY);
+    if (path) sessionStorage.removeItem(REDIRECT_KEY);
+    return path;
+  } catch {
+    return null;
+  }
+};
