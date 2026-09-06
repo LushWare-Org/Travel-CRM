@@ -388,9 +388,9 @@ export default function MyAccountContainer() {
               <h2 className="text-3xl font-bold text-gray-900 mb-12">My Requests</h2>
 
               {loading ? (
-                <div className="flex items-center justify-center py-24">
+                <div className="flex items-center justify-center py-24" role="status">
                   <div className="text-center">
-                    <Loader className="w-16 h-16 text-brand-500 animate-spin mx-auto mb-4" />
+                    <Loader className="w-16 h-16 text-brand-500 animate-spin mx-auto mb-4" aria-hidden="true" />
                     <p className="text-gray-600 font-semibold text-lg">Loading your requests...</p>
                   </div>
                 </div>

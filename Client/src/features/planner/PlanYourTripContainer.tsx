@@ -1252,6 +1252,7 @@ export default function PlanYourTripContainer() {
               type="button"
               onClick={next}
               disabled={nextDisabled}
+              aria-busy={isSubmitting}
               className={`flex-1 px-6 py-3 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors ${
                 nextDisabled
                   ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
@@ -1260,8 +1261,8 @@ export default function PlanYourTripContainer() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Submitting...</span>
+                  <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  <span aria-live="polite">Submitting...</span>
                 </>
               ) : (
                 <>

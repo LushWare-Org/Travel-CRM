@@ -381,9 +381,10 @@ export default function LoginContainer() {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
+                  aria-busy={isSubmitting}
                   className="h-12 w-full rounded-xl bg-brand-600 px-8 text-sm font-semibold text-white transition-colors duration-300 hover:bg-brand-700"
                 >
-                  <span>
+                  <span aria-live="polite">
                     {isSubmitting
                       ? isLogin
                         ? 'Signing In...'

@@ -14,8 +14,8 @@ const VacancyList = ({ vacancies, loading, onApply }: VacancyListProps) => {
       <div className="max-w-7xl mx-auto px-6">
         <h2 className="text-3xl font-bold text-gray-900 mb-10">Open Positions</h2>
         {loading ? (
-          <div className="text-center py-8">
-            <Loader className="w-8 h-8 animate-spin mx-auto text-brand-600" />
+          <div className="text-center py-8" role="status">
+            <Loader className="w-8 h-8 animate-spin mx-auto text-brand-600" aria-hidden="true" />
             <p className="text-gray-600 mt-2">Loading positions...</p>
           </div>
         ) : vacancies.length > 0 ? (

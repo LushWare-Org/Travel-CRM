@@ -334,7 +334,7 @@ export default function PackageDetailsContainer() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-white" role="status" aria-label="Loading package">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-accent-500" />
         </div>
@@ -344,7 +344,7 @@ export default function PackageDetailsContainer() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+      <div className="min-h-screen flex items-center justify-center bg-white px-4" role="alert">
         <div className="max-w-md text-center bg-white rounded-3xl shadow-xl p-8">
           <h2 className="text-3xl font-black text-gray-900 mb-4">Unable to load package</h2>
           <p className="text-gray-600 mb-6">{error}</p>
