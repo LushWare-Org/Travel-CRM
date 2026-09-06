@@ -47,50 +47,50 @@ export const TEAM_MEMBERS = [
   {
     name: 'Rajesh Kumar',
     role: 'Founder & CEO',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/man-32.jpg',
     bio: 'Visionary leader with 15+ years in travel industry',
     social: { linkedin: '#', twitter: '#', email: 'rajesh@lushware.org' }
   },
   {
     name: 'Priya Sharma',
     role: 'Head of Operations',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/woman-44.jpg',
     bio: 'Expert in streamlining travel experiences globally',
   },
   {
     name: 'Amit Patel',
     role: 'Lead Travel Designer',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/man-45.jpg',
     bio: 'Crafting unforgettable journeys since 2021',
   },
   {
     name: 'Sneha Reddy',
     role: 'Customer Experience Manager',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/woman-21.jpg',
     bio: 'Passionate about creating memorable moments',
   },
   {
     name: 'Vikram Singh',
     role: 'International Relations Head',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/man-12.jpg',
     bio: 'Building bridges across continents',
   },
   {
     name: 'Anjali Mehta',
     role: 'Marketing Director',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/woman-58.jpg',
     bio: 'Storyteller bringing destinations',
   },
   {
     name: 'Karan Desai',
     role: 'Technology Lead',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/man-67.jpg',
     bio: 'Innovating the future of travel tech',
   },
   {
     name: 'Meera Iyer',
     role: 'Sustainability Officer',
-    image: 'https://i.postimg.cc/T24bpv6W/pexels-photo-1467300.jpg',
+    image: '/lush/about/team/woman-33.jpg',
     bio: 'Champion of responsible tourism',
   },
 ];
