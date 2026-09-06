@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, Loader2, Sparkles, MessageCircle, Phone } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { fetchPackageById } from '../../services/api/packages';
@@ -9,13 +9,30 @@ import { submitCustomizationRequest } from '../../services/api/customization';
 import { formatCurrency } from '../../lib/currency';
 import { pluralize } from '../../lib/pluralize';
 import { useAuth } from '../../contexts/AuthContext';
+import BRANDING, { getWhatsAppUrl } from '../../config/branding';
+import { FLOATING_ACTIONS_CONFIG } from '../../config/floatingActions';
 import ActivitySelector from '../../components/shared/ActivitySelector';
 import LocationSelector from '../../components/shared/LocationSelector';
+import Stepper from '../../components/shared/Stepper';
 import { buildDayState, computeMissingDayNumbers, mergeDayByNumber, mergeDaysByNumber, splitTextToList, toExistingDayContext } from './utils/formHelpers';
 import type { DayOverrideState } from './utils/formHelpers';
 import { useAIItineraryGenerator } from './hooks/useAIItineraryGenerator';
 import { useAIDayGenerator } from './hooks/useAIDayGenerator';
 import RegenerationToast from './components/RegenerationToast';
+
+/** Step labels for the shared Stepper — must match the five per-step titles below. */
+const CUSTOMIZE_STEPS = [
+  { label: 'Contact' },
+  { label: 'Travel' },
+  { label: 'Itinerary' },
+  { label: 'Notes' },
+  { label: 'Review' },
+];
+
+const WHATSAPP_HELP_MESSAGE =
+  "Hello! I'm customizing a trip and have a question before submitting my request.";
+const callEnabled = FLOATING_ACTIONS_CONFIG.call.enabled;
+const whatsappEnabled = FLOATING_ACTIONS_CONFIG.whatsapp.enabled;
 
 interface ContactState {
   name: string;
@@ -48,7 +65,7 @@ export default function CustomizePackageContainer() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
-  const [successModalMessage, setSuccessModalMessage] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [contact, setContact] = useState<ContactState>({
     name: '',
@@ -205,6 +222,10 @@ export default function CustomizePackageContainer() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Double-submit guard: the disabled button alone is not enough — repeat
+    // submit events (e.g. Enter-key re-fire) must be ignored while a request
+    // is in flight.
+    if (isSubmitting) return;
     if (!pkg) return;
 
     if (!contact.email) {
@@ -235,14 +256,17 @@ export default function CustomizePackageContainer() {
       },
     };
 
+    setSubmitError(null);
     setIsSubmitting(true);
     try {
       await submitCustomizationRequest(payload);
-      const successMsg = 'Thank you! Our travel experts will connect with you shortly to finalize your customized itinerary.';
-      setSuccessModalMessage(successMsg);
       setSuccessModalVisible(true);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Unable to submit customization request. Please try again later.');
+    } catch {
+      // This endpoint (lead-service's createWebsiteCustomizedPackage) has no
+      // availability check and no cross-service rollback — never surface a
+      // specific "sold out"/"conflict" claim. Keep the failure generic and
+      // leave the form state intact so nothing the visitor typed is lost.
+      setSubmitError("We couldn't complete your request — please try again or contact us.");
     } finally {
       setIsSubmitting(false);
     }
@@ -375,45 +399,7 @@ export default function CustomizePackageContainer() {
           <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 lg:p-8">
                 {/* Progress Indicator */}
                 <div className="mb-8 sm:mb-10">
-                  <div className="flex items-center justify-between mb-4">
-                    {[1, 2, 3, 4, 5].map((step) => (
-                      <div key={step} className="flex items-center flex-1">
-                        <div className="flex flex-col items-center flex-1">
-                          <div
-                            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-lg transition-all duration-300 ${
-                              currentStep === step
-                                ? 'bg-brand-600 text-white scale-110 shadow-lg'
-                                : currentStep > step
-                                ? 'bg-brand-500 text-white'
-                                : 'bg-gray-200 text-gray-500'
-                            }`}
-                          >
-                            {currentStep > step ? (
-                              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              step
-                            )}
-                          </div>
-                          <span className={`text-xs mt-1.5 sm:mt-2 font-medium text-center ${currentStep >= step ? 'text-black' : 'text-gray-400'}`}>
-                            {step === 1 && 'Contact'}
-                            {step === 2 && 'Travel'}
-                            {step === 3 && 'Itinerary'}
-                            {step === 4 && 'Notes'}
-                            {step === 5 && 'Review'}
-                          </span>
-                        </div>
-                        {step < 5 && (
-                          <div
-                            className={`flex-1 h-1 mx-1 sm:mx-2 rounded-full transition-all duration-300 ${
-                              currentStep > step ? 'bg-brand-500' : 'bg-gray-200'
-                            }`}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <Stepper steps={CUSTOMIZE_STEPS} currentStep={currentStep} className="mb-6 sm:mb-8" />
                   <div className="text-center">
                     <h2 className="text-xl sm:text-2xl font-bold text-black mb-2">
                       {currentStep === 1 && "Let's start with your contact info"}
@@ -834,42 +820,132 @@ export default function CustomizePackageContainer() {
                         )}
                       </div>
 
-                      <div className="bg-gradient-to-br from-brand-500 via-brand-600 to-brand-accent-600 rounded-2xl p-5 sm:p-6 text-white">
-                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                          <CheckCircle2 className="w-7 h-7 sm:w-8 sm:h-8" />
-                          <h4 className="text-lg sm:text-xl font-bold">Ready to create your perfect trip?</h4>
+                      {/* Decision-point trust content (Phase 4): price clarity,
+                          cancellation/refund + deposit terms, and a human-support
+                          escape hatch — surfaced at the exact step the visitor is
+                          about to submit. Wording is grounded in this package's
+                          price data, existing site copy, and branding.ts contact
+                          sources — see the parent report for file:line citations. */}
+                      <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 mb-5 sm:mb-6">
+                        <h4 className="text-base sm:text-lg font-bold text-gray-900 mb-4">Good to know before you send</h4>
+                        <div className="space-y-4 sm:space-y-5">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">Price</p>
+                            {pkg.price_from > 0 ? (
+                              <>
+                                <p className="text-sm text-gray-600">
+                                  <span className="font-semibold text-gray-900">{formatCurrency(pkg.price_from)}</span> is
+                                  this package's starting price, shown <span className="font-semibold text-gray-900">per person</span>.
+                                </p>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  Taxes and service fees are included in the price shown above — no hidden fees.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-gray-600">
+                                Pricing depends on your customizations — this request is free, and your expert confirms the
+                                exact quote for your trip.
+                              </p>
+                            )}
+                            <p className="text-sm text-gray-600 mt-1">
+                              Submitting this request is free — nothing is charged today, and your expert confirms the
+                              final price in your quote.
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">Cancellation &amp; refunds</p>
+                            <p className="text-sm text-gray-600">
+                              Cancellation and refund terms apply once your trip is booked, not to this request. The
+                              standard policy is shown in this package's Booking Terms and our FAQ — your quote will
+                              state the exact terms for your trip.
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">Deposit</p>
+                            <p className="text-sm text-gray-600">
+                              Once you approve your quote and book, a 30% deposit secures your trip; the balance is due
+                              before departure.
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-brand-50 mb-4 sm:mb-6 text-xs sm:text-sm">
+                        <div className="mt-4 sm:mt-5 pt-4 sm:pt-5 border-t border-gray-200">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
+                            Questions before you send? Talk to a human:
+                          </p>
+                          <div className="flex flex-wrap gap-2 sm:gap-3">
+                            {callEnabled && (
+                              <a
+                                href={`tel:${BRANDING.contact.phone}`}
+                                aria-label="Call us"
+                                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:border-gray-300 hover:text-brand-700"
+                              >
+                                <Phone className="w-4 h-4 text-brand-600" aria-hidden="true" />
+                                {BRANDING.contact.phone}
+                              </a>
+                            )}
+                            {whatsappEnabled && (
+                              <a
+                                href={getWhatsAppUrl(WHATSAPP_HELP_MESSAGE)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Chat on WhatsApp"
+                                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:border-gray-300 hover:text-brand-700"
+                              >
+                                <MessageCircle className="w-4 h-4 text-brand-600" aria-hidden="true" />
+                                WhatsApp
+                              </a>
+                            )}
+                            <Link
+                              to="/contact"
+                              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:border-gray-300 hover:text-brand-700"
+                            >
+                              Contact page
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                          <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7 text-brand-600" aria-hidden="true" />
+                          <h4 className="text-lg sm:text-xl font-bold text-gray-900">Ready to create your perfect trip?</h4>
+                        </div>
+                        <p className="text-gray-600 mb-4 sm:mb-6 text-xs sm:text-sm">
                           Our travel experts will review your preferences and send you a personalized itinerary within 24 hours.
                         </p>
-                        <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm text-brand-50 mb-5 sm:mb-6">
-                          <div className="flex items-center gap-1.5 sm:gap-2">
-                            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <div className="flex flex-wrap gap-x-4 sm:gap-x-6 gap-y-1.5 text-xs sm:text-sm text-gray-600 mb-5 sm:mb-6">
+                          <span className="flex items-center gap-1.5 sm:gap-2">
+                            <svg className="w-3 h-3 sm:w-4 sm:h-4 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
-                            <span>Expert travel consultants</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 sm:gap-2">
-                            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                            Expert travel consultants
+                          </span>
+                          <span className="flex items-center gap-1.5 sm:gap-2">
+                            <svg className="w-3 h-3 sm:w-4 sm:h-4 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
-                            <span>24-hour response</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 sm:gap-2">
-                            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                            24-hour response
+                          </span>
+                          <span className="flex items-center gap-1.5 sm:gap-2">
+                            <svg className="w-3 h-3 sm:w-4 sm:h-4 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
-                            <span>100% personalized</span>
-                          </div>
+                            100% personalized
+                          </span>
                         </div>
+                        {submitError && (
+                          <div role="alert" className="mb-4 sm:mb-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+                            <p className="text-sm font-medium text-red-700">{submitError}</p>
+                          </div>
+                        )}
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className="w-full px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-base sm:text-lg text-brand-600 bg-white shadow-xl hover:shadow-2xl transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 transform disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                          className="w-full px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg text-white bg-brand-600 hover:bg-brand-700 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSubmitting ? (
                             <>
-                              <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
+                              <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" aria-hidden="true" />
                               <span>Creating Your Request...</span>
                             </>
                           ) : (
@@ -933,7 +1009,41 @@ export default function CustomizePackageContainer() {
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all duration-300">
             <div className="px-8 py-10">
               <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">Thank you!</h2>
-              <p className="text-gray-700 text-center leading-relaxed">{successModalMessage}</p>
+              <p className="text-gray-700 text-center leading-relaxed mb-5">Your customization request is in.</p>
+              <ul className="space-y-3 text-left text-sm text-gray-700 leading-relaxed">
+                <li className="flex items-start gap-2">
+                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>
+                    No automated confirmation email is sent for customization requests — a travel expert will
+                    reach out to you directly instead.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>Your expert will send a personalized itinerary and quote within 24 hours.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>
+                    Nothing is charged today — payment is only due once you approve your final trip (a 30%
+                    deposit secures the booking).
+                  </span>
+                </li>
+              </ul>
+              <p className="text-center mt-5">
+                <Link
+                  to="/my-account"
+                  className="text-sm font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2"
+                >
+                  Track your request in My Account
+                </Link>
+              </p>
             </div>
             <div className="px-8 py-6 bg-gray-50 border-t border-gray-200 flex justify-center">
               <button
@@ -942,9 +1052,9 @@ export default function CustomizePackageContainer() {
                   setSuccessModalVisible(false);
                   navigate(`/package/${id}`);
                 }}
-                className="px-16 py-3 bg-gradient-to-r from-brand-600 to-brand-accent-600 text-white font-bold rounded-2xl hover:from-brand-700 hover:to-brand-accent-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                className="px-16 py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl transition-colors duration-200"
               >
-                OK
+                Done
               </button>
             </div>
           </div>

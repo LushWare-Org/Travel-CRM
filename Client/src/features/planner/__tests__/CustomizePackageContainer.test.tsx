@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import CustomizePackageContainer from '../CustomizePackageContainer';
 import { fetchPackageById } from '../../../services/api/packages';
 import { submitCustomizationRequest } from '../../../services/api/customization';
@@ -44,6 +45,9 @@ vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 'pkg-123' }),
   useNavigate: () => mocks.useNavigate(),
   useLocation: () => mocks.useLocation(),
+  Link: ({ to, children, className }: { to: string; children?: ReactNode; className?: string }) => (
+    <a href={to} className={className}>{children}</a>
+  ),
 }));
 
 const fetchPackageByIdMock = vi.mocked(fetchPackageById);
@@ -450,5 +454,142 @@ describe('CustomizePackageContainer', () => {
       resolveGenerate({ day: { dayNumber: 1, title: 'AI Colombo Day', locations: [], activities: [] } });
       await Promise.resolve();
     });
+  });
+
+  it('renders the shared Stepper with the five funnel step labels', async () => {
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    const progress = screen.getByRole('list', { name: 'Progress' });
+    for (const label of ['Contact', 'Travel', 'Itinerary', 'Notes', 'Review']) {
+      expect(within(progress).getByText(label)).toBeInTheDocument();
+    }
+    expect(within(progress).getAllByRole('listitem')).toHaveLength(5);
+  });
+
+  it('surfaces price clarity, cancellation/deposit terms, and human support at the Review step', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    expect(screen.getByText('Good to know before you send')).toBeInTheDocument();
+
+    // (a) Price clarity: per-person starting price, grounded in pkg.price_from
+    // (sellPrice 1299 in the fixture) + the site's per-person display convention.
+    const priceLine = screen.getByText(/is this package's starting price, shown/);
+    expect(priceLine.textContent).toContain('1,299');
+    expect(priceLine.textContent).toContain('per person');
+    expect(
+      screen.getByText(/Taxes and service fees are included in the price shown above/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Submitting this request is free — nothing is charged today/),
+    ).toBeInTheDocument();
+
+    // (b) + (c) Cancellation/refund and deposit terms — non-committal about
+    // refund specifics (repo copy conflicts), 30% deposit matches both live sources.
+    expect(
+      screen.getByText(/Cancellation and refund terms apply once your trip is booked/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/a 30% deposit secures your trip/)).toBeInTheDocument();
+
+    // (d) Human-support escape hatch on the submit step — sourced from
+    // branding.ts (never a hardcoded number) and the /contact route.
+    const callLink = screen.getByRole('link', { name: 'Call us' });
+    expect(callLink.getAttribute('href')).toBe('tel:+1-800-000-0000');
+    const whatsappLink = screen.getByRole('link', { name: 'Chat on WhatsApp' });
+    expect(whatsappLink.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/18000000000\?text=/);
+    expect(screen.getByRole('link', { name: 'Contact page' }).getAttribute('href')).toBe('/contact');
+  });
+
+  it('ignores a second form submit while a request is in flight (double-submit guard)', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    let resolveSubmit: (value: { customizedPackageId: string; leadId: string; salesRepId?: string | null }) => void = () => {};
+    const pendingSubmit = new Promise<{ customizedPackageId: string; leadId: string; salesRepId?: string | null }>(
+      (resolve) => { resolveSubmit = resolve; },
+    );
+    submitCustomizationRequestMock.mockReturnValue(pendingSubmit);
+
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+    expect(submitCustomizationRequestMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Creating Your Request/ })).toBeDisabled();
+
+    // A second submit event on the form (not just the disabled button) must be
+    // dropped by the in-handler guard, not double-sent.
+    const form = container.querySelector('form');
+    expect(form).not.toBeNull();
+    fireEvent.submit(form as HTMLFormElement);
+    expect(submitCustomizationRequestMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSubmit({ customizedPackageId: 'cp-1', leadId: 'lead-1' });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText('Thank you!')).toBeInTheDocument();
+  });
+
+  it('a rejected submit shows the generic failure message and keeps the form data for retry', async () => {
+    const user = userEvent.setup();
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    submitCustomizationRequestMock.mockRejectedValueOnce(new Error('backend exploded'));
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+
+    // Generic copy only — never the raw server error, and never a specific
+    // "sold out"/"conflict" claim (the backend has no availability check).
+    expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't complete your request/);
+    expect(screen.queryByText(/backend exploded/)).not.toBeInTheDocument();
+
+    // The form data survived the failure: a straight retry resubmits the same
+    // email, the error banner clears, and the success state appears.
+    submitCustomizationRequestMock.mockResolvedValueOnce({ customizedPackageId: 'cp-1', leadId: 'lead-1' });
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+
+    expect(submitCustomizationRequestMock).toHaveBeenCalledTimes(2);
+    expect(submitCustomizationRequestMock.mock.calls[1][0]).toMatchObject({ email: 'tester@example.com' });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(await screen.findByText('Thank you!')).toBeInTheDocument();
+  });
+
+  it('the success modal states what happens next (email, agent, payment) and links to /my-account', async () => {
+    const user = userEvent.setup();
+    const navigateMock = vi.fn();
+    mocks.useNavigate.mockReturnValue(navigateMock);
+    render(<CustomizePackageContainer />);
+    await screen.findByRole('heading', { name: 'Sri Lanka Highlights' });
+
+    await user.type(screen.getByPlaceholderText('your.email@example.com'), 'tester@example.com');
+    for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    await user.click(screen.getByRole('button', { name: /Send My Request/ }));
+
+    expect(await screen.findByText('Thank you!')).toBeInTheDocument();
+    // No automated confirmation email exists for this flow (lead-service sends
+    // none) — the copy says the expert reaches out instead of claiming one.
+    expect(
+      screen.getByText(/No automated confirmation email is sent for customization requests/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/personalized itinerary and quote within 24 hours/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing is charged today/)).toBeInTheDocument();
+
+    const accountLink = screen.getByRole('link', { name: 'Track your request in My Account' });
+    expect(accountLink.getAttribute('href')).toBe('/my-account');
+
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(navigateMock).toHaveBeenCalledWith('/package/pkg-123');
+    expect(screen.queryByText('Thank you!')).not.toBeInTheDocument();
   });
 });
