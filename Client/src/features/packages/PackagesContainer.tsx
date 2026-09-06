@@ -1,15 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Filter } from 'lucide-react';
+import { Clock, Filter } from 'lucide-react';
 import { fetchPackages } from '../../services/api/packages';
 import { createSlug } from '../../services/api/packages.transform';
 import type { AggregatedDestination, NormalizedPackage } from '../../services/api/packages.transform';
 import HeroSection from './components/HeroSection';
 import Toolbar from './components/Toolbar';
 import FiltersSidebar, { type RangeOption } from './components/FiltersSidebar';
-import PackageCard from './components/PackageCard';
+import PackageCard from '../../components/shared/PackageCard';
 import PackageListItem from './components/PackageListItem';
 import Pagination from './components/Pagination';
+import { Button } from '../../components/ui/button';
+import { formatCurrency } from '../../lib/currency';
 import { pluralize } from '../../lib/pluralize';
 
 export type SortOption = 'popularity' | 'price-low' | 'price-high' | 'duration';
@@ -236,13 +238,48 @@ export default function PackagesContainer() {
               <div className="text-center py-24 bg-gray-50 rounded-2xl">
                 <Filter className="w-16 h-16 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">No packages found</h3>
-                <p className="text-gray-600">Try adjusting your filters</p>
+                <p className="text-gray-600 mb-8">Try adjusting your filters</p>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="lg"
+                  onClick={clearAllFilters}
+                  className="h-12 rounded-xl bg-brand-600 px-8 font-semibold text-white hover:bg-brand-700"
+                >
+                  Clear all filters
+                </Button>
               </div>
             ) : viewMode === 'grid' ? (
               <>
                 <div className={`grid gap-4 md:gap-6 lg:gap-8 ${showFilters ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                   {paginatedPackages.map(pkg => (
-                    <PackageCard key={pkg.id} pkg={pkg} />
+                    <PackageCard
+                      key={pkg.id}
+                      href={`/package/${pkg.id}`}
+                      image={pkg.images?.[0] || pkg.image_url}
+                      title={pkg.title}
+                      price={formatCurrency(pkg.price_from)}
+                      description={pkg.description}
+                      overlayMeta={
+                        <>
+                          <Clock className="size-4 text-brand-accent-300" />
+                          <span className="text-sm font-medium">{pkg.durationLabel}</span>
+                        </>
+                      }
+                      meta={
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 text-center">
+                            <div className="text-sm font-bold text-gray-900">{pkg.durationLabel}</div>
+                            <p className="mt-1 text-xs text-gray-500">Duration</p>
+                          </div>
+                          <div aria-hidden="true" className="h-9 w-px bg-gray-200" />
+                          <div className="flex-1 text-center">
+                            <div className="text-sm font-bold text-gray-900">{pkg.rating || 'N/A'}</div>
+                            <p className="mt-1 text-xs text-gray-500">Rating</p>
+                          </div>
+                        </div>
+                      }
+                    />
                   ))}
                 </div>
                 {totalPages > 1 && (

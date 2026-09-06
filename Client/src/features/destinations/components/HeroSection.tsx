@@ -25,23 +25,15 @@ export default function HeroSection({ isVisible, destinationCount }: HeroSection
           style={{ lineHeight: '1.15' }}
         >
           Discover Your Next{' '}
-          <span className="relative inline-block">
-            <span className="bg-gradient-to-r from-brand-400 via-brand-accent-400 to-brand-accent-400 bg-clip-text text-transparent">
-              Adventure
-            </span>
-            <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
+          <span className="relative inline-block text-brand-accent-400">
+            Adventure
+            <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none" aria-hidden="true">
               <path
                 d="M2 10C50 2 100 2 150 6C200 10 250 10 298 4"
-                stroke="url(#gradient)"
+                stroke="currentColor"
                 strokeWidth="3"
                 strokeLinecap="round"
               />
-              <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="var(--brand-500)" />
-                  <stop offset="100%" stopColor="var(--brand-accent-500)" />
-                </linearGradient>
-              </defs>
             </svg>
           </span>
         </h1>
@@ -61,7 +53,7 @@ export default function HeroSection({ isVisible, destinationCount }: HeroSection
               {[1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
-                  className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-brand-400 to-red-500 flex items-center justify-center text-white text-xs font-bold shadow-lg"
+                  className="w-10 h-10 rounded-full border-2 border-white bg-brand-600 flex items-center justify-center text-white text-xs font-bold"
                 >
                   {String.fromCharCode(64 + i)}
                 </div>

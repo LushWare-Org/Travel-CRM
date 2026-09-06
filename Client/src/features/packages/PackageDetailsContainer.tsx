@@ -13,6 +13,7 @@ import { useElfsightWidget } from '../../lib/elfsight';
 import { generateAndDownloadPDF as generateManagementPDF } from './pdf/pdfService';
 import { useAuth } from '../../contexts/AuthContext';
 import { submitBookingRequest } from '../../services/api/booking';
+import { FALLBACK_IMAGE } from '../../config/media';
 import BRANDING from '../../config/branding';
 import BookingModal from './components/BookingModal';
 import ReviewModal from './components/ReviewModal';
@@ -36,6 +37,7 @@ export default function PackageDetailsContainer() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isImageHovered, setIsImageHovered] = useState(false);
+  const [galleryLoadedUrls, setGalleryLoadedUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -284,6 +286,9 @@ export default function PackageDetailsContainer() {
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev - 1 + heroImages.length) % heroImages.length);
   };
+  const markGalleryImageLoaded = (imgUrl: string) => {
+    setGalleryLoadedUrls((prev) => (prev.includes(imgUrl) ? prev : [...prev, imgUrl]));
+  };
 
   const handleReviewSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -372,7 +377,10 @@ export default function PackageDetailsContainer() {
     );
   }
 
-  const images = heroImages.length > 0 ? heroImages : [];
+  // A package with no gallery images still gets the shared brand fallback so the
+  // hero never renders a blank media area.
+  const images = heroImages.length > 0 ? heroImages : [FALLBACK_IMAGE];
+  const galleryReady = images.every((imgUrl) => galleryLoadedUrls.includes(imgUrl));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
@@ -468,25 +476,6 @@ export default function PackageDetailsContainer() {
 
         /* Mobile-specific styles */
         @media (max-width: 1024px) {
-          .hero-height-mobile {
-            height: 70vh !important;
-          }
-          .hero-title-mobile {
-            font-size: 2.5rem !important;
-            line-height: 1.2 !important;
-          }
-          .hero-subtitle-mobile {
-            font-size: 1.125rem !important;
-          }
-          .hero-info-cards-mobile {
-            flex-direction: column !important;
-            gap: 0.75rem !important;
-          }
-          .hero-info-card-mobile {
-            width: 100% !important;
-            justify-content: center !important;
-            text-align: center !important;
-          }
           .section-tabs-mobile {
             flex-direction: column !important;
           }
@@ -574,17 +563,6 @@ export default function PackageDetailsContainer() {
         }
 
         @media (max-width: 640px) {
-          .hero-height-sm {
-            height: 60vh !important;
-          }
-          .hero-title-sm {
-            font-size: 2rem !important;
-          }
-          .hero-padding-sm {
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-            padding-bottom: 2rem !important;
-          }
           .main-content-padding-sm {
             padding-left: 1rem !important;
             padding-right: 1rem !important;
@@ -653,6 +631,11 @@ export default function PackageDetailsContainer() {
                   src={img}
                   alt={`${pkg.title} - ${idx + 1}`}
                   className="w-full h-full object-cover"
+                  onLoad={() => markGalleryImageLoaded(img)}
+                  onError={(e) => {
+                    e.currentTarget.src = FALLBACK_IMAGE;
+                    markGalleryImageLoaded(img);
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/40" />
@@ -701,7 +684,7 @@ export default function PackageDetailsContainer() {
                 <Star className="w-5 h-5 text-brand-accent-400 fill-current" />
                 <span className="font-medium">{pkg.rating > 0 ? pkg.rating.toFixed(1) : 'Not yet rated'}</span>
               </div>
-              <span className="px-4 py-2 bg-gradient-to-r from-brand-accent-500 to-brand-500 backdrop-blur-sm text-black rounded-full font-semibold capitalize">
+              <span className="px-4 py-2 bg-brand-accent-500/95 text-brand-accent-950 rounded-full font-semibold capitalize">
                 {pkg.category}
               </span>
             </div>
@@ -732,6 +715,16 @@ export default function PackageDetailsContainer() {
               <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6" />
             </button>
           </>
+        )}
+
+        {!galleryReady && (
+          <div
+            data-testid="package-gallery-loading"
+            aria-hidden="true"
+            className="absolute inset-0 z-elevated flex items-center justify-center bg-brand-900"
+          >
+            <div className="h-12 w-12 animate-spin rounded-full border-2 border-brand-500/30 border-t-brand-500" />
+          </div>
         )}
       </div>
 
@@ -993,7 +986,7 @@ export default function PackageDetailsContainer() {
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky lg:sticky top-6 lg:top-24 space-y-4 lg:space-y-6 sidebar-sticky-mobile">
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 lg:p-6 pricing-card-mobile pricing-padding-sm">
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 lg:p-6 pricing-card-mobile pricing-padding-sm">
                 <div className="mb-4 lg:mb-6">
                   <p className="text-xs lg:text-sm text-gray-600 mb-1 pricing-title-mobile">Starting from</p>
                   <div className="flex items-baseline gap-2 pricing-amount-mobile">
@@ -1007,7 +1000,7 @@ export default function PackageDetailsContainer() {
                       setSubmissionType('booking');
                       setShowBookingModal(true);
                     }}
-                    className="w-full bg-gradient-to-r from-brand-accent-500 to-brand-500 text-white py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg hover:shadow-xl hover:from-brand-accent-600 hover:to-brand-600 transform hover:scale-[1.02] transition-all flex items-center justify-center gap-2 button-padding-sm"
+                    className="w-full bg-brand-600 text-white py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg hover:bg-brand-700 transition-colors flex items-center justify-center gap-2 button-padding-sm"
                   >
                     <Calendar className="w-4 h-4 lg:w-5 lg:h-5" />
                     Book Now

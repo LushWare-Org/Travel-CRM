@@ -29,15 +29,15 @@ export default function Toolbar({
         <div className="flex items-center space-x-4">
           <button
             onClick={onToggleFilters}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${showFilters
-              ? 'bg-gray-100 hover:bg-gray-200 text-black shadow-md hover:shadow-lg'
-              : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 hover:border-brand-300'
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl border transition-colors duration-300 ${showFilters
+              ? 'bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100'
+              : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200 hover:border-brand-300'
               }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
             <span className="font-semibold">{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
             {activeFiltersCount > 0 && (
-              <span className={`bg-black text-white text-xs px-2 py-0.5 rounded-full font-medium`}>
+              <span className="bg-brand-600 text-white text-xs px-2 py-0.5 rounded-full font-medium">
                 {activeFiltersCount}
               </span>
             )}
@@ -53,28 +53,28 @@ export default function Toolbar({
           <select
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value as SortOption)}
-            className="w-full md:w-auto px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white transition-all duration-200"
+            className="w-full md:w-auto px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white transition-colors duration-200"
           >
             <option value="popularity">Most Popular</option>
             <option value="price-low">Price: Low to High</option>
             <option value="price-high">Price: High to Low</option>
             <option value="duration">Shortest Trip</option>
           </select>
-          <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1 w-full md:w-auto">
+          <div className="flex items-center space-x-1 bg-gray-100 rounded-xl p-1 w-full md:w-auto">
             <button
               onClick={() => onViewModeChange('grid')}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'grid'
-                ? 'bg-brand-50 text-brand-600 shadow-sm border border-brand-200'
-                : 'text-gray-500 hover:bg-gray-200 hover:border-brand-300'
+              className={`p-2 rounded-lg border transition-colors duration-200 ${viewMode === 'grid'
+                ? 'bg-brand-50 text-brand-600 border-brand-200'
+                : 'text-gray-500 border-transparent hover:bg-gray-200 hover:border-brand-300'
                 }`}
             >
               <Grid className="w-5 h-5" />
             </button>
             <button
               onClick={() => onViewModeChange('list')}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === 'list'
-                ? 'bg-brand-50 text-brand-600 shadow-sm border border-brand-200'
-                : 'text-gray-500 hover:bg-gray-200 hover:border-brand-300'
+              className={`p-2 rounded-lg border transition-colors duration-200 ${viewMode === 'list'
+                ? 'bg-brand-50 text-brand-600 border-brand-200'
+                : 'text-gray-500 border-transparent hover:bg-gray-200 hover:border-brand-300'
                 }`}
             >
               <List className="w-5 h-5" />
