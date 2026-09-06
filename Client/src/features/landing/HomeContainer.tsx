@@ -439,6 +439,17 @@ export default function HomeContainer() {
               display: none !important;
             }
           }
+          /* Short viewports (common on phones in landscape or small
+             devices): the fixed-position floating action stack (Ask us /
+             WhatsApp / Call) is anchored to the viewport bottom in raw
+             pixels, not vh, so it can sit on top of the hero subtitle once
+             the 80vh hero shrinks below ~700px tall. Reserve extra bottom
+             space in that case regardless of viewport width. */
+          @media (max-height: 700px) {
+            .hero-content {
+              padding-bottom: 9rem;
+            }
+          }
         `}</style>
         {/* Media Slides — clipped to the hero's own box via a dedicated
             overflow-hidden wrapper (not the hero root itself), so the Ken
@@ -472,7 +483,7 @@ export default function HomeContainer() {
         </button>
 
         {/* Hero Content */}
-        <div className="relative z-lifted max-w-2xl px-6 md:px-16 pb-12 md:pb-16">
+        <div className="hero-content relative z-lifted max-w-2xl px-6 md:px-16 pb-28 sm:pb-12 md:pb-16">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-hero font-display text-white mb-4 sm:mb-5 md:mb-6 leading-tight lg:leading-[1.02]">
             {heroHeadline}
           </h1>
