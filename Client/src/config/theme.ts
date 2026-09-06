@@ -1,10 +1,13 @@
 /**
  * Brand theme helpers.
  *
- * PALETTE mirrors palettes/lush.json (which tailwind.config.js also reads,
- * independently, for its own Node/CJS load context). A new deployment
- * re-themes by editing src/config/palettes/lush.json; these helpers expose
- * the same values to JS (PDF generation) and CSS variables.
+ * PALETTE mirrors palettes/lush.json, which Client/src/index.css's @theme
+ * block also mirrors directly (Phase 0 of the Client rewamp — see
+ * docs/CLIENT-REWAMP-PLAN.md). A new deployment re-themes by editing both
+ * src/config/palettes/lush.json and index.css's @theme block; these
+ * helpers expose the JSON values to JS callers that can't use CSS
+ * variables (PDF generation, which renders to a canvas/PDF document, not
+ * the DOM).
  */
 import PALETTE from './palettes/lush.json';
 
@@ -17,25 +20,3 @@ export const hexToRgb = (hex: string): [number, number, number] => {
   return [(int >> 16) & 255, (int >> 8) & 255, int & 255];
 };
 
-/**
- * Sets --brand-{shade} and --brand-{shade}-rgb on :root so index.css and
- * inline styles can reference brand colors without hardcoded hex literals.
- */
-export const applyCssVariables = (): void => {
-  const root = document.documentElement;
-  const setShade = (family: string, shades: Record<string, string>): void => {
-    Object.entries(shades).forEach(([shade, hex]) => {
-      const [r, g, b] = hexToRgb(hex);
-      root.style.setProperty(`--${family}-${shade}`, hex);
-      root.style.setProperty(`--${family}-${shade}-rgb`, `${r}, ${g}, ${b}`);
-    });
-  };
-  setShade('brand', PALETTE.brand);
-  setShade('brand-accent', PALETTE.brandAccent);
-  setShade('brand-dark', PALETTE.brandDark);
-  if (PALETTE.neutral) {
-    setShade('neutral', PALETTE.neutral);
-  }
-  root.style.setProperty('--font-display', PALETTE.fonts.display);
-  root.style.setProperty('--font-body', PALETTE.fonts.body);
-};
