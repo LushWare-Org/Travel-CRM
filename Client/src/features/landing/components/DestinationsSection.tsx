@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import { fetchPackages } from '../../../services/api/packages';
 import type { AggregatedDestination } from '../../../services/api/packages.transform';
 import InternationalGrid from './InternationalGrid';
+import { Button } from '@/components/ui/button';
 
 export default function DestinationsSection() {
   const navigate = useNavigate();
@@ -34,20 +35,23 @@ export default function DestinationsSection() {
         }
       `}</style>
       {/* Destinations Section */}
-      <section className="py-section-lg bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
-        <div className="max-w-[1350px] mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
+      <section className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white py-section-lg">
+        <div className="relative z-raised mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Explore the World Without Limits</h2>
-            <p className="text-lg text-gray-600">Exclusive international packages made for comfort, class & unforgettable moments</p>
+            <h2 className="mb-4 font-display text-3xl font-bold text-gray-900 md:text-4xl">Explore the World Without Limits</h2>
+            <p className="mx-auto max-w-2xl text-lg leading-relaxed text-gray-600">Exclusive international packages made for comfort, class & unforgettable moments</p>
           </div>
           <InternationalGrid destinations={destinations} loading={loading} />
-          <div className="text-center mt-8">
-            <button onClick={() => navigate("/destinations-international")} className="group inline-flex items-center justify-center px-10 py-3.5 text-slate-800 font-semibold text-base tracking-wide border-2 border-slate-800 rounded-lg hover:border-brand-400 transition-all duration-300 transform hover:scale-105 hover:shadow-lg">
-              <span className="group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-brand-800 group-hover:to-brand-accent-700 group-hover:bg-clip-text transition-all duration-300">
-                Explore All Locations
-              </span>
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:text-brand-500 transition-colors duration-300" />
-            </button>
+          <div className="mt-10 text-center">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => navigate('/destinations-international')}
+              className="h-12 w-full rounded-xl border-2 border-gray-900 bg-transparent px-8 font-semibold text-gray-900 transition-colors duration-300 hover:border-brand-600 hover:bg-brand-50 hover:text-brand-700 focus-visible:border-brand-600 focus-visible:ring-brand-600/40 sm:w-auto"
+            >
+              Explore All Locations
+              <ArrowRight className="size-5" />
+            </Button>
           </div>
         </div>
       </section>

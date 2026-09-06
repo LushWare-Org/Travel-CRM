@@ -22,15 +22,15 @@ export default function KeyPartnersSection() {
   }, [totalWidth]);
 
   return (
-    <section className="py-section-sm relative overflow-hidden font-body">
-      <div className="max-w-8xl mx-auto lg:px-8 relative z-raised">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-4 font-display">
+    <section className="relative overflow-hidden bg-gray-50 py-section-md font-body">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="relative z-raised mb-8 text-center">
+          <h2 className="mb-4 font-display text-3xl font-bold text-gray-900 md:text-5xl">
            Our Trusted Travel Partners
           </h2>
         </div>
         <div className="relative">
-          <div className="overflow-hidden py-8">
+          <div className="overflow-hidden py-4">
             <div
               className="flex"
               style={{
@@ -42,18 +42,21 @@ export default function KeyPartnersSection() {
               {duplicatedPartners.map((partner, idx) => (
                 <div
                   key={idx}
-                  className="flex-shrink-0"
+                  className="flex flex-shrink-0 items-center justify-center"
                   style={{ width: `${cardWidth}px` }}
                 >
                   <img
                     src={partner.logo}
                     alt={partner.name}
-                    className="max-h-10 mx-3 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300"
+                    className="mx-3 max-h-10 opacity-60 grayscale transition-all duration-300 hover:opacity-100 hover:grayscale-0"
                   />
                 </div>
               ))}
             </div>
           </div>
+          {/* Edge fades — logos drift out of the band cleanly on every width. */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-raised w-16 bg-gradient-to-r from-gray-50 to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-raised w-16 bg-gradient-to-l from-gray-50 to-transparent" />
         </div>
       </div>
     </section>

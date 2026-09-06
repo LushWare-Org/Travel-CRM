@@ -58,13 +58,18 @@ describe('RecentlyBookedSlider', () => {
     expect(screen.getAllByText('5D/4N').length).toBeGreaterThan(0);
   });
 
-  it('shows the empty state when no items are provided', () => {
+  it('shows the empty state with a catalog CTA when no items are provided', () => {
     render(
       <MemoryRouter>
         <RecentlyBookedSlider items={[]} />
       </MemoryRouter>
     );
 
-    expect(screen.getByText('No recent bookings available yet.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Recently Booked Packages' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Be the first to book a getaway')).toBeInTheDocument();
+    const cta = screen.getByRole('link', { name: 'Explore Packages' });
+    expect(cta).toHaveAttribute('href', '/packages');
   });
 });

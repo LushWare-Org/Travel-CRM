@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 import { FAQ_CATEGORIES, FAQS } from '../../../content/faq';
 import { useState } from 'react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function FAQSection() {
   const [activeCategory, setActiveCategory] = useState<keyof typeof FAQS>('booking');
@@ -14,66 +15,74 @@ export default function FAQSection() {
   };
 
   return (
-    <section className="pt-4 pb-section-lg bg-white relative overflow-hidden font-body">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-raised">
+    <section className="relative overflow-hidden bg-white pb-section-lg pt-4 font-body">
+      <div className="relative z-raised mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
-          <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-display">
+        <div className="mb-12 text-center">
+          <h2 className="mb-4 font-display text-3xl font-bold text-gray-900 md:text-4xl">
             Got Questions? We've Got Answers
           </h2>
-          <p className="text-lg text-gray-600">
+          <p className="mx-auto max-w-2xl text-lg leading-relaxed text-gray-600">
             Helpful answers to make your holiday planning easy and confident
           </p>
         </div>
 
-        {/* Category Tabs */}
-        <div className="flex flex-wrap justify-center gap-3 mb-12">
-          {FAQ_CATEGORIES.map((category) => {
-            const Icon = category.icon;
-            return (
-              <button
-                key={category.id}
-                onClick={() => {
-                  setActiveCategory(category.id as keyof typeof FAQS);
-                  setOpenQuestions({});
-                }}
-                className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2 ${
-                  activeCategory === category.id
-                    ? 'bg-gradient-to-r from-brand-600 to-brand-accent-500 text-white shadow-lg transform scale-105'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 shadow-md hover:shadow-lg border border-gray-200'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span>{category.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Category tabs — shadcn Tabs line variant (see DESIGN.md). */}
+        <Tabs
+          value={activeCategory}
+          onValueChange={(value) => {
+            setActiveCategory(value as keyof typeof FAQS);
+            setOpenQuestions({});
+          }}
+          className="mb-12 flex flex-col items-center"
+        >
+          <TabsList
+            variant="line"
+            className="mx-auto flex h-auto w-full max-w-3xl flex-wrap items-center justify-center gap-x-1 gap-y-3 rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-auto"
+          >
+            {FAQ_CATEGORIES.map((category) => {
+              const Icon = category.icon;
+              return (
+                <TabsTrigger
+                  key={category.id}
+                  value={category.id}
+                  className="h-10 gap-2 rounded-md px-4 text-sm font-semibold text-gray-600 transition-colors duration-300 hover:text-gray-900 data-active:text-brand-700 after:bg-brand-600 sm:px-5"
+                >
+                  <Icon className="size-4" />
+                  <span>{category.label}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
 
-        {/* FAQ Accordion */}
-        <div className="max-w-4xl mx-auto">
+        {/* FAQ Accordion — expand/collapse list; shadcn ships no Accordion
+            primitive today, so the interaction stays a button toggle on Card
+            tiles (DESIGN.md: border-elevated, no resting shadow). */}
+        <div className="mx-auto max-w-4xl">
           <div className="space-y-4">
             {FAQS[activeCategory].map((faq: { question: string; answer: string }, index: number) => {
               const isOpen = openQuestions[index];
               return (
                 <div
                   key={index}
-                  className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200 overflow-hidden"
+                  className="overflow-hidden rounded-2xl border border-gray-200 bg-white transition-colors duration-300 hover:border-gray-300"
                 >
                   <button
                     onClick={() => toggleQuestion(index)}
-                    className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-gray-50 transition-colors duration-200"
+                    aria-expanded={isOpen}
+                    className="flex w-full items-center justify-between px-6 py-5 text-left"
                   >
-                    <span className="text-lg font-semibold text-gray-900 pr-8 font-display">
+                    <span className="pr-8 font-display text-lg font-semibold text-gray-900">
                       {faq.question}
                     </span>
-                    <div
-                      className={`flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-accent-500 flex items-center justify-center transition-transform duration-300 ${
+                    <span
+                      className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-transform duration-300 ${
                         isOpen ? 'rotate-180' : ''
                       }`}
                     >
-                      <ChevronDown className="w-5 h-5 text-white" />
-                    </div>
+                      <ChevronDown className="size-5" />
+                    </span>
                   </button>
                   <div
                     className={`transition-all duration-300 ease-in-out ${
@@ -81,8 +90,8 @@ export default function FAQSection() {
                     } overflow-hidden`}
                   >
                     <div className="px-6 pb-6">
-                      <div className="pt-2 pb-2 border-t border-gray-200">
-                        <p className="text-gray-600 leading-relaxed font-body">
+                      <div className="border-t border-gray-200 pt-4">
+                        <p className="leading-relaxed text-gray-600">
                           {faq.answer}
                         </p>
                       </div>
@@ -93,7 +102,7 @@ export default function FAQSection() {
             })}
           </div>
         </div>
-        </div>
+      </div>
     </section>
   );
 }
