@@ -26,33 +26,35 @@ export default function InternationalGrid({ destinations, loading }: Internation
   const handleDestinationClick = (dest: AggregatedDestination) => {
     navigate(`/packages?destination=${dest.slug}`)
   }
-  // The hero-tile layout (idx 0 spanning 2x2 in a 4-col grid) only reads
-  // well once there's enough tiles to fill the remaining cells — with fewer
-  // destinations it leaves an obviously empty grid. Below that count, fall
-  // back to a single evenly-sized row instead.
-  const useHeroLayout = internationalDests.length >= 4
-  // The hero tile occupies a 2x2 block (4 of the grid's 8 cells across two
-  // rows), leaving exactly 4 cells for single tiles — a 6th tile has nowhere
-  // to go and CSS grid auto-flow strands it alone on an otherwise-empty 3rd
-  // row. Cap at 5 (hero + 4) so the grid always fills completely.
-  const displayDests = useHeroLayout ? internationalDests.slice(0, 5) : internationalDests
-  const rowLayoutCols: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-1 sm:grid-cols-3' }
-  const gridClassName = useHeroLayout
-    ? 'grid grid-cols-2 md:grid-cols-4 gap-4'
-    : `grid ${rowLayoutCols[displayDests.length] || 'grid-cols-2'} gap-4`
+  // Bento Grid layout logic
+  const getBentoClasses = (idx: number, total: number) => {
+    if (total === 4) {
+      if (idx === 0) return 'md:col-span-2 md:row-span-2 aspect-[4/5] md:aspect-auto h-full max-w-none';
+      if (idx === 1) return 'md:col-span-2 md:row-span-1 aspect-[5/7] md:aspect-auto h-full max-w-none';
+      return 'md:col-span-1 md:row-span-1 aspect-[5/7] md:aspect-auto h-full max-w-none';
+    }
+    if (total >= 5) {
+      if (idx === 0) return 'md:col-span-2 md:row-span-2 aspect-[4/5] md:aspect-square max-w-none';
+      return 'aspect-[5/7] max-w-[300px] md:max-w-none md:aspect-auto h-full';
+    }
+    return 'aspect-[4/5] max-w-none';
+  };
+
+  const displayDests = internationalDests.slice(0, 5);
+  const total = displayDests.length;
+
+  const rowLayoutCols: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-1 sm:grid-cols-3' };
+  const gridClassName = total >= 4
+    ? 'grid grid-cols-2 md:grid-cols-4 gap-4 md:auto-rows-[250px]'
+    : `grid ${rowLayoutCols[total] || 'grid-cols-2'} gap-4`;
+
   return (
     <div className={gridClassName}>
         {displayDests.map((dest, idx) => (
           <button
             key={dest.id}
             onClick={() => handleDestinationClick(dest)}
-            className={`group relative overflow-hidden rounded-2xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 w-full justify-self-center ${
-              useHeroLayout && idx === 0
-                ? 'aspect-[4/5] md:aspect-square md:col-span-2 md:row-span-2 max-w-none'
-                : useHeroLayout
-                  ? 'aspect-[5/7] max-w-[300px]'
-                  : 'aspect-[4/5] max-w-none'
-            }`}
+            className={`group relative overflow-hidden rounded-2xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 w-full justify-self-center ${getBentoClasses(idx, total)}`}
           >
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent z-raised pointer-events-none"></div>
             <img
