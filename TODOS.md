@@ -236,6 +236,54 @@
 **Priority:** P3
 **Depends on:** None
 
+### Client: remove the invalid shared hero image priority prop
+
+**What:** `HeroBackground` forwards a camelCase `fetchPriority` prop into React 18.2's DOM renderer, which logs an unknown-prop warning on every page using the shared hero.
+
+**Why:** Deferred from Phase 9 design review FINDING-006. Rendering succeeds, so this is technical polish rather than a release blocker, but a clean browser console makes real runtime faults easier to spot.
+
+**Context:** `Client/src/components/shared/HeroBackground.tsx`.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** None
+
+### Client: converge decorative gradients on the documented color system
+
+**What:** Header, planner, package, and package-detail surfaces still mix green-to-gold and occasional cool-blue gradients despite `Client/DESIGN.md` specifying green interactive fills with gold reserved for highlights.
+
+**Why:** Deferred from Phase 9 design review FINDING-007. The current UI remains readable and functional, but the drift weakens cross-page consistency and increases the AI-generated feel.
+
+**Context:** Audit each rendered use before changing it; preserve image overlays and functional contrast gradients.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** None
+
+### Career fixtures: make repeated seeding idempotent
+
+**What:** The real vacancies endpoint currently returns 22 rows, including five copies of four exact roles under distinct UUIDs. `Services/seed-extended.mjs` creates fresh IDs, so `createMany({ skipDuplicates: true })` cannot prevent duplication.
+
+**Why:** Deferred from Phase 9 design review FINDING-008. The repeated cards damage trust and make the page unnecessarily long. Client-side title deduplication would mask the source defect.
+
+**Context:** Give vacancy fixtures deterministic unique keys or replace the fixture set transactionally, then clean duplicate development rows.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** None
+
+### Client: complete content and deployment polish
+
+**What:** About has a long origin-story block and inconsistent team portraits; Contact renders no street address when its environment value is absent; the homepage repeats a centered-heading/card-row composition across many sections.
+
+**Why:** Deferred from Phase 9 design review FINDING-009. These are editorial and deployment-input issues, not code correctness defects, but they limit the final premium impression.
+
+**Context:** Requires approved team imagery/copy and a production address value before implementation.
+
+**Effort:** M
+**Priority:** P4
+**Depends on:** Approved content and deployment configuration
+
 ## Completed
 
 ### Honor Gemini's RetryInfo.retryDelay on 429 quota errors
