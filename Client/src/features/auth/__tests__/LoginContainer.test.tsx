@@ -73,6 +73,18 @@ describe('LoginContainer', () => {
     expect(screen.getByRole('button', { name: 'Register' })).toBeInTheDocument();
   });
 
+  it('focuses the first invalid field when login validation fails', async () => {
+    const user = userEvent.setup();
+    renderContainer();
+
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+
+    const email = screen.getByPlaceholderText('you@example.com');
+    expect(await screen.findByText('Email is required')).toBeInTheDocument();
+    expect(email).toHaveFocus();
+    expect(mocks.login).not.toHaveBeenCalled();
+  });
+
   it('submits valid credentials to the mocked login with the exact payload', async () => {
     const user = userEvent.setup();
     renderContainer();
