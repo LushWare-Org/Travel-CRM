@@ -8,6 +8,7 @@ import { setPostLoginRedirect } from '../../../services/auth/tokenStorage';
 const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   register: vi.fn(),
+  requestPasswordReset: vi.fn(),
 }));
 
 // Mock the untyped AuthContext module boundary so the container's
@@ -22,6 +23,10 @@ vi.mock('../../../contexts/AuthContext', () => ({
     logout: vi.fn(),
     isAuthenticated: false,
   }),
+}));
+
+vi.mock('../../../services/api/auth', () => ({
+  requestPasswordReset: mocks.requestPasswordReset,
 }));
 
 const renderContainer = () =>
@@ -58,6 +63,7 @@ describe('LoginContainer', () => {
   beforeEach(() => {
     mocks.login.mockReset();
     mocks.register.mockReset();
+    mocks.requestPasswordReset.mockReset();
     mocks.login.mockResolvedValue({});
     mocks.register.mockResolvedValue({});
     sessionStorage.clear();
@@ -71,6 +77,29 @@ describe('LoginContainer', () => {
     expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register' })).toBeInTheDocument();
+  });
+
+  it('requests a password reset without leaving the login surface', async () => {
+    mocks.requestPasswordReset.mockResolvedValueOnce(
+      'If an account exists with this email, a password reset link will be sent.',
+    );
+    const user = userEvent.setup();
+    renderContainer();
+
+    await user.click(screen.getByRole('button', { name: 'Forgot password?' }));
+    expect(screen.getByRole('heading', { name: 'Reset your password' })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('••••••••')).not.toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('you@example.com'), 'user@example.com');
+    await user.click(screen.getByRole('button', { name: 'Send Reset Link' }));
+
+    expect(mocks.requestPasswordReset).toHaveBeenCalledWith('user@example.com');
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'If an account exists with this email, a password reset link will be sent.',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Back to sign in' }));
+    expect(screen.getByRole('heading', { name: 'Sign in to your account' })).toBeInTheDocument();
   });
 
   it('focuses the first invalid field when login validation fails', async () => {

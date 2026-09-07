@@ -14,6 +14,7 @@ const AboutUs = lazy(() => import('./pages/AboutPage'));
 const Contact = lazy(() => import('./pages/ContactPage'));
 const Career = lazy(() => import('./pages/CareerPage'));
 const Login = lazy(() => import('./pages/LoginPage'));
+const ResetPassword = lazy(() => import('./pages/ResetPasswordPage'));
 const MyAccount = lazy(() => import('./pages/MyAccountPage'));
 const PlanYourTrip = lazy(() => import('./pages/PlanYourTripPage'));
 // Dev-only verification page (Phase 0 design-system style guide). Vite
@@ -72,6 +73,7 @@ function AppContent() {
             {PAGE_CONFIG.career.enabled && <Route path="/career" element={<Career />} />}
             {PAGE_CONFIG.account.enabled && <Route path="/my-account" element={<MyAccount />} />}
             {PAGE_CONFIG.account.enabled && <Route path="/login" element={<Login />} />}
+            {PAGE_CONFIG.account.enabled && <Route path="/reset-password/:token" element={<ResetPassword />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
