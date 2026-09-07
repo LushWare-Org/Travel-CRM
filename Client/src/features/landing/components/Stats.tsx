@@ -169,7 +169,7 @@ export default function RecommendedPackagesSection() {
   };
 
   const arrowClasses =
-    'absolute top-1/2 z-elevated -translate-y-1/2 rounded-full border border-gray-200 bg-white text-gray-700 shadow-floating transition-colors duration-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:pointer-events-none disabled:opacity-40';
+    'absolute top-1/2 z-elevated flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-floating transition-colors duration-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:pointer-events-none disabled:opacity-40';
 
   return (
     <section className="stats-section bg-white py-section-md">
@@ -225,7 +225,7 @@ export default function RecommendedPackagesSection() {
               className={`${arrowClasses} left-1`}
               aria-label="Previous"
             >
-              <ChevronLeft className="size-5" />
+              <ChevronLeft className="size-5" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -233,7 +233,7 @@ export default function RecommendedPackagesSection() {
               className={`${arrowClasses} right-1`}
               aria-label="Next"
             >
-              <ChevronRight className="size-5" />
+              <ChevronRight className="size-5" aria-hidden="true" />
             </button>
           </div>
         )}

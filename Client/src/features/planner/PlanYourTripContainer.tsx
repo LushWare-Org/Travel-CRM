@@ -706,20 +706,22 @@ export default function PlanYourTripContainer() {
                   <button
                     type="button"
                     onClick={() => setTravelers(Math.max(1, travelers - 1))}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-md hover:shadow-lg flex items-center justify-center"
+                    aria-label="Decrease travelers"
+                    className="flex size-11 items-center justify-center rounded-full bg-white shadow-md hover:shadow-lg sm:size-12"
                   >
-                    <ChevronLeft className="w-4 sm:w-5 h-4 sm:h-5" />
+                    <ChevronLeft className="w-4 sm:w-5 h-4 sm:h-5" aria-hidden="true" />
                   </button>
-                  <div className="flex-1 text-center">
+                  <div className="flex-1 text-center" role="status" aria-label="Traveler count" aria-live="polite">
                     <div className="text-2xl sm:text-3xl font-bold text-gray-900 font-display">{travelers}</div>
                     <div className="text-xs sm:text-sm text-gray-600">Person(s)</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setTravelers(travelers + 1)}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white shadow-md hover:shadow-lg flex items-center justify-center"
+                    aria-label="Increase travelers"
+                    className="flex size-11 items-center justify-center rounded-full bg-white shadow-md hover:shadow-lg sm:size-12"
                   >
-                    <ChevronRight className="w-4 sm:w-5 h-4 sm:h-5" />
+                    <ChevronRight className="w-4 sm:w-5 h-4 sm:h-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>

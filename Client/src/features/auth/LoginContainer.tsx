@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { ArrowRight, Eye, EyeOff, Globe, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { consumePostLoginRedirect } from '../../services/auth/tokenStorage';
+import { requestPasswordReset } from '../../services/api/auth';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Form, FormField, FormFieldItem } from '../../components/ui/form';
@@ -50,6 +51,14 @@ const loginSchema = z.object({
   email: emailField,
   phone: phoneField,
   password: passwordField,
+  confirmPassword: z.string(),
+});
+
+const recoverySchema = z.object({
+  name: nameField,
+  email: emailField,
+  phone: phoneField,
+  password: z.string(),
   confirmPassword: z.string(),
 });
 
@@ -110,13 +119,18 @@ export default function LoginContainer() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState('');
   const resolver = useMemo(
-    () => (isLogin ? zodResolver(loginSchema) : zodResolver(registerSchema)),
-    [isLogin],
+    () => zodResolver(isRecovering ? recoverySchema : isLogin ? loginSchema : registerSchema),
+    [isLogin, isRecovering],
   );
   const form = useForm<AuthFormValues>({ resolver, defaultValues });
 
   const switchMode = (nextIsLogin: boolean) => {
+    setIsRecovering(false);
+    setRecoveryMessage('');
+    setError('');
     if (nextIsLogin !== isLogin) {
       setIsLogin(nextIsLogin);
     }
@@ -124,8 +138,13 @@ export default function LoginContainer() {
 
   const onSubmit = async (values: AuthFormValues) => {
     setError('');
+    setRecoveryMessage('');
     setIsSubmitting(true);
     try {
+      if (isRecovering) {
+        setRecoveryMessage(await requestPasswordReset(values.email));
+        return;
+      }
       if (isLogin) {
         await login({ email: values.email, password: values.password });
       } else {
@@ -155,6 +174,18 @@ export default function LoginContainer() {
       {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
     </button>
   );
+
+  const submitLabel = isSubmitting
+    ? isRecovering
+      ? 'Sending Reset Link...'
+      : isLogin
+        ? 'Signing In...'
+        : 'Creating Account...'
+    : isRecovering
+      ? 'Send Reset Link'
+      : isLogin
+        ? 'Sign In'
+        : 'Create Account';
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10 sm:px-6 lg:px-8">
@@ -200,12 +231,18 @@ export default function LoginContainer() {
             {/* Form header */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-gray-900">
-                {isLogin ? 'Sign in to your account' : 'Create your account'}
+                {isRecovering
+                  ? 'Reset your password'
+                  : isLogin
+                    ? 'Sign in to your account'
+                    : 'Create your account'}
               </h2>
               <p className="mt-1.5 text-sm text-gray-600">
-                {isLogin
-                  ? 'Enter your credentials to access your account'
-                  : 'Fill in the details below to get started'}
+                {isRecovering
+                  ? 'Enter your account email and we will send you a secure reset link'
+                  : isLogin
+                    ? 'Enter your credentials to access your account'
+                    : 'Fill in the details below to get started'}
               </p>
             </div>
 
@@ -215,7 +252,24 @@ export default function LoginContainer() {
                 noValidate
                 className="space-y-6 [&_[data-slot=field-error]]:text-red-600"
               >
-                {!isLogin ? (
+                {isRecovering ? (
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field, fieldState }) => (
+                      <FormFieldItem label="Email Address" error={fieldState.error}>
+                        <Input
+                          {...field}
+                          type="email"
+                          autoComplete="email"
+                          placeholder="you@example.com"
+                          aria-invalid={fieldState.error ? true : undefined}
+                          className={fieldInputClassName}
+                        />
+                      </FormFieldItem>
+                    )}
+                  />
+                ) : !isLogin ? (
                   <>
                     <div className="grid gap-6 sm:grid-cols-2">
                       <FormField
@@ -358,12 +412,18 @@ export default function LoginContainer() {
                           />
                           Remember me
                         </label>
-                        <a
-                          href="#"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsRecovering(true);
+                            setRecoveryMessage('');
+                            setError('');
+                            form.clearErrors();
+                          }}
                           className="text-sm font-semibold text-brand-600 transition-colors hover:text-brand-700"
                         >
                           Forgot password?
-                        </a>
+                        </button>
                       </div>
                     )}
                   </>
@@ -378,21 +438,22 @@ export default function LoginContainer() {
                   </div>
                 )}
 
+                {recoveryMessage && (
+                  <div
+                    role="status"
+                    className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800"
+                  >
+                    {recoveryMessage}
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   disabled={isSubmitting}
                   aria-busy={isSubmitting}
                   className="h-12 w-full rounded-xl bg-brand-600 px-8 text-sm font-semibold text-white transition-colors duration-300 hover:bg-brand-700"
                 >
-                  <span aria-live="polite">
-                    {isSubmitting
-                      ? isLogin
-                        ? 'Signing In...'
-                        : 'Creating Account...'
-                      : isLogin
-                        ? 'Sign In'
-                        : 'Create Account'}
-                  </span>
+                  <span aria-live="polite">{submitLabel}</span>
                   {!isSubmitting && <ArrowRight />}
                 </Button>
               </form>
@@ -400,14 +461,26 @@ export default function LoginContainer() {
 
             {/* Footer toggle */}
             <p className="mt-6 text-center text-sm text-gray-600">
-              {isLogin ? "Don't have an account? " : 'Already have an account? '}
-              <button
-                type="button"
-                onClick={() => switchMode(!isLogin)}
-                className="font-semibold text-brand-600 transition-colors hover:text-brand-700"
-              >
-                {isLogin ? 'Sign up' : 'Sign in'}
-              </button>
+              {isRecovering ? (
+                <button
+                  type="button"
+                  onClick={() => switchMode(true)}
+                  className="font-semibold text-brand-600 transition-colors hover:text-brand-700"
+                >
+                  Back to sign in
+                </button>
+              ) : (
+                <>
+                  {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                  <button
+                    type="button"
+                    onClick={() => switchMode(!isLogin)}
+                    className="font-semibold text-brand-600 transition-colors hover:text-brand-700"
+                  >
+                    {isLogin ? 'Sign up' : 'Sign in'}
+                  </button>
+                </>
+              )}
             </p>
           </div>
         </div>

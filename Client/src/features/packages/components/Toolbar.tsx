@@ -62,22 +62,28 @@ export default function Toolbar({
           </select>
           <div className="flex items-center space-x-1 bg-gray-100 rounded-xl p-1 w-full md:w-auto">
             <button
+              type="button"
               onClick={() => onViewModeChange('grid')}
-              className={`p-2 rounded-lg border transition-colors duration-200 ${viewMode === 'grid'
+              aria-label="Grid view"
+              aria-pressed={viewMode === 'grid'}
+              className={`flex size-11 items-center justify-center rounded-lg border transition-colors duration-200 ${viewMode === 'grid'
                 ? 'bg-brand-50 text-brand-600 border-brand-200'
                 : 'text-gray-500 border-transparent hover:bg-gray-200 hover:border-brand-300'
                 }`}
             >
-              <Grid className="w-5 h-5" />
+              <Grid className="w-5 h-5" aria-hidden="true" />
             </button>
             <button
+              type="button"
               onClick={() => onViewModeChange('list')}
-              className={`p-2 rounded-lg border transition-colors duration-200 ${viewMode === 'list'
+              aria-label="List view"
+              aria-pressed={viewMode === 'list'}
+              className={`flex size-11 items-center justify-center rounded-lg border transition-colors duration-200 ${viewMode === 'list'
                 ? 'bg-brand-50 text-brand-600 border-brand-200'
                 : 'text-gray-500 border-transparent hover:bg-gray-200 hover:border-brand-300'
                 }`}
             >
-              <List className="w-5 h-5" />
+              <List className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
         </div>

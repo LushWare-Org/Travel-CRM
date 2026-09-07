@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Edit2, Loader, Mail, Phone } from 'lucide-react';
+import { Edit2, Loader, Mail, Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchUserBookings } from '../../services/api/booking';
 import { fetchUserCustomizedPackages } from '../../services/api/customization';
@@ -32,39 +32,6 @@ export default function MyAccountContainer() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<UpdateMessage | null>(null);
-  const [showStickySidebar, setShowStickySidebar] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const mainContent = document.querySelector('[data-main-content]');
-      const sidebarFixed = document.querySelector<HTMLElement>('[data-sticky-sidebar]');
-      const footer = document.querySelector('footer');
-
-      if (mainContent) {
-        const rect = mainContent.getBoundingClientRect();
-        const shouldShow = rect.top <= 100;
-        setShowStickySidebar(shouldShow);
-        if (sidebarFixed && footer) {
-          const footerRect = footer.getBoundingClientRect();
-          const sidebarHeight = sidebarFixed.offsetHeight;
-          const sidebarTop = 96;
-
-          if (footerRect.top < window.innerHeight) {
-            const gap = 20;
-            const maxTop = footerRect.top - sidebarHeight - gap;
-            const newTop = Math.min(sidebarTop, maxTop);
-            sidebarFixed.style.top = Math.max(0, newTop) + 'px';
-          } else {
-            sidebarFixed.style.top = sidebarTop + 'px';
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -195,16 +162,15 @@ export default function MyAccountContainer() {
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
       <div className="relative w-full py-28 overflow-visible">
-        <div className="absolute inset-0">
-          <video
-            src="/v5.mp4"
-            className="w-full h-full object-cover"
-            autoPlay
-            loop
-            muted
+        <picture className="absolute inset-0">
+          <source srcSet="/lush/hero/mountain.webp" type="image/webp" />
+          <img
+            src="/lush/hero/mountain.jpg"
+            alt="Mountain landscape"
+            className="h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-        </div>
+        </picture>
+        <div className="absolute inset-0 bg-black/55" />
         <div className="relative z-raised max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1
             className={`text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 transition-all duration-700 delay-100 ${
@@ -274,113 +240,44 @@ export default function MyAccountContainer() {
       </div>
 
       <div className="max-w-8xl mx-auto px-4 py-12 pt-20">
-        <div className="flex gap-6">
-          {/* Left Sidebar */}
-          {showStickySidebar && (
-            <div className={`hidden lg:block ${sidebarCollapsed ? 'w-20' : 'w-80'} flex-shrink-0 transition-all duration-300`}>
-              <div className="fixed w-80 left-4 z-header" style={{ paddingBottom: '1000px' }} data-sticky-sidebar>
-                <div className="bg-white rounded-2xl border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-16 h-16 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
-                        {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-                      </div>
-                      {!sidebarCollapsed && (
-                        <div className="min-w-0 flex-1">
-                          <h2 className="text-xl font-bold text-gray-900 truncate">{user?.name || 'Traveler'}</h2>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-                      title={sidebarCollapsed ? 'Expand' : 'Collapse'}
-                    >
-                      {sidebarCollapsed ? (
-                        <ChevronRight className="w-5 h-5 text-gray-600" />
-                      ) : (
-                        <ChevronLeft className="w-5 h-5 text-gray-600" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Contact Info */}
-                  {!sidebarCollapsed && (
-                    <>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                          <Mail className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-gray-600 font-semibold">Email:</p>
-                            <p className="text-sm text-gray-900 truncate font-medium">{user?.email}</p>
-                          </div>
-                        </div>
-                        {user?.phone && (
-                          <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                            <Phone className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm text-gray-600 font-semibold">Phone:</p>
-                              <p className="text-sm text-gray-900 truncate font-medium">{user.phone}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Edit Button */}
-                      <button
-                        onClick={() => setIsEditMode(true)}
-                        className="w-full px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mb-4"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        Edit Profile
-                      </button>
-                    </>
-                  )}
-                </div>
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <aside className="w-full flex-shrink-0 rounded-2xl border border-gray-200 bg-white p-6 lg:sticky lg:top-24 lg:w-80 lg:self-start">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex size-16 flex-shrink-0 items-center justify-center rounded-full bg-brand-600 text-2xl font-bold text-white">
+                {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-xl font-bold text-gray-900">{user?.name || 'Traveler'}</h2>
               </div>
             </div>
-          )}
-          {!showStickySidebar && (
-            <div className={`hidden lg:block ${sidebarCollapsed ? 'w-20' : 'w-80'} flex-shrink-0 transition-all duration-300`}>
-              <div className="bg-white rounded-2xl border border-gray-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-16 h-16 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
-                    {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-                  </div>
+
+            <div className="mb-4 space-y-2">
+              <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                <Mail className="mt-0.5 size-4 flex-shrink-0 text-brand-500" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-600">Email:</p>
+                  <p className="truncate text-sm font-medium text-gray-900">{user?.email}</p>
+                </div>
+              </div>
+              {user?.phone && (
+                <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <Phone className="mt-0.5 size-4 flex-shrink-0 text-brand-500" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-xl font-bold text-gray-900 truncate">{user?.name || 'Traveler'}</h2>
+                    <p className="text-sm font-semibold text-gray-600">Phone:</p>
+                    <p className="truncate text-sm font-medium text-gray-900">{user.phone}</p>
                   </div>
                 </div>
-
-                {/* Contact Info */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                    <Mail className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-600 font-semibold">Email:</p>
-                      <p className="text-sm text-gray-900 truncate font-medium">{user?.email}</p>
-                    </div>
-                  </div>
-                  {user?.phone && (
-                    <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                      <Phone className="w-4 h-4 text-brand-500 flex-shrink-0 mt-0.5" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-600 font-semibold">Phone:</p>
-                        <p className="text-sm text-gray-900 truncate font-medium">{user.phone}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => setIsEditMode(true)}
-                  className="w-full px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 mb-4"
-                >
-                  <Edit2 className="w-3 h-3" />
-                  Edit Profile
-                </button>
-              </div>
+              )}
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => setIsEditMode(true)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+            >
+              <Edit2 className="size-4" aria-hidden="true" />
+              Edit Profile
+            </button>
+          </aside>
 
           {/* Right Column */}
           <div className="flex-1 w-full lg:w-auto" data-main-content>
