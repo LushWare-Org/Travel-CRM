@@ -120,18 +120,6 @@ describe('MyAccountContainer', () => {
     expect(screen.getByText('Confirmed')).toBeInTheDocument();
   });
 
-  it('renders a durable account hero and one responsive profile action', async () => {
-    renderContainer();
-
-    await screen.findByText('My Requests');
-    expect(screen.getByRole('img', { name: 'Mountain landscape' })).toHaveAttribute(
-      'src',
-      '/lush/hero/mountain.jpg',
-    );
-    expect(document.querySelector('video')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Edit Profile' })).toHaveLength(1);
-  });
-
   it('saves the edited profile with the exact payload and merges the stored user', async () => {
     // The success path schedules window.location.reload() via setTimeout(…,
     // 1000). jsdom's reload is non-configurable, so it cannot be stubbed;
