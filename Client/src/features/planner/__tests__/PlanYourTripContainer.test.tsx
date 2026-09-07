@@ -722,6 +722,25 @@ describe('PlanYourTripContainer', () => {
     expect(within(activeStep).getByText('1')).toBeInTheDocument();
   });
 
+  it('names the traveler controls and updates the announced count', async () => {
+    const user = userEvent.setup();
+    renderWithRouter('/planner');
+
+    await user.click(screen.getByRole('button', { name: 'Choose your destination...' }));
+    await user.click(screen.getByRole('button', { name: 'Bali, Indonesia' }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    const decrease = screen.getByRole('button', { name: 'Decrease travelers' });
+    const increase = screen.getByRole('button', { name: 'Increase travelers' });
+    const count = screen.getByRole('status', { name: 'Traveler count' });
+    expect(count).toHaveTextContent('2Person(s)');
+
+    await user.click(increase);
+    expect(count).toHaveTextContent('3Person(s)');
+    await user.click(decrease);
+    expect(count).toHaveTextContent('2Person(s)');
+  });
+
   it('writes ?step= on forward and back transitions and reads it on deep-link mount', async () => {
     const user = userEvent.setup();
     const { router } = renderWithRouter('/planner');

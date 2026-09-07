@@ -158,18 +158,20 @@ export default function RecentlyBookedSlider({ items = [] }: RecentlyBookedSlide
             }`}
           >
             <button
+              type="button"
               onClick={goPrev}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-floating transition-colors duration-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              className="flex size-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-floating transition-colors duration-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
               aria-label="Previous"
             >
-              <ChevronLeft className="size-5" />
+              <ChevronLeft className="size-5" aria-hidden="true" />
             </button>
             <button
+              type="button"
               onClick={goNext}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-floating transition-colors duration-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              className="flex size-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-floating transition-colors duration-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
               aria-label="Next"
             >
-              <ChevronRight className="size-5" />
+              <ChevronRight className="size-5" aria-hidden="true" />
             </button>
           </div>
           <div className="overflow-hidden">

@@ -14,6 +14,21 @@ describe('DestinationSelector', () => {
     expect(screen.getByText('Choose your destination...')).toBeInTheDocument();
   });
 
+  it('opens from the keyboard through a semantic expanded-state trigger', async () => {
+    const user = userEvent.setup();
+    render(<DestinationSelector onChange={vi.fn()} />);
+
+    const trigger = screen.getByRole('button', { name: 'Select Destination' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    await user.tab();
+    expect(trigger).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByPlaceholderText('Search destinations...')).toHaveFocus();
+  });
+
   it('calls onChange with the destination option when one is picked', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

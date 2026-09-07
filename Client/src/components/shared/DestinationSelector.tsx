@@ -129,25 +129,29 @@ const DestinationSelector = ({ value, onChange, placeholder = 'Select Destinatio
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Selected Value Display / Trigger */}
-      <div
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls="destination-selector-panel"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-white cursor-pointer flex items-center justify-between hover:border-brand-500 transition-colors focus:ring-2 focus:ring-brand-500"
+        className="flex min-h-12 w-full items-center justify-between rounded-xl border border-gray-300 bg-white px-4 py-3 text-left transition-colors hover:border-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
       >
-        <div className="flex items-center gap-2 flex-1">
-          <MapPin className="w-5 h-5 text-brand-600 flex-shrink-0" />
+        <span className="flex flex-1 items-center gap-2">
+          <MapPin className="w-5 h-5 text-brand-600 flex-shrink-0" aria-hidden="true" />
           <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>
             {selectedOptionLabel || (typeof value === 'string' ? value : '') || placeholder}
           </span>
-        </div>
+        </span>
         <ChevronDown
           className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'transform rotate-180' : ''
             }`}
+          aria-hidden="true"
         />
-      </div>
+      </button>
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute z-dropdown w-[calc(100vw-1rem)] sm:w-full sm:min-w-[520px] max-w-[600px] mt-2 bg-white border-2 border-brand-200 rounded-2xl shadow-2xl overflow-hidden left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0">
+        <div id="destination-selector-panel" className="absolute z-dropdown w-[calc(100vw-1rem)] sm:w-full sm:min-w-[520px] max-w-[600px] mt-2 bg-white border-2 border-brand-200 rounded-2xl shadow-2xl overflow-hidden left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0">
           {/* Search Bar */}
           <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-brand-50 to-brand-accent-50">
             <div className="relative">

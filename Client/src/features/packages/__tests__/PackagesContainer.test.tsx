@@ -61,6 +61,22 @@ describe('PackagesContainer', () => {
     expect(screen.getByText('Curated • 2 packages available')).toBeInTheDocument();
   });
 
+  it('exposes named view controls and reports the selected layout', async () => {
+    const user = userEvent.setup();
+    renderContainer();
+    await screen.findByText('Bali Honeymoon Special');
+
+    const gridView = screen.getByRole('button', { name: 'Grid view' });
+    const listView = screen.getByRole('button', { name: 'List view' });
+    expect(gridView).toHaveAttribute('aria-pressed', 'true');
+    expect(listView).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(listView);
+
+    expect(gridView).toHaveAttribute('aria-pressed', 'false');
+    expect(listView).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('filters packages by trip duration and updates the displayed list', async () => {
     const user = userEvent.setup();
     renderContainer();
