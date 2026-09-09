@@ -12,7 +12,7 @@ import { setAssistantLauncherOpen, useAssistantLauncherOpen } from '../../../com
 const routeLabel = (route: string): string => route.charAt(0).toUpperCase() + route.slice(1);
 
 const GREETING =
-  "Hi! I'm the site assistant — ask me to take you to a page, or ask a question about our policies.";
+  "Hi! I can help with destinations, packages, site navigation, and LushWare policy questions. What are you planning?";
 
 const PANEL_CLASS =
   'pointer-events-auto w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-floating';
@@ -41,9 +41,13 @@ function AssistantTurnExtras({ data, onNavigate }: AssistantTurnExtrasProps) {
     );
   }
 
+  if (data.tool === 'respond_conversationally' || data.tool === 'redirect_off_topic') {
+    return null;
+  }
+
   if (data.answered) {
     return (
-      <div className="space-y-2 rounded-xl bg-blue-50 px-3 py-2 shadow-sm">
+      <div className="space-y-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
         {data.snippets.map((snippet) => (
           <blockquote key={snippet.docId} className="border-l-4 border-brand-400 pl-3">
             <p className="text-sm text-gray-800">{snippet.quote}</p>
@@ -55,7 +59,7 @@ function AssistantTurnExtras({ data, onNavigate }: AssistantTurnExtrasProps) {
   }
 
   return (
-    <div className="rounded-xl bg-blue-50 px-3 py-2 shadow-sm">
+    <div className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
       <p className="text-sm text-gray-700">{data.fallbackMessage}</p>
     </div>
   );
@@ -182,7 +186,7 @@ export default function AssistantWidget() {
             <Bot className="w-5 h-5 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-tight">Travel Assistant</p>
-              <p className="text-xs text-white/80 leading-tight">Navigation help &amp; FAQ answers</p>
+              <p className="text-xs text-white/80 leading-tight">Travel help, navigation &amp; policies</p>
             </div>
           </div>
           <button
@@ -203,7 +207,12 @@ export default function AssistantWidget() {
           {chat.messages.map((message) => (
             <MessageRow key={message.id} message={message} turnData={turnByMessageId.get(message.id)} onNavigate={handleChipClick} />
           ))}
-          {chat.isSending && <Loader2 className="w-4 h-4 animate-spin text-brand-600" />}
+          {chat.isSending && (
+            <div className="flex items-center gap-2 text-sm text-gray-600" role="status" aria-live="polite">
+              <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
+              <span>Thinking…</span>
+            </div>
+          )}
         </div>
 
         {chat.error && (
@@ -223,7 +232,7 @@ export default function AssistantWidget() {
                 handleSend();
               }
             }}
-            placeholder="Ask me to help you navigate..."
+            placeholder="Ask about travel, pages, or policies…"
             maxLength={2000}
             disabled={chat.isSending}
             className={INPUT_CLASS}

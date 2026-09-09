@@ -48,6 +48,22 @@ describe('POST /api/v1/assistant/events', () => {
     });
   });
 
+  it.each(['respond_conversationally', 'redirect_off_topic'])(
+    'persists response events for the %s outcome',
+    async (tool) => {
+      mockPrisma.assistantEvent.create.mockResolvedValue({ id: 'evt-3' });
+
+      const res = await request(app)
+        .post('/api/v1/assistant/events')
+        .send({ sessionId: 'session-1', eventType: 'response', tool });
+
+      expect(res.status).toBe(200);
+      expect(mockPrisma.assistantEvent.create).toHaveBeenCalledWith({
+        data: { sessionId: 'session-1', eventType: 'response', tool, route: null },
+      });
+    },
+  );
+
   it('rejects an invalid eventType with a 400 and never touches the DB', async () => {
     const res = await request(app)
       .post('/api/v1/assistant/events')

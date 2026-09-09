@@ -7,7 +7,12 @@ import { parseEnvelope } from '../http/envelope';
 // wizard-turn/itinerary-chat schemas) — this mirrors that shape on the client
 // side rather than re-declaring a stricter contract package-side.
 
-export const AssistantTurnTool = z.enum(['navigate', 'answer_faq_policy']);
+export const AssistantTurnTool = z.enum([
+  'navigate',
+  'answer_faq_policy',
+  'respond_conversationally',
+  'redirect_off_topic',
+]);
 
 // Identical shape to WizardTurnMessage: `id`/`at` are required so the
 // stateless server can diff a resent sliding window against what the client
@@ -39,15 +44,18 @@ export type AssistantTurnMessageT = z.infer<typeof AssistantTurnMessage>;
 export type AssistantTurnResultT = z.infer<typeof AssistantTurnResult>;
 type AssistantTurnPayload = z.infer<typeof AssistantTurnRequest>;
 
+export const ASSISTANT_TURN_TIMEOUT_MS = 30_000;
+
 export const sendAssistantTurn = async (payload: AssistantTurnPayload) => {
   const body = AssistantTurnRequest.parse(payload);
-  // retry:false — a turn is non-idempotent and expensive (1+ billed Gemini
-  // calls). The shared http client's default retry fires on ANY no-response
-  // error (timeouts included) regardless of method, so without this override
-  // a client-side timeout during a slow Gemini call would trigger a SECOND
-  // full billed turn while the first is still running server-side (found in
-  // /ship's Claude adversarial review). The failed message stays visible so
-  // the visitor can deliberately resend instead.
-  const response = await httpClient.post('/assistant/turn', body, { retry: false });
+  // retry:false — a turn is non-idempotent and expensive. The shared HTTP
+  // client's default retry fires on no-response errors, including timeouts,
+  // which could start a second billed turn while the first is still running.
+  // The 30s client timeout stays above the server's 27s request deadline so
+  // the server has time to return its own deterministic failure envelope.
+  const response = await httpClient.post('/assistant/turn', body, {
+    retry: false,
+    timeout: ASSISTANT_TURN_TIMEOUT_MS,
+  });
   return parseEnvelope(AssistantTurnResult, response.data, 'POST /assistant/turn').data;
 };

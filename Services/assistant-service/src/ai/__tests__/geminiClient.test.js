@@ -126,6 +126,16 @@ describe('geminiClient (assistant-service)', () => {
     await expect(generateStructured({ prompt: 'p', schema: {} })).rejects.toMatchObject({ statusCode: 502 });
     expect(mockGenerateContent).toHaveBeenCalledTimes(3);
   });
+  it('honors a caller-supplied one-attempt budget for retryable failures', async () => {
+    mockGenerateContent.mockRejectedValueOnce(Object.assign(new Error('rate limited'), { status: 429 }));
+    const { generateStructured } = await import('../geminiClient.js');
+
+    await expect(
+      generateStructured({ prompt: 'p', schema: {}, maxAttempts: 1 }),
+    ).rejects.toMatchObject({ statusCode: 502 });
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
   it('throws a 503 without calling the model when GEMINI_API_KEY is unset', async () => {
     delete process.env.GEMINI_API_KEY;
     const { generateStructured } = await import('../geminiClient.js');

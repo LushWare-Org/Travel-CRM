@@ -12,7 +12,12 @@ import httpClient from '../http/client';
 // public and unauthenticated, but if the http client's interceptor ever
 // treats it as an auth attempt this helper still must not throw.
 export type AssistantEventType = 'impression' | 'opened' | 'turn' | 'response' | 'nav_click' | 'error';
-export type AssistantEventTool = 'navigate' | 'answer_faq_policy' | null;
+export type AssistantEventTool =
+  | 'navigate'
+  | 'answer_faq_policy'
+  | 'respond_conversationally'
+  | 'redirect_off_topic'
+  | null;
 
 export interface AssistantEventPayload {
   sessionId: string;

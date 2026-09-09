@@ -4,27 +4,16 @@
 
 ### E2E coverage for cross-service assistant flows
 
-**What:** The /ship coverage audit (77%, 15 gaps, 6 tagged `[→E2E]`) identified several flows that need integration tests against a live stack rather than more mocked unit tests: nav round-trip through the real gateway (visitor asks to navigate → gateway → assistant-service → client chip → route change), Gemini/gateway-down banner recovery, telemetry funnel landing in Postgres (`assistant_impression` → `assistant_response` → `AssistantEvent` rows), and SPA navigation to `/planner` mid-conversation (widget must not re-fire an impression event).
+**What:** A basic live-gateway contract smoke now exists in `Services/e2e-tests/client-contracts/assistantTurn.spec.js`, but several flows still need integration tests against a live stack rather than more mocked unit tests: nav round-trip through the real gateway (visitor asks to navigate → gateway → assistant-service → client chip → route change), Gemini/gateway-down banner recovery, telemetry funnel landing in Postgres (`assistant_impression` → `assistant_response` → `AssistantEvent` rows), and SPA navigation to `/planner` mid-conversation (widget must not re-fire an impression event).
 
 **Why:** These cross real service boundaries (Client → gateway → assistant-service → Postgres) that mocked unit tests can't exercise faithfully — exactly the class of flow `Services/e2e-tests/` already exists for (per CLAUDE.md: "driving real HTTP calls through the Gateway against a fully running local microservices stack").
 
-**Context:** Flagged during `/ship`'s coverage audit on `feat/site-wide-assistant`. Add to `Services/e2e-tests/` following the existing per-run-marker/cleanup convention.
+**Context:** The PR1 contract smoke covers one recognized outcome through the gateway; extend `Services/e2e-tests/` for the remaining flows, following the existing per-run-marker/cleanup convention.
 
 **Effort:** M
 **Priority:** P2
 **Depends on:** None
 
-### Verify assistant-service (and package-service) can actually reach user-service in Cloud Run
-
-**What:** `@travel-crm/policy-retrieval`'s `fetchPolicyDocuments()` makes a plain, unsigned `fetch` to `USER_SERVICE_URL` with only an `x-internal-token` header — no Google-signed ID token. In production, user-service is deployed `allow_unauthenticated = false`, and `iam.tf`'s `run.invoker` grants only cover the gateway's service account calling each backend (`gateway_invoker_*`) — there is no `run.invoker` grant for package-service's or assistant-service's own service account to call user-service directly. If that IAM gap is real, the call 403s at the platform layer before the application-level token check even runs, and the failure path (`if (!res.ok) return cachedDocuments || [];`) makes this indistinguishable from "no policy documents" — every FAQ turn silently degrades to the fallback message with no error surfaced anywhere.
-
-**Why:** Flagged during `/ship`'s Claude adversarial AND Codex adversarial review (both independently found this). This pattern is NOT new to this diff — `wizard-turn`'s `answer_policy_question` already makes the identical direct-fetch call today, unchanged by this PR (just relocated into the shared package). Either there's a production mechanism this review can't see from the code alone (a broader IAM binding, a VPC-internal allowance, etc.) making this a non-issue, or FAQ answering has been silently degraded in production for wizard-turn already, and this diff extends the same exposure to a second, more widely-mounted caller.
-
-**Context:** `Services/shared/policy-retrieval/src/index.js`, `infra/terraform/modules/deployment/iam.tf`. Needs a human to verify the real prod call path (check Cloud Run logs for 403s on this route, or confirm the actual IAM bindings on user-service beyond what this diff's terraform shows). If genuinely missing, fix direction: add a `run.invoker` grant for package-service's and assistant-service's service accounts on user-service (mirroring the existing `gateway_invoker_*` pattern), or switch to routing this call through the gateway.
-
-**Effort:** M (mostly investigation; the terraform fix itself is small)
-**Priority:** P1
-**Depends on:** None
 
 ### Unbounded public telemetry sink has no retention policy
 
@@ -62,13 +51,13 @@
 **Priority:** P3
 **Depends on:** None
 
-### Client axios timeout can fire before a slow-but-successful Gemini turn completes
+### Planner AI turns can outlive the client timeout
 
-**What:** The shared axios client (`Client/src/services/http/config.ts`) times out at `VITE_API_TIMEOUT` (default 15s), but `generateStructured`'s own budget is 30s per attempt with up to `MAX_ATTEMPTS = 3` and 429 `RetryInfo` sleeps capped at 60s — a slow-but-eventually-successful Gemini call can run well past the client's abort point. The Cloud Run request keeps running (and billing) after the browser gives up; the visitor sees the generic error banner and may retry, launching a second billed call under the same 30/15min gateway limiter.
+**What:** The shared axios client (`Client/src/services/http/config.ts`) still defaults to `VITE_API_TIMEOUT` (15s), while the planner's `wizard-turn` and `itinerary-chat` paths can spend up to 30s per Gemini attempt, retry transient failures, and sleep on Gemini `RetryInfo` delays. A slow-but-eventually-successful planner call can outlive the browser request; the visitor sees the generic error banner and may retry while the Cloud Run request keeps running and billing.
 
-**Why:** Flagged during `/ship`'s red-team review (confidence 3). Pre-existing architectural characteristic shared by every AI-chat endpoint on this axios client (`wizard-turn`, `itinerary-chat`) — not introduced by this diff, but now also applies to `/assistant/turn`.
+**Why:** Flagged during `/ship`'s red-team review (confidence 3). PR1 fixed this failure mode for `/assistant/turn` with an endpoint-specific 30s client timeout, a 27s server deadline, one resolver attempt, and `retry:false`; the remaining gap is limited to the existing planner AI endpoints.
 
-**Context:** `Client/src/services/http/config.ts`, `Services/assistant-service/src/ai/geminiClient.js` (and its package-service twin). Fix direction: give AI-chat endpoints a per-request axios timeout that covers the server's real worst-case budget, or shrink the server-side retry budget to fit under the client's default timeout and surface 429/503 as an immediate response instead of sleeping past the client's abort.
+**Context:** `Client/src/services/http/config.ts`, `Client/src/services/api/wizardTurn.ts`, `Client/src/services/api/itineraryChat.ts`, `Services/package-service/src/ai/geminiClient.js`. Fix direction: give planner AI endpoints per-request timeouts that cover their real server budget, or shrink their server-side retry budget to fit under the client's default timeout and surface 429/503 immediately instead of sleeping past the browser's abort.
 
 **Effort:** M
 **Priority:** P3
@@ -293,3 +282,11 @@
 **Context:** `Services/package-service/src/ai/geminiClient.js`. Landed alongside `docs/designs/site-wide-floating-assistant.md`'s `assistant-service` work — pulled forward because that design adds a 3rd caller of this same client, widening exposure to the previously-known-broken retry path.
 
 **Completed:** v0.3.0.0 (2026-09-05)
+
+### Verify assistant-service can reach user-service in Cloud Run
+
+**What:** Confirm the deployed assistant-service identity can call user-service through Cloud Run before enabling conversational outcomes.
+
+**Context:** The live assistant-service → user-service authenticated call path was confirmed during the v0.4.0.0 ship review.
+
+**Completed:** v0.4.0.0 (2026-09-09)

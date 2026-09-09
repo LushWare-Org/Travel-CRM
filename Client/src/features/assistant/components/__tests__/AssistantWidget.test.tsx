@@ -99,7 +99,7 @@ const eventsOf = (eventType: string) => mockSendAssistantEvent.mock.calls.filter
 
 const dialog = () => screen.queryByRole('dialog', { name: 'Travel assistant panel' });
 const sendButton = () => screen.getByRole('button', { name: 'Send message' });
-const input = () => screen.getByPlaceholderText('Ask me to help you navigate...');
+const input = () => screen.getByPlaceholderText('Ask about travel, pages, or policies…');
 
 beforeEach(() => {
   mockSendAssistantTurn.mockReset();
@@ -203,6 +203,63 @@ describe('AssistantWidget', () => {
     await user.click(sendButton());
 
     expect(await screen.findByText("I don't have a confirmed answer to that — please contact support.")).toBeInTheDocument();
+  });
+
+  it('renders conversational and off-topic outcomes as plain assistant bubbles without action panels', async () => {
+    mockSendAssistantTurn
+      .mockResolvedValueOnce({
+        toolCall: { tool: 'respond_conversationally', args: { mode: 'social', socialSubtype: 'greeting' } },
+        serverResult: { mode: 'social', source: 'resolver' },
+        message: 'Hi! I can help with your trip.',
+      })
+      .mockResolvedValueOnce({
+        toolCall: { tool: 'redirect_off_topic', args: {} },
+        serverResult: { redirected: true, source: 'resolver' },
+        message: 'I can help with travel and LushWare trips.',
+      });
+    renderWidget('/');
+    const user = userEvent.setup();
+    openPanel();
+
+    await user.type(input(), 'Hello');
+    await user.click(sendButton());
+    expect(await screen.findByText('Hi! I can help with your trip.')).toBeInTheDocument();
+
+    await user.type(input(), 'Write a sorting algorithm');
+    await user.click(sendButton());
+    expect(await screen.findByText('I can help with travel and LushWare trips.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Go to / })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Policy source/)).not.toBeInTheDocument();
+  });
+
+  it('shows an accessible pending status only while a turn is in flight', async () => {
+    let resolveTurn!: (value: {
+      toolCall: { tool: 'respond_conversationally'; args: { mode: 'social'; socialSubtype: 'greeting' } };
+      serverResult: { mode: 'social'; source: 'resolver' };
+      message: string;
+    }) => void;
+    // Promise.withResolvers is unavailable under this client's configured lib.
+    const pendingTurn = new Promise<Parameters<typeof resolveTurn>[0]>((resolve) => {
+      resolveTurn = resolve;
+    });
+    mockSendAssistantTurn.mockReturnValue(pendingTurn);
+    renderWidget('/');
+    const user = userEvent.setup();
+    openPanel();
+
+    await user.type(input(), 'Hello');
+    const pendingSend = user.click(sendButton());
+    expect(await screen.findByRole('status')).toHaveTextContent('Thinking…');
+
+    resolveTurn({
+      toolCall: { tool: 'respond_conversationally', args: { mode: 'social', socialSubtype: 'greeting' } },
+      serverResult: { mode: 'social', source: 'resolver' },
+      message: 'Hi!',
+    });
+    await pendingSend;
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(await screen.findByText('Hi!')).toBeInTheDocument();
   });
 
   it('a failed turn renders the exact degraded-state banner and previous nav chips stay clickable', async () => {

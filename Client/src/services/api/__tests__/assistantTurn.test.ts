@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mockPost = vi.hoisted(() => vi.fn());
 vi.mock('../../http/client', () => ({ default: { post: mockPost } }));
 
-import { sendAssistantTurn } from '../assistantTurn';
+import { ASSISTANT_TURN_TIMEOUT_MS, sendAssistantTurn } from '../assistantTurn';
 
 const MESSAGE = { id: 'msg-1', role: 'user' as const, content: 'Where are the refund rules?', at: '2026-01-01T00:00:00.000Z' };
 const AVAILABLE_ROUTES = [{ name: 'packages', path: '/packages' }];
@@ -37,8 +37,40 @@ describe('sendAssistantTurn', () => {
         messages: [MESSAGE],
         availableRoutes: AVAILABLE_ROUTES,
       },
-      { retry: false },
+      { retry: false, timeout: ASSISTANT_TURN_TIMEOUT_MS },
     );
+  });
+
+  it.each([
+    [
+      'respond_conversationally',
+      { mode: 'social', socialSubtype: 'greeting' },
+      { mode: 'social', source: 'resolver' },
+    ],
+    [
+      'redirect_off_topic',
+      {},
+      { redirected: true, source: 'resolver' },
+    ],
+  ])('parses the %s response envelope', async (tool, args, serverResult) => {
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        data: { toolCall: { tool, args }, serverResult, message: 'Reviewed server copy' },
+      },
+    });
+
+    const result = await sendAssistantTurn({
+      sessionId: 'sess-1',
+      messages: [MESSAGE],
+      availableRoutes: AVAILABLE_ROUTES,
+    });
+
+    expect(result).toMatchObject({
+      toolCall: { tool, args },
+      serverResult,
+      message: 'Reviewed server copy',
+    });
   });
 
   it('rejects before calling httpClient.post when messages is []', async () => {
