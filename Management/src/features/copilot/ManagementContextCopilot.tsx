@@ -49,6 +49,7 @@ interface ManagementContextCopilotProps {
 // Mounted beside the route outlet; collapsible; never covers the page.
 export default function ManagementContextCopilot({ pageKey, scope, scopeLabel, since = "last_visit" }: ManagementContextCopilotProps) {
   const scopeKey = useMemo(() => JSON.stringify(scope), [scope]);
+  const hasScope = useMemo(() => scope != null && Object.keys(scope).length > 0, [scopeKey]);
 
   const [context, setContext] = useState<ContextStamp | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -64,6 +65,13 @@ export default function ManagementContextCopilot({ pageKey, scope, scopeLabel, s
   // Two-phase load: deterministic first, then briefing.
   useEffect(() => {
     let cancelled = false;
+    if (!hasScope) {
+      setLoading(false);
+      setClaims([]);
+      return () => {
+        cancelled = true;
+      };
+    }
     setLoading(true);
     setError(null);
     setClaims([]);
@@ -179,7 +187,7 @@ export default function ManagementContextCopilot({ pageKey, scope, scopeLabel, s
 
   if (collapsed) {
     return (
-      <Button variant="ghost" size="sm" onClick={() => setCollapsed(false)} className="gap-1.5">
+      <Button variant="ghost" size="sm" onClick={() => setCollapsed(false)} className="fixed top-20 right-4 z-50 gap-1.5 shadow-dropdown">
         <Sparkles className="h-4 w-4" />
         Copilot
       </Button>
@@ -187,7 +195,7 @@ export default function ManagementContextCopilot({ pageKey, scope, scopeLabel, s
   }
 
   return (
-    <Card className="w-full border">
+    <Card className="fixed top-20 right-4 z-50 w-80 max-h-[80vh] border shadow-dropdown flex flex-col overflow-hidden">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -205,8 +213,15 @@ export default function ManagementContextCopilot({ pageKey, scope, scopeLabel, s
           </p>
         )}
       </CardHeader>
-      <CardContent className="space-y-3">
-        {loading && (
+      <CardContent className="space-y-3 overflow-y-auto">
+        {!hasScope && (
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <Sparkles className="h-4 w-4 mt-0.5 text-primary" />
+            Open a lead to see its AI situation briefing.
+          </div>
+        )}
+
+        {hasScope && loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Analyzing…

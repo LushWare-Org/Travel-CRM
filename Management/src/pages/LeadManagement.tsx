@@ -672,11 +672,11 @@ const LeadManagement = () => {
           }}
         />
       )}
-      {copilotEnabled && showSectionView && sectionLead?.id && (
+      {copilotEnabled && (
         <ManagementContextCopilot
           pageKey="leads"
-          scope={{ leadId: sectionLead.id }}
-          scopeLabel={`Lead ${sectionLead.id}`}
+          scope={sectionLead?.id ? { leadId: sectionLead.id } : {}}
+          scopeLabel={sectionLead?.id ? `Lead ${sectionLead.id}` : "Leads"}
         />
       )}
     </div>
