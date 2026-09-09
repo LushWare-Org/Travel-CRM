@@ -10,7 +10,7 @@ import {
   managementBriefingResponseJsonSchema,
 } from '../ai/prompts/managementBriefing.v1.js';
 import { runAgentLoop } from '../ai/agentRunner.js';
-import { validateClaims, buildSources, insightsToClaims } from '../ai/groundingValidator.js';
+import prisma from '../db/client.js';
 
 // One model attempt inside a 17s server deadline; the client holds a 20s
 // endpoint timeout with retry disabled (see design §7).
@@ -38,6 +38,35 @@ function isNoAccess(bundle) {
   return bundle.notAuthorizedSources.length > 0 && bundle.evidence.length === 0;
 }
 
+function scopeFingerprint(scope) {
+  return JSON.stringify(scope ?? {});
+}
+
+// Server-authoritative last-seen read (for since=last_visit). A miss degrades
+// to the client hint, then 7_days. Best-effort — never blocks the turn.
+async function readLastSeen(actorId, pageKey, fingerprint) {
+  try {
+    const row = await prisma.managementLastSeen.findUnique({
+      where: { actorId_pageKey_scopeFingerprint: { actorId, pageKey, scopeFingerprint: fingerprint } },
+    });
+    return row?.lastSeenAt ? row.lastSeenAt.toISOString() : null;
+  } catch {
+    return null;
+  }
+}
+
+// Fire-and-forget upsert after the actor opens a scope; a write failure must
+// never surface as a turn failure.
+function writeLastSeen(actorId, pageKey, fingerprint) {
+  prisma.managementLastSeen
+    .upsert({
+      where: { actorId_pageKey_scopeFingerprint: { actorId, pageKey, scopeFingerprint: fingerprint } },
+      update: { lastSeenAt: new Date() },
+      create: { actorId, pageKey, scopeFingerprint: fingerprint, lastSeenAt: new Date() },
+    })
+    .catch((err) => logger.warn({ err: err.message }, 'failed to persist management lastSeen'));
+}
+
 export const managementCopilotTurn = asyncHandler(async (req, res) => {
   const { mode, page } = req.body;
   const adapter = getAdapter(page.key);
@@ -46,6 +75,15 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
 
   const bundle = await adapter.loadEvidence(ctx, scope);
   const noAccess = isNoAccess(bundle);
+
+  // Server-authoritative last_visit window: prefer the stored value over the
+  // client hint (which is only a display hint and is lost across devices).
+  const scopeFp = scopeFingerprint(scope);
+  if (page.since === 'last_visit') {
+    const serverLastSeen = await readLastSeen(req.user.id, page.key, scopeFp);
+    if (serverLastSeen) page.lastSeenAt = serverLastSeen;
+  }
+  if (!noAccess) writeLastSeen(req.user.id, page.key, scopeFp);
 
   // mode='deterministic': no Gemini — stamp + deterministic insights only.
   if (mode === 'deterministic') {
