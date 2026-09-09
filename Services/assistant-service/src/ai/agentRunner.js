@@ -30,7 +30,6 @@ export async function runAgentLoop({ ctx, scopeLabel, question, evidence, genera
     } catch {
       return { claims: null, toolEvidence: historyToEvidence(history) };
     }
-
     const tool = raw?.tool;
     const args = raw?.args ?? {};
 

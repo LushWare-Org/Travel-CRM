@@ -10,7 +10,37 @@ export const managementAnswerResponseJsonSchema = {
   type: 'object',
   properties: {
     tool: { type: 'string' },
-    args: { type: 'object' },
+    args: {
+      type: 'object',
+      properties: {
+        // final_answer payload — same claim shape as the briefing schema
+        claims: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              section: { type: 'string', enum: ['current_state', 'changed', 'attention', 'experienced_view'] },
+              text: { type: 'string' },
+              facts: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { kind: { type: 'string', enum: ['id', 'date', 'amount', 'percentage', 'count', 'duration'] }, value: { type: 'string' }, evidenceId: { type: 'string' } },
+                  required: ['kind', 'value', 'evidenceId'],
+                },
+              },
+              evidenceIds: { type: 'array', items: { type: 'string' } },
+              evidenceType: { type: 'string', enum: ['record', 'computed', 'pattern', 'guidance', 'inference'] },
+              severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
+            },
+            required: ['id', 'section', 'text', 'facts', 'evidenceIds', 'evidenceType', 'severity'],
+          },
+        },
+        // getLead payload
+        leadId: { type: 'string' },
+      },
+    },
   },
   required: ['tool', 'args'],
 };
