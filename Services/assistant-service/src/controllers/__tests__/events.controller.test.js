@@ -29,7 +29,7 @@ describe('POST /api/v1/assistant/events', () => {
     expect(res.body).toEqual({ success: true });
     expect(mockPrisma.assistantEvent.create).toHaveBeenCalledTimes(1);
     expect(mockPrisma.assistantEvent.create).toHaveBeenCalledWith({
-      data: { sessionId: 'session-1', eventType: 'impression', tool: null, route: null },
+      data: { sessionId: 'session-1', turnId: null, eventType: 'impression', tool: null, route: null, metadata: null },
     });
   });
 
@@ -44,7 +44,14 @@ describe('POST /api/v1/assistant/events', () => {
     expect(res.body).toEqual({ success: true });
     expect(mockPrisma.assistantEvent.create).toHaveBeenCalledTimes(1);
     expect(mockPrisma.assistantEvent.create).toHaveBeenCalledWith({
-      data: { sessionId: 'session-1', eventType: 'nav_click', tool: 'navigate', route: 'packages' },
+      data: {
+        sessionId: 'session-1',
+        turnId: null,
+        eventType: 'nav_click',
+        tool: 'navigate',
+        route: 'packages',
+        metadata: null,
+      },
     });
   });
 
@@ -59,7 +66,7 @@ describe('POST /api/v1/assistant/events', () => {
 
       expect(res.status).toBe(200);
       expect(mockPrisma.assistantEvent.create).toHaveBeenCalledWith({
-        data: { sessionId: 'session-1', eventType: 'response', tool, route: null },
+        data: { sessionId: 'session-1', turnId: null, eventType: 'response', tool, route: null, metadata: null },
       });
     },
   );
@@ -79,6 +86,32 @@ describe('POST /api/v1/assistant/events', () => {
       .send({ sessionId: 'session-1', eventType: 'nav_click', tool: 'navigate', route: 'x'.repeat(1000) });
 
     expect(res.status).toBe(400);
+    expect(mockPrisma.assistantEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('persists the optional turnId without accepting server-only metadata', async () => {
+    mockPrisma.assistantEvent.create.mockResolvedValue({ id: 'evt-turn' });
+
+    const accepted = await request(app)
+      .post('/api/v1/assistant/events')
+      .send({ sessionId: 'session-1', turnId: 'message-1', eventType: 'response', tool: 'navigate' });
+    expect(accepted.status).toBe(200);
+    expect(mockPrisma.assistantEvent.create).toHaveBeenCalledWith({
+      data: {
+        sessionId: 'session-1',
+        turnId: 'message-1',
+        eventType: 'response',
+        tool: 'navigate',
+        route: null,
+        metadata: null,
+      },
+    });
+
+    vi.clearAllMocks();
+    const rejected = await request(app)
+      .post('/api/v1/assistant/events')
+      .send({ sessionId: 'session-1', eventType: 'response', metadata: { predictedIntent: 'social' } });
+    expect(rejected.status).toBe(400);
     expect(mockPrisma.assistantEvent.create).not.toHaveBeenCalled();
   });
 

@@ -135,7 +135,7 @@ export async function generateStructured({
         return JSON.parse(text);
       } catch (parseErr) {
         logger.error({ err: parseErr, model, attempt }, 'Failed to parse Gemini structured response as JSON');
-        throw new AppError('AI did not return valid JSON', BAD_GATEWAY);
+        throw Object.assign(new AppError('AI did not return valid JSON', BAD_GATEWAY), { aiFailureCategory: 'schema' });
       }
     } catch (err) {
       lastError = err;
@@ -146,10 +146,16 @@ export async function generateStructured({
         if (err instanceof AppError) throw err;
         if (err.isTruncated) {
           logger.error({ model, attempt, maxOutputTokens: currentMaxOutputTokens }, 'Gemini response repeatedly truncated at maxOutputTokens');
-          throw new AppError('AI generation was too large to complete — try a shorter itinerary or fewer days', BAD_GATEWAY);
+          throw Object.assign(
+            new AppError('AI generation was too large to complete — try a shorter itinerary or fewer days', BAD_GATEWAY),
+            { aiFailureCategory: 'schema' },
+          );
         }
         logger.error({ err, model, attempt, status }, 'Gemini request failed');
-        throw new AppError('AI generation failed', status === 401 || status === 403 ? SERVICE_UNAVAILABLE : BAD_GATEWAY);
+        throw Object.assign(
+          new AppError('AI generation failed', status === 401 || status === 403 ? SERVICE_UNAVAILABLE : BAD_GATEWAY),
+          { aiFailureCategory: err.isTimeout ? 'timeout' : 'provider' },
+        );
       }
 
       if (err.isTruncated) {

@@ -37,7 +37,7 @@ export type AssistantTurnData =
   | { tool: 'navigate'; route: null; path: null }
   | { tool: 'answer_faq_policy'; answered: true; snippets: AssistantSnippet[] }
   | { tool: 'answer_faq_policy'; answered: false; fallbackMessage: string }
-  | { tool: 'respond_conversationally'; mode: 'social' }
+  | { tool: 'respond_conversationally'; mode: 'social' | 'travel_general' }
   | { tool: 'redirect_off_topic'; redirected: true };
 
 export interface AssistantTurnView {
@@ -69,8 +69,14 @@ function createMessage(role: 'user' | 'assistant', content: string): AssistantTu
   return { id: crypto.randomUUID(), role, content, at: new Date().toISOString() };
 }
 
-function fireEvent(sessionId: string, eventType: AssistantEventPayload['eventType'], tool: AssistantEventPayload['tool'], route: string | null) {
-  const payload: AssistantEventPayload = { sessionId, eventType, tool, route };
+function fireEvent(
+  sessionId: string,
+  turnId: string | null,
+  eventType: AssistantEventPayload['eventType'],
+  tool: AssistantEventPayload['tool'],
+  route: string | null,
+) {
+  const payload: AssistantEventPayload = { sessionId, turnId, eventType, tool, route };
   void sendAssistantEvent(payload);
 }
 
@@ -90,7 +96,8 @@ function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
   }
 
   if (result.toolCall.tool === 'respond_conversationally') {
-    return { tool: 'respond_conversationally', mode: 'social' };
+    const mode = serverResult?.mode === 'travel_general' ? 'travel_general' : 'social';
+    return { tool: 'respond_conversationally', mode };
   }
 
   if (result.toolCall.tool === 'redirect_off_topic') {
@@ -125,7 +132,7 @@ export function useAssistantChat() {
     setMessages((prev) => [...prev, userMessage]);
     setError('');
     setIsSending(true);
-    fireEvent(sessionId, 'turn', null, null);
+    fireEvent(sessionId, userMessage.id, 'turn', null, null);
 
     try {
       const result = await sendAssistantTurn({
@@ -143,10 +150,10 @@ export function useAssistantChat() {
       setMessages((prev) => [...prev, assistantMessage]);
       setTurns((prev) => [...prev, { assistantMessageId: assistantMessage.id, data: deriveTurnData(result) }]);
       const route = result.toolCall.tool === 'navigate' ? ((result.toolCall.args.route as string | undefined) ?? null) : null;
-      fireEvent(sessionId, 'response', result.toolCall.tool, route);
+      fireEvent(sessionId, userMessage.id, 'response', result.toolCall.tool, route);
     } catch {
       setError(ASSISTANT_ERROR_MESSAGE);
-      fireEvent(sessionId, 'error', null, null);
+      fireEvent(sessionId, userMessage.id, 'error', null, null);
     } finally {
       setIsSending(false);
     }

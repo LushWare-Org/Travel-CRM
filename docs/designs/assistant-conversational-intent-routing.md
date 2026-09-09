@@ -408,8 +408,8 @@ Within PR1, implement the client compatibility change first. Service work may pr
 - [ ] **T5 (P1)** — Cross-service — Add unit, client, and real gateway E2E coverage; prove flag-disabled compatibility and one rollback.
 - [ ] **T6 (P2)** — Release — Deploy client first, deploy service disabled, enable after propagation, test rollback, then remove the flag.
 - [ ] **T7 (P2)** — Evidence — Obtain and label at least 50 sanitized real messages for each direct-response class before enabling it.
-- [ ] **T8 (P2)** — Router — Implement classifier, abstention, nested evaluation, stage agreement for model-authored travel guidance, and disabled-by-default class gates.
-- [ ] **T9 (P2)** — Telemetry — Add strict server-owned `resolution` events, end-to-end nullable `turnId`, composite index, and nullable metadata while preserving client `response`.
+- [x] **T8 (P2)** — Router — Implement classifier, abstention, nested evaluation, stage agreement for model-authored travel guidance, and disabled-by-default class gates. A synthetic development/safety corpus is included; it cannot satisfy T7 or enable a class.
+- [x] **T9 (P2)** — Telemetry — Add strict server-owned `resolution` events, end-to-end nullable `turnId`, composite index, and nullable metadata while preserving client `response`.
 - [ ] **T10 (P2)** — Evaluation — Run the live model replay and enable each fast-path class only when every gate passes.
 
 ## GSTACK REVIEW REPORT

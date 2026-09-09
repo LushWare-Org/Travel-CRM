@@ -28,12 +28,15 @@ datasource db {
 model AssistantEvent {
   id        String   @id @default(uuid())
   sessionId String
+  turnId    String?
   eventType String
   tool      String?
   route     String?
+  metadata  Json?
   createdAt DateTime @default(now())
 
   @@index([sessionId])
+  @@index([sessionId, turnId])
   @@index([createdAt])
   @@schema("crm_assistant")
 }

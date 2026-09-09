@@ -21,6 +21,7 @@ export type AssistantEventTool =
 
 export interface AssistantEventPayload {
   sessionId: string;
+  turnId: string | null;
   eventType: AssistantEventType;
   tool: AssistantEventTool;
   route: string | null;

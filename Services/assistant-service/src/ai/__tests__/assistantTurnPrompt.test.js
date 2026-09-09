@@ -26,7 +26,7 @@ describe('assistant turn prompt contract', () => {
     expect(prompt).toContain('respond_conversationally, redirect_off_topic');
     expect(prompt).toContain('3. respond_conversationally');
     expect(prompt).toContain('4. redirect_off_topic');
-    expect(prompt).toContain('Never use respond_conversationally for travel facts or advice');
+    expect(prompt).toContain('Use travel_general only when the untrusted router hint is exactly travel_general');
   });
 });
 
@@ -39,6 +39,28 @@ describe('canonicalizeAssistantTurnResponse', () => {
 
     expect(canonical).toEqual(expected);
     expect(assistantTurnResponseSchema.safeParse(canonical).success).toBe(true);
+  });
+
+  it('accepts travel_general text only when stage one independently agrees', () => {
+    const raw = {
+      tool: 'respond_conversationally',
+      args: { mode: 'travel_general', message: 'Leave one flexible day.' },
+    };
+    expect(
+      canonicalizeAssistantTurnResponse(raw, {
+        conversationalOutcomesEnabled: true,
+        routerIntent: 'travel_general',
+      }),
+    ).toEqual(raw);
+    expect(
+      canonicalizeAssistantTurnResponse(raw, {
+        conversationalOutcomesEnabled: true,
+        routerIntent: 'ambiguous',
+      }),
+    ).toEqual({
+      tool: 'respond_conversationally',
+      args: { mode: 'social', socialSubtype: 'repair' },
+    });
   });
 
   it('rejects unrecognized tools before controller dispatch', () => {
