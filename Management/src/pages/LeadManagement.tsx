@@ -34,6 +34,10 @@ import type { LifecycleStatus } from "../features/lead-management/components/Lea
 type FilterKey = 'all' | LifecycleStatus;
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ManagementContextCopilot from "../features/copilot/ManagementContextCopilot";
+
+// Feature-gated client flag; the panel stays off until explicitly enabled.
+const copilotEnabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === "true";
 
 // Lifecycle status maps (10 states) plus old-status fallbacks
 const statusColors: Record<string, string> = {
@@ -666,6 +670,13 @@ const LeadManagement = () => {
             setShowSectionView(false);
             setSectionLead(null);
           }}
+        />
+      )}
+      {copilotEnabled && showSectionView && sectionLead?.id && (
+        <ManagementContextCopilot
+          pageKey="leads"
+          scope={{ leadId: sectionLead.id }}
+          scopeLabel={`Lead ${sectionLead.id}`}
         />
       )}
     </div>
