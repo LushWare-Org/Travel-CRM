@@ -9,6 +9,7 @@ import {
   canonicalizeBriefingResponse,
   managementBriefingResponseJsonSchema,
 } from '../ai/prompts/managementBriefing.v1.js';
+import { runAgentLoop } from '../ai/agentRunner.js';
 import { validateClaims, buildSources, insightsToClaims } from '../ai/groundingValidator.js';
 
 // One model attempt inside a 17s server deadline; the client holds a 20s
@@ -74,6 +75,12 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
     return respondWithFallback(res, page, bundle, adapter);
   }
 
+  // mode='ask': bounded tool loop. The model may gather data via domain tools
+  // before answering; the final answer is grounded against the same bundle.
+  if (mode === 'ask') {
+    return handleAsk(res, req, page, bundle, adapter, ctx);
+  }
+
   const guidanceEnabled = process.env.MANAGEMENT_COPILOT_GUIDANCE_ENABLED === 'true';
   const prompt = buildManagementBriefingPrompt({
     bundle,
@@ -118,11 +125,6 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
     unavailableSources: bundle.unavailableSources,
     notAuthorizedSources: bundle.notAuthorizedSources,
   };
-
-  if (mode === 'ask') {
-    result.answerBlocks = claims;
-  }
-
   return res.json(result);
 });
 
@@ -142,4 +144,53 @@ function respondWithFallback(res, page, bundle, adapter) {
     unavailableSources: bundle.unavailableSources,
     notAuthorizedSources: bundle.notAuthorizedSources,
   });
+}
+
+// mode='ask': bounded tool loop → grounded answer blocks. Tool-gathered data
+// is appended to the bundle as turn-local evidence so answer claims cite it
+// correctly; if the loop yields nothing, fall back to deterministic insights.
+async function handleAsk(res, req, page, bundle, adapter, ctx) {
+  const question = latestUserQuestion(req.body.messages);
+  const { claims: rawClaims, toolEvidence } = await runAgentLoop({
+    ctx,
+    scopeLabel: bundle.context.scopeLabel,
+    question,
+    evidence: bundle.evidence,
+    generateStructured,
+  });
+
+  if (!rawClaims || rawClaims.length === 0) {
+    return respondWithFallback(res, page, bundle, adapter);
+  }
+
+  const validationBundle = { ...bundle, evidence: [...bundle.evidence, ...toolEvidence] };
+  const guidanceEnabled = process.env.MANAGEMENT_COPILOT_GUIDANCE_ENABLED === 'true';
+  const canonical = canonicalizeBriefingResponse({ claims: rawClaims }, BriefingClaimSchema);
+  const { claims } = validateClaims({ claims: canonical, bundle: validationBundle, enableGuidance: guidanceEnabled });
+
+  if (claims.length === 0) {
+    return respondWithFallback(res, page, bundle, adapter);
+  }
+
+  return res.json({
+    context: {
+      pageKey: page.key,
+      scopeLabel: bundle.context.scopeLabel,
+      generatedAt: new Date().toISOString(),
+      partial: bundle.unavailableSources.length > 0,
+      noAccess: false,
+    },
+    claims: [],
+    answerBlocks: claims,
+    suggestedQuestions: adapter.defaultQuestions(bundle),
+    sources: buildSources(claims, validationBundle),
+    unavailableSources: bundle.unavailableSources,
+    notAuthorizedSources: bundle.notAuthorizedSources,
+  });
+}
+
+function latestUserQuestion(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return '';
+  const last = [...messages].reverse().find((m) => m.role === 'user');
+  return last?.content ?? '';
 }
