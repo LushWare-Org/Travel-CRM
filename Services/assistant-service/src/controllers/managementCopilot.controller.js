@@ -16,6 +16,26 @@ import prisma from '../db/client.js';
 // endpoint timeout with retry disabled (see design §7).
 const MANAGEMENT_GENERATION_DEADLINE_MS = 17_000;
 
+// Server-side feature gates. MANAGEMENT_COPILOT_ENABLED defaults off; when on,
+// MANAGEMENT_COPILOT_PAGE_KEYS (comma-separated) allowlists specific pages for
+// independent rollback. A disabled feature returns 404 so it does not reveal
+// its existence to unprivileged callers.
+function copilotEnabled() {
+  return process.env.MANAGEMENT_COPILOT_ENABLED === 'true';
+}
+
+function pageKeyAllowed(key) {
+  const allowlist = (process.env.MANAGEMENT_COPILOT_PAGE_KEYS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return allowlist.length === 0 || allowlist.includes(key);
+}
+
+function copilotNotFound(res) {
+  return res.status(404).json({ success: false, message: 'Not found' });
+}
+
 function sinceToDate(since, lastSeenAt) {
   const now = Date.now();
   switch (since) {
@@ -69,6 +89,9 @@ function writeLastSeen(actorId, pageKey, fingerprint) {
 
 export const managementCopilotTurn = asyncHandler(async (req, res) => {
   const { mode, page } = req.body;
+  if (!copilotEnabled() || !pageKeyAllowed(page.key)) {
+    return copilotNotFound(res);
+  }
   const adapter = getAdapter(page.key);
   const scope = adapter.parseScope(page.scope);
   const ctx = { user: req.user, headers: forwardActorHeaders(req) };
