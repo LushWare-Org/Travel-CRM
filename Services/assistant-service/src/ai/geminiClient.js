@@ -96,6 +96,7 @@ export async function generateStructured({
   temperature = 0.7,
   maxOutputTokens = 8192,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxAttempts = MAX_ATTEMPTS,
 }) {
   const ai = getClient();
   let lastError;
@@ -104,7 +105,7 @@ export async function generateStructured({
   // the budget it actually used.
   let currentMaxOutputTokens = maxOutputTokens;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const response = await withTimeout(
         ai.models.generateContent({
@@ -141,7 +142,7 @@ export async function generateStructured({
       const status = extractStatus(err);
       const retryable = err.isTimeout || err.isTruncated || RETRYABLE_STATUS.has(status);
 
-      if (!retryable || attempt === MAX_ATTEMPTS) {
+      if (!retryable || attempt === maxAttempts) {
         if (err instanceof AppError) throw err;
         if (err.isTruncated) {
           logger.error({ model, attempt, maxOutputTokens: currentMaxOutputTokens }, 'Gemini response repeatedly truncated at maxOutputTokens');

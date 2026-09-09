@@ -36,7 +36,9 @@ export type AssistantTurnData =
   | { tool: 'navigate'; route: string; path: string }
   | { tool: 'navigate'; route: null; path: null }
   | { tool: 'answer_faq_policy'; answered: true; snippets: AssistantSnippet[] }
-  | { tool: 'answer_faq_policy'; answered: false; fallbackMessage: string };
+  | { tool: 'answer_faq_policy'; answered: false; fallbackMessage: string }
+  | { tool: 'respond_conversationally'; mode: 'social' }
+  | { tool: 'redirect_off_topic'; redirected: true };
 
 export interface AssistantTurnView {
   assistantMessageId: string;
@@ -74,7 +76,7 @@ function fireEvent(sessionId: string, eventType: AssistantEventPayload['eventTyp
 
 function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
   const serverResult = result.serverResult as
-    | { answered?: unknown; snippets?: unknown; fallbackMessage?: unknown; route?: unknown; path?: unknown }
+    | { answered?: unknown; snippets?: unknown; fallbackMessage?: unknown; route?: unknown; path?: unknown; mode?: unknown; redirected?: unknown }
     | null
     | undefined;
 
@@ -85,6 +87,14 @@ function deriveTurnData(result: AssistantTurnResultT): AssistantTurnData {
     // Model picked a route the client never offered (or the server declined
     // it) — nothing executable to render, the bubble text carries the reply.
     return { tool: 'navigate', route: null, path: null };
+  }
+
+  if (result.toolCall.tool === 'respond_conversationally') {
+    return { tool: 'respond_conversationally', mode: 'social' };
+  }
+
+  if (result.toolCall.tool === 'redirect_off_topic') {
+    return { tool: 'redirect_off_topic', redirected: true };
   }
 
   if (serverResult?.answered === true) {

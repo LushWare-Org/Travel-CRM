@@ -4,28 +4,38 @@ import logger from '../config/logger.js';
 import { generateStructured } from '../ai/geminiClient.js';
 import {
   buildAssistantTurnPrompt,
+  canonicalizeAssistantTurnResponse,
   assistantTurnResponseSchema,
   assistantTurnResponseJsonSchema,
 } from '../ai/prompts/assistantTurn.v1.js';
 import { fetchPolicyDocuments, retrieveSnippets, FALLBACK_POLICY_MESSAGE } from '@travel-crm/policy-retrieval';
 import { BAD_GATEWAY } from '../constants/httpStatus.js';
 
-// Both guard against the same failure mode (found in /ship's red-team
-// review, confidence verified): the model's structured-output schema puts
-// no `required` list inside `args`, so `args.message` can legally be
-// missing even though the prompt asks for one. An empty `message` would
-// get stored as an assistant chat bubble client-side — and because both
-// wire schemas require `content.min(1)`, that empty message then fails
-// validation on every LATER turn's resent sliding window, permanently
-// bricking the session until a page reload. `message` must never be ''.
+// The wire contract requires every assistant bubble to have non-empty
+// content. Missing model-authored messages are legal in the flat generation
+// schema, so deterministic fallbacks must prevent an empty response from
+// poisoning every later turn's resent conversation window.
 const ROUTE_DECLINED_MESSAGE =
   "I can't take you there directly — try asking for a specific page, like packages or destinations.";
 const NO_MESSAGE_FALLBACK = "Sorry, I didn't quite catch that — could you rephrase?";
 // Matches content.max(2000) on both wire schemas (assistant.schema.js,
-// assistantTurn.ts) — the model's args are an open z.record with no length
-// cap, and Gemini's 1024-1536 token budget makes a >2000-char reply
-// reachable, so this is enforced server-side as the single source of truth.
+// assistantTurn.ts). Enforce the cap server-side as the single source of
+// truth before a response enters the client's resent conversation window.
 const MAX_MESSAGE_LENGTH = 2000;
+const ASSISTANT_TURN_DEADLINE_MS = 27_000;
+const ASSISTANT_RESOLVER_TIMEOUT_MS = 20_000;
+const SOCIAL_MESSAGES = {
+  greeting: 'Hi! I can help you explore destinations, find packages, navigate the site, or answer LushWare policy questions.',
+  thanks: "You're welcome! If you need anything else for your trip, just ask.",
+  farewell: 'Safe travels! Come back anytime you need help planning your trip.',
+  repair: "No problem. Tell me what you're trying to do, and I'll help you find the right travel option or page.",
+};
+const OFF_TOPIC_MESSAGE =
+  "I’m here to help with travel and LushWare trips. I can help you explore destinations, find packages, navigate the site, or answer a company-policy question.";
+
+function conversationalOutcomesEnabled() {
+  return process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED === 'true';
+}
 
 function latestUserMessage(messages) {
   for (let i = (messages || []).length - 1; i >= 0; i -= 1) {
@@ -35,45 +45,54 @@ function latestUserMessage(messages) {
 }
 
 // ── Public: stateless site-wide assistant turn ──
-// Implements docs/designs/site-wide-floating-assistant.md's Phase 1 tool
-// contract: the model picks exactly one tool from a fixed two-tool
-// vocabulary per turn; this handler executes the deterministic server-side
-// work that tool implies. Navigation is client-side ONLY — the server
-// validates the model's chosen route is one the client actually offered in
-// this request and resolves its path from THAT list, never from a
-// server-held route table or from model-authored text. Policy answers never
-// trust model-authored quote text — the model only picks among the
-// server-retrieved candidate snippets, and an empty result always degrades
-// to the shared FALLBACK_POLICY_MESSAGE.
+// The model selects one recognized outcome. This handler canonicalizes its
+// flat generation payload, validates a strict per-tool union, and executes
+// deterministic server-side behavior. Navigation resolves only routes the
+// client offered in this request. Policy answers quote only server-retrieved
+// snippets. Social and off-topic outcomes use reviewed server-owned copy.
 export const assistantTurn = asyncHandler(async (req, res) => {
+  const startedAt = Date.now();
   const { sessionId, messages, availableRoutes } = req.body;
+  const outcomesEnabled = conversationalOutcomesEnabled();
 
-  // Policy retrieval is deterministic and cheap (no LLM cost) — always run
-  // it against the latest message so a single generateStructured call can
-  // both pick the tool AND, if it's answer_faq_policy, choose among
-  // already-retrieved candidates in the same turn (see assistantTurn.v1.js).
+  // Policy candidates are available before the single resolver call, so a
+  // policy answer never requires a second generation. The shared fetch has
+  // its own 3-second timeout.
   const documents = await fetchPolicyDocuments();
   const candidateSnippets = retrieveSnippets(documents, latestUserMessage(messages));
+  const remainingBudgetMs = ASSISTANT_TURN_DEADLINE_MS - (Date.now() - startedAt);
+  if (remainingBudgetMs <= 0) {
+    throw new AppError('Assistant request deadline exhausted', BAD_GATEWAY);
+  }
 
-  const prompt = buildAssistantTurnPrompt({ messages, availableRoutes, candidateSnippets });
+  const prompt = buildAssistantTurnPrompt({
+    messages,
+    availableRoutes,
+    candidateSnippets,
+    conversationalOutcomesEnabled: outcomesEnabled,
+  });
   const raw = await generateStructured({
     prompt,
     schema: assistantTurnResponseJsonSchema,
     maxOutputTokens: 1024,
+    timeoutMs: Math.min(ASSISTANT_RESOLVER_TIMEOUT_MS, remainingBudgetMs),
+    maxAttempts: 1,
   });
 
-  // Zod contract check on the model's raw output (tool vocabulary + args
-  // shape) before anything is dispatched — the Gemini JSON schema constrains
-  // generation, this is the enforcement boundary.
-  const parsed = assistantTurnResponseSchema.safeParse(raw);
+  // Raw Gemini args use a flat generation schema. Canonicalization copies
+  // only the selected tool's fields and supplies its safe defaults; the
+  // strict discriminated union then protects controller dispatch.
+  const canonical = canonicalizeAssistantTurnResponse(raw, {
+    conversationalOutcomesEnabled: outcomesEnabled,
+  });
+  const parsed = assistantTurnResponseSchema.safeParse(canonical);
   if (!parsed.success) {
     throw new AppError('AI response did not match the tool contract', BAD_GATEWAY);
   }
-  const { tool, args = {} } = parsed.data;
+  const { tool, args } = parsed.data;
 
   let serverResult = null;
-  let message = args.message || '';
-
+  let message = 'message' in args ? args.message : '';
   switch (tool) {
     case 'navigate': {
       // The model names a route; the client's own router executes the actual
@@ -121,17 +140,25 @@ export const assistantTurn = asyncHandler(async (req, res) => {
       break;
     }
 
+    case 'respond_conversationally': {
+      serverResult = { mode: 'social', source: 'resolver' };
+      message = SOCIAL_MESSAGES[args.socialSubtype];
+      break;
+    }
+
+    case 'redirect_off_topic': {
+      serverResult = { redirected: true, source: 'resolver' };
+      message = OFF_TOPIC_MESSAGE;
+      break;
+    }
+
     default:
       throw new AppError('AI returned an unrecognized tool', 502);
   }
 
-  // Never let an empty OR oversized message reach the client: an empty one
-  // fails content.min(1) on resend (ROUTE_DECLINED_MESSAGE/NO_MESSAGE_FALLBACK
-  // above cover the branches that can legitimately omit one); an oversized
-  // one — args is an open z.record with no length cap, and Gemini's 1024-1536
-  // token budget makes >2000 chars reachable — fails content.max(2000) on
-  // resend just the same. Either failure permanently bricks the session
-  // (found in /ship's red-team + Claude adversarial review).
+  // Never let an empty or oversized message reach the client. Either violates
+  // the resent turn schema on the next request and would brick the session
+  // until reload.
   if (!message) message = NO_MESSAGE_FALLBACK;
   else if (message.length > MAX_MESSAGE_LENGTH) message = message.slice(0, MAX_MESSAGE_LENGTH);
   // Envelope: { success: true, data } matches every sibling AI endpoint

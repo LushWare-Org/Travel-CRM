@@ -165,8 +165,9 @@ locals {
       cpu     = "1"
       secrets = ["${var.env}-database-url", "${var.env}-direct-url", "${var.env}-internal-service-key", "${var.env}-gemini-api-key"]
       plain_env = {
-        NODE_ENV   = "production"
-        CLIENT_URL = "https://lush-ware-client-${var.env}.web.app"
+        NODE_ENV                                  = "production"
+        CLIENT_URL                                = "https://lush-ware-client-${var.env}.web.app"
+        ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = "false"
       }
       allow_unauthenticated = false
     }

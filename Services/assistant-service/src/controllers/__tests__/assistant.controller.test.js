@@ -51,6 +51,7 @@ function baseBody(overrides = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockFetchPolicyDocuments.mockResolvedValue([]);
+  delete process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED;
 });
 
 describe('POST /api/v1/assistant/turn — navigate', () => {
@@ -152,6 +153,103 @@ describe('POST /api/v1/assistant/turn — answer_faq_policy', () => {
     // The visitor-facing turn text is the server fallback too — the model's
     // authored text never reaches the visitor as policy.
     expect(res.body.data.message).toBe(FALLBACK_POLICY_MESSAGE);
+  });
+});
+
+describe('POST /api/v1/assistant/turn — conversational outcomes', () => {
+  it('returns reviewed server copy for a pure greeting when the rollout flag is enabled', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'social', socialSubtype: 'greeting', message: 'Untrusted model copy' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Hello')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      toolCall: {
+        tool: 'respond_conversationally',
+        args: { mode: 'social', socialSubtype: 'greeting' },
+      },
+      serverResult: { mode: 'social', source: 'resolver' },
+      message: 'Hi! I can help you explore destinations, find packages, navigate the site, or answer LushWare policy questions.',
+    });
+    expect(res.body.data.message).not.toContain('Untrusted');
+    expect(mockGenerateStructured).toHaveBeenCalledWith(
+      expect.objectContaining({ maxAttempts: 1, timeoutMs: expect.any(Number) }),
+    );
+  });
+
+  it.each([
+    ['thanks', "You're welcome! If you need anything else for your trip, just ask."],
+    ['farewell', 'Safe travels! Come back anytime you need help planning your trip.'],
+  ])('maps the %s subtype to its reviewed server copy', async (socialSubtype, expectedMessage) => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'social', socialSubtype },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Social message')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall.args.socialSubtype).toBe(socialSubtype);
+    expect(res.body.data.message).toBe(expectedMessage);
+  });
+
+  it('returns the reviewed warm redirect and discards model-authored args', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'redirect_off_topic',
+      args: { message: 'Go away', route: 'refunds' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Write me a sorting algorithm')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall).toEqual({ tool: 'redirect_off_topic', args: {} });
+    expect(res.body.data.serverResult).toEqual({ redirected: true, source: 'resolver' });
+    expect(res.body.data.message).toContain('help with travel and LushWare trips');
+    expect(res.body.data.message).not.toContain('Go away');
+  });
+
+  it('degrades new model tools to the legacy policy fallback while the rollout flag is disabled', async () => {
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'social', socialSubtype: 'greeting' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Hello')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall.tool).toBe('answer_faq_policy');
+    expect(res.body.data.message).toBe(FALLBACK_POLICY_MESSAGE);
+  });
+
+  it('maps malformed recognized-tool args to a canonical safe response', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'travel_general', socialSubtype: 'unknown', message: 'A visa is guaranteed.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Can you clarify?')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall.args).toEqual({ mode: 'social', socialSubtype: 'repair' });
+    expect(res.body.data.message).toContain("Tell me what you're trying to do");
+    expect(res.body.data.message).not.toContain('visa');
   });
 });
 

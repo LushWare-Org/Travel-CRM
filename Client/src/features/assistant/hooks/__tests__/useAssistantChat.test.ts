@@ -137,6 +137,48 @@ describe('useAssistantChat', () => {
     });
   });
 
+  it('sendMessage conversational path produces bubble-only turn data and reports the tool', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'respond_conversationally', args: { mode: 'social', socialSubtype: 'greeting' } },
+      serverResult: { mode: 'social', source: 'resolver' },
+      message: 'Hi! I can help with your trip.',
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await act(async () => {
+      await result.current.sendMessage('Hello');
+    });
+
+    expect(result.current.turns[0].data).toEqual({ tool: 'respond_conversationally', mode: 'social' });
+    expect(mockSendAssistantEvent.mock.calls[1][0]).toMatchObject({
+      eventType: 'response',
+      tool: 'respond_conversationally',
+      route: null,
+    });
+  });
+
+  it('sendMessage off-topic path produces bubble-only redirect data and reports the tool', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'redirect_off_topic', args: {} },
+      serverResult: { redirected: true, source: 'resolver' },
+      message: 'I can help with travel and LushWare trips.',
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await act(async () => {
+      await result.current.sendMessage('Write a sorting algorithm');
+    });
+
+    expect(result.current.turns[0].data).toEqual({ tool: 'redirect_off_topic', redirected: true });
+    expect(mockSendAssistantEvent.mock.calls[1][0]).toMatchObject({
+      eventType: 'response',
+      tool: 'redirect_off_topic',
+      route: null,
+    });
+  });
+
   it('a rejected call sets the exact error string, keeps the user message, appends no reply, fires an error event, and does not throw', async () => {
     mockSendAssistantTurn.mockRejectedValue(new Error('network down'));
 

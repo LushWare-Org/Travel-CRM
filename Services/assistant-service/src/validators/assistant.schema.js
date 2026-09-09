@@ -35,6 +35,6 @@ export const ASSISTANT_EVENT_TYPES = ['impression', 'opened', 'turn', 'response'
 export const recordEventSchema = z.object({
   sessionId: z.string().min(1).max(255),
   eventType: z.enum(ASSISTANT_EVENT_TYPES),
-  tool: z.enum(['navigate', 'answer_faq_policy']).nullable().optional(),
+  tool: z.enum(['navigate', 'answer_faq_policy', 'respond_conversationally', 'redirect_off_topic']).nullable().optional(),
   route: z.string().max(255).nullable().optional(),
 });
