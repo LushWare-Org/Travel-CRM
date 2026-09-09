@@ -10,6 +10,7 @@ import {
   managementBriefingResponseJsonSchema,
 } from '../ai/prompts/managementBriefing.v1.js';
 import { runAgentLoop } from '../ai/agentRunner.js';
+import { validateClaims, buildSources, insightsToClaims } from '../ai/groundingValidator.js';
 import prisma from '../db/client.js';
 
 // One model attempt inside a 17s server deadline; the client holds a 20s
