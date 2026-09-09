@@ -81,8 +81,18 @@ Plain env vars (set directly on the Cloud Run service, not Secret Manager):
 - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`/absent, `EMAIL_FROM` — notification, booking.
 - `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_API_VERSION` — notification.
 - `TRAVELPORT_ENV=sandbox`, `TRAVELPORT_MOCK_MODE` — flight (leave `true` until real Travelport credentials are supplied).
+- `GEMINI_ROUTER_MODEL=gemini-3.5-flash` — assistant; this model is pinned independently from the resolver.
+- `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED=false` — assistant; keep the compatible resolver outcomes disabled until the client bundle has propagated and the rollback window has been tested.
+- `ASSISTANT_ROUTER_SOCIAL_ENABLED=false` and `ASSISTANT_ROUTER_OFF_TOPIC_ENABLED=false` — assistant; these direct-response classes remain independently disabled until their evaluation gates pass.
+- `ASSISTANT_ROUTER_SOCIAL_THRESHOLD=0.95` and `ASSISTANT_ROUTER_OFF_TOPIC_THRESHOLD=0.95` — assistant confidence thresholds for the corresponding direct-response classes.
 - Every `*_SERVICE_URL` var — resolved from that same environment's `module.services[...].uri` outputs, so an environment's gateway only ever points at that same environment's backends, never another environment's.
 - `SKIP_OTP` is deliberately never set in any environment.
+
+### Assistant intent-router rollout and evaluation
+
+The router is an abstaining, stage-one classifier. A committed social or off-topic fast path is allowed only when its class flag is enabled, confidence meets that class's threshold, and the message has no actionable clause; otherwise the normal resolver handles the turn. Keep both direct-response flags disabled in every environment until the class has at least 50 `real_sanitized` direct-response examples and passes every precision, confidence, data, and zero-leak safety gate. The checked-in synthetic corpus is not evidence for enablement.
+
+Before deploying a schema change, run the assistant migration through the existing migration step (`Services/migrate-all.mjs`, using `DIRECT_URL`), which applies the nullable turn correlation and resolution metadata fields. To inspect the checked-in corpus without a model call, run `cd Services/assistant-service && npm run eval:router -- --validate-only`. A live replay uses `npm run eval:router -- evaluation/<corpus>.jsonl`, one Gemini request per row with one attempt and a 1.5-second timeout; it is currently blocked by the provider's 5 RPM quota and timeout budget, so an incomplete replay must not be used to enable a class.
 
 ## 5. Deferred, with revisit triggers
 
