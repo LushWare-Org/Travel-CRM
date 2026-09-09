@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.4.0.0] - 2026-09-09
+
+### Added
+- The site-wide assistant can now respond naturally to greetings, thanks, farewells, and conversational repair requests, and warmly redirects unrelated questions back to travel help.
+- Assistant replies now use a four-outcome response contract across the service, client, and usage telemetry, with reviewed company copy for social and off-topic responses.
+
+### Changed
+- Assistant requests now use a 27-second server deadline and 30-second client timeout, with one resolver attempt and no automatic retry for billed turns, avoiding duplicate AI calls after timeouts.
+- The new conversational outcomes ship behind a disabled rollout flag: deploy the compatible Client first, verify cached-bundle propagation, then enable the outcomes and remove the temporary flag after one tested rollback window.
+
+### Fixed
+- Model output is now canonicalized into strict per-outcome arguments before dispatch, preventing unrelated or malformed generated fields from crossing the assistant trust boundary.
+
 ## [0.3.0.1] - 2026-09-05
 
 ### Fixed
