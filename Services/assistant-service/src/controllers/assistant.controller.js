@@ -10,6 +10,8 @@ import {
 } from '../ai/prompts/assistantTurn.v1.js';
 import { fetchPolicyDocuments, retrieveSnippets, FALLBACK_POLICY_MESSAGE } from '@travel-crm/policy-retrieval';
 import { BAD_GATEWAY } from '../constants/httpStatus.js';
+import { recordAssistantResolution } from '../telemetry/assistantEvents.js';
+import { classifyAssistantIntent, confidenceBucket } from '../ai/assistantRouter.js';
 
 // The wire contract requires every assistant bubble to have non-empty
 // content. Missing model-authored messages are legal in the flat generation
@@ -32,16 +34,35 @@ const SOCIAL_MESSAGES = {
 };
 const OFF_TOPIC_MESSAGE =
   "I’m here to help with travel and LushWare trips. I can help you explore destinations, find packages, navigate the site, or answer a company-policy question.";
+const SENSITIVE_MESSAGE =
+  'I can’t provide guidance on visas, entry requirements, health, safety, legal, emergency, or financial matters. Please check the relevant official authority or contact the LushWare team.';
 
 function conversationalOutcomesEnabled() {
   return process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED === 'true';
 }
 
-function latestUserMessage(messages) {
+function latestUserTurn(messages) {
   for (let i = (messages || []).length - 1; i >= 0; i -= 1) {
-    if (messages[i].role === 'user') return messages[i].content;
+    if (messages[i].role === 'user') return messages[i];
   }
-  return '';
+  return null;
+}
+
+
+function resolutionFailureCategory(err) {
+  if (err?.aiFailureCategory) return err.aiFailureCategory;
+  const message = err instanceof Error ? err.message.toLowerCase() : '';
+  if (message.includes('deadline')) return 'server_deadline';
+  if (message.includes('timeout') || err?.name === 'AbortError') return 'timeout';
+  if (message.includes('schema') || message.includes('tool contract') || err?.name === 'ZodError') return 'schema';
+  return 'provider';
+}
+
+function safeGeneratedMessage(message) {
+  if (typeof message !== 'string') return '';
+  const withoutHtml = message.replace(/<[^>]*>/g, '').trim();
+  if (/(?:https?:\/\/|www\.|javascript:)/i.test(withoutHtml)) return '';
+  return withoutHtml;
 }
 
 // ── Public: stateless site-wide assistant turn ──
@@ -54,118 +75,200 @@ export const assistantTurn = asyncHandler(async (req, res) => {
   const startedAt = Date.now();
   const { sessionId, messages, availableRoutes } = req.body;
   const outcomesEnabled = conversationalOutcomesEnabled();
+  const latestTurn = latestUserTurn(messages);
+  const turnId = latestTurn?.id;
+  let routerResult = null;
+  let routerFailureCategory = null;
 
-  // Policy candidates are available before the single resolver call, so a
-  // policy answer never requires a second generation. The shared fetch has
-  // its own 3-second timeout.
-  const documents = await fetchPolicyDocuments();
-  const candidateSnippets = retrieveSnippets(documents, latestUserMessage(messages));
-  const remainingBudgetMs = ASSISTANT_TURN_DEADLINE_MS - (Date.now() - startedAt);
-  if (remainingBudgetMs <= 0) {
-    throw new AppError('Assistant request deadline exhausted', BAD_GATEWAY);
-  }
+  try {
+    const routerBudgetMs = ASSISTANT_TURN_DEADLINE_MS - (Date.now() - startedAt);
+    if (routerBudgetMs <= 0) throw new AppError('Assistant request deadline exhausted', BAD_GATEWAY);
 
-  const prompt = buildAssistantTurnPrompt({
-    messages,
-    availableRoutes,
-    candidateSnippets,
-    conversationalOutcomesEnabled: outcomesEnabled,
-  });
-  const raw = await generateStructured({
-    prompt,
-    schema: assistantTurnResponseJsonSchema,
-    maxOutputTokens: 1024,
-    timeoutMs: Math.min(ASSISTANT_RESOLVER_TIMEOUT_MS, remainingBudgetMs),
-    maxAttempts: 1,
-  });
-
-  // Raw Gemini args use a flat generation schema. Canonicalization copies
-  // only the selected tool's fields and supplies its safe defaults; the
-  // strict discriminated union then protects controller dispatch.
-  const canonical = canonicalizeAssistantTurnResponse(raw, {
-    conversationalOutcomesEnabled: outcomesEnabled,
-  });
-  const parsed = assistantTurnResponseSchema.safeParse(canonical);
-  if (!parsed.success) {
-    throw new AppError('AI response did not match the tool contract', BAD_GATEWAY);
-  }
-  const { tool, args } = parsed.data;
-
-  let serverResult = null;
-  let message = 'message' in args ? args.message : '';
-  switch (tool) {
-    case 'navigate': {
-      // The model names a route; the client's own router executes the actual
-      // navigation, so the server only ever resolves a route the client
-      // offered in THIS request's availableRoutes. Anything else is ignored
-      // (never executed) and logged — the model hallucinated a route.
-      const routeName = typeof args.route === 'string' ? args.route : '';
-      const offered = (availableRoutes || []).find((r) => r.name === routeName);
-      if (offered) {
-        serverResult = { route: offered.name, path: offered.path };
-        if (!message) message = 'Sure — heading there now.';
-      } else {
-        logger.warn(
-          { sessionId, requestedRoute: routeName },
-          'assistant model requested a route not offered by the client — ignoring',
-        );
-        serverResult = { route: null, path: null };
-        message = ROUTE_DECLINED_MESSAGE;
+    if (outcomesEnabled) {
+      try {
+        routerResult = await classifyAssistantIntent(latestTurn?.content ?? '', routerBudgetMs);
+      } catch (err) {
+        routerFailureCategory = resolutionFailureCategory(err);
       }
-      break;
     }
 
-    case 'answer_faq_policy': {
-      const selectedIds = new Set(Array.isArray(args.selectedSnippetIds) ? args.selectedSnippetIds : []);
-      // The model is never trusted with quote text — only with picking which
-      // of the server-retrieved candidates (if any) apply. Zero candidates,
-      // or a selection outside them, always degrades to the fixed fallback;
-      // the model cannot override this (see the design doc's no-match rule).
-      const chosen = candidateSnippets.filter((s) => selectedIds.has(s.id));
-      if (candidateSnippets.length === 0 || chosen.length === 0) {
-        serverResult = {
-          answered: false,
-          fallbackMessage: FALLBACK_POLICY_MESSAGE,
-        };
-        // The visitor-facing text for this turn is the server's fallback —
-        // never whatever policy-ish lead-in the model tried to author.
-        message = FALLBACK_POLICY_MESSAGE;
-      } else {
-        serverResult = {
-          answered: true,
-          snippets: chosen.map((s) => ({ docId: s.docId, title: s.title, quote: s.quote })),
-        };
-        if (!message) message = "Here's what I found:";
+    if (outcomesEnabled && routerResult?.decision.committed) {
+      const { classification } = routerResult;
+      const isSocial = classification.intent === 'social';
+      const tool = isSocial ? 'respond_conversationally' : 'redirect_off_topic';
+      const args = isSocial
+        ? { mode: 'social', socialSubtype: classification.socialSubtype === 'none' ? 'repair' : classification.socialSubtype }
+        : {};
+      const serverResult = isSocial
+        ? { mode: 'social', source: 'router' }
+        : { redirected: true, source: 'router' };
+      const message = isSocial ? SOCIAL_MESSAGES[args.socialSubtype] : OFF_TOPIC_MESSAGE;
+
+      if (turnId) {
+        await recordAssistantResolution({
+          sessionId,
+          turnId,
+          tool,
+          route: null,
+          metadata: {
+            routerVersion: routerResult.version,
+            routerModel: routerResult.model,
+            predictedIntent: classification.intent,
+            socialSubtype: classification.socialSubtype,
+            confidenceBucket: confidenceBucket(classification.confidence),
+            committed: true,
+            abstainReason: routerResult.decision.reason,
+            stageOneLatencyMs: Math.min(routerResult.latencyMs, ASSISTANT_TURN_DEADLINE_MS),
+            fallbackUsed: false,
+          },
+        });
       }
-      break;
+      res.json({ success: true, data: { toolCall: { tool, args }, serverResult, message } });
+      return;
     }
 
-    case 'respond_conversationally': {
-      serverResult = { mode: 'social', source: 'resolver' };
-      message = SOCIAL_MESSAGES[args.socialSubtype];
-      break;
+    const documents = await fetchPolicyDocuments();
+    const candidateSnippets = retrieveSnippets(documents, latestTurn?.content ?? '');
+    const remainingBudgetMs = ASSISTANT_TURN_DEADLINE_MS - (Date.now() - startedAt);
+    if (remainingBudgetMs <= 0) throw new AppError('Assistant request deadline exhausted', BAD_GATEWAY);
+
+    const routerIntent = routerResult?.classification.intent ?? null;
+    const prompt = buildAssistantTurnPrompt({
+      messages,
+      availableRoutes,
+      candidateSnippets,
+      conversationalOutcomesEnabled: outcomesEnabled,
+      routerHint: routerIntent,
+    });
+    const stageTwoStartedAt = Date.now();
+    const raw = await generateStructured({
+      prompt,
+      schema: assistantTurnResponseJsonSchema,
+      maxOutputTokens: 1024,
+      timeoutMs: Math.min(ASSISTANT_RESOLVER_TIMEOUT_MS, remainingBudgetMs),
+      maxAttempts: 1,
+    });
+
+    const canonical = canonicalizeAssistantTurnResponse(raw, {
+      conversationalOutcomesEnabled: outcomesEnabled,
+      routerIntent,
+    });
+    const parsed = assistantTurnResponseSchema.safeParse(canonical);
+    if (!parsed.success) throw new AppError('AI response did not match the tool contract', BAD_GATEWAY);
+
+    let { tool, args } = parsed.data;
+    if (routerIntent === 'sensitive') {
+      tool = 'answer_faq_policy';
+      args = { question: '', selectedSnippetIds: [], message: '' };
     }
 
-    case 'redirect_off_topic': {
-      serverResult = { redirected: true, source: 'resolver' };
-      message = OFF_TOPIC_MESSAGE;
-      break;
+    let serverResult = null;
+    let message = 'message' in args ? args.message : '';
+    switch (tool) {
+      case 'navigate': {
+        const routeName = typeof args.route === 'string' ? args.route : '';
+        const offered = (availableRoutes || []).find((route) => route.name === routeName);
+        if (offered) {
+          serverResult = { route: offered.name, path: offered.path };
+          if (!message) message = 'Sure — heading there now.';
+        } else {
+          logger.warn({ sessionId, requestedRoute: routeName }, 'assistant model requested a route not offered by the client — ignoring');
+          serverResult = { route: null, path: null };
+          message = ROUTE_DECLINED_MESSAGE;
+        }
+        break;
+      }
+      case 'answer_faq_policy': {
+        const selectedIds = new Set(Array.isArray(args.selectedSnippetIds) ? args.selectedSnippetIds : []);
+        const chosen = candidateSnippets.filter((snippet) => selectedIds.has(snippet.id));
+        if (routerIntent === 'sensitive') {
+          serverResult = { answered: false, fallbackMessage: SENSITIVE_MESSAGE };
+          message = SENSITIVE_MESSAGE;
+        } else if (candidateSnippets.length === 0 || chosen.length === 0) {
+          serverResult = { answered: false, fallbackMessage: FALLBACK_POLICY_MESSAGE };
+          message = FALLBACK_POLICY_MESSAGE;
+        } else {
+          serverResult = {
+            answered: true,
+            snippets: chosen.map((snippet) => ({ docId: snippet.docId, title: snippet.title, quote: snippet.quote })),
+          };
+          if (!message) message = "Here's what I found:";
+        }
+        break;
+      }
+      case 'respond_conversationally':
+        if (args.mode === 'travel_general' && routerIntent === 'travel_general') {
+          serverResult = { mode: 'travel_general', source: 'resolver' };
+          message = safeGeneratedMessage(args.message);
+        } else {
+          serverResult = { mode: 'social', source: 'resolver' };
+          message = SOCIAL_MESSAGES[args.socialSubtype];
+        }
+        break;
+      case 'redirect_off_topic':
+        serverResult = { redirected: true, source: 'resolver' };
+        message = OFF_TOPIC_MESSAGE;
+        break;
+      default:
+        throw new AppError('AI returned an unrecognized tool', BAD_GATEWAY);
     }
 
-    default:
-      throw new AppError('AI returned an unrecognized tool', 502);
+    if (!message) message = NO_MESSAGE_FALLBACK;
+    else if (message.length > MAX_MESSAGE_LENGTH) message = message.slice(0, MAX_MESSAGE_LENGTH);
+
+    if (turnId) {
+      const classification = routerResult?.classification;
+      await recordAssistantResolution({
+        sessionId,
+        turnId,
+        tool,
+        route: tool === 'navigate' && typeof serverResult?.route === 'string' ? serverResult.route : null,
+        metadata: {
+          ...(routerResult && {
+            routerVersion: routerResult.version,
+            routerModel: routerResult.model,
+            predictedIntent: classification.intent,
+            socialSubtype: classification.socialSubtype,
+            confidenceBucket: confidenceBucket(classification.confidence),
+            committed: false,
+            abstainReason: routerResult.decision.reason,
+            stageOneLatencyMs: Math.min(routerResult.latencyMs, ASSISTANT_TURN_DEADLINE_MS),
+          }),
+          finalStageTwoTool: tool,
+          stageTwoLatencyMs: Math.min(Date.now() - stageTwoStartedAt, ASSISTANT_TURN_DEADLINE_MS),
+          fallbackUsed:
+            routerIntent === 'sensitive' ||
+            (tool === 'navigate' && serverResult?.route === null) ||
+            (tool === 'answer_faq_policy' && serverResult?.answered === false),
+          ...(routerFailureCategory && { failureCategory: routerFailureCategory }),
+        },
+      });
+    }
+    res.json({ success: true, data: { toolCall: { tool, args }, serverResult, message } });
+  } catch (err) {
+    if (turnId) {
+      await recordAssistantResolution({
+        sessionId,
+        turnId,
+        tool: null,
+        route: null,
+        metadata: {
+          ...(routerResult && {
+            routerVersion: routerResult.version,
+            routerModel: routerResult.model,
+            predictedIntent: routerResult.classification.intent,
+            socialSubtype: routerResult.classification.socialSubtype,
+            confidenceBucket: confidenceBucket(routerResult.classification.confidence),
+            committed: false,
+            abstainReason: routerResult.decision.reason,
+            stageOneLatencyMs: Math.min(routerResult.latencyMs, ASSISTANT_TURN_DEADLINE_MS),
+          }),
+          stageTwoLatencyMs: Math.min(Date.now() - startedAt, ASSISTANT_TURN_DEADLINE_MS),
+          fallbackUsed: false,
+          failureCategory: resolutionFailureCategory(err),
+        },
+      });
+    }
+    throw err;
   }
-
-  // Never let an empty or oversized message reach the client. Either violates
-  // the resent turn schema on the next request and would brick the session
-  // until reload.
-  if (!message) message = NO_MESSAGE_FALLBACK;
-  else if (message.length > MAX_MESSAGE_LENGTH) message = message.slice(0, MAX_MESSAGE_LENGTH);
-  // Envelope: { success: true, data } matches every sibling AI endpoint
-  // (wizard.controller.js's wizardTurn) and the client's parseEnvelope
-  // (Client/src/services/http/envelope.ts requires success===true/status
-  // ==='success' before it unwraps `data`) — a bare body here would make
-  // every turn fail client-side with "did not succeed" (found in /ship
-  // review, api-contract specialist).
-  res.json({ success: true, data: { toolCall: { tool, args }, serverResult, message } });
 });

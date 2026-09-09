@@ -32,9 +32,12 @@ export const assistantTurnSchema = z.object({
 
 export const ASSISTANT_EVENT_TYPES = ['impression', 'opened', 'turn', 'response', 'nav_click', 'error'];
 
-export const recordEventSchema = z.object({
-  sessionId: z.string().min(1).max(255),
-  eventType: z.enum(ASSISTANT_EVENT_TYPES),
-  tool: z.enum(['navigate', 'answer_faq_policy', 'respond_conversationally', 'redirect_off_topic']).nullable().optional(),
-  route: z.string().max(255).nullable().optional(),
-});
+export const recordEventSchema = z
+  .object({
+    sessionId: z.string().min(1).max(255),
+    turnId: z.string().min(1).max(255).nullable().optional(),
+    eventType: z.enum(ASSISTANT_EVENT_TYPES),
+    tool: z.enum(['navigate', 'answer_faq_policy', 'respond_conversationally', 'redirect_off_topic']).nullable().optional(),
+    route: z.string().max(255).nullable().optional(),
+  })
+  .strict();

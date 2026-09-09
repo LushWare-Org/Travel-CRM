@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.5.0.0] - 2026-09-09
+
+### Added
+- Assistant telemetry now correlates browser delivery and server resolution events by turn ID, with strict privacy-safe resolution metadata and a composite session/turn database index.
+- Added an abstaining two-stage assistant intent router with independently disabled social/off-topic fast paths, stage agreement for low-risk travel guidance, and a live nested-fold replay command.
+- Added a strict synthetic safety corpus for router development; synthetic rows are explicitly excluded from production enablement evidence.
+
 ## [0.4.0.0] - 2026-09-09
 
 ### Added

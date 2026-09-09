@@ -40,6 +40,13 @@ Each service has its own `package.json` — there is no root workspace. Commands
 - **Start dev:** `cd Services/<name> && npm run dev` (nodemon with hot reload)
 - **Start prod:** `cd Services/<name> && npm start`
 
+### Assistant intent-router dark launch
+- **Validate the checked-in corpus without calling Gemini:** `cd Services/assistant-service && npm run eval:router -- --validate-only`. The default `evaluation/assistant-router.synthetic.v1.jsonl` corpus is for development and safety fixtures only; synthetic rows never count as production enablement evidence.
+- **Run a live replay only with an approved, already-sanitized corpus:** `cd Services/assistant-service && npm run eval:router -- evaluation/<corpus>.jsonl`. Each row makes one Gemini request using `GEMINI_ROUTER_MODEL`, a 1.5-second timeout, and no retry. The live replay is currently blocked by the provider's 5 RPM quota and this timeout budget, so an incomplete replay cannot authorize rollout.
+- **Keep all router gates disabled by default:** `ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED`, `ASSISTANT_ROUTER_SOCIAL_ENABLED`, and `ASSISTANT_ROUTER_OFF_TOPIC_ENABLED` must remain `false`. The social and off-topic classes are independent gates with a `0.95` confidence threshold; enable either only after at least 50 `real_sanitized` direct-response examples for that class pass every precision, confidence, data, and zero-leak safety gate.
+- **Apply the assistant telemetry migration before deploying the service:** `cd Services/assistant-service && npm run db:migrate:deploy`.
+
+
 ### Database (Prisma services)
 - **Generate client:** `cd Services/<name> && npm run db:generate`
 - **Push schema (local/dev only):** `cd Services/<name> && npm run db:push`

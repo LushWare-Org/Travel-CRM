@@ -168,6 +168,11 @@ locals {
         NODE_ENV                                  = "production"
         CLIENT_URL                                = "https://lush-ware-client-${var.env}.web.app"
         ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = "false"
+        GEMINI_ROUTER_MODEL                       = "gemini-3.5-flash"
+        ASSISTANT_ROUTER_SOCIAL_ENABLED           = "false"
+        ASSISTANT_ROUTER_OFF_TOPIC_ENABLED        = "false"
+        ASSISTANT_ROUTER_SOCIAL_THRESHOLD         = "0.95"
+        ASSISTANT_ROUTER_OFF_TOPIC_THRESHOLD      = "0.95"
       }
       allow_unauthenticated = false
     }

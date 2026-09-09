@@ -8,11 +8,11 @@ import logger from '../config/logger.js';
 // catch, log, and still answer { success: true }. Telemetry loss is
 // acceptable; breaking the widget over a telemetry write is not.
 export const recordEvent = asyncHandler(async (req, res) => {
-  const { sessionId, eventType, tool, route } = req.body;
+  const { sessionId, turnId, eventType, tool, route } = req.body;
 
   try {
     await prisma.assistantEvent.create({
-      data: { sessionId, eventType, tool: tool ?? null, route: route ?? null },
+      data: { sessionId, turnId: turnId ?? null, eventType, tool: tool ?? null, route: route ?? null, metadata: null },
     });
   } catch (err) {
     logger.error({ err, sessionId, eventType }, 'Failed to persist assistant telemetry event');

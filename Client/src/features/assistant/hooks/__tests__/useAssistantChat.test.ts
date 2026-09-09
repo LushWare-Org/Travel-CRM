@@ -89,8 +89,19 @@ describe('useAssistantChat', () => {
     expect(sentPayload.availableRoutes.every((route: { name: string; path: string }) => 'name' in route && 'path' in route)).toBe(true);
 
     expect(mockSendAssistantEvent.mock.calls.map(([payload]) => payload.eventType)).toEqual(['turn', 'response']);
-    expect(mockSendAssistantEvent.mock.calls[0][0]).toMatchObject({ eventType: 'turn', tool: null, route: null, sessionId: result.current.sessionId });
-    expect(mockSendAssistantEvent.mock.calls[1][0]).toMatchObject({ eventType: 'response', tool: 'navigate', route: 'packages' });
+    expect(mockSendAssistantEvent.mock.calls[0][0]).toMatchObject({
+      eventType: 'turn',
+      turnId: sentPayload.messages[0].id,
+      tool: null,
+      route: null,
+      sessionId: result.current.sessionId,
+    });
+    expect(mockSendAssistantEvent.mock.calls[1][0]).toMatchObject({
+      eventType: 'response',
+      turnId: sentPayload.messages[0].id,
+      tool: 'navigate',
+      route: 'packages',
+    });
   });
 
   it('sendMessage answer_faq_policy matched path resolves the snippet data and reports the faq tool on the response event', async () => {
@@ -155,6 +166,24 @@ describe('useAssistantChat', () => {
       eventType: 'response',
       tool: 'respond_conversationally',
       route: null,
+    });
+  });
+
+  it('preserves the resolver-owned travel_general mode for bubble-only turns', async () => {
+    mockSendAssistantTurn.mockResolvedValue({
+      toolCall: { tool: 'respond_conversationally', args: { mode: 'travel_general', message: 'Leave one flexible day.' } },
+      serverResult: { mode: 'travel_general', source: 'resolver' },
+      message: 'Leave one flexible day.',
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+    await act(async () => {
+      await result.current.sendMessage('How should I structure a relaxed trip?');
+    });
+
+    expect(result.current.turns[0].data).toEqual({
+      tool: 'respond_conversationally',
+      mode: 'travel_general',
     });
   });
 

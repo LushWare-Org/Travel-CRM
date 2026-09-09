@@ -121,7 +121,7 @@ export default function AssistantWidget() {
   // actually renders the widget (mounting on an excluded route renders null).
   useEffect(() => {
     if (!isAssistantExcludedPath(mountPathname.current)) {
-      void sendAssistantEvent({ sessionId: chat.sessionId, eventType: 'impression', tool: null, route: null });
+      void sendAssistantEvent({ sessionId: chat.sessionId, turnId: null, eventType: 'impression', tool: null, route: null });
     }
   }, [chat.sessionId]);
 
@@ -145,7 +145,7 @@ export default function AssistantWidget() {
   useEffect(() => {
     if (isOpen && !openedEventFired.current && !isAssistantExcludedPath(location.pathname)) {
       openedEventFired.current = true;
-      void sendAssistantEvent({ sessionId: chat.sessionId, eventType: 'opened', tool: null, route: null });
+      void sendAssistantEvent({ sessionId: chat.sessionId, turnId: null, eventType: 'opened', tool: null, route: null });
     }
   }, [isOpen, location.pathname, chat.sessionId]);
 
@@ -158,7 +158,7 @@ export default function AssistantWidget() {
   // suite when it started exercising that transition).
   const handleChipClick = useCallback(
     (route: string, path: string) => {
-      void sendAssistantEvent({ sessionId: chat.sessionId, eventType: 'nav_click', tool: 'navigate', route });
+      void sendAssistantEvent({ sessionId: chat.sessionId, turnId: null, eventType: 'nav_click', tool: 'navigate', route });
       navigate(path);
     },
     [chat.sessionId, navigate],

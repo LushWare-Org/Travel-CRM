@@ -5,7 +5,7 @@ vi.mock('../../http/client', () => ({ default: { post: mockPost } }));
 
 import { sendAssistantEvent } from '../assistantEvents';
 
-const PAYLOAD = { sessionId: 'sess-1', eventType: 'impression' as const, tool: null, route: null };
+const PAYLOAD = { sessionId: 'sess-1', turnId: null, eventType: 'impression' as const, tool: null, route: null };
 
 beforeEach(() => {
   mockPost.mockReset();

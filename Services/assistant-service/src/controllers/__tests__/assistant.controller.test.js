@@ -2,17 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { FALLBACK_POLICY_MESSAGE } from '@travel-crm/policy-retrieval';
 
-const { mockGenerateStructured, mockPrisma, mockFetchPolicyDocuments } = vi.hoisted(() => ({
+const { mockGenerateStructured, mockPrisma, mockFetchPolicyDocuments, mockClassifyAssistantIntent } = vi.hoisted(() => ({
   mockGenerateStructured: vi.fn(),
   mockPrisma: {
     assistantEvent: { create: vi.fn() },
   },
   mockFetchPolicyDocuments: vi.fn(),
+  mockClassifyAssistantIntent: vi.fn(),
 }));
 
 vi.mock('../../ai/geminiClient.js', () => ({
   generateStructured: mockGenerateStructured,
   isAIConfigured: vi.fn(() => true),
+}));
+vi.mock('../../ai/assistantRouter.js', () => ({
+  classifyAssistantIntent: mockClassifyAssistantIntent,
+  confidenceBucket: (confidence) => (confidence >= 0.9 ? 'high' : confidence >= 0.7 ? 'medium' : 'low'),
 }));
 
 // app.js pulls in routes → db/client.js, which constructs a real
@@ -51,7 +56,129 @@ function baseBody(overrides = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockFetchPolicyDocuments.mockResolvedValue([]);
+  mockClassifyAssistantIntent.mockRejectedValue(new Error('router unavailable'));
+  delete process.env.ASSISTANT_ROUTER_SOCIAL_ENABLED;
+  delete process.env.ASSISTANT_ROUTER_OFF_TOPIC_ENABLED;
   delete process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED;
+});
+
+describe('POST /api/v1/assistant/turn — stage-one router', () => {
+  it('uses an enabled high-confidence social fast path without policy retrieval or stage two', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockClassifyAssistantIntent.mockResolvedValue({
+      classification: {
+        intent: 'social',
+        confidence: 0.99,
+        hasActionableClause: false,
+        socialSubtype: 'greeting',
+        reasonCode: 'single_social',
+      },
+      decision: { committed: true, reason: 'threshold_met' },
+      latencyMs: 12,
+      version: 'assistant-router.v1',
+      model: 'gemini-3.5-flash',
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Hello')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({
+      toolCall: { tool: 'respond_conversationally', args: { mode: 'social', socialSubtype: 'greeting' } },
+      serverResult: { mode: 'social', source: 'router' },
+    });
+    expect(mockFetchPolicyDocuments).not.toHaveBeenCalled();
+    expect(mockGenerateStructured).not.toHaveBeenCalled();
+  });
+
+  it('requires stage-one and stage-two travel_general agreement for model-authored guidance', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockClassifyAssistantIntent.mockResolvedValue({
+      classification: {
+        intent: 'travel_general',
+        confidence: 0.94,
+        hasActionableClause: true,
+        socialSubtype: 'none',
+        reasonCode: 'low_risk_travel',
+      },
+      decision: { committed: false, reason: 'resolver_required' },
+      latencyMs: 8,
+      version: 'assistant-router.v1',
+      model: 'gemini-3.5-flash',
+    });
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'travel_general', message: 'Consider choosing one region and leaving a flexible day.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('How should I plan a relaxed week?')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult).toEqual({ mode: 'travel_general', source: 'resolver' });
+    expect(res.body.data.message).toBe('Consider choosing one region and leaving a flexible day.');
+  });
+
+  it('does not accept travel_general model text when stage one disagrees', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockClassifyAssistantIntent.mockResolvedValue({
+      classification: {
+        intent: 'ambiguous',
+        confidence: 0.5,
+        hasActionableClause: true,
+        socialSubtype: 'none',
+        reasonCode: 'mixed_or_unclear',
+      },
+      decision: { committed: false, reason: 'resolver_required' },
+      latencyMs: 7,
+      version: 'assistant-router.v1',
+      model: 'gemini-3.5-flash',
+    });
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'travel_general', message: 'Untrusted generated guidance.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Maybe plan something and tell me the refund price')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.serverResult).toEqual({ mode: 'social', source: 'resolver' });
+    expect(res.body.data.message).not.toContain('Untrusted');
+  });
+
+  it('replaces sensitive guidance with fixed escalation copy', async () => {
+    process.env.ASSISTANT_CONVERSATIONAL_OUTCOMES_ENABLED = 'true';
+    mockClassifyAssistantIntent.mockResolvedValue({
+      classification: {
+        intent: 'sensitive',
+        confidence: 0.99,
+        hasActionableClause: true,
+        socialSubtype: 'none',
+        reasonCode: 'protected_topic',
+      },
+      decision: { committed: false, reason: 'resolver_required' },
+      latencyMs: 6,
+      version: 'assistant-router.v1',
+      model: 'gemini-3.5-flash',
+    });
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'respond_conversationally',
+      args: { mode: 'travel_general', message: 'You do not need a visa.' },
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/turn')
+      .send(baseBody({ messages: [assistantMsg('Do I need a visa tomorrow?')] }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.toolCall.tool).toBe('answer_faq_policy');
+    expect(res.body.data.message).toContain('relevant official authority');
+    expect(res.body.data.message).not.toContain('do not need a visa');
+  });
 });
 
 describe('POST /api/v1/assistant/turn — navigate', () => {
@@ -70,6 +197,21 @@ describe('POST /api/v1/assistant/turn — navigate', () => {
     expect(res.body.data.toolCall.tool).toBe('navigate');
     expect(res.body.data.serverResult).toEqual({ route: 'destinations', path: '/destinations-international' });
     expect(res.body.data.message).toBe('Sure — taking you to the destinations page.');
+    expect(mockClassifyAssistantIntent).not.toHaveBeenCalled();
+    expect(mockPrisma.assistantEvent.create).toHaveBeenCalledWith({
+      data: {
+        sessionId: 'session-1',
+        turnId: 'm-Take me to international destinations',
+        eventType: 'resolution',
+        tool: 'navigate',
+        route: 'destinations',
+        metadata: expect.objectContaining({
+          finalStageTwoTool: 'navigate',
+          fallbackUsed: false,
+          stageTwoLatencyMs: expect.any(Number),
+        }),
+      },
+    });
   });
 
   it('ignores a route the client never offered — null result, nothing executed', async () => {
@@ -304,6 +446,20 @@ describe('POST /api/v1/assistant/turn — model tool-contract enforcement', () =
     expect(res.body.success).toBe(false);
     expect(res.body.message).toBe('AI response did not match the tool contract');
     expect(res.body.serverResult).toBeUndefined();
+    expect(mockPrisma.assistantEvent.create).toHaveBeenCalledWith({
+      data: {
+        sessionId: 'session-1',
+        turnId: 'm-Email me the refund policy',
+        eventType: 'resolution',
+        tool: null,
+        route: null,
+        metadata: expect.objectContaining({
+          failureCategory: 'schema',
+          fallbackUsed: false,
+          stageTwoLatencyMs: expect.any(Number),
+        }),
+      },
+    });
   });
 
 });
