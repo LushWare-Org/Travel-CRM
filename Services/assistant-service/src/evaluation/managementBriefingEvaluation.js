@@ -42,7 +42,9 @@ export const ManagementBriefingCannedRowSchema = z
 function normalizeProse(value) {
   return String(value ?? '')
     .toLowerCase()
-    .replace(/[_\-]+/g, ' ')
+    // `-` at the end of a character class is already literal, so the escape was
+    // redundant. Pre-existing: this package had no CI lint step until now.
+    .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

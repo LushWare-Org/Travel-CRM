@@ -9,9 +9,9 @@ type ClaimItemProps = {
 };
 
 function severityStyles(severity: CopilotClaim["severity"]) {
-  if (severity === "critical") return { className: "text-destructive", label: "Critical", Icon: OctagonAlert };
-  if (severity === "warning") return { className: "text-warning", label: "Warning", Icon: AlertTriangle };
-  return { className: "text-foreground", label: "Informational", Icon: null };
+  if (severity === "critical") return { textClass: "font-semibold", markerClass: "text-destructive", label: "Critical", Icon: OctagonAlert, badgeVariant: "destructive" as const };
+  if (severity === "warning") return { textClass: "font-medium", markerClass: "text-warning", label: "Warning", Icon: AlertTriangle, badgeVariant: "warning" as const };
+  return { textClass: "font-normal", markerClass: "text-foreground", label: "Information", Icon: null, badgeVariant: "muted" as const };
 }
 
 /**
@@ -20,14 +20,14 @@ function severityStyles(severity: CopilotClaim["severity"]) {
  * Semantic status is always carried by text and icon, never color alone.
  */
 export default function ClaimItem({ claim, sources, announce }: ClaimItemProps) {
-  const { className, label, Icon } = severityStyles(claim.severity);
+  const { textClass, markerClass, label, Icon, badgeVariant } = severityStyles(claim.severity);
 
   return (
     <div className="space-y-1">
-      <p className={`text-base leading-relaxed ${className}`}>
+      <p className={`text-sm leading-relaxed text-foreground ${textClass}`}>
         {Icon && (
           <>
-            <Icon className="mr-1 inline h-4 w-4 align-[-2px]" aria-hidden="true" />
+            <Icon className={`mr-1.5 inline h-3.5 w-3.5 align-text-bottom ${markerClass}`} aria-hidden="true" />
             <span className="sr-only">{label}: </span>
           </>
         )}
@@ -48,7 +48,7 @@ export default function ClaimItem({ claim, sources, announce }: ClaimItemProps) 
         </div>
       )}
 
-      <EvidenceAction evidenceIds={claim.evidenceIds} sources={sources} announce={announce} />
+      <EvidenceAction evidenceIds={claim.evidenceIds} sources={sources} announce={announce} badgeVariant={badgeVariant} />
     </div>
   );
 }

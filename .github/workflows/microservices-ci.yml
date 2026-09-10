@@ -5,9 +5,17 @@ on:
     branches: [main, microservices]
     paths: &ci-paths
       - 'Services/shared/contracts/**'
-      - 'Services/lead-service/**'
+      - 'Services/analytics-service/**'
+      - 'Services/assistant-service/**'
+      - 'Services/auth-service/**'
       - 'Services/billing-service/**'
+      - 'Services/booking-service/**'
+      - 'Services/career-service/**'
+      - 'Services/flight-service/**'
+      - 'Services/lead-service/**'
+      - 'Services/notification-service/**'
       - 'Services/package-service/**'
+      - 'Services/user-service/**'
       - 'Management/**'
       - '.github/workflows/microservices-ci.yml'
   push:
@@ -42,10 +50,29 @@ jobs:
         working-directory: Services/shared/contracts
         run: npm test
 
-  lead-service:
-    name: lead-service tests
+  # One job per backend service, driven by a matrix rather than a copied block.
+  # Eight services had test suites that never ran in CI, so a change to any of
+  # them could ship with its tests red and nobody would see it.
+  #
+  # `fail-fast: false` is deliberate: one service failing must not cancel the
+  # others, or a single red suite hides the state of every other one.
+  service:
+    name: ${{ matrix.service }} tests
     runs-on: ubuntu-latest
     needs: contracts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { service: lead-service,         contracts: true,  lint: true }
+          - { service: billing-service,      contracts: true,  lint: true }
+          - { service: assistant-service,    contracts: true,  lint: true }
+          - { service: user-service,         contracts: true,  lint: false }
+          - { service: analytics-service,    contracts: false, lint: false }
+          - { service: auth-service,         contracts: false, lint: false }
+          - { service: booking-service,      contracts: false, lint: false }
+          - { service: career-service,       contracts: false, lint: false }
+          - { service: notification-service, contracts: false, lint: false }
     steps:
       - uses: actions/checkout@v4
 
@@ -55,56 +82,30 @@ jobs:
           cache: npm
           cache-dependency-path: |
             Services/shared/contracts/package-lock.json
-            Services/lead-service/package-lock.json
+            Services/${{ matrix.service }}/package-lock.json
 
-      # lead-service depends on @travel-crm/contracts via a `file:` link, so
-      # the shared package's own node_modules must exist before `npm ci` here
-      # can resolve it — these are independent npm projects, no workspace.
+      # Services that depend on @travel-crm/contracts do so via a `file:` link,
+      # so the shared package's own node_modules must exist before `npm ci` in
+      # the service can resolve it — these are independent npm projects with no
+      # workspace, which is why the install is a separate conditional step.
       - name: Install shared/contracts
+        if: matrix.contracts
         working-directory: Services/shared/contracts
         run: npm ci
 
-      - name: Install lead-service
-        working-directory: Services/lead-service
+      - name: Install ${{ matrix.service }}
+        working-directory: Services/${{ matrix.service }}
         run: npm ci
 
+      # Not every service has a lint script yet; `lint: false` above skips this
+      # rather than failing on a missing script.
       - name: Lint
-        working-directory: Services/lead-service
+        if: matrix.lint
+        working-directory: Services/${{ matrix.service }}
         run: npm run lint
 
       - name: Test
-        working-directory: Services/lead-service
-        run: npm test
-
-  billing-service:
-    name: billing-service tests
-    runs-on: ubuntu-latest
-    needs: contracts
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: |
-            Services/shared/contracts/package-lock.json
-            Services/billing-service/package-lock.json
-
-      - name: Install shared/contracts
-        working-directory: Services/shared/contracts
-        run: npm ci
-
-      - name: Install billing-service
-        working-directory: Services/billing-service
-        run: npm ci
-
-      - name: Lint
-        working-directory: Services/billing-service
-        run: npm run lint
-
-      - name: Test
-        working-directory: Services/billing-service
+        working-directory: Services/${{ matrix.service }}
         run: npm test
 
   management:
@@ -168,19 +169,27 @@ jobs:
         working-directory: Services/package-service
         run: npm run test:ci
 
+  # NOT COVERED: flight-service. Its integration suite (test/integration/
+  # flights.api.test.js) currently has 7 failing tests on `microservices` —
+  # pre-existing, and untouched by this workflow. They appear to be drift from
+  # the `feat(flight-service): add Zod validation layer` commit: the search/book
+  # payloads now fail validation (422) and two endpoints answer 404, so the
+  # tests were written against the pre-validation API. Wiring the job in before
+  # that is fixed would make CI red for everyone. Its `Services/flight-service/**`
+  # path trigger is kept above so the gap stays visible in the workflow diff.
+
   ci-status:
     name: Microservices CI Status
     runs-on: ubuntu-latest
-    needs: [contracts, lead-service, billing-service, package-service, management]
+    needs: [contracts, service, management, package-service]
     if: always()
     steps:
       - name: Check status
         run: |
           if [ "${{ needs.contracts.result }}" != "success" ] || \
-             [ "${{ needs.lead-service.result }}" != "success" ] || \
-             [ "${{ needs.billing-service.result }}" != "success" ] || \
-             [ "${{ needs.package-service.result }}" != "success" ] || \
-             [ "${{ needs.management.result }}" != "success" ]; then
+             [ "${{ needs.service.result }}" != "success" ] || \
+             [ "${{ needs.management.result }}" != "success" ] || \
+             [ "${{ needs.package-service.result }}" != "success" ]; then
             echo "Microservices CI failed"
             exit 1
           fi

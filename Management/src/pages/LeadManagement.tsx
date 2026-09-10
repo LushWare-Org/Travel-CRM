@@ -31,7 +31,7 @@ import LeadDetailPane from "../features/lead-management/components/LeadDetailPan
 import ActiveSalesRepsDialog from "../features/lead-management/components/ActiveSalesRepsDialog";
 import { LIFECYCLE_STATUS_COLORS, LIFECYCLE_STATUS_LABELS } from "../features/lead-management/components/LeadStatusBadge";
 import type { LifecycleStatus } from "../features/lead-management/components/LeadStatusBadge";
-import type { LeadCopilotScope } from "../features/copilot/types";
+import type { CopilotScope } from "../features/copilot/types";
 
 type FilterKey = 'all' | LifecycleStatus;
 import { Button } from "@/components/ui/button";
@@ -399,7 +399,7 @@ const LeadManagement = () => {
   // The copilot scope is the record selected in the persistent pane; nothing is
   // sent when no lead is selected.
   const detailLeadId = detailLead ? String(detailLead.id ?? detailLead._id ?? "").trim() : "";
-  const copilotScope: LeadCopilotScope = detailLeadId ? { leadId: detailLeadId } : null;
+  const copilotScope: CopilotScope | null = detailLeadId ? { leadId: detailLeadId } : null;
   const copilotLabel = detailLead
     ? String(detailLead.name ?? "") || `Lead ${detailLeadId}`
     : "Leads";

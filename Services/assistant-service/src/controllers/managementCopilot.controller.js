@@ -64,7 +64,18 @@ function sinceToDate(since, lastSeenAt) {
 }
 
 function isNoAccess(bundle) {
-  return bundle.notAuthorizedSources.length > 0 && bundle.evidence.length === 0;
+  const attempted = bundle.attemptedSources ?? [];
+  const denied = bundle.notAuthorizedSources ?? [];
+  // No access means every source we actually tried was refused. The
+  // `attempted.length > 0` guard matters: with zero attempts `[].every(...)` is
+  // vacuously true, which would render "you do not have access" on a page whose
+  // sources were merely skipped by a `when(ctx)` predicate — a false denial on
+  // a quiet page. Adapters that predate `attemptedSources` (the leads record
+  // path) fall back to the previous rule.
+  if (attempted.length === 0) {
+    return denied.length > 0 && bundle.evidence.length === 0;
+  }
+  return denied.length === attempted.length && bundle.evidence.length === 0;
 }
 
 function scopeFingerprint(scope) {
@@ -95,7 +106,11 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   const scope = adapter.parseScope(page.scope);
   const ctx = { user: req.user, headers: forwardActorHeaders(req) };
 
-  const bundle = await adapter.loadEvidence(ctx, scope);
+  // The phase is passed through so the engine can apply the right per-source
+  // budget: the deterministic phase exists to be instant and gets a short leash,
+  // the briefing phase can wait longer for completeness. Adapters that ignore
+  // the third argument are unaffected.
+  const bundle = await adapter.loadEvidence(ctx, scope, { mode });
   const noAccess = isNoAccess(bundle);
 
   // Server-authoritative last_visit window: prefer the stored value over the
@@ -111,9 +126,31 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
 
   // mode='deterministic': no Gemini — stamp + deterministic insights only.
   if (mode === 'deterministic') {
+    const insights = adapter.computeInsights(bundle, sinceBoundary);
     return res.json({
       context: { pageKey: page.key, scopeLabel: bundle.context.scopeLabel, asOf: bundle.context.asOf, noAccess },
-      insights: adapter.computeInsights(bundle, sinceBoundary),
+      insights,
+      // Same payload the briefing path already builds. Without it the cold-open
+      // evidence action has no `sources` entry to render from and falls back to
+      // "not captured" — the phase the trust claim actually rests on — and the
+      // client has no per-source count to distinguish an empty page from a
+      // quiet one.
+      sources: [
+        ...buildSources(insightsToClaims(insights), bundle),
+        // Per-source baselines are not cited by any claim — there is nothing to
+        // reveal — so `buildSources` omits them. They still belong in the
+        // response: they are server-computed counts of how much was actually
+        // examined, which is what lets the client distinguish a quiet page from
+        // an empty one instead of asserting a zero it never measured.
+        ...bundle.evidence
+          .filter((item) => item.recordRef?.kind === 'source')
+          .map((item) => ({
+            id: item.id,
+            label: item.label,
+            type: item.type,
+            capturedValue: item.value,
+          })),
+      ],
       unavailableSources: bundle.unavailableSources,
       notAuthorizedSources: bundle.notAuthorizedSources,
     });

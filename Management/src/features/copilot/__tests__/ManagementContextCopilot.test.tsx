@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { CopilotSectionApi } from '../ManagementContextCopilot';
-import type { LeadCopilotScope } from '../types';
+import type { CopilotScope } from '../types';
 import { visibilityKey, mobileCueKey } from '../useCopilotVisibility';
 import { setViewport } from './copilotTestUtils';
 
@@ -58,7 +58,7 @@ function StubSections({ api: sectionApi }: { api: CopilotSectionApi }) {
   );
 }
 
-function renderShell({ scope = { leadId: 'a' } as LeadCopilotScope, withAuth = true } = {}) {
+function renderShell({ scope = { leadId: 'a' } as CopilotScope | null, withAuth = true } = {}) {
   const tree = (
     <ManagementContextCopilot pageKey="leads" scope={scope} scopeLabel="Alice Traveller">
       {(sectionApi) => <StubSections api={sectionApi} />}

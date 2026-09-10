@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useCopilotSession, BRIEFING_FRESHNESS_MS } from '../useCopilotSession';
-import type { LeadCopilotScope } from '../types';
+import type { CopilotScope } from '../types';
 import { deferred } from '@/test/deferred';
 
 const api = vi.hoisted(() => ({
@@ -61,7 +61,7 @@ const briefingResult = (leadId: string, text: string, extra: Record<string, unkn
 });
 
 type HarnessProps = {
-  scope: LeadCopilotScope;
+  scope: CopilotScope | null;
   open?: boolean;
 };
 

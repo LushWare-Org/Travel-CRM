@@ -6,16 +6,13 @@
 // agnostic and only the page adapter knows whether a claim's evidence resolves
 // to a rendered record field.
 
-export const COPILOT_PAGE_KEY = "leads";
-
 export type SinceWindow = "last_visit" | "today" | "7_days";
 
 export type ClaimSection = "current_state" | "changed" | "attention" | "experienced_view";
 
 export type ClaimSeverity = "info" | "warning" | "critical";
 
-/** A selected lead. `null` is the only no-scope sentinel — never `{}`. */
-export type LeadCopilotScope = { leadId: string } | null;
+export type CopilotScope = Record<string, unknown>;
 
 export type CopilotFact = {
   kind: string;
@@ -50,6 +47,8 @@ export type CopilotContext = {
   generatedAt?: string;
   partial: boolean;
   noAccess: boolean;
+  unavailableSources?: string[];
+  notAuthorizedSources?: string[];
 };
 
 export type CopilotTurn = {
@@ -65,7 +64,8 @@ export type CopilotSession = {
   /** Normalized selected lead id, or null when nothing is selected. */
   leadId: string | null;
   hasScope: boolean;
-  /** Deterministic phase: the cheap skeleton every scope change paints. */
+  /** Feature is disabled for this page key (server returned 404). */
+  unsupported: boolean;
   loading: boolean;
   error: string | null;
   context: CopilotContext | null;

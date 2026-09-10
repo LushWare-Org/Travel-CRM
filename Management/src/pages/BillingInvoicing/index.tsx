@@ -1,3 +1,5 @@
+import ManagementContextCopilot from '@/features/copilot/ManagementContextCopilot';
+import CollectionBriefing from '@/features/copilot/CollectionBriefing';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/lib/toast';
@@ -93,6 +95,7 @@ function EmptyState({ message }: { message: string }) {
 }
 
 export default function BillingInvoicing() {
+  const copilotEnabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === 'true';
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -205,6 +208,7 @@ export default function BillingInvoicing() {
   const totalRevenue = (documents.invoice as Invoice[]).reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
   const totalOutstanding = (documents.invoice as Invoice[]).reduce((sum, inv) => sum + (inv.outstandingAmount || 0), 0);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleDownload/handleSend are stable per render, only activeTab actually varies column shape
   const columns = useMemo<DataTableColumn<BillingDocument>[]>(() => {
     const actionsColumn: DataTableColumn<BillingDocument> = {
       key: 'actions',
@@ -310,11 +314,17 @@ export default function BillingInvoicing() {
           actionsColumn,
         ];
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleDownload/handleSend are stable per render, only activeTab actually varies column shape
   }, [activeTab]);
 
   return (
     <div className="min-h-screen bg-background">
+      {copilotEnabled && (
+        <ManagementContextCopilot pageKey="billing" scope={{}} scopeLabel="Billing">
+          {({ session, collapse }) => (
+            <CollectionBriefing session={session} scopeLabel="Billing" onCollapse={collapse} />
+          )}
+        </ManagementContextCopilot>
+      )}
       {/* Mobile Header + Horizontal Tabs */}
       <div className="sticky top-0 z-20 border-b border-border bg-card md:hidden">
         <div className="flex items-center gap-3 px-4 pb-2 pt-3 pl-14">

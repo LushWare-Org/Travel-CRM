@@ -72,6 +72,7 @@ export {
   ManagementSeverities,
   LEAD_COPILOT_FIELDS,
   leadEvidenceId,
+  pageEvidenceId,
   ManagementCopilotSeenRequest,
   BriefingFactSchema,
   PriorClaimSchema,

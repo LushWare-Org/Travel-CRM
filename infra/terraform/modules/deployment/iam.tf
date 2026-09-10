@@ -139,3 +139,14 @@ resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_lead" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
 }
+
+# The billing page's adapter reads invoice and quotation aggregates straight
+# from billing-service under the same rules as the leads grant above: it reaches
+# the container, and billing-service's own checks still decide access.
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_billing" {
+  project  = var.project_id
+  location = var.region
+  name     = module.billing_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}

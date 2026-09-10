@@ -326,7 +326,8 @@ module "assistant_service" {
     # from lead-service. Without this they fall back to http://localhost:3004
     # inside the container, so every briefing reported the source as
     # unavailable and rendered zero insights.
-    LEAD_SERVICE_URL = module.lead_service.uri
+    LEAD_SERVICE_URL    = module.lead_service.uri
+    BILLING_SERVICE_URL = module.billing_service.uri
   })
   memory                = local.services.assistant-service.memory
   cpu                   = local.services.assistant-service.cpu
