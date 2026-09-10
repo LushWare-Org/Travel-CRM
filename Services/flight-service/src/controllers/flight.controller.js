@@ -134,19 +134,33 @@ export const book = asyncHandler(async (req, res) => {
 });
 
 export const listBookings = asyncHandler(async (req, res) => {
-  const { status } = req.query;
+  const { status, page = 1, limit, sortBy = 'createdAt', order = 'desc' } = req.query;
   const isScopedToOwn = req.user.role === SALES_REP && !req.user.isSuperAdmin;
+  const where = {
+    ...(isScopedToOwn && { createdById: req.user.id }),
+    ...(status && { status }),
+  };
 
-  const bookings = await prisma.flightBooking.findMany({
-    where: {
-      ...(isScopedToOwn && { createdById: req.user.id }),
-      ...(status && { status }),
+  const [bookings, total] = await Promise.all([
+    prisma.flightBooking.findMany({
+      where,
+      include: { segments: true, travelers: true },
+      orderBy: { [sortBy]: order },
+      ...(limit && { skip: (page - 1) * limit, take: limit }),
+    }),
+    prisma.flightBooking.count({ where }),
+  ]);
+
+  res.json({
+    success: true,
+    data: bookings,
+    pagination: {
+      total,
+      page,
+      limit: limit ?? total,
+      pages: limit ? Math.ceil(total / limit) : total > 0 ? 1 : 0,
     },
-    include: { segments: true, travelers: true },
-    orderBy: { createdAt: 'desc' },
   });
-
-  res.json({ success: true, data: bookings });
 });
 
 export const getBooking = asyncHandler(async (req, res) => {

@@ -63,9 +63,15 @@ export const cancelBookingSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
-/** GET /hotels/bookings — query */
+/** GET /hotels/bookings — query.
+ * Paging/sorting stay optional for backward compatibility; the copilot opts
+ * into a bounded, deadline-first page. */
 export const listBookingsQuerySchema = z.object({
   status: z.enum(['confirmed', 'pending', 'cancelled', 'failed']).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  sortBy: z.enum(['createdAt', 'checkin']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
 });
 
 /** Route params with UUID */

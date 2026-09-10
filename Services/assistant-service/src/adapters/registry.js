@@ -29,8 +29,16 @@
 
 import AppError from '../utils/appError.js';
 import { BAD_REQUEST } from '../constants/httpStatus.js';
-import { leadsAdapter } from './leads.adapter.js';
+import { leadsPageAdapter } from './pages/leads.adapter.js';
 import { billingAdapter } from './pages/billing.adapter.js';
+import { overviewAdapter } from './pages/overview.adapter.js';
+import { analyticsAdapter } from './pages/analytics.adapter.js';
+import { packagesAdapter } from './pages/packages.adapter.js';
+import { flightsAdapter } from './pages/flights.adapter.js';
+import { hotelsAdapter } from './pages/hotels.adapter.js';
+import { usersAdapter } from './pages/users.adapter.js';
+import { careerAdapter } from './pages/career.adapter.js';
+import { settingsAdapter } from './pages/settings.adapter.js';
 
 const adapters = new Map();
 
@@ -39,8 +47,19 @@ function register(adapter) {
   adapters.set(adapter.key, adapter);
 }
 
-register(leadsAdapter);
+// One adapter per page key — all ten Management page keys are registered here,
+// so `MANAGEMENT_COPILOT_PAGE_KEYS` is the only thing that decides which of them
+// actually serves a request.
+register(leadsPageAdapter);
 register(billingAdapter);
+register(overviewAdapter);
+register(analyticsAdapter);
+register(packagesAdapter);
+register(flightsAdapter);
+register(hotelsAdapter);
+register(usersAdapter);
+register(careerAdapter);
+register(settingsAdapter);
 
 export function getAdapter(key) {
   const adapter = adapters.get(key);

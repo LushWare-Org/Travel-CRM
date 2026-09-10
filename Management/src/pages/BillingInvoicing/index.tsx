@@ -1,5 +1,4 @@
-import ManagementContextCopilot from '@/features/copilot/ManagementContextCopilot';
-import CollectionBriefing from '@/features/copilot/CollectionBriefing';
+import PageCopilot from '@/features/copilot/PageCopilot';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/lib/toast';
@@ -95,7 +94,6 @@ function EmptyState({ message }: { message: string }) {
 }
 
 export default function BillingInvoicing() {
-  const copilotEnabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === 'true';
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -317,14 +315,8 @@ export default function BillingInvoicing() {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-background">
-      {copilotEnabled && (
-        <ManagementContextCopilot pageKey="billing" scope={{}} scopeLabel="Billing">
-          {({ session, collapse }) => (
-            <CollectionBriefing session={session} scopeLabel="Billing" onCollapse={collapse} />
-          )}
-        </ManagementContextCopilot>
-      )}
+    <PageCopilot pageKey="billing" scopeLabel="Billing">
+      <div className="min-h-screen bg-background">
       {/* Mobile Header + Horizontal Tabs */}
       <div className="sticky top-0 z-20 border-b border-border bg-card md:hidden">
         <div className="flex items-center gap-3 px-4 pb-2 pt-3 pl-14">
@@ -556,6 +548,7 @@ export default function BillingInvoicing() {
             : undefined
         }
       />
-    </div>
+      </div>
+    </PageCopilot>
   );
 }

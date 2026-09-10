@@ -18,6 +18,9 @@ const { mockPrisma } = vi.hoisted(() => ({
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      // listBookings reports a real total now, so the page size cannot be
+      // mistaken for the total.
+      count: vi.fn(),
     },
   },
 }));

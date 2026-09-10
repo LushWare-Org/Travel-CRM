@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CareerContainer, VacanciesContainer } from '../features/career';
 import { Briefcase, Users } from 'lucide-react';
+import PageCopilot from '../features/copilot/PageCopilot';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type TabId = 'applications' | 'vacancies';
@@ -14,7 +15,8 @@ const CareerManagement = () => {
   const [activeTab, setActiveTab] = useState<TabId>('applications');
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <PageCopilot pageKey="career" scopeLabel="Career">
+      <div className="h-full flex flex-col bg-background">
       <div className="bg-card border-b border-border px-4 sm:px-8 py-3">
         <Tabs
           value={activeTab}
@@ -38,7 +40,8 @@ const CareerManagement = () => {
         {activeTab === 'vacancies' && <VacanciesContainer />}
         {activeTab === 'applications' && <CareerContainer />}
       </div>
-    </div>
+      </div>
+    </PageCopilot>
   );
 };
 

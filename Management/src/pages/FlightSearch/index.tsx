@@ -10,6 +10,7 @@ import OfferCard, { OfferSkeleton } from './OfferCard';
 import SearchForm from './SearchForm';
 import { TravelerDetailsStep, ReviewStep, ConfirmationStep } from './BookingWizard';
 import BookingsPanel from './BookingsPanel';
+import PageCopilot from '@/features/copilot/PageCopilot';
 import { SORT_OPTIONS, emptyTraveler, segmentStops, todayStr } from './helpers';
 import type {
   BookingStep,
@@ -281,7 +282,8 @@ export default function FlightSearch() {
   };
 
   return (
-    <FlightErrorBoundary>
+    <PageCopilot pageKey="flights" scopeLabel="Flights">
+      <FlightErrorBoundary>
       <div className="min-h-screen bg-background mx-auto max-w-7xl p-4 md:p-6">
         <div className="mb-6 flex items-center gap-3">
           <div className="rounded-lg bg-primary p-2.5 text-primary-foreground">
@@ -531,6 +533,7 @@ export default function FlightSearch() {
           />
         )}
       </div>
-    </FlightErrorBoundary>
+      </FlightErrorBoundary>
+    </PageCopilot>
   );
 }
