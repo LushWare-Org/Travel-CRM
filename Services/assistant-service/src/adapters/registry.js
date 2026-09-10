@@ -30,6 +30,7 @@
 import AppError from '../utils/appError.js';
 import { BAD_REQUEST } from '../constants/httpStatus.js';
 import { leadsAdapter } from './leads.adapter.js';
+import { billingAdapter } from './pages/billing.adapter.js';
 
 const adapters = new Map();
 
@@ -39,6 +40,7 @@ function register(adapter) {
 }
 
 register(leadsAdapter);
+register(billingAdapter);
 
 export function getAdapter(key) {
   const adapter = adapters.get(key);

@@ -50,7 +50,7 @@ export function source(overrides: Partial<CopilotSource> = {}): CopilotSource {
 /** A complete session surface so sections can be tested without the transport. */
 export function makeSession(overrides: Partial<CopilotSession> = {}): CopilotSession {
   return {
-    leadId: 'a',
+    unsupported: false, leadId: 'a',
     hasScope: true,
     loading: false,
     error: null,

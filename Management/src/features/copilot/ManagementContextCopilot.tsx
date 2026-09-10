@@ -6,7 +6,7 @@ import { useIsDesktopDock } from "./useMediaQuery";
 import CopilotDock from "./CopilotDock";
 import CopilotDrawer from "./CopilotDrawer";
 import CopilotRail from "./CopilotRail";
-import type { CopilotSession, LeadCopilotScope, SinceWindow } from "./types";
+import type { CopilotSession, CopilotScope, SinceWindow } from "./types";
 
 const BRIEFING_HEADING_ID = "copilot-briefing-heading";
 
@@ -21,7 +21,7 @@ export type CopilotSectionApi = {
 
 type ManagementContextCopilotProps = {
   pageKey: string;
-  scope: LeadCopilotScope;
+  scope: CopilotScope | null;
   /** Client-only display label for the active scope. */
   scopeLabel: string;
   since?: SinceWindow;
@@ -30,6 +30,7 @@ type ManagementContextCopilotProps = {
 };
 
 /** The operator's stable internal id — never email or display name. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function actorIdOf(user: unknown): string | null {
   const candidate = user as { _id?: unknown; id?: unknown } | null | undefined;
   const raw = candidate?._id ?? candidate?.id;
@@ -44,7 +45,7 @@ export function actorIdOf(user: unknown): string | null {
  *
  * Landing a second workspace therefore means supplying six page-owned pieces —
  * not copying this shell:
- *   1. a typed, strict, nullable page scope (`LeadCopilotScope` is this page's);
+ *   1. a typed, strict, nullable page scope (`CopilotScope` is this page's);
  *   2. an authenticated server adapter for the page key;
  *   3. field-level evidence ids plus the record targets that publish them;
  *   4. page-specific deterministic insights and suggested questions;

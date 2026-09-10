@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { Crosshair } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   clearEvidencePreview,
-  clearEvidenceReveal,
+  
   evidenceFieldPath,
   pinEvidence,
   previewEvidence,
@@ -15,6 +17,7 @@ import type { CopilotSource } from "./types";
 type EvidenceActionProps = {
   evidenceIds: string[];
   sources: CopilotSource[];
+  badgeVariant?: "destructive" | "warning" | "muted";
   /** Announces the outcome through the surface's polite live region. */
   announce: (message: string) => void;
 };
@@ -41,10 +44,10 @@ function formatCapturedValue(value: CopilotSource["capturedValue"]): string | nu
  * is rendered — the same action opens the inline evidence detail instead, so a
  * claim is never a dead control.
  */
-export default function EvidenceAction({ evidenceIds, sources, announce }: EvidenceActionProps) {
+export default function EvidenceAction({ evidenceIds, sources, announce, badgeVariant = "muted" }: EvidenceActionProps) {
   const isDesktop = useIsDesktopDock();
   const [detailOpen, setDetailOpen] = useState(false);
-  const buttonRef = useRef<HTMLElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   if (evidenceIds.length === 0) return null;
 
@@ -88,27 +91,33 @@ export default function EvidenceAction({ evidenceIds, sources, announce }: Evide
 
   return (
     <div className="mt-1.5">
-      <Button
-        ref={buttonRef}
-        type="button"
-        variant="ghost"
-        size="xs"
-        className="gap-1 text-xs text-primary hover:text-primary"
-        onClick={activate}
-        onPointerEnter={preview}
-        onPointerLeave={endPreview}
-        onFocus={preview}
-        onBlur={() => {
-          // The pinned highlight is owned by the reveal and cleared when focus
-          // leaves the record target — focusing that target blurs this button.
-          clearEvidencePreview();
-        }}
-        aria-label={`Evidence: ${sourceLabel}`}
-        aria-expanded={detailOpen || undefined}
+      <Badge
+        variant="outline"
+        className={cn(
+          "cursor-pointer min-h-\[44px\] min-w-\[44px\] font-mono font-normal transition-colors border-transparent",
+          badgeVariant === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20",
+          badgeVariant === "warning" && "bg-warning/10 text-warning hover:bg-warning/20",
+          badgeVariant === "muted" && "bg-muted text-muted-foreground hover:bg-muted/80"
+        )}
+        render={
+          <button
+            ref={buttonRef}
+            type="button"
+            onClick={activate}
+            onPointerEnter={preview}
+            onPointerLeave={endPreview}
+            onFocus={preview}
+            onBlur={() => {
+              clearEvidencePreview();
+            }}
+            aria-label={`Evidence: ${sourceLabel}`}
+            aria-expanded={detailOpen || undefined}
+          />
+        }
       >
         <Crosshair className="h-3 w-3" aria-hidden="true" />
         {sourceLabel}
-      </Button>
+      </Badge>
 
       {detailOpen && (
         <div
