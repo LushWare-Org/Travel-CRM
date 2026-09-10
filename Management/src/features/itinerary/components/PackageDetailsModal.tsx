@@ -6,10 +6,12 @@
 import {
   Star, MapPin, Calendar, Briefcase,
   Tag, Banknote, Check, XCircle,
-  Image as ImageIcon, CalendarDays, BookOpen, TrendingUp
+  Image as ImageIcon, CalendarDays, BookOpen, TrendingUp,
+  type LucideIcon,
 } from 'lucide-react';
 import ItineraryDisplay from './ItineraryDisplay';
 import { formatPriceINR } from '../utils/helpers';
+import { formatRating, formatNumber } from '@/utils/number';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 
@@ -18,23 +20,27 @@ interface PackageDetailsModalProps {
   onClose: () => void;
 }
 
-// Info Card Component
-const InfoCard = ({ label, value, icon: Icon }: { label: string; value?: string | null; icon: any }) => (
-  <div className="bg-card rounded-lg border border-border p-4 hover:shadow-card transition-shadow">
+// min-w-0 on the card and on the text column is what lets a long value shrink to
+// its grid track instead of forcing the row wider; break-words then wraps it onto
+// further lines. Wrapping rather than truncating is deliberate — the value is what
+// the user opened the modal to read, and the grid's rows already size to the tallest
+// tile.
+const InfoCard = ({ label, value, icon: Icon }: { label: string; value?: string | null; icon: LucideIcon }) => (
+  <div className="bg-card rounded-lg border border-border p-4 hover:shadow-card transition-shadow min-w-0">
     <div className="flex items-start gap-3">
       <div className="w-10 h-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center flex-shrink-0">
         <Icon className="w-5 h-5" />
       </div>
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="font-semibold text-foreground mt-0.5">{value || 'N/A'}</p>
+        <p className="font-semibold text-foreground mt-0.5 break-words">{value || 'N/A'}</p>
       </div>
     </div>
   </div>
 );
 
 // Section Component
-const Section = ({ title, icon: Icon, children, className = '' }: { title: string; icon?: any; children: React.ReactNode; className?: string }) => (
+const Section = ({ title, icon: Icon, children, className = '' }: { title: string; icon?: LucideIcon; children: React.ReactNode; className?: string }) => (
   <div className={className}>
     <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
       {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
@@ -86,7 +92,10 @@ const PackageDetailsModal = ({ pkg, onClose }: PackageDetailsModalProps) => {
         {/* Content */}
         <div className="space-y-6">
           {/* Quick Info Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* auto-fit over a hand-authored column count: six tracks in a ~896px dialog
+              left each tile ~130px, which is what squeezed the value out of its box.
+              DESIGN.md, Layout → Grid. */}
+          <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
             <InfoCard
               label="Category"
               value={pkg.category ? pkg.category.charAt(0).toUpperCase() + pkg.category.slice(1) : 'N/A'}
@@ -109,12 +118,12 @@ const PackageDetailsModal = ({ pkg, onClose }: PackageDetailsModalProps) => {
             />
             <InfoCard
               label="Margin"
-              value={pkg.defaultMarginType === 'PERCENTAGE' ? `${pkg.defaultMarginInput}%` : `$${pkg.defaultMarginInput}`}
+              value={pkg.defaultMarginType === 'PERCENTAGE' ? `${formatNumber(pkg.defaultMarginInput, 2)}%` : `$${formatNumber(pkg.defaultMarginInput, 2)}`}
               icon={TrendingUp}
             />
             <InfoCard
               label="Reviews"
-              value={`${pkg.rating || 0} (${pkg.numReviews || 0})`}
+              value={`${formatRating(pkg.rating)} (${pkg.numReviews || 0})`}
               icon={Star}
             />
           </div>
@@ -201,7 +210,7 @@ const PackageDetailsModal = ({ pkg, onClose }: PackageDetailsModalProps) => {
                   <Star className="w-6 h-6 fill-warning text-warning" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold font-mono tabular-nums text-warning">{pkg.rating || 0}</p>
+                  <p className="text-2xl font-bold font-mono tabular-nums text-warning">{formatRating(pkg.rating)}</p>
                   <p className="text-xs text-warning">out of 5</p>
                 </div>
               </div>
