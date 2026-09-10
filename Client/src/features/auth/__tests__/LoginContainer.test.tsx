@@ -95,7 +95,7 @@ describe('LoginContainer', () => {
     await user.type(screen.getByPlaceholderText('••••••••'), 'wrong-password');
     await user.click(screen.getByRole('button', { name: 'Sign In' }));
 
-    expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
   });
 
   it('shows a field-level validation error and skips register when passwords do not match', async () => {

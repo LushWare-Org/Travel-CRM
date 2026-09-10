@@ -74,7 +74,7 @@ describe('useAIItineraryGenerator', () => {
       await result.current.generate({ destination: 'Kandy', duration: 1 });
     });
 
-    await waitFor(() => expect(result.current.error).toBe('AI generation failed'));
+    await waitFor(() => expect(result.current.error).toBe('Something went wrong. Please try again.'));
     expect(onGenerated).not.toHaveBeenCalled();
     expect(result.current.isGenerating).toBe(false);
   });

@@ -92,7 +92,7 @@ describe('useAIDayGenerator', () => {
       await result.current.generateDay(1);
     });
 
-    expect(result.current.error).toBe('AI generation failed');
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
     expect(onDayGenerated).not.toHaveBeenCalled();
   });
 
@@ -164,7 +164,7 @@ describe('useAIDayGenerator', () => {
       await result.current.generateDays([4, 5]);
     });
 
-    expect(result.current.error).toBe('Range generation failed');
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
     expect(onDaysGenerated).not.toHaveBeenCalled();
   });
 });

@@ -193,7 +193,7 @@ describe('PackageDetailsContainer', () => {
     await user.click(screen.getByRole('button', { name: /Next Step/ }));
     await user.click(screen.getByRole('button', { name: /Submit Booking Request/ }));
 
-    expect(alertSpy).toHaveBeenCalledWith('Server unavailable');
+    expect(alertSpy).toHaveBeenCalledWith('Something went wrong. Please try again.');
     alertSpy.mockRestore();
   });
 });

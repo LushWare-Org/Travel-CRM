@@ -81,7 +81,9 @@ describe('DestinationsContainer', () => {
 
     expect(fetchPackagesMock).toHaveBeenCalledWith({ limit: 100 });
     expect(await screen.findByRole('heading', { name: /Discover Your Next/ })).toBeInTheDocument();
-    expect(screen.getByText('Bali, Indonesia')).toBeInTheDocument();
+    // The heading renders before the fetch resolves, so waiting on it is not enough:
+    // the list has to be awaited or this asserts against an empty state.
+    expect(await screen.findByText('Bali, Indonesia')).toBeInTheDocument();
     expect(screen.getByText('Paris, France')).toBeInTheDocument();
     expect(screen.getByText('2 destinations')).toBeInTheDocument();
   });
@@ -105,7 +107,7 @@ describe('DestinationsContainer', () => {
     renderContainer();
 
     expect(await screen.findByText('Unable to load destinations')).toBeInTheDocument();
-    expect(screen.getByText('Server unreachable')).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });

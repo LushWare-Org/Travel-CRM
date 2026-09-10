@@ -13,6 +13,7 @@ import { useElfsightWidget } from '../../lib/elfsight';
 import { generateAndDownloadPDF as generateManagementPDF } from './pdf/pdfService';
 import { useAuth } from '../../contexts/AuthContext';
 import { submitBookingRequest } from '../../services/api/booking';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import { FALLBACK_IMAGE } from '../../config/media';
 import BRANDING from '../../config/branding';
 import BookingModal from './components/BookingModal';
@@ -73,7 +74,7 @@ export default function PackageDetailsContainer() {
       })
       .catch((err) => {
         if (!isMounted) return;
-        setError(err.message || 'Unable to load package details');
+        setError(apiErrorMessage(err));
       })
       .finally(() => {
         if (!isMounted) return;
@@ -239,7 +240,7 @@ export default function PackageDetailsContainer() {
       setSubmissionType('booking');
     } catch (err) {
       if (err && typeof err === 'object' && 'message' in err) {
-        alert(err.message);
+        alert(apiErrorMessage(err));
       } else {
         alert('Unable to submit your booking request right now. Please try again.');
       }

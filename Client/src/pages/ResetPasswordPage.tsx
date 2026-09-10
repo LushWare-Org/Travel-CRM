@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { resetPassword } from '../services/api/auth';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 
 const inputClassName =
   'h-12 rounded-xl border-gray-200 bg-white px-4 text-gray-900 placeholder:text-gray-500 ' +
@@ -39,7 +40,7 @@ export default function ResetPasswordPage() {
       await resetPassword(token, password);
       setIsComplete(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to reset your password. Please try again.');
+      setError(apiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

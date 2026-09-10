@@ -161,7 +161,7 @@ describe('HomeContainer', () => {
     await flushAsyncWork();
 
     expect(screen.getByText("We couldn't load travel experiences")).toBeInTheDocument();
-    expect(screen.getByText('Server unreachable')).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 

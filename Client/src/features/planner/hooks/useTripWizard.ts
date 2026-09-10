@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { sendWizardTurn } from '../../../services/api/wizardTurn';
 import type { WizardState, WizardTurnMessageT } from '../../../services/api/wizardTurn';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 
 export interface WizardPackage {
   id: string;
@@ -91,7 +92,7 @@ export function useTripWizard() {
 
       setLastFailedMessages(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reach the trip-planning assistant. Please try again.');
+      setError(apiErrorMessage(err));
       setLastFailedMessages(nextMessages);
     } finally {
       setIsSending(false);

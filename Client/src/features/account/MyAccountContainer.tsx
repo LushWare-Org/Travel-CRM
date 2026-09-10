@@ -8,6 +8,7 @@ import { fetchUserCustomizedPackages } from '../../services/api/customization';
 import { fetchUserManualItineraries } from '../../services/api/manualItinerary';
 import { updateProfile } from '../../services/api/account';
 import { mergeStoredUser } from '../../services/auth/tokenStorage';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import ProfileEditModal from './components/ProfileEditModal';
 import type { ProfileFormData, UpdateMessage } from './components/ProfileEditModal';
 import RequestList from './components/RequestList';
@@ -41,21 +42,21 @@ export default function MyAccountContainer() {
         data => ({ data: data as RequestCardItem[] }),
         err => {
           console.error('Error loading bookings:', err);
-          return { error: err instanceof Error ? err.message : 'Failed to load your bookings' };
+          return { error: apiErrorMessage(err) };
         },
       ),
       fetchUserCustomizedPackages().then(
         data => ({ data: data as RequestCardItem[] }),
         err => {
           console.error('Error loading customized packages:', err);
-          return { error: err instanceof Error ? err.message : 'Failed to load your customized packages' };
+          return { error: apiErrorMessage(err) };
         },
       ),
       fetchUserManualItineraries().then(
         data => ({ data: data as RequestCardItem[] }),
         err => {
           console.error('Error loading manual itineraries:', err);
-          return { error: err instanceof Error ? err.message : 'Failed to load your manual itineraries' };
+          return { error: apiErrorMessage(err) };
         },
       ),
     ]);
@@ -141,7 +142,7 @@ export default function MyAccountContainer() {
       setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
       console.error('Profile update error:', err);
-      setUpdateMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update profile' });
+      setUpdateMessage({ type: 'error', text: apiErrorMessage(err) });
       setTimeout(() => setUpdateMessage(null), 5000);
     } finally {
       setIsSaving(false);
