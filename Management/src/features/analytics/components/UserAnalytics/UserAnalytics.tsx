@@ -10,6 +10,7 @@ import { CHART_PALETTE } from '../Common/chartTheme';
 import { Users, UserCheck, Shield, Download, Activity, Award } from 'lucide-react';
 import { exportUserAnalyticsPDF } from '../../utils/exportAnalytics';
 import toast from '@/lib/toast';
+import { formatNumber, formatPercent } from '@/utils/number';
 import AnalyticsService from '../../../../services/analytics.service';
 import {
   getUserGrowthByTimeRange,
@@ -88,7 +89,7 @@ const UserAnalytics = () => {
         { label: 'Total Users', value: analyticsData?.stats?.totalUsers || 0 },
         { label: 'Active Users', value: analyticsData?.stats?.activeUsers || 0 },
         { label: 'Users with Bookings', value: analyticsData?.stats?.usersWithBookings || 0 },
-        { label: 'Conversion Rate', value: `${analyticsData?.stats?.conversionRate || 0}%` },
+        { label: 'Conversion Rate', value: formatPercent(analyticsData?.stats?.conversionRate) },
         { label: 'Time Range', value: timeRange.toUpperCase() },
       ];
       await exportUserAnalyticsPDF({ timeRange, summaryMetrics });
@@ -153,7 +154,7 @@ const UserAnalytics = () => {
         <StatCard icon={Users} label="Total Users" value={stats.totalUsers || 0} subtitle={`${stats.activeUsers || 0} currently active`} color="primary" />
         <StatCard icon={Activity} label="Active" value={stats.activeUsers || 0} subtitle="With activity this period" color="success" />
         <StatCard icon={UserCheck} label="Verified" value={stats.verifiedUsers || 0} subtitle="Email confirmed" color="muted" />
-        <StatCard icon={Award} label="Conversion" value={stats.conversionRate || 0} unit="%" subtitle={`${stats.usersWithBookings || 0} with bookings`} color="muted" />
+        <StatCard icon={Award} label="Conversion" value={formatNumber(stats.conversionRate, 1)} unit="%" subtitle={`${stats.usersWithBookings || 0} with bookings`} color="muted" />
       </div>
 
       {/* User Growth Chart - Full Width */}
@@ -245,7 +246,7 @@ const UserAnalytics = () => {
           </div>
           <div className="bg-card p-4 rounded-lg border border-border">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Conversion</p>
-            <p className="font-mono text-2xl font-semibold tabular-nums text-foreground mt-1">{stats.conversionRate || 0}%</p>
+            <p className="font-mono text-2xl font-semibold tabular-nums text-foreground mt-1">{formatPercent(stats.conversionRate)}</p>
           </div>
           <div className="bg-card p-4 rounded-lg border border-border">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Verified</p>

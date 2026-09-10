@@ -4,6 +4,7 @@ import { Users, Target, Activity, Zap } from 'lucide-react';
 import AnalyticsService from '../../../../services/analytics.service';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { DataTable, type DataTableColumn } from '../../../../components/shared/DataTable';
+import { formatNumber } from '@/utils/number';
 import { Badge } from '../../../../components/ui/badge';
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
@@ -96,7 +97,7 @@ const MyPerformanceAnalytics = () => {
         <StatCard icon={Users} label="Leads Assigned" value={performance.leadsAssigned} color="muted" loading={loading} />
         <StatCard icon={Target} label="Converted" value={performance.converted} color="success" loading={loading} />
         <StatCard icon={Activity} label="Pending" value={performance.pending} color="warning" loading={loading} />
-        <StatCard icon={Zap} label="Conversion Rate" value={performance.conversionRate} unit="%" color="primary" loading={loading} />
+        <StatCard icon={Zap} label="Conversion Rate" value={formatNumber(performance.conversionRate, 1)} unit="%" color="primary" loading={loading} />
       </div>
 
       {/* Recent Leads */}

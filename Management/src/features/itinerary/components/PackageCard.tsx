@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import { usePermission } from '../../../contexts/PermissionContext';
 import { formatPriceINR } from '../utils/helpers';
+import { formatRating } from '@/utils/number';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -136,7 +137,7 @@ const PackageCard = ({
         <div className="flex justify-between items-center pt-3 border-t border-border">
           <div className="flex items-center gap-1">
             <Star className="w-4 h-4 fill-warning text-warning" />
-            <span className="text-sm font-semibold text-foreground">{pkg.rating || 0}</span>
+            <span className="text-sm font-semibold text-foreground">{formatRating(pkg.rating)}</span>
             <span className="text-xs text-muted-foreground">({pkg.numReviews || 0})</span>
           </div>
           <div className="text-lg font-bold font-mono tabular-nums text-foreground">{formattedPrice || 'Contact us'}</div>
