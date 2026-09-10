@@ -2,6 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { z } from 'zod';
 import { createPageAdapter } from '../collectionEngine.js';
 import { pageEvidenceId } from '@travel-crm/contracts';
+import { domainAuthHeader } from '../../utils/cloudRunAuth.js';
+import logger from '../../config/logger.js';
+
+// The engine's source deadline must not be charged for platform token minting,
+// so the auth helper is driven per-test instead of being left to return {}.
+vi.mock('../../utils/cloudRunAuth.js', () => ({
+  domainAuthHeader: vi.fn(async () => ({})),
+}));
 
 // The engine's failure paths are the point of this suite. Every one of them
 // produces a WRONG BRIEFING rather than an error if it is wrong, which is why
@@ -84,6 +92,7 @@ afterEach(() => {
   delete process.env.MANAGEMENT_MAX_FETCH_BYTES;
   delete process.env.MANAGEMENT_MAX_FETCH_ROWS;
   delete process.env.MANAGEMENT_MAX_EVIDENCE;
+  vi.mocked(domainAuthHeader).mockImplementation(async () => ({}));
   vi.restoreAllMocks();
 });
 
@@ -154,6 +163,51 @@ describe('failure classification', () => {
     const adapter = createPageAdapter(descriptor());
     const bundle = await adapter.loadEvidence(ctx, {}, { mode: 'deterministic' });
     expect(bundle.notAuthorizedSources).toEqual(['invoices']);
+  });
+
+  it('classifies 401 as notAuthorized, never as unavailable', async () => {
+    // The service answered; what it said was "you may not". Bucketing this with
+    // faults showed the operator an outage where the truth was a permission
+    // boundary — and a permission boundary is actionable, an outage is not.
+    globalThis.fetch = vi.fn(() => jsonResponse({}, 401));
+    const adapter = createPageAdapter(descriptor());
+    const bundle = await adapter.loadEvidence(ctx, {}, { mode: 'deterministic' });
+    expect(bundle.notAuthorizedSources).toEqual(['invoices']);
+    expect(bundle.unavailableSources).toEqual([]);
+  });
+
+  it('does not charge ID-token minting to the source deadline', async () => {
+    // Minting is transport setup, not work done for the source. It used to run
+    // inside the deadline, so a slow mint aborted the request before the
+    // service was ever asked — and a healthy source was reported unavailable.
+    process.env.MANAGEMENT_DETERMINISTIC_SOURCE_TIMEOUT_MS = '20';
+    vi.mocked(domainAuthHeader).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return {};
+    });
+    globalThis.fetch = vi.fn(() => jsonResponse(listBody([invoice('inv-1')])));
+
+    const adapter = createPageAdapter(descriptor());
+    const bundle = await adapter.loadEvidence(ctx, {}, { mode: 'deterministic' });
+
+    expect(bundle.unavailableSources).toEqual([]);
+    expect(bundle.records).toHaveLength(1);
+  });
+
+  it('logs why a source was unavailable', async () => {
+    // The response reports only that some sources were unavailable, never which
+    // or why. Without the reason on the log line, a panel reading "1 sources
+    // unavailable" cannot be diagnosed after the fact.
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    globalThis.fetch = vi.fn(() => jsonResponse({}, 500));
+
+    const adapter = createPageAdapter(descriptor());
+    await adapter.loadEvidence(ctx, {}, { mode: 'deterministic' });
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'invoices', reason: 'HTTP 500' }),
+      expect.any(String),
+    );
   });
 
   it('classifies 5xx as unavailable', async () => {

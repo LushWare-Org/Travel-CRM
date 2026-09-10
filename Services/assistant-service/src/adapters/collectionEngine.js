@@ -19,7 +19,7 @@
 // flagged", without rules needing to know about bundling.
 //
 // ── Failure classification ──
-//   403/404            → notAuthorizedSources   (a permission boundary)
+//   401/403/404        → notAuthorizedSources   (a permission boundary)
 //   5xx / network /    → unavailableSources     (a fault)
 //     timeout
 //   over a cap, or a   → unavailableSources     (a truncated count is a wrong
@@ -34,28 +34,17 @@ import { pageEvidenceId } from '@travel-crm/contracts';
 import AppError from '../utils/appError.js';
 import { BAD_REQUEST } from '../constants/httpStatus.js';
 import { domainAuthHeader } from '../utils/cloudRunAuth.js';
+import logger from '../config/logger.js';
 import { RULES, COLLECTION_RULES, DAY_MS, toMs, isBlank } from './rules.js';
 
-// Per-source budgets differ by phase. The deterministic phase exists to be
-// instant, so it gets a short leash and renders whatever arrived; the briefing
-// phase is not latency-critical and can wait longer for completeness.
-// Read at CALL time, not at import time. Module-load constants are frozen for
-// the life of the process, which makes a cap impossible to exercise in a test
-// and silently wrong if a test sets one before importing.
+// Limits are read at CALL time, not at import time. Module-load constants are
+// frozen for the life of the process, which makes a cap impossible to exercise
+// in a test and silently wrong if a test sets one before importing.
 function num(name, fallback) {
   const raw = process.env[name];
   if (raw === undefined || raw === '') return fallback;
   const value = Number(raw);
   return Number.isFinite(value) ? value : fallback;
-}
-
-// Per-source budgets differ by phase. The deterministic phase exists to be
-// instant, so it gets a short leash and renders whatever arrived; the briefing
-// phase is not latency-critical and can wait longer for completeness.
-function timeoutFor(mode) {
-  return mode === 'deterministic'
-    ? num('MANAGEMENT_DETERMINISTIC_SOURCE_TIMEOUT_MS', 900)
-    : num('MANAGEMENT_BRIEFING_SOURCE_TIMEOUT_MS', 2_500);
 }
 
 // Must not exceed the briefing prompt's own cap: serializeEvidence slices to 200
@@ -64,12 +53,28 @@ function timeoutFor(mode) {
 // desynchronizes the two budgets.
 export function engineLimits() {
   return {
-    deterministicTimeoutMs: num('MANAGEMENT_DETERMINISTIC_SOURCE_TIMEOUT_MS', 900),
+    // ── Per-source budgets ──
+    // The deterministic phase exists to be instant, so it takes the shorter
+    // leash and renders whatever arrived; the briefing phase is not
+    // latency-critical and waits longer for completeness.
+    //
+    // The deterministic budget has to clear the SLOWEST healthy source, not the
+    // average. It sat at 900ms while a real source answered anywhere between
+    // 436ms and 1486ms, so a source that was merely slow was reported to the
+    // operator as unavailable — roughly two calls in five, each one showing up
+    // as "partially loaded". The measured p99 is what sets the floor.
+    deterministicTimeoutMs: num('MANAGEMENT_DETERMINISTIC_SOURCE_TIMEOUT_MS', 2_000),
     briefingTimeoutMs: num('MANAGEMENT_BRIEFING_SOURCE_TIMEOUT_MS', 2_500),
     maxFetchRows: num('MANAGEMENT_MAX_FETCH_ROWS', 1_000),
     maxFetchBytes: num('MANAGEMENT_MAX_FETCH_BYTES', 1_000_000),
     maxEvidence: num('MANAGEMENT_MAX_EVIDENCE', 200),
   };
+}
+
+// Derived from engineLimits so the two cannot drift apart on a default.
+function timeoutFor(mode) {
+  const limits = engineLimits();
+  return mode === 'deterministic' ? limits.deterministicTimeoutMs : limits.briefingTimeoutMs;
 }
 
 /** Resolve a dotted path (`data.items`) against a parsed JSON body. */
@@ -78,14 +83,36 @@ function readPath(body, path) {
   return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), body);
 }
 
+// A source that produced no usable rows. Recorded as attempted and unavailable,
+// and LOGGED with its reason: the response tells the operator only that some
+// sources were unavailable, never which or why, and the cause is not
+// recoverable after the fact. Without this line a "partially loaded" panel is
+// undiagnosable from outside the process.
+function fail(bundle, source, reason) {
+  bundle.attemptedSources.push(source.name);
+  bundle.unavailableSources.push(source.name);
+  logger.warn({ source: source.name, reason }, 'copilot source unavailable');
+  return [];
+}
+
 async function fetchSource(source, ctx, mode, bundle) {
   const base = process.env[source.envKey];
   if (!base) {
     // A missing environment URL is a deployment fault, not a denial. Reported
     // as unavailable so the page still renders everything else.
-    bundle.attemptedSources.push(source.name);
-    bundle.unavailableSources.push(source.name);
-    return [];
+    return fail(bundle, source, 'no service URL configured');
+  }
+
+  // Minting the platform ID token is transport setup, not work done for the
+  // source, so it happens BEFORE the deadline starts. It used to run inside the
+  // budget, and token minting costs hundreds of milliseconds against a
+  // sub-second deterministic budget — so a healthy source could be aborted
+  // before the request had even reached it.
+  let auth;
+  try {
+    auth = await domainAuthHeader(base);
+  } catch (err) {
+    return fail(bundle, source, `could not mint an ID token: ${err.message}`);
   }
 
   const url = new URL(source.path, base).toString();
@@ -93,39 +120,35 @@ async function fetchSource(source, ctx, mode, bundle) {
   const timer = setTimeout(() => controller.abort(), timeoutFor(mode));
 
   try {
-    const auth = await domainAuthHeader(base);
     const res = await fetch(url, {
       headers: { ...ctx.headers, accept: 'application/json', ...auth },
       signal: controller.signal,
     });
 
-    if (res.status === 403 || res.status === 404) {
+    // A 401 belongs with 403/404: the service answered, and what it said was
+    // "you may not". Bucketing it with faults (which is what `!res.ok` did)
+    // showed the operator an outage where the truth was a permission boundary.
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
       bundle.attemptedSources.push(source.name);
       bundle.notAuthorizedSources.push(source.name);
       return [];
     }
     if (!res.ok) {
-      bundle.attemptedSources.push(source.name);
-      bundle.unavailableSources.push(source.name);
-      return [];
+      return fail(bundle, source, `HTTP ${res.status}`);
     }
 
     const raw = await res.text();
     if (raw.length > engineLimits().maxFetchBytes) {
       // Over the byte cap: the response is not usable as a complete view, and a
       // count taken from it would be a wrong count.
-      bundle.attemptedSources.push(source.name);
-      bundle.unavailableSources.push(source.name);
-      return [];
+      return fail(bundle, source, 'response over the byte cap');
     }
 
     let body;
     try {
       body = JSON.parse(raw);
     } catch {
-      bundle.attemptedSources.push(source.name);
-      bundle.unavailableSources.push(source.name);
-      return [];
+      return fail(bundle, source, 'response was not JSON');
     }
 
     const extracted = readPath(body, source.listPath);
@@ -136,23 +159,15 @@ async function fetchSource(source, ctx, mode, bundle) {
       // A missing singleton is a successful empty source, not an outage.
       if (extracted === null || extracted === undefined) rows = [];
       else if (typeof extracted === 'object' && !Array.isArray(extracted)) rows = [extracted];
-      else {
-        bundle.attemptedSources.push(source.name);
-        bundle.unavailableSources.push(source.name);
-        return [];
-      }
+      else return fail(bundle, source, 'singleton payload was not an object');
     } else if (Array.isArray(extracted)) {
       rows = extracted;
     } else {
-      bundle.attemptedSources.push(source.name);
-      bundle.unavailableSources.push(source.name);
-      return [];
+      return fail(bundle, source, 'collection payload was not an array');
     }
 
     if (rows.length > engineLimits().maxFetchRows) {
-      bundle.attemptedSources.push(source.name);
-      bundle.unavailableSources.push(source.name);
-      return [];
+      return fail(bundle, source, `record count over the cap (${rows.length})`);
     }
 
     // Truncation applies to collection endpoints only. A singleton is already
@@ -161,14 +176,10 @@ async function fetchSource(source, ctx, mode, bundle) {
       const total = readPath(body, source.paging.totalPath);
       if (typeof total === 'number' && Number.isFinite(total)) {
         if (total > rows.length) {
-          bundle.attemptedSources.push(source.name);
-          bundle.unavailableSources.push(source.name);
-          return [];
+          return fail(bundle, source, `truncated: ${rows.length} of ${total} rows`);
         }
       } else if (rows.length >= (source.paging.defaultLimit ?? rows.length)) {
-        bundle.attemptedSources.push(source.name);
-        bundle.unavailableSources.push(source.name);
-        return [];
+        return fail(bundle, source, 'truncated: no total to prove completeness');
       }
     }
 
@@ -186,11 +197,11 @@ async function fetchSource(source, ctx, mode, bundle) {
     });
     for (const record of projected) record.__source = source.name;
     return projected;
-  } catch {
+  } catch (err) {
     // Abort (timeout) and network errors land here, both of which are faults.
-    bundle.attemptedSources.push(source.name);
-    bundle.unavailableSources.push(source.name);
-    return [];
+    const reason =
+      err?.name === 'AbortError' ? `timed out after ${timeoutFor(mode)}ms` : `fetch failed: ${err?.message}`;
+    return fail(bundle, source, reason);
   } finally {
     clearTimeout(timer);
   }
