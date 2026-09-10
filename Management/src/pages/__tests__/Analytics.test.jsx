@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 
 const { mockUseAuth } = vi.hoisted(() => ({ mockUseAuth: vi.fn() }));
 
-vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: mockUseAuth }));
+vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: mockUseAuth, useOptionalAuth: mockUseAuth }));
 
 vi.mock('../../features/analytics/components', () => ({
   LeadAnalytics: () => <div>Lead Analytics Content</div>,

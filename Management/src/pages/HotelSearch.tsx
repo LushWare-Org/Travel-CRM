@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import PageCopilot from '../features/copilot/PageCopilot';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -291,7 +292,8 @@ export default function HotelSearch() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6 max-w-7xl mx-auto">
+    <PageCopilot pageKey="hotels" scopeLabel="Hotels">
+      <div className="min-h-screen bg-background p-4 md:p-6 max-w-7xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2.5 rounded-lg bg-primary text-primary-foreground">
           <Hotel className="w-6 h-6" />
@@ -652,6 +654,7 @@ export default function HotelSearch() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </PageCopilot>
   );
 }

@@ -150,3 +150,59 @@ resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_billing" {
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
 }
+
+# ── Remaining page adapters ───────────────────────────────────────────────
+# Every page key the copilot serves needs BOTH the internal URL on
+# assistant-service (cloud_run.tf) and a run.invoker grant here. Domain services
+# run with allow_unauthenticated = false, so a missing grant is not a 403 the
+# app can explain — Cloud Run rejects the call at the platform edge before the
+# container starts, and the page renders as "source unavailable".
+#
+# assistant_invoker_user is the one that matters most: USER_SERVICE_URL has been
+# set on assistant-service since the public assistant shipped, but no grant was
+# ever added, so that call could not have succeeded in a deployed environment.
+# The settings page reads it directly, and so does the policy-document path.
+#
+# These are written out individually rather than as a for_each map on purpose:
+# converting the existing gateway_invoker_* resources would change their state
+# addresses, and rewriting live IAM bindings for tidiness is not worth the risk.
+# A future change can consolidate the whole family once nothing is mid-deploy.
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_user" {
+  project  = var.project_id
+  location = var.region
+  name     = module.user_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_analytics" {
+  project  = var.project_id
+  location = var.region
+  name     = module.analytics_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_package" {
+  project  = var.project_id
+  location = var.region
+  name     = module.package_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_flight" {
+  project  = var.project_id
+  location = var.region
+  name     = module.flight_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_career" {
+  project  = var.project_id
+  location = var.region
+  name     = module.career_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}

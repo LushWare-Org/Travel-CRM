@@ -12,6 +12,9 @@ vi.mock('../../db/client.js', () => ({
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      // listBookings reports a real total now: without `count` the page size
+      // would be indistinguishable from the total.
+      count: vi.fn(),
     },
   },
 }));
@@ -190,13 +193,21 @@ describe('listBookings', () => {
       { id: 'b1', pnr: 'PNR1', status: 'confirmed', segments: [], travelers: [] },
     ];
     prisma.flightBooking.findMany.mockResolvedValue(fakeBookings);
+    // Set BEFORE the call: the controller reads the total while it runs.
+    prisma.flightBooking.count.mockResolvedValue(1);
 
     const req = mockReq({ user: { id: 'admin-1', role: 'admin', isSuperAdmin: false } });
     const res = mockRes();
 
     await listBookings(req, res, vi.fn());
 
-    expect(res.json).toHaveBeenCalledWith({ success: true, data: fakeBookings });
+    // listBookings now reports a total alongside the page, so a caller can tell
+    // a complete list from the first page of many.
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      data: fakeBookings,
+      pagination: { total: 1, page: 1, limit: 1, pages: 1 },
+    });
     expect(prisma.flightBooking.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: {} }),
     );

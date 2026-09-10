@@ -227,13 +227,31 @@ describe('management copilot server-side gate (seen route)', () => {
     expect(res.status).toBe(500);
   });
 
-  it('rejects an invalid scope before any write', async () => {
+  it('accepts the empty collection scope, which is now valid for leads', async () => {
+    // `{}` used to be rejected: the leads scope required a leadId. It is now the
+    // collection scope — the general leads page — so a 400 here would mean the
+    // page could never acknowledge its own briefing.
     enableCopilot();
     const res = await request(app)
       .post('/api/v1/assistant/management/seen')
       .set(authHeaders)
       .send({ page: { key: 'leads', scope: {} } });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(mockPrisma.managementLastSeen.upsert).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.managementLastSeen.upsert.mock.calls[0][0].where).toEqual({
+      actorId_pageKey_scopeFingerprint: { actorId: 'rep-1', pageKey: 'leads', scopeFingerprint: '{}' },
+    });
+  });
+
+  it('still rejects a malformed scope', async () => {
+    enableCopilot();
+    for (const scope of [{ leadId: '' }, { leadId: '   ' }, { bogus: true }]) {
+      const res = await request(app)
+        .post('/api/v1/assistant/management/seen')
+        .set(authHeaders)
+        .send({ page: { key: 'leads', scope } });
+      expect(res.status, `scope ${JSON.stringify(scope)} must reject`).toBe(400);
+    }
     expect(mockPrisma.managementLastSeen.upsert).not.toHaveBeenCalled();
   });
 });

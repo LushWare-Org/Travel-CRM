@@ -62,7 +62,7 @@ export default function ManagementContextCopilot({
   const auth = useOptionalAuth();
   const actorId = actorIdOf(auth?.user);
   const isDesktop = useIsDesktopDock();
-  const { ready, visibility, cueDismissed, setVisibility, dismissCue } = useCopilotVisibility(actorId);
+  const { ready, visibility, cueDismissed, setVisibility, dismissCue } = useCopilotVisibility(actorId, pageKey);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Until the identity resolves nothing is read or written: the dock renders as

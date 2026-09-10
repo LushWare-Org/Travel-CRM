@@ -21,6 +21,9 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import ManagementContextCopilot from '../ManagementContextCopilot';
 
 const ACTOR = 'actor-1';
+/** The page key the shell is rendered with below; the stored preference is
+ *  keyed by actor AND page, so the assertions must name both. */
+const PAGE = 'leads';
 
 function StubSections({ api: sectionApi }: { api: CopilotSectionApi }) {
   const { session } = sectionApi;
@@ -141,7 +144,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
     expect(screen.getByTestId('claims')).toHaveTextContent('Briefing a');
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBe('open');
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('open');
   });
 
   it('does not count a no-lead visit as discovery', async () => {
@@ -149,7 +152,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
     await act(async () => {});
     expect(screen.getByRole('button', { name: 'Open copilot' })).toBeInTheDocument();
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBeNull();
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBeNull();
     expect(api.copilotDeterministic).not.toHaveBeenCalled();
   });
 
@@ -160,7 +163,7 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
     await user.click(screen.getByRole('button', { name: 'collapse' }));
 
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBe('collapsed');
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('collapsed');
     expect(screen.queryByTestId('surface-open')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open copilot' })).toBeInTheDocument();
 
@@ -174,20 +177,41 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
     await act(async () => {});
     expect(screen.queryByTestId('surface-open')).not.toBeInTheDocument();
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBe('collapsed');
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('collapsed');
   });
 
   it('persists a manual reopen and keeps another operator preference untouched', async () => {
-    localStorage.setItem(visibilityKey('actor-2'), 'collapsed');
-    localStorage.setItem(visibilityKey(ACTOR), 'collapsed');
+    localStorage.setItem(visibilityKey('actor-2', PAGE), 'collapsed');
+    localStorage.setItem(visibilityKey(ACTOR, PAGE), 'collapsed');
     const user = userEvent.setup();
 
     renderShell();
     await user.click(screen.getByRole('button', { name: 'Open copilot' }));
 
     await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBe('open');
-    expect(localStorage.getItem(visibilityKey('actor-2'))).toBe('collapsed');
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('open');
+    expect(localStorage.getItem(visibilityKey('actor-2', PAGE))).toBe('collapsed');
+  });
+
+  it('keys the preference per page, so collapsing one page does not silence the others', async () => {
+    // The operator collapsed the copilot on `leads` and has never opened
+    // `overview`. Under the previous actor-global key, `overview` would have
+    // inherited that collapse and never announced that a briefing exists there;
+    // the decided behaviour is one discovery moment per page key.
+    localStorage.setItem(visibilityKey(ACTOR, 'leads'), 'collapsed');
+
+    render(
+      <AuthProvider>
+        <ManagementContextCopilot pageKey="overview" scope={{}} scopeLabel="Overview">
+          {(sectionApi) => <StubSections api={sectionApi} />}
+        </ManagementContextCopilot>
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
+    expect(localStorage.getItem(visibilityKey(ACTOR, 'overview'))).toBe('open');
+    // And it did not overwrite the choice made on the other page.
+    expect(localStorage.getItem(visibilityKey(ACTOR, 'leads'))).toBe('collapsed');
   });
 
   it('waits for the authenticated identity and persists nothing until it resolves', async () => {
@@ -195,8 +219,8 @@ describe('ManagementContextCopilot — desktop visibility', () => {
 
     await act(async () => {});
     expect(screen.getByRole('button', { name: 'Open copilot' })).toBeInTheDocument();
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBeNull();
-    expect(localStorage.getItem(visibilityKey('undefined'))).toBeNull();
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBeNull();
+    expect(localStorage.getItem(visibilityKey('undefined', PAGE))).toBeNull();
   });
 
   it('renders the persistent dock at xl and a labeled rail once collapsed', async () => {
@@ -251,15 +275,15 @@ describe('ManagementContextCopilot — below xl', () => {
     renderShell();
 
     expect(await screen.findByText('Lead briefing ready')).toBeInTheDocument();
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBeNull();
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBeNull();
     expect(document.querySelector('[data-copilot-surface="dock"]')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Open copilot' }));
 
     await waitFor(() => expect(api.copilotDeterministic).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId('claims').textContent).toMatch(/Deterministic a|Briefing a/);
-    expect(localStorage.getItem(mobileCueKey(ACTOR))).toBe('true');
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBe('open');
+    expect(localStorage.getItem(mobileCueKey(ACTOR, PAGE))).toBe('true');
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBe('open');
     await waitFor(() => expect(screen.queryByText('Lead briefing ready')).not.toBeInTheDocument());
   });
 
@@ -284,8 +308,8 @@ describe('ManagementContextCopilot — below xl', () => {
     await screen.findByText('Lead briefing ready');
     await user.click(screen.getByRole('button', { name: 'Dismiss briefing ready cue' }));
 
-    expect(localStorage.getItem(mobileCueKey(ACTOR))).toBe('true');
-    expect(localStorage.getItem(visibilityKey(ACTOR))).toBeNull();
+    expect(localStorage.getItem(mobileCueKey(ACTOR, PAGE))).toBe('true');
+    expect(localStorage.getItem(visibilityKey(ACTOR, PAGE))).toBeNull();
     expect(screen.queryByText('Lead briefing ready')).not.toBeInTheDocument();
   });
 });

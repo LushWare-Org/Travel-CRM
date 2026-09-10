@@ -12,7 +12,7 @@ const { default: app } = await import('../../src/app.js');
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    hotelBooking: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    hotelBooking: { create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), count: vi.fn() },
   },
 }));
 

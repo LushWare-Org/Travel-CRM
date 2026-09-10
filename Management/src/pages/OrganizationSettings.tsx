@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
+import PageCopilot from '../features/copilot/PageCopilot';
+
 interface SettingsForm {
   companyName: string;
   companyShortName: string;
@@ -269,7 +271,8 @@ const OrganizationSettings = () => {
   }
 
   return (
-    <div className="h-full overflow-auto bg-background">
+    <PageCopilot pageKey="settings" scopeLabel="Settings">
+      <div className="h-full overflow-auto bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -470,7 +473,8 @@ const OrganizationSettings = () => {
           </div>
         </Section>
       </div>
-    </div>
+      </div>
+    </PageCopilot>
   );
 };
 

@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ManagementContextCopilot from "../features/copilot/ManagementContextCopilot";
 import LeadBriefing from "../features/copilot/LeadBriefing";
+import CollectionBriefing from "../features/copilot/CollectionBriefing";
 
 // Feature-gated client flag; the panel stays off until explicitly enabled.
 const copilotEnabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === "true";
@@ -398,8 +399,12 @@ const LeadManagement = () => {
 
   // The copilot scope is the record selected in the persistent pane; nothing is
   // sent when no lead is selected.
+  // With no lead selected this is the COLLECTION scope (`{}`), which serves the
+  // analyst briefing for the general leads page — the collection engine's
+  // `leads` descriptor. The record briefing and the collection briefing are
+  // different sections, so the mount below branches on which one applies.
   const detailLeadId = detailLead ? String(detailLead.id ?? detailLead._id ?? "").trim() : "";
-  const copilotScope: CopilotScope | null = detailLeadId ? { leadId: detailLeadId } : null;
+  const copilotScope = detailLeadId ? { leadId: detailLeadId } : {};
   const copilotLabel = detailLead
     ? String(detailLead.name ?? "") || `Lead ${detailLeadId}`
     : "Leads";
@@ -560,12 +565,20 @@ const LeadManagement = () => {
         {copilotEnabled && (
           <ManagementContextCopilot pageKey="leads" scope={copilotScope} scopeLabel={copilotLabel}>
             {({ session, collapse }) => (
-              <LeadBriefing
-                session={session}
-                scopeLabel={copilotLabel}
-                leadId={detailLeadId || null}
-                onCollapse={collapse}
-              />
+              detailLeadId ? (
+                <LeadBriefing
+                  session={session}
+                  scopeLabel={copilotLabel}
+                  leadId={detailLeadId}
+                  onCollapse={collapse}
+                />
+              ) : (
+                <CollectionBriefing
+                  session={session}
+                  scopeLabel={copilotLabel}
+                  onCollapse={collapse}
+                />
+              )
             )}
           </ManagementContextCopilot>
         )}

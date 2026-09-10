@@ -321,13 +321,20 @@ module "assistant_service" {
     }
   ]
   plain_env = merge(local.services.assistant-service.plain_env, {
+    # Every URL here needs a matching run.invoker grant in iam.tf. A URL without
+    # a grant is worse than a missing URL: the fetch fails at the Cloud Run edge
+    # rather than falling back, so the source reports unavailable on every load.
     USER_SERVICE_URL = module.user_service.uri
     # The leads adapter (and the ask-mode lead tool) fetch the record straight
     # from lead-service. Without this they fall back to http://localhost:3004
     # inside the container, so every briefing reported the source as
     # unavailable and rendered zero insights.
-    LEAD_SERVICE_URL    = module.lead_service.uri
-    BILLING_SERVICE_URL = module.billing_service.uri
+    LEAD_SERVICE_URL      = module.lead_service.uri
+    BILLING_SERVICE_URL   = module.billing_service.uri
+    ANALYTICS_SERVICE_URL = module.analytics_service.uri
+    PACKAGE_SERVICE_URL   = module.package_service.uri
+    FLIGHT_SERVICE_URL    = module.flight_service.uri
+    CAREER_SERVICE_URL    = module.career_service.uri
   })
   memory                = local.services.assistant-service.memory
   cpu                   = local.services.assistant-service.cpu

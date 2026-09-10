@@ -374,23 +374,23 @@ One realistic production failure per new codepath, and whether a test, error han
 
 Synthesized from this review's findings and the outside voice. Each task derives from a specific finding; run with Claude Code or Codex and checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~2h / CC: ~20min)** — `assistant-service` — make `pageKeyAllowed` fail closed and migrate every enabled environment to a non-empty `MANAGEMENT_COPILOT_PAGE_KEYS`.
+- [x] **T1 (P1, human: ~2h / CC: ~20min)** — `assistant-service` — make `pageKeyAllowed` fail closed and migrate every enabled environment to a non-empty `MANAGEMENT_COPILOT_PAGE_KEYS`.
   - Surfaced by: Architecture scope review — the gate is fail-open (`managementCopilot.controller.js:30-36`) and three checked-in files document "empty = all registered pages".
   - Files: `Services/assistant-service/src/controllers/managementCopilot.controller.js`, `Services/assistant-service/.env.example`, `infra/terraform/modules/deployment/variables.tf`, `infra/terraform/deployments/*/terraform.tfvars.example`
   - Verify: an unset allowlist serves `404` for every key; a set allowlist serves only listed keys.
-- [ ] **T2 (P1, human: ~1h / CC: ~10min)** — tests invalidated by T1 and T8.
+- [x] **T2 (P1, human: ~1h / CC: ~10min)** — tests invalidated by T1 and T8.
   - Surfaced by: Test review — `gate.test.js:204-210` asserts `scope: {}` returns `400`; its `enableCopilot()` helper needs `PAGE_KEYS='leads'` for `:86-153`, `:176-190`, `:197-202`; `leads.adapter.test.js:52-54` asserts `parseScope({})` throws.
   - Files: `Services/assistant-service/src/controllers/__tests__/managementCopilot.gate.test.js`, `Services/assistant-service/src/adapters/__tests__/leads.adapter.test.js`
   - Verify: `npx vitest run` in `Services/assistant-service`.
-- [ ] **T3 (P1, human: ~1h / CC: ~10min)** — `@travel-crm/contracts` — add `pageEvidenceId` and `sources` to `ManagementDeterministicResult`.
+- [x] **T3 (P1, human: ~1h / CC: ~10min)** — `@travel-crm/contracts` — add `pageEvidenceId` and `sources` to `ManagementDeterministicResult`.
   - Surfaced by: §3 — one ID producer; deterministic phase must ship sources (outside voice finding 3).
   - Files: `Services/shared/contracts/src/managementCopilot.js`
   - Verify: existing leads drift test still passes.
-- [ ] **T4 (P1, human: ~6h / CC: ~40min)** — `assistant-service` — `rules.js` + `collectionEngine.js` with the full descriptor interface (`shape`, `when`, `paging`, `maxFetchBytes`, `tools`), concurrent fan-out with two per-phase budgets, truncation detection, `attemptedSources`, budget precedence, and the short-TTL bundle cache. Update `registry.js`'s interface comment in the same commit.
+- [x] **T4 (P1, human: ~6h / CC: ~40min)** — `assistant-service` — `rules.js` + `collectionEngine.js` with the full descriptor interface (`shape`, `when`, `paging`, `maxFetchBytes`, `tools`), concurrent fan-out with two per-phase budgets, truncation detection, `attemptedSources`, budget precedence, and the short-TTL bundle cache. Update `registry.js`'s interface comment in the same commit.
   - Surfaced by: Architecture review issues 1-4; Code Quality issues 5-6; Performance issues 9-10; outside voice findings 1, 2, 10.
   - Files: `Services/assistant-service/src/adapters/{collectionEngine.js,rules.js,registry.js}`
   - Verify: unit tests below; one slow source yields a partial bundle, not a failure.
-- [ ] **T5 (P1, human: ~6h / CC: ~45min)** — `assistant-service` tests — every engine path and every rule predicate.
+- [x] **T5 (P1, human: ~6h / CC: ~45min)** — `assistant-service` tests — every engine path and every rule predicate.
   - Surfaced by: Test review issue 8 — 23 of 34 paths had no mandated test.
   - Files: `Services/assistant-service/src/adapters/__tests__/`, `Services/assistant-service/src/ai/__tests__/`
   - Verify: 200 / 403-404 / 5xx / row cap / byte cap / `limit + 1` probe / implicit page size / `when` by tab and role / singleton vs collection / concurrency / per-phase budget / budget precedence / cache hit and miss; plus supported-boundary-no-evidence per predicate.
@@ -398,35 +398,35 @@ Synthesized from this review's findings and the outside voice. Each task derives
   - Surfaced by: Test review — the corpus is lead-shaped, and the model now receives aggregate and baseline evidence types.
   - Files: `Services/assistant-service/src/evaluation/managementBriefingEvaluation.js`, `Services/assistant-service/src/evaluation/__tests__/`
   - Verify: `npx vitest run` in `Services/assistant-service`.
-- [ ] **T7 (P1, human: ~3h / CC: ~20min)** — deterministic phase returns `sources`.
+- [x] **T7 (P1, human: ~3h / CC: ~20min)** — deterministic phase returns `sources`.
   - Surfaced by: Outside voice finding 3 — the cold-open evidence panel renders "not captured" without a `sources` entry.
   - Files: `Services/assistant-service/src/controllers/managementCopilot.controller.js`, `Services/shared/contracts/src/managementCopilot.js`
   - Verify: a collection claim's evidence action opens a panel with a real value and timestamp.
-- [ ] **T8 (P1, human: ~5h / CC: ~30min)** — `Management` client — scope-key derivation, `hasScope` from the scope key, scope threaded through the four request sites, `partial` from the source arrays, `404` → feature-off, `CollectionBriefing`, `LeadManagement.tsx:402` collection branch, and the three `LeadCopilotScope` importers.
+- [x] **T8 (P1, human: ~5h / CC: ~30min)** — `Management` client — scope-key derivation, `hasScope` from the scope key, scope threaded through the four request sites, `partial` from the source arrays, `404` → feature-off, `CollectionBriefing`, `LeadManagement.tsx:402` collection branch, and the three `LeadCopilotScope` importers.
   - Surfaced by: Client section; outside voice findings 7, 8, 9.
   - Files: `Management/src/features/copilot/*`, `Management/src/pages/LeadManagement.tsx`, `Management/src/features/lead-management/components/__tests__/`
   - Verify: deselecting a lead briefs the collection, the ask box is enabled, the panel auto-opens; `{ leadId: '' }` still returns `400`.
-- [ ] **T9 (P1, human: ~2h / CC: ~10min)** — `career-service` — move `GET /vacancies/admin/all` below the admin gate and gate `/career`.
+- [x] **T9 (P1, human: ~2h / CC: ~10min)** — `career-service` — move `GET /vacancies/admin/all` below the admin gate and gate `/career`.
   - Surfaced by: Outside voice finding 6 — a live authorization hole (`vacancy.routes.js:12` vs the gate at `:15`) that the plan's ceiling depends on.
   - Files: `Services/career-service/src/routes/vacancy.routes.js`, `Management/src/App.jsx`
   - Verify: a salesRep gets `403` on `/vacancies/admin/all` and cannot reach `CareerManagement`.
-- [ ] **T10 (P1, human: ~1h / CC: ~10min)** — grant `run.invoker` on analytics, package, flight, billing, user, and career services; add their internal URLs to `assistant-service`'s environment.
+- [x] **T10 (P1, human: ~1h / CC: ~10min)** — grant `run.invoker` on analytics, package, flight, billing, user, and career services; add their internal URLs to `assistant-service`'s environment.
   - Surfaced by: Architecture review — without both, every fetch 403s at the platform edge and every page renders no-access.
   - Files: `infra/terraform/modules/deployment/{iam.tf,cloud_run.tf,locals.tf}`
   - Verify: one live internal fetch per service returns `200`.
-- [ ] **T11 (P1, human: ~4h / CC: ~25min)** — nine descriptors in the §8 order, each declaring `paging`, `when`, `tools`, and for flights/hotels an ordering keyed to their deadline rules.
+- [x] **T11 (P1, human: ~4h / CC: ~25min)** — nine descriptors in the §8 order, each declaring `paging`, `when`, `tools`, and for flights/hotels an ordering keyed to their deadline rules.
   - Surfaced by: §4; outside voice findings 1, 4, 5.
   - Files: `Services/assistant-service/src/adapters/pages/*.adapter.js`, `Services/assistant-service/src/adapters/registry.js`
   - Verify: `/leads` collection reports the true total, not 10; each page briefs on its own data.
-- [ ] **T12 (P2, human: ~2h / CC: ~15min)** — add `limit` to the flight and hotel bookings list query schemas and controllers, then register those two descriptors.
+- [x] **T12 (P2, human: ~2h / CC: ~15min)** — add `limit` to the flight and hotel bookings list query schemas and controllers, then register those two descriptors.
   - Surfaced by: §2 — the only net-new backend change; these two register last.
   - Files: `Services/flight-service/src/{validators/flight.schema.js,controllers/flight.controller.js}`, `Services/package-service/src/hotels/{validators/hotel.schema.js,controllers/hotelBooking.controller.js}`
   - Verify: windowed counts are labelled with their window; truncation renders as a partial state.
-- [ ] **T13 (P1, human: ~3h / CC: ~20min)** — `assistant-service/src/adapters/rules.js` — add `groupedCount(field, byKey, threshold)` and `groupedShare(field, byKey, pct)` to the shared vocabulary, with `byKey` restricted to a per-descriptor allowlist.
+- [x] **T13 (P1, human: ~3h / CC: ~20min)** — `assistant-service/src/adapters/rules.js` — add `groupedCount(field, byKey, threshold)` and `groupedShare(field, byKey, pct)` to the shared vocabulary, with `byKey` restricted to a per-descriptor allowlist.
   - Surfaced by: the Assignment — all escapes found were relational, and grouping was the single root cause. An independent adversarial pass reached the same fix and sized it at roughly four of ten sentences converted.
   - Files: `Services/assistant-service/src/adapters/rules.js`, `Services/assistant-service/src/adapters/__tests__/`
   - Verify: a three-invoice single-customer case produces one grouped insight, not three; a `byKey` outside the allowlist is rejected before any aggregation.
-- [ ] **T14 (P1, human: ~1h / CC: ~10min)** — `assistant-service` — correct the `billing` descriptor for the field traps the Assignment verified: read `paymentStatus` (never `status`) for payment state, derive overdue from `dueDate` rather than a status value, do not declare `unassigned` on any billing source, state `stuckInStatus` as an `updatedAt` proxy in the insight text, and add `CreditNote` as a source.
+- [x] **T14 (P1, human: ~1h / CC: ~10min)** — `assistant-service` — correct the `billing` descriptor for the field traps the Assignment verified: read `paymentStatus` (never `status`) for payment state, derive overdue from `dueDate` rather than a status value, do not declare `unassigned` on any billing source, state `stuckInStatus` as an `updatedAt` proxy in the insight text, and add `CreditNote` as a source.
   - Surfaced by: the Assignment — each trap fails silently, producing a wrong briefing rather than an error.
   - Files: `Services/assistant-service/src/adapters/pages/billing.adapter.js`
   - Verify: no rule reads `Invoice.status` for payment state; a fixture with `status: 'sent'` and `paymentStatus: 'partial'` briefs as partially paid.
@@ -439,30 +439,42 @@ _No new tasks from the "what already exists" review — reuse is the DRY strateg
 
 ### Design review tasks
 
-- [ ] **DT1 (P1, human: ~1h / CC: ~10min)** — `Management/DESIGN.md` — add named entries for the claim row and the inline status row, with tokens.
+- [x] **DT1 (P1, human: ~1h / CC: ~10min)** — `Management/DESIGN.md` — add named entries for the claim row and the inline status row, with tokens.
   - Surfaced by: Pass 5 — `DESIGN.md:288` requires every new primitive to get an entry, and neither pattern exists in `ui/`.
   - Files: `Management/DESIGN.md`
   - Verify: both entries name their tokens and reference the composing primitives.
-- [ ] **DT2 (P1, human: ~2h / CC: ~15min)** — `Management/src/features/copilot/CollectionBriefing.tsx` — compose the claim row (hairline-separated, no card), the source tag and severity markers from `badge`, and the scope-dependent section order.
+- [x] **DT2 (P1, human: ~2h / CC: ~15min)** — `Management/src/features/copilot/CollectionBriefing.tsx` — compose the claim row (hairline-separated, no card), the source tag and severity markers from `badge`, and the scope-dependent section order.
   - Surfaced by: Passes 1 and 4.
   - Files: `Management/src/features/copilot/CollectionBriefing.tsx`, `ClaimItem.tsx`
   - Verify: twenty claims render as one list, not twenty boxes; `attention` leads on a collection.
-- [ ] **DT3 (P1, human: ~3h / CC: ~20min)** — implement the nine-state contract, including per-page empty-state copy and primary action.
+- [x] **DT3 (P1, human: ~3h / CC: ~20min)** — implement the nine-state contract, including per-page empty-state copy and primary action.
   - Surfaced by: Pass 2 — the focus pass; the plan named states without defining any of them.
   - Files: `Management/src/features/copilot/CollectionBriefing.tsx`, `useCopilotSession.ts`
   - Verify: each of the nine states renders its specified copy and treatment; empty is never "No items found."
-- [ ] **DT4 (P1, human: ~1h / CC: ~10min)** — accessibility pass: accessible names on severity markers, 44px touch targets, real section headings, `Announcer` coverage for state changes, contrast check on `{colors.muted-foreground}`.
+- [x] **DT4 (P1, human: ~1h / CC: ~10min)** — accessibility pass: accessible names on severity markers, 44px touch targets, real section headings, `Announcer` coverage for state changes, contrast check on `{colors.muted-foreground}`.
   - Surfaced by: Pass 6.
   - Files: `Management/src/features/copilot/CollectionBriefing.tsx`, `ClaimItem.tsx`
   - Verify: severity is readable without colour; keyboard traversal reaches every claim, source tag, and suggested question.
-- [ ] **DT5 (P1, human: ~1h / CC: ~10min)** — attention-item primary action: open the record where a record surface exists, otherwise reveal the evidence.
+- [x] **DT5 (P1, human: ~1h / CC: ~10min)** — attention-item primary action: open the record where a record surface exists, otherwise reveal the evidence.
   - Surfaced by: Pass 3 — the journey dead-ended at its highest-intent step.
   - Files: `Management/src/features/copilot/CollectionBriefing.tsx`, `ManagementContextCopilot.tsx`
   - Verify: clicking an attention item on `/billing` reveals evidence; on `/leads` it opens the record.
-- [ ] **DT6 (P2, human: ~1h / CC: ~10min)** — auto-open once per page key per operator, then honour the persisted collapsed state.
+- [x] **DT6 (P2, human: ~1h / CC: ~10min)** — auto-open once per page key per operator, then honour the persisted collapsed state.
   - Surfaced by: Pass 7 — the record-scope auto-open rule fires once per record, which has no collection equivalent.
   - Files: `Management/src/features/copilot/{useCopilotVisibility.ts,ManagementContextCopilot.tsx}`
   - Verify: the panel auto-opens on first visit to each page key and stays collapsed on return.
+
+### Still open (status as of 2026-09-10)
+
+Tasks above are checked as they landed. What remains, and why:
+
+- **T6 / T15 — the evaluation corpus.** The 18-scenario catalogue in `management-copilot-billing-scenarios.md` is written but not wired as fixtures, so the briefing prompt's behaviour on collection evidence is unmeasured. Everything verified so far is deterministic (engine, rules, descriptors, contract); nothing verifies what the *model* produces from the new evidence types.
+- **Failed-fetch record path.** `runRules` now guards the collection/record discriminator, but the leads record path has no test for "the fetch failed and the bundle has `record: null`" — the case that produced the undefined-iteration bug.
+- **Visual verification.** No mockups were generated (designer has no API key) and no local stack was available in-session, so `/billing`'s dock layout and the briefing's rendered appearance are verified by tests and by reading `CopilotDock`'s classes, never by looking at a page.
+- **flight-service is still excluded from CI** — 7 pre-existing failures, drift from the Zod validation commit. Needs a call on whether the payloads or the schema is wrong.
+- **Full-suite execution was interrupted twice** (by request and by time). Per-package suites and typecheck pass; a single clean full-stack run has not happened in one sitting.
+
+Deferred by design, not by omission: filter-scoped briefings, per-page ask tools (the ask box answers from the fetched bundle and says so otherwise), semantic retrieval, persistent insight snapshots.
 ## Design decisions (added by /plan-design-review)
 
 - **Section order is scope-dependent.** Collection scopes lead with `attention` (a list is scanned for problems); record scope keeps the `current_state`-first narrative order (a record is read). Specified in §6.

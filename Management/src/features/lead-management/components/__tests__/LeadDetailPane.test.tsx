@@ -130,7 +130,7 @@ beforeEach(() => {
         {
           id: 'claim-1',
           section: 'current_state',
-          text: `Briefing ${scope.leadId}`,
+          text: `Briefing ${scope.leadId ?? 'collection'}`,
           facts: [],
           evidenceIds: [leadEvidenceId(scope.leadId, 'destination')],
           evidenceType: 'record',
@@ -158,7 +158,7 @@ describe('LeadDetailPane', () => {
     renderPage();
 
     const row = await screen.findByText('Alice Traveller');
-    expect(mockDeterministic).not.toHaveBeenCalled();
+    expect(mockDeterministic).toHaveBeenCalledTimes(1);
 
     await user.click(row);
 
@@ -196,7 +196,7 @@ describe('LeadDetailPane', () => {
     renderPage();
 
     await user.click(await screen.findByText('Alice Traveller'));
-    await waitFor(() => expect(mockDeterministic).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockDeterministic).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByText('Briefing lead-a')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Close lead detail' }));
@@ -204,9 +204,13 @@ describe('LeadDetailPane', () => {
     expect(screen.getByText('Select a lead to see its details and evidence.')).toBeInTheDocument();
     expect(screen.queryByText('Briefing lead-a')).not.toBeInTheDocument();
     expect(screen.queryByText('Deterministic lead-a')).not.toBeInTheDocument();
-    expect(screen.getByText('Select a lead to generate its situation briefing.')).toBeInTheDocument();
-
-    expect(mockDeterministic).toHaveBeenCalledTimes(1);
+    // Deselecting does NOT go dormant any more: `{}` is the COLLECTION scope —
+    // the general leads page. That is the whole point of the collection mode,
+    // so a further request is expected and the record's claims must be gone.
+    await waitFor(() =>
+      expect(mockDeterministic).toHaveBeenCalledWith(expect.objectContaining({ scope: {} })),
+    );
+    await waitFor(() => expect(screen.getByText('Briefing collection')).toBeInTheDocument());
     expect(screen.getByRole('complementary', { name: 'Lead detail' })).toHaveAttribute(
       'data-copilot-record',
       'empty'

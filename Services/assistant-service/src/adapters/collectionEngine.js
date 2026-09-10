@@ -128,23 +128,36 @@ async function fetchSource(source, ctx, mode, bundle) {
       return [];
     }
 
-    const rows = readPath(body, source.listPath);
-    if (!Array.isArray(rows)) {
+    const extracted = readPath(body, source.listPath);
+    const shape = source.shape ?? 'collection';
+    let rows;
+    if (shape === 'singleton') {
+      // Stats and settings endpoints return one object rather than an array.
+      // A missing singleton is a successful empty source, not an outage.
+      if (extracted === null || extracted === undefined) rows = [];
+      else if (typeof extracted === 'object' && !Array.isArray(extracted)) rows = [extracted];
+      else {
+        bundle.attemptedSources.push(source.name);
+        bundle.unavailableSources.push(source.name);
+        return [];
+      }
+    } else if (Array.isArray(extracted)) {
+      rows = extracted;
+    } else {
       bundle.attemptedSources.push(source.name);
       bundle.unavailableSources.push(source.name);
       return [];
     }
+
     if (rows.length > engineLimits().maxFetchRows) {
       bundle.attemptedSources.push(source.name);
       bundle.unavailableSources.push(source.name);
       return [];
     }
 
-    // Truncation detection. A declared `paging` means the endpoint pages on its
-    // own, so a tidy 200 can still be one page of many. Either the response
-    // reports the true total and we compare, or we cannot tell a full result
-    // from a sliced one and the source is dropped.
-    if (source.paging) {
+    // Truncation applies to collection endpoints only. A singleton is already
+    // complete by construction.
+    if (shape === 'collection' && source.paging) {
       const total = readPath(body, source.paging.totalPath);
       if (typeof total === 'number' && Number.isFinite(total)) {
         if (total > rows.length) {
@@ -153,9 +166,6 @@ async function fetchSource(source, ctx, mode, bundle) {
           return [];
         }
       } else if (rows.length >= (source.paging.defaultLimit ?? rows.length)) {
-        // No total to compare against and the page came back exactly full,
-        // which is the ambiguous case. Treat it as truncated rather than
-        // reporting a page size as a total.
         bundle.attemptedSources.push(source.name);
         bundle.unavailableSources.push(source.name);
         return [];
@@ -166,11 +176,14 @@ async function fetchSource(source, ctx, mode, bundle) {
     bundle.recordCounts[source.name] = rows.length;
 
     const projected = rows.map((row) => {
+      // A source transform is the explicit seam for nested analytics/settings
+      // envelopes. It returns a flat record; fields still go through the source
+      // allowlist below, so a transform cannot widen what reaches the model.
+      const normalized = source.transform ? source.transform(row, body, ctx) : row;
       const out = {};
-      for (const field of source.fields) out[field] = row[field];
+      for (const field of source.fields) out[field] = normalized?.[field];
       return out;
     });
-    // Records carry their source so an insight can tell which list it came from.
     for (const record of projected) record.__source = source.name;
     return projected;
   } catch {
@@ -393,9 +406,6 @@ export function createPageAdapter(descriptor) {
       // means "changed since the operator last acknowledged this scope" rather
       // than "changed recently".
       const insights = runRules(rules, bundle, bundle.scope ?? {}, Date.now(), since);
-      // Defensive: the same inputs produce the same citations, so this should
-      // be a no-op — but an insight citing pruned evidence must never ship, and
-      // that invariant belongs here rather than in a caller's assumptions.
       const present = new Set(bundle.evidence.map((item) => item.id));
       return insights.filter((insight) => insight.evidenceIds.every((id) => present.has(id)));
     },
@@ -413,19 +423,29 @@ export function createPageAdapter(descriptor) {
 
 function runRules(rules, bundle, scope, now, since) {
   const insights = [];
+  // A record-scope bundle (the legacy leads adapter) carries `record`, not
+  // `records`. Reading through this once means a missing list cannot crash a
+  // page, and the escape hatch still receives the original bundle untouched.
+  const records = Array.isArray(bundle.records) ? bundle.records : [];
+  // Escape-hatch rules receive a bundle whose `records` is always an array, so
+  // page code never has to defend against the record-scope shape.
+  const safeBundle = records === bundle.records ? bundle : { ...bundle, records };
   for (const [declarationIndex, declaration] of rules.entries()) {
     const name = declaration.rule;
     const def = name ? RULES[name] : null;
 
     if (def) {
       if (COLLECTION_RULES.has(name)) {
-        // Collection rules see the whole list and decide their own grouping,
-        // but they also need per-record field evidence to exist, so the engine
-        // pre-widens the index for their key/sum fields.
-        insights.push(...def.run(bundle, declaration, now, since).map(prefix(declarationIndex)));
+        // Collection rules may still be source-scoped. Grouping invoice rows
+        // together with a stats singleton would produce nonsense.
+        const ruleBundle = declaration.source
+          ? { ...bundle, records: records.filter((record) => record.__source === declaration.source) }
+          : safeBundle;
+        insights.push(...def.run(ruleBundle, declaration, now, since).map(prefix(declarationIndex)));
         continue;
       }
-      for (const record of bundle.records) {
+      for (const record of records) {
+        if (declaration.source && record.__source !== declaration.source) continue;
         insights.push(...def.run(bundle, declaration, record, now, since).map(prefix(declarationIndex)));
       }
       continue;
@@ -433,7 +453,7 @@ function runRules(rules, bundle, scope, now, since) {
 
     // Escape hatch: page-specific code, same contract.
     if (typeof declaration.run === 'function') {
-      insights.push(...declaration.run(bundle, since).map(prefix(declarationIndex)));
+      insights.push(...declaration.run(safeBundle, since).map(prefix(declarationIndex)));
       continue;
     }
 

@@ -79,9 +79,16 @@ export const cancelBookingSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
-/** GET /flights/bookings — query params */
+/** GET /flights/bookings — query params.
+ * Paging/sorting stay optional so existing callers that expect the full list
+ * keep their current behavior. The copilot opts into a bounded, deadline-first
+ * page explicitly. */
 export const listBookingsQuerySchema = z.object({
   status: z.enum(['quoted', 'pending', 'confirmed', 'ticketed', 'cancelled', 'failed']).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  sortBy: z.enum(['createdAt', 'ticketingDeadline']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
 });
 
 /** Route params with UUID */
