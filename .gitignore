@@ -159,3 +159,6 @@ secret/
 # Local env backups — never commit (they contain live keys/secrets)
 env_backup/
 env_backup.zip
+
+# Local Deployment Skill
+.claude/skills/deploy-travelcrm/
