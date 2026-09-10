@@ -136,8 +136,8 @@ const Sidebar = () => {
 
   const navigationItems: NavItem[] = [
     { icon: Home, label: "Dashboard", path: "/", requiredPermission: null },
-    { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
     { icon: Users, label: "Leads", path: "/leads", requiredPermission: null, allowedRoles: ["salesRep", "admin"], requiresAnyPermission: ["manage_leads"] },
+    { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
     {
       icon: MapPin,
       label: "Packages",

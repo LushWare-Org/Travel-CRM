@@ -265,6 +265,18 @@ describe('Sidebar brand header', () => {
 });
 
 describe('Sidebar navigation', () => {
+  it('orders Leads directly beneath Dashboard', async () => {
+    // The order is the feature: agents never see Dashboard, so whatever sits
+    // directly beneath it becomes the first item in their sidebar.
+    render(<Sidebar />);
+
+    const nav = await screen.findByRole('navigation');
+    const labels = Array.from(nav.querySelectorAll('button[title]')).map((b) => b.getAttribute('title'));
+
+    expect(labels[0]).toBe('Dashboard');
+    expect(labels[1]).toBe('Leads');
+  });
+
   it('navigates when a nav item is clicked and marks the active route', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Sidebar />);
