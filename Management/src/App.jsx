@@ -84,7 +84,17 @@ function AppContent() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="/career" element={<CareerManagement />} />
+                  {/* Admin-gated to match career-service: /vacancies/admin/all
+                      sits behind the admin role, so a non-admin reaching this
+                      page would render a list that 403s. */}
+                  <Route
+                    path="/career"
+                    element={
+                      <ProtectedRoute requiredRoles={["admin", "superAdmin"]}>
+                        <CareerManagement />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="/settings"
                     element={

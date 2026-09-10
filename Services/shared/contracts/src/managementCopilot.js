@@ -52,6 +52,22 @@ export function leadEvidenceId(leadId, field) {
   return `lead:${leadId}:${field}`;
 }
 
+// The page-agnostic evidence-ID producer for every non-lead page. Same
+// purpose as `leadEvidenceId`: one producer, so the engine, the reveal
+// resolver, and (when a page opts in) that page's own field anchors cannot
+// drift apart.
+//
+// Shape is always four or more colon-separated segments. The client resolver
+// (Management/src/features/copilot/evidence.ts) parses only four-or-more
+// segment IDs, so every emitted ID — record fields, aggregates, and per-source
+// baselines — goes through here and never gets hand-built:
+//   pageEvidenceId('billing', 'invoice', id, 'dueDate')      → record field
+//   pageEvidenceId('billing', 'aggregate', 'overdue-count', 'value')
+//   pageEvidenceId('billing', 'source', 'invoices', 'recordCount')
+export function pageEvidenceId(pageKey, recordKind, recordId, field) {
+  return `${pageKey}:${recordKind}:${recordId}:${field}`;
+}
+
 // A typed fact is the only place a risky value (id/date/amount/percentage/
 // count/duration) may appear. Free prose must stay qualitative.
 export const BriefingFactSchema = z
@@ -206,5 +222,11 @@ export const ManagementDeterministicResult = z
     insights: z.array(DeterministicInsightSchema).max(100),
     unavailableSources: z.array(z.string().min(1).max(255)).max(50),
     notAuthorizedSources: z.array(z.string().min(1).max(255)).max(50),
+    // Optional until the deterministic handler populates it. The briefing path
+    // already builds this payload server-side; shipping it in the deterministic
+    // phase too is what lets the cold-open evidence action render a real value
+    // instead of "not captured" — EvidenceAction derives its inline detail from
+    // a sources entry and has none in this phase today.
+    sources: z.array(ManagementSourceSchema).max(100).optional(),
   })
   .strict();
