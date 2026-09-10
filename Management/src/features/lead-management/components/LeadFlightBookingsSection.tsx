@@ -8,6 +8,7 @@ import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
 import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
 import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';
 import { Button } from '@/components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '-';
@@ -60,7 +61,7 @@ export default function LeadFlightBookingsSection({
       const res = await flightAPI.getByLead(leadId);
       setBookings(res.data || []);
     } catch (err: any) {
-      setError(err.message || 'Failed to load bookings');
+      setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ export default function LeadFlightBookingsSection({
       const res = await leadAPI.getSelectionFlights(leadId, selectionId);
       setOptionalFlights(res.data || []);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load transfer flights');
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -90,7 +91,7 @@ export default function LeadFlightBookingsSection({
       toast.success('Booking cancelled');
       fetchBookings();
     } catch (err: any) {
-      toast.error(err.message || 'Cancel failed');
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -154,7 +155,7 @@ export default function LeadFlightBookingsSection({
       await fetchOptionalFlights();
       onFlightsChanged?.();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save flight preferences');
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -166,7 +167,7 @@ export default function LeadFlightBookingsSection({
       fetchOptionalFlights();
       onFlightsChanged?.();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to remove flight');
+      toast.error(apiErrorMessage(err));
     }
   };
 

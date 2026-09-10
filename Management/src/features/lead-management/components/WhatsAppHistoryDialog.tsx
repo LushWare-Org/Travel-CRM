@@ -5,6 +5,7 @@ import { leadAPI } from '../../../services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const SESSION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -60,7 +61,7 @@ const WhatsAppHistoryDialog = ({ isOpen, onClose, lead, onSuccess }: WhatsAppHis
       const data = res?.data ?? res;
       setLogs((data?.communicationLogs || []).filter((l: CommunicationLog) => l.type === 'whatsapp'));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load WhatsApp history');
+      toast.error(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ const WhatsAppHistoryDialog = ({ isOpen, onClose, lead, onSuccess }: WhatsAppHis
       await load();
       onSuccess?.();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send WhatsApp reply');
+      toast.error(apiErrorMessage(err));
     } finally {
       setSending(false);
     }

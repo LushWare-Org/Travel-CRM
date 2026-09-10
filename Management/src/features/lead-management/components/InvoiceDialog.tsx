@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const EMPTY_CUSTOMER_OVERRIDES = { customerName: '', customerEmail: '', customerPhone: '', customerAddress: '', customerGstNumber: '', destination: '' };
 const emptyFormData = () => ({
@@ -120,7 +121,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }: InvoiceDialogProps)
       });
       setFormData((prev) => ({ ...prev, quotation: quotationId, notes: prev.notes || snapshot.notes }));
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load quotation data');
+      toast.error(apiErrorMessage(err));
     }
   }, []);
 
@@ -170,7 +171,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }: InvoiceDialogProps)
         }));
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load invoice data');
+      toast.error(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -283,7 +284,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }: InvoiceDialogProps)
         setExistingInvoices((prev) => prev.map((inv) => ((inv.id || inv._id) === invoiceId ? updated : inv)));
         toast.success('Invoice updated');
       } catch (err: any) {
-        toast.error(err.message || 'Failed to update invoice');
+        toast.error(apiErrorMessage(err));
         throw err;
       } finally {
         setSectionSaving(null);
@@ -309,7 +310,7 @@ const InvoiceDialog = ({ isOpen, onClose, lead, onSuccess }: InvoiceDialogProps)
       toast.success(channel === 'email' ? 'Invoice emailed' : 'Invoice sent via WhatsApp');
       onSuccess?.();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send invoice');
+      toast.error(apiErrorMessage(err));
     } finally {
       setSending(false);
     }

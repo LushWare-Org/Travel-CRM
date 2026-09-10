@@ -13,6 +13,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Input } from '../../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Card } from '../../../components/ui/card';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // ═══════════════════════════════════════════════════════════════════
 //  Types
@@ -327,8 +328,8 @@ export default function HotelSelectionModal({
       setSearchResults(data);
       if (!data.length) toast('No hotels found', { type: 'info' });
     } catch (error: any) {
-      setSearchError(error.message || 'Search failed');
-      toast.error(error.message || 'Hotel search failed');
+      setSearchError(apiErrorMessage(error));
+      toast.error(apiErrorMessage(error));
     } finally {
       setSearching(false);
     }
@@ -365,7 +366,7 @@ export default function HotelSelectionModal({
       onBookHotel?.(response.data);
       toast.success('Hotel booked');
     } catch (err: any) {
-      toast.error(err.message || 'Booking failed');
+      toast.error(apiErrorMessage(err));
     } finally {
       setBooking(false);
     }

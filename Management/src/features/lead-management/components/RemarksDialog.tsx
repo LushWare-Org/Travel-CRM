@@ -5,6 +5,7 @@ import { leadAPI } from '../../../services/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 interface Remark {
   text: string;
@@ -83,7 +84,7 @@ const RemarksDialog = ({ isOpen, onClose, lead, onSuccess }: RemarksDialogProps)
       onSuccess?.();
     } catch (error: any) {
       console.error('Error updating remark:', error);
-      toast.error(error.message || 'Failed to update remark');
+      toast.error(apiErrorMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -116,7 +117,7 @@ const RemarksDialog = ({ isOpen, onClose, lead, onSuccess }: RemarksDialogProps)
       onSuccess?.();
     } catch (error: any) {
       console.error('Error adding remark:', error);
-      toast.error(error.message || 'Failed to add remark');
+      toast.error(apiErrorMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -135,7 +136,7 @@ const RemarksDialog = ({ isOpen, onClose, lead, onSuccess }: RemarksDialogProps)
       onSuccess?.();
     } catch (error: any) {
       console.error('Error deleting remark:', error);
-      toast.error(error.message || 'Failed to delete remark');
+      toast.error(apiErrorMessage(error));
     } finally {
       setIsSaving(false);
     }

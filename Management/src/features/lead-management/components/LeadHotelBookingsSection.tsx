@@ -5,6 +5,7 @@ import HotelService from '../../../services/hotel.service';
 import { HotelSelectionModal } from '../../shared';
 import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';
 import { Button } from '@/components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return '-';
@@ -49,7 +50,7 @@ export default function LeadHotelBookingsSection({
       const res = await HotelService.getByLead(leadId);
       setBookings(res.data || []);
     } catch (err: any) {
-      setError(err.message || 'Failed to load bookings');
+      setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,7 @@ export default function LeadHotelBookingsSection({
       toast.success('Booking cancelled');
       fetchBookings();
     } catch (err: any) {
-      toast.error(err.message || 'Cancel failed');
+      toast.error(apiErrorMessage(err));
     }
   };
 

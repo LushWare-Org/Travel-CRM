@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { FormDialogHeader, FormDialogBody, FormDialogSection, FormDialogFooter } from '@/components/shared/FormDialogSections';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // A lead has one package or a manual (from-scratch) itinerary, never both —
 // this sentinel is a third option inside the Package select itself.
@@ -290,7 +291,7 @@ const NewLeadDialog = ({ isOpen, onClose, salesReps, onSuccess }: NewLeadDialogP
       onSuccess?.();
       onClose();
     } catch (error: any) {
-      toast.error(`Failed to create lead: ${error.message}`);
+      toast.error(apiErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
