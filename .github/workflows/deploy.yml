@@ -199,6 +199,17 @@ jobs:
         working-directory: Management
         env:
           VITE_API_URL: ${{ vars.GATEWAY_URL }}
+          # The Management copilot panel is a build-time feature gate:
+          # src/pages/LeadManagement.tsx reads
+          # `import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === 'true'`, and any
+          # other value tree-shakes the whole copilot component tree out of the
+          # bundle. Until now the flag only ever came from a developer's local,
+          # gitignored Management/.env, so CI-built Management shipped without
+          # the copilot while local dev builds had it -- deployed and local
+          # silently disagreed. Set it explicitly so the CI artifact matches the
+          # intended feature set; revisit per-environment if staging/prod should
+          # not enable it.
+          VITE_MANAGEMENT_COPILOT_ENABLED: 'true'
         run: npm ci --legacy-peer-deps && npm run build
 
       - name: Authenticate to Google Cloud with Firebase service account
