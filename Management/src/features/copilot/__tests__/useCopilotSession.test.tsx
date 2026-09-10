@@ -3,6 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useCopilotSession, BRIEFING_FRESHNESS_MS } from '../useCopilotSession';
 import type { LeadCopilotScope } from '../types';
+import { deferred } from '@/test/deferred';
 
 const api = vi.hoisted(() => ({
   copilotDeterministic: vi.fn(),
@@ -17,16 +18,6 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('@/services/copilotAPI', () => api);
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 const deterministicResult = (leadId: string, text: string) => ({
   context: { pageKey: 'leads', scopeLabel: `Lead ${leadId}`, asOf: '2026-09-10T10:00:00.000Z', noAccess: false },
