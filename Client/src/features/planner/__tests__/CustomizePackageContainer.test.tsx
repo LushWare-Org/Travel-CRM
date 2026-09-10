@@ -162,7 +162,7 @@ describe('CustomizePackageContainer', () => {
     expect(
       await screen.findByText('Unable to Customize Package'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Package not found')).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Browse other packages' }),
     ).toBeInTheDocument();
@@ -225,7 +225,7 @@ describe('CustomizePackageContainer', () => {
 
     await user.click(screen.getByRole('button', { name: /Regenerate with AI/ }));
 
-    expect(await screen.findByText('AI generation failed')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add Day' }));
     expect(screen.getByText('Day 2')).toBeInTheDocument();
@@ -409,7 +409,7 @@ describe('CustomizePackageContainer', () => {
     generateDayPreviewMock.mockRejectedValue(new Error('Network Error'));
     await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
 
-    expect(await screen.findByText('Network Error')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(screen.queryByText('AI Colombo Day')).not.toBeInTheDocument();
     expect(screen.queryByText('Day 1 regenerated')).not.toBeInTheDocument();
   });

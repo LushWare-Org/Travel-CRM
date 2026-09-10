@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 interface PaymentDetails {
   cardType: string;
@@ -154,7 +155,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }: ReceiptDialogProps)
       toast.success(channel === 'email' ? 'Receipt emailed successfully' : 'Receipt sent via WhatsApp');
       await fetchExistingReceipts();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to send receipt');
+      toast.error(apiErrorMessage(error));
     } finally {
       setSending(false);
     }
@@ -269,7 +270,7 @@ const ReceiptDialog = ({ isOpen, onClose, lead, onSuccess }: ReceiptDialogProps)
         toast.error(response.message || 'Failed to create payment receipt');
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create payment receipt');
+      toast.error(apiErrorMessage(error));
     } finally {
       setLoading(false);
     }

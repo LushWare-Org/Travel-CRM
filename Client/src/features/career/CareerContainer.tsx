@@ -6,6 +6,7 @@ import { HERO_TITLE, HIRING_PERKS } from '../../content/career';
 import VacancyList from './components/VacancyList';
 import ApplicationForm from './components/ApplicationForm';
 import { isImgbbConfigured, uploadResumeToImgbb } from './services/imageUpload';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 
 /** A job opening as returned by GET /vacancies. */
 export interface Vacancy {
@@ -187,7 +188,7 @@ export default function CareerContainer() {
           setSubmitStatus('error');
           setErrors((prev) => ({
             ...prev,
-            submit: `Resume upload to imgbb failed: ${(imgbbError as Error).message}`,
+            submit: "We couldn't upload your resume. Please try again.",
           }));
           setIsSubmitting(false);
           return;
@@ -229,7 +230,7 @@ export default function CareerContainer() {
       setSubmitStatus('error');
       setErrors((prev) => ({
         ...prev,
-        submit: err instanceof Error ? err.message : 'Failed to submit application',
+        submit: apiErrorMessage(err),
       }));
     } finally {
       setIsSubmitting(false);

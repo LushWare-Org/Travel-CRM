@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '../../components/ui/textarea';
 import { DataTable, type DataTableColumn } from '../../components/shared/DataTable';
 import { StatCard } from '../../components/shared/StatCard';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 interface Application {
   id: string;
@@ -129,7 +130,7 @@ const CareerContainer = () => {
       }
     } catch (error: any) {
       console.error('Fetch applications error:', error);
-      toast.error(`Failed to load applications: ${error.message || error}`);
+      toast.error(apiErrorMessage(error));
     } finally {
       setLoading(false);
     }

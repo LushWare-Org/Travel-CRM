@@ -110,7 +110,7 @@ describe('PackagesContainer', () => {
     renderContainer();
 
     expect(await screen.findByText('We ran into an issue')).toBeInTheDocument();
-    expect(screen.getByText('Server unreachable')).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });

@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Card } from '../../../components/ui/card';
 import type { FlightLegPrefs } from '../utils/flightLegDefaults';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // ═══════════════════════════════════════════════════════════════════
 //  Types
@@ -320,8 +321,8 @@ export default function FlightSelectionModal({
       setOffers(response.data || []);
       if (!response.data?.length) toast('No flights found', { type: 'info' });
     } catch (error: any) {
-      setSearchError(error.message || 'Flight search failed');
-      toast.error(error.message || 'Flight search failed');
+      setSearchError(apiErrorMessage(error));
+      toast.error(apiErrorMessage(error));
     } finally {
       setSearching(false);
     }
@@ -372,7 +373,7 @@ export default function FlightSelectionModal({
       onBookFlight?.(response.data);
       toast.success('Flight booked successfully');
     } catch (error: any) {
-      toast.error(error.message || 'Booking failed');
+      toast.error(apiErrorMessage(error));
     } finally {
       setBooking(false);
     }

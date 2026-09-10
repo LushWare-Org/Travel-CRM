@@ -6,6 +6,7 @@ import 'react-phone-number-input/style.css';
 import { fetchPackageById } from '../../services/api/packages';
 import type { NormalizedPackage } from '../../services/api/packages.transform';
 import { submitCustomizationRequest } from '../../services/api/customization';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import { formatCurrency } from '../../lib/currency';
 import { pluralize } from '../../lib/pluralize';
 import { useAuth } from '../../contexts/AuthContext';
@@ -155,7 +156,7 @@ export default function CustomizePackageContainer() {
       })
       .catch((err) => {
         if (!isMounted) return;
-        setError(err.message || 'Unable to load package details');
+        setError(apiErrorMessage(err));
       })
       .finally(() => {
         if (!isMounted) return;

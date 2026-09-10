@@ -5,6 +5,7 @@ import AnalyticsService from '../../../../services/analytics.service';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { DataTable, type DataTableColumn } from '../../../../components/shared/DataTable';
 import { Badge } from '../../../../components/ui/badge';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 interface RecentLead {
   id: string;
@@ -49,7 +50,7 @@ const MyPerformanceAnalytics = () => {
         setRecentLeads(data?.recentLeads || []);
       } catch (error: any) {
         console.error('Failed to load salesRep performance', error);
-        setErrorMessage(error.message || 'Failed to load your performance data.');
+        setErrorMessage(apiErrorMessage(error));
         setPerformance({ leadsAssigned: 0, converted: 0, pending: 0, conversionRate: 0 });
         setRecentLeads([]);
       } finally {

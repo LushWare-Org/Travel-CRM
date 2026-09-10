@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Clock, Filter } from 'lucide-react';
 import { fetchPackages } from '../../services/api/packages';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import { createSlug } from '../../services/api/packages.transform';
 import type { AggregatedDestination, NormalizedPackage } from '../../services/api/packages.transform';
 import HeroSection from './components/HeroSection';
@@ -68,7 +69,7 @@ export default function PackagesContainer() {
       })
       .catch((err) => {
         if (!isMounted) return;
-        setError(err.message || 'Failed to load packages');
+        setError(apiErrorMessage(err));
         setPackagesData([]);
         setDestinations([]);
       })

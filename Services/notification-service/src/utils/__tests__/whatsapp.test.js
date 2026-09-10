@@ -84,12 +84,19 @@ describe('sendWhatsappTemplateMessage', () => {
     ]);
   });
 
-  it('surfaces the Graph API error message and maps a 4xx response to statusCode 400', async () => {
+  it('withholds the Graph API error message and maps a 4xx to a caller-fixable 400', async () => {
+    // The Graph API's own text names Meta internals, so it is logged, not returned.
     const fetchImpl = mockFetchError(400, { error: { message: 'Template name does not exist' } });
 
-    await expect(
-      sendWhatsappTemplateMessage({ to: '15551234567', templateName: 'missing_template', fetchImpl })
-    ).rejects.toMatchObject({ statusCode: 400, message: 'Template name does not exist' });
+    const err = await sendWhatsappTemplateMessage({
+      to: '15551234567',
+      templateName: 'missing_template',
+      fetchImpl,
+    }).catch((e) => e);
+
+    expect(err.statusCode).toBe(400);
+    expect(err.code).toBe('PROVIDER_REJECTED');
+    expect(err.message).not.toContain('Template name does not exist');
   });
 
   it("maps a 401 Graph API response to statusCode 502 (bad credentials, not the caller's fault)", async () => {

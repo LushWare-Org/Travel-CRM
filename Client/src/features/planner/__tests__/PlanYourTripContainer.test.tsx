@@ -353,7 +353,7 @@ describe('PlanYourTripContainer', () => {
 
     await user.click(screen.getByRole('button', { name: /Generate itinerary with AI/ }));
 
-    expect(await screen.findByText('AI generation failed')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
     expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();
@@ -433,7 +433,7 @@ describe('PlanYourTripContainer', () => {
     await user.type(input, 'Hi');
     await user.click(input.parentElement!.querySelector('button') as HTMLButtonElement);
 
-    expect(await screen.findByText('offline')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(generateItineraryPreviewMock).not.toHaveBeenCalled();
   });
@@ -653,7 +653,7 @@ describe('PlanYourTripContainer', () => {
     generateDayPreviewMock.mockRejectedValue(new Error('Network Error'));
     await user.click(screen.getByRole('button', { name: 'Regenerate day 1' }));
 
-    expect(await screen.findByText('Network Error')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Day 1')).toBeInTheDocument();
     expect(screen.queryByText('Day 1 regenerated')).not.toBeInTheDocument();
   });
@@ -927,7 +927,7 @@ describe('PlanYourTripContainer', () => {
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     await user.click(screen.getByRole('button', { name: /Generate itinerary with AI/ }));
-    expect(await screen.findByText('AI generation failed')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
 
     // The failure affordance drops the visitor onto the manual day form of
     // this same step — no progress reset, no AI retry required.
@@ -951,7 +951,7 @@ describe('PlanYourTripContainer', () => {
     await user.click(screen.getByRole('button', { name: /Next/ }));
 
     await user.click(screen.getByRole('button', { name: /Generate itinerary with AI/ }));
-    await screen.findByText('AI generation failed');
+    await screen.findByText('Something went wrong. Please try again.');
 
     await user.click(screen.getByRole('button', { name: 'Add Day 1' }));
     expect(screen.getByText(/Day 1 of 5/)).toBeInTheDocument();

@@ -38,10 +38,16 @@ describe('WebsiteAnalytics', () => {
   });
 
   it('shows an error panel when the fetch rejects', async () => {
-    mockGetWebsiteAnalyticsOverview.mockRejectedValue(new Error('Service unavailable'));
+    // A real API failure carries a status. The raw message must not reach the page.
+    mockGetWebsiteAnalyticsOverview.mockRejectedValue(
+      Object.assign(new Error('Service unavailable'), { status: 503 }),
+    );
     render(<WebsiteAnalytics />);
 
-    await waitFor(() => expect(screen.getByText('Service unavailable')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Something went wrong on our side. Please try again.')).toBeInTheDocument(),
+    );
+    expect(screen.queryByText('Service unavailable')).not.toBeInTheDocument();
     expect(screen.getByText(/error loading analytics/i)).toBeInTheDocument();
   });
 });

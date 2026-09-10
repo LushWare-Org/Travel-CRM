@@ -170,7 +170,7 @@ describe('MyAccountContainer', () => {
     await user.click(await screen.findByRole('button', { name: /Edit Profile/ }));
     await user.click(screen.getByRole('button', { name: /Save Changes/ }));
 
-    expect(await screen.findByText('Server unreachable')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(updateProfileMock).toHaveBeenCalledTimes(1);
     expect(mergeStoredUserMock).not.toHaveBeenCalled();
   });
@@ -199,13 +199,16 @@ describe('MyAccountContainer', () => {
 
   it('shows an inline error banner with a working retry when the request data fails to load', async () => {
     const user = userEvent.setup();
-    fetchUserBookingsMock.mockRejectedValueOnce(new Error('Network unreachable'));
-    fetchUserCustomizedPackagesMock.mockRejectedValueOnce(new Error('Network unreachable'));
-    fetchUserManualItinerariesMock.mockRejectedValueOnce(new Error('Network unreachable'));
+    const failure = () => Object.assign(new Error('Network unreachable'), { status: 503 });
+    fetchUserBookingsMock.mockRejectedValueOnce(failure());
+    fetchUserCustomizedPackagesMock.mockRejectedValueOnce(failure());
+    fetchUserManualItinerariesMock.mockRejectedValueOnce(failure());
     renderContainer();
 
     expect(await screen.findByText('Error Loading Requests')).toBeInTheDocument();
-    expect(screen.getByText('Network unreachable')).toBeInTheDocument();
+    // The raw message must not reach the page; the mapper decides what is shown.
+    expect(screen.getByText('Something went wrong on our side. Please try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Network unreachable')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /try again/i }));
 

@@ -1,4 +1,5 @@
 import api from './api';
+import { apiErrorMessage } from '../lib/apiErrorMessage';
 
 /**
  * Sales Representative Service
@@ -294,16 +295,19 @@ class SalesRepService {
           errorMessage.userMessage = 'Server error. Please try again later.';
           break;
         default:
-          errorMessage.userMessage = error.response.data?.message || 'An error occurred.';
+          errorMessage.userMessage = apiErrorMessage({
+            data: error.response.data,
+            status: error.response.status,
+          });
       }
     } else if (error.request) {
       // Request made but no response received
-      errorMessage.message = 'No response from server. Please check your connection.';
-      errorMessage.userMessage = 'Network error. Please check your internet connection.';
+      errorMessage.message = apiErrorMessage({ isNetworkError: true });
+      errorMessage.userMessage = apiErrorMessage({ isNetworkError: true });
     } else {
-      // Error in setting up request
-      errorMessage.message = error.message || 'Unknown error occurred';
-      errorMessage.userMessage = 'An unexpected error occurred.';
+      // Error in setting up request. The mapper never returns error.message.
+      errorMessage.message = apiErrorMessage(error);
+      errorMessage.userMessage = apiErrorMessage(error);
     }
 
     return errorMessage;

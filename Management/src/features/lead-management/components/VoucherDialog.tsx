@@ -11,6 +11,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const buildHotelStaysFromDays = (days: any[], travelStartDate: string) => {
   const hotelBookings: any[] = [];
@@ -284,7 +285,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialSe
       fetchExistingVouchers();
       setIsEditing(true);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to save voucher');
+      toast.error(apiErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -320,7 +321,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialSe
       toast.success(channel === 'email' ? 'Voucher emailed' : 'Voucher sent via WhatsApp');
       onSuccess?.();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to send voucher');
+      toast.error(apiErrorMessage(error));
     } finally {
       setSending(false);
     }

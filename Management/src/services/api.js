@@ -1,5 +1,6 @@
 import { apiEnvelope, LeadPackageSelectionSummary, QuotePackageSelectionResult, QuotationSummary } from "@travel-crm/contracts";
 import { z } from "zod";
+import { apiErrorMessage, apiFieldErrors } from "../lib/apiErrorMessage";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL || "https://api.lushtravelcloud.com/api/v1";
@@ -44,7 +45,10 @@ class ApiService {
       // ✅ Handle blob responses FIRST (before any JSON parsing)
       if (options.responseType === "blob") {
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const blobError = new Error(apiErrorMessage({ status: response.status }));
+          blobError.status = response.status;
+          blobError.statusCode = response.status;
+          throw blobError;
         }
         return await response.blob();
       }
@@ -75,16 +79,6 @@ class ApiService {
       }
 
       if (!response.ok) {
-        // Extract detailed error information
-        let errorMessage =
-          data.message ||
-          data.error?.message ||
-          data.error ||
-          `HTTP error! status: ${response.status}`;
-
-        // Log full error response for debugging
-        console.log("Full error response:", data);
-
         // Special handling for 401 (authentication errors)
         if (response.status === 401) {
           // Clear invalid token
@@ -94,33 +88,19 @@ class ApiService {
           } catch (e) { }
           localStorage.removeItem("token");
           localStorage.removeItem("user");
-          errorMessage =
-            data.message || "Your session has expired. Please login again.";
         }
 
-        // Include validation errors if available
-        if (data.error?.errors && Array.isArray(data.error.errors)) {
-          const validationErrors = data.error.errors
-            .map((err) => `${err.field}: ${err.message}`)
-            .join("; ");
-          errorMessage = `${errorMessage} - ${validationErrors}`;
-        } else if (data.error?.details && Array.isArray(data.error.details)) {
-          const validationErrors = data.error.details
-            .map((err) => `${err.field}: ${err.message}`)
-            .join("; ");
-          errorMessage = `${errorMessage} - ${validationErrors}`;
-        } else if (data.details?.validation) {
-          // Handle new error format from backend
-          const validationErrors = Object.entries(data.details.validation)
-            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
-            .join("; ");
-          errorMessage = `${errorMessage} - ${validationErrors}`;
-        }
-
-        const error = new Error(errorMessage);
+        // The sentence comes from the mapper, never from error.message: the backend
+        // marks which of its own messages are safe to show, and a response without
+        // one is reported as a status-appropriate generic. Field-level detail travels
+        // separately so a form can highlight the offending input instead of parsing
+        // it back out of a sentence.
+        const error = new Error(apiErrorMessage({ data, status: response.status }));
         error.status = response.status;
         error.statusCode = response.status;
+        error.code = data?.code;
         error.data = data;
+        error.fieldErrors = apiFieldErrors({ data });
         throw error;
       }
 
@@ -153,9 +133,7 @@ class ApiService {
         error.message.includes("ERR_CONNECTION_REFUSED") ||
         error.message.includes("NetworkError")
       ) {
-        const networkError = new Error(
-          "Cannot connect to server. Please check your network connection and ensure the API server is running."
-        );
+        const networkError = new Error(apiErrorMessage({ isNetworkError: true }));
         networkError.status = 0;
         networkError.statusCode = 0;
         networkError.isNetworkError = true;

@@ -1,6 +1,7 @@
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import logger from '../config/logger.js';
 import { nextInvoiceNumber } from '../utils/docNumber.js';
 import { generateInvoicePDF } from '../utils/invoicePDFGenerator.js';
 import { sendInvoiceEmail } from '../utils/emailService.js';
@@ -180,8 +181,10 @@ export const sendInvoice = asyncHandler(async (req, res) => {
     return res.json({ success: true, message: 'Invoice sent via email', data: updated });
   } catch (err) {
     if (err instanceof AppError) throw err;
-    // Configuration / delivery failures surface as a clean 400, not a 500.
-    throw new AppError(err.message || 'Failed to send invoice', 400);
+    // Configuration / delivery failures surface as a clean 400, not a 500. The
+    // transport's own message is logged here and never echoed to the client.
+    logger.error({ err }, 'Failed to send invoice');
+    throw new AppError("We couldn't send that invoice. Please try again.", 400);
   }
 });
 

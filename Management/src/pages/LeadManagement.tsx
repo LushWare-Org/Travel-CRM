@@ -39,6 +39,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ManagementContextCopilot from "../features/copilot/ManagementContextCopilot";
 import LeadBriefing from "../features/copilot/LeadBriefing";
 import CollectionBriefing from "../features/copilot/CollectionBriefing";
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // Feature-gated client flag; the panel stays off until explicitly enabled.
 const copilotEnabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === "true";
@@ -149,7 +150,7 @@ const LeadManagement = () => {
         toast.error(response.message || "Failed to delete lead");
       }
     } catch (err: any) {
-      toast.error(err.message || "Error deleting lead");
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -258,7 +259,7 @@ const LeadManagement = () => {
         setLeads([]);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to fetch leads");
+      setError(apiErrorMessage(err));
       console.error("Error fetching leads:", err);
     } finally {
       setLoading(false);
@@ -379,7 +380,7 @@ const LeadManagement = () => {
       fetchLeads();
       fetchLeadStats();
     } catch (err: any) {
-      toast.error(err.message || "Failed to update status");
+      toast.error(apiErrorMessage(err));
     }
     setShowStatusDialog(false);
     setStatusLead(null);
@@ -393,7 +394,7 @@ const LeadManagement = () => {
       fetchLeads();
       fetchLeadStats();
     } catch (err: any) {
-      toast.error(err.message || "Failed to claim lead");
+      toast.error(apiErrorMessage(err));
     }
   };
 

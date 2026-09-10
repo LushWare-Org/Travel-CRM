@@ -1,6 +1,7 @@
 import prisma from '../db/client.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/appError.js';
+import logger from '../config/logger.js';
 import { nextReceiptNumber, nextPaymentHistoryNumber } from '../utils/docNumber.js';
 import { emitLeadEvent, logLeadCommunication } from '../services/events.client.js';
 import { generatePaymentReceiptPDF } from '../utils/paymentReceiptPDFGenerator.js';
@@ -241,8 +242,10 @@ export const sendPaymentReceipt = asyncHandler(async (req, res) => {
     return res.json({ success: true, message: 'Payment receipt sent via email', data: updated });
   } catch (err) {
     if (err instanceof AppError) throw err;
-    // Configuration / delivery failures surface as a clean 400, not a 500.
-    throw new AppError(err.message || 'Failed to send payment receipt', 400);
+    // Configuration / delivery failures surface as a clean 400, not a 500. The
+    // transport's own message is logged here and never echoed to the client.
+    logger.error({ err }, 'Failed to send payment receipt');
+    throw new AppError("We couldn't send that receipt. Please try again.", 400);
   }
 });
 
