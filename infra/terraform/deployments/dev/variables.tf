@@ -377,3 +377,15 @@ variable "admin_emails" {
   type        = string
 }
 
+variable "management_copilot_enabled" {
+  description = "Management Context Copilot server-side gate (plain env var MANAGEMENT_COPILOT_ENABLED on assistant-service). \"true\" is required for the Management copilot to answer at all; anything else makes its turn/seen routes return an undisclosed 404."
+  type        = string
+  default     = "false"
+}
+
+variable "management_copilot_page_keys" {
+  description = "Comma-separated page-key allowlist the copilot answers for (plain env var MANAGEMENT_COPILOT_PAGE_KEYS on assistant-service). Empty means every registered page."
+  type        = string
+  default     = ""
+}
+
