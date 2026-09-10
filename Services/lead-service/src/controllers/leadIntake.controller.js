@@ -181,7 +181,8 @@ export const claimLead = asyncHandler(async (req, res) => {
   } catch (err) {
     // State-machine gatekeeper failures are client errors, not an unhandled 500
     // — matches updateLead's handling of the same validateTransition call.
-    throw new AppError(err.message, 400);
+    if (err.isOperational) throw err;
+    throw new AppError("We couldn't claim this lead. Please try again.", 400);
   }
 
   // Atomic conditional update, not a plain update: the findUnique check above

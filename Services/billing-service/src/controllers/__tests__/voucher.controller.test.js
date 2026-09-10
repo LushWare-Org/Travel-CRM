@@ -262,7 +262,10 @@ describe('sendVoucher', () => {
 
     expect(nextErr).toBeDefined();
     expect(nextErr.statusCode).toBe(400);
-    expect(nextErr.message).toMatch(/not configured/i);
+    // The transport names EMAIL_HOST/EMAIL_USER/EMAIL_PASSWORD; none of that may
+    // reach the caller.
+    expect(nextErr.message).toBe("We couldn't send that voucher. Please try again.");
+    expect(nextErr.message).not.toMatch(/EMAIL_HOST|EMAIL_USER|EMAIL_PASSWORD|not configured/i);
     expect(mockVoucherUpdate).not.toHaveBeenCalled();
   });
 
