@@ -9,9 +9,12 @@ const router = express.Router();
 router.use(extractUser);
 
 router.get('/', getVacancies);
-router.get('/admin/all', getAdminVacancies);
 
 router.use(requireAuth, authorize('admin', 'superAdmin'));
+
+// Registered BELOW the admin gate on purpose: above it only extractUser ran, so
+// any authenticated caller could read the admin vacancy list. Keep this order.
+router.get('/admin/all', getAdminVacancies);
 router.post('/', createVacancy);
 router.get('/:id', getVacancyById);
 router.patch('/:id', updateVacancy);

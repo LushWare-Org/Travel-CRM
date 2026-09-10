@@ -371,6 +371,102 @@
 **Priority:** P3
 **Depends on:** Landed Evidence Lens; a measured need from tablet or phone agents
 
+### Merge the flights and hotels descriptors if a third booking-like page appears
+
+**What:** `flights` and `hotels` are written as two separate page descriptors with the same shape — a windowed booking list, differing only in field names and deadline semantics. Collapse them into one parameterized descriptor when and only when a third booking-like page is added.
+
+**Why:** Two instances with different field sets is exactly where premature abstraction starts, so they ship as two. But a third copy is the point where the duplication costs more than the abstraction would, and without a recorded trigger the third page gets written as a third copy by default.
+
+**Pros:** Stops the descriptor set drifting into N near-copies of the same booking-list logic, each with its own rule bugs to fix separately.
+
+**Cons:** A parameterized descriptor will carry more branching than either instance does alone, so it is a loss if no third page ever arrives.
+
+**Context:** Raised during `/plan-eng-review` on `docs/designs/management-copilot-all-pages.md` (issue 7, confidence 6/10). The trigger is concrete: a third descriptor whose sources are a bounded, ordered list of booking-like records.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** A third booking-like page actually existing
+
+### Collection briefings that respect the page's active filters
+
+**What:** v1 sends `{}` as the collection scope for every page, so the briefing describes the page's default view rather than the list the operator has filtered to. Add validated filter scopes per page so the briefing describes what is actually on screen.
+
+**Why:** A briefing that describes a different list than the one rendered is worse than no briefing — it reads as authoritative while being about something else. This was deferred rather than partially wired because a scope the adapter rejects produces the exact `400 Invalid leads scope` the collection work set out to remove.
+
+**Pros:** Makes every count and attention item match the visible list, which is the precondition for an operator trusting the panel while filtering.
+
+**Cons:** Each descriptor needs a filter scope schema that mirrors the page's real filter state, and every filter the page gains becomes a schema to keep in sync.
+
+**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-all-pages.md` (Open Question 1). The leads union in §5 is deliberately strict — `{ leadId } | {}` — so filter scopes require a real schema on the collection branch, not an opaque object.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** The all-pages collection work landing
+
+### Per-page ask-mode tool vocabulary
+
+**What:** Give each page descriptor its own allowlisted ask-mode tools, so a follow-up question can fetch data that was not already in the briefing bundle. Today the whole vocabulary is one lead-bound tool (`getLead`), and pages declaring none answer single-shot over the evidence already fetched.
+
+**Why:** The ask box is present on every page but can only answer what the bundle already contains. Questions like "which of these three customers is most at risk" work; "what did we quote them last quarter" does not, because nothing can go and fetch it.
+
+**Pros:** Turns the assistant on each page from a briefing with follow-ups into something that can actually investigate, which is where the ten-times-return value sits.
+
+**Cons:** Each tool is a new allowlisted, Zod-validated, server-executed call under the caller's identity — a real per-page design and review, not a config change.
+
+**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-all-pages.md` (§6, outside-voice finding 4). The engine reuses the existing `assistantTurn`/`wizard-turn` tool-calling convention (fixed enum, server-executed, Zod-validated, canonicalized), so this is additive rather than a new framework. Note the existing `runAgentLoop` receives no page key or adapter, so the tool selection currently has no way to be page-aware.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** A page declaring at least one tool and the descriptor `tools` field landing
+
+### Generate the collection briefing mockups
+
+**What:** Produce visual mockups of the collection briefing panel with the gstack designer, covering the claim list, the inline status row, and the empty state.
+
+**Why:** `/plan-design-review` on `docs/designs/management-copilot-all-pages.md` ran text-only because the designer binary has no API key configured, so the panel's visual design was described and reviewed but never rendered. Anyone reading that design doc later would reasonably assume the visuals were validated.
+
+**Pros:** Turns the state contract, claim form, and severity discipline into something reviewable at a glance, and catches layout problems while they are still plan-stage.
+
+**Cons:** Requires an OpenAI API key (`$D setup`), and the mockups then have to be re-checked against `Management/DESIGN.md` tokens rather than trusted as-is.
+
+**Context:** Run `$D setup` in the gstack design package, then `$D variants --brief <collection briefing brief>`. The design decisions to render are recorded in the design doc's `## Design decisions` section.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** A configured designer API key
+
+### Surface briefing freshness in the panel
+
+**What:** The client cache permits a briefing to be up to 60 seconds stale, and nothing on screen says so. Decide whether the context stamp's `as of` time is sufficient, or whether near-expiry needs a visible marker.
+
+**Why:** The panel presents itself as "current state". A briefing served from cache can be a minute old, and an operator acting on a stale number has no way to know. The existing design accepts the 60s bound but never surfaces it.
+
+**Pros:** Closes a small but real trust gap on a surface whose entire value is being believable, and it is cheap once the wording is decided.
+
+**Cons:** Any freshness indicator risks reading as a warning on every load, which would be worse than the silence it replaces.
+
+**Context:** The bound comes from the client's in-memory cache keyed by scope fingerprint. The server-side `asOf` stamp is already authoritative; the question is only whether the user is told when the value they are reading is old. Decide alongside the server-side TTL work rather than before it.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** The collection briefing landing; a decision on the server-side TTL
+
+### Section collapse behaviour at high claim volumes
+
+**What:** Decide whether the four briefing sections collapse, and what the default is when a collection page produces twenty or more claims.
+
+**Why:** The state contract specifies a list that can be arbitrarily long, and nothing says whether the reader scrolls it, folds sections, or sees a summary with an expand. Guessing wrong makes the panel either a long scroll or a set of closed drawers nobody opens.
+
+**Pros:** Long panels are the most common reason people stop opening an assistant; deciding this deliberately keeps the top of the panel meaningful.
+
+**Cons:** Designing collapse honestly needs real claim volumes from a live page, which do not exist yet — designing it now would be guessing.
+
+**Context:** Deferred from `/plan-design-review` Pass 7 on `docs/designs/management-copilot-all-pages.md` for exactly that reason. The section order is settled (attention leads on collections); only the folding behaviour is open.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Real claim volumes from at least one live collection page
+
 ## Completed
 
 ### Honor Gemini's RetryInfo.retryDelay on 429 quota errors

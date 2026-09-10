@@ -100,7 +100,9 @@ const PUBLIC_PATTERNS = [
   [/^\/api\/v1\/assistant\/events$/, 'POST'],
   [/^\/api\/v1\/careers\/apply$/, 'POST'],
   [/^\/api\/v1\/vacancies\/?$/, 'GET'],
-  [/^\/api\/v1\/vacancies\/admin\/all$/, 'GET'],
+  // NOTE: /api/v1/vacancies/admin/all is deliberately NOT public. It was listed
+  // here and the downstream route was registered above its own auth gate, which
+  // together made the admin vacancy list reachable without a token at all.
   // Upload public
   [/^\/api\/v1\/upload\/optimize$/, 'GET'],
   // Webhooks

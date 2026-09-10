@@ -32,7 +32,13 @@ function pageKeyAllowed(key) {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  return allowlist.length === 0 || allowlist.includes(key);
+  // Fail closed. An unset or empty allowlist serves nothing: the previous
+  // allow-all default meant registering a new page adapter enabled it in every
+  // environment at once, which made per-page rollback a no-op exactly when it
+  // was needed. Enabling a page key is now an explicit act, and every
+  // environment with MANAGEMENT_COPILOT_ENABLED=true must name the keys it
+  // serves (including 'leads', which was implicitly on before this change).
+  return allowlist.includes(key);
 }
 
 function copilotNotFound(res) {

@@ -58,8 +58,13 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
+// Enables the copilot AND allowlists the page key the happy-path cases use.
+// The gate is fail-closed: an unset or empty MANAGEMENT_COPILOT_PAGE_KEYS
+// serves nothing, so a test that set only ENABLED would now get a 404. Override
+// PAGE_KEYS after calling this to exercise a different allowlist.
 function enableCopilot() {
   process.env.MANAGEMENT_COPILOT_ENABLED = 'true';
+  process.env.MANAGEMENT_COPILOT_PAGE_KEYS = 'leads';
 }
 
 describe('management copilot server-side gate (turn route)', () => {
@@ -74,6 +79,27 @@ describe('management copilot server-side gate (turn route)', () => {
     process.env.MANAGEMENT_COPILOT_PAGE_KEYS = 'packages';
     const res = await request(app).post('/api/v1/assistant/management/turn').set(authHeaders).send(turnBody);
     expect(res.status).toBe(404);
+  });
+
+  it('returns 404 when the allowlist is unset, rather than allowing every key', async () => {
+    process.env.MANAGEMENT_COPILOT_ENABLED = 'true';
+    delete process.env.MANAGEMENT_COPILOT_PAGE_KEYS;
+    const res = await request(app).post('/api/v1/assistant/management/turn').set(authHeaders).send(turnBody);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 when the allowlist is empty, rather than allowing every key', async () => {
+    process.env.MANAGEMENT_COPILOT_ENABLED = 'true';
+    process.env.MANAGEMENT_COPILOT_PAGE_KEYS = '  ,  ';
+    const res = await request(app).post('/api/v1/assistant/management/turn').set(authHeaders).send(turnBody);
+    expect(res.status).toBe(404);
+  });
+
+  it('serves an allowlisted key', async () => {
+    enableCopilot();
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('lead-service unavailable'));
+    const res = await request(app).post('/api/v1/assistant/management/turn').set(authHeaders).send(turnBody);
+    expect(res.status).toBe(200);
   });
 
   it('returns 401 without actor context (scoped auth, not global)', async () => {
