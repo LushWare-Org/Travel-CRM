@@ -29,8 +29,28 @@ export const ManagementFactKinds = ['id', 'date', 'amount', 'percentage', 'count
 export const ManagementClaimSections = ['current_state', 'changed', 'attention', 'experienced_view'];
 
 export const ManagementEvidenceTypes = ['record', 'computed', 'pattern', 'guidance', 'inference'];
-
 export const ManagementSeverities = ['info', 'warning', 'critical'];
+
+// The lead adapter's field allowlist. Each entry grounds exactly one field
+// evidence item, and the rendered lead record publishes the same ID via
+// `data-copilot-evidence-id` so a claim can reveal its supporting field.
+export const LEAD_COPILOT_FIELDS = [
+  'id',
+  'lifecycleStatus',
+  'assignedToId',
+  'name',
+  'destination',
+  'budget',
+  'createdAt',
+  'updatedAt',
+];
+
+// The single producer of a lead field evidence ID. The adapter, the record
+// surface, and the reveal resolver all call this — no call site rebuilds the
+// string, and a drift test asserts the emitted and published sets are equal.
+export function leadEvidenceId(leadId, field) {
+  return `lead:${leadId}:${field}`;
+}
 
 // A typed fact is the only place a risky value (id/date/amount/percentage/
 // count/duration) may appear. Free prose must stay qualitative.
@@ -79,6 +99,12 @@ export const ManagementAssistantTurnRequest = z
         key: z.enum(ManagementPageKeys),
         scope: z.record(z.unknown()).optional().default({}),
         since: z.enum(ManagementSinceWindows),
+        // FIRST-VISIT-ONLY fallback, never a source of truth. Used solely when
+        // no stored ManagementLastSeen row exists for this actor/page/scope
+        // (i.e. the operator has never acknowledged this scope). The server
+        // stores and advances the window via POST .../management/seen, which
+        // accepts no client timestamp; this field is a device-local display
+        // hint that must not override a stored row.
         lastSeenAt: z.string().datetime().optional(),
       })
       .strict(),
@@ -99,6 +125,20 @@ export const BriefingClaimSchema = z
   })
   .strict();
 
+// Request body for POST /api/v1/assistant/management/seen — the authenticated
+// acknowledgement that a grounded briefing was actually presented. There is
+// deliberately no client-authored timestamp: the handler stamps server time.
+export const ManagementCopilotSeenRequest = z
+  .object({
+    page: z
+      .object({
+        key: z.enum(ManagementPageKeys),
+        scope: z.record(z.unknown()).optional().default({}),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const ManagementSourceTargetSchema = z
   .object({
     kind: z.string().min(1).max(64),
@@ -114,6 +154,10 @@ export const ManagementSourceSchema = z
     type: z.enum(['record', 'computed', 'pattern', 'guidance']),
     updatedAt: z.string().datetime().optional(),
     target: ManagementSourceTargetSchema.optional(),
+    // The cited allowlisted field's scalar value, copied only from a field
+    // evidence item. Lets an authorized client render the inline detail
+    // fallback when no record anchor is rendered.
+    capturedValue: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
   })
   .strict();
 

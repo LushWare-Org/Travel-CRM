@@ -438,55 +438,55 @@ No failure mode in this change is both untested, unhandled, and silent.
 
 Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~1 day / CC: ~20 min)** — Copilot session — Replace loose scope and scattered state with a nullable, keyed lead session.
+- [x] **T1 (P1, human: ~1 day / CC: ~20 min)** — Copilot session — Replace loose scope and scattered state with a nullable, keyed lead session.
   - Surfaced by: Scope bug and Pass 2 state coverage — `{}` reaches the strict adapter and deselection leaves stale lead state behind.
   - Files: `Management/src/pages/LeadManagement.tsx`, `Management/src/features/copilot/useCopilotSession.ts`, `Management/src/features/copilot/__tests__/useCopilotSession.test.tsx`
   - Verify: `cd Management && npm test -- src/features/copilot/__tests__/useCopilotSession.test.tsx`; cover no scope issuing zero requests, A → clear → B leaking nothing, scope-switch abort, and late A response suppression.
 
-- [ ] **T2 (P1, human: ~1 day / CC: ~45 min)** — Last-seen lifecycle — Add visible-render acknowledgement and remove turn-time timestamp writes.
+- [x] **T2 (P1, human: ~1 day / CC: ~45 min)** — Last-seen lifecycle — Add visible-render acknowledgement and remove turn-time timestamp writes.
   - Surfaced by: Pass 7 decision 3 — deterministic currently advances `lastSeenAt` before the following briefing can use the same prior window.
   - Files: `Services/shared/contracts/src/managementCopilot.js`, `Services/assistant-service/src/app.js`, `Services/assistant-service/src/routes/managementCopilotSeen.routes.js`, `Services/assistant-service/src/controllers/managementCopilot.controller.js`, `Services/assistant-service/src/adapters/leads.adapter.js`, `Services/assistant-service/src/ai/prompts/managementBriefing.v1.js`, `Management/src/services/copilotAPI.js`
   - Verify: `cd Services/shared/contracts && npm test`; `cd Services/assistant-service && npm test -- src/controllers/__tests__/managementCopilot.gate.test.js`; prove deterministic and briefing share one prior timestamp, only presentation in an open dock advances it, seen keeps the turn route's gates and 404, and a failed upsert returns 5xx.
   - Boundary consumer: pass the resolved ISO boundary into `buildManagementBriefingPrompt` (not the `last_visit` keyword) and filter `computeInsights`' `changed` output against it. Without this, delete the endpoint and keep turn-time writes — a window nothing reads is worse than no window. Also resolve `page.lastSeenAt` in `ManagementAssistantTurnRequest` as remove-or-document.
 
-- [ ] **T3 (P1, human: ~1–2 days / CC: ~45 min)** — Evidence contract — Replace composite lead evidence with allowlisted field-level evidence and captured source values.
+- [x] **T3 (P1, human: ~1–2 days / CC: ~45 min)** — Evidence contract — Replace composite lead evidence with allowlisted field-level evidence and captured source values.
   - Surfaced by: Evidence Lens feasibility review — current `lead:<id>` evidence has no `fieldPaths`, so it cannot identify the field supporting a claim.
   - Files: `Services/shared/contracts/src/managementCopilot.js`, `Services/assistant-service/src/adapters/leads.adapter.js`, `Services/assistant-service/src/ai/groundingValidator.js`, `Services/assistant-service/src/prompts/managementBriefing.v1.js`, corresponding contract/adapter/validator tests
   - Verify: `cd Services/shared/contracts && npm test`; `cd Services/assistant-service && npm test -- src/adapters/__tests__/leads.adapter.test.js src/ai/__tests__/groundingValidator.test.js`.
   - Regressions (critical): `leads.adapter.test.js` currently asserts `bundle.evidence` has length 1 with a composite `value`, and `groundingValidator.test.js` fixtures cite `lead:1`; both must be rewritten for scalar per-field items and the now-invalid legacy ID. Add: one item per allowlisted field with scalar `value` and `fieldPaths`, insights reading the fetched lead, `defaultQuestions` reading the fetched lead, `>=7`-day freshness and stale thresholds, `capturedValue` only from a cited field item, and the seen handler's gates, fingerprint parity with the turn path, idempotency, and 5xx on write failure.
 
-- [ ] **T4 (P1, human: ~2 days / CC: ~45 min)** — Responsive shell — Replace the fixed card with the persisted desktop dock, collapsed rail, and Dialog-based mobile drawer.
+- [x] **T4 (P1, human: ~2 days / CC: ~45 min)** — Responsive shell — Replace the fixed card with the persisted desktop dock, collapsed rail, and Dialog-based mobile drawer.
   - Surfaced by: Pass 1 information architecture, Pass 5 primitive alignment, Pass 6 breakpoint review, and Pass 7 decisions 1–2.
   - Files: `Management/src/pages/LeadManagement.tsx`, `Management/src/features/copilot/ManagementContextCopilot.tsx`, `Management/src/features/copilot/CopilotDrawer.tsx`, `Management/src/contexts/AuthContext.jsx`
   - Verify: component tests cover operator-scoped visibility/cue keys, first desktop open, mobile cue without auto-open, collapse persistence, focus entry/return, and 1280/1279 breakpoint behavior.
 
-- [ ] **T5 (P2, human: ~1 day / CC: ~30 min)** — Briefing presentation — Implement the top-three hierarchy and reviewed Signal Console visual rules.
+- [x] **T5 (P2, human: ~1 day / CC: ~30 min)** — Briefing presentation — Implement the top-three hierarchy and reviewed Signal Console visual rules.
   - Surfaced by: Passes 1, 3, 4, and 5 — chat must remain secondary; the approved sketch's teal stripe and filled identity tile were explicitly superseded.
   - Files: `Management/src/features/copilot/ManagementContextCopilot.tsx`, `Management/src/features/copilot/CopilotDrawer.tsx`, `Management/DESIGN.md`
   - Verify: actual-surface review at 1440px and 1280px in light/dark confirms flat change row, neutral header icon, 16px claim prose, one solid teal dock action, and no nested card shell.
 
-- [ ] **T6 (P1, human: ~2 days / CC: ~1 hour)** — Evidence Lens — Connect grounded claim actions to rendered lead fields with accessible reveal and fallback.
+- [x] **T6 (P1, human: ~2 days / CC: ~1 hour)** — Evidence Lens — Connect grounded claim actions to rendered lead fields with accessible reveal and fallback.
   - Surfaced by: Selected approach and Pass 4 motion review — evidence must be spatially verifiable rather than detached source pills.
   - Files: `Management/src/pages/LeadManagement.tsx`, `Management/src/features/copilot/LeadBriefing.tsx`, `Management/src/features/copilot/__tests__/LeadBriefing.test.tsx`
   - Verify: tests cover mapped/off-screen/hidden/missing targets, 140ms preview, pinned activation, focus transfer, polite announcement, and reduced-motion behavior. Reveal is asserted only at `xl` and above; below `xl` the same action must open the inline detail because the modal drawer makes the record inert.
 
-- [ ] **T7 (P2, human: ~1 day / CC: ~30 min)** — Conversation — Render paired user turns, grounded answers, inline evidence, progress, and per-turn retry.
+- [x] **T7 (P2, human: ~1 day / CC: ~30 min)** — Conversation — Render paired user turns, grounded answers, inline evidence, progress, and per-turn retry.
   - Surfaced by: Pass 2 state coverage — current answers omit their originating question and share one global error.
   - Files: `Management/src/features/copilot/ManagementContextCopilot.tsx`, `Management/src/services/copilotAPI.js`, `Management/src/features/copilot/__tests__/ManagementContextCopilot.test.tsx`
   - Verify: `cd Management && npm test -- src/features/copilot/__tests__/ManagementContextCopilot.test.tsx`; assert suggested and typed questions remain paired with success, partial, and failed answers.
 
-- [ ] **T8 (P1, human: ~3 hours / CC: ~20 min)** — Lead detail surface — Add the persistent record pane the Evidence Lens reveals into.
+- [x] **T8 (P1, human: ~3 hours / CC: ~20 min)** — Lead detail surface — Add the persistent record pane the Evidence Lens reveals into.
   - Surfaced by: Outside voice finding 2 — `sectionLead` comes only from the documents dialog, so no surface renders the allowlisted fields with evidence anchors.
   - Files: `Management/src/pages/LeadManagement.tsx`, `Management/src/features/lead-management/components/LeadDetailPane.tsx`, `Management/src/features/lead-management/components/__tests__/LeadDetailPane.test.tsx`
   - Verify: `cd Management && npm test -- src/features/lead-management/components/__tests__/LeadDetailPane.test.tsx`; assert every allowlisted field renders with its `data-copilot-evidence-id`, row selection drives the copilot scope, and clearing selection unmounts the session. Land before T4 and T6, which target this surface.
 
-- [ ] **T9 (P1, human: ~2 days / CC: ~45 min)** — Behavioral and visual proof — Cover the enumerated module contract and inspect the real surface.
+- [x] **T9 (P1, human: ~2 days / CC: ~45 min)** — Behavioral and visual proof — Cover the enumerated module contract and inspect the real surface.
   - Surfaced by: Passes 2, 3, and 6 — the first module becomes the pattern copied into every workspace.
   - Files: `Management/src/features/copilot/__tests__/*.test.tsx`, `Management/e2e/copilot.spec.js`
   - Verify: `cd Management && npm test && npm run typecheck && npm run test:e2e -- e2e/copilot.spec.js`; browser-check 1440, 1280, 1279, 768, and 375px, both themes, 200% zoom, keyboard-only traversal, and screen-reader live output.
   - Assertions: session hook — no-scope issues zero requests, A→clear→B leaks nothing, scope switch aborts and ignores the late response; visibility — operator-scoped keys, first desktop open, mobile cue without auto-open, collapse persistence, pre-auth identity does not persist; evidence reveal — mapped, off-screen, hidden, and missing targets, preview versus pinned highlight, focus transfer, polite announcement, reduced motion; conversation — paired turns with per-turn retry; attention — marker derived only from real severity; responsive — 1280 dock versus 1279 drawer, no page-level horizontal scroll at 200% zoom, no focused control obscured.
 
-- [ ] **T10 (P1, human: ~1 day / CC: ~45 min)** — Briefing content gate — Add a fixture-based evaluation that judges briefing substance, not just grounding.
+- [x] **T10 (P1, human: ~1 day / CC: ~45 min)** — Briefing content gate — Add a fixture-based evaluation that judges briefing substance, not just grounding.
   - Surfaced by: Outside voice finding 7 — all 15 success criteria test state, layout, and accessibility, so a technically grounded but substantively empty briefing passes everything.
   - Files: `Services/assistant-service/src/evaluation/managementBriefingEvaluation.js`, `Services/assistant-service/src/evaluation/__tests__/managementBriefingEvaluation.test.js`, fixtures alongside the existing `routerEvaluation` convention
   - Verify: `cd Services/assistant-service && npm test -- src/evaluation/__tests__/managementBriefingEvaluation.test.js`; assert each claim's substance follows from the field it cites and every `changed` claim falls inside the active window. Replay canned model output so no live Gemini quota is required. This gates T3 and T9.

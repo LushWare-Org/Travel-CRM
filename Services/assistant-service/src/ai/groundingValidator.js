@@ -77,6 +77,16 @@ export function validateClaims({ claims, bundle, enableGuidance }) {
   return { claims: accepted, rejected };
 }
 
+// A source `capturedValue` is copied ONLY from a cited allowlisted field
+// evidence item (an item carrying `fieldPaths`). Computed/aggregate items and
+// any non-scalar value never yield a captured value — nothing is fabricated.
+function capturedValueFor(item) {
+  if (!Array.isArray(item.fieldPaths) || item.fieldPaths.length === 0) return undefined;
+  const { value } = item;
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return value;
+  return undefined;
+}
+
 // Builds the server-owned sources list from accepted evidence IDs — never from
 // model-authored labels/URLs.
 export function buildSources(acceptedClaims, bundle) {
@@ -89,12 +99,17 @@ export function buildSources(acceptedClaims, bundle) {
       const item = evidenceById.get(id);
       if (!item) continue;
       seen.add(id);
+      const target = item.recordRef
+        ? { kind: item.recordRef.kind, id: item.recordRef.id, fieldPaths: item.fieldPaths }
+        : undefined;
+      const capturedValue = capturedValueFor(item);
       sources.push({
         id: item.id,
         label: item.label,
         type: item.type,
         updatedAt: item.updatedAt,
-        target: item.recordRef ? { kind: item.recordRef.kind, id: item.recordRef.id, fieldPaths: item.fieldPaths } : undefined,
+        ...(target ? { target } : {}),
+        ...(capturedValue !== undefined ? { capturedValue } : {}),
       });
     }
   }
