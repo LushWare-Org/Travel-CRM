@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LEAD_COPILOT_FIELDS, leadEvidenceId } from '@travel-crm/contracts';
+// The page gates the copilot behind a build-time flag that only exists in a
+// local .env, so set it before the page module is evaluated. Without this the
+// copilot never mounts under CI and the scope assertions below read zero calls.
+vi.hoisted(() => {
+  vi.stubEnv('VITE_MANAGEMENT_COPILOT_ENABLED', 'true');
+});
 
 const {
   mockGetAllLeads, mockGetLeadStats, mockGetSalesReps, mockGetAssignmentSettings, mockGetStoredUser,
