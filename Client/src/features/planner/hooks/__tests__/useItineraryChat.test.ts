@@ -46,7 +46,7 @@ describe('useItineraryChat', () => {
     });
 
     expect(result.current.messages).toEqual([{ role: 'user', content: 'Hi' }]);
-    expect(result.current.error).toBe('network down');
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
   });
 
   it('retry() after a failure re-sends without duplicating the user message, and clears error on success', async () => {
@@ -58,7 +58,7 @@ describe('useItineraryChat', () => {
     await act(async () => {
       await result.current.send('Hi');
     });
-    expect(result.current.error).toBe('network down');
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
 
     await act(async () => {
       result.current.retry();

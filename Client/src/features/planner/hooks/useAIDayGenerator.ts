@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { generateDayPreview, generateDaysRangePreview, type AIGeneratedDay } from '../../../services/api/aiDayGeneration';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import type { ExistingDayContext } from '../utils/formHelpers';
 
 interface DayGenerationContext {
@@ -47,7 +48,7 @@ export function useAIDayGenerator<TDay>({ getContext, mapDay, onDayGenerated, on
       });
       onDayGenerated(mapDay(day, dayNumber), dayNumber);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to regenerate this day. Please try again.');
+      setError(apiErrorMessage(err));
     } finally {
       setIsGenerating(false);
       setGeneratingDayNumber(null);
@@ -77,7 +78,7 @@ export function useAIDayGenerator<TDay>({ getContext, mapDay, onDayGenerated, on
         setError(`${mapped.length} of ${dayNumbers.length} days generated. Click again to fill the rest.`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate days. Please try again.');
+      setError(apiErrorMessage(err));
     } finally {
       setIsGenerating(false);
     }

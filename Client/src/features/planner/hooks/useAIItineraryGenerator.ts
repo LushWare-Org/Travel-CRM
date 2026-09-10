@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Swal from 'sweetalert2';
 import { generateItineraryPreview, type AIItineraryDay } from '../../../services/api/aiItinerary';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 
 interface GenerateParams {
   destination: string;
@@ -37,7 +38,7 @@ export function useAIItineraryGenerator<TDay>({ hasExistingDays, mapDay, onGener
       const { days } = await generateItineraryPreview(params);
       onGenerated(days.map(mapDay));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate itinerary. Please try again or plan manually.');
+      setError(apiErrorMessage(err));
     } finally {
       setIsGenerating(false);
     }

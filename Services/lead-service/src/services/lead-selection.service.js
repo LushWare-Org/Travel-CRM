@@ -141,7 +141,7 @@ export async function refreshSelection({ selectionId, force = false, prismaClien
     throw new AppError(
       'This package has already been quoted — refreshing will make the saved itinerary no longer match what was quoted',
       409,
-      'REFRESH_BLOCKED_QUOTED',
+      { code: 'REFRESH_BLOCKED_QUOTED' },
     );
   }
 

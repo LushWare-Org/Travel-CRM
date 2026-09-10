@@ -7,6 +7,7 @@ import { ArrowRight, Eye, EyeOff, Globe, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { consumePostLoginRedirect } from '../../services/auth/tokenStorage';
 import { requestPasswordReset } from '../../services/api/auth';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Form, FormField, FormFieldItem } from '../../components/ui/form';
@@ -158,7 +159,7 @@ export default function LoginContainer() {
       }
       navigate(resolvePostLoginDestination(location.state?.from));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to process request. Please try again.');
+      setError(apiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

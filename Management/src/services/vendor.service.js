@@ -1,4 +1,5 @@
 import api from './api';
+import { apiErrorMessage } from '../lib/apiErrorMessage';
 
 /**
  * Vendor Service
@@ -444,11 +445,8 @@ class VendorService {
     // Check if error has data property (from ApiService)
     if (error.data) {
       errorMessage.status = error.status || 'error';
-      errorMessage.message = error.data.message || error.message;
+      errorMessage.message = apiErrorMessage({ data: error.data, status: error.status });
       errorMessage.details = error.data;
-
-      // Log detailed error for debugging
-      console.log('Backend error response:', error.data);
 
       // Handle specific error codes
       switch (error.status) {
@@ -481,7 +479,7 @@ class VendorService {
           } else if (error.data?.details?.message) {
             errorMessage.userMessage = error.data.details.message;
           } else {
-            errorMessage.userMessage = error.message || 'Invalid input. Please check your data.';
+            errorMessage.userMessage = apiErrorMessage({ data: error.data, status: error.status });
           }
           break;
         case 401:
@@ -500,17 +498,13 @@ class VendorService {
           errorMessage.userMessage = 'Server error. Please try again later.';
           break;
         default:
-          errorMessage.userMessage = error.data?.message || error.message || 'An error occurred.';
+          errorMessage.userMessage = apiErrorMessage({ data: error.data, status: error.status });
       }
     } else if (error.message) {
-      // Error thrown by ApiService or network error
-      errorMessage.message = error.message;
-      
-      if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
-        errorMessage.userMessage = 'Network error. Please check your internet connection and ensure the server is running.';
-      } else {
-        errorMessage.userMessage = error.message || 'An unexpected error occurred.';
-      }
+      // Thrown by ApiService or the network layer. The mapper never returns
+      // error.message — that is where fetch and axios put their own strings.
+      errorMessage.message = apiErrorMessage(error);
+      errorMessage.userMessage = apiErrorMessage(error);
     } else {
       // Unknown error format
       errorMessage.message = 'Unknown error occurred';

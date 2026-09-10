@@ -143,9 +143,21 @@ app.use((req, res, next) => {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Token expired. Please login again.' });
+      return res.status(401).json({
+        success: false,
+        status: 'fail',
+        code: 'UNAUTHENTICATED',
+        message: 'Token expired. Please login again.',
+        ...(req.requestId && { requestId: req.requestId }),
+      });
     }
-    return res.status(401).json({ success: false, message: 'Invalid token.' });
+    return res.status(401).json({
+      success: false,
+      status: 'fail',
+      code: 'UNAUTHENTICATED',
+      message: 'Invalid token.',
+      ...(req.requestId && { requestId: req.requestId }),
+    });
   }
 });
 
@@ -192,7 +204,13 @@ const proxy = (target) => {
       error: (err, req, res) => {
         (req.log || logger).error({ err, target, requestId: req.requestId }, 'Proxy error');
         if (!res.headersSent) {
-          res.status(502).json({ success: false, message: 'Service temporarily unavailable' });
+          res.status(502).json({
+            success: false,
+            status: 'error',
+            code: 'DEPENDENCY_UNAVAILABLE',
+            message: 'Service temporarily unavailable',
+            ...(req.requestId && { requestId: req.requestId }),
+          });
         }
       },
     },
@@ -280,8 +298,16 @@ app.use(`${V1}/assistant/turn`, itineraryChatLimiter, proxy(SERVICES.assistant))
 app.use(`${V1}/assistant`, proxy(SERVICES.assistant));
 
 // ─── 404 ───────────────────────────────────────────────────────────────────────
+// Generic rather than echoing the method and path back: the response should not
+// describe the routing table to whoever asked.
 app.use((req, res) =>
-  res.status(404).json({ success: false, message: `Route ${req.method} ${req.path} not found` })
+  res.status(404).json({
+    success: false,
+    status: 'fail',
+    code: 'NOT_FOUND',
+    message: "We couldn't find what you were looking for.",
+    ...(req.requestId && { requestId: req.requestId }),
+  })
 );
 
 const PORT = process.env.PORT || 3000;

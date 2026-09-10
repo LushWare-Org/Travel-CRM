@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import toast from '@/lib/toast';
 import packageAIApi from '../services/packageAIApi.js';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const AIGenerateButton = ({ packageId, onContentGenerated, disabled = false }) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -31,7 +32,7 @@ const AIGenerateButton = ({ packageId, onContentGenerated, disabled = false }) =
       }
     } catch (error) {
       console.error('Error generating AI content:', error);
-      toast.error(error.message || 'Failed to generate AI content');
+      toast.error(apiErrorMessage(error));
     } finally {
       setIsGenerating(false);
     }

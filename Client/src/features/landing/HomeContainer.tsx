@@ -12,6 +12,7 @@ import TrustSection from './components/TrustSection';
 import { fetchPackages } from '../../services/api/packages';
 import type { NormalizedPackage, AggregatedDestination } from '../../services/api/packages.transform';
 import { fetchRecentBookings } from '../../services/api/booking';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import { HERO_CONTENT } from '../../content/home';
 import { MONTHS } from './utils/constants';
 import { HERO_MEDIA } from '../../config/media';
@@ -97,7 +98,7 @@ export default function HomeContainer() {
           })
           .catch((err: Error) => {
             if (!mounted) return;
-            setError(err.message || 'Failed to load travel data');
+            setError(apiErrorMessage(err));
           })
           .finally(() => {
             if (mounted) setLoading(false);
@@ -116,7 +117,7 @@ export default function HomeContainer() {
           })
           .catch((err: Error) => {
             if (!mounted) return;
-            setError(err.message || 'Failed to load travel data');
+            setError(apiErrorMessage(err));
           })
           .finally(() => {
             if (mounted) setLoading(false);

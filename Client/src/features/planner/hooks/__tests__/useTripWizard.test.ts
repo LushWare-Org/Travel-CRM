@@ -129,7 +129,7 @@ describe('useTripWizard', () => {
     await act(async () => {
       await result.current.send('Hi');
     });
-    expect(result.current.error).toBe('offline');
+    expect(result.current.error).toBe('Something went wrong. Please try again.');
 
     await act(async () => {
       result.current.retry();

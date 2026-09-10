@@ -13,6 +13,7 @@ import toast from '@/lib/toast';
 import AnalyticsService from '../../../../services/analytics.service';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 /**
  * WebsiteAnalytics Component
@@ -33,7 +34,7 @@ const WebsiteAnalytics = () => {
         setAnalyticsData(data);
       } catch (err: any) {
         console.error('Error fetching website analytics:', err);
-        setError(err.message || 'Failed to load analytics data');
+        setError(apiErrorMessage(err));
       } finally {
         setLoading(false);
       }

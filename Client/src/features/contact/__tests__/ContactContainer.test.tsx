@@ -106,7 +106,7 @@ describe('ContactContainer', () => {
     await fillRequiredFields(user);
     await user.click(screen.getByRole('button', { name: /Send Message/ }));
 
-    expect(await screen.findByText('Server unreachable')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
     expect(submitContactFormMock).toHaveBeenCalledTimes(1);
   });
 

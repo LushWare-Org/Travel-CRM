@@ -99,7 +99,7 @@ describe('ItineraryChatPanel', () => {
     await user.type(screen.getByPlaceholderText('Tell us about your trip...'), 'Hi');
     await user.click(getSendButton());
 
-    expect(await screen.findByText('offline')).toBeInTheDocument();
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Back online!')).toBeInTheDocument();

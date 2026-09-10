@@ -57,10 +57,14 @@ describe('LeadAnalytics', () => {
     expect(screen.getByText(/no destination data available/i)).toBeInTheDocument();
   });
 
-  it('shows the error message inline when the fetch rejects', async () => {
-    mockGetLeadOverview.mockRejectedValue(new Error('Network down'));
+  it('shows a mapped error message inline when the fetch rejects', async () => {
+    // A real API failure carries a status. The raw message must not reach the page.
+    mockGetLeadOverview.mockRejectedValue(Object.assign(new Error('Network down'), { status: 500 }));
     render(<LeadAnalytics />);
 
-    await waitFor(() => expect(screen.getByText('Network down')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Something went wrong on our side. Please try again.')).toBeInTheDocument(),
+    );
+    expect(screen.queryByText('Network down')).not.toBeInTheDocument();
   });
 });

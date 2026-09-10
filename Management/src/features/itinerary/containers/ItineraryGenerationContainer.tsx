@@ -44,6 +44,7 @@ import { createDefaultPackage } from '../types';
 
 // Sample data
 import { SAMPLE_PACKAGES } from './sampleData';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const ItineraryGenerationContainer = () => {
   const [, navigate] = useLocation();
@@ -343,7 +344,7 @@ const ItineraryGenerationContainer = () => {
         const errorList = error.errors.map((err: any) => `• ${err.param || err.field}: ${err.msg}`).join('\n');
         Swal.fire('Validation Error', `Please fix the following:\n\n${errorList}`, 'error');
       } else {
-        Swal.fire('Error', error.message || 'Failed to save package to database', 'error');
+        Swal.fire('Error', apiErrorMessage(error), 'error');
       }
     }
   };

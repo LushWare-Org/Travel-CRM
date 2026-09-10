@@ -34,7 +34,9 @@ describe('validateQuery middleware', () => {
     expect(req.query).toEqual({ timeRange: 'weekly' });
   });
 
-  it('responds 400 with an errors array and does not call next() on invalid input', () => {
+  it('reports a 400 validation error through next() without writing a response', () => {
+    // The body is the central error handler's job: routing through it is what
+    // gives this response the same code and requestId as every other service's.
     const req = { query: { timeRange: 'not-a-range' } };
     const json = vi.fn();
     const res = { status: vi.fn(() => ({ json })) };
@@ -42,10 +44,10 @@ describe('validateQuery middleware', () => {
 
     middleware(req, res, next);
 
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false, errors: expect.any(Array) })
-    );
+    expect(res.status).not.toHaveBeenCalled();
+    const err = next.mock.calls[0][0];
+    expect(err.statusCode).toBe(400);
+    expect(err.code).toBe('VALIDATION_FAILED');
+    expect(err.errors).toEqual([{ field: 'timeRange', message: expect.any(String) }]);
   });
 });

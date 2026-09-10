@@ -17,6 +17,7 @@ import {
 } from '../../utils/userAnalyticsData';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 /**
  * UserAnalytics Component
@@ -39,7 +40,7 @@ const UserAnalytics = () => {
         setAnalyticsData(data);
       } catch (err: any) {
         console.error('Error fetching user analytics:', err);
-        setError(err.message || 'Failed to fetch analytics data');
+        setError(apiErrorMessage(err));
         setAnalyticsData(null);
       } finally {
         setLoading(false);

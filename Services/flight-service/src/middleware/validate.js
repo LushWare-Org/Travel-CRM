@@ -16,7 +16,10 @@ export function validateBody(schema) {
         field: i.path.join('.'),
         message: i.message,
       }));
-      return next(new AppError(`Validation failed: ${details.map((d) => `${d.field} — ${d.message}`).join('; ')}`, BAD_REQUEST));
+      return next(new AppError('Please check the highlighted fields and try again.', BAD_REQUEST, {
+        code: 'VALIDATION_FAILED',
+        errors: details,
+      }));
     }
     req.body = result.data; // use parsed (coerced) values
     next();
@@ -37,7 +40,10 @@ export function validateQuery(schema) {
         field: i.path.join('.'),
         message: i.message,
       }));
-      return next(new AppError(`Invalid query: ${details.map((d) => `${d.field} — ${d.message}`).join('; ')}`, BAD_REQUEST));
+      return next(new AppError('Please check the highlighted fields and try again.', BAD_REQUEST, {
+        code: 'VALIDATION_FAILED',
+        errors: details,
+      }));
     }
     req.query = result.data;
     next();
@@ -58,7 +64,10 @@ export function validateParams(schema) {
         field: i.path.join('.'),
         message: i.message,
       }));
-      return next(new AppError(`Invalid params: ${details.map((d) => `${d.field} — ${d.message}`).join('; ')}`, BAD_REQUEST));
+      return next(new AppError('Please check the highlighted fields and try again.', BAD_REQUEST, {
+        code: 'VALIDATION_FAILED',
+        errors: details,
+      }));
     }
     req.params = result.data;
     next();

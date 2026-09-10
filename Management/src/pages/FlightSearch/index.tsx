@@ -23,6 +23,7 @@ import type {
   TravelerType,
   TripType,
 } from './types';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const SORT_LABEL: Record<string, string> = Object.fromEntries(SORT_OPTIONS.map((s) => [s.id, s.label]));
 
@@ -172,7 +173,7 @@ export default function FlightSearch() {
       if (!results.length) toast('No flights found for this search', { type: 'info' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- flight.service.js is untyped JS, error shape is unknown at this boundary
     } catch (error: any) {
-      toast.error(error.message || 'Flight search failed');
+      toast.error(apiErrorMessage(error));
     } finally {
       setSearching(false);
     }
@@ -228,7 +229,7 @@ export default function FlightSearch() {
       toast.success('Flight booked successfully');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- flight.service.js is untyped JS, error shape is unknown at this boundary
     } catch (error: any) {
-      toast.error(error.message || 'Booking failed');
+      toast.error(apiErrorMessage(error));
     } finally {
       setBooking(false);
     }
@@ -259,7 +260,7 @@ export default function FlightSearch() {
       setBookings(response.data || []);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- flight.service.js is untyped JS, error shape is unknown at this boundary
     } catch (error: any) {
-      toast.error(error.message || 'Failed to load flight bookings');
+      toast.error(apiErrorMessage(error));
     } finally {
       setLoadingBookings(false);
     }
@@ -277,7 +278,7 @@ export default function FlightSearch() {
       fetchBookings();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- flight.service.js is untyped JS, error shape is unknown at this boundary
     } catch (error: any) {
-      toast.error(error.message || 'Failed to cancel booking');
+      toast.error(apiErrorMessage(error));
     }
   };
 

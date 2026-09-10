@@ -12,6 +12,7 @@ import { exportPackageAnalyticsPDF } from '../../utils/exportAnalytics';
 import toast from '@/lib/toast';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 /**
  * PackageAnalytics Component
@@ -42,7 +43,7 @@ const PackageAnalytics = () => {
         setAnalyticsData(data);
       } catch (err: any) {
         console.error('Error fetching analytics:', err);
-        setError(err.message);
+        setError(apiErrorMessage(err));
         setAnalyticsData(null);
       } finally {
         setLoading(false);

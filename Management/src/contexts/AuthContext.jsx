@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import toast from '@/lib/toast';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const AuthContext = createContext();
 
@@ -90,7 +91,7 @@ export const AuthProvider = ({ children }) => {
 
         return true;
       } catch (error) {
-        const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
+        const errorMessage = apiErrorMessage({ data: error.response?.data, status: error.response?.status });
         toast.error(errorMessage);
         console.error('Login error:', error);
         return false;
@@ -208,7 +209,7 @@ export const AuthProvider = ({ children }) => {
         toast.success('Profile updated successfully');
         return true;
       } catch (error) {
-        const errorMessage = error.response?.data?.message || 'Failed to update profile';
+        const errorMessage = apiErrorMessage({ data: error.response?.data, status: error.response?.status });
         toast.error(errorMessage);
         console.error('Update profile error:', error);
         return false;
@@ -233,7 +234,7 @@ export const AuthProvider = ({ children }) => {
         toast.success('Password changed successfully');
         return true;
       } catch (error) {
-        const errorMessage = error.response?.data?.message || 'Failed to change password';
+        const errorMessage = apiErrorMessage({ data: error.response?.data, status: error.response?.status });
         toast.error(errorMessage);
         console.error('Change password error:', error);
         return false;

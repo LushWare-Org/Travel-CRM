@@ -1,4 +1,12 @@
 import asyncHandler from '../utils/asyncHandler.js';
+import AppError from '../utils/appError.js';
+import {
+  EMAIL_NOT_CONFIGURED,
+  EMAIL_SEND_FAILED,
+  WHATSAPP_UNAVAILABLE,
+  INVALID_EMAIL_PAYLOAD,
+  INVALID_WHATSAPP_PAYLOAD,
+} from '../constants/errorMessages.js';
 import { sendEmailSchema } from '../validators/email.validator.js';
 import { sendWhatsappSchema } from '../validators/whatsapp.validator.js';
 import { sendEmail as deliverEmail } from '../utils/email.js';
@@ -19,7 +27,8 @@ export const markAsRead = asyncHandler(async (req, res) => {
 export const sendEmail = asyncHandler(async (req, res) => {
   const parsed = sendEmailSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ success: false, message: 'Invalid email payload', errors: parsed.error.flatten() });
+    const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
+    throw new AppError(INVALID_EMAIL_PAYLOAD, 400, { code: 'VALIDATION_FAILED', errors });
   }
 
   const { to, subject, html, text, from, attachments, meta } = parsed.data;
@@ -30,20 +39,24 @@ export const sendEmail = asyncHandler(async (req, res) => {
     return res.status(200).json({ success: true, data: result });
   } catch (err) {
     req.log.error({ err, to: maskRecipients(to), subject, meta }, 'Failed to send email');
+    // A delivery fault already written for the caller (attachment size, transport
+    // unavailable) is passed through; anything else is reported generically by the
+    // central error handler rather than echoing a raw transport message.
+    if (err.isOperational) throw err;
+    // An unconfigured transport reports 503 without being operational; keep the
+    // status class so a caller can tell an outage from a rejected send.
     if (err.statusCode === 503) {
-      return res.status(503).json({ success: false, message: 'Email is not configured' });
+      throw new AppError(EMAIL_NOT_CONFIGURED, 503, { code: 'DEPENDENCY_UNAVAILABLE' });
     }
-    if (err.statusCode === 400) {
-      return res.status(400).json({ success: false, message: err.message });
-    }
-    return res.status(502).json({ success: false, message: 'Failed to send email' });
+    throw new AppError(EMAIL_SEND_FAILED, 502, { code: 'DEPENDENCY_UNAVAILABLE' });
   }
 });
 
 export const sendWhatsapp = asyncHandler(async (req, res) => {
   const parsed = sendWhatsappSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ success: false, message: 'Invalid WhatsApp payload', errors: parsed.error.flatten() });
+    const errors = parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
+    throw new AppError(INVALID_WHATSAPP_PAYLOAD, 400, { code: 'VALIDATION_FAILED', errors });
   }
 
   const { to, meta, ...rest } = parsed.data;
@@ -57,12 +70,10 @@ export const sendWhatsapp = asyncHandler(async (req, res) => {
     return res.status(200).json({ success: true, data: result });
   } catch (err) {
     req.log.error({ err, to: maskPhone(to), type: rest.type, meta }, 'Failed to send WhatsApp message');
+    if (err.isOperational) throw err;
     if (err.statusCode === 503) {
-      return res.status(503).json({ success: false, message: 'WhatsApp is not configured' });
+      throw new AppError(WHATSAPP_UNAVAILABLE, 503, { code: 'DEPENDENCY_UNAVAILABLE' });
     }
-    if (err.statusCode === 400) {
-      return res.status(400).json({ success: false, message: err.message });
-    }
-    return res.status(502).json({ success: false, message: 'Failed to send WhatsApp message' });
+    throw new AppError(WHATSAPP_UNAVAILABLE, 502, { code: 'DEPENDENCY_UNAVAILABLE' });
   }
 });

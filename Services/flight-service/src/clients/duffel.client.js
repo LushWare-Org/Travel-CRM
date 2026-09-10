@@ -1,17 +1,14 @@
 import axios from 'axios';
 import AppError from '../utils/appError.js';
 import logger from '../config/logger.js';
-import { BAD_REQUEST, BAD_GATEWAY, SERVICE_UNAVAILABLE, NOT_FOUND } from '../constants/httpStatus.js';
+import { BAD_REQUEST, SERVICE_UNAVAILABLE } from '../constants/httpStatus.js';
 import {
   SEARCH_REQUIRED_FIELDS,
   OFFER_ID_REQUIRED,
   TRAVELERS_REQUIRED,
   TRAVELPORT_ORDER_ID_REQUIRED,
-  DUFFEL_NOT_CONFIGURED,
-  DUFFEL_SEARCH_FAILED,
-  DUFFEL_BOOK_FAILED,
-  DUFFEL_ORDER_RETRIEVE_FAILED,
-  DUFFEL_CANCEL_FAILED,
+  PROVIDER_NOT_CONFIGURED_FRIENDLY,
+  flightProviderFailure,
 } from '../constants/errorMessages.js';
 
 /**
@@ -63,7 +60,7 @@ export class DuffelClient {
 
       return this.#normalizeOffers(data.data);
     } catch (err) {
-      this.#unwrapError(err, DUFFEL_SEARCH_FAILED);
+      this.#unwrapError(err, 'search');
     }
   }
 
@@ -87,7 +84,7 @@ export class DuffelClient {
         priceChanged: offer.total_amount !== offer.base_amount,
       };
     } catch (err) {
-      this.#unwrapError(err, 'Flight pricing failed');
+      this.#unwrapError(err, 'price');
     }
   }
 
@@ -116,7 +113,7 @@ export class DuffelClient {
 
       return this.#normalizeOrder(data.data);
     } catch (err) {
-      this.#unwrapError(err, DUFFEL_BOOK_FAILED);
+      this.#unwrapError(err, 'book');
     }
   }
 
@@ -128,7 +125,7 @@ export class DuffelClient {
       const { data } = await this.#client().get(`/air/orders/${orderId}`);
       return this.#normalizeOrder(data.data);
     } catch (err) {
-      this.#unwrapError(err, DUFFEL_ORDER_RETRIEVE_FAILED);
+      this.#unwrapError(err, 'retrieve');
     }
   }
 
@@ -159,7 +156,7 @@ export class DuffelClient {
         refundCurrency: cancellation.data.refund_currency,
       };
     } catch (err) {
-      this.#unwrapError(err, DUFFEL_CANCEL_FAILED);
+      this.#unwrapError(err, 'cancel');
     }
   }
 
@@ -189,7 +186,9 @@ export class DuffelClient {
   #ensureConfig() {
     const token = process.env.DUFFEL_ACCESS_TOKEN;
     if (!token) {
-      throw new AppError(DUFFEL_NOT_CONFIGURED, SERVICE_UNAVAILABLE);
+      throw new AppError(PROVIDER_NOT_CONFIGURED_FRIENDLY, SERVICE_UNAVAILABLE, {
+        code: 'PROVIDER_UNAVAILABLE',
+      });
     }
     this._token = token;
   }
@@ -347,24 +346,25 @@ export class DuffelClient {
 
   // ── Private: error handling ───────────────────────────────────────
 
-  #unwrapError(err, fallbackMessage) {
+  /**
+   * Turns a provider failure into a user-facing AppError.
+   *
+   * The provider's payload is logged here and nowhere else; what reaches the caller
+   * carries only a sentence written for a traveller. `operation` selects which one,
+   * because "that fare has gone" and "search is down" need different advice.
+   *
+   * @param {unknown} err
+   * @param {'search'|'price'|'book'|'retrieve'|'cancel'} operation
+   */
+  #unwrapError(err, operation) {
     if (err instanceof AppError) throw err;
 
-    const status = err.response?.status;
-    const duffelErrors = err.response?.data?.errors;
     logger.error(
-      { status: err.response?.status, data: err.response?.data },
+      { status: err.response?.status, data: err.response?.data, operation },
       'Duffel API error details',
     );
 
-    const message = Array.isArray(duffelErrors)
-      ? duffelErrors.map((e) => `${e.field || ''}: ${e.title || e.message}`.trim()).filter(Boolean).join('; ')
-      : err.response?.data?.message || err.message || fallbackMessage;
-
-    const mappedStatus = status === 404 ? NOT_FOUND
-      : (status >= 400 && status < 600) ? status
-        : BAD_GATEWAY;
-
-    throw new AppError(`Duffel error: ${message}`, mappedStatus);
+    const { statusCode, code, message } = flightProviderFailure(operation, err.response?.status);
+    throw new AppError(message, statusCode, { code });
   }
 }

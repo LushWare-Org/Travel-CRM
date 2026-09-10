@@ -60,8 +60,14 @@ describe('sendEmail', () => {
   it('throws a 503 error when SMTP is not configured', async () => {
     clearSmtpEnv();
 
+    // The reason a transport is missing is ours, not the caller's: the response
+    // must not name SMTP or any environment variable.
     await expect(sendEmail({ to: 'a@test.com', subject: 'Hi', html: '<p>Hi</p>' }))
-      .rejects.toMatchObject({ statusCode: 503, message: 'Email is not configured' });
+      .rejects.toMatchObject({
+        statusCode: 503,
+        code: 'DEPENDENCY_UNAVAILABLE',
+        message: 'Email is temporarily unavailable. Please try again in a moment.',
+      });
     expect(mockSendMail).not.toHaveBeenCalled();
   });
 

@@ -14,6 +14,7 @@ import toast from '@/lib/toast';
 import { formatCompact, formatCurrency, getCurrencySymbol } from '../../../../utils/currency.js';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 /**
  * BillingAnalytics Component
@@ -75,7 +76,7 @@ const BillingAnalytics = () => {
         setInvoiceBreakdownData(payload?.invoiceCategoryBreakdown || []);
       } catch (error: any) {
         console.error('Failed to load billing analytics', error);
-        setErrorMessage(error.message || 'Failed to load billing analytics data.');
+        setErrorMessage(apiErrorMessage(error));
         setStats({ totalRevenue: 0, totalOutstanding: 0, totalPotentialRevenue: 0, pendingInvoices: 0 });
         setRevenueTrendData([]);
         setOutstandingTrendData([]);

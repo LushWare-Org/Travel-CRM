@@ -289,8 +289,10 @@ export const updateLead = asyncHandler(async (req, res) => {
       });
     } catch (err) {
       // State-machine gatekeeper failures are client errors (e.g. CLOSED_LOST
-      // without a lostReason) — surface them as 400, not an unhandled 500.
-      throw new AppError(err.message, 400);
+      // without a lostReason) — the error carries its own 400 and marks itself as
+      // safe to show. Anything else is reported generically, never echoed.
+      if (err.isOperational) throw err;
+      throw new AppError("We couldn't update this lead's status. Please try again.", 400);
     }
     statusHistoryCreate.push({
       status: validatedBody.lifecycleStatus,

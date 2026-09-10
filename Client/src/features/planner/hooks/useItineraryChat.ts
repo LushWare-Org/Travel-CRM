@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { sendItineraryChatMessage } from '../../../services/api/itineraryChat';
 import type { ItineraryChatSlots } from '../../../services/api/itineraryChat';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 
 export interface ItineraryChatMessage {
   role: 'user' | 'assistant';
@@ -30,7 +31,7 @@ export function useItineraryChat() {
       setReadyToGenerate(result.readyToGenerate);
       setLastFailedMessages(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reach the trip-planning assistant. Please try again.');
+      setError(apiErrorMessage(err));
       setLastFailedMessages(nextMessages);
     } finally {
       setIsSending(false);

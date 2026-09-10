@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { submitContactForm } from '../../services/api/contact';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import DestinationSelector from '../../components/shared/DestinationSelector';
 import LocationSelector from '../../components/shared/LocationSelector';
 import { useAuth } from '../../contexts/AuthContext';
@@ -169,7 +170,7 @@ export default function ContactContainer() {
       setTimeout(() => setSubmitted(false), 5000);
     } catch (err) {
       console.error('Error submitting contact form:', err);
-      setError(err instanceof Error ? err.message : 'Failed to send message. Please try again later.');
+      setError(apiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

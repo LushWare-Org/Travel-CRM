@@ -1,4 +1,7 @@
 import readWhatsappEnv, { isWhatsappConfigured } from '../config/whatsapp.js';
+import AppError from './appError.js';
+import logger from '../config/logger.js';
+import { WHATSAPP_UNAVAILABLE, WHATSAPP_SEND_FAILED } from '../constants/errorMessages.js';
 
 export { isWhatsappConfigured };
 
@@ -10,9 +13,7 @@ function normalizePhone(phone) {
 async function callGraphApi(payload, fetchImpl = fetch) {
   const { accessToken, phoneNumberId, apiVersion } = readWhatsappEnv();
   if (!accessToken || !phoneNumberId) {
-    const err = new Error('WhatsApp is not configured (set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID)');
-    err.statusCode = 503;
-    throw err;
+    throw new AppError(WHATSAPP_UNAVAILABLE, 503, { code: 'DEPENDENCY_UNAVAILABLE' });
   }
 
   const res = await fetchImpl(`https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`, {
@@ -26,9 +27,13 @@ async function callGraphApi(payload, fetchImpl = fetch) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data?.error?.message || `WhatsApp send failed (status ${res.status})`);
-    err.statusCode = res.status === 401 || res.status === 403 ? 502 : 400;
-    throw err;
+    // The Graph API's own message names Meta internals, so it is logged rather
+    // than forwarded. An auth failure is ours; anything else is the caller's.
+    logger.error({ status: res.status, error: data?.error }, 'WhatsApp send failed');
+    const unauthenticated = res.status === 401 || res.status === 403;
+    throw unauthenticated
+      ? new AppError(WHATSAPP_UNAVAILABLE, 502, { code: 'DEPENDENCY_UNAVAILABLE' })
+      : new AppError(WHATSAPP_SEND_FAILED, 400, { code: 'PROVIDER_REJECTED' });
   }
   return data;
 }

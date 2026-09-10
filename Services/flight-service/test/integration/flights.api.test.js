@@ -145,7 +145,13 @@ describe('Flight API — Search & Book', () => {
         });
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toContain('traveler');
+      // Field-level detail travels in errors[] now; the message is a fixed sentence
+      // written for the caller rather than the validator's own wording.
+      expect(res.body.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ field: expect.stringContaining('travelers') }),
+        ]),
+      );
     });
   });
 

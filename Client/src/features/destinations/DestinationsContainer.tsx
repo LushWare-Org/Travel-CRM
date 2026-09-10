@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Filter, X } from 'lucide-react';
 import { fetchPackages } from '../../services/api/packages';
+import { apiErrorMessage } from '@/services/http/apiErrorMessage';
 import type { AggregatedDestination } from '../../services/api/packages.transform';
 import HeroSection from './components/HeroSection';
 import Toolbar from './components/Toolbar';
@@ -55,7 +56,7 @@ export default function DestinationsContainer() {
       })
       .catch(err => {
         if (!isMounted) return;
-        setError(err.message || 'Failed to load destinations');
+        setError(apiErrorMessage(err));
       })
       .finally(() => {
         if (!isMounted) return;

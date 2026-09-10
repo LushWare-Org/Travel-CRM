@@ -12,6 +12,7 @@ import { Row, ChannelTab } from '../shared/BillingPrimitives';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', INR: '₹', AUD: 'A$', LKR: 'Rs ' };
 const MANUAL_LABEL = 'Manual Itinerary';
@@ -93,7 +94,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
         || list[0];
       setActiveId(preferred ? preferred.id : null);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load packages for this lead');
+      toast.error(apiErrorMessage(err));
       setSelections([]);
     } finally {
       setLoading(false);
@@ -161,7 +162,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
         )));
         toast.success('Destination updated');
       } catch (err: any) {
-        toast.error(err.message || 'Failed to update destination');
+        toast.error(apiErrorMessage(err));
       } finally {
         setSavingDestination(false);
       }
@@ -198,7 +199,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
       toast.success('Quotation generated');
       onSuccess?.();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to generate quotation');
+      toast.error(apiErrorMessage(err));
     } finally {
       setGeneratingId(null);
     }
@@ -218,7 +219,7 @@ const QuotationModal = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialS
       toast.success(channel === 'email' ? 'Quotation emailed' : 'Quotation sent via WhatsApp');
       onSuccess?.();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send quotation');
+      toast.error(apiErrorMessage(err));
     } finally {
       setSending(false);
     }

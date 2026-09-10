@@ -4,6 +4,7 @@ import { adminAPI, leadAPI } from '../../../services/api';
 import toast from '@/lib/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 interface AssignmentSettings {
   mode: 'manual' | 'auto';
@@ -87,7 +88,7 @@ const SettingsDialog = ({
       }
     } catch (err: any) {
       console.error('Error saving settings:', err);
-      toast.error(err.message || 'Failed to save settings');
+      toast.error(apiErrorMessage(err));
     } finally {
       setIsSaving(false);
     }

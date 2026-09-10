@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FormDialogHeader, FormDialogBody, FormDialogSection, FormDialogFooter } from '@/components/shared/FormDialogSections';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 // A lead can hold many packages at once, plus at most one manual
 // (from-scratch) itinerary slot — this sentinel is the "add" picker's third
@@ -285,7 +286,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       setShowItineraryEditor(true);
       toast.success(isManual ? 'Manual itinerary added' : 'Package added');
     } catch (err: any) {
-      toast.error(`Failed to add package: ${err.message}`);
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -306,7 +307,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       });
       toast.success('Package removed');
     } catch (err: any) {
-      toast.error(`Failed to remove package: ${err.message}`);
+      toast.error(apiErrorMessage(err));
     }
   };
 
@@ -331,7 +332,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
           return;
         }
       } else {
-        toast.error(`Failed to refresh: ${err.message}`);
+        toast.error(apiErrorMessage(err));
       }
     } finally {
       setRefreshingSelectionId(null);
@@ -395,7 +396,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
       onSuccess?.();
       onClose();
     } catch (error: any) {
-      toast.error(`Failed to update lead: ${error.message}`);
+      toast.error(apiErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }

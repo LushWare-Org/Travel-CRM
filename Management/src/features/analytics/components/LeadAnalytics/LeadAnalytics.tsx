@@ -13,6 +13,7 @@ import { exportLeadAnalyticsPDF } from '../../utils/exportAnalytics';
 import toast from '@/lib/toast';
 import { StatCard } from '../../../../components/shared/StatCard';
 import { Button } from '../../../../components/ui/button';
+import { apiErrorMessage } from '@/lib/apiErrorMessage';
 
 /**
  * LeadAnalytics Component
@@ -82,7 +83,7 @@ const LeadAnalytics = () => {
         setDestinationData(destinations);
       } catch (error: any) {
         console.error('Failed to load lead analytics', error);
-        setErrorMessage(error.message || 'Failed to load lead analytics data.');
+        setErrorMessage(apiErrorMessage(error));
         setStats({ totalLeads: 0, contacted: 0, interested: 0, converted: 0, new: 0, quoted: 0 });
         setTrendData([]);
         setStatusData([]);

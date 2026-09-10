@@ -20,6 +20,7 @@ vi.mock('../../utils/whatsapp.js', () => ({
 }));
 
 const { default: notificationRoutes } = await import('../notification.routes.js');
+const { default: errorHandler } = await import('../../middleware/errorHandler.js');
 
 function buildApp() {
   const app = express();
@@ -29,9 +30,9 @@ function buildApp() {
     next();
   });
   app.use('/api/v1/notifications', notificationRoutes);
-  app.use((err, req, res, next) => {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
-  });
+  // The real handler, not a stand-in: these tests assert what a caller actually
+  // receives, and a local stub would let a leak slip through unnoticed.
+  app.use(errorHandler);
   return app;
 }
 
@@ -109,7 +110,14 @@ describe('POST /api/v1/notifications/internal/email', () => {
       .send(PAYLOAD);
 
     expect(res.status).toBe(502);
-    expect(res.body).toEqual({ success: false, message: 'Failed to send email' });
+    expect(res.body).toMatchObject({
+      success: false,
+      status: 'error',
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: "We couldn't send that email. Please try again.",
+    });
+    // The transport's own text is logged server-side and never returned.
+    expect(JSON.stringify(res.body)).not.toContain('ECONNREFUSED');
   });
 
   it('forwards a base64 PDF attachment to the transport layer', async () => {
@@ -211,6 +219,12 @@ describe('POST /api/v1/notifications/internal/whatsapp', () => {
       .send(TEMPLATE_PAYLOAD);
 
     expect(res.status).toBe(502);
-    expect(res.body).toEqual({ success: false, message: 'Failed to send WhatsApp message' });
+    expect(res.body).toMatchObject({
+      success: false,
+      status: 'error',
+      code: 'DEPENDENCY_UNAVAILABLE',
+      message: 'WhatsApp messaging is temporarily unavailable. Please try again in a moment.',
+    });
+    expect(JSON.stringify(res.body)).not.toContain('socket hang up');
   });
 });

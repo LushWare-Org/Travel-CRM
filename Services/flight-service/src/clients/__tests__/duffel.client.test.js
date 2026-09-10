@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DuffelClient } from '../duffel.client.js';
+import logger from '../../config/logger.js';
 
 // ── Hoisted mock for axios ───────────────────────────────────────────
 const { mockAxiosInstance } = vi.hoisted(() => ({
@@ -116,9 +117,99 @@ describe('DuffelClient', () => {
   });
 
   describe('constructor', () => {
-    it('should throw when DUFFEL_ACCESS_TOKEN is not set', () => {
+    it('should throw a user-facing message when DUFFEL_ACCESS_TOKEN is not set', () => {
       delete process.env.DUFFEL_ACCESS_TOKEN;
-      expect(() => new DuffelClient()).toThrow('Duffel is not configured');
+
+      let thrown;
+      try {
+        new DuffelClient();
+      } catch (err) {
+        thrown = err;
+      }
+
+      expect(thrown.message).toBe('Flight search is temporarily unavailable. Please try again in a moment.');
+      expect(thrown.message).not.toContain('DUFFEL_ACCESS_TOKEN');
+      expect(thrown.code).toBe('PROVIDER_UNAVAILABLE');
+    });
+  });
+
+  // A Duffel error names the supplier and its own field paths. None of that may
+  // reach a traveller, so each operation is checked for both the sentence shown
+  // and the text withheld.
+  describe('provider failures are sanitised', () => {
+    const providerError = (status, data) =>
+      Object.assign(new Error(`Request failed with status code ${status}`), {
+        response: { status, data },
+      });
+
+    const callFor = {
+      search: () => client.searchFlights({ origin: 'CMB', destination: 'DXB', departureDate: '2026-08-01' }),
+      price: () => client.priceOffer('off_1'),
+      book: () =>
+        client.createOrder({
+          offerId: 'off_1',
+          travelers: [{ id: 't1' }],
+          contact: { email: 'a@b.test' },
+        }),
+      retrieve: () => client.getOrder('ord_1'),
+      cancel: () => client.cancelOrder('ord_1'),
+    };
+
+    async function failure(operation, status, data) {
+      const err = providerError(status, data);
+      mockAxiosInstance.post.mockRejectedValue(err);
+      mockAxiosInstance.get.mockRejectedValue(err);
+      return callFor[operation]().catch((e) => e);
+    }
+
+    const rawPayload = {
+      errors: [{ field: 'passengers[0].born_on', title: 'is invalid' }],
+      message: 'raw operator text',
+    };
+
+    it.each([
+      ['search', 422, 400, 'PROVIDER_REJECTED'],
+      ['search', 503, 502, 'PROVIDER_UNAVAILABLE'],
+      ['price', 404, 404, 'NOT_FOUND'],
+      ['price', 500, 502, 'PROVIDER_UNAVAILABLE'],
+      ['book', 400, 400, 'PROVIDER_REJECTED'],
+      ['book', 502, 502, 'PROVIDER_UNAVAILABLE'],
+      ['retrieve', 404, 404, 'NOT_FOUND'],
+      ['cancel', 409, 400, 'PROVIDER_REJECTED'],
+    ])(
+      '%s failing with provider status %i surfaces %i / %s',
+      async (operation, providerStatus, statusCode, code) => {
+        const err = await failure(operation, providerStatus, rawPayload);
+
+        expect(err.statusCode).toBe(statusCode);
+        expect(err.code).toBe(code);
+        expect(err.message).not.toMatch(
+          /Duffel|born_on|raw operator text|passengers\[0\]|Request failed with status code/,
+        );
+      },
+    );
+
+    it('maps a provider outage with no status to a retryable 502', async () => {
+      mockAxiosInstance.post.mockRejectedValue(new Error('socket hang up'));
+      mockAxiosInstance.get.mockRejectedValue(new Error('socket hang up'));
+
+      const err = await callFor.search().catch((e) => e);
+
+      expect(err.statusCode).toBe(502);
+      expect(err.code).toBe('PROVIDER_UNAVAILABLE');
+      expect(err.message).not.toContain('socket hang up');
+    });
+
+    it('logs the provider payload it refuses to show', async () => {
+      const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      await failure('search', 422, rawPayload);
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'search', status: 422, data: rawPayload }),
+        'Duffel API error details',
+      );
+      spy.mockRestore();
     });
   });
 
