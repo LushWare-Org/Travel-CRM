@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toast";
 import Sidebar from "./pages/Sidebar";
-import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import LeadManagement from "./pages/LeadManagement";
 import ItineraryGeneration from "./pages/ItineraryGeneration";
@@ -16,6 +15,7 @@ import SalesRepLogin from "./pages/SalesRepLogin";
 import SalesRepLoginOTP from "./pages/SalesRepLoginOTP";
 import ResetPassword from "./pages/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
+import HomeRoute from "./components/HomeRoute";
 import { useAuth } from "./contexts/AuthContext";
 
 function AppContent() {
@@ -69,7 +69,7 @@ function AppContent() {
               <div className="flex-1 overflow-auto min-w-0">
                 <div className="md:hidden h-0" /> {/* Spacer for mobile hamburger */}
                 <Routes>
-                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/" element={<HomeRoute />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/leads" element={<LeadManagement />} />
                   <Route path="/packages" element={<ItineraryGeneration />} />

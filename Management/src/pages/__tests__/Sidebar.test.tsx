@@ -265,6 +265,27 @@ describe('Sidebar brand header', () => {
 });
 
 describe('Sidebar navigation', () => {
+  it('orders Leads directly beneath Dashboard', async () => {
+    // The order is the feature: agents never see Dashboard, so whatever sits
+    // directly beneath it becomes the first item in their sidebar.
+    render(<Sidebar />);
+
+    const nav = await screen.findByRole('navigation');
+    const labels = Array.from(nav.querySelectorAll('button[title]')).map((b) => b.getAttribute('title'));
+
+    expect(labels[0]).toBe('Dashboard');
+    expect(labels[1]).toBe('Leads');
+  });
+
+  it('orders Analytics directly beneath Billing', async () => {
+    render(<Sidebar />);
+
+    const nav = await screen.findByRole('navigation');
+    const labels = Array.from(nav.querySelectorAll('button[title]')).map((b) => b.getAttribute('title'));
+
+    expect(labels.indexOf('Analytics')).toBe(labels.indexOf('Billing') + 1);
+  });
+
   it('navigates when a nav item is clicked and marks the active route', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Sidebar />);
@@ -285,10 +306,12 @@ describe('Sidebar navigation', () => {
 
     render(<Sidebar />);
 
-    for (const label of ['Dashboard', 'Leads', 'Packages', 'Flights', 'Hotels']) {
+    for (const label of ['Leads', 'Packages', 'Flights', 'Hotels']) {
       expect(await screen.findByTitle(label)).toBeInTheDocument();
     }
-    for (const label of ['Analytics', 'Billing', 'Users', 'Career', 'Settings']) {
+    // An agent has no Dashboard: it is hidden here, and HomeRoute lands them on
+    // Leads so they never open on a page their own sidebar does not list.
+    for (const label of ['Dashboard', 'Analytics', 'Billing', 'Users', 'Career', 'Settings']) {
       expect(screen.queryByTitle(label)).not.toBeInTheDocument();
     }
   });
@@ -322,14 +345,16 @@ describe('Sidebar navigation', () => {
     expect(screen.queryByTitle('Users')).not.toBeInTheDocument();
   });
 
-  it('shows only unguarded items when there is no user', async () => {
+  it('shows no navigation items when there is no user', async () => {
+    // Every item now sits behind a role or permission gate, so an unresolved
+    // user gets an empty menu rather than a default entry — fail closed. The
+    // app only renders the sidebar for an authenticated user anyway.
     setUser(undefined);
     setPermissions(() => false);
 
     render(<Sidebar />);
 
-    expect(await screen.findByTitle('Dashboard')).toBeInTheDocument();
-    for (const label of ['Analytics', 'Leads', 'Packages', 'Flights', 'Hotels', 'Billing', 'Users', 'Career', 'Settings']) {
+    for (const label of ['Dashboard', 'Analytics', 'Leads', 'Packages', 'Flights', 'Hotels', 'Billing', 'Users', 'Career', 'Settings']) {
       expect(screen.queryByTitle(label)).not.toBeInTheDocument();
     }
   });
