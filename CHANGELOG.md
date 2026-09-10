@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.5.1.0] - 2026-09-10
+
+### Changed
+- The Management sidebar is about a fifth narrower, so more of the page you are working on fits on screen. Nav labels stay whole — the rail is sized to fit the longest one — and the brand block now stacks the logo above the company name instead of running them side by side.
+- The company name shown throughout Management is now "Lush Travel Providers": the sidebar, the browser tab, and the default wording on generated documents all use it.
+- The account panel at the bottom of the sidebar groups your name and role together, with a larger role icon and a roomier greeting.
+
+### Fixed
+- The sidebar's collapse animation now respects your operating system's "reduce motion" setting instead of always animating.
+- A very wide organization logo can no longer push the sidebar's collapse button off the edge of the rail.
+
 ## [0.5.0.0] - 2026-09-09
 
 ### Added
