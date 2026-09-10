@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 
-// Operator-scoped copilot preferences. Keyed by the authenticated operator's
-// stable internal id (never email or display name) so one operator can never
-// inherit another's discovery or visibility choice, and never written before
-// the identity resolves.
+// Keyed by page key as well as actor. The design decision is "auto-open once per
+// page key per operator, then honour the persisted collapsed state": a record
+// scope has a notion of a first visit, a collection scope does not, so an
+// actor-global key would auto-open exactly once ever and nine pages would never
+// announce that a briefing exists there. Collapsing on one page therefore no
+// longer silences the others — that is the intended discovery behaviour, not a
+// regression.
+//
+// Changing the key shape orphans any previously stored value, so every operator
+// sees one extra discovery pass. Harmless (the entries are a few bytes) and not
+// worth a migration.
 export const COPILOT_STORAGE_PREFIX = "management-copilot:v1";
 
-export function visibilityKey(actorId: string): string {
-  return `${COPILOT_STORAGE_PREFIX}:${actorId}:visibility`;
+export function visibilityKey(actorId: string, pageKey: string): string {
+  return `${COPILOT_STORAGE_PREFIX}:${actorId}:${pageKey}:visibility`;
 }
 
-export function mobileCueKey(actorId: string): string {
-  return `${COPILOT_STORAGE_PREFIX}:${actorId}:mobile-cue-dismissed`;
+export function mobileCueKey(actorId: string, pageKey: string): string {
+  return `${COPILOT_STORAGE_PREFIX}:${actorId}:${pageKey}:mobile-cue-dismissed`;
 }
 
 export type CopilotVisibility = "open" | "collapsed";
@@ -42,7 +49,7 @@ export type UseCopilotVisibility = {
   dismissCue: () => void;
 };
 
-export function useCopilotVisibility(actorId: string | null | undefined): UseCopilotVisibility {
+export function useCopilotVisibility(actorId: string | null | undefined, pageKey: string): UseCopilotVisibility {
   const [visibility, setVisibilityState] = useState<CopilotVisibility | null>(null);
   const [cueDismissed, setCueDismissed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -54,26 +61,26 @@ export function useCopilotVisibility(actorId: string | null | undefined): UseCop
       setReady(false);
       return;
     }
-    const stored = read(visibilityKey(actorId));
+    const stored = read(visibilityKey(actorId, pageKey));
     setVisibilityState(stored === "open" || stored === "collapsed" ? stored : null);
-    setCueDismissed(read(mobileCueKey(actorId)) === "true");
+    setCueDismissed(read(mobileCueKey(actorId, pageKey)) === "true");
     setReady(true);
-  }, [actorId]);
+  }, [actorId, pageKey]);
 
   const setVisibility = useCallback(
     (value: CopilotVisibility) => {
       if (!actorId) return;
-      write(visibilityKey(actorId), value);
+      write(visibilityKey(actorId, pageKey), value);
       setVisibilityState(value);
     },
-    [actorId]
+    [actorId, pageKey]
   );
 
   const dismissCue = useCallback(() => {
     if (!actorId) return;
-    write(mobileCueKey(actorId), "true");
+    write(mobileCueKey(actorId, pageKey), "true");
     setCueDismissed(true);
-  }, [actorId]);
+  }, [actorId, pageKey]);
 
   return { ready, visibility, cueDismissed, setVisibility, dismissCue };
 }
