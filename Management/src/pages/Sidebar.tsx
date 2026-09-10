@@ -27,7 +27,6 @@ const deriveInitials = (name: string): string => {
 interface OrgBranding {
   companyName?: string;
   companyShortName?: string;
-  tagline?: string;
   logoUrl?: string;
 }
 
@@ -57,7 +56,6 @@ const Sidebar = () => {
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isMobile, setIsMobile] = useState(false);
   const [orgBranding, setOrgBranding] = useState<OrgBranding | null>(null);
@@ -85,7 +83,6 @@ const Sidebar = () => {
     shortName:
       orgBranding?.companyShortName ||
       (orgBranding?.companyName ? deriveInitials(orgBranding.companyName) : fallbackInfo.shortName),
-    tagline: orgBranding?.tagline || fallbackInfo.tagline,
     logoUrl: orgBranding?.logoUrl || fallbackInfo.logoUrl,
   };
   const canEditOrgSettings = user?.isSuperAdmin || user?.role === 'admin' || user?.role === 'superAdmin';
@@ -218,53 +215,44 @@ const Sidebar = () => {
   // Toggle for mobile
   const toggleMobile = useCallback(() => setMobileOpen(prev => !prev), []);
 
+  // Both brand surfaces (the logo tile and the company name) open Org Settings
+  // for the roles allowed to edit it — one gate, not two copies.
+  const openOrgSettings = useCallback(() => {
+    if (!canEditOrgSettings) return;
+    navigate('/settings');
+    if (isMobile) setMobileOpen(false);
+  }, [canEditOrgSettings, navigate, isMobile]);
+
+  // w-56 (224px) is set by the user card, not by the nav: the card's identity row
+  // has ~167px of room and the 40px avatar + 8px gap + the 111px "Super Admin"
+  // role row already spend 159 of them. Nav labels clear it with room to spare,
+  // so nothing in the rail may grow wider.
   const sidebarContent = (isExpanded: boolean) => (
-    <div className={`${isExpanded ? "w-72" : "w-20"} h-full relative flex-shrink-0 transition-all duration-300`}>
+    <div className={`${isExpanded ? "w-56" : "w-20"} h-full relative flex-shrink-0 transition-layout`}>
       <div className="h-full w-full flex flex-col relative overflow-hidden bg-sidebar border-r border-sidebar-border">
 
         {/* Header / Brand */}
-        <div className="p-5 border-b border-sidebar-border relative z-10">
-          <div className={`flex ${isExpanded ? 'flex-row items-center gap-3' : 'flex-col items-center gap-2'}`}>
+        <div className="p-3 border-b border-sidebar-border relative z-10">
+          <div className={`flex px-4 ${isExpanded ? 'items-center gap-2' : 'flex-col items-center gap-2'}`}>
             <button
               type="button"
-              onClick={() => {
-                if (!canEditOrgSettings) return;
-                navigate('/settings');
-                if (isMobile) setMobileOpen(false);
-              }}
+              onClick={openOrgSettings}
               title={canEditOrgSettings ? 'Organization Settings' : brandInfo.name}
               className={
                 isExpanded && brandInfo.logoUrl
-                  ? `h-11 w-auto max-w-[180px] px-1 rounded-lg flex items-center justify-center transition-colors duration-200 flex-shrink-0 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:bg-sidebar-accent' : 'cursor-default'}`
+                  ? `h-11 w-auto min-w-0 max-w-full px-1 rounded-lg flex items-center justify-center transition-colors duration-200 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:bg-sidebar-accent' : 'cursor-default'}`
                   : `${isExpanded ? 'w-11 h-11' : 'w-10 h-10'} rounded-lg flex items-center justify-center font-bold text-sidebar-primary-foreground bg-sidebar-primary transition-colors duration-200 flex-shrink-0 overflow-hidden ${canEditOrgSettings ? 'cursor-pointer hover:bg-sidebar-primary/90' : 'cursor-default'}`
               }
               disabled={!canEditOrgSettings}
             >
               {isExpanded && brandInfo.logoUrl ? (
-                <img src={brandInfo.logoUrl} alt={brandInfo.name} className="h-full w-auto object-contain" />
+                <img src={brandInfo.logoUrl} alt={brandInfo.name} className="h-full w-auto max-w-full object-contain" />
               ) : (
                 <span className={`${isExpanded ? 'text-base' : 'text-sm'} font-heading font-extrabold tracking-tight`}>
-                  {brandInfo.shortName.substring(0, 2)}
+                  {brandInfo.shortName.substring(0, 3)}
                 </span>
               )}
             </button>
-            {isExpanded && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (!canEditOrgSettings) return;
-                  navigate('/settings');
-                  if (isMobile) setMobileOpen(false);
-                }}
-                disabled={!canEditOrgSettings}
-                className={`flex-1 min-w-0 text-left ${canEditOrgSettings ? 'cursor-pointer group/brand' : 'cursor-default'}`}
-              >
-                <h1 className={`font-heading text-base font-bold text-sidebar-foreground truncate ${canEditOrgSettings ? 'group-hover/brand:text-sidebar-primary' : ''}`}>
-                  {brandInfo.name}
-                </h1>
-                <p className="text-xs text-muted-foreground truncate">{brandInfo.tagline}</p>
-              </button>
-            )}
             {/* Close button on mobile */}
             {isMobile && isExpanded && (
               <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg hover:bg-sidebar-accent text-muted-foreground ml-auto">
@@ -286,6 +274,21 @@ const Sidebar = () => {
               </button>
             )}
           </div>
+          {/* Company name gets its own row under the logo, and wraps rather than
+              truncating: the header must not force the sidebar wider than the
+              longest nav label. */}
+          {isExpanded && (
+            <button
+              type="button"
+              onClick={openOrgSettings}
+              disabled={!canEditOrgSettings}
+              className={`mt-2.5 block w-full px-4 text-left ${canEditOrgSettings ? 'cursor-pointer group/brand' : 'cursor-default'}`}
+            >
+              <h1 className={`font-heading text-sm font-bold leading-snug text-sidebar-foreground ${canEditOrgSettings ? 'group-hover/brand:text-sidebar-primary' : ''}`}>
+                {brandInfo.name}
+              </h1>
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -296,9 +299,8 @@ const Sidebar = () => {
             )}
           </div>
 
-          {accessibleItems.map((item, index) => {
+          {accessibleItems.map((item) => {
             const active = isActive(item.path);
-            const hovered = hoveredItem === index;
 
             return (
               <button
@@ -307,8 +309,6 @@ const Sidebar = () => {
                   navigate(item.path);
                   if (isMobile) setMobileOpen(false);
                 }}
-                onMouseEnter={() => setHoveredItem(index)}
-                onMouseLeave={() => setHoveredItem(null)}
                 title={item.label}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-150 text-left group relative overflow-hidden ${active
                   ? 'bg-sidebar-primary text-sidebar-primary-foreground'
@@ -322,8 +322,7 @@ const Sidebar = () => {
                     <span className={`text-sm font-medium flex-1 ${active ? 'text-sidebar-primary-foreground' : ''}`}>
                       {item.label}
                     </span>
-                    <ChevronRight className={`w-4 h-4 transition-all duration-200 ${active ? 'text-sidebar-primary-foreground/70 opacity-100' : 'text-muted-foreground opacity-0 group-hover:opacity-100'
-                      } ${hovered ? 'translate-x-1' : ''}`} />
+                    <ChevronRight className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-all duration-200 group-hover:translate-x-1 ${active ? 'text-sidebar-primary-foreground/70 opacity-100' : 'text-muted-foreground opacity-0 group-hover:opacity-100'}`} />
                   </>
                 )}
               </button>
@@ -333,30 +332,37 @@ const Sidebar = () => {
 
         {/* User Profile Section */}
         {isExpanded && user && (
-          <div className="p-4 border-t border-sidebar-border relative z-10">
-            <div className="rounded-lg p-3 bg-sidebar-accent">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sidebar-primary-foreground bg-sidebar-primary font-semibold flex-shrink-0">
+          <div className="p-3 border-t border-sidebar-border relative z-10">
+            <div className="rounded-lg bg-sidebar-accent p-2">
+              {/* Greeting is its own box inside the card. The identity row below
+                  keeps the same inner gutter, so the greeting text, the avatar and
+                  the nav icons all sit on the rail's 28px content x (the well's
+                  1px border shifts its text by a pixel). */}
+              <div className="rounded-md border border-sidebar-border/60 bg-sidebar px-2 py-1.5">
+                <p className="text-sm text-muted-foreground">{formatGreeting()}</p>
+              </div>
+              <div className="mt-2 flex items-center gap-2 px-2">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center text-sidebar-primary-foreground bg-sidebar-primary font-semibold flex-shrink-0">
                   {user.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
+                {/* Name and role share one column so the role reads as part of
+                    the identity, not as a second, unrelated row in the card. */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">{formatGreeting()}</p>
                   <p className="text-sm font-semibold text-sidebar-foreground truncate">{user.name}</p>
+                  <div className="mt-1 flex items-center gap-1">
+                    {user.role === 'superAdmin' && <Sparkles className="w-4 h-4 flex-shrink-0 text-sidebar-primary" />}
+                    <Badge variant="secondary">
+                      {user.role === 'superAdmin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'Sales Rep'}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-1.5">
-                {user.role === 'superAdmin' && <Sparkles className="w-3.5 h-3.5 text-sidebar-primary" />}
-                <Badge variant="secondary">
-                  {user.role === 'superAdmin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'Sales Rep'}
-                </Badge>
               </div>
             </div>
           </div>
         )}
 
         {/* Footer Actions */}
-        <div className="p-4 space-y-3 relative z-10">
+        <div className="p-3 space-y-3 relative z-10">
           <div>
             {isExpanded && (
               <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 px-1">Appearance</p>

@@ -8,13 +8,19 @@
  * in your .env or .env.local file (prefixed with VITE_).
  */
 
+// Shipped brand fallbacks, used only when the VITE_COMPANY_* vars are unset.
+// They cover company.name, app.name and pdf.company - NOT the <title> literal in
+// Management/index.html (hand-edited) and not `legalName` (a separate fact).
+const DEFAULT_COMPANY_NAME = 'Lush Travel Providers';
+const DEFAULT_COMPANY_SHORT_NAME = 'LTP';
+
 const BRANDING = {
     // ==========================================
     // Company Information
     // ==========================================
     company: {
-        name: import.meta.env.VITE_COMPANY_NAME || 'LUSH Ware',
-        shortName: import.meta.env.VITE_COMPANY_SHORT_NAME || 'LW',
+        name: import.meta.env.VITE_COMPANY_NAME || DEFAULT_COMPANY_NAME,
+        shortName: import.meta.env.VITE_COMPANY_SHORT_NAME || DEFAULT_COMPANY_SHORT_NAME,
         tagline: import.meta.env.VITE_COMPANY_TAGLINE || 'Your Travel Partner',
         legalName: import.meta.env.VITE_COMPANY_LEGAL_NAME || 'LUSH Ware',
     },
@@ -40,7 +46,7 @@ const BRANDING = {
     // App Configuration
     // ==========================================
     app: {
-        name: import.meta.env.VITE_APP_NAME || 'LUSH Ware Management',
+        name: import.meta.env.VITE_APP_NAME || `${DEFAULT_COMPANY_NAME} Management`,
         version: import.meta.env.VITE_APP_VERSION || '1.0.0',
     },
 
@@ -48,7 +54,7 @@ const BRANDING = {
     // PDF Configuration (for itinerary generation)
     // ==========================================
     pdf: {
-        company: import.meta.env.VITE_COMPANY_NAME || 'LUSH Ware',
+        company: import.meta.env.VITE_COMPANY_NAME || DEFAULT_COMPANY_NAME,
         tagline: import.meta.env.VITE_COMPANY_TAGLINE || 'Your Ultimate Travel Partner',
         contact: `Contact us: ${import.meta.env.VITE_COMPANY_EMAIL || 'info@example.com'} | ${import.meta.env.VITE_COMPANY_PHONE || '+1-800-000-0000'}`,
         email: import.meta.env.VITE_COMPANY_EMAIL || 'info@example.com',
@@ -85,9 +91,11 @@ export const getCopyrightText = (year = new Date().getFullYear()) => {
 export const getSidebarInfo = () => {
     return {
         name: BRANDING.company.name,
-        tagline: BRANDING.company.tagline || 'Travel Agency Management',
         shortName: BRANDING.company.shortName,
-        logoUrl: '/logo-full.png',
+        // The square mark, not the wordmark: the rail shows the company name as
+        // text next to it, and /logo-full.png still carries the retired wordmark
+        // (the login screens keep that asset until it is redrawn).
+        logoUrl: '/favicon.png',
     };
 };
 
