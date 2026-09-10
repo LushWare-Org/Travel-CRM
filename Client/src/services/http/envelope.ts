@@ -21,6 +21,11 @@ export interface ParsedEnvelope<T> {
   pagination?: unknown;
 }
 
+/** Marks an error as ours, so a caller can branch without reading the sentence. */
+function contractError(message: string): Error {
+  return Object.assign(new Error(message), { code: 'INTERNAL' });
+}
+
 /**
  * Validates and unwraps an axios response body against `dataSchema`.
  * Throws a descriptive Error (read by every existing catch block via
@@ -32,16 +37,20 @@ export interface ParsedEnvelope<T> {
 export function parseEnvelope<T>(schema: ZodType<T>, raw: unknown, endpoint: string): ParsedEnvelope<T> {
   const envelope = rawEnvelope.safeParse(raw);
   if (!envelope.success) {
-    throw new Error(`Malformed response envelope from ${endpoint}`);
+    // A shape this broken is ours to chase, not the visitor's to read about: the
+    // endpoint and the reason go to the console above, and the visitor gets a
+    // sentence they can act on.
+    console.error(`[contract] malformed response envelope from ${endpoint}`);
+    throw contractError("We couldn't load that page. Please refresh and try again.");
   }
   const ok = envelope.data.success === true || envelope.data.status === 'success';
   if (!ok) {
-    throw new Error(envelope.data.message || `Request to ${endpoint} did not succeed`);
+    throw contractError(envelope.data.message || "We couldn't complete that request. Please try again.");
   }
   const parsed = schema.safeParse(envelope.data.data);
   if (!parsed.success) {
     console.error(`[contract] ${endpoint} response failed validation`, parsed.error.issues);
-    throw new Error(`Unexpected response shape from ${endpoint}`);
+    throw contractError("We couldn't load that page. Please refresh and try again.");
   }
   return { data: parsed.data, message: envelope.data.message, pagination: envelope.data.pagination };
 }

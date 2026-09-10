@@ -22,17 +22,46 @@ describe('parseEnvelope', () => {
     expect(() => parseEnvelope(UserSchema, raw, 'POST /auth/login')).toThrow('Invalid credentials');
   });
 
-  it('throws a validation-specific message when data fails the schema, for either convention', () => {
+  it('reports a schema mismatch as a page that could not be loaded', () => {
     const raw = { status: 'success', data: { name: 'Jane', email: 'not-an-email' } };
-    expect(() => parseEnvelope(UserSchema, raw, 'GET /users/me')).toThrow(/Unexpected response shape/);
+    expect(() => parseEnvelope(UserSchema, raw, 'GET /users/me')).toThrow(
+      "We couldn't load that page. Please refresh and try again.",
+    );
   });
 
-  it('throws on a malformed envelope (not an object)', () => {
-    expect(() => parseEnvelope(UserSchema, 'not-an-envelope', 'GET /users/me')).toThrow(/Malformed response envelope/);
+  it('reports a malformed envelope the same way', () => {
+    expect(() => parseEnvelope(UserSchema, 'not-an-envelope', 'GET /users/me')).toThrow(
+      "We couldn't load that page. Please refresh and try again.",
+    );
   });
 
-  it('throws a generic message when neither success nor status indicates success', () => {
+  it('reports a non-success envelope with no message as a failed request', () => {
     const raw = { data: { name: 'Jane', email: 'jane@example.com' } };
-    expect(() => parseEnvelope(UserSchema, raw, 'GET /users/me')).toThrow(/did not succeed/);
+    expect(() => parseEnvelope(UserSchema, raw, 'GET /users/me')).toThrow(
+      "We couldn't complete that request. Please try again.",
+    );
+  });
+
+  it('never names the endpoint in what a visitor reads', () => {
+    // The endpoint stays in the console.error above each throw, where a developer
+    // can act on it; it is not the visitor's business or vocabulary.
+    const cases: Array<[unknown, string]> = [
+      ['not-an-envelope', 'GET /users/me'],
+      [{ data: {} }, 'GET /users/me'],
+      [{ status: 'success', data: { name: 'Jane', email: 'bad' } }, 'GET /users/me'],
+    ];
+
+    for (const [raw, endpoint] of cases) {
+      let thrown: Error | undefined;
+      try {
+        parseEnvelope(UserSchema, raw, endpoint);
+      } catch (err) {
+        thrown = err as Error;
+      }
+
+      expect(thrown).toBeDefined();
+      expect(thrown?.message).not.toContain(endpoint);
+      expect((thrown as Error & { code?: string }).code).toBe('INTERNAL');
+    }
   });
 });
