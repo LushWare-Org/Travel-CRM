@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import AppError from './appError.js';
+import { EMAIL_NOT_CONFIGURED } from '../constants/errorMessages.js';
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
@@ -24,9 +26,12 @@ function decodeAttachments(attachments = []) {
   return attachments.map(({ filename, contentType, contentBase64 }) => {
     const content = Buffer.from(contentBase64, 'base64');
     if (content.byteLength > MAX_ATTACHMENT_BYTES) {
-      const err = new Error(`Attachment "${filename}" exceeds the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB limit`);
-      err.statusCode = 400;
-      throw err;
+      // Written for the caller and safe to show: it names the file the caller sent.
+      throw new AppError(
+        `Attachment "${filename}" exceeds the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)}MB limit`,
+        400,
+        { code: 'BAD_REQUEST' },
+      );
     }
     return { filename, contentType, content };
   });
@@ -35,9 +40,7 @@ function decodeAttachments(attachments = []) {
 export async function sendEmail({ to, subject, html, text, from, attachments }) {
   const transporter = buildTransport();
   if (!transporter) {
-    const err = new Error('Email is not configured');
-    err.statusCode = 503;
-    throw err;
+    throw new AppError(EMAIL_NOT_CONFIGURED, 503, { code: 'DEPENDENCY_UNAVAILABLE' });
   }
 
   const info = await transporter.sendMail({
