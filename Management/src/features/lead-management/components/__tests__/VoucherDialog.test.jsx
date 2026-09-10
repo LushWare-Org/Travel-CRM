@@ -111,6 +111,19 @@ describe('VoucherDialog', () => {
     expect(await screen.findAllByText('Newest Pick Deluxe')).not.toHaveLength(0);
   });
 
+  it('overrides the dialog width at the sm breakpoint so it does not collapse', async () => {
+    renderDialog();
+
+    // The collapse was a merge problem, not a CSS one: DialogContent's primitive
+    // carries `sm:max-w-sm`, and tailwind-merge only drops it when the caller's
+    // override shares the `sm:` variant. A bare `max-w-6xl` left both in the class
+    // list and the primitive's rule won, rendering the dialog 384px wide.
+    const dialog = await screen.findByRole('dialog');
+
+    expect(dialog.className).not.toContain('sm:max-w-sm');
+    expect(dialog.className).toContain('sm:max-w-6xl');
+  });
+
   it('falls back to primarySelectionId when no selection has an accepted quote', async () => {
     mockGetPackageSelections.mockResolvedValue({
       data: selections.map((s) => ({ ...s, quoteAcceptedAt: null })),
