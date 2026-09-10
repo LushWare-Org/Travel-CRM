@@ -13,8 +13,10 @@ import { runAgentLoop } from '../ai/agentRunner.js';
 import { validateClaims, buildSources, insightsToClaims } from '../ai/groundingValidator.js';
 import prisma from '../db/client.js';
 
-// One model attempt inside a 17s server deadline; the client holds a 20s
-// endpoint timeout with retry disabled (see design §7).
+// One model attempt inside a 17s server deadline. The Management client holds
+// a 20s endpoint timeout WITH AbortSignal support: a scope change aborts the
+// in-flight request, and a timeout surfaces as a recoverable failure with
+// Retry rather than an endless loading state (see design §1).
 const MANAGEMENT_GENERATION_DEADLINE_MS = 17_000;
 
 // Server-side feature gates. MANAGEMENT_COPILOT_ENABLED defaults off; when on,
@@ -64,7 +66,9 @@ function scopeFingerprint(scope) {
 }
 
 // Server-authoritative last-seen read (for since=last_visit). A miss degrades
-// to the client hint, then 7_days. Best-effort — never blocks the turn.
+// to the client hint — a FIRST-VISIT-ONLY fallback, since no stored row means
+// the actor has never acknowledged this scope — then to 7_days. Best-effort:
+// a storage problem never fails a briefing. The turn route never writes.
 async function readLastSeen(actorId, pageKey, fingerprint) {
   try {
     const row = await prisma.managementLastSeen.findUnique({
@@ -74,18 +78,6 @@ async function readLastSeen(actorId, pageKey, fingerprint) {
   } catch {
     return null;
   }
-}
-
-// Fire-and-forget upsert after the actor opens a scope; a write failure must
-// never surface as a turn failure.
-function writeLastSeen(actorId, pageKey, fingerprint) {
-  prisma.managementLastSeen
-    .upsert({
-      where: { actorId_pageKey_scopeFingerprint: { actorId, pageKey, scopeFingerprint: fingerprint } },
-      update: { lastSeenAt: new Date() },
-      create: { actorId, pageKey, scopeFingerprint: fingerprint, lastSeenAt: new Date() },
-    })
-    .catch((err) => logger.warn({ err: err.message }, 'failed to persist management lastSeen'));
 }
 
 export const managementCopilotTurn = asyncHandler(async (req, res) => {
@@ -101,19 +93,21 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   const noAccess = isNoAccess(bundle);
 
   // Server-authoritative last_visit window: prefer the stored value over the
-  // client hint (which is only a display hint and is lost across devices).
+  // client hint. Resolved ONCE per request and threaded through every path
+  // (deterministic insights, fallback claims, model prompt) so both phases of
+  // one request observe the same prior boundary.
   const scopeFp = scopeFingerprint(scope);
   if (page.since === 'last_visit') {
     const serverLastSeen = await readLastSeen(req.user.id, page.key, scopeFp);
     if (serverLastSeen) page.lastSeenAt = serverLastSeen;
   }
-  if (!noAccess) writeLastSeen(req.user.id, page.key, scopeFp);
+  const sinceBoundary = sinceToDate(page.since, page.lastSeenAt);
 
   // mode='deterministic': no Gemini — stamp + deterministic insights only.
   if (mode === 'deterministic') {
     return res.json({
       context: { pageKey: page.key, scopeLabel: bundle.context.scopeLabel, asOf: bundle.context.asOf, noAccess },
-      insights: adapter.computeInsights(bundle, sinceToDate(page.since, page.lastSeenAt)),
+      insights: adapter.computeInsights(bundle, sinceBoundary),
       unavailableSources: bundle.unavailableSources,
       notAuthorizedSources: bundle.notAuthorizedSources,
     });
@@ -134,20 +128,20 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
 
   // Provider unavailable → deterministic fallback (same single claims contract).
   if (!isAIConfigured()) {
-    return respondWithFallback(res, page, bundle, adapter);
+    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
   }
 
   // mode='ask': bounded tool loop. The model may gather data via domain tools
   // before answering; the final answer is grounded against the same bundle.
   if (mode === 'ask') {
-    return handleAsk(res, req, page, bundle, adapter, ctx);
+    return handleAsk(res, req, page, bundle, adapter, ctx, sinceBoundary);
   }
 
   const guidanceEnabled = process.env.MANAGEMENT_COPILOT_GUIDANCE_ENABLED === 'true';
   const prompt = buildManagementBriefingPrompt({
     bundle,
     scopeLabel: bundle.context.scopeLabel,
-    since: page.since,
+    sinceBoundary: sinceBoundary.toISOString(),
     guidanceEnabled,
   });
 
@@ -163,14 +157,14 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
     });
   } catch (err) {
     logger.warn({ err: err.message, pageKey: page.key }, 'management briefing generation failed — falling back to deterministic insights');
-    return respondWithFallback(res, page, bundle, adapter);
+    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
   }
 
   const canonical = canonicalizeBriefingResponse(raw, BriefingClaimSchema);
   const { claims } = validateClaims({ claims: canonical, bundle, enableGuidance: guidanceEnabled });
 
   if (claims.length === 0) {
-    return respondWithFallback(res, page, bundle, adapter);
+    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
   }
 
   const result = {
@@ -190,8 +184,43 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   return res.json(result);
 });
 
-function respondWithFallback(res, page, bundle, adapter) {
-  const claims = insightsToClaims(adapter.computeInsights(bundle, sinceToDate(page.since, page.lastSeenAt)));
+// POST /api/v1/assistant/management/seen — the authenticated acknowledgement
+// that a grounded briefing was actually presented in an open dock. It applies
+// the same feature gates as the turn route (a disabled copilot or an
+// unallowlisted page key stays an undisclosed 404), parses the scope with the
+// page adapter, and upserts the operator/page/scope lastSeenAt from SERVER
+// time. It loads no evidence, never calls the model, and accepts no
+// client-authored timestamp. Repeated acknowledgements are idempotent and only
+// move the timestamp forward. The upsert is awaited on purpose: the design's
+// failure mode requires a rejected write to surface as a 5xx rather than being
+// swallowed, while the turn route's last-seen READ stays best-effort.
+export const managementCopilotSeen = asyncHandler(async (req, res) => {
+  const { page } = req.body;
+  if (!copilotEnabled() || !pageKeyAllowed(page.key)) {
+    return copilotNotFound(res);
+  }
+  const adapter = getAdapter(page.key);
+  const scope = adapter.parseScope(page.scope);
+  const scopeFingerprintValue = scopeFingerprint(scope);
+
+  const lastSeenAt = new Date();
+  await prisma.managementLastSeen.upsert({
+    where: {
+      actorId_pageKey_scopeFingerprint: {
+        actorId: req.user.id,
+        pageKey: page.key,
+        scopeFingerprint: scopeFingerprintValue,
+      },
+    },
+    update: { lastSeenAt },
+    create: { actorId: req.user.id, pageKey: page.key, scopeFingerprint: scopeFingerprintValue, lastSeenAt },
+  });
+
+  return res.json({ success: true });
+});
+
+function respondWithFallback(res, page, bundle, adapter, sinceBoundary) {
+  const claims = insightsToClaims(adapter.computeInsights(bundle, sinceBoundary));
   return res.json({
     context: {
       pageKey: page.key,
@@ -211,7 +240,7 @@ function respondWithFallback(res, page, bundle, adapter) {
 // mode='ask': bounded tool loop → grounded answer blocks. Tool-gathered data
 // is appended to the bundle as turn-local evidence so answer claims cite it
 // correctly; if the loop yields nothing, fall back to deterministic insights.
-async function handleAsk(res, req, page, bundle, adapter, ctx) {
+async function handleAsk(res, req, page, bundle, adapter, ctx, sinceBoundary) {
   const question = latestUserQuestion(req.body.messages);
   const { claims: rawClaims, toolEvidence } = await runAgentLoop({
     ctx,
@@ -222,7 +251,7 @@ async function handleAsk(res, req, page, bundle, adapter, ctx) {
   });
 
   if (!rawClaims || rawClaims.length === 0) {
-    return respondWithFallback(res, page, bundle, adapter);
+    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
   }
 
   const validationBundle = { ...bundle, evidence: [...bundle.evidence, ...toolEvidence] };
@@ -231,7 +260,7 @@ async function handleAsk(res, req, page, bundle, adapter, ctx) {
   const { claims } = validateClaims({ claims: canonical, bundle: validationBundle, enableGuidance: guidanceEnabled });
 
   if (claims.length === 0) {
-    return respondWithFallback(res, page, bundle, adapter);
+    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
   }
 
   return res.json({

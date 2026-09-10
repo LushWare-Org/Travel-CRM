@@ -40,6 +40,7 @@ enum LeadSource {
   walk_in      @map("walk-in")
   other
   chatbot
+  voice_agent  @map("voice-agent")
 
   @@schema("crm_leads")
 }
@@ -54,6 +55,7 @@ enum LeadPlatform {
   Referral     @map("Referral")
   Walk_in      @map("Walk-in")
   Chatbot_Wizard @map("Chatbot Wizard")
+  Voice_Agent  @map("Voice Agent")
 
   @@schema("crm_leads")
 }

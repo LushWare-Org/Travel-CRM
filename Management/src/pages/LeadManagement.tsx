@@ -27,14 +27,17 @@ import InvoiceDialog from "../features/lead-management/components/InvoiceDialog"
 import ReceiptDialog from "../features/lead-management/components/ReceiptDialog";
 import VoucherDialog from "../features/lead-management/components/VoucherDialog";
 import LeadSectionView from "../features/lead-management/components/LeadSectionView";
+import LeadDetailPane from "../features/lead-management/components/LeadDetailPane";
 import ActiveSalesRepsDialog from "../features/lead-management/components/ActiveSalesRepsDialog";
 import { LIFECYCLE_STATUS_COLORS, LIFECYCLE_STATUS_LABELS } from "../features/lead-management/components/LeadStatusBadge";
 import type { LifecycleStatus } from "../features/lead-management/components/LeadStatusBadge";
+import type { LeadCopilotScope } from "../features/copilot/types";
 
 type FilterKey = 'all' | LifecycleStatus;
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ManagementContextCopilot from "../features/copilot/ManagementContextCopilot";
+import LeadBriefing from "../features/copilot/LeadBriefing";
 
 // Feature-gated client flag; the panel stays off until explicitly enabled.
 const copilotEnabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === "true";
@@ -98,6 +101,9 @@ const LeadManagement = () => {
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [statusLead, setStatusLead] = useState<any>(null);
   const [sectionLead, setSectionLead] = useState<any>(null);
+  // The lead selected into the persistent detail pane. This — not the documents
+  // dialog below — owns the copilot scope: clearing it unmounts the session.
+  const [detailLead, setDetailLead] = useState<any>(null);
   // When set, the lead editor was opened from the quotation flow and we return
   // to the quotation modal once the editor closes.
   const [resumeQuoteLead, setResumeQuoteLead] = useState<any>(null);
@@ -390,6 +396,14 @@ const LeadManagement = () => {
     }
   };
 
+  // The copilot scope is the record selected in the persistent pane; nothing is
+  // sent when no lead is selected.
+  const detailLeadId = detailLead ? String(detailLead.id ?? detailLead._id ?? "").trim() : "";
+  const copilotScope: LeadCopilotScope = detailLeadId ? { leadId: detailLeadId } : null;
+  const copilotLabel = detailLead
+    ? String(detailLead.name ?? "") || `Lead ${detailLeadId}`
+    : "Leads";
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -432,7 +446,11 @@ const LeadManagement = () => {
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      {/* Above xl this is the two-column work surface: the record on
+          minmax(0,1fr) and the copilot dock column. Below xl the copilot
+          renders its own trigger/drawer and the record keeps the full width. */}
+      <div className="grid grid-cols-1 items-start xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0 px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Stats Cards */}
         <LeadStats
           summary={statsSummary}
@@ -454,6 +472,9 @@ const LeadManagement = () => {
           onAdvancedFilterClick={() => setShowFilterDialog(true)}
         />
 
+        {/* Persistent record surface: the Evidence Lens reveals into these anchors. */}
+        <LeadDetailPane lead={detailLead} onClose={() => setDetailLead(null)} />
+
         {/* Lead Cards Grid */}
         {!loading && !error && leads.length > 0 && (
           <LeadTable
@@ -463,10 +484,7 @@ const LeadManagement = () => {
             error={error}
             statusColors={statusColors}
             statusLabels={statusLabels}
-            onLeadClick={(lead: any) => {
-              setSelectedLead(lead);
-              setShowEditDialog(true);
-            }}
+            onLeadClick={(lead: any) => setDetailLead(lead)}
             onRemarksClick={(lead: any) => {
               setSelectedLead(lead);
               setShowRemarksDialog(true);
@@ -536,6 +554,20 @@ const LeadManagement = () => {
               </Button>
             )}
           </div>
+        )}
+        </div>
+
+        {copilotEnabled && (
+          <ManagementContextCopilot pageKey="leads" scope={copilotScope} scopeLabel={copilotLabel}>
+            {({ session, collapse }) => (
+              <LeadBriefing
+                session={session}
+                scopeLabel={copilotLabel}
+                leadId={detailLeadId || null}
+                onCollapse={collapse}
+              />
+            )}
+          </ManagementContextCopilot>
         )}
       </div>
 
@@ -670,13 +702,6 @@ const LeadManagement = () => {
             setShowSectionView(false);
             setSectionLead(null);
           }}
-        />
-      )}
-      {copilotEnabled && (
-        <ManagementContextCopilot
-          pageKey="leads"
-          scope={sectionLead?.id ? { leadId: sectionLead.id } : {}}
-          scopeLabel={sectionLead?.id ? `Lead ${sectionLead.id}` : "Leads"}
         />
       )}
     </div>

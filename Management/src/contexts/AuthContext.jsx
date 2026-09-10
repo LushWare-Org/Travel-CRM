@@ -275,3 +275,9 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// Same context, without the provider requirement. Used by chrome that must
+// still render (in its unauthenticated, non-persisting form) outside a
+// provider — e.g. the copilot shell keying its stored preferences on the
+// authenticated operator's stable internal id.
+export const useOptionalAuth = () => useContext(AuthContext) || null;
