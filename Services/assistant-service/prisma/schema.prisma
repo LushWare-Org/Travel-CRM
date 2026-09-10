@@ -40,3 +40,22 @@ model AssistantEvent {
   @@index([createdAt])
   @@schema("crm_assistant")
 }
+
+// ─── ManagementLastSeen (Management copilot delta window) ─────
+// Server-authoritative per-actor/page/scope last-seen timestamp, so the
+// `since=last_visit` delta is correct across devices/sessions (the client's
+// local lastSeenAt is only a display hint). Not a chat transcript — this is
+// the only server-side client state the copilot keeps.
+
+model ManagementLastSeen {
+  id               String   @id @default(uuid())
+  actorId          String
+  pageKey          String
+  scopeFingerprint String
+  lastSeenAt       DateTime
+  updatedAt        DateTime @updatedAt
+
+  @@unique([actorId, pageKey, scopeFingerprint])
+  @@index([actorId])
+  @@schema("crm_assistant")
+}

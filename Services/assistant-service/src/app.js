@@ -5,6 +5,7 @@ import { correlationId, requestLogger } from './middleware/requestLogger.js';
 import errorHandler from './middleware/errorHandler.js';
 import assistantRoutes from './routes/assistant.routes.js';
 import eventsRoutes from './routes/events.routes.js';
+import managementCopilotRoutes from './routes/managementCopilot.routes.js';
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.get('/health', (req, res) =>
 
 app.use('/api/v1/assistant/turn', assistantRoutes);
 app.use('/api/v1/assistant/events', eventsRoutes);
+app.use('/api/v1/assistant/management/turn', managementCopilotRoutes);
 
 app.use((req, res) => res.status(404).json({ success: false, message: `Route not found: ${req.path}` }));
 app.use(errorHandler);

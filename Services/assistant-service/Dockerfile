@@ -7,10 +7,13 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
 
 WORKDIR /app
 
-# Shared packages, in dependency order — assistant-service only depends on
-# policy-retrieval (no constants/pricing-engine/contracts/lead-pricing-engine).
+# Shared packages, in dependency order — assistant-service depends on
+# policy-retrieval and contracts (contracts carries the Management copilot
+# wire schemas).
 COPY shared/policy-retrieval ./shared/policy-retrieval
-RUN npm ci --prefix ./shared/policy-retrieval
+COPY shared/contracts ./shared/contracts
+RUN npm ci --prefix ./shared/policy-retrieval \
+    && npm ci --prefix ./shared/contracts
 
 COPY assistant-service ./assistant-service
 WORKDIR /app/assistant-service

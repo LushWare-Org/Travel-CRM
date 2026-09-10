@@ -273,6 +273,104 @@
 **Priority:** P4
 **Depends on:** Approved content and deployment configuration
 
+## Management Context Copilot
+
+### Proactive AI review queue
+
+**What:** Add a cross-lead queue of real AI review records for stale leads, missing follow-ups, contradictions, and high-intent opportunities. Each review needs source evidence, freshness, status, dismiss/resolve behavior, and routing into the specialized workspace dock.
+
+**Why:** This is the chosen ten-times return loop. It gives operators a truthful reason to reopen Copilot without fake unread counts or decorative engagement prompts.
+
+**Pros:** Creates recurring value across workspaces and turns verified per-record attention into an actionable management workflow.
+
+**Cons:** Requires a review data model, generation schedule, deduplication, lifecycle semantics, permissions, filtering, and noise controls.
+
+**Context:** Deferred by the Evidence Lens design review so the first specialized lead module can prove briefing trust, evidence reveal, and visibility behavior before collection-level intelligence is introduced.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** Approved lead Evidence Lens implementation; real-agent usability result; review lifecycle and freshness design
+
+### Confirmed action-taking copilot
+
+**What:** Let specialized workspace claims offer relevant CRM actions such as drafting a follow-up, updating an allowed field, or scheduling a next step, with explicit preview and confirmation before every write.
+
+**Why:** Converts verified understanding into operator outcomes while keeping the human in control of business-data changes.
+
+**Pros:** Reduces context switching and attaches each proposed action to the evidence and claim that justified it.
+
+**Cons:** Changes the read-only security boundary and requires authorization, idempotency, audit history, reversal/compensation, and failure recovery.
+
+**Context:** The Evidence Lens design keeps this out of the first module. Start only after agents trust briefing accuracy and a separate write-action threat model and contract are approved.
+
+**Effort:** XL
+**Priority:** P3
+**Depends on:** Proven Evidence Lens briefing; approved write-action security design; audit and rollback contracts
+
+### Scoped cross-page Copilot working memory
+
+**What:** Allow operators to carry explicitly pinned evidence or unfinished questions between specialized workspace modules while keeping every answer visibly bound to its originating page and record scope.
+
+**Why:** A product-wide Copilot can preserve useful work across navigation, but implicit transcript carryover would create stale or misattributed context.
+
+**Pros:** Reduces repeated questioning and makes the shared shell feel continuous after multiple real workspace modules exist.
+
+**Cons:** Requires explicit scope labels, expiry, pin/unpin behavior, stale-data handling, privacy rules, and conflict behavior when the active record changes.
+
+**Context:** Separate from moving the shell into the protected layout. The default remains session isolation until at least two specialized modules prove a real continuity need.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** At least two specialized workspace modules; approved memory scope/expiry design; stale-context tests
+
+### Audited related evidence for richer lead briefings
+
+**What:** Add authenticated, allowlisted evidence from payment, invoice, itinerary, and communication services so lead claims can truthfully cite deposit status, travel deadlines, and recent client interactions.
+
+**Why:** The approved Evidence Lens sketch demonstrates this richer operational briefing, but the current adapter only exposes lead-record fields.
+
+**Pros:** Makes attention claims more actionable and lets evidence reveal connect the lead briefing to the full travel-sales workflow.
+
+**Cons:** Adds cross-service latency, authorization, partial-failure, data-minimization, and field-level source-contract work for each service.
+
+**Context:** Do not implement from the mockup alone. Audit each endpoint under the caller's identity, define allowed fields and latency budget, then add one source at a time with no-access and unavailable-source tests.
+
+**Effort:** L
+**Priority:** P2
+**Depends on:** Proven lead-record Evidence Lens; per-service endpoint and permission audit; partial-failure budget
+
+### Operational lead fields and attention rules for the briefing
+
+**What:** Extend the leads evidence allowlist to the lead-owned operational fields — `travelDate`, `endDate`, `numberOfTravelers`, `priority`, `followUpDate` — and add deterministic attention rules that use them, such as travel-date proximity and an overdue follow-up date.
+
+**Why:** The first Evidence Lens release briefs only on lifecycle status, destination, budget, assignment, and the created/updated timestamps, so the “Needs attention” section stays thin for most leads even though the record already holds the fields agents act on.
+
+**Pros:** Makes attention operationally useful, gives the model real material, and gives the Evidence Lens fields worth verifying.
+
+**Cons:** Requires explicit product thresholds (how near a travel date counts as attention) plus insight rules, tests, and evaluation fixtures.
+
+**Context:** Flagged by the independent plan review outside voice during `/plan-eng-review` on `feat/management-context-copilot`. All five fields are lead-owned, so no new endpoint or cross-service read is needed — the work is thresholds and rules, following the field-level evidence contract that ships first.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Landed Evidence Lens with field-level evidence IDs and boundary-aware `changed` insights
+
+### Non-modal tablet and phone drawer for field reveal
+
+**What:** Replace the modal `CopilotDrawer` below `xl` with a non-modal surface, or otherwise let the record stay interactive, so the evidence reveal interaction works on tablet and phone.
+
+**Why:** Field reveal is scoped to `xl` and above because `Management/src/components/ui/dialog.tsx` composes Base UI's modal dialog, which makes the record behind the drawer inert. Below `xl` the evidence action falls back to the inline detail.
+
+**Pros:** Extends the design's signature interaction to every viewport and removes the viewport caveat from the reveal success criterion.
+
+**Cons:** A non-modal drawer must own dismissal, backdrop, scroll-lock, outside-click, and focus-restoration behavior that the modal dialog currently provides, plus its own accessibility verification.
+
+**Context:** Deferred during `/plan-eng-review` on `feat/management-context-copilot` after confirming the modal constraint. The real fix is drawer modality, not a reveal bug — do not simply flip `modal={false}` without the replacement behavior.
+
+**Effort:** M
+**Priority:** P3
+**Depends on:** Landed Evidence Lens; a measured need from tablet or phone agents
+
 ## Completed
 
 ### Honor Gemini's RetryInfo.retryDelay on 429 quota errors

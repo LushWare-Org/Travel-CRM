@@ -63,3 +63,20 @@ export {
   LeadIntakeResult,
   LeadClaimResult,
 } from './leadIntake.js';
+export {
+  ManagementPageKeys,
+  ManagementSinceWindows,
+  ManagementFactKinds,
+  ManagementClaimSections,
+  ManagementEvidenceTypes,
+  ManagementSeverities,
+  BriefingFactSchema,
+  PriorClaimSchema,
+  ManagementAssistantTurnRequest,
+  BriefingClaimSchema,
+  ManagementSourceSchema,
+  ManagementSourceTargetSchema,
+  ManagementAssistantTurnResult,
+  DeterministicInsightSchema,
+  ManagementDeterministicResult,
+} from './managementCopilot.js';
