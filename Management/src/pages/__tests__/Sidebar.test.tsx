@@ -277,6 +277,15 @@ describe('Sidebar navigation', () => {
     expect(labels[1]).toBe('Leads');
   });
 
+  it('orders Analytics directly beneath Billing', async () => {
+    render(<Sidebar />);
+
+    const nav = await screen.findByRole('navigation');
+    const labels = Array.from(nav.querySelectorAll('button[title]')).map((b) => b.getAttribute('title'));
+
+    expect(labels.indexOf('Analytics')).toBe(labels.indexOf('Billing') + 1);
+  });
+
   it('navigates when a nav item is clicked and marks the active route', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Sidebar />);

@@ -137,7 +137,6 @@ const Sidebar = () => {
   const navigationItems: NavItem[] = [
     { icon: Home, label: "Dashboard", path: "/", requiredPermission: null },
     { icon: Users, label: "Leads", path: "/leads", requiredPermission: null, allowedRoles: ["salesRep", "admin"], requiresAnyPermission: ["manage_leads"] },
-    { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
     {
       icon: MapPin,
       label: "Packages",
@@ -153,6 +152,7 @@ const Sidebar = () => {
     { icon: Plane, label: "Flights", path: "/flights", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
     { icon: Hotel, label: "Hotels", path: "/hotels", requiredPermission: null, allowedRoles: ["salesRep", "admin", "superAdmin"] },
     { icon: DollarSign, label: "Billing", path: "/billing", requiredPermission: "manage_billing" },
+    { icon: BarChart3, label: "Analytics", path: "/analytics", requiredPermission: "view_reports" },
     { icon: User, label: "Users", path: "/users", requiredPermission: null, requiresAnyPermission: ["manage_users", "manage_sales_reps", "manage_vendors", "manage_admins"] },
     {
       icon: Briefcase,
