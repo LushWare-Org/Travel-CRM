@@ -20,6 +20,11 @@ module "deployment" {
   whatsapp_phone_number_id     = var.whatsapp_phone_number_id
   whatsapp_business_account_id = var.whatsapp_business_account_id
 
+  # Management Context Copilot server-side gates (assistant-service). Must be
+  # turned on for the client panel to get anything other than a 404.
+  management_copilot_enabled   = var.management_copilot_enabled
+  management_copilot_page_keys = var.management_copilot_page_keys
+
   # Secret Manager secrets (26 rows of the plan table)
   database_url               = var.database_url
   direct_url                 = var.direct_url

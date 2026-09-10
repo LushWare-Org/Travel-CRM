@@ -397,3 +397,15 @@ variable "admin_emails" {
   type        = string
 }
 
+variable "management_copilot_enabled" {
+  description = "Management Context Copilot server-side gate (plain env var MANAGEMENT_COPILOT_ENABLED on assistant-service). Anything other than \"true\" makes the turn/seen routes answer an undisclosed 404 — that is how the dark launch ships, so the default stays off and a new environment must opt in deliberately (see docs/designs/management-context-copilot.md, \"Feature flags\"). The client half of this gate is VITE_MANAGEMENT_COPILOT_ENABLED at build time; enabling one without the other ships a panel whose every request 404s."
+  type        = string
+  default     = "false"
+}
+
+variable "management_copilot_page_keys" {
+  description = "Comma-separated page-key allowlist the copilot answers for (plain env var MANAGEMENT_COPILOT_PAGE_KEYS on assistant-service). Empty means every registered page; set it to roll a single page back without touching the main gate."
+  type        = string
+  default     = ""
+}
+

@@ -121,3 +121,21 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_invoker_notification"
   role     = "roles/run.invoker"
   member   = "serviceAccount:${google_service_account.services["gateway"].email}"
 }
+
+# Service-to-service invoker grants (deliberately NOT the gateway identity).
+# The Management copilot reads the lead record straight from lead-service —
+# no gateway hop, by design, so no public rate limiter and no server-to-self
+# ingress (docs/designs/management-context-copilot.md §"Adapters"). It forwards
+# the original caller's x-user-* headers, so lead-service's own ownership and
+# role checks still decide access; this grant only lets the call reach the
+# container at all. Cloud Run rejects an unauthenticated call at the platform
+# edge with a 403 before the app runs, so the caller must also present an ID
+# token for this service's URL — minted in
+# Services/assistant-service/src/utils/cloudRunAuth.js.
+resource "google_cloud_run_v2_service_iam_member" "assistant_invoker_lead" {
+  project  = var.project_id
+  location = var.region
+  name     = module.lead_service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.services["assistant-service"].email}"
+}

@@ -19,6 +19,7 @@
 import { z } from 'zod';
 import { LEAD_COPILOT_FIELDS, leadEvidenceId } from '@travel-crm/contracts';
 import AppError from '../utils/appError.js';
+import { domainAuthHeader } from '../utils/cloudRunAuth.js';
 import { BAD_REQUEST } from '../constants/httpStatus.js';
 
 const LEAD_SERVICE_URL = process.env.LEAD_SERVICE_URL || 'http://localhost:3004';
@@ -47,8 +48,11 @@ function allowlistLead(lead) {
 async function fetchLead(ctx, leadId, bundle) {
   let res;
   try {
+    // Platform auth (Cloud Run run.invoker) on top of the forwarded actor
+    // headers — see cloudRunAuth.js. A minting failure is a source failure.
+    const auth = await domainAuthHeader(LEAD_SERVICE_URL);
     res = await fetch(`${LEAD_SERVICE_URL}/api/v1/leads/${leadId}`, {
-      headers: { ...ctx.headers, 'content-type': 'application/json' },
+      headers: { ...ctx.headers, 'content-type': 'application/json', ...auth },
     });
   } catch {
     bundle.unavailableSources.push('leads');

@@ -24,6 +24,15 @@ email_from                   = "noreply@<company-domain>"
 whatsapp_phone_number_id     = "<whatsapp-phone-number-id>"
 whatsapp_business_account_id = "<whatsapp-business-account-id>"
 
+# Management Context Copilot (assistant-service). The client panel is a separate
+# build-time gate (VITE_MANAGEMENT_COPILOT_ENABLED in deploy.yml); this is the
+# server half. Anything other than "true" leaves the copilot's turn/seen routes
+# returning an undisclosed 404, so enabling one half without the other ships a
+# panel whose every request fails. PAGE_KEYS is a comma-separated allowlist for
+# rolling one page back on its own; empty means all registered pages.
+management_copilot_enabled   = "false"
+management_copilot_page_keys = ""
+
 # --- Secret Manager secrets (all required, all sensitive) ---
 database_url               = "postgresql://postgres.<project-ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 direct_url                 = "postgresql://postgres.<project-ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres"

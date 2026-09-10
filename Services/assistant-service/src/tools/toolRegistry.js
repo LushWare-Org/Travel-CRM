@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { domainAuthHeader } from '../utils/cloudRunAuth.js';
 
 // ─── Domain tool registry ─────────────────────────────────────────────────
 // The model selects from this fixed, allowlisted tool vocabulary; the server
@@ -25,7 +26,8 @@ function allowlistLead(lead) {
 }
 
 async function fetchJson(url, ctx) {
-  const res = await fetch(url, { headers: { ...ctx.headers, 'content-type': 'application/json' } });
+  const auth = await domainAuthHeader(LEAD_SERVICE_URL);
+  const res = await fetch(url, { headers: { ...ctx.headers, 'content-type': 'application/json', ...auth } });
   if (res.status === 403 || res.status === 404) {
     return { notAuthorized: true };
   }
