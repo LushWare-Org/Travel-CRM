@@ -34,6 +34,10 @@ vi.mock('@/lib/toast', () => ({
 
 import FlightSearch from '../FlightSearch';
 
+// Every case here mounts the whole page and drives it through Base UI controls,
+// which is slow enough on a loaded runner to trip vitest's 5s default.
+vi.setConfig({ testTimeout: 20_000 });
+
 const seg = (origin, destination, departureAt, arrivalAt, durationMinutes, sequence) => ({
   origin,
   destination,
@@ -225,8 +229,7 @@ describe('FlightSearch booking', () => {
     // rejects those, so they must not be sent at all.
     expect(payload.travelers[0]).not.toHaveProperty('dob');
     expect(payload.travelers[0]).not.toHaveProperty('nationality');
-    // The whole flow through Base UI's selects runs long under a parallel suite.
-  }, 20_000);
+  });
 });
 
 describe('FlightSearch bookings list', () => {
