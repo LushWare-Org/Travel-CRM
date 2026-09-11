@@ -21,8 +21,8 @@ describe('branding config fallbacks', () => {
     // vi.resetModules() + the env stubs, so no static import can work here.
     const { getSidebarInfo, default: BRANDING } = await import('../branding');
 
-    expect(getSidebarInfo()).toMatchObject({ name: 'Lush Travel Providers', shortName: 'LTP' });
-    expect(BRANDING.app.name).toBe('Lush Travel Providers Management');
-    expect(BRANDING.pdf.company).toBe('Lush Travel Providers');
+    expect(getSidebarInfo()).toMatchObject({ name: 'Lush Travel Cloud', shortName: 'LTC' });
+    expect(BRANDING.app.name).toBe('Lush Travel Cloud Management');
+    expect(BRANDING.pdf.company).toBe('Lush Travel Cloud');
   });
 });
