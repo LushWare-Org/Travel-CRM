@@ -1074,7 +1074,8 @@ const ItineraryEditor = ({
         initialData={flightModalTarget
           ? (days.find(d => d && d.dayNumber === flightModalTarget.dayNumber)?.flights || [])[flightModalTarget.index as number] || {}
           : {}}
-        onSelectTemplate={(flightData: any) => {
+        onSelectTemplate={(template: any) => {
+          const { tripType: _tripType, ...flightData } = template;
           if (flightModalTarget) {
             const day = days.find(d => d && d.dayNumber === flightModalTarget.dayNumber);
             const result = flightModalTarget.index != null
