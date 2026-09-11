@@ -117,14 +117,16 @@ describe('CopilotConversation — composer', () => {
     expect(form?.className).toContain('-mx-4');
     expect(form?.className).toContain('px-4');
 
-    // With no turns the root must fill the scrollport and `mt-auto` must push
-    // the composer to its end, or the bar renders directly under the briefing
-    // with dead space below it instead of on the panel's bottom edge.
+    // The root must NOT force a full panel height. `min-h-full` with an
+    // `mt-auto` composer pins the bar to the panel's bottom edge, which the
+    // operator experiences as dead space between the briefing and the bar:
+    // reported at 661px of a 768px panel, so almost a full screen scrolled
+    // through for nothing. The composer follows the transcript instead.
     const root = form?.parentElement;
     expect(root?.className).toContain('flex');
-    expect(root?.className).toContain('min-h-full');
     expect(root?.className).toContain('flex-col');
-    expect(form?.className).toContain('mt-auto');
+    expect(root?.className).not.toContain('min-h-full');
+    expect(form?.className).not.toContain('mt-auto');
   });
 
   it('is present but disabled until the deterministic phase is ready', () => {

@@ -32,10 +32,15 @@ type CopilotConversationProps = {
  *
  * The composer's `-mx-4 px-4` cancels this surface's `px-4` so its `bg-card`
  * spans the full scroll width and scrolling text cannot show beside it; its
- * `sticky bottom-0` is scoped to this scrollport and to nothing else. The
- * conversation root is `flex min-h-full flex-col` with the composer
- * `mt-auto`, so an empty transcript still puts the bar on the panel's bottom
- * edge; `sticky bottom-0` keeps it there once the transcript overflows.
+ * `sticky bottom-0` is scoped to this scrollport and to nothing else, and keeps
+ * the bar reachable once the transcript overflows.
+ *
+ * The root must NOT force a full panel height. `min-h-full` with an `mt-auto`
+ * composer pins the bar to the panel's bottom edge, and the operator pays for
+ * that with a blank band between the last fact and the bar on every panel that
+ * has a briefing above it — measured at 661px of a 768px panel, so almost a
+ * full screen scrolled through for nothing. The transcript follows the briefing
+ * directly and its composer follows the transcript.
  *
  * State contract, both scope kinds (what the operator SEES):
  *
@@ -67,7 +72,7 @@ export default function CopilotConversation({ session, scopeLabel }: CopilotConv
   if (!hasTurns && !showComposer) return null;
 
   return (
-    <div className="mt-4 flex min-h-full flex-col space-y-3 border-t border-border pt-3">
+    <div className="mt-4 flex flex-col space-y-3 border-t border-border pt-3">
       {hasTurns && (
         <section aria-label="Conversation" className="space-y-3">
           <LiveStatus message={announcement} />
@@ -127,7 +132,7 @@ export default function CopilotConversation({ session, scopeLabel }: CopilotConv
 
       {showComposer && (
         <form
-          className="sticky bottom-0 mt-auto -mx-4 flex items-end gap-2 border-t border-border bg-card px-4 pt-3 pb-1"
+          className="sticky bottom-0 -mx-4 flex items-end gap-2 border-t border-border bg-card px-4 pt-3 pb-1"
           onSubmit={(event) => {
             event.preventDefault();
             session.submit();
