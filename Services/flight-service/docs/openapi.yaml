@@ -278,6 +278,11 @@ components:
           type: string
           nullable: true
           example: "EK123456789"
+        passengerId:
+          type: string
+          nullable: true
+          description: "Duffel passenger id from the offer's passengerIds — required to book a Duffel offer"
+          example: "pas_0000B8gLbxm7jv6uGDEhIE"
       required:
         - type
         - firstName
