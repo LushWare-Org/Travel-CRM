@@ -19,6 +19,13 @@ const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_ATTEMPTS = 3;
 const RETRYABLE_STATUS = new Set([429, 503]);
+// Smallest slice of an overall `deadlineMs` budget worth starting another
+// attempt on. A retry only earns its keep if it can plausibly finish: the
+// fastest healthy 'gemini-3.5-flash' answer observed against this service took
+// ~4.8s, so a retry handed less time than that just converts a clean provider
+// failure into a client-side timeout while still spending the caller's
+// remaining budget. Under this floor the last error propagates unchanged.
+const MIN_RETRY_TIMEOUT_MS = 5_000;
 // Real output ceiling for the flash model family (confirmed via the API's
 // own model-metadata endpoint) — never escalate a truncation retry past this.
 const MAX_OUTPUT_TOKENS_CEILING = 65536;
@@ -88,6 +95,17 @@ function extractRetryDelayMs(err) {
  * object. Retries transient failures (429/503, and client-side timeouts) with
  * capped exponential backoff + jitter; fails fast on anything else (bad key,
  * bad request, non-transient errors).
+ *
+ * `timeoutMs` caps ONE attempt. `deadlineMs` (optional) caps the WHOLE call —
+ * every attempt plus the backoff slept between them — measured from the first
+ * attempt, for callers that sit inside their own outer request timeout. With it
+ * set, each attempt is given `min(timeoutMs, time left)`: the per-attempt
+ * ceiling the caller already chose is never raised, and a healthy attempt is
+ * never cut shorter than it. A retry is only started while the time left, after
+ * paying that retry's backoff, still clears MIN_RETRY_TIMEOUT_MS; otherwise the
+ * failure surfaces immediately, with the same typed error a final-attempt
+ * failure produces. Callers that omit `deadlineMs` keep the previous behaviour
+ * exactly: up to `maxAttempts` attempts, each bounded by `timeoutMs`.
  */
 export async function generateStructured({
   prompt,
@@ -97,6 +115,7 @@ export async function generateStructured({
   maxOutputTokens = 8192,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   maxAttempts = MAX_ATTEMPTS,
+  deadlineMs,
 }) {
   const ai = getClient();
   let lastError;
@@ -104,6 +123,30 @@ export async function generateStructured({
   // separate from the caller's `maxOutputTokens` param so each attempt logs
   // the budget it actually used.
   let currentMaxOutputTokens = maxOutputTokens;
+  // Terminal exit shared by "gave up retrying" and "no time left to retry":
+  // a deadline stop must report the exact error shape a maxAttempts stop does.
+  const failWith = (err, status, attempt) => {
+    if (err instanceof AppError) throw err;
+    if (err.isTruncated) {
+      logger.error({ model, attempt, maxOutputTokens: currentMaxOutputTokens }, 'Gemini response repeatedly truncated at maxOutputTokens');
+      throw Object.assign(
+        new AppError('AI generation was too large to complete — try a shorter itinerary or fewer days', BAD_GATEWAY),
+        { aiFailureCategory: 'schema' },
+      );
+    }
+    logger.error({ err, model, attempt, status }, 'Gemini request failed');
+    throw Object.assign(
+      new AppError('AI generation failed', status === 401 || status === 403 ? SERVICE_UNAVAILABLE : BAD_GATEWAY),
+      { aiFailureCategory: err.isTimeout ? 'timeout' : 'provider' },
+    );
+  };
+
+  // Wall clock is measured from just before the first attempt, so `deadlineMs`
+  // bounds all attempts and their backoffs together, not one call. A caller
+  // that passes no deadline gets Infinity, which leaves the per-attempt timeout
+  // below (`Math.min`) exactly as it was.
+  const startedAt = Date.now();
+  const remainingBudgetMs = () => (deadlineMs == null ? Infinity : deadlineMs - (Date.now() - startedAt));
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -118,7 +161,7 @@ export async function generateStructured({
             maxOutputTokens: currentMaxOutputTokens,
           },
         }),
-        timeoutMs,
+        Math.min(timeoutMs, remainingBudgetMs()),
       );
 
       // Structured-output decoding still closes the JSON validly when cut off
@@ -143,27 +186,23 @@ export async function generateStructured({
       const retryable = err.isTimeout || err.isTruncated || RETRYABLE_STATUS.has(status);
 
       if (!retryable || attempt === maxAttempts) {
-        if (err instanceof AppError) throw err;
-        if (err.isTruncated) {
-          logger.error({ model, attempt, maxOutputTokens: currentMaxOutputTokens }, 'Gemini response repeatedly truncated at maxOutputTokens');
-          throw Object.assign(
-            new AppError('AI generation was too large to complete — try a shorter itinerary or fewer days', BAD_GATEWAY),
-            { aiFailureCategory: 'schema' },
-          );
-        }
-        logger.error({ err, model, attempt, status }, 'Gemini request failed');
-        throw Object.assign(
-          new AppError('AI generation failed', status === 401 || status === 403 ? SERVICE_UNAVAILABLE : BAD_GATEWAY),
-          { aiFailureCategory: err.isTimeout ? 'timeout' : 'provider' },
-        );
+        failWith(err, status, attempt);
+      }
+
+      // How long the retry would get to run: what is left of the budget minus
+      // the backoff it sleeps first. Without a `deadlineMs` this is Infinity, so
+      // the legacy fixed retry schedule is untouched. The check runs BEFORE the
+      // sleep, so the backoff itself can never overshoot the deadline.
+      const retryDelayMs = status === 429 ? extractRetryDelayMs(err) : null;
+      const backoffMs = err.isTruncated ? 0 : retryDelayMs ?? (2 ** (attempt - 1) * 500 + Math.random() * 250);
+      if (remainingBudgetMs() - backoffMs < MIN_RETRY_TIMEOUT_MS) {
+        failWith(err, status, attempt);
       }
 
       if (err.isTruncated) {
         currentMaxOutputTokens = Math.min(MAX_OUTPUT_TOKENS_CEILING, Math.ceil(currentMaxOutputTokens * 1.5));
         logger.warn({ attempt, newMaxOutputTokens: currentMaxOutputTokens }, 'Retrying Gemini request with a larger token budget after truncation');
       } else {
-        const retryDelayMs = status === 429 ? extractRetryDelayMs(err) : null;
-        const backoffMs = retryDelayMs ?? (2 ** (attempt - 1) * 500 + Math.random() * 250);
         logger.warn({ status, attempt, backoffMs, usedRetryInfo: retryDelayMs != null }, 'Retrying Gemini request after transient failure');
         await sleep(backoffMs);
       }

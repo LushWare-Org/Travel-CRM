@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
+import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../../constants/managementCopilot.js';
 
 const { mockPrisma, mockGenerateStructured, mockIsAIConfigured } = vi.hoisted(() => ({
   mockPrisma: {
@@ -445,5 +446,24 @@ describe('management copilot ask mode payload contract (S7/R3)', () => {
     expect(Array.isArray(res.body.insights)).toBe(true);
     expect(res.body.answerBlocks).toBeUndefined();
     expect(res.body.claims).toBeUndefined();
+  });
+
+  it('gives the briefing a second attempt bounded by the same generation deadline', async () => {
+    enableCopilot();
+    stubLead();
+
+    const res = await postTurn({ mode: 'briefing', page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' } });
+
+    expect(res.status).toBe(200);
+    // The retry is only safe because `deadlineMs` caps the WHOLE call: the
+    // second attempt cannot outlive the single-attempt budget the client's 20s
+    // abort wraps (see geminiClient.js and constants/managementCopilot.js).
+    expect(mockGenerateStructured).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxAttempts: 2,
+        timeoutMs: MANAGEMENT_GENERATION_DEADLINE_MS,
+        deadlineMs: MANAGEMENT_GENERATION_DEADLINE_MS,
+      }),
+    );
   });
 });

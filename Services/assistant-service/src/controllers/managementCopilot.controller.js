@@ -14,12 +14,20 @@ import { validateClaims, buildSources, insightsToClaims } from '../ai/groundingV
 import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../constants/managementCopilot.js';
 import prisma from '../db/client.js';
 
-// One model attempt inside a 17s server deadline. The Management client holds
-// a 20s endpoint timeout WITH AbortSignal support: a scope change aborts the
-// in-flight request, and a timeout surfaces as a recoverable failure with
-// Retry rather than an endless loading state (see design §1).
-// The deadline itself is defined once in constants/managementCopilot.js and
-// shared with the agent loop, so the loop budget and this attempt cannot drift.
+// The briefing generation runs inside one 17s server deadline. The Management
+// client holds a 20s endpoint timeout WITH AbortSignal support: a scope change
+// aborts the in-flight request, and a timeout surfaces as a recoverable failure
+// with Retry rather than an endless loading state (see design §1). The deadline
+// is defined once in constants/managementCopilot.js and shared with the agent
+// loop, so the loop budget and this phase cannot drift.
+//
+// The phase is allowed a SECOND attempt, but strictly inside that same 17s
+// budget (`deadlineMs`), so worst-case latency does not grow: a transient 503
+// that comes back fast still leaves room and is retried, while an attempt slow
+// enough to leave less than a meaningful retry is not retried at all and falls
+// back as before. That is the difference between a hard `maxAttempts: 1` —
+// which threw away every fast 503 — and a retry that can never outlive the old
+// single attempt's ceiling.
 
 // Server-side feature gates. MANAGEMENT_COPILOT_ENABLED defaults off; when on,
 // MANAGEMENT_COPILOT_PAGE_KEYS (comma-separated) allowlists specific pages for
@@ -208,7 +216,8 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
       temperature: 0.2,
       maxOutputTokens: 8192,
       timeoutMs: MANAGEMENT_GENERATION_DEADLINE_MS,
-      maxAttempts: 1,
+      maxAttempts: 2,
+      deadlineMs: MANAGEMENT_GENERATION_DEADLINE_MS,
     });
   } catch (err) {
     logger.warn({ err: err.message, pageKey: page.key }, 'management briefing generation failed — falling back to deterministic insights');
