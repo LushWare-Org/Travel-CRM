@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -19,6 +20,7 @@ vi.mock('@/services/copilotAPI', () => api);
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import ManagementContextCopilot from '../ManagementContextCopilot';
+import CopilotTrigger from '../CopilotTrigger';
 
 const ACTOR = 'actor-1';
 /** The page key the shell is rendered with below; the stored preference is
@@ -223,17 +225,38 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     expect(localStorage.getItem(visibilityKey('undefined', PAGE))).toBeNull();
   });
 
-  it('renders the persistent dock at xl and a labeled rail once collapsed', async () => {
+  it('collapses to the labeled floating trigger beside the rail, never an icon-only control', async () => {
     const user = userEvent.setup();
     renderShell();
     await waitFor(() => expect(document.querySelector('[data-copilot-surface="dock"]')).not.toBeNull());
 
     await user.click(screen.getByRole('button', { name: 'collapse' }));
     expect(document.querySelector('[data-copilot-surface="dock"]')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Open copilot' })).toBeInTheDocument();
+
+    // The discoverable desktop affordance is labeled, not an icon-only rail.
+    const trigger = screen.getByRole('button', { name: 'Open copilot' });
+    expect(trigger).toHaveTextContent('Copilot');
+
+    // The rail is kept as the page's layout edge, with its own distinct name.
+    expect(screen.getByRole('button', { name: 'Expand copilot panel' })).toBeInTheDocument();
+
+    // The two controls never share a name on one viewport.
+    expect(screen.getAllByRole('button', { name: 'Open copilot' })).toHaveLength(1);
   });
 
-  it('shows the attention marker on the rail only for a real warning claim', async () => {
+  it('activates the desktop trigger into the panel and moves focus to the briefing heading', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
+
+    await user.click(screen.getByRole('button', { name: 'collapse' }));
+    await user.click(screen.getByRole('button', { name: 'Open copilot' }));
+
+    await waitFor(() => expect(screen.getByTestId('surface-open')).toHaveTextContent('open'));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Lead briefing' }));
+  });
+
+  it('exposes the attention state as a sibling marker plus a visible glyph, never a button child', async () => {
     const user = userEvent.setup();
     api.copilotBriefing.mockImplementationOnce(() =>
       Promise.resolve({
@@ -260,7 +283,27 @@ describe('ManagementContextCopilot — desktop visibility', () => {
     await waitFor(() => expect(screen.getByTestId('claims')).toHaveTextContent('The deposit is overdue.'));
 
     await user.click(screen.getByRole('button', { name: 'collapse' }));
-    expect(screen.getByLabelText('This lead has items needing attention.')).toBeInTheDocument();
+
+    // Both collapsed desktop controls carry the state: the rail's icon marker
+    // and the floating trigger's dot.
+    const markers = screen.getAllByLabelText('This lead has items needing attention.');
+    expect(markers).toHaveLength(2);
+    for (const marker of markers) {
+      expect(marker).toHaveAttribute('role', 'img');
+      expect(marker).toHaveAttribute('data-copilot-attention-marker', 'true');
+    }
+
+    // The accessible name is a sibling of the trigger, never its child — a
+    // button's contents are presentational in the accessibility tree.
+    const trigger = screen.getByRole('button', { name: 'Open copilot' });
+    expect(trigger.querySelector('[data-copilot-attention-marker]')).toBeNull();
+
+    // And the state is never colour-only: a visible, aria-hidden glyph sits
+    // beside the label.
+    const glyph = trigger.querySelector('svg.text-warning');
+    expect(glyph).not.toBeNull();
+    expect(glyph).toHaveAttribute('aria-hidden', 'true');
+
     expect(screen.queryByText(/unread/i)).not.toBeInTheDocument();
   });
 });
@@ -364,6 +407,33 @@ describe('ManagementContextCopilot — conversation', () => {
   });
 });
 
+describe('ManagementContextCopilot — conversation on every scope', () => {
+  it('renders the shell conversation for a collection scope and drops it without a scope', async () => {
+    const { rerender } = renderShell({ scope: {} });
+
+    // The shell owns the conversation, so a collection page (no leadId) has the
+    // composer the record briefing used to own — and it lives in the panel's
+    // single scroll container, after the briefing.
+    const composer = await screen.findByLabelText('Ask about Alice Traveller');
+    const surface = document.querySelector('[data-copilot-surface="surface"]');
+    expect(surface).not.toBeNull();
+    expect(surface?.contains(composer)).toBe(true);
+
+    // No transcript region before the first question; the composer is enough.
+    expect(screen.queryByRole('region', { name: 'Conversation' })).not.toBeInTheDocument();
+
+    rerender(
+      <AuthProvider>
+        <ManagementContextCopilot pageKey="leads" scope={null} scopeLabel="Leads">
+          {(sectionApi) => <StubSections api={sectionApi} />}
+        </ManagementContextCopilot>
+      </AuthProvider>
+    );
+
+    await waitFor(() => expect(screen.queryByLabelText('Ask about Leads')).not.toBeInTheDocument());
+  });
+});
+
 describe('ManagementContextCopilot — scope lifecycle', () => {
   it('drops the previous lead briefing when the selection is cleared', async () => {
     const { rerender } = renderShell();
@@ -380,5 +450,16 @@ describe('ManagementContextCopilot — scope lifecycle', () => {
 
     await waitFor(() => expect(screen.getByTestId('claims')).not.toHaveTextContent('Briefing a'));
     expect(screen.getByTestId('claims')).not.toHaveTextContent('Deterministic a');
+  });
+});
+
+describe('CopilotTrigger — the one labeled trigger', () => {
+  it('forwards its ref to the button so drawer focus restoration keeps working', () => {
+    const ref = createRef<HTMLElement>();
+    render(<CopilotTrigger ref={ref} hasAttention={false} />);
+
+    const button = screen.getByRole('button', { name: 'Open copilot' });
+    expect(button).toHaveTextContent('Copilot');
+    expect(ref.current).toBe(button);
   });
 });

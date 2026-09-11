@@ -21,6 +21,11 @@ import CollectionBriefing from "./CollectionBriefing";
  *    why this stays mounted on every page instead of being conditionally
  *    imported per page.
  *
+ * 3. **The bottom exclusion.** At `xl`+ a collapsed panel floats a labeled
+ *    trigger over the bottom-right of the content column. The column therefore
+ *    reserves 72px (the trigger's height plus its offset) so no interactive row
+ *    action or tab control sits under it at 1280, 1366 or 1439px.
+ *
  * Usage:
  *   <PageCopilot pageKey="overview" scopeLabel="Overview">
  *     ...existing page content...
@@ -52,7 +57,7 @@ export default function PageCopilot({
 
   return (
     <div className="grid grid-cols-1 items-start xl:grid-cols-[minmax(0,1fr)_auto]">
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 xl:pb-[72px]">{children}</div>
       <ManagementContextCopilot pageKey={pageKey} scope={scope} scopeLabel={scopeLabel}>
         {(api) =>
           renderBriefing ? (

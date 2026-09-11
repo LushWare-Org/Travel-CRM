@@ -94,7 +94,17 @@ export default function EvidenceAction({ evidenceIds, sources, announce, badgeVa
       <Badge
         variant="outline"
         className={cn(
-          "cursor-pointer min-h-\[44px\] min-w-\[44px\] font-mono font-normal transition-colors border-transparent",
+          // `max-w-full` is load-bearing, not cosmetic. Badge's base classes are
+          // `w-fit shrink-0 whitespace-nowrap overflow-hidden`: with `nowrap` the
+          // chip's min-content equals its max-content, so `w-fit` sizes it to the
+          // full label and `shrink-0` refuses to shrink it. Its own
+          // `overflow-hidden` clips the text, but the BOX stays label-wide and
+          // becomes the widest child of CopilotSurface, which is what put a
+          // horizontal axis back on the panel (measured: a 447px chip in a 327px
+          // column, 104px of surface overflow). Capping at 100% makes the chip
+          // clip inside the column instead of widening it; the full label stays
+          // available through the button's `aria-label`.
+          "max-w-full cursor-pointer min-h-\[44px\] min-w-\[44px\] font-mono font-normal transition-colors border-transparent",
           badgeVariant === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20",
           badgeVariant === "warning" && "bg-warning/10 text-warning hover:bg-warning/20",
           badgeVariant === "muted" && "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -111,12 +121,13 @@ export default function EvidenceAction({ evidenceIds, sources, announce, badgeVa
               clearEvidencePreview();
             }}
             aria-label={`Evidence: ${sourceLabel}`}
+            title={sourceLabel}
             aria-expanded={detailOpen || undefined}
           />
         }
       >
         <Crosshair className="h-3 w-3" aria-hidden="true" />
-        {sourceLabel}
+        <span className="min-w-0 truncate">{sourceLabel}</span>
       </Badge>
 
       {detailOpen && (
