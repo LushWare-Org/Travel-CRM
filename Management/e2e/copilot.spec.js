@@ -1,5 +1,6 @@
 import { test, expect, getToken } from './fixtures/auth.fixture.js';
 import { inputByTestId, phoneInputByTestId, leadRowByName } from './utils/selectors.js';
+import { SURFACE_SELECTOR, UNBREAKABLE_TOKEN, surfacesWithHorizontalOverflow } from './utils/copilot.js';
 
 // The Management copilot Evidence Lens, driven through the real gateway and the
 // real assistant-service. Like lead-lifecycle.spec.js this creates its own lead
@@ -11,7 +12,8 @@ import { inputByTestId, phoneInputByTestId, leadRowByName } from './utils/select
 // spec owns the things only a real browser against a real stack can prove:
 // the dock never covers the record, the field reveal actually moves focus into
 // the lead record, the operator-scoped visibility preference survives a reload,
-// and the breakpoint flip changes the surface.
+// the breakpoint flip changes the surface, and a 120-character token wraps
+// inside the panel instead of widening it.
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
@@ -90,6 +92,21 @@ test.describe('Management copilot — Evidence Lens', () => {
       expect(visibility).toBe('open');
     });
 
+    await test.step('a 120-character token wraps inside the dock instead of widening it', async () => {
+      // One unbreakable token is the reported defect: a lead id or a URL inside
+      // model prose used to widen the panel's scroll area by its full length.
+      // The composer is the deterministic driver — the user turn is committed
+      // before the request starts, so the transcript holds the token without
+      // waiting on model output.
+      const surface = page.locator(SURFACE_SELECTOR);
+      await expect(surface).toHaveCount(1);
+      await surface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
+      await surface.getByRole('button', { name: 'Ask' }).click();
+      await expect(surface.getByText(UNBREAKABLE_TOKEN, { exact: true }).first()).toBeVisible();
+
+      expect(await surfacesWithHorizontalOverflow(page)).toEqual([]);
+    });
+
     await test.step('a claim reveals the exact allowlisted field it cites', async () => {
       const action = page.locator(`${DOCK} button[aria-label^="Evidence:"]`).first();
       await expect(action).toBeVisible();
@@ -125,9 +142,10 @@ test.describe('Management copilot — Evidence Lens', () => {
       // lead the drawer should be briefing.
       await leadRowByName(page, leadName).getByText(leadName, { exact: true }).click();
 
-      // The rail and the drawer trigger share the "Open copilot" name, so wait
-      // for the media query to drop the desktop surface before clicking —
-      // otherwise the click lands on the rail's expand control, which only
+      // Wait for the below-`xl` media query to swap the desktop dock for the
+      // drawer. The rail is "Expand copilot panel" and the floating trigger is
+      // "Open copilot", so the two no longer share a name — but the dock must
+      // still be gone before the click, since the rail's expand control only
       // persists visibility and never opens the drawer.
       await expect(page.locator('[data-copilot-surface="dock"]')).toHaveCount(0);
       await expect(page.getByRole('button', { name: /open copilot/i })).toHaveCount(1);
@@ -147,7 +165,29 @@ test.describe('Management copilot — Evidence Lens', () => {
 
       const detail = page.getByRole('region', { name: 'Evidence detail' });
       await expect(detail).toBeVisible();
-      await expect(detail).toContainText('not captured');
+      // What this step owns is the fallback itself: the modal makes the record
+      // inert, so the evidence action opens the inline detail instead of moving
+      // focus behind the drawer. It asserts the detail reports a source and a
+      // value row, and deliberately not WHICH value — that depends on the phase
+      // that produced the cited source. The deterministic phase ships the
+      // allowlisted field values, so `Value <iso>` is the normal rendering and
+      // "not captured" is the other valid one; asserting "not captured"
+      // specifically made the test depend on which phase won, which is why it
+      // was red on microservices before this branch existed.
+      await expect(detail).toContainText('Source');
+      await expect(detail).toContainText('Value');
+    });
+
+    await test.step('a 120-character token wraps inside the drawer instead of widening it', async () => {
+      // The drawer hosts the same CopilotSurface below `xl`, so the same token
+      // must wrap there too — asserted on the scroller, never on the dialog.
+      const drawerSurface = page.locator(`[role="dialog"] ${SURFACE_SELECTOR}`);
+      await expect(drawerSurface).toHaveCount(1);
+      await drawerSurface.getByRole('textbox', { name: /^Ask about / }).fill(UNBREAKABLE_TOKEN);
+      await drawerSurface.getByRole('button', { name: 'Ask' }).click();
+      await expect(drawerSurface.getByText(UNBREAKABLE_TOKEN, { exact: true }).first()).toBeVisible();
+
+      expect(await surfacesWithHorizontalOverflow(page)).toEqual([]);
     });
 
     await test.step('clearing the selection leaks no previous session content', async () => {
@@ -155,11 +195,18 @@ test.describe('Management copilot — Evidence Lens', () => {
       await page.keyboard.press('Escape');
       await page.locator(`${DETAIL_PANE} button[aria-label="Close lead detail"]`).click();
 
-      // T1's core guarantee: no scope means the session unmounts and renders
-      // guidance — never the previous lead's claims or a usable composer.
+      // T1's core guarantee: the closed lead's session is gone. On `/leads` a
+      // cleared selection is no longer "no scope" — the all-pages work made `{}`
+      // a real collection scope, so the panel swaps the record briefing for the
+      // collection briefing instead of unmounting to record-scope guidance. The
+      // guarantee is therefore asserted as a swap plus a leak check against the
+      // closed lead's ID: the previous lead's briefing is gone, the collection
+      // briefing has taken its place, and no evidence action anywhere in the
+      // panel still resolves to that lead.
       const dock = page.locator(DOCK);
-      await expect(dock).toContainText('Select a lead to generate its situation briefing.');
-      await expect(dock.locator('button[aria-label^="Evidence:"]')).toHaveCount(0);
+      await expect(dock).toContainText('Page briefing');
+      await expect(dock).not.toContainText('Lead briefing');
+      await expect(dock.locator(`button[aria-label*="${createdLeadId}"]`)).toHaveCount(0);
       await expect(page.locator(DETAIL_PANE)).toContainText('Select a lead to see its details and evidence.');
     });
   });

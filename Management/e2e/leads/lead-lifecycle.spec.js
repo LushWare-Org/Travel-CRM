@@ -1,5 +1,6 @@
 import { test, expect, getToken } from '../fixtures/auth.fixture.js';
 import { inputByTestId, phoneInputByTestId, leadRowByName } from '../utils/selectors.js';
+import { surfacesWithHorizontalOverflow } from '../utils/copilot.js';
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
@@ -53,6 +54,13 @@ test.describe('Lead lifecycle', () => {
       });
       expect(dockOverflowsAncestor).toBe(false);
 
+      // The horizontal counterpart. The panel's scroller is `overflow-y-auto`,
+      // and CSS computes an unset `overflow-x: visible` to `auto` whenever the
+      // other axis is not `visible` — so one unbreakable token used to widen the
+      // panel by its full length instead of wrapping. No rendered copilot
+      // surface may keep a live horizontal axis.
+      expect(await surfacesWithHorizontalOverflow(page)).toEqual([]);
+
       await page.getByRole('button', { name: 'New Lead' }).click();
 
       // data-testid is unique to the one dialog open at a time, so — unlike
@@ -105,14 +113,25 @@ test.describe('Lead lifecycle', () => {
     });
 
     await test.step('Invoice dialog opens for the lead', async () => {
-      await leadRow.getByRole('button', { name: 'Invoice' }).click();
+      // Quotation is the only document action still inline in the row; Invoice,
+      // Payment Receipt and Travel Voucher live in the row's "More actions"
+      // overflow menu (LeadTable's Actions cell). The menu is portalled out of
+      // the <tr>, so its items are matched from the page, not the row.
+      await leadRow.getByRole('button', { name: 'More actions' }).click();
+      await page.getByRole('button', { name: 'Invoice' }).click();
       await expect(page.getByRole('heading', { name: 'New Invoice' })).toBeVisible();
       await expect(page.getByText(leadName).first()).toBeVisible();
       await page.getByRole('button', { name: 'Close', exact: true }).first().click();
     });
 
     await test.step('Receipt dialog opens for the lead', async () => {
-      await leadRow.getByRole('button', { name: 'Payment Receipt' }).click();
+      // Reload first: the Invoice step's overflow menu may still be mounted
+      // behind its closed dialog, in which case clicking its trigger again
+      // would close rather than open it. A fresh load also re-resolves the row.
+      await page.goto('/leads');
+      const receiptRow = leadRowByName(page, leadName);
+      await receiptRow.getByRole('button', { name: 'More actions' }).click();
+      await page.getByRole('button', { name: 'Payment Receipt' }).click();
       await expect(page.getByRole('heading', { name: 'Create Payment Receipt' })).toBeVisible();
       // ReceiptDialog's close button is icon-only with no accessible name
       // (no aria-label, no visible text) — reload instead of trying to close it.
@@ -120,7 +139,9 @@ test.describe('Lead lifecycle', () => {
     });
 
     await test.step('Voucher dialog opens for the lead', async () => {
-      await leadRowByName(page, leadName).getByRole('button', { name: 'Travel Voucher' }).click();
+      const voucherRow = leadRowByName(page, leadName);
+      await voucherRow.getByRole('button', { name: 'More actions' }).click();
+      await page.getByRole('button', { name: 'Travel Voucher' }).click();
       await expect(page.getByRole('heading', { name: 'Voucher', exact: true })).toBeVisible();
     });
   });
