@@ -405,19 +405,19 @@
 
 ### Per-page ask-mode tool vocabulary
 
-**What:** Give each page descriptor its own allowlisted ask-mode tools, so a follow-up question can fetch data that was not already in the briefing bundle. Today the whole vocabulary is one lead-bound tool (`getLead`), and pages declaring none answer single-shot over the evidence already fetched.
+**What:** Finish declaring ask-mode tools per page. The panel-hardening slice shipped the seam — a descriptor `tools` list, `askTools(scope)` on every adapter, and `runAgentLoop` resolving the vocabulary from the parsed scope — plus two read tools (`listLeads`, `listInvoices`), so `/leads` and `/billing` can now fetch data the briefing bundle does not contain. The remaining work is declaring tools on the other eight page keys and adding reads beyond the two list tools. A page declaring none still answers single-shot over the evidence already fetched.
 
-**Why:** The ask box is present on every page but can only answer what the bundle already contains. Questions like "which of these three customers is most at risk" work; "what did we quote them last quarter" does not, because nothing can go and fetch it.
+**Why:** The seam is the hard part, and it has landed; the vocabulary is what makes the ask box worth using on a page. On the eight page keys that declare nothing, "what did we quote them last quarter" is still unanswerable, because the bundle is all the model may read.
 
 **Pros:** Turns the assistant on each page from a briefing with follow-ups into something that can actually investigate, which is where the ten-times-return value sits.
 
 **Cons:** Each tool is a new allowlisted, Zod-validated, server-executed call under the caller's identity — a real per-page design and review, not a config change.
 
-**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-all-pages.md` (§6, outside-voice finding 4). The engine reuses the existing `assistantTurn`/`wizard-turn` tool-calling convention (fixed enum, server-executed, Zod-validated, canonicalized), so this is additive rather than a new framework. Note the existing `runAgentLoop` receives no page key or adapter, so the tool selection currently has no way to be page-aware.
+**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-all-pages.md` (§6, outside-voice finding 4). The seam landed on `feat/management-copilot-panel-hardening` (see `docs/designs/management-copilot-panel-hardening.md` §4) and reuses the existing `assistantTurn`/`wizard-turn` tool-calling convention (fixed enum, server-executed, Zod-validated, canonicalized), so this stays additive rather than a new framework. `runAgentLoop` now receives `adapter.askTools(scope)`, so adding a tool is a descriptor declaration plus a registry entry, not a controller change.
 
 **Effort:** L
 **Priority:** P2
-**Depends on:** A page declaring at least one tool and the descriptor `tools` field landing
+**Depends on:** Per-descriptor tool design for the remaining eight page keys (the `tools` seam and two tools have landed)
 
 ### Interrogable briefing: promptable claim rows
 
@@ -429,7 +429,7 @@
 
 **Cons:** A new interaction surface needing its own focus, keyboard, and accessibility pass. Prompt affordances can crowd the briefing hierarchy that the Evidence Lens design deliberately ranked first. The turn request needs an optional originating-claim field.
 
-**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-panel-hardening.md` (approach C, "Interrogable briefing") because it is a new interaction rather than a fix, and that change set was already ~20 files. The substrate lands first: the conversation moves into the shell so it renders on every scope, the page-scoped tool seam exists, and the shared briefing logic is extracted. Start it once the panel-hardening slice has real agent usage behind it.
+**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-panel-hardening.md` (approach C, "Interrogable briefing") because it is a new interaction rather than a fix, and that change set was already ~20 files. Its substrate has landed: the conversation lives in the shell so it renders on every scope, the page-scoped tool seam exists (`adapter.askTools(scope)`), and the shared briefing logic is extracted. Start it once the panel-hardening slice has real agent usage behind it.
 
 **Effort:** L
 **Priority:** P3
