@@ -86,7 +86,7 @@ export const book = asyncHandler(async (req, res) => {
       travelportOrderId: order.travelportOrderId,
       createdById: req.user.id,
       customerId: customer.id,
-      tripType: tripType || (offer.segments?.length > 1 ? 'roundTrip' : 'oneWay'),
+      tripType: tripType || ((offer.legCount ?? 1) > 1 ? 'roundTrip' : 'oneWay'),
       cabinClass: offer.cabinClass || 'Economy',
       currency: offer.currency || 'USD',
       baseFare: offer.baseFare,

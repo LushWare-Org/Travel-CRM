@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { MockFlightClient } from '../../src/clients/mock.client.js';
-import { buildFlightOffer, buildSearchRequest, buildBookingRequest } from '../factories/flight.js';
+import {
+  buildFlightOffer,
+  buildFlightSegment,
+  buildSearchRequest,
+  buildBookingRequest,
+} from '../factories/flight.js';
 
 // ── Ensure mock mode (no real Travelport calls) ─────────────────────
 beforeAll(() => {
@@ -132,6 +137,53 @@ describe('Flight API — Search & Book', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.pnr).toBeTruthy();
       expect(res.body.data.status).toBe('confirmed');
+    });
+
+    it('should store the trip type the caller searched with', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+      prisma.$executeRaw.mockResolvedValue(undefined);
+      prisma.flightBooking.create.mockResolvedValue({ id: 'booking-rt', pnr: 'MOCKRT', status: 'confirmed' });
+
+      const res = await request(app)
+        .post('/api/v1/flights/book')
+        .set(authHeaders())
+        .send(
+          buildBookingRequest({
+            tripType: 'roundTrip',
+            offer: buildFlightOffer({
+              legCount: 2,
+              segments: [buildFlightSegment({ sequence: 1 }), buildFlightSegment({ sequence: 101 })],
+            }),
+          }),
+        );
+
+      expect(res.status).toBe(201);
+      expect(prisma.flightBooking.create.mock.calls[0][0].data.tripType).toBe('roundTrip');
+    });
+
+    // The validated boundary fills tripType in from its own default, so the
+    // offer-derived inference in the controller is only reachable below the
+    // HTTP layer (covered by the controller unit tests).
+    it('should default an omitted tripType to oneWay', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+      prisma.$executeRaw.mockResolvedValue(undefined);
+      prisma.flightBooking.create.mockResolvedValue({ id: 'booking-def', pnr: 'MOCKDEF', status: 'confirmed' });
+
+      const payload = buildBookingRequest({
+        offer: buildFlightOffer({
+          legCount: 2,
+          segments: [buildFlightSegment({ sequence: 1 }), buildFlightSegment({ sequence: 101 })],
+        }),
+      });
+      delete payload.tripType;
+
+      const res = await request(app)
+        .post('/api/v1/flights/book')
+        .set(authHeaders())
+        .send(payload);
+
+      expect(res.status).toBe(201);
+      expect(prisma.flightBooking.create.mock.calls[0][0].data.tripType).toBe('oneWay');
     });
 
     it('should return 400 when travelers array is empty', async () => {
