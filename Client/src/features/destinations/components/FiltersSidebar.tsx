@@ -1,5 +1,5 @@
-import { Search, Filter, X, Globe, ChevronRight, IndianRupee, Star } from 'lucide-react';
-import { getCurrencySymbol } from '../../../lib/currency';
+import { Search, Filter, X, Globe, ChevronRight, Banknote, Star } from 'lucide-react';
+import { getPriceRangeOptions } from '../../../lib/currency';
 import FilterPanelShell from '../../../components/shared/FilterPanelShell';
 import RangeFilterGroup from '../../../components/shared/RangeFilterGroup';
 
@@ -9,18 +9,10 @@ export interface PriceRange {
   max: number;
 }
 
-const CURRENCY_SYMBOL = getCurrencySymbol();
+const PRICE_RANGE_OPTIONS = getPriceRangeOptions();
 
 const filterOptions = {
   regions: ['All', 'Asia', 'Europe', 'Middle East', 'Oceania', 'Africa', 'Americas'],
-  priceRanges: [
-    { label: `Below ${CURRENCY_SYMBOL} 50 k`, min: 0, max: 50000 },
-    { label: `${CURRENCY_SYMBOL} 50k - ${CURRENCY_SYMBOL} 75k`, min: 50000, max: 75000 },
-    { label: `${CURRENCY_SYMBOL} 75k - ${CURRENCY_SYMBOL} 1 L`, min: 75000, max: 100000 },
-    { label: `${CURRENCY_SYMBOL} 1 L - ${CURRENCY_SYMBOL} 1.5L`, min: 100000, max: 150000 },
-    { label: `${CURRENCY_SYMBOL} 1.5L - ${CURRENCY_SYMBOL} 2 L`, min: 150000, max: 200000 },
-    { label: `Above ${CURRENCY_SYMBOL} 2L`, min: 200000, max: Infinity },
-  ],
   ratings: [5, 4, 3],
 };
 
@@ -129,8 +121,8 @@ export default function FiltersSidebar({
       {/* Price Range */}
       <RangeFilterGroup
         label="Budget"
-        icon={<IndianRupee />}
-        options={filterOptions.priceRanges}
+        icon={<Banknote />}
+        options={PRICE_RANGE_OPTIONS}
         selected={selectedPriceRange}
         onChange={onPriceRangeChange}
       />

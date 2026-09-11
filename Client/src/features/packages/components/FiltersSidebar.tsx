@@ -1,9 +1,9 @@
 import { Filter, X, Banknote, Clock, Star } from 'lucide-react';
-import { getCurrencySymbol } from '../../../lib/currency';
+import { getPriceRangeOptions } from '../../../lib/currency';
 import FilterPanelShell from '../../../components/shared/FilterPanelShell';
 import RangeFilterGroup from '../../../components/shared/RangeFilterGroup';
 
-const CURRENCY_SYMBOL = getCurrencySymbol();
+const PRICE_RANGE_OPTIONS = getPriceRangeOptions();
 
 export interface RangeOption {
   label: string;
@@ -12,14 +12,6 @@ export interface RangeOption {
 }
 
 const filterOptions = {
-  priceRanges: [
-    { label: `Below ${CURRENCY_SYMBOL} 50 k`, min: 0, max: 50000 },
-    { label: `${CURRENCY_SYMBOL} 50k - ${CURRENCY_SYMBOL} 75k`, min: 50000, max: 75000 },
-    { label: `${CURRENCY_SYMBOL} 75k - ${CURRENCY_SYMBOL} 1 L`, min: 75000, max: 100000 },
-    { label: `${CURRENCY_SYMBOL} 1 L - ${CURRENCY_SYMBOL} 1.5L`, min: 100000, max: 150000 },
-    { label: `${CURRENCY_SYMBOL} 1.5L - ${CURRENCY_SYMBOL} 2 L`, min: 150000, max: 200000 },
-    { label: `Above ${CURRENCY_SYMBOL} 2L`, min: 200000, max: Infinity }
-  ],
   durations: [
     { label: 'Short (1-4 days)', min: 1, max: 4 },
     { label: 'Medium (5-7 days)', min: 5, max: 7 },
@@ -66,7 +58,7 @@ export default function FiltersSidebar({
       <RangeFilterGroup
         label="Budget"
         icon={<Banknote />}
-        options={filterOptions.priceRanges}
+        options={PRICE_RANGE_OPTIONS}
         selected={selectedPriceRange}
         onChange={onPriceRangeChange}
       />

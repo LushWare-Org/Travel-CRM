@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import type { AggregatedDestination } from "../../../services/api/packages.transform"
 import { formatCurrency } from "../../../lib/currency"
 
-const MAX_DESTINATIONS = 6;
+const MAX_DESTINATIONS = 5;
 
 interface InternationalGridProps {
   destinations: AggregatedDestination[]
@@ -26,22 +26,24 @@ export default function InternationalGrid({ destinations, loading }: Internation
   const handleDestinationClick = (dest: AggregatedDestination) => {
     navigate(`/packages?destination=${dest.slug}`)
   }
-  // Bento Grid layout logic
+  // Bento grid layout. On md+ the grid's fixed rows own each tile's height
+  // (`md:auto-rows-[250px]`); a tile that keeps an aspect-ratio there refuses
+  // the row's stretch and overflows its area — the 2x2 hero at 5+ destinations
+  // rendered square (600x600 inside a 600x516 area at 1440px), hung 84px past
+  // the grid and painted over the "Explore All Locations" button below it.
+  // `md:aspect-auto md:h-full` hands the height back to the grid rows. Below md
+  // there are no fixed rows, so one shared aspect-ratio sizes every row evenly.
   const getBentoClasses = (idx: number, total: number) => {
-    if (total === 4) {
-      if (idx === 0) return 'md:col-span-2 md:row-span-2 aspect-[4/5] md:aspect-auto h-full max-w-none';
-      if (idx === 1) return 'md:col-span-2 md:row-span-1 aspect-[5/7] md:aspect-auto h-full max-w-none';
-      return 'md:col-span-1 md:row-span-1 aspect-[5/7] md:aspect-auto h-full max-w-none';
+    if (total >= 4) {
+      const stretch = 'aspect-[4/5] md:aspect-auto md:h-full';
+      if (idx === 0) return `md:col-span-2 md:row-span-2 ${stretch}`;
+      if (total === 4 && idx === 1) return `md:col-span-2 md:row-span-1 ${stretch}`;
+      return stretch;
     }
-    if (total >= 5) {
-      if (idx === 0) return 'md:col-span-2 md:row-span-2 aspect-[4/5] md:aspect-square max-w-none';
-      return 'aspect-[5/7] max-w-[300px] md:max-w-none md:aspect-auto h-full';
-    }
-    return 'aspect-[4/5] max-w-none';
+    return 'aspect-[4/5]';
   };
 
-  const displayDests = internationalDests.slice(0, 5);
-  const total = displayDests.length;
+  const total = internationalDests.length;
 
   const rowLayoutCols: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-1 sm:grid-cols-3' };
   const gridClassName = total >= 4
@@ -50,7 +52,7 @@ export default function InternationalGrid({ destinations, loading }: Internation
 
   return (
     <div className={gridClassName}>
-        {displayDests.map((dest, idx) => (
+        {internationalDests.map((dest, idx) => (
           <button
             key={dest.id}
             onClick={() => handleDestinationClick(dest)}
