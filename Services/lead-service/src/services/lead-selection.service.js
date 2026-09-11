@@ -108,16 +108,28 @@ export async function materializeSelection({ selectionId, fetchImpl = fetch, pri
 
   const { packageName, days, costLines, pricing } = await deriveSelectionView({ selection, fetchImpl });
 
-  return prismaClient.leadPackageSelection.update({
-    where: { id: selectionId },
-    data: {
-      ...(packageName != null ? { packageName } : {}),
-      sourcePackageId: selection.isManual ? null : selection.packageId,
-      itineraryDays: { create: days },
-      costLines: { create: costLines },
-      pricing: { create: pricing },
-    },
-  });
+  try {
+    return await prismaClient.leadPackageSelection.update({
+      where: { id: selectionId },
+      data: {
+        ...(packageName != null ? { packageName } : {}),
+        sourcePackageId: selection.isManual ? null : selection.packageId,
+        itineraryDays: { create: days },
+        costLines: { create: costLines },
+        pricing: { create: pricing },
+      },
+    });
+  } catch (err) {
+    // Two callers can pass the pristine check above at once — both then try to
+    // create the same dayNumber for this selection, and the loser gets a
+    // unique-violation (P2002) on rows the winner derived identically. Its own
+    // transaction has rolled back and the winner's has committed, so re-read
+    // and return that instead of failing the caller's separate write.
+    if (err?.code !== 'P2002' || !(await isSelectionMaterialized(selectionId, prismaClient))) {
+      throw err;
+    }
+    return prismaClient.leadPackageSelection.findUnique({ where: { id: selectionId } });
+  }
 }
 
 /**

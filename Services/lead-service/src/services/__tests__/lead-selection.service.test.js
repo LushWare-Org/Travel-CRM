@@ -182,6 +182,34 @@ describe('materializeSelection', () => {
     });
     await expect(materializeSelection({ selectionId: 'ghost', prismaClient })).rejects.toThrow(AppError);
   });
+
+  it('returns the materialized selection when a concurrent caller wins the race (regression: P2002)', async () => {
+    // Two transfer-flight adds fired together both see a pristine selection and
+    // both try to create day 1. The loser must not fail its own write: the
+    // winner's derivation is identical, so re-read and return it.
+    const winnerRow = { id: 'sel-1', isManual: true, packageId: null, itineraryDays: [{ dayNumber: 1 }] };
+    const prismaClient = mockPrisma({
+      leadItineraryDay: { count: vi.fn().mockResolvedValueOnce(0).mockResolvedValue(1) },
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue(winnerRow),
+        update: vi.fn().mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })),
+      },
+    });
+
+    await expect(materializeSelection({ selectionId: 'sel-1', prismaClient })).resolves.toEqual(winnerRow);
+    expect(prismaClient.leadPackageSelection.update).toHaveBeenCalled();
+  });
+
+  it('rethrows a unique violation that did not leave the selection materialized', async () => {
+    const prismaClient = mockPrisma({
+      leadPackageSelection: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'sel-1', isManual: true, packageId: null }),
+        update: vi.fn().mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })),
+      },
+    });
+
+    await expect(materializeSelection({ selectionId: 'sel-1', prismaClient })).rejects.toThrow('Unique constraint failed');
+  });
 });
 
 describe('refreshSelection', () => {
