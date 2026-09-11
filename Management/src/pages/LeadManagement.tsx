@@ -135,6 +135,9 @@ const LeadManagement = () => {
 
   const currentUser = authAPI.getStoredUser();
   const canDelete = currentUser?.role === 'admin' || currentUser?.role === 'super-admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'super_admin';
+  // Reassigning a lead that already has an owner is an admin action. The service
+  // enforces the same rule; this only decides whether to offer the control.
+  const canChangeAssignment = canDelete || currentUser?.isSuperAdmin === true;
 
   const handleDeleteLead = async (leadId: string) => {
     try {
@@ -395,6 +398,17 @@ const LeadManagement = () => {
     }
   };
 
+  const handleAssignLead = async (leadId: string, repId: string) => {
+    try {
+      await leadAPI.assignLead(leadId, repId);
+      toast.success("Lead assigned successfully");
+      fetchLeads();
+      fetchLeadStats();
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
+
   // The copilot scope is the record selected in the persistent pane; nothing is
   // sent when no lead is selected.
   // With no lead selected this is the COLLECTION scope (`{}`), which serves the
@@ -546,6 +560,9 @@ const LeadManagement = () => {
                 canDelete={canDelete}
                 onClaimClick={handleClaimLead}
                 onDeleteClick={handleDeleteLead}
+                salesReps={salesReps}
+                onAssign={handleAssignLead}
+                canChangeAssignment={canChangeAssignment}
               />
             )}
 
