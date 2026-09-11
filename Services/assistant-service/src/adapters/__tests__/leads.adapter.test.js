@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { LEAD_COPILOT_FIELDS, leadEvidenceId } from '@travel-crm/contracts';
 import { leadsAdapter } from '../leads.adapter.js';
+import { leadsPageAdapter } from '../pages/leads.adapter.js';
+import { leadsCollectionAdapter } from '../pages/leadsCollection.adapter.js';
 
 const ctx = {
   user: { id: 'rep-1', role: 'salesRep', permissions: [] },
@@ -187,5 +189,27 @@ describe('leadsAdapter.defaultQuestions', () => {
 
   it('returns no questions without a fetched record', () => {
     expect(leadsAdapter.defaultQuestions({ record: null, evidence: [] })).toEqual([]);
+  });
+});
+
+describe('leads ask vocabulary is resolved per scope (S6)', () => {
+  it('gives a record scope the record vocabulary', () => {
+    expect(leadsPageAdapter.askTools({ leadId: 'lead-1' })).toEqual(['getLead', 'listLeads']);
+    expect(leadsAdapter.askTools({ leadId: 'lead-1' })).toEqual(['getLead', 'listLeads']);
+  });
+
+  it('gives the collection scope the collection vocabulary, without getLead', () => {
+    expect(leadsPageAdapter.askTools({})).toEqual(['listLeads']);
+    expect(leadsCollectionAdapter.askTools({})).toEqual(['listLeads']);
+  });
+
+  it('discriminates on the scope, not the page key', () => {
+    // `/leads` is one key with two vocabularies; a key-based resolution cannot
+    // express that and would leak getLead onto the collection scope.
+    expect(leadsPageAdapter.askTools({ leadId: 'lead-1' })).not.toEqual(leadsPageAdapter.askTools({}));
+  });
+
+  it('treats a blank leadId as the collection scope, the same branch loadEvidence uses', () => {
+    expect(leadsPageAdapter.askTools({ leadId: '   ' })).toEqual(['listLeads']);
   });
 });

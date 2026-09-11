@@ -74,6 +74,11 @@ export const billingAdapter = createPageAdapter({
 
   scopeSchema,
 
+  // Invoice questions ("which are overdue, what is outstanding") are what the
+  // rule-cited bundle cannot answer; this tool reads the invoices source
+  // directly, under the same identity and allowlist.
+  tools: ['listInvoices'],
+
   scopeLabel: () => 'Billing',
 
   sources: [

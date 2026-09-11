@@ -7,6 +7,10 @@ export const leadsCollectionAdapter = createPageAdapter({
   key: 'leads',
   scopeSchema: z.object({}).strict(),
   scopeLabel: () => 'Leads',
+  // The collection scope knows about lists, not about one lead, so `getLead` is
+  // deliberately absent here — it would invite a fetch for a row the operator
+  // never selected.
+  tools: ['listLeads'],
   sources: [
     {
       name: 'leads',

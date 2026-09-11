@@ -11,6 +11,7 @@ import { careerAdapter } from '../pages/career.adapter.js';
 import { settingsAdapter } from '../pages/settings.adapter.js';
 import { leadsCollectionAdapter } from '../pages/leadsCollection.adapter.js';
 import { leadsPageAdapter } from '../pages/leads.adapter.js';
+import { toolNames } from '../../tools/toolRegistry.js';
 
 // Structural contract tests across EVERY descriptor. Individual rule behaviour
 // is covered by rules.test.js and the engine's failure paths by
@@ -172,5 +173,49 @@ describe('page key coverage', () => {
     expect(leadsPageAdapter.parseScope({})).toEqual({});
     expect(() => leadsPageAdapter.parseScope({ leadId: '' })).toThrow();
     expect(() => leadsPageAdapter.parseScope({ nope: 1 })).toThrow();
+  });
+});
+
+describe('ask vocabulary is declared, resolvable and registered', () => {
+  // The adapter registry's deep interface, exercised across every adapter so a
+  // page cannot ship reachable for a briefing but silent for a question.
+  const EVERY_ADAPTER = { ...ENGINE_DESCRIPTORS, leadsPage: leadsPageAdapter };
+
+  it.each(Object.entries(EVERY_ADAPTER))('%s exposes askTools(scope) as a name list', (_name, adapter) => {
+    expect(typeof adapter.askTools).toBe('function');
+    for (const scope of [{}, { leadId: 'lead-1' }, { tab: 'leads' }]) {
+      const tools = adapter.askTools(scope);
+      expect(Array.isArray(tools)).toBe(true);
+      for (const name of tools) expect(typeof name).toBe('string');
+    }
+  });
+
+  it('billing declares the invoice list tool', () => {
+    expect(billingAdapter.askTools({})).toContain('listInvoices');
+  });
+
+  it('the collection descriptor declares only the leads list tool', () => {
+    expect(leadsCollectionAdapter.askTools({})).toEqual(['listLeads']);
+  });
+
+  it('every declared tool name exists in the tool registry', () => {
+    // An `askTools` name that is not registered would be advertised to nobody
+    // and rejected on execution, degrading the vocabulary silently.
+    const registered = new Set(toolNames());
+    const offenders = [];
+    for (const [name, adapter] of Object.entries(EVERY_ADAPTER)) {
+      for (const toolName of adapter.askTools({})) {
+        if (!registered.has(toolName)) offenders.push(`${name}: ${toolName}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('only the leads and billing pages declare a vocabulary', () => {
+    const withTools = Object.entries(ENGINE_DESCRIPTORS)
+      .filter(([, adapter]) => adapter.askTools({}).length > 0)
+      .map(([name]) => name)
+      .sort();
+    expect(withTools).toEqual(['billing', 'leadsCollection']);
   });
 });
