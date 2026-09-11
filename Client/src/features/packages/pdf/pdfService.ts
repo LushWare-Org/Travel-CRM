@@ -66,7 +66,6 @@ export interface PdfPackageData {
   price?: number | string;
   sellPrice?: number | string;
   basePrice?: number | string;
-  currency?: string;
   priceNotes?: string;
   highlights?: string[];
   inclusions?: string[];
@@ -247,8 +246,8 @@ export const generateAndDownloadPDF = async (pkg: PdfPackageData): Promise<void>
   }
 };
 
-// Cover-page fields (destination title, duration, price, currency, terms) read
-// title/durationDays/sellPrice/basePrice/currency/termsAndConditions to match
+// Cover-page fields (destination title, duration, price, terms) read
+// title/durationDays/sellPrice/basePrice/termsAndConditions to match
 // serializePackage()'s real output. `terms` is derived from the
 // termsAndConditions string in createPackagePdfBlob before this runs.
 // pkg.highlights/pkg.maxGroupSize remain genuinely absent from the backend
@@ -1058,9 +1057,7 @@ function buildPDFDocument(pkg: PdfPackageData, images: PdfImages) {
     doc.setFontSize(28);
     doc.setTextColor(...palette.primaryText);
     const priceText = formatCurrencyForPdf(pkg.sellPrice ?? pkg.basePrice);
-    const sanitizedPrice = priceText.replace(/[^\d.,]/g, '');
-    const currencyCode = pkg.currency || import.meta.env.VITE_CURRENCY_CODE || 'INR';
-    doc.text(`${currencyCode} ${sanitizedPrice}`, priceLeftX, yPos + 36);
+    doc.text(priceText, priceLeftX, yPos + 36);
 
     if (pkg.priceNotes) {
       setFontStyle('normal');
