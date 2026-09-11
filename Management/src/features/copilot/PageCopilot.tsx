@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import ManagementContextCopilot from "./ManagementContextCopilot";
+import ManagementContextCopilot, { type CopilotSectionApi } from "./ManagementContextCopilot";
 import CollectionBriefing from "./CollectionBriefing";
 
 /**
@@ -31,6 +31,11 @@ type PageCopilotProps = {
   scopeLabel: string;
   /** Page filter state, when the page has any. v1 sends `{}` (the default view). */
   scope?: Record<string, unknown>;
+  /**
+   * The briefing to render in the dock. Defaults to the collection briefing; a
+   * record-scoped page passes its own, since it swaps between the two.
+   */
+  renderBriefing?: (api: CopilotSectionApi) => ReactNode;
   children: ReactNode;
 };
 
@@ -38,6 +43,7 @@ export default function PageCopilot({
   pageKey,
   scopeLabel,
   scope = {},
+  renderBriefing,
   children,
 }: PageCopilotProps) {
   const enabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === "true";
@@ -48,9 +54,13 @@ export default function PageCopilot({
     <div className="grid grid-cols-1 items-start xl:grid-cols-[minmax(0,1fr)_auto]">
       <div className="min-w-0">{children}</div>
       <ManagementContextCopilot pageKey={pageKey} scope={scope} scopeLabel={scopeLabel}>
-        {({ session, collapse }) => (
-          <CollectionBriefing session={session} scopeLabel={scopeLabel} onCollapse={collapse} />
-        )}
+        {(api) =>
+          renderBriefing ? (
+            renderBriefing(api)
+          ) : (
+            <CollectionBriefing session={api.session} scopeLabel={scopeLabel} onCollapse={api.collapse} />
+          )
+        }
       </ManagementContextCopilot>
     </div>
   );

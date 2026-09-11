@@ -36,13 +36,10 @@ import type { CopilotScope } from "../features/copilot/types";
 type FilterKey = 'all' | LifecycleStatus;
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ManagementContextCopilot from "../features/copilot/ManagementContextCopilot";
+import PageCopilot from "../features/copilot/PageCopilot";
 import LeadBriefing from "../features/copilot/LeadBriefing";
 import CollectionBriefing from "../features/copilot/CollectionBriefing";
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
-
-// Feature-gated client flag; the panel stays off until explicitly enabled.
-const copilotEnabled = import.meta.env.VITE_MANAGEMENT_COPILOT_ENABLED === "true";
 
 // Lifecycle status maps (10 states) plus old-status fallbacks
 const statusColors: Record<string, string> = {
@@ -411,179 +408,183 @@ const LeadManagement = () => {
     : "Leads";
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border">
-        <div className="px-4 sm:px-6 py-4 sm:py-5">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-            <div className="pl-10 md:pl-0">
-              <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Lead Management</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Track and manage your leads efficiently
-              </p>
+    <div className="bg-background">
+      <PageCopilot
+        pageKey="leads"
+        scope={copilotScope}
+        scopeLabel={copilotLabel}
+        renderBriefing={({ session, collapse }) =>
+          detailLeadId ? (
+            <LeadBriefing
+              session={session}
+              scopeLabel={copilotLabel}
+              leadId={detailLeadId}
+              onCollapse={collapse}
+            />
+          ) : (
+            <CollectionBriefing
+              session={session}
+              scopeLabel={copilotLabel}
+              onCollapse={collapse}
+            />
+          )
+        }
+      >
+        {/* The header sits inside the content column: CopilotDock is a
+            full-viewport-tall sticky column, so anything stacked above the grid
+            made the page taller than the viewport and scrolling then revealed a
+            blank band beside the sidebar. */}
+        <div className="flex min-h-dvh flex-col">
+          {/* Header */}
+          <div className="bg-card border-b border-border">
+            <div className="px-4 sm:px-6 py-4 sm:py-5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                <div className="pl-10 md:pl-0">
+                  <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">Lead Management</h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                    Track and manage your leads efficiently
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'table' | 'grid')}>
+                    <TabsList>
+                      <TabsTrigger value="table" aria-label="Table view">
+                        <List className="w-4 h-4" />
+                      </TabsTrigger>
+                      <TabsTrigger value="grid" aria-label="Grid view">
+                        <LayoutGrid className="w-4 h-4" />
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Button onClick={fetchLeads} disabled={loading} variant="outline">
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">Refresh</span>
+                  </Button>
+                  <Button onClick={() => setShowSettingsDialog(true)} variant="outline">
+                    <Settings className="w-4 h-4" />
+                    <span className="hidden sm:inline">{assignmentSettings.mode === "auto"
+                      ? `Auto: ${assignmentSettings.strategy}`
+                      : "Manual"}</span>
+                  </Button>
+                  <Button onClick={() => setShowNewDialog(true)}>
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">New Lead</span>
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <Tabs value={viewMode} onValueChange={(value) => value && setViewMode(value as 'table' | 'grid')}>
-                <TabsList>
-                  <TabsTrigger value="table" aria-label="Table view">
-                    <List className="w-4 h-4" />
-                  </TabsTrigger>
-                  <TabsTrigger value="grid" aria-label="Grid view">
-                    <LayoutGrid className="w-4 h-4" />
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <Button onClick={fetchLeads} disabled={loading} variant="outline">
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
-              <Button onClick={() => setShowSettingsDialog(true)} variant="outline">
-                <Settings className="w-4 h-4" />
-                <span className="hidden sm:inline">{assignmentSettings.mode === "auto"
-                  ? `Auto: ${assignmentSettings.strategy}`
-                  : "Manual"}</span>
-              </Button>
-              <Button onClick={() => setShowNewDialog(true)}>
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">New Lead</span>
-              </Button>
-            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Above xl this is the two-column work surface: the record on
-          minmax(0,1fr) and the copilot dock column. Below xl the copilot
-          renders its own trigger/drawer and the record keeps the full width. */}
-      <div className="grid grid-cols-1 items-start xl:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="min-w-0 px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Stats Cards */}
-        <LeadStats
-          summary={statsSummary}
-          salesReps={salesReps}
-          onAssignSuccess={() => { fetchLeads(); fetchLeadStats(); }}
-        />
+          <div className="flex flex-1 flex-col px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+            {/* Stats Cards */}
+            <LeadStats
+              summary={statsSummary}
+              salesReps={salesReps}
+              onAssignSuccess={() => { fetchLeads(); fetchLeadStats(); }}
+            />
 
-        {/* Filters */}
-        <LeadFilters
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          filterStatus={filterStatus}
-          setFilterStatus={setFilterStatus}
-          statusCounts={statusCounts}
-          filterSources={filterSources}
-          setFilterSources={setFilterSources}
-          filterPlatforms={filterPlatforms}
-          setFilterPlatforms={setFilterPlatforms}
-          onAdvancedFilterClick={() => setShowFilterDialog(true)}
-        />
+            {/* Filters */}
+            <LeadFilters
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              filterStatus={filterStatus}
+              setFilterStatus={setFilterStatus}
+              statusCounts={statusCounts}
+              filterSources={filterSources}
+              setFilterSources={setFilterSources}
+              filterPlatforms={filterPlatforms}
+              setFilterPlatforms={setFilterPlatforms}
+              onAdvancedFilterClick={() => setShowFilterDialog(true)}
+            />
 
-        {/* Persistent record surface: the Evidence Lens reveals into these anchors. */}
-        <LeadDetailPane lead={detailLead} onClose={() => setDetailLead(null)} />
+            {/* Persistent record surface: the Evidence Lens reveals into these anchors. */}
+            <LeadDetailPane lead={detailLead} onClose={() => setDetailLead(null)} />
 
-        {/* Lead Cards Grid */}
-        {!loading && !error && leads.length > 0 && (
-          <LeadTable
-            viewMode={viewMode}
-            leads={leads}
-            loading={loading}
-            error={error}
-            statusColors={statusColors}
-            statusLabels={statusLabels}
-            onLeadClick={(lead: any) => setDetailLead(lead)}
-            onRemarksClick={(lead: any) => {
-              setSelectedLead(lead);
-              setShowRemarksDialog(true);
-            }}
-            onWhatsappClick={(lead: any) => {
-              setSelectedLead(lead);
-              setShowWhatsappDialog(true);
-            }}
-            onEditClick={(lead: any) => {
-              setSelectedLead(lead);
-              setShowEditDialog(true);
-            }}
-            onStatusClick={(lead: any) => {
-              setStatusLead(lead);
-              setShowStatusDialog(true);
-            }}
-            onQuotationClick={(lead: any) => setQuotationLead(lead)}
-            onInvoiceClick={(lead: any) => setInvoiceLead(lead)}
-            onReceiptClick={(lead: any) => setReceiptLead(lead)}
-            onVoucherClick={(lead: any) => setVoucherLead(lead)}
-            onSectionClick={(lead: any) => {
-              setSectionLead(lead);
-              setShowSectionView(true);
-            }}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={goToPage}
-            leadsPerPage={leadsPerPage}
-            totalLeads={totalLeads}
-            highlightedLeadId={highlightedLeadId}
-            canDelete={canDelete}
-            onClaimClick={handleClaimLead}
-            onDeleteClick={handleDeleteLead}
-          />
-        )}
+            {/* Lead Cards Grid */}
+            {!loading && !error && leads.length > 0 && (
+              <LeadTable
+                viewMode={viewMode}
+                leads={leads}
+                loading={loading}
+                error={error}
+                statusColors={statusColors}
+                statusLabels={statusLabels}
+                onLeadClick={(lead: any) => setDetailLead(lead)}
+                onRemarksClick={(lead: any) => {
+                  setSelectedLead(lead);
+                  setShowRemarksDialog(true);
+                }}
+                onWhatsappClick={(lead: any) => {
+                  setSelectedLead(lead);
+                  setShowWhatsappDialog(true);
+                }}
+                onEditClick={(lead: any) => {
+                  setSelectedLead(lead);
+                  setShowEditDialog(true);
+                }}
+                onStatusClick={(lead: any) => {
+                  setStatusLead(lead);
+                  setShowStatusDialog(true);
+                }}
+                onQuotationClick={(lead: any) => setQuotationLead(lead)}
+                onInvoiceClick={(lead: any) => setInvoiceLead(lead)}
+                onReceiptClick={(lead: any) => setReceiptLead(lead)}
+                onVoucherClick={(lead: any) => setVoucherLead(lead)}
+                onSectionClick={(lead: any) => {
+                  setSectionLead(lead);
+                  setShowSectionView(true);
+                }}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={goToPage}
+                leadsPerPage={leadsPerPage}
+                totalLeads={totalLeads}
+                highlightedLeadId={highlightedLeadId}
+                canDelete={canDelete}
+                onClaimClick={handleClaimLead}
+                onDeleteClick={handleDeleteLead}
+              />
+            )}
 
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
-            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <p className="mt-3 text-muted-foreground">Loading leads...</p>
-          </div>
-        )}
+            {/* flex-1 so each state fills what is left of the column: with few or no
+                leads that centres it rather than leaving a large gap beneath. */}
+            {loading && (
+              <div className="flex flex-1 flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                <p className="mt-3 text-muted-foreground">Loading leads...</p>
+              </div>
+            )}
 
-        {error && !loading && (
-          <div className="flex flex-col items-center justify-center py-16 bg-card rounded-xl border border-destructive/30">
-            <AlertCircle className="w-12 h-12 text-destructive mb-3" />
-            <p className="text-destructive font-medium">{error}</p>
-            <Button onClick={fetchLeads} variant="destructive" className="mt-4">
-              Try Again
-            </Button>
-          </div>
-        )}
+            {error && !loading && (
+              <div className="flex flex-1 flex-col items-center justify-center py-16 bg-card rounded-xl border border-destructive/30">
+                <AlertCircle className="w-12 h-12 text-destructive mb-3" />
+                <p className="text-destructive font-medium">{error}</p>
+                <Button onClick={fetchLeads} variant="destructive" className="mt-4">
+                  Try Again
+                </Button>
+              </div>
+            )}
 
-        {!loading && !error && leads.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
-            <Users className="w-12 h-12 text-muted-foreground/40 mb-4" />
-            <p className="text-muted-foreground font-medium">No leads found</p>
-            <p className="text-muted-foreground/70 text-sm mt-1">
-              {searchTerm || filterStatus !== "all"
-                ? "Try adjusting your filters"
-                : "Create your first lead to get started"}
-            </p>
-            {!searchTerm && filterStatus === "all" && (
-              <Button onClick={() => setShowNewDialog(true)} className="mt-4">
-                <Plus className="w-4 h-4" />
-                Create Lead
-              </Button>
+            {!loading && !error && leads.length === 0 && (
+              <div className="flex flex-1 flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
+                <Users className="w-12 h-12 text-muted-foreground/40 mb-4" />
+                <p className="text-muted-foreground font-medium">No leads found</p>
+                <p className="text-muted-foreground/70 text-sm mt-1">
+                  {searchTerm || filterStatus !== "all"
+                    ? "Try adjusting your filters"
+                    : "Create your first lead to get started"}
+                </p>
+                {!searchTerm && filterStatus === "all" && (
+                  <Button onClick={() => setShowNewDialog(true)} className="mt-4">
+                    <Plus className="w-4 h-4" />
+                    Create Lead
+                  </Button>
+                )}
+              </div>
             )}
           </div>
-        )}
         </div>
-
-        {copilotEnabled && (
-          <ManagementContextCopilot pageKey="leads" scope={copilotScope} scopeLabel={copilotLabel}>
-            {({ session, collapse }) => (
-              detailLeadId ? (
-                <LeadBriefing
-                  session={session}
-                  scopeLabel={copilotLabel}
-                  leadId={detailLeadId}
-                  onCollapse={collapse}
-                />
-              ) : (
-                <CollectionBriefing
-                  session={session}
-                  scopeLabel={copilotLabel}
-                  onCollapse={collapse}
-                />
-              )
-            )}
-          </ManagementContextCopilot>
-        )}
-      </div>
+      </PageCopilot>
 
       {/* Dialogs */}
       <NewLeadDialog
