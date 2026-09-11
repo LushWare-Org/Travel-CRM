@@ -141,6 +141,51 @@ export function evaluateCannedBriefing(row, { bundle, adapter, enableGuidance = 
   };
 }
 
+// Canned ASK fixtures. `answerInView` states whether the fetched bundle can
+// answer the question at all, and `claims` is raw model output for the
+// zero-tool single-shot call (the same canned replay, no live quota).
+export const ManagementAskCannedRowSchema = z
+  .object({
+    id: z.string().min(1).max(255),
+    description: z.string().min(1).max(500).optional(),
+    question: z.string().min(1),
+    answerInView: z.boolean(),
+    claims: z.array(z.unknown()),
+    expectedFailures: z.array(z.string().min(1).max(255)),
+  })
+  .strict();
+
+// Replays one canned ask response through the REAL validator, exactly as
+// `handleAsk` does after the loop returns. `notInView` is the explicit honest
+// outcome the ask slot shows when the bundle cannot answer the question: every
+// surviving claim against an out-of-bundle question is recorded as
+// `${id}:restates-briefing`, so a restated list FAILS the gate instead of
+// passing as an answer.
+export function evaluateCannedAsk(row, { bundle, enableGuidance = false }) {
+  const canonical = canonicalizeBriefingResponse({ claims: row.claims }, BriefingClaimSchema);
+  const { claims: accepted, rejected } = validateClaims({ claims: canonical, bundle, enableGuidance });
+
+  const failures = rejected.map((entry) => ({ claimId: entry.id, reason: entry.reason }));
+  if (!row.answerInView) {
+    for (const claim of accepted) failures.push({ claimId: claim.id, reason: 'restates-briefing' });
+  }
+  const failureKeys = failures.map((failure) => `${failure.claimId}:${failure.reason}`).sort();
+
+  return {
+    id: row.id,
+    // What the route would place in the answer slot: accepted claims only.
+    answerBlocks: accepted,
+    // The outcome the route reaches: no accepted claim means there is nothing
+    // to put in the answer slot. An unanswerable question whose claims still
+    // grounded is NOT the honest outcome — that is the `restates-briefing`
+    // failure recorded above, and `notInView` stays false for it.
+    notInView: accepted.length === 0,
+    failures,
+    failureKeys,
+    passed: failures.length === 0,
+  };
+}
+
 // Rolls a set of row results into one gate verdict, mirroring
 // routerEvaluation's report convention.
 export function summarizeBriefingEvaluation(results) {
