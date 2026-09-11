@@ -348,8 +348,8 @@ describe('assignLead / unassignLead — authorization and consistency', () => {
     expect(mockLeadUpdate).not.toHaveBeenCalled();
   });
 
-  it('allows a salesRep with the manage_leads permission to assign a lead', async () => {
-    mockLeadFindUnique.mockResolvedValue(leadFixture());
+  it('allows a salesRep with the manage_leads permission to assign an unassigned lead', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: null }));
     mockLeadUpdate.mockResolvedValue(leadFixture({ assignedToId: 'rep-b' }));
 
     const { req, res, next } = buildReqRes({ user: adminOrSalesRep({ permissions: ['manage_leads'] }), body: { assignedTo: 'rep-b' } });
@@ -358,6 +358,43 @@ describe('assignLead / unassignLead — authorization and consistency', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ assignedToId: 'rep-b', assignmentMode: 'manual' }),
+    }));
+  });
+
+  it('refuses to let a salesRep with manage_leads move a lead that already has an owner', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: 'rep-a' }));
+
+    const { req, res, next } = buildReqRes({ user: adminOrSalesRep({ permissions: ['manage_leads'] }), body: { assignedTo: 'rep-b' } });
+    await assignLead(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+    expect(mockLeadUpdate).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin to move a lead that already has an owner', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: 'rep-a' }));
+    mockLeadUpdate.mockResolvedValue(leadFixture({ assignedToId: 'rep-b' }));
+
+    const { req, res, next } = buildReqRes({ user: adminUser, body: { assignedTo: 'rep-b' } });
+    await assignLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ assignedToId: 'rep-b' }),
+    }));
+  });
+
+  it('allows a superAdmin to move a lead that already has an owner', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: 'rep-a' }));
+    mockLeadUpdate.mockResolvedValue(leadFixture({ assignedToId: 'rep-b' }));
+
+    const superAdmin = { id: 'super-1', role: 'salesRep', isSuperAdmin: true, permissions: [] };
+    const { req, res, next } = buildReqRes({ user: superAdmin, body: { assignedTo: 'rep-b' } });
+    await assignLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ assignedToId: 'rep-b' }),
     }));
   });
 

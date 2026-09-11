@@ -404,11 +404,19 @@ export const getLeadRemarks = asyncHandler(async (req, res) => {
 
 export const assignLead = asyncHandler(async (req, res) => {
   const { user } = req;
-  const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
+  const isAdmin = user.isSuperAdmin || user.role === 'admin';
+  const canManage = isAdmin || user.permissions.includes('manage_leads');
   if (!canManage) throw new AppError('Not authorized to assign this lead', 403);
 
   const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
   if (!lead) throw new AppError('Lead not found', 404);
+
+  // An unassigned lead is anyone's to pick up; moving one that already has an
+  // owner is an admin action, so it is enforced here rather than only hidden in
+  // the UI.
+  if (!isAdmin && lead.assignedToId) {
+    throw new AppError('Only an admin can change an assigned lead', 403);
+  }
 
   const { assignedTo } = req.body;
   const updated = await prisma.lead.update({
