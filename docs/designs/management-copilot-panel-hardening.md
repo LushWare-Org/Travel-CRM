@@ -83,7 +83,7 @@ Two properties make this the correct fix rather than a cosmetic one:
 
 `Management/DESIGN.md` gains a line under the copilot primitives naming `copilot-surface` as the owner of the wrap contract, so the next workspace module inherits the rule instead of rediscovering it.
 
-Known and accepted: `Badge` is `whitespace-nowrap overflow-hidden` by design, so a long source label clips inside its chip. That is a chip, not prose; the full text stays available through the action's `aria-label`.
+**Correction, measured on the real surface during `/ship`:** the chip below needed more than the wrap contract, and assuming otherwise was this design's one wrong call. `Badge`'s base classes are `w-fit shrink-0 whitespace-nowrap overflow-hidden`. With `nowrap`, min-content equals max-content, so `w-fit` sizes the chip to the full label and `shrink-0` refuses to shrink it. The chip's own `overflow-hidden` does clip its text — but the BOX stays label-wide, and that box becomes the widest child of `CopilotSurface`, which puts the horizontal axis straight back. Measured with a real lead id: a 447px chip inside a 327px column, giving the surface `scrollWidth 463` against `clientWidth 359` — the same 104px the operator reported, with no scrollbar because `overflow-x: hidden` was doing its job. The fix is `max-w-full` on that chip in `EvidenceAction.tsx`, so it clips inside its column instead of widening it; the full label stays available through the button's `aria-label`. The lesson worth keeping: `overflow-x: hidden` hides this class of defect from a human and exposes it only to a measurement, so the X-axis assertion is what caught it.
 
 ### 2. One trigger, both breakpoints, labeled
 

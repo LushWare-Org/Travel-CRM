@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.6.0.0] - 2026-09-11
+
+### Added
+- Follow-up questions now work on every protected Management page, not only on a single selected lead. Each page decides which of its own records the assistant may look up, so a question on Billing can reach invoices and a question on Leads can reach the lead list — and only what that page allows.
+- The assistant can fetch invoices and leads while it answers, so questions like "what is still unpaid on these invoices" are answered from the records rather than restated from the summary already on screen.
+- Desktop now has a labeled Copilot button next to the slim edge rail, so the panel can be found at any window size instead of only below the `xl` breakpoint.
+
+### Changed
+- The panel reads in one fixed order — briefing, then suggested questions, then the conversation — and the ask box is pinned to the bottom and present on every page.
+- A long evidence label is truncated inside its chip with the full value available on hover, instead of widening the panel.
+- The panel's scrolling, text-wrapping and collapsed-state controls are now owned in one place, so a page that adopts the copilot inherits them rather than re-implementing them.
+
+### Fixed
+- The copilot panel no longer scrolls sideways when a briefing or an answer contains a long unbroken value such as a lead ID or a URL. Text wraps inside the panel.
+- The panel no longer becomes horizontally scrollable on a page whose evidence chip is wider than the panel column.
+- An answer that could not be grounded now offers "Try again" instead of leaving no way forward.
+- The assistant can no longer be asked to use a tool its page did not grant it.
+- Answer sizes and the total time one ask may take are bounded before generation, including the record lookups it performs, so a question cannot run past the point where the panel gives up waiting.
+
 ## [0.5.1.0] - 2026-09-10
 
 ### Changed
