@@ -99,7 +99,7 @@ const LeadFilters = ({
             onValueChange={(value) => setFilterStatus(String(value) as FilterKey)}
             className="min-w-0"
           >
-            <TabsList className="w-full justify-start overflow-x-auto scrollbar-hide sm:w-fit">
+            <TabsList className="w-full justify-start overflow-x-auto scrollbar-hide">
               {STATUSES.map((status) => (
                 <TabsTrigger key={status.key} value={status.key} className="gap-1.5">
                   <span className={`hidden sm:block w-2 h-2 rounded-full ${status.dot}`} />
@@ -116,7 +116,7 @@ const LeadFilters = ({
           <Button
             variant="outline"
             onClick={onAdvancedFilterClick}
-            className="whitespace-nowrap sm:shrink-0"
+            className="whitespace-nowrap shrink-0"
           >
             <Filter className="w-4 h-4" />
             Filters
