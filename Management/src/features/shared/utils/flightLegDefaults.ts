@@ -7,6 +7,12 @@ export interface FlightLegPrefs {
   estimatedUnitPrice?: number | string;
 }
 
+export type TripType = 'oneWay' | 'roundTrip';
+
+export interface FlightLegSubmission extends FlightLegPrefs {
+  tripType: TripType;
+}
+
 /**
  * Flips an inbound (getting-to-the-trip) leg into sensible defaults for the
  * outbound (returning-home) leg: origin/destination swap, cabin class and
@@ -27,6 +33,16 @@ export function flipLegForReturn(inboundPrefs?: FlightLegPrefs | null): FlightLe
     airlinePreference: airlinePreference || '',
     departureTime: '',
   };
+}
+
+/**
+ * The other direction of a round trip: route swapped, cabin + airline carried,
+ * departure time cleared, and price pinned to 0 — the rep sets the second
+ * leg's cost explicitly (same reasoning as flipLegForReturn's missing price).
+ */
+export function oppositeLeg(prefs?: FlightLegPrefs | null): FlightLegPrefs | null {
+  const flipped = flipLegForReturn(prefs);
+  return flipped ? { ...flipped, estimatedUnitPrice: 0 } : null;
 }
 
 /**

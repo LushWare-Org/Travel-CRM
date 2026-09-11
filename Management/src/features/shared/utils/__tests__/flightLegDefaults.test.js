@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { flipLegForReturn, getOutboundModalDefaults } from '../flightLegDefaults.ts';
+import { flipLegForReturn, getOutboundModalDefaults, oppositeLeg } from '../flightLegDefaults.ts';
 
 describe('flipLegForReturn', () => {
   it('swaps origin and destination', () => {
@@ -58,5 +58,34 @@ describe('getOutboundModalDefaults', () => {
   it('returns empty object when neither leg is set', () => {
     expect(getOutboundModalDefaults(null, null)).toEqual({});
     expect(getOutboundModalDefaults({}, {})).toEqual({});
+  });
+});
+
+describe('oppositeLeg', () => {
+  it('swaps the route, carries cabin class and airline, clears departure time and pins the price to 0', () => {
+    const result = oppositeLeg({
+      origin: 'CMB',
+      destination: 'DXB',
+      cabinClass: 'Business',
+      airlinePreference: 'EK',
+      departureTime: 'morning',
+      estimatedUnitPrice: 180,
+    });
+    expect(result).toEqual({
+      origin: 'DXB',
+      destination: 'CMB',
+      cabinClass: 'Business',
+      airlinePreference: 'EK',
+      departureTime: '',
+      estimatedUnitPrice: 0,
+    });
+  });
+
+  it('returns null when neither airport is set', () => {
+    expect(oppositeLeg({ cabinClass: 'Business' })).toBeNull();
+  });
+
+  it('returns null when prefs are missing entirely', () => {
+    expect(oppositeLeg(null)).toBeNull();
   });
 });
