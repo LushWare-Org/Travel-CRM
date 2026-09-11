@@ -88,6 +88,30 @@ describe('InternationalGrid', () => {
     expect(screen.getAllByRole('button')).toHaveLength(5);
   });
 
+  // Regression test for the reported overlap: at 5 destinations the hero kept
+  // `md:aspect-square`, refused the fixed row's stretch, rendered 600x600
+  // inside a 600x516 area at 1440px — 84px past the grid and painted over the
+  // "Explore All Locations" button below it. Every tile now takes its height
+  // from `md:auto-rows-[250px]`, so only the grid decides where tiles end.
+  it('sizes every tile from the grid rows instead of an aspect ratio', () => {
+    const destinations = Array.from({ length: 5 }, (_, i) =>
+      buildDestination({ id: `dest-${i}`, name: `Destination ${i}`, slug: `destination-${i}` }),
+    );
+
+    renderGrid(destinations);
+
+    const tiles = screen.getAllByRole('button');
+    expect(tiles).toHaveLength(5);
+    expect(tiles[0].className).toContain('md:col-span-2');
+    expect(tiles[0].className).toContain('md:row-span-2');
+    expect(tiles[0].className).toContain('md:aspect-auto');
+    expect(tiles[0].className).toContain('md:h-full');
+    expect(tiles[0].className).not.toContain('aspect-square');
+    tiles.slice(1).forEach((tile) => {
+      expect(tile.className).toContain('md:aspect-auto');
+    });
+  });
+
   it('navigates to the filtered packages list when a tile is clicked', async () => {
     const user = userEvent.setup();
     renderGrid([buildDestination({ slug: 'dubai', name: 'Dubai' })]);
