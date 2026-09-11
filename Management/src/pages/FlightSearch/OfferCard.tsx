@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fmtTime, fmtDuration, fmtMoney } from './helpers';
+import { fmtTime, fmtDuration, fmtMoney, stopsLabel } from './helpers';
+import { splitLegs, journeyStops, legStops, legDurationMinutes } from '@/features/shared/utils/flightSegments';
 import type { FlightOffer } from './types';
 
 export function OfferSkeleton() {
@@ -25,13 +26,14 @@ interface OfferCardProps {
   offer: FlightOffer;
   onSelect: (offer: FlightOffer) => void;
   paxCount: number;
+  /** The searched destination for a round trip: where the outbound leg turns around. */
+  turnPoint?: string;
 }
 
-export default function OfferCard({ offer, onSelect, paxCount }: OfferCardProps) {
+export default function OfferCard({ offer, onSelect, paxCount, turnPoint }: OfferCardProps) {
   const segs = offer.segments || [];
-  const firstSeg = segs[0];
-  const lastSeg = segs[segs.length - 1];
-  const totalDuration = segs.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+  const legs = splitLegs(segs, turnPoint);
+  const stops = journeyStops(legs);
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 shadow-card transition-colors hover:border-primary/40 lg:flex-row lg:items-center">
@@ -48,32 +50,41 @@ export default function OfferCard({ offer, onSelect, paxCount }: OfferCardProps)
             {offer.refundable && (
               <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Refundable</span>
             )}
-            {firstSeg?.stops === 0 && (
+            {stops === 0 && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Direct</span>
             )}
           </div>
         </div>
 
-        <div className="mb-2 flex items-center gap-3">
-          <div className="text-right">
-            <div className="font-mono text-lg font-bold tabular-nums text-foreground">{fmtTime(firstSeg?.departureAt)}</div>
-            <div className="text-xs font-medium text-muted-foreground">{firstSeg?.origin}</div>
-          </div>
-          <div className="flex flex-1 flex-col items-center px-2">
-            <div className="mb-0.5 text-xs text-muted-foreground">{fmtDuration(totalDuration)}</div>
-            <div className="relative h-0.5 w-full bg-border">
-              <div className="absolute -top-0.5 left-0 h-1.5 w-2 rounded-full bg-primary" />
-              <div className="absolute -top-0.5 right-0 h-1.5 w-2 rounded-full bg-primary" />
+        {legs.map((leg, i) => {
+          const first = leg[0];
+          const last = leg[leg.length - 1];
+          return (
+            <div key={i} className="mb-2 flex items-center gap-3">
+              {legs.length > 1 && (
+                <div className="w-14 shrink-0 text-xs font-medium uppercase text-muted-foreground">
+                  {i === 0 ? 'Outbound' : 'Return'}
+                </div>
+              )}
+              <div className="text-right">
+                <div className="font-mono text-lg font-bold tabular-nums text-foreground">{fmtTime(first?.departureAt)}</div>
+                <div className="text-xs font-medium text-muted-foreground">{first?.origin}</div>
+              </div>
+              <div className="flex flex-1 flex-col items-center px-2">
+                <div className="mb-0.5 text-xs text-muted-foreground">{fmtDuration(legDurationMinutes(leg))}</div>
+                <div className="relative h-0.5 w-full bg-border">
+                  <div className="absolute -top-0.5 left-0 h-1.5 w-2 rounded-full bg-primary" />
+                  <div className="absolute -top-0.5 right-0 h-1.5 w-2 rounded-full bg-primary" />
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{stopsLabel(legStops(leg))}</div>
+              </div>
+              <div>
+                <div className="font-mono text-lg font-bold tabular-nums text-foreground">{fmtTime(last?.arrivalAt)}</div>
+                <div className="text-xs font-medium text-muted-foreground">{last?.destination}</div>
+              </div>
             </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              {segs.length === 1 ? 'Nonstop' : `${segs.length - 1} stop${segs.length > 2 ? 's' : ''}`}
-            </div>
-          </div>
-          <div>
-            <div className="font-mono text-lg font-bold tabular-nums text-foreground">{fmtTime(lastSeg?.arrivalAt)}</div>
-            <div className="text-xs font-medium text-muted-foreground">{lastSeg?.destination}</div>
-          </div>
-        </div>
+          );
+        })}
 
         {segs.length > 1 && (
           <details className="mt-2 text-xs text-muted-foreground">

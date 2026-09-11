@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { fmtDate, fmtMoney } from './helpers';
+import { routeChain } from '@/features/shared/utils/flightSegments';
 import type { ContactForm, FlightOffer, TravelerForm, TravelerType } from './types';
 
 const TRAVELER_TYPE_LABEL: Record<TravelerType, string> = { adult: 'Adults', child: 'Children', infant: 'Infants' };
@@ -282,7 +283,7 @@ export function ConfirmationStep({ pnr, selectedOffer, travelerCount, onCopyPNR,
         <div className="mx-auto mb-6 max-w-md rounded-lg bg-muted/50 p-4 text-left">
           <div className="space-y-1 text-sm text-muted-foreground">
             <div className="flex justify-between"><span>Airline</span><span className="font-medium text-foreground">{selectedOffer.airline}</span></div>
-            <div className="flex justify-between"><span>Route</span><span className="font-medium text-foreground">{selectedOffer.segments?.[0]?.origin} → {selectedOffer.segments?.[(selectedOffer.segments?.length ?? 1) - 1]?.destination}</span></div>
+            <div className="flex justify-between"><span>Route</span><span className="font-medium text-foreground">{routeChain(selectedOffer.segments)}</span></div>
             <div className="flex justify-between"><span>Travelers</span><span className="font-mono font-medium tabular-nums text-foreground">{travelerCount}</span></div>
             <div className="flex justify-between"><span>Total</span><span className="font-mono font-medium tabular-nums text-foreground">{fmtMoney(selectedOffer.fareTotal, selectedOffer.currency)}</span></div>
           </div>

@@ -61,6 +61,27 @@ export function fmtMoney(amount?: number, currency?: string): string {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(amount);
 }
 
-export function segmentStops(segments?: { stops?: number }[]): number {
-  return segments?.[0]?.stops ?? (segments?.length || 1) - 1;
+// How many offers/bookings the page renders at a time. A live Duffel search
+// answers with hundreds of offers (772 on one round trip), so rendering stops
+// at a page and the caller asks for the next one explicitly.
+export const OFFERS_PAGE_SIZE = 20;
+export const BOOKINGS_PAGE_SIZE = 25;
+
+// Same grouping as STATUS_STYLES/STATUS_TABS: confirmed+ticketed is the
+// positive milestone, quoted+pending still in motion, cancelled+failed
+// terminal-negative. An unknown status appears only under All.
+export const STATUS_BUCKETS = {
+  confirmed: ['confirmed', 'ticketed'],
+  pending: ['quoted', 'pending'],
+  cancelled: ['cancelled', 'failed'],
+} as const;
+export type StatusBucket = keyof typeof STATUS_BUCKETS;
+export function statusBucket(bucket: string): StatusBucket | null {
+  return (Object.keys(STATUS_BUCKETS) as StatusBucket[]).find((b) =>
+    (STATUS_BUCKETS[b] as readonly string[]).includes(bucket),
+  ) ?? null;
+}
+
+export function stopsLabel(stops: number): string {
+  return stops === 0 ? 'Nonstop' : `${stops} stop${stops > 1 ? 's' : ''}`;
 }

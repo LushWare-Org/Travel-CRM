@@ -11,12 +11,15 @@ import SearchForm from './SearchForm';
 import { TravelerDetailsStep, ReviewStep, ConfirmationStep } from './BookingWizard';
 import BookingsPanel from './BookingsPanel';
 import PageCopilot from '@/features/copilot/PageCopilot';
-import { SORT_OPTIONS, emptyTraveler, segmentStops, todayStr } from './helpers';
+import { SORT_OPTIONS, STATUS_BUCKETS, OFFERS_PAGE_SIZE, emptyTraveler, statusBucket, todayStr } from './helpers';
+import type { StatusBucket } from './helpers';
+import { journeyStops, splitLegs } from '@/features/shared/utils/flightSegments';
 import type {
   BookingStep,
   ContactForm,
   FlightBookingRecord,
   FlightOffer,
+  FlightSearchContext,
   FlightTab,
   SearchFormState,
   TravelerForm,
@@ -47,6 +50,11 @@ export default function FlightSearch() {
   const [hasSearched, setHasSearched] = useState(false);
   const [searchSummary, setSearchSummary] = useState('');
 
+  // The context that produced the offers on screen — what the traveler count,
+  // the booking's tripType and the provider passenger ids are read from.
+  const [searchContext, setSearchContext] = useState<FlightSearchContext | null>(null);
+  const [visibleCount, setVisibleCount] = useState(OFFERS_PAGE_SIZE);
+
   const [sortBy, setSortBy] = useState('price');
   const [filterStops, setFilterStops] = useState<number[]>([]);
   const [filterAirlines, setFilterAirlines] = useState<string[]>([]);
@@ -67,6 +75,10 @@ export default function FlightSearch() {
 
   const paxCount = form.adults + form.children + form.infants;
 
+  // A round trip arrives as one flat segment list; the outbound leg ends the
+  // first time the journey reaches the searched destination.
+  const turnPoint = searchContext?.tripType === 'roundTrip' ? searchContext.destination : undefined;
+
   const availableAirlines = useMemo(() => {
     const set = new Map<string, string>();
     offers.forEach((o) => {
@@ -76,16 +88,22 @@ export default function FlightSearch() {
   }, [offers]);
 
   const sortedAndFilteredOffers = useMemo(() => {
+    // Stops are counted over the whole journey (connections on every leg), which
+    // is what the card's per-leg labels add up to. Pill value 2 is "2+ Stops",
+    // so it means at least two — matching exactly two cannot select a 3-stop
+    // journey.
+    const stopsOf = (o: FlightOffer) => journeyStops(splitLegs(o.segments, turnPoint));
+
     let list = [...offers];
 
     if (filterStops.length > 0) {
-      list = list.filter((o) => filterStops.includes(segmentStops(o.segments)));
+      list = list.filter((o) => filterStops.some((bucket) => (bucket === 2 ? stopsOf(o) >= 2 : stopsOf(o) === bucket)));
     }
     if (filterAirlines.length > 0) {
       list = list.filter((o) => o.airlineCode && filterAirlines.includes(o.airlineCode));
     }
     if (nonstopOnly) {
-      list = list.filter((o) => segmentStops(o.segments) === 0);
+      list = list.filter((o) => stopsOf(o) === 0);
     }
 
     switch (sortBy) {
@@ -101,17 +119,20 @@ export default function FlightSearch() {
         break;
       }
       case 'stops':
-        list.sort((a, b) => segmentStops(a.segments) - segmentStops(b.segments));
+        list.sort((a, b) => stopsOf(a) - stopsOf(b));
         break;
     }
 
     return list;
-  }, [offers, sortBy, filterStops, filterAirlines, nonstopOnly]);
+  }, [offers, sortBy, filterStops, filterAirlines, nonstopOnly, turnPoint]);
+
+  const visibleOffers = sortedAndFilteredOffers.slice(0, visibleCount);
 
   const filteredBookings = useMemo(() => {
     let list = bookings;
-    if (bookingStatusFilter !== 'all') {
-      list = list.filter((b) => b.status === bookingStatusFilter);
+    const bucket = statusBucket(bookingStatusFilter);
+    if (bucket) {
+      list = list.filter((b) => statusBucket(b.status) === bucket);
     }
     if (bookingSearch.trim()) {
       const q = bookingSearch.toLowerCase();
@@ -125,9 +146,13 @@ export default function FlightSearch() {
   }, [bookings, bookingStatusFilter, bookingSearch]);
 
   const statusCounts = useMemo(() => {
-    const c: Record<string, number> = { all: bookings.length, confirmed: 0, pending: 0, cancelled: 0 };
+    const c: Record<string, number> = { all: bookings.length };
+    (Object.keys(STATUS_BUCKETS) as StatusBucket[]).forEach((b) => {
+      c[b] = 0;
+    });
     bookings.forEach((b) => {
-      if (c[b.status] !== undefined) c[b.status]++;
+      const bucket = statusBucket(b.status);
+      if (bucket) c[bucket]++;
     });
     return c;
   }, [bookings]);
@@ -165,6 +190,14 @@ export default function FlightSearch() {
       });
       const results: FlightOffer[] = response.data || [];
       setOffers(results);
+      setSearchContext({
+        origin: form.origin,
+        destination: form.destination,
+        tripType,
+        adults: form.adults,
+        children: form.children,
+        infants: form.infants,
+      });
       setSearchSummary(
         results.length > 0
           ? `${form.origin} → ${form.destination}, ${new Date(form.departureDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
@@ -186,15 +219,18 @@ export default function FlightSearch() {
   const selectOffer = useCallback(
     (offer: FlightOffer) => {
       setSelectedOffer(offer);
+      // One traveler per searched passenger, not per current form value, and
+      // carrying the provider's own passenger id so the offer can be booked.
+      const ctx = searchContext;
       const newTravelers = [
-        ...Array.from({ length: form.adults }, () => emptyTraveler('adult' as TravelerType)),
-        ...Array.from({ length: form.children }, () => emptyTraveler('child' as TravelerType)),
-        ...Array.from({ length: form.infants }, () => emptyTraveler('infant' as TravelerType)),
-      ];
+        ...Array.from({ length: ctx?.adults ?? form.adults }, () => emptyTraveler('adult' as TravelerType)),
+        ...Array.from({ length: ctx?.children ?? form.children }, () => emptyTraveler('child' as TravelerType)),
+        ...Array.from({ length: ctx?.infants ?? form.infants }, () => emptyTraveler('infant' as TravelerType)),
+      ].map((t, i) => ({ ...t, passengerId: offer.passengerIds?.[i] }));
       setTravelers(newTravelers);
       setStep('travelers');
     },
-    [form.adults, form.children, form.infants]
+    [form.adults, form.children, form.infants, searchContext]
   );
 
   const updateTraveler = (index: number, field: keyof TravelerForm, value: string) => {
@@ -223,7 +259,18 @@ export default function FlightSearch() {
   const confirmBooking = async () => {
     setBooking(true);
     try {
-      const response = await flightAPI.book({ offer: selectedOffer, tripType, travelers, contact });
+      // Optional traveler fields (dob, passport, nationality…) sit in the form as
+      // empty strings, and the API's schema only accepts them as absent — an
+      // empty string fails its format checks and the whole booking 400s.
+      const bookedTravelers = travelers.map((t) =>
+        Object.fromEntries(Object.entries(t).filter(([, value]) => value !== '')),
+      );
+      const response = await flightAPI.book({
+        offer: selectedOffer,
+        tripType: searchContext?.tripType ?? tripType,
+        travelers: bookedTravelers,
+        contact,
+      });
       setConfirmedBooking(response.data);
       setStep('confirmation');
       toast.success('Flight booked successfully');
@@ -246,6 +293,7 @@ export default function FlightSearch() {
     setStep('results');
     setFilterStops([]);
     setFilterAirlines([]);
+    setSearchContext(null);
   };
 
   const copyPNR = (pnr: string) => {
@@ -269,6 +317,11 @@ export default function FlightSearch() {
   useEffect(() => {
     if (activeTab === 'bookings') fetchBookings();
   }, [activeTab, fetchBookings]);
+
+  // A new result set (or a changed filter/sort) starts a fresh page.
+  useEffect(() => {
+    setVisibleCount(OFFERS_PAGE_SIZE);
+  }, [offers, sortBy, filterStops, filterAirlines, nonstopOnly]);
 
   const cancelBooking = async (id: string, reason: string) => {
     try {
@@ -462,10 +515,30 @@ export default function FlightSearch() {
                     )}
 
                     <div className="space-y-3">
-                      {sortedAndFilteredOffers.map((offer) => (
-                        <OfferCard key={offer.offerId} offer={offer} onSelect={selectOffer} paxCount={paxCount} />
+                      {visibleOffers.map((offer) => (
+                        <OfferCard
+                          key={offer.offerId}
+                          offer={offer}
+                          onSelect={selectOffer}
+                          paxCount={searchContext ? searchContext.adults + searchContext.children + searchContext.infants : paxCount}
+                          turnPoint={turnPoint}
+                        />
                       ))}
                     </div>
+
+                    {sortedAndFilteredOffers.length > visibleCount && (
+                      <div className="pt-2 text-center">
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          Showing {visibleOffers.length} of {sortedAndFilteredOffers.length} flights
+                        </p>
+                        <Button
+                          variant="outline"
+                          onClick={() => setVisibleCount((c) => c + OFFERS_PAGE_SIZE)}
+                        >
+                          Show {Math.min(OFFERS_PAGE_SIZE, sortedAndFilteredOffers.length - visibleCount)} more flights
+                        </Button>
+                      </div>
+                    )}
                   </>
                 )}
 
