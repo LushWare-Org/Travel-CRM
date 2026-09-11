@@ -383,7 +383,7 @@ const EditLeadDialog = ({ isOpen, onClose, lead, salesReps, onSuccess, initialSe
         endDate: formData.endDate || undefined,
         whatsapp: formData.whatsapp || undefined,
         lifecycleStatus: formData.lifecycleStatus || 'NEW',
-        remarks: remarks.length > 0 ? remarks : undefined,
+        remarks: remarks.length > 0 ? remarks : (lead?.remarks?.length ? [] : undefined),
       };
       if (formData.assignedTo && formData.assignedTo !== '' && formData.assignedTo !== '__name_only') {
         const rep = salesReps.find((r) => r.id === formData.assignedTo || r._id === formData.assignedTo);

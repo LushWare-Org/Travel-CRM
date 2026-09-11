@@ -9,6 +9,7 @@ import {
   Moon, Star, Phone, MapPinned, Clock, Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatRating } from '@/utils/number';
 
 interface ItineraryDisplayProps {
   days?: any[];
@@ -170,7 +171,7 @@ const ItineraryDisplay = ({ days = [] }: ItineraryDisplayProps) => {
                     {day.accommodation.rating > 0 && (
                       <div className="flex items-center gap-1 bg-warning/10 text-warning px-3 py-1 rounded-lg">
                         <Star className="w-4 h-4 fill-warning text-warning" />
-                        <span className="font-semibold">{day.accommodation.rating}</span>
+                        <span className="font-semibold">{formatRating(day.accommodation.rating)}</span>
                         <span className="text-xs">/5</span>
                       </div>
                     )}

@@ -8,6 +8,8 @@ import {
   Ticket,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  MoreHorizontal,
   Phone,
   Mail,
   MapPin,
@@ -18,6 +20,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 
 interface LeadTableProps {
@@ -45,11 +48,94 @@ interface LeadTableProps {
   onDeleteClick?: (lead: any) => void;
   onClaimClick?: (lead: any) => void;
   canDelete?: boolean;
+  salesReps?: SalesRepOption[];
+  onAssign?: (leadId: string, repId: string) => void;
+  canChangeAssignment?: boolean;
   viewMode?: 'grid' | 'table';
 }
 
 const docActionClass = 'p-2 transition-colors bg-muted rounded-lg hover:bg-accent';
 const docIconClass = 'w-4 h-4 text-muted-foreground';
+
+interface SalesRepOption {
+  id: string;
+  _id?: string;
+  name: string;
+}
+
+const menuItemClass =
+  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted';
+
+const repOptionId = (rep: SalesRepOption) => rep.id || rep._id || '';
+
+const findAssignedRep = (lead: { assignedToId?: string }, salesReps?: SalesRepOption[]) =>
+  salesReps?.find((rep) => repOptionId(rep) === lead.assignedToId);
+
+/**
+ * The assignee's name. A lead can point at a rep who is no longer in the active
+ * list, and showing "Unassigned" for one of those would invite a second
+ * assignment, so the id stands in for the name instead.
+ */
+const repLabelFor = (lead: { assignedToId?: string }, salesReps?: SalesRepOption[]) => {
+  const rep = findAssignedRep(lead, salesReps);
+  if (rep) return rep.name;
+  return lead.assignedToId ? String(lead.assignedToId).substring(0, 8) : 'Unassigned';
+};
+
+/**
+ * In-cell assignment control, deliberately one 32px trigger so the Sales Rep
+ * column stays narrow instead of carrying a full-width Select per row. It
+ * serves both actions through the same interaction: assigning a lead that has
+ * no owner, and handing one that does to somebody else. The second case is
+ * admin-only, which the caller expresses by only rendering the picker when it
+ * is allowed — and which the service enforces independently.
+ */
+const RepPicker = ({
+  salesReps,
+  value,
+  label,
+  onPick,
+}: {
+  salesReps: SalesRepOption[];
+  value?: string;
+  label: string;
+  onPick: (repId: string) => void;
+}) => {
+  const isUnassigned = !value;
+  return (
+    <Popover>
+      <PopoverTrigger
+        className={`inline-flex h-8 max-w-[150px] items-center gap-1 rounded-lg px-2 text-sm transition-colors ${
+          isUnassigned ? 'text-warning hover:bg-warning/10' : 'text-foreground hover:bg-muted'
+        }`}
+        aria-label={isUnassigned ? 'Assign this lead' : `Change assignee, currently ${label}`}
+        title={isUnassigned ? 'Assign this lead' : `Assigned to ${label} — click to change`}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1" align="start">
+        {salesReps.length === 0 ? (
+          <p className="px-2 py-1.5 text-sm text-muted-foreground">No sales reps available</p>
+        ) : (
+          <div className="max-h-64 overflow-y-auto">
+            {salesReps.map((rep) => (
+              <button
+                key={repOptionId(rep)}
+                type="button"
+                className={menuItemClass}
+                title={rep.name}
+                onClick={() => onPick(repOptionId(rep))}
+              >
+                <span className="truncate">{rep.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const LeadTable = ({
   leads,
@@ -76,6 +162,9 @@ const LeadTable = ({
   onDeleteClick,
   onClaimClick,
   canDelete,
+  salesReps,
+  onAssign,
+  canChangeAssignment,
   viewMode = 'grid',
 }: LeadTableProps) => {
   const paginationStart = (currentPage - 1) * leadsPerPage + 1;
@@ -113,9 +202,8 @@ const LeadTable = ({
       const dateStr = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
       const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       return (
-        <div className="text-xs">
-          <div className="font-medium">{dateStr}</div>
-          <div className="text-muted-foreground">{timeStr}</div>
+        <div className="max-w-[130px] truncate" title={`${dateStr} ${timeStr}`}>
+          {dateStr} {timeStr}
         </div>
       );
     } catch (error) {
@@ -126,6 +214,13 @@ const LeadTable = ({
   const formatDate = (date: string | undefined) => {
     if (!date) return null;
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // `time` is not a field on the live lead model, which is why the Time column
+  // has always rendered N/A; leadDateTime is the timestamp that does exist.
+  const formatTime = (date: string | undefined) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   const getPackageDisplay = (lead: any) => {
@@ -310,8 +405,8 @@ const LeadTable = ({
                     )}
                     <div className="flex items-center gap-2 text-sm">
                       <User className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <span className={`truncate ${lead.salesRep || lead.adviser ? 'text-muted-foreground' : 'text-warning font-medium'}`}>
-                        {lead.salesRep || lead.adviser || 'Unassigned'}
+                      <span className={`truncate ${lead.assignedToId ? 'text-muted-foreground' : 'text-warning font-medium'}`}>
+                        {repLabelFor(lead, salesReps)}
                       </span>
                     </div>
                   </div>
@@ -482,11 +577,11 @@ const LeadTable = ({
           <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="sticky left-0 z-10 px-4 py-3 text-xs font-bold tracking-wider border-r border-border bg-muted">ID</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[190px]">Sales Rep</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[150px]">Name</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[130px]">Contact No.</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[120px]">Departure</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[180px]">E-mail ID</TableHead>
-              <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[130px]">Sales Rep</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[130px]">Whatsapp</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[110px]">Travelers</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[150px]">Package</TableHead>
@@ -497,8 +592,8 @@ const LeadTable = ({
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[100px]">Time</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[120px]">Remarks</TableHead>
               <TableHead className="px-4 py-3 text-xs font-bold border-r border-border min-w-[140px]">Created Date/Time</TableHead>
-              <TableHead className="px-4 py-3 text-xs font-bold border-r border-border sticky right-[250px] bg-muted z-10 min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.1)]">Status</TableHead>
-              <TableHead className="px-4 py-3 text-xs font-bold sticky right-0 bg-muted z-10 min-w-[250px] shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">Actions</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-bold border-r border-border sticky right-[172px] bg-muted z-10 min-w-[120px] shadow-[2px_0_4px_rgba(0,0,0,0.1)]">Status</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-bold sticky right-0 bg-muted z-10 min-w-[172px] shadow-[-2px_0_4px_rgba(0,0,0,0.1)]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -506,6 +601,7 @@ const LeadTable = ({
               const displayStatus = lead.lifecycleStatus;
               const statusColor = (statusColors && statusColors[displayStatus]) || 'bg-muted text-muted-foreground';
               const leadId = (lead._id || lead.id)?.toString();
+              const repLabel = repLabelFor(lead, salesReps);
               const isHighlighted = highlightedLeadId && leadId === highlightedLeadId.toString();
 
               return (
@@ -515,48 +611,83 @@ const LeadTable = ({
                   className={`cursor-pointer group ${isHighlighted ? 'bg-warning/10 border-2 border-warning/40 shadow-[var(--shadow-modal)]' : ''}`}
                   onClick={() => onLeadClick(lead)}
                 >
-                  <TableCell className="px-4 py-3 text-sm font-bold border-r border-border sticky left-0 bg-card group-hover:bg-muted z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)]">
+                  <TableCell className="px-4 py-2 text-sm font-bold border-r border-border sticky left-0 bg-card group-hover:bg-muted z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)]">
                     {(lead._id || lead.id).toString().substring(0, 8)}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-sm font-semibold text-foreground border-r border-border">{lead.name || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.phone || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.city || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.email || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.salesRep || lead.adviser || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.whatsapp || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.numberOfTravelers || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm border-r border-border">
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border" onClick={(e) => e.stopPropagation()}>
+                    {lead.assignedToId ? (
+                      canChangeAssignment ? (
+                        <RepPicker
+                          salesReps={salesReps || []}
+                          value={String(lead.assignedToId)}
+                          label={repLabel}
+                          onPick={(repId) => onAssign?.(String(lead._id || lead.id), repId)}
+                        />
+                      ) : (
+                        <div className="max-w-[160px] truncate" title={repLabel}>{repLabel}</div>
+                      )
+                    ) : (
+                      <RepPicker
+                        salesReps={salesReps || []}
+                        value={undefined}
+                        label="Unassigned"
+                        onPick={(repId) => onAssign?.(String(lead._id || lead.id), repId)}
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm font-semibold text-foreground border-r border-border">
+                    <div className="max-w-[170px] truncate" title={String(lead.name || '')}>{lead.name || 'N/A'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
+                    <div className="max-w-[130px] truncate" title={String(lead.phone || '')}>{lead.phone || 'N/A'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
+                    <div className="max-w-[130px] truncate" title={String(lead.city || '')}>{lead.city || 'N/A'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
+                    <div className="max-w-[190px] truncate" title={String(lead.email || '')}>{lead.email || 'N/A'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
+                    <div className="max-w-[140px] truncate" title={String(lead.whatsapp || '')}>{lead.whatsapp || 'N/A'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">{lead.numberOfTravelers || 'N/A'}</TableCell>
+                  <TableCell className="px-4 py-2 text-sm border-r border-border">
                     {(() => {
                       const packageInfo = getPackageDisplay(lead);
                       return (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-muted-foreground">{packageInfo.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground max-w-[150px] truncate" title={packageInfo.name}>{packageInfo.name}</span>
                           {packageInfo.badge}
                         </div>
                       );
                     })()}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.destination || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.platform || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
+                    <div className="max-w-[160px] truncate" title={String(lead.destination || '')}>{lead.destination || 'N/A'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
+                    <div className="max-w-[120px] truncate" title={String(lead.platform || '')}>{lead.platform || 'N/A'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
                     {lead.travelDate ? new Date(lead.travelDate).toISOString().split('T')[0] : 'N/A'}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">
                     {lead.endDate ? new Date(lead.endDate).toISOString().split('T')[0] : 'N/A'}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-sm text-muted-foreground border-r border-border">{lead.time || 'N/A'}</TableCell>
-                  <TableCell className="px-4 py-3 text-sm border-r border-border" onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="px-4 py-2 text-sm text-muted-foreground border-r border-border">{formatTime(lead.leadDateTime)}</TableCell>
+                  <TableCell className="px-4 py-2 text-sm border-r border-border" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => onRemarksClick(lead)}
-                      className="flex items-center gap-2 px-3 py-2 transition-colors rounded-lg hover:bg-muted group"
+                      title="View remarks"
+                      className="inline-flex h-8 items-center gap-2 px-2 transition-colors rounded-lg hover:bg-muted"
                     >
                       <MessageSquare className="w-4 h-4 text-primary" />
                       <span className="font-medium text-foreground">{lead.remarks?.length || 0}</span>
                     </button>
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-sm border-r border-border">{formatDateTime(lead.createdAt || lead.leadDateTime)}</TableCell>
+                  <TableCell className="px-4 py-2 text-sm border-r border-border">{formatDateTime(lead.createdAt || lead.leadDateTime)}</TableCell>
                   <TableCell
-                    className="px-4 py-3 whitespace-nowrap border-r border-border sticky right-[250px] bg-card group-hover:bg-muted z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)]"
+                    className="px-4 py-2 whitespace-nowrap border-r border-border sticky right-[172px] bg-card group-hover:bg-muted z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
@@ -568,45 +699,14 @@ const LeadTable = ({
                     </button>
                   </TableCell>
                   <TableCell
-                    className="px-4 py-3 text-sm text-muted-foreground sticky right-0 bg-card group-hover:bg-muted z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"
+                    className="w-[172px] px-4 py-2 text-sm text-muted-foreground sticky right-0 bg-card group-hover:bg-muted z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.1)]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex flex-wrap items-center gap-1">
-                      {displayStatus === 'PENDING_VERIFICATION' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClaimClick?.(lead);
-                          }}
-                          className="p-2 transition-colors bg-warning/10 text-warning rounded-lg hover:bg-warning/20"
-                          title="Claim Lead"
-                        >
-                          <span className="text-xs font-medium">Claim</span>
-                        </button>
-                      )}
-                      <button onClick={() => onEditClick?.(lead)} className={docActionClass} title="Edit Lead">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => onEditClick?.(lead)} className={docActionClass} title="Edit Lead" aria-label="Edit Lead">
                         <Edit className={docIconClass} />
                       </button>
-                      <button onClick={(e) => handleQuotationClick(e, lead)} className={docActionClass} title="Quotation">
-                        <FileText className={docIconClass} />
-                      </button>
-                      <button onClick={(e) => handleInvoiceClick(e, lead)} className={docActionClass} title="Invoice">
-                        <Receipt className={docIconClass} />
-                      </button>
-                      <button onClick={(e) => handleReceiptClick(e, lead)} className={docActionClass} title="Payment Receipt">
-                        <FileCheck className={docIconClass} />
-                      </button>
-                      <button onClick={(e) => handleVoucherClick(e, lead)} className={docActionClass} title="Travel Voucher">
-                        <Ticket className={docIconClass} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSectionClick?.(lead);
-                        }}
-                        className={docActionClass}
-                        title="View Documents"
-                      >
+                      <button onClick={(e) => handleQuotationClick(e, lead)} className={docActionClass} title="Quotation" aria-label="Quotation">
                         <FileText className={docIconClass} />
                       </button>
                       {(lead.phone || lead.whatsapp) && (
@@ -617,24 +717,72 @@ const LeadTable = ({
                           }}
                           className={docActionClass}
                           title="WhatsApp"
+                          aria-label="WhatsApp"
                         >
                           <MessageCircle className={docIconClass} />
                         </button>
                       )}
-                      {canDelete && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
-                              onDeleteClick?.(lead);
-                            }
-                          }}
-                          className="p-2 transition-colors bg-muted rounded-lg hover:bg-destructive/10"
-                          title="Delete Lead"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </button>
-                      )}
+                      <Popover>
+                        <PopoverTrigger className={docActionClass} title="More actions" aria-label="More actions">
+                          <MoreHorizontal className={docIconClass} />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-52 p-1" align="end">
+                          <button type="button" onClick={(e) => handleInvoiceClick(e, lead)} className={menuItemClass} title="Invoice">
+                            <Receipt className={docIconClass} />
+                            <span>Invoice</span>
+                          </button>
+                          <button type="button" onClick={(e) => handleReceiptClick(e, lead)} className={menuItemClass} title="Payment Receipt">
+                            <FileCheck className={docIconClass} />
+                            <span>Payment Receipt</span>
+                          </button>
+                          <button type="button" onClick={(e) => handleVoucherClick(e, lead)} className={menuItemClass} title="Travel Voucher">
+                            <Ticket className={docIconClass} />
+                            <span>Travel Voucher</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSectionClick?.(lead);
+                            }}
+                            className={menuItemClass}
+                            title="View Documents"
+                          >
+                            <FolderOpen className={docIconClass} />
+                            <span>View Documents</span>
+                          </button>
+                          {displayStatus === 'PENDING_VERIFICATION' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onClaimClick?.(lead);
+                              }}
+                              className={menuItemClass}
+                              title="Claim Lead"
+                            >
+                              <User className={docIconClass} />
+                              <span>Claim Lead</span>
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
+                                  onDeleteClick?.(lead);
+                                }
+                              }}
+                              className={`${menuItemClass} text-destructive hover:bg-destructive/10`}
+                              title="Delete Lead"
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                              <span>Delete Lead</span>
+                            </button>
+                          )}
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </TableCell>
                 </TableRow>

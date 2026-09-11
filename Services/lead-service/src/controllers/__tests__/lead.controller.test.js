@@ -63,7 +63,7 @@ vi.mock('../../services/notification.client.js', () => ({
 }));
 
 import {
-  updateLead, createLead, draftLead, assignLead, unassignLead,
+  updateLead, createLead, draftLead, assignLead, unassignLead, getLeads,
   getLeadsByStatus, searchLeads, handleFacebookLeadEvent,
   logCommunication, sendWhatsappReply, getLeadStats,
 } from '../lead.controller.js';
@@ -348,8 +348,8 @@ describe('assignLead / unassignLead — authorization and consistency', () => {
     expect(mockLeadUpdate).not.toHaveBeenCalled();
   });
 
-  it('allows a salesRep with the manage_leads permission to assign a lead', async () => {
-    mockLeadFindUnique.mockResolvedValue(leadFixture());
+  it('allows a salesRep with the manage_leads permission to assign an unassigned lead', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: null }));
     mockLeadUpdate.mockResolvedValue(leadFixture({ assignedToId: 'rep-b' }));
 
     const { req, res, next } = buildReqRes({ user: adminOrSalesRep({ permissions: ['manage_leads'] }), body: { assignedTo: 'rep-b' } });
@@ -358,6 +358,43 @@ describe('assignLead / unassignLead — authorization and consistency', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ assignedToId: 'rep-b', assignmentMode: 'manual' }),
+    }));
+  });
+
+  it('refuses to let a salesRep with manage_leads move a lead that already has an owner', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: 'rep-a' }));
+
+    const { req, res, next } = buildReqRes({ user: adminOrSalesRep({ permissions: ['manage_leads'] }), body: { assignedTo: 'rep-b' } });
+    await assignLead(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+    expect(mockLeadUpdate).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin to move a lead that already has an owner', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: 'rep-a' }));
+    mockLeadUpdate.mockResolvedValue(leadFixture({ assignedToId: 'rep-b' }));
+
+    const { req, res, next } = buildReqRes({ user: adminUser, body: { assignedTo: 'rep-b' } });
+    await assignLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ assignedToId: 'rep-b' }),
+    }));
+  });
+
+  it('allows a superAdmin to move a lead that already has an owner', async () => {
+    mockLeadFindUnique.mockResolvedValue(leadFixture({ assignedToId: 'rep-a' }));
+    mockLeadUpdate.mockResolvedValue(leadFixture({ assignedToId: 'rep-b' }));
+
+    const superAdmin = { id: 'super-1', role: 'salesRep', isSuperAdmin: true, permissions: [] };
+    const { req, res, next } = buildReqRes({ user: superAdmin, body: { assignedTo: 'rep-b' } });
+    await assignLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ assignedToId: 'rep-b' }),
     }));
   });
 
@@ -683,5 +720,61 @@ describe('getLeadStats — assigned/unassigned/conversionRate summary', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       summary: expect.objectContaining({ total: 0, assigned: 0, unassigned: 0, conversionRate: '0.0' }),
     }));
+  });
+});
+describe('getLeads / searchLeads — remarks reach the list UI', () => {
+  beforeEach(() => {
+    mockLeadFindMany.mockReset().mockResolvedValue([]);
+    mockLeadCount.mockReset().mockResolvedValue(0);
+  });
+
+  it('includes each lead’s remarks in the paginated list response', async () => {
+    const req = { query: {}, user: adminUser };
+    await getLeads(req, { json: vi.fn() }, vi.fn());
+
+    expect(mockLeadFindMany.mock.calls[0][0].include.remarks).toEqual({ orderBy: { date: 'desc' } });
+  });
+
+  it('includes each lead’s remarks in search results', async () => {
+    const req = { query: { query: 'jane' }, user: adminUser };
+    await searchLeads(req, { json: vi.fn() }, vi.fn());
+
+    expect(mockLeadFindMany.mock.calls[0][0].include.remarks).toEqual({ orderBy: { date: 'desc' } });
+  });
+});
+
+describe('updateLead — remarks replacement', () => {
+  beforeEach(() => {
+    mockLeadFindUnique.mockReset().mockResolvedValue(leadFixture());
+    mockLeadUpdate.mockReset().mockResolvedValue(leadFixture());
+  });
+
+  it('replaces the whole remarks list when the client sends one', async () => {
+    const { req, res, next } = buildReqRes({ body: { remarks: [{ text: 'Called the client', date: '2026-09-11' }] } });
+    await updateLead(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockLeadUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        remarks: {
+          deleteMany: {},
+          create: [{ text: 'Called the client', date: new Date('2026-09-11'), addedById: 'user-1' }],
+        },
+      }),
+    }));
+  });
+
+  it('clears every remark when the client sends an empty list', async () => {
+    const { req, res, next } = buildReqRes({ body: { remarks: [] } });
+    await updateLead(req, res, next);
+
+    expect(mockLeadUpdate.mock.calls[0][0].data.remarks).toEqual({ deleteMany: {}, create: [] });
+  });
+
+  it('leaves remarks untouched when the field is absent', async () => {
+    const { req, res, next } = buildReqRes({ body: { name: 'Renamed Lead' } });
+    await updateLead(req, res, next);
+
+    expect(mockLeadUpdate.mock.calls[0][0].data.remarks).toBeUndefined();
   });
 });

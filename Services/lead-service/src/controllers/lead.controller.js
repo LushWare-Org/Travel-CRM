@@ -175,7 +175,10 @@ export const getLeads = asyncHandler(async (req, res) => {
       skip,
       take: parseInt(limit),
       orderBy: { [sortBy]: order },
-      include: { packageSelections: { orderBy: { createdAt: 'asc' }, take: 1, include: { pricing: true } } },
+      include: {
+        packageSelections: { orderBy: { createdAt: 'asc' }, take: 1, include: { pricing: true } },
+        remarks: { orderBy: { date: 'desc' } },
+      },
     }),
     prisma.lead.count({ where }),
   ]);
@@ -320,11 +323,25 @@ export const updateLead = asyncHandler(async (req, res) => {
   if (validatedBody.endDate !== undefined) {
     updateData.endDate = validatedBody.endDate ? new Date(validatedBody.endDate) : null;
   }
+  // Remarks arrive as the entire array the client is holding (both the dedicated
+  // remarks dialog and the lead editor PUT the full list), so the update is a
+  // replace: absent means "leave alone", [] means "clear them all".
+  const remarksReplace = validatedBody.remarks === undefined
+    ? undefined
+    : {
+        deleteMany: {},
+        create: validatedBody.remarks.map((r) => ({
+          text: r.text,
+          date: r.date ? new Date(r.date) : new Date(),
+          addedById: r.addedBy || user.id,
+        })),
+      };
 
   const updated = await prisma.lead.update({
     where: { id: req.params.id },
     data: {
       ...updateData,
+      ...(remarksReplace && { remarks: remarksReplace }),
       ...(statusHistoryCreate.length && { statusHistory: { create: statusHistoryCreate } }),
     },
     include: { remarks: true, statusHistory: { orderBy: { changedAt: 'desc' } } },
@@ -404,11 +421,19 @@ export const getLeadRemarks = asyncHandler(async (req, res) => {
 
 export const assignLead = asyncHandler(async (req, res) => {
   const { user } = req;
-  const canManage = user.isSuperAdmin || user.role === 'admin' || user.permissions.includes('manage_leads');
+  const isAdmin = user.isSuperAdmin || user.role === 'admin';
+  const canManage = isAdmin || user.permissions.includes('manage_leads');
   if (!canManage) throw new AppError('Not authorized to assign this lead', 403);
 
   const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
   if (!lead) throw new AppError('Lead not found', 404);
+
+  // An unassigned lead is anyone's to pick up; moving one that already has an
+  // owner is an admin action, so it is enforced here rather than only hidden in
+  // the UI.
+  if (!isAdmin && lead.assignedToId) {
+    throw new AppError('Only an admin can change an assigned lead', 403);
+  }
 
   const { assignedTo } = req.body;
   const updated = await prisma.lead.update({
@@ -510,7 +535,7 @@ export const searchLeads = asyncHandler(async (req, res) => {
     where.AND.push({ OR: [{ assignedToId: user.id }, { lifecycleStatus: 'PENDING_VERIFICATION' }] });
   }
 
-  const leads = await prisma.lead.findMany({ where, take: 20 });
+  const leads = await prisma.lead.findMany({ where, take: 20, include: { remarks: { orderBy: { date: 'desc' } } } });
   res.json({ success: true, count: leads.length, data: leads });
 });
 

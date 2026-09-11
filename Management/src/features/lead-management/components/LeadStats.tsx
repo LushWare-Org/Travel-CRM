@@ -7,6 +7,7 @@ import { leadAPI } from '../../../services/api';
 import toast from '@/lib/toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { formatPercent } from '@/utils/number';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import type { LucideIcon } from 'lucide-react';
@@ -94,7 +95,7 @@ const LeadStats = ({ summary, salesReps, onAssignSuccess }: LeadStatsProps) => {
     { key: 'total', label: 'Total Leads', value: stats.total, icon: Users, color: 'muted' },
     { key: 'assigned', label: 'Assigned', value: stats.assigned, icon: UserCheck, color: 'success' },
     { key: 'unassigned', label: 'Unassigned', value: stats.unassigned, icon: UserX, color: 'warning' },
-    { key: 'conversion', label: 'Conversion Rate', value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'primary', clickable: false },
+    { key: 'conversion', label: 'Conversion Rate', value: formatPercent(stats.conversionRate), icon: TrendingUp, color: 'primary', clickable: false },
   ];
 
   const colorClasses: Record<string, string> = {

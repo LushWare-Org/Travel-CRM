@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const {
@@ -77,8 +77,10 @@ describe('LeadManagement — claim flow', () => {
     const user = userEvent.setup();
     render(<LeadManagement />);
 
-    const claimButton = await screen.findByRole('button', { name: /claim/i });
-    await user.click(claimButton);
+    // Claim lives in the row's overflow menu, which is portalled out of the row.
+    const pendingRow = (await screen.findByText('Chat Lead')).closest('tr');
+    await user.click(within(pendingRow).getByRole('button', { name: /more actions/i }));
+    await user.click(await screen.findByRole('button', { name: /claim lead/i }));
 
     await waitFor(() => expect(mockClaimLead).toHaveBeenCalledWith('p-1'));
     // A successful claim triggers a list + stats refetch.

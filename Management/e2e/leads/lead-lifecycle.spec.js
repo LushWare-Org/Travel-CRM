@@ -29,6 +29,30 @@ test.describe('Lead lifecycle', () => {
 
     await test.step('Create a lead with a manual itinerary', async () => {
       await page.goto('/leads');
+      // The status filter strip must stay inside its own row: before this guard,
+      // a `sm:w-fit` TabsList rendered 990px wide in a 650px slot and covered the
+      // Filters button and the card edge.
+      const overflowingStrips = await page.evaluate(() =>
+        [...document.querySelectorAll('[role=tablist]')].filter((list) => {
+          const parent = list.parentElement;
+          return list.getBoundingClientRect().right > parent.getBoundingClientRect().right + 1;
+        }).length
+      );
+      expect(overflowingStrips).toBe(0);
+      // The dock is a viewport-tall column, so nothing inside it may contribute to
+      // an ancestor's scroll range. When it did (absolutely positioned `sr-only`
+      // labels escaping its unpositioned scroller), the whole page scrolled past
+      // its content into blank space while the copilot was open.
+      const dockOverflowsAncestor = await page.evaluate(() => {
+        const dock = document.querySelector('[data-copilot-surface="dock"]');
+        if (!dock) return false;
+        for (let el = dock.parentElement; el; el = el.parentElement) {
+          if (el.scrollHeight > el.clientHeight + 1) return true;
+        }
+        return false;
+      });
+      expect(dockOverflowsAncestor).toBe(false);
+
       await page.getByRole('button', { name: 'New Lead' }).click();
 
       // data-testid is unique to the one dialog open at a time, so — unlike

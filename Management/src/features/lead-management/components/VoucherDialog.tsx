@@ -373,7 +373,7 @@ const VoucherDialog = ({ isOpen, onClose, lead, onSuccess, onEditLead, initialSe
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent showCloseButton={false} className="p-0 gap-0 w-full max-w-6xl h-full sm:h-[92vh] rounded-none sm:rounded-3xl overflow-hidden flex flex-col md:flex-row">
+        <DialogContent showCloseButton={false} className="p-0 gap-0 w-full sm:max-w-6xl h-full sm:h-[92vh] rounded-none sm:rounded-3xl overflow-hidden flex flex-col md:flex-row">
           {/* Left Sidebar */}
           <div className="hidden md:flex w-64 bg-primary text-primary-foreground flex-col shrink-0">
             {/* Logo Area */}

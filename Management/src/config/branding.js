@@ -11,8 +11,8 @@
 // Shipped brand fallbacks, used only when the VITE_COMPANY_* vars are unset.
 // They cover company.name, app.name and pdf.company - NOT the <title> literal in
 // Management/index.html (hand-edited) and not `legalName` (a separate fact).
-const DEFAULT_COMPANY_NAME = 'Lush Travel Providers';
-const DEFAULT_COMPANY_SHORT_NAME = 'LTP';
+const DEFAULT_COMPANY_NAME = 'Lush Travel Cloud';
+const DEFAULT_COMPANY_SHORT_NAME = 'LTC';
 
 const BRANDING = {
     // ==========================================

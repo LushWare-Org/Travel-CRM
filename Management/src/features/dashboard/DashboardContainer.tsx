@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { usePermission } from '../../contexts/PermissionContext';
+import { formatPercent } from '@/utils/number';
 import { useAuth } from '../../contexts/AuthContext';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -298,7 +299,7 @@ const SalesRepDashboard = ({ data }: { data: any }) => {
     { icon: Users, label: 'Leads Assigned', value: performance.leadsAssigned || 0, color: 'muted' },
     { icon: Target, label: 'Converted', value: performance.converted || 0, color: 'success' },
     { icon: Clock, label: 'Pending', value: performance.pending || 0, color: 'warning' },
-    { icon: TrendingUp, label: 'Conversion Rate', value: `${performance.conversionRate || 0}%`, color: 'primary' },
+    { icon: TrendingUp, label: 'Conversion Rate', value: formatPercent(performance.conversionRate), color: 'primary' },
   ];
 
   return (

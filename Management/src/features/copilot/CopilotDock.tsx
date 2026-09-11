@@ -18,7 +18,15 @@ export default function CopilotDock({ children, labelledBy }: CopilotDockProps) 
       data-copilot-surface="dock"
       className="sticky top-0 hidden h-dvh w-[360px] shrink-0 flex-col border-l border-border bg-card min-[1440px]:w-[388px] xl:flex"
     >
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 scroll-pb-24">
+      {/*
+        `relative` is load-bearing, not decoration: this scroller is the dock's
+        only scroll container, and without a positioning context the absolutely
+        positioned `sr-only` labels deep inside the briefing resolve against the
+        sticky <aside> instead. They then escape this element's clip and stretch
+        the app shell's scrollable area by ~1900px, so the page scrolls past its
+        content into blank space whenever the dock is open.
+      */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 scroll-pb-24">
         {children}
       </div>
     </aside>
