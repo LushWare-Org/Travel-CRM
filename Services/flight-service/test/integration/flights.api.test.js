@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { MockFlightClient } from '../../src/clients/mock.client.js';
-import { buildFlightOffer, buildSearchRequest, buildBookingRequest } from '../factories/flight.js';
+import {
+  buildFlightOffer,
+  buildFlightSegment,
+  buildSearchRequest,
+  buildBookingRequest,
+} from '../factories/flight.js';
 
 // ── Ensure mock mode (no real Travelport calls) ─────────────────────
 beforeAll(() => {
@@ -134,6 +139,53 @@ describe('Flight API — Search & Book', () => {
       expect(res.body.data.status).toBe('confirmed');
     });
 
+    it('should store the trip type the caller searched with', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+      prisma.$executeRaw.mockResolvedValue(undefined);
+      prisma.flightBooking.create.mockResolvedValue({ id: 'booking-rt', pnr: 'MOCKRT', status: 'confirmed' });
+
+      const res = await request(app)
+        .post('/api/v1/flights/book')
+        .set(authHeaders())
+        .send(
+          buildBookingRequest({
+            tripType: 'roundTrip',
+            offer: buildFlightOffer({
+              legCount: 2,
+              segments: [buildFlightSegment({ sequence: 1 }), buildFlightSegment({ sequence: 101 })],
+            }),
+          }),
+        );
+
+      expect(res.status).toBe(201);
+      expect(prisma.flightBooking.create.mock.calls[0][0].data.tripType).toBe('roundTrip');
+    });
+
+    // The validated boundary fills tripType in from its own default, so the
+    // offer-derived inference in the controller is only reachable below the
+    // HTTP layer (covered by the controller unit tests).
+    it('should default an omitted tripType to oneWay', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+      prisma.$executeRaw.mockResolvedValue(undefined);
+      prisma.flightBooking.create.mockResolvedValue({ id: 'booking-def', pnr: 'MOCKDEF', status: 'confirmed' });
+
+      const payload = buildBookingRequest({
+        offer: buildFlightOffer({
+          legCount: 2,
+          segments: [buildFlightSegment({ sequence: 1 }), buildFlightSegment({ sequence: 101 })],
+        }),
+      });
+      delete payload.tripType;
+
+      const res = await request(app)
+        .post('/api/v1/flights/book')
+        .set(authHeaders())
+        .send(payload);
+
+      expect(res.status).toBe(201);
+      expect(prisma.flightBooking.create.mock.calls[0][0].data.tripType).toBe('oneWay');
+    });
+
     it('should return 400 when travelers array is empty', async () => {
       const res = await request(app)
         .post('/api/v1/flights/book')
@@ -194,6 +246,20 @@ describe('Flight API — Booking Management', () => {
       expect(res.body.data).toHaveLength(2);
     });
 
+    it('should return segments in sequence order', async () => {
+      prisma.flightBooking.findMany.mockResolvedValue([]);
+
+      await request(app)
+        .get('/api/v1/flights/bookings')
+        .set(authHeaders());
+
+      expect(prisma.flightBooking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: { segments: { orderBy: { sequence: 'asc' } }, travelers: true },
+        }),
+      );
+    });
+
     it('should filter by status', async () => {
       prisma.flightBooking.findMany.mockResolvedValue([]);
 
@@ -229,6 +295,22 @@ describe('Flight API — Booking Management', () => {
         .set(authHeaders());
 
       expect(res.status).toBe(404);
+    });
+
+    it('should read segments in sequence order', async () => {
+      prisma.flightBooking.findFirst.mockResolvedValue({
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', segments: [], travelers: [],
+      });
+
+      await request(app)
+        .get('/api/v1/flights/bookings/a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+        .set(authHeaders());
+
+      expect(prisma.flightBooking.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: { segments: { orderBy: { sequence: 'asc' } }, travelers: true },
+        }),
+      );
     });
   });
 
@@ -267,6 +349,27 @@ describe('Flight API — Booking Management', () => {
 
       expect(res.status).toBe(200);
     });
+  });
+});
+
+describe('Flight API — lead-scoped bookings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should read segments in sequence order', async () => {
+    prisma.flightBooking.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/v1/flights/bookings/by-lead/a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+      .set(authHeaders());
+
+    expect(res.status).toBe(200);
+    expect(prisma.flightBooking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { segments: { orderBy: { sequence: 'asc' } }, travelers: true },
+      }),
+    );
   });
 });
 

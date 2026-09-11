@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Ban, ListChecks, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -5,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { DataTable, type DataTableColumn } from '@/components/shared/DataTable';
-import { STATUS_TABS, fmtDate, fmtMoney } from './helpers';
+import { STATUS_TABS, BOOKINGS_PAGE_SIZE, fmtDate, fmtMoney } from './helpers';
+import { routeChain } from '@/features/shared/utils/flightSegments';
 import type { FlightBookingRecord } from './types';
 
 // Grouped by meaning, same convention as StatusBadge/LeadStatusBadge:
@@ -60,12 +62,19 @@ export default function BookingsPanel({
   setCancelDialog,
   onCancel,
 }: BookingsPanelProps) {
+  const [visibleCount, setVisibleCount] = useState(BOOKINGS_PAGE_SIZE);
+  const visibleBookings = filteredBookings.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(BOOKINGS_PAGE_SIZE);
+  }, [bookings, statusFilter, search]);
+
   const columns: DataTableColumn<FlightBookingRecord>[] = [
     { key: 'pnr', header: 'PNR', className: 'font-mono font-medium text-foreground', render: (b) => b.pnr || '-' },
     {
       key: 'route',
       header: 'Route',
-      render: (b) => `${b.segments?.[0]?.origin ?? ''} → ${b.segments?.[(b.segments?.length ?? 1) - 1]?.destination ?? ''}`,
+      render: (b) => routeChain(b.segments) || '-',
     },
     { key: 'departure', header: 'Departure', numeric: true, render: (b) => fmtDate(b.segments?.[0]?.departureAt) },
     { key: 'travelers', header: 'Travelers', numeric: true, render: (b) => b.travelers?.length || 0 },
@@ -128,12 +137,15 @@ export default function BookingsPanel({
         </div>
       ) : (
         <>
-          <DataTable columns={columns} data={filteredBookings} getRowKey={(b) => b.id} className="rounded-none border-0 shadow-none" />
-          {filteredBookings.length > 10 && (
-            <div className="border-t border-border px-4 py-3 text-center text-xs text-muted-foreground">
-              Showing {filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''}
-            </div>
-          )}
+          <DataTable columns={columns} data={visibleBookings} getRowKey={(b) => b.id} className="rounded-none border-0 shadow-none" />
+          <div className="border-t border-border px-4 py-3 text-center text-xs text-muted-foreground">
+            Showing {visibleBookings.length} of {filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''}
+            {visibleBookings.length < filteredBookings.length && (
+              <Button variant="outline" size="sm" className="ml-3" onClick={() => setVisibleCount((c) => c + BOOKINGS_PAGE_SIZE)}>
+                Show {Math.min(BOOKINGS_PAGE_SIZE, filteredBookings.length - visibleBookings.length)} more
+              </Button>
+            )}
+          </div>
         </>
       )}
 

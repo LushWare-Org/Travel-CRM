@@ -133,11 +133,20 @@ export const buildItineraryDayFromAIDay = (aiDay: RawAIDay, index: number): Itin
 
 // ── Date helpers shared by the manual duration calc and the chat panel ──
 
-/** Whole-day count between two ISO date strings, 0 if either is empty. */
-export const computeDurationDays = (start: string, end: string): number =>
-  start && end
-    ? Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24))
-    : 0;
+/** Inclusive day count of a whole-day range — both endpoints are trip days,
+ * 0 when either date is missing or the end precedes the start.
+ *
+ * A start/end pair one day apart is a 2-day/1-night trip and must yield 2:
+ * this value is the itinerary's day count everywhere downstream (the
+ * "N Days / N-1 Nights" label, the `duration` sent to the N-day AI preview,
+ * the per-day/bulk-fill day-number ceiling), and ItineraryChatPanel's default
+ * end date (addDaysISO(start, duration - 1)) already assumes an inclusive
+ * range. */
+export const computeDurationDays = (start: string, end: string): number => {
+  if (!start || !end) return 0;
+  const diffDays = Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays < 0 ? 0 : diffDays + 1;
+};
 
 /** Adds `days` whole days to an ISO date string, returning an ISO date string. */
 export const addDaysISO = (isoDate: string, days: number): string => {

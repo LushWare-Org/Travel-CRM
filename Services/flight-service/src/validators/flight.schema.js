@@ -33,6 +33,10 @@ const traveler = z.object({
   passportExpiry: dateString.nullable().optional(),
   nationality: z.string().length(2, 'Must be 2-letter country code').nullable().optional(),
   frequentFlyerNumber: z.string().nullable().optional(),
+  // Provider (Duffel) passenger id from the offer's passengerIds. Required to
+  // book a Duffel offer; stripped here it never reaches createOrder and the
+  // order 422s at /passengers/{i}/id.
+  passengerId: z.string().min(1).optional(),
 });
 
 // ═══════════════════════════════════════════════════════════════════

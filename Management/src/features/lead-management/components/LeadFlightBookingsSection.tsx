@@ -6,6 +6,7 @@ import { flightAPI } from '../../../services/flight.service';
 import { leadAPI } from '../../../services/api';
 import { FlightSelectionModal, FlightPreferenceCard } from '../../shared';
 import { getOutboundModalDefaults } from '../../shared/utils/flightLegDefaults';
+import { routeChain } from '../../shared/utils/flightSegments';
 import { deriveItemState, ITEM_STATE_LABELS, ITEM_STATE_COLORS } from '../utils/bookingState';
 import { Button } from '@/components/ui/button';
 import { apiErrorMessage } from '@/lib/apiErrorMessage';
@@ -233,7 +234,9 @@ export default function LeadFlightBookingsSection({
                           <span className="text-sm font-semibold text-foreground">Day {day.dayNumber}</span>
                           {(booked || hasPrefs) && (
                             <span className="text-sm text-muted-foreground">
-                              {(dayBooking?.segments?.[0]?.origin || firstFlight?.origin)} → {(dayBooking?.segments?.[dayBooking?.segments?.length - 1]?.destination || firstFlight?.destination)}
+                              {dayBooking?.segments?.length
+                                ? routeChain(dayBooking.segments)
+                                : `${firstFlight?.origin ?? ''} → ${firstFlight?.destination ?? ''}`}
                             </span>
                           )}
                           <span className={`px-1.5 py-0.5 text-xs rounded-full border ${stateColor}`}>

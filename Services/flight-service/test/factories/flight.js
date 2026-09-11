@@ -54,6 +54,7 @@ export function buildFlightOffer(overrides = {}) {
     offerId: overrides.offerId || faker.string.uuid(),
     airline: overrides.airline || 'Emirates',
     airlineCode: overrides.airlineCode || 'EK',
+    legCount: overrides.legCount ?? 1,
     cabinClass: overrides.cabinClass || 'Economy',
     currency: overrides.currency || 'USD',
     baseFare: overrides.baseFare ?? 220,
