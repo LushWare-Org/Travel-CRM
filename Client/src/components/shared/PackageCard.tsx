@@ -12,9 +12,16 @@ export interface PackageCardProps {
   /**
    * Required. Resolved cover URL (the caller picks its own source order, e.g.
    * `image_url || images[0]`). An empty/missing URL — and any URL that fails
-   * to load — renders the site-wide `FALLBACK_IMAGE` instead.
+   * to load — renders `fallbackImage` when supplied, otherwise the site-wide
+   * `FALLBACK_IMAGE`.
    */
   image?: string;
+  /**
+   * Optional. Used when `image` is missing or fails to load — package surfaces
+   * pass `categoryImage(pkg.category)`. Defaults to the site-wide
+   * `FALLBACK_IMAGE`.
+   */
+  fallbackImage?: string;
   /** Required. Card heading text; also used as the image's alt text. */
   title: string;
   /**
@@ -102,6 +109,7 @@ export interface PackageCardProps {
 export default function PackageCard({
   href,
   image,
+  fallbackImage,
   title,
   price,
   badge,
@@ -112,6 +120,9 @@ export default function PackageCard({
   className,
   imageClassName,
 }: PackageCardProps) {
+  const fallbackSrc = fallbackImage || FALLBACK_IMAGE;
+  const imageSrc = image || fallbackSrc;
+
   return (
     <Link
       to={href}
@@ -128,15 +139,15 @@ export default function PackageCard({
       >
         <picture>
           <source
-            srcSet={(image || FALLBACK_IMAGE)?.replace(/\.(jpg|jpeg|png)$/i, '.webp')}
+            srcSet={imageSrc.replace(/\.(jpg|jpeg|png)$/i, '.webp')}
             type="image/webp"
           />
           <img
-            src={image || FALLBACK_IMAGE}
+            src={imageSrc}
             alt={title}
             loading="lazy"
             onError={(e) => {
-              e.currentTarget.src = FALLBACK_IMAGE;
+              e.currentTarget.src = fallbackSrc;
             }}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
           />

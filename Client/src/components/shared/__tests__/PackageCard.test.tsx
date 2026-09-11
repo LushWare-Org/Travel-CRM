@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { FALLBACK_IMAGE } from '@/config/media';
 import PackageCard, { type PackageCardProps } from '../PackageCard';
@@ -42,6 +42,30 @@ describe('PackageCard', () => {
       'src',
       FALLBACK_IMAGE,
     );
+  });
+
+  it('prefers the package image over the supplied category fallback', () => {
+    renderCard({ image: '/cover.jpg', fallbackImage: '/lush/categories/family.jpg' });
+
+    expect(screen.getByRole('img', { name: 'Bali Paradise' })).toHaveAttribute('src', '/cover.jpg');
+  });
+
+  it('uses the supplied category fallback when the image is missing', () => {
+    renderCard({ image: '', fallbackImage: '/lush/categories/family.jpg' });
+
+    expect(screen.getByRole('img', { name: 'Bali Paradise' })).toHaveAttribute(
+      'src',
+      '/lush/categories/family.jpg',
+    );
+  });
+
+  it('swaps a broken image for the supplied category fallback', () => {
+    renderCard({ fallbackImage: '/lush/categories/family.jpg' });
+
+    const img = screen.getByRole('img', { name: 'Bali Paradise' }) as HTMLImageElement;
+    fireEvent.error(img);
+
+    expect(img.src).toContain('/lush/categories/family.jpg');
   });
 
   it('renders the badge slot when provided', () => {

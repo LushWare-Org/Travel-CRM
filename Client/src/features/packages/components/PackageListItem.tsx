@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Clock, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '../../../lib/currency';
 import type { EnrichedPackage } from '../PackagesContainer';
+import { categoryImage } from '../../../config/media';
 
 interface PackageListItemProps {
   pkg: EnrichedPackage;
@@ -9,6 +10,8 @@ interface PackageListItemProps {
 
 export default function PackageListItem({ pkg }: PackageListItemProps) {
   const navigate = useNavigate();
+  const imageSrc = pkg.images?.[0] || pkg.image_url || categoryImage(pkg.category);
+
   return (
     <div
       onClick={() => navigate(`/package/${pkg.id}`)}
@@ -20,15 +23,15 @@ export default function PackageListItem({ pkg }: PackageListItemProps) {
       <div className="flex flex-col lg:flex-row">
         <div className="relative lg:w-80 h-64 lg:h-80 overflow-hidden flex-shrink-0">
           <picture>
-            <source
-              srcSet={(pkg.images && pkg.images[0])?.replace(/\.(jpg|jpeg|png)$/i, '.webp') || (pkg.image_url?.replace(/\.(jpg|jpeg|png)$/i, '.webp') || '')}
-              type="image/webp"
-            />
+            <source srcSet={imageSrc.replace(/\.(jpg|jpeg|png)$/i, '.webp')} type="image/webp" />
             <img
-              src={(pkg.images && pkg.images[0]) || pkg.image_url}
+              src={imageSrc}
               alt={pkg.title}
               loading="lazy"
               decoding="async"
+              onError={(e) => {
+                e.currentTarget.src = categoryImage(pkg.category);
+              }}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           </picture>
