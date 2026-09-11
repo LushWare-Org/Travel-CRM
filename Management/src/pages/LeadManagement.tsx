@@ -430,11 +430,14 @@ const LeadManagement = () => {
           )
         }
       >
-        {/* The header sits inside the content column: CopilotDock is a
-            full-viewport-tall sticky column, so anything stacked above the grid
-            made the page taller than the viewport and scrolling then revealed a
-            blank band beside the sidebar. */}
-        <div className="flex min-h-dvh flex-col">
+        {/* The header sits inside the content column, and the column is exactly
+            one viewport tall (h-dvh, not min-h-dvh) with the body below scrolling
+            inside it. Two reasons: CopilotDock beside it is a full-viewport-tall
+            sticky column, so an unbounded column would make the page taller than
+            the viewport and reveal a blank band beside the sidebar; and matching
+            heights is what keeps the two columns looking deliberately paired
+            rather than one towering over a short list. */}
+        <div className="flex h-dvh flex-col">
           {/* Header */}
           <div className="bg-card border-b border-border">
             <div className="px-4 sm:px-6 py-4 sm:py-5">
@@ -475,7 +478,7 @@ const LeadManagement = () => {
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
             {/* Stats Cards */}
             <LeadStats
               summary={statsSummary}
