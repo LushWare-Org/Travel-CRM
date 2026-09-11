@@ -134,8 +134,8 @@ export function useCopilotSession(
   const open = options.open ?? false;
   const scopeKey = deriveScopeKey(scope);
 
-  const [session, setSessionState] = useState<Session>(() => createSession(scopeKey));
-  const sessionRef = useRef(session);
+  const [sessionState, setSessionState] = useState<Session>(() => createSession(scopeKey));
+  const sessionRef = useRef(sessionState);
   const activeKeyRef = useRef(scopeKey);
   // The committed session key. The reset below is guarded by this STATE rather
   // than only by `activeKeyRef`: React may discard a render pass, and a ref
@@ -173,6 +173,18 @@ export function useCopilotSession(
     briefingStartedRef.current = null;
     setSessionState(sessionRef.current);
   }
+
+  // The reset above races completions belonging to the scope being left: React
+  // can re-commit one of those already-queued writes after the reset, leaving
+  // the state holding the previous scope's session. With the selection cleared
+  // there is nothing left in flight to correct it, so the cleared scope's
+  // composer and its claims would stay on screen indefinitely. Wherever the
+  // state has drifted, this render presents the scope it was actually given:
+  // a session carrying another scope's key is discarded rather than shown.
+  const session = sessionState.scopeKey === scopeKey ? sessionState : createSession(scopeKey);
+  // Point later completions at the session being presented, so the state
+  // converges on the next commit rather than staying stale.
+  if (session !== sessionState) sessionRef.current = session;
 
   const register = useCallback((controller: AbortController) => {
     controllersRef.current.add(controller);
