@@ -492,7 +492,13 @@ const LeadManagement = () => {
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+          {/* `[&>*]:shrink-0` keeps each section at its natural height. Without it
+              this flex column shrinks its tallest children to fit one viewport
+              instead of scrolling: the filters card collapsed to 131px (hiding the
+              Source/Platform chips behind its own overflow-hidden) and the table to
+              250px (7 of 11 rows behind an inner scrollbar). The column is meant to
+              scroll — that is what the overflow-y-auto is for. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 [&>*]:shrink-0">
             {/* Stats Cards */}
             <LeadStats
               summary={statsSummary}
