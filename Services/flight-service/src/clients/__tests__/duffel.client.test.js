@@ -229,6 +229,7 @@ describe('DuffelClient', () => {
       expect(offer.offerId).toBe('off_00009htYpSCXrwaB9DnUm0');
       expect(offer.airline).toBe('Emirates');
       expect(offer.airlineCode).toBe('EK');
+      expect(offer.legCount).toBe(1);
       expect(offer.currency).toBe('USD');
       expect(offer.baseFare).toBe(250.00);
       expect(offer.taxes).toBe(51.57);
@@ -258,6 +259,59 @@ describe('DuffelClient', () => {
       expect(body.data.slices[0].departure_date).toBe('2026-09-10');
       expect(body.data.slices[1].departure_date).toBe('2026-09-20');
       expect(body.data.passengers).toHaveLength(2);
+    });
+
+    it('should report one leg per slice and flatten both slices\' segments for a round trip', async () => {
+      const segment = (number, origin, destination, departingAt, duration) => ({
+        marketing_carrier: { iata_code: 'EK', name: 'Emirates' },
+        marketing_carrier_flight_number: number,
+        origin: { iata_code: origin },
+        destination: { iata_code: destination },
+        departing_at: departingAt,
+        arriving_at: departingAt,
+        duration,
+      });
+
+      mockAxiosInstance.post.mockResolvedValue(
+        mockDuffelOfferRequest({
+          offers: [
+            {
+              id: 'off_rt_1',
+              owner: { name: 'Emirates', iata_code: 'EK' },
+              total_amount: '620.00',
+              total_currency: 'USD',
+              base_amount: '520.00',
+              tax_amount: '100.00',
+              slices: [
+                {
+                  cabin_class: 'economy',
+                  segments: [
+                    segment('1', 'LHR', 'IST', '2026-08-01T08:00:00Z', 'PT4H'),
+                    segment('2', 'IST', 'DXB', '2026-08-01T13:00:00Z', 'PT5H'),
+                  ],
+                },
+                {
+                  cabin_class: 'economy',
+                  segments: [segment('3', 'DXB', 'LHR', '2026-08-08T08:00:00Z', 'PT7H')],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const offers = await client.searchFlights({
+        origin: 'LHR',
+        destination: 'DXB',
+        departureDate: '2026-08-01',
+        returnDate: '2026-08-08',
+        adults: 1,
+      });
+
+      expect(offers[0].legCount).toBe(2);
+      expect(offers[0].segments).toHaveLength(3);
+      // Sequence is sliceIdx * 100 + segIdx + 1 — the booking read orders by it.
+      expect(offers[0].segments.map((s) => s.sequence)).toEqual([1, 2, 101]);
     });
 
     it('should reject when required fields are missing', async () => {

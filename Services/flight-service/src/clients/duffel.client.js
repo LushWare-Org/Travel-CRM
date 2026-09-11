@@ -276,6 +276,7 @@ export class DuffelClient {
         offerId: offer.id,
         airline: offer.owner?.name || 'Unknown',
         airlineCode: offer.owner?.iata_code || 'XX',
+        legCount: (offer.slices || []).length,
         cabinClass: firstSlice?.cabin_class || 'economy',
         currency: offer.total_currency,
         baseFare: parseFloat(offer.base_amount) || 0,

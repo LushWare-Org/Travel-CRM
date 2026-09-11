@@ -6,6 +6,13 @@ import { SALES_REP } from '../constants/roles.js';
 import { CREATED, BAD_REQUEST, NOT_FOUND } from '../constants/httpStatus.js';
 import { BOOKING_NOT_FOUND, BOOKING_ALREADY_CANCELLED } from '../constants/errorMessages.js';
 
+// Every booking read returns its segments in journey order: sequence is the
+// provider's own ordering key, and route/departure rendering depends on it.
+const BOOKING_INCLUDE = {
+  segments: { orderBy: { sequence: 'asc' } },
+  travelers: true,
+};
+
 // ── cross-schema helpers (mirrors Services/booking-service's pattern) ─────
 
 async function findUserByEmail(email) {
@@ -86,7 +93,7 @@ export const book = asyncHandler(async (req, res) => {
       travelportOrderId: order.travelportOrderId,
       createdById: req.user.id,
       customerId: customer.id,
-      tripType: tripType || (offer.segments?.length > 1 ? 'roundTrip' : 'oneWay'),
+      tripType: tripType || ((offer.legCount ?? 1) > 1 ? 'roundTrip' : 'oneWay'),
       cabinClass: offer.cabinClass || 'Economy',
       currency: offer.currency || 'USD',
       baseFare: offer.baseFare,
@@ -126,7 +133,7 @@ export const book = asyncHandler(async (req, res) => {
         })),
       },
     },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
   });
 
   req.log.info({ bookingId: booking.id, pnr: booking.pnr }, 'Flight booked');
@@ -144,7 +151,7 @@ export const listBookings = asyncHandler(async (req, res) => {
   const [bookings, total] = await Promise.all([
     prisma.flightBooking.findMany({
       where,
-      include: { segments: true, travelers: true },
+      include: BOOKING_INCLUDE,
       orderBy: { [sortBy]: order },
       ...(limit && { skip: (page - 1) * limit, take: limit }),
     }),
@@ -169,7 +176,7 @@ export const getBooking = asyncHandler(async (req, res) => {
 
   const booking = await prisma.flightBooking.findFirst({
     where: { id, ...(isScopedToOwn && { createdById: req.user.id }) },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
   });
 
   if (!booking) throw new AppError(BOOKING_NOT_FOUND, NOT_FOUND);
@@ -194,7 +201,7 @@ export const cancelBooking = asyncHandler(async (req, res) => {
   const updated = await prisma.flightBooking.update({
     where: { id },
     data: { status: 'cancelled', cancelledAt: new Date(), cancellationReason: reason || undefined },
-    include: { segments: true, travelers: true },
+    include: BOOKING_INCLUDE,
   });
 
   res.json({ success: true, data: updated });

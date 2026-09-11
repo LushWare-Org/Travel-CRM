@@ -25,6 +25,10 @@ export interface FlightOffer {
   taxes?: number;
   fareTotal: number;
   currency?: string;
+  /** Journey legs (Duffel slices): 2 for a round trip. Absent on providers that do not report it. */
+  legCount?: number;
+  /** Provider (Duffel) passenger ids, in the adults → children → infants order the forms are built in. */
+  passengerIds?: string[];
   segments?: FlightSegmentOffer[];
 }
 
@@ -41,6 +45,7 @@ export interface TravelerForm {
   passportExpiry: string;
   nationality: string;
   frequentFlyerNumber: string;
+  passengerId?: string;
 }
 
 export interface ContactForm {
@@ -50,6 +55,16 @@ export interface ContactForm {
 }
 
 export type TripType = 'oneWay' | 'roundTrip';
+
+/** The search that produced the displayed offers — what the traveler form and the booking are built from. */
+export interface FlightSearchContext {
+  origin: string;
+  destination: string;
+  tripType: TripType;
+  adults: number;
+  children: number;
+  infants: number;
+}
 
 export interface SearchFormState {
   origin: string;

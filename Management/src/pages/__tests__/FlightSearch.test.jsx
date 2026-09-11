@@ -1,0 +1,251 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+const { mockSearch, mockBook, mockListBookings, mockCancelBooking } = vi.hoisted(() => ({
+  mockSearch: vi.fn(),
+  mockBook: vi.fn(),
+  mockListBookings: vi.fn(),
+  mockCancelBooking: vi.fn(),
+}));
+
+vi.mock('../../services/flight.service', () => ({
+  flightAPI: {
+    search: mockSearch,
+    book: mockBook,
+    listBookings: mockListBookings,
+    cancelBooking: mockCancelBooking,
+  },
+}));
+
+// Mounting the page mounts PageCopilot, whose session hooks reach
+// services/api.js → @travel-crm/contracts → zod, which is not resolvable from
+// the shared Services/ tree under vitest. The copilot is off by default and
+// nothing here goes through it, so the module is stubbed.
+vi.mock('../../services/api', () => ({
+  API_BASE_URL: 'http://localhost:3000/api/v1',
+  default: {},
+}));
+
+vi.mock('@/lib/toast', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
+import FlightSearch from '../FlightSearch';
+
+// Every case here mounts the whole page and drives it through Base UI controls,
+// which is slow enough on a loaded runner to trip vitest's 5s default.
+vi.setConfig({ testTimeout: 20_000 });
+
+const seg = (origin, destination, departureAt, arrivalAt, durationMinutes, sequence) => ({
+  origin,
+  destination,
+  departureAt,
+  arrivalAt,
+  durationMinutes,
+  sequence,
+});
+
+const oneWayOffer = (index, segmentCount = 1) => {
+  const stops = ['DXB', 'IST', 'CAI', 'AMM'];
+  const segments = [];
+  let origin = 'LHR';
+  for (let i = 0; i < segmentCount; i++) {
+    const destination = stops[i % stops.length];
+    segments.push(seg(origin, destination, `2026-09-20T0${i + 8}:00:00Z`, `2026-09-20T1${i}:00:00Z`, 180, i + 1));
+    origin = destination;
+  }
+  return {
+    offerId: `off-ow-${index}`,
+    airline: `Airline ${index}`,
+    airlineCode: `A${index % 10}`,
+    cabinClass: 'Economy',
+    fareTotal: 200 + index,
+    currency: 'USD',
+    legCount: 1,
+    passengerIds: [`pas_ow_${index}`],
+    segments,
+  };
+};
+
+const NONSTOP_ROUND_TRIP = {
+  offerId: 'off-rt-nonstop',
+  airline: 'Emirates',
+  airlineCode: 'EK',
+  cabinClass: 'Economy',
+  fareTotal: 620,
+  currency: 'USD',
+  legCount: 2,
+  passengerIds: ['pas_rt_1'],
+  segments: [
+    seg('LHR', 'DXB', '2026-09-20T08:00:00Z', '2026-09-20T15:00:00Z', 420, 1),
+    seg('DXB', 'LHR', '2026-09-27T08:00:00Z', '2026-09-27T15:10:00Z', 430, 101),
+  ],
+};
+
+const CONNECTING_ROUND_TRIP = {
+  offerId: 'off-rt-connecting',
+  airline: 'Turkish Airlines',
+  airlineCode: 'TK',
+  cabinClass: 'Economy',
+  fareTotal: 700,
+  currency: 'USD',
+  legCount: 2,
+  passengerIds: ['pas_rt_2'],
+  segments: [
+    seg('LHR', 'IST', '2026-09-20T08:00:00Z', '2026-09-20T12:00:00Z', 240, 1),
+    seg('IST', 'DXB', '2026-09-20T13:00:00Z', '2026-09-20T18:00:00Z', 300, 2),
+    seg('DXB', 'AMS', '2026-09-27T08:00:00Z', '2026-09-27T10:00:00Z', 120, 101),
+    seg('AMS', 'LHR', '2026-09-27T11:00:00Z', '2026-09-27T13:00:00Z', 120, 102),
+  ],
+};
+
+const booking = (index, status) => ({
+  id: `booking-${index}`,
+  pnr: `PNR-${index}`,
+  status,
+  segments: [seg('CMB', 'DXB', '2026-09-20T08:00:00Z')],
+  travelers: [{ type: 'adult', firstName: 'John', lastName: 'Doe' }],
+  totalAmount: 300,
+  currency: 'USD',
+});
+
+async function pickAirport(user, input, query, code) {
+  await user.type(input, query);
+  const options = await screen.findAllByRole('button', { name: new RegExp(code) });
+  await user.click(options[0]);
+}
+
+async function searchLhrToDxb(user) {
+  const [fromInput, toInput] = screen.getAllByPlaceholderText('City or airport');
+  await pickAirport(user, fromInput, 'London', 'LHR');
+  await pickAirport(user, toInput, 'Dubai', 'DXB');
+  await user.click(screen.getByRole('button', { name: /Search Flights/ }));
+  await waitFor(() => expect(mockSearch).toHaveBeenCalled());
+}
+
+async function setDates(user, departureDate, returnDate) {
+  await user.click(screen.getByRole('tab', { name: 'Round Trip' }));
+  const dateInputs = document.querySelectorAll('input[type="date"]');
+  fireEvent.change(dateInputs[0], { target: { value: departureDate } });
+  fireEvent.change(dateInputs[1], { target: { value: returnDate } });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockBook.mockResolvedValue({ data: { pnr: 'MOCKPNR' } });
+  mockListBookings.mockResolvedValue({ data: [] });
+});
+
+describe('FlightSearch results', () => {
+  it('renders one page of offers and grows the list on request', async () => {
+    const user = userEvent.setup();
+    mockSearch.mockResolvedValue({ data: Array.from({ length: 45 }, (_, i) => oneWayOffer(i + 1)) });
+    render(<FlightSearch />);
+
+    await searchLhrToDxb(user);
+
+    expect(screen.getAllByRole('button', { name: 'Select' })).toHaveLength(20);
+    expect(screen.getByText('Showing 20 of 45 flights')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show 20 more flights' }));
+    expect(screen.getAllByRole('button', { name: 'Select' })).toHaveLength(40);
+
+    await user.click(screen.getByRole('button', { name: 'Show 5 more flights' }));
+    expect(screen.getAllByRole('button', { name: 'Select' })).toHaveLength(45);
+    expect(screen.queryByText(/Showing \d+ of \d+ flights/)).toBeNull();
+  });
+
+  it('treats the 2+ Stops pill as at least two stops', async () => {
+    const user = userEvent.setup();
+    mockSearch.mockResolvedValue({ data: [oneWayOffer(1), oneWayOffer(2, 3)] });
+    render(<FlightSearch />);
+
+    await searchLhrToDxb(user);
+    expect(screen.getByText('2 flights found')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(screen.getByRole('button', { name: '2+ Stops' }));
+
+    expect(screen.getByText('1 flight found')).toBeInTheDocument();
+    expect(screen.getByText('2 stops')).toBeInTheDocument();
+  });
+
+  it('labels each leg of a round trip and filters on the journey total', async () => {
+    const user = userEvent.setup();
+    mockSearch.mockResolvedValue({ data: [NONSTOP_ROUND_TRIP, CONNECTING_ROUND_TRIP] });
+    render(<FlightSearch />);
+
+    await setDates(user, '2026-09-20', '2026-09-27');
+    await searchLhrToDxb(user);
+    expect(mockSearch).toHaveBeenCalledWith(expect.objectContaining({ tripType: 'roundTrip', returnDate: '2026-09-27' }));
+
+    // 1 + 1 slices: both legs nonstop; 2 + 2 slices: one connection each way.
+    expect(screen.getAllByText('Nonstop')).toHaveLength(2);
+    expect(screen.getAllByText('1 stop')).toHaveLength(2);
+    expect(screen.getByText('Direct')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(screen.getByRole('button', { name: '2+ Stops' }));
+
+    expect(screen.getByText('1 flight found')).toBeInTheDocument();
+    expect(screen.getByText('Turkish Airlines')).toBeInTheDocument();
+  });
+});
+
+describe('FlightSearch booking', () => {
+  it('books with the searched context and the offer’s passenger ids', async () => {
+    const user = userEvent.setup();
+    mockSearch.mockResolvedValue({ data: [NONSTOP_ROUND_TRIP] });
+    render(<FlightSearch />);
+
+    await setDates(user, '2026-09-20', '2026-09-27');
+    await searchLhrToDxb(user);
+
+    // The trip type is switched back to one-way after the search. It may not
+    // change what is booked off the round trip that produced these results.
+    await user.click(screen.getByRole('tab', { name: 'One Way' }));
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+
+    await user.type(screen.getByPlaceholderText('First name *'), 'John');
+    await user.type(screen.getByPlaceholderText('Last name *'), 'Doe');
+    await user.type(screen.getByPlaceholderText('Email *'), 'john@test.com');
+
+    const genderTrigger = screen.getAllByRole('combobox')[1];
+    await user.click(genderTrigger);
+    await user.click(await screen.findByRole('option', { name: 'Male' }));
+
+    await user.click(screen.getByRole('button', { name: /Review Booking/ }));
+    await user.click(screen.getByRole('button', { name: /Confirm Booking/ }));
+
+    await waitFor(() => expect(mockBook).toHaveBeenCalled());
+    const payload = mockBook.mock.calls[0][0];
+    expect(payload.tripType).toBe('roundTrip');
+    expect(payload.travelers).toHaveLength(1);
+    expect(payload.travelers[0].passengerId).toBe('pas_rt_1');
+    expect(payload.travelers[0].type).toBe('adult');
+    // Untouched optional fields are empty strings in the form; the API's schema
+    // rejects those, so they must not be sent at all.
+    expect(payload.travelers[0]).not.toHaveProperty('dob');
+    expect(payload.travelers[0]).not.toHaveProperty('nationality');
+  });
+});
+
+describe('FlightSearch bookings list', () => {
+  it('counts bookings by status bucket', async () => {
+    const user = userEvent.setup();
+    mockListBookings.mockResolvedValue({
+      data: [booking(1, 'confirmed'), booking(2, 'ticketed'), booking(3, 'failed'), booking(4, 'pending')],
+    });
+    render(<FlightSearch />);
+
+    await user.click(screen.getByRole('tab', { name: /Manage Bookings/ }));
+
+    await screen.findByText('PNR-1');
+    expect(screen.getByRole('tab', { name: /All/ })).toHaveTextContent('4');
+    expect(screen.getByRole('tab', { name: /Confirmed/ })).toHaveTextContent('2');
+    expect(screen.getByRole('tab', { name: /Pending/ })).toHaveTextContent('1');
+    expect(screen.getByRole('tab', { name: /Cancelled/ })).toHaveTextContent('1');
+  });
+});

@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockFlightClient } from '../../clients/mock.client.js';
-import { buildFlightOffer, buildSearchRequest, buildBookingRequest, buildTraveler } from '../../../test/factories/flight.js';
+import {
+  buildFlightOffer,
+  buildFlightSegment,
+  buildSearchRequest,
+  buildBookingRequest,
+  buildTraveler,
+} from '../../../test/factories/flight.js';
 
 // ── Mock prisma (DB only — no travelport mocking needed!) ───────────
 vi.mock('../../db/client.js', () => ({
@@ -170,6 +176,44 @@ describe('book', () => {
         contact: payload.contact,
       }),
     );
+  });
+
+  it('should infer a round trip from the offer when the caller sends no tripType', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.$executeRaw.mockResolvedValue(undefined);
+    prisma.flightBooking.create.mockResolvedValue({ id: 'booking-rt', pnr: 'MOCKRT' });
+
+    const payload = buildBookingRequest({
+      offer: buildFlightOffer({
+        legCount: 2,
+        segments: [buildFlightSegment({ sequence: 1 }), buildFlightSegment({ sequence: 101 })],
+      }),
+    });
+    delete payload.tripType;
+
+    await book(mockReq({ body: payload }), mockRes(), vi.fn());
+
+    expect(prisma.flightBooking.create.mock.calls[0][0].data.tripType).toBe('roundTrip');
+  });
+
+  // Regression guard for the old `segments.length > 1` heuristic: a one-way with
+  // a connection has two segments and exactly one leg.
+  it('should record a connecting one-way as oneWay', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.$executeRaw.mockResolvedValue(undefined);
+    prisma.flightBooking.create.mockResolvedValue({ id: 'booking-ow', pnr: 'MOCKOW' });
+
+    const payload = buildBookingRequest({
+      offer: buildFlightOffer({
+        legCount: 1,
+        segments: [buildFlightSegment({ sequence: 1 }), buildFlightSegment({ sequence: 2 })],
+      }),
+    });
+    delete payload.tripType;
+
+    await book(mockReq({ body: payload }), mockRes(), vi.fn());
+
+    expect(prisma.flightBooking.create.mock.calls[0][0].data.tripType).toBe('oneWay');
   });
 
   it('should throw when no travelers are provided', async () => {
