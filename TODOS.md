@@ -405,25 +405,41 @@
 
 ### Per-page ask-mode tool vocabulary
 
-**What:** Give each page descriptor its own allowlisted ask-mode tools, so a follow-up question can fetch data that was not already in the briefing bundle. Today the whole vocabulary is one lead-bound tool (`getLead`), and pages declaring none answer single-shot over the evidence already fetched.
+**What:** Finish declaring ask-mode tools per page. The panel-hardening slice shipped the seam — a descriptor `tools` list, `askTools(scope)` on every adapter, and `runAgentLoop` resolving the vocabulary from the parsed scope — plus two read tools (`listLeads`, `listInvoices`), so `/leads` and `/billing` can now fetch data the briefing bundle does not contain. The remaining work is declaring tools on the other eight page keys and adding reads beyond the two list tools. A page declaring none still answers single-shot over the evidence already fetched.
 
-**Why:** The ask box is present on every page but can only answer what the bundle already contains. Questions like "which of these three customers is most at risk" work; "what did we quote them last quarter" does not, because nothing can go and fetch it.
+**Why:** The seam is the hard part, and it has landed; the vocabulary is what makes the ask box worth using on a page. On the eight page keys that declare nothing, "what did we quote them last quarter" is still unanswerable, because the bundle is all the model may read.
 
 **Pros:** Turns the assistant on each page from a briefing with follow-ups into something that can actually investigate, which is where the ten-times-return value sits.
 
 **Cons:** Each tool is a new allowlisted, Zod-validated, server-executed call under the caller's identity — a real per-page design and review, not a config change.
 
-**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-all-pages.md` (§6, outside-voice finding 4). The engine reuses the existing `assistantTurn`/`wizard-turn` tool-calling convention (fixed enum, server-executed, Zod-validated, canonicalized), so this is additive rather than a new framework. Note the existing `runAgentLoop` receives no page key or adapter, so the tool selection currently has no way to be page-aware.
+**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-all-pages.md` (§6, outside-voice finding 4). The seam landed on `feat/management-copilot-panel-hardening` (see `docs/designs/management-copilot-panel-hardening.md` §4) and reuses the existing `assistantTurn`/`wizard-turn` tool-calling convention (fixed enum, server-executed, Zod-validated, canonicalized), so this stays additive rather than a new framework. `runAgentLoop` now receives `adapter.askTools(scope)`, so adding a tool is a descriptor declaration plus a registry entry, not a controller change.
 
 **Effort:** L
 **Priority:** P2
-**Depends on:** A page declaring at least one tool and the descriptor `tools` field landing
+**Depends on:** Per-descriptor tool design for the remaining eight page keys (the `tools` seam and two tools have landed)
+
+### Interrogable briefing: promptable claim rows
+
+**What:** Make each briefing claim row a prompt. An `Ask why this` affordance on a claim submits a turn carrying that claim's own `evidenceIds`, so the answer is grounded against evidence already on screen, and the Needs attention list becomes the agent's open loop rather than a wall of prose.
+
+**Why:** The strongest idea surfaced in the 2026-09-11 panel-hardening session, from the independent model read. Today the conversation is a box below the briefing, and the operator has to re-describe what they are looking at. Carrying the claim's evidence ids makes the turn self-grounding and makes the briefing the entry point to the agent, which is what "act as a real agent copilot" actually requires.
+
+**Pros:** Zero re-description, since the question arrives with its scope and citations attached. Turns the briefing into the agent's interface rather than a report with a chat underneath it. Reuses the existing turn endpoint, the claim shape, and `evidenceIds`; no new transport.
+
+**Cons:** A new interaction surface needing its own focus, keyboard, and accessibility pass. Prompt affordances can crowd the briefing hierarchy that the Evidence Lens design deliberately ranked first. The turn request needs an optional originating-claim field.
+
+**Context:** Deferred during `/plan-eng-review` on `docs/designs/management-copilot-panel-hardening.md` (approach C, "Interrogable briefing") because it is a new interaction rather than a fix, and that change set was already ~20 files. Its substrate has landed: the conversation lives in the shell so it renders on every scope, the page-scoped tool seam exists (`adapter.askTools(scope)`), and the shared briefing logic is extracted. Start it once the panel-hardening slice has real agent usage behind it.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Landed panel-hardening slice (shell-owned conversation + page-scoped ask tools); an optional originating-claim field on `ManagementAssistantTurnRequest`
 
 ### Generate the collection briefing mockups
 
-**What:** Produce visual mockups of the collection briefing panel with the gstack designer, covering the claim list, the inline status row, and the empty state.
+**What:** Produce visual mockups of the copilot panel with the gstack designer. Covers the collection briefing (claim list, inline status row, empty state) **and** the surfaces that `docs/designs/management-copilot-panel-hardening.md` specifies in text only: the floating desktop trigger sitting beside the retained rail, the attention marker's dot-plus-glyph treatment, and the combined briefing-plus-conversation column with its sticky composer.
 
-**Why:** `/plan-design-review` on `docs/designs/management-copilot-all-pages.md` ran text-only because the designer binary has no API key configured, so the panel's visual design was described and reviewed but never rendered. Anyone reading that design doc later would reasonably assume the visuals were validated.
+**Why:** `/plan-design-review` on `docs/designs/management-copilot-all-pages.md` ran text-only because the designer binary has no API key configured, so the panel's visual design was described and reviewed but never rendered. The same happened again on `docs/designs/management-copilot-panel-hardening.md`, where `$D generate` returned verbatim: `No OpenAI API key found. Run: $D setup ... or set OPENAI_API_KEY`. Anyone reading either doc later would reasonably assume the visuals were validated. Nothing is blocked by this, since both specs are precise enough to build from; the risk is a specification that is right in words and wrong on screen, which only a rendered check catches.
 
 **Pros:** Turns the state contract, claim form, and severity discipline into something reviewable at a glance, and catches layout problems while they are still plan-stage.
 
@@ -466,6 +482,54 @@
 **Effort:** S
 **Priority:** P3
 **Depends on:** Real claim volumes from at least one live collection page
+
+### Run the Playwright suite in CI
+
+**What:** Add a GitHub Actions job that boots the stack and runs `cd Management && npm run test:e2e` on PRs targeting `microservices`.
+
+**Why:** `Management/e2e/` never runs in CI — `.github/workflows/` has no Playwright step. Three tests were red from the commits that wrote them: `auth/login.spec.js` still expected a salesRep to land on `/` after `ce651b2` deliberately sent agents to `/leads`; `copilot.spec.js` expected an evidence chip to read "not captured" at a moment when the briefing does supply a field value; and `lead-lifecycle.spec.js` still clicked Invoice as a direct row child after `01043f6` moved it into a "More actions" popover. All three were only found when the panel-hardening branch repaired them, and the horizontal-scroll regression that branch fixes had no X-axis assertion for the same reason.
+
+**Pros:** Makes the browser suite an actual gate, so a stale assertion fails loudly instead of rotting unnoticed; the X-axis assertion then protects the wrap contract permanently.
+
+**Cons:** The suite needs the full stack and a seeded database, which is real pipeline setup and a slow, potentially flaky job unless the harness is tuned.
+
+**Context:** Deferred during `/ship` on `docs/designs/management-copilot-panel-hardening.md`, which repaired the three stale tests; only the CI wiring is outstanding. `Services/e2e-tests/` has the same gap.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** A CI-runnable stack (database + services), or a recorded decision to run the suite on a schedule instead of per-PR
+
+### Reuse the invoice page across one ask
+
+**What:** Cache the `listInvoices` upstream page for the lifetime of a single ask, so a model that calls the tool more than once does not re-fetch and re-sort up to 1000 rows per call.
+
+**Why:** `listInvoices` must fetch a capped page and filter/sort locally, because billing-service cannot filter by `paymentStatus` or order by `dueDate` (`getAllInvoices` hardcodes `createdAt desc`). The loop permits four tool calls, so a repeated call pays the whole page cost again.
+
+**Pros:** Cuts latency and upstream load on the heaviest tool, and the full-page read stays so correctness is unchanged.
+
+**Cons:** Adds per-request cache state plus a lifetime question — what invalidates it, and whether a cached page may outlive its turn.
+
+**Context:** Found by the performance specialist during `/ship` review of `docs/designs/management-copilot-panel-hardening.md`. The per-comparison `dueDate` re-parse was fixed in the same review (decorate-once sort); this is the remaining half.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Nothing, or a billing endpoint that can filter by payment status and order by due date, which would remove the need entirely
+
+### Copilot collapsed-state polish
+
+**What:** Two cosmetic findings from the same review — move the `xl`+ floating `CopilotTrigger` clear of the rail's 40px column instead of letting it straddle the rail's `border-l` edge, and drop the unused `export` on `COPILOT_TRIGGER_LABEL` (nothing imports it; `COPILOT_RAIL_LABEL` is the one with a consumer).
+
+**Why:** Both are small incoherences a reader notices: one control crossing the other's edge at `xl`+, and an exported constant with no importer that reads as load-bearing.
+
+**Pros:** Cheap, and removes two "is this deliberate?" moments from the copilot surface.
+
+**Cons:** The offset is a visual taste call never seen rendered — the design pass ran text-only with no designer API key — so changing it now trades one unverified layout for another.
+
+**Context:** Found by the design and simplification specialists during `/ship` review. Nothing is occluded by the current position: the rail's control and marker sit at the top, the trigger at the bottom.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** A rendered look at 1280px, or the designer API key so the panel can be visualised
 
 ## Completed
 

@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
+import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../../constants/managementCopilot.js';
 
-const { mockPrisma, mockGenerateStructured } = vi.hoisted(() => ({
+const { mockPrisma, mockGenerateStructured, mockIsAIConfigured } = vi.hoisted(() => ({
   mockPrisma: {
     managementLastSeen: { findUnique: vi.fn(), upsert: vi.fn() },
   },
   mockGenerateStructured: vi.fn(),
+  // Controllable so the ask/briefing gate order can be exercised both with and
+  // without a provider (R3).
+  mockIsAIConfigured: vi.fn(() => true),
 }));
 
 // app.js pulls in routes → db/client.js, which constructs a real PrismaClient
@@ -16,7 +20,7 @@ const { mockPrisma, mockGenerateStructured } = vi.hoisted(() => ({
 vi.mock('../../db/client.js', () => ({ default: mockPrisma }));
 vi.mock('../../ai/geminiClient.js', () => ({
   generateStructured: mockGenerateStructured,
-  isAIConfigured: () => true,
+  isAIConfigured: () => mockIsAIConfigured(),
 }));
 
 const { default: app } = await import('../../app.js');
@@ -50,6 +54,8 @@ beforeEach(() => {
   mockPrisma.managementLastSeen.upsert.mockResolvedValue({});
   mockGenerateStructured.mockReset();
   mockGenerateStructured.mockResolvedValue({ claims: [] });
+  mockIsAIConfigured.mockReset();
+  mockIsAIConfigured.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -253,5 +259,211 @@ describe('management copilot server-side gate (seen route)', () => {
       expect(res.status, `scope ${JSON.stringify(scope)} must reject`).toBe(400);
     }
     expect(mockPrisma.managementLastSeen.upsert).not.toHaveBeenCalled();
+  });
+});
+
+// mode='ask' is answer-shaped and is evaluated ahead of the provider gate; the
+// briefing fallback behind that gate keeps its claims contract (R3).
+describe('management copilot ask mode payload contract (S7/R3)', () => {
+  const askBody = {
+    mode: 'ask',
+    page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' },
+    messages: [{ role: 'user', content: 'What changed since I last looked?' }],
+  };
+
+  const lead = {
+    id: 'lead-1',
+    lifecycleStatus: 'NEW',
+    assignedToId: 'rep-1',
+    name: 'Jane',
+    destination: 'Bali',
+    budget: 450000,
+    createdAt: '2026-09-01T00:00:00Z',
+    updatedAt: '2026-09-08T00:00:00Z',
+  };
+
+  function stubLead() {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: lead }),
+    });
+  }
+
+  const postTurn = (body) => request(app).post('/api/v1/assistant/management/turn').set(authHeaders).send(body);
+
+  it('returns answerBlocks, never a claims payload, when the provider is unconfigured', async () => {
+    enableCopilot();
+    mockIsAIConfigured.mockReturnValue(false);
+    mockGenerateStructured.mockRejectedValue(new Error('AI generation is not configured'));
+    stubLead();
+
+    const res = await postTurn(askBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.answerBlocks).toEqual([]);
+    expect(res.body.claims).toEqual([]);
+  });
+
+  it('returns answerBlocks: [] when the loop generation fails', async () => {
+    enableCopilot();
+    stubLead();
+    mockGenerateStructured.mockRejectedValue(new Error('provider down'));
+
+    const res = await postTurn(askBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.answerBlocks).toEqual([]);
+    expect(res.body.claims).toEqual([]);
+  });
+
+  it('returns an empty answer, never a briefing body, when every claim is rejected', async () => {
+    enableCopilot();
+    stubLead();
+    mockGenerateStructured.mockResolvedValue({
+      tool: 'final_answer',
+      args: {
+        claims: [
+          {
+            id: 'ask-rejected-1',
+            section: 'current_state',
+            text: 'The lead is in a state the server cannot ground.',
+            facts: [],
+            evidenceIds: ['lead:does-not-exist:lifecycleStatus'],
+            evidenceType: 'record',
+            severity: 'info',
+          },
+        ],
+      },
+    });
+
+    const res = await postTurn(askBody);
+
+    expect(res.status).toBe(200);
+    // Every claim cited evidence the bundle does not contain, so the honest
+    // outcome is an empty answer — never the briefing's claims payload.
+    expect(res.body.answerBlocks).toEqual([]);
+    expect(res.body.claims).toEqual([]);
+    expect(res.body.insights).toBeUndefined();
+    expect(res.body.context.pageKey).toBe('leads');
+  });
+
+  it('passes the record scope vocabulary into the loop', async () => {
+    enableCopilot();
+    stubLead();
+    const prompts = [];
+    mockGenerateStructured.mockImplementation(async ({ prompt }) => {
+      prompts.push(prompt);
+      return { tool: 'final_answer', args: { claims: [] } };
+    });
+
+    await postTurn(askBody);
+
+    expect(prompts[0]).toContain('- getLead:');
+    expect(prompts[0]).toContain('- listLeads:');
+    expect(prompts[0]).not.toContain('- listInvoices:');
+  });
+
+  it('passes the collection scope vocabulary into the loop', async () => {
+    enableCopilot();
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ success: true, count: 0, total: 0, data: [], pagination: { total: 0 } }),
+    });
+    const prompts = [];
+    mockGenerateStructured.mockImplementation(async ({ prompt }) => {
+      prompts.push(prompt);
+      return { tool: 'final_answer', args: { claims: [] } };
+    });
+
+    const res = await postTurn({ ...askBody, page: { key: 'leads', scope: {}, since: '7_days' } });
+
+    expect(res.status).toBe(200);
+    expect(prompts[0]).toContain('- listLeads:');
+    expect(prompts[0]).not.toContain('- getLead:');
+  });
+
+  it('grounds an answer claim that cites tool-gathered evidence', async () => {
+    enableCopilot();
+    stubLead();
+    const toolClaim = {
+      id: 'ask-1',
+      section: 'current_state',
+      text: 'The lead is new.',
+      facts: [],
+      evidenceIds: ['tool:listLeads:1'],
+      evidenceType: 'computed',
+      severity: 'info',
+    };
+    let step = 0;
+    mockGenerateStructured.mockImplementation(async () =>
+      step++ === 0
+        ? { tool: 'listLeads', args: { limit: 1 } }
+        : { tool: 'final_answer', args: { claims: [toolClaim] } },
+    );
+
+    const res = await postTurn(askBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.answerBlocks.map((claim) => claim.id)).toEqual(['ask-1']);
+    expect(res.body.sources.map((source) => source.id)).toContain('tool:listLeads:1');
+    expect(res.body.claims).toEqual([]);
+  });
+
+  it('returns answerBlocks, not claims, when the scope cannot be read', async () => {
+    enableCopilot();
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 403, text: async () => '{}' });
+
+    const res = await postTurn(askBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.context.noAccess).toBe(true);
+    expect(res.body.answerBlocks).toEqual([]);
+    expect(res.body.claims).toEqual([]);
+  });
+
+  it('keeps the briefing fallback in the claims shape when the provider is unconfigured (R3)', async () => {
+    enableCopilot();
+    mockIsAIConfigured.mockReturnValue(false);
+    stubLead();
+
+    const res = await postTurn({ mode: 'briefing', page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' } });
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.claims)).toBe(true);
+    expect(res.body.answerBlocks).toBeUndefined();
+  });
+
+  it('leaves the deterministic phase deterministic when the provider is unconfigured (R3)', async () => {
+    enableCopilot();
+    mockIsAIConfigured.mockReturnValue(false);
+    stubLead();
+
+    const res = await postTurn(turnBody);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.insights)).toBe(true);
+    expect(res.body.answerBlocks).toBeUndefined();
+    expect(res.body.claims).toBeUndefined();
+  });
+
+  it('gives the briefing a second attempt bounded by the same generation deadline', async () => {
+    enableCopilot();
+    stubLead();
+
+    const res = await postTurn({ mode: 'briefing', page: { key: 'leads', scope: { leadId: 'lead-1' }, since: '7_days' } });
+
+    expect(res.status).toBe(200);
+    // The retry is only safe because `deadlineMs` caps the WHOLE call: the
+    // second attempt cannot outlive the single-attempt budget the client's 20s
+    // abort wraps (see geminiClient.js and constants/managementCopilot.js).
+    expect(mockGenerateStructured).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxAttempts: 2,
+        timeoutMs: MANAGEMENT_GENERATION_DEADLINE_MS,
+        deadlineMs: MANAGEMENT_GENERATION_DEADLINE_MS,
+      }),
+    );
   });
 });

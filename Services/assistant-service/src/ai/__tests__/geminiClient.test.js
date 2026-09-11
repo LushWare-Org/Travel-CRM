@@ -204,4 +204,80 @@ describe('geminiClient (assistant-service)', () => {
     await expect(generateStructured({ prompt: 'p', schema: {} })).rejects.toMatchObject({ statusCode: 502 });
     expect(mockGenerateContent).toHaveBeenCalledTimes(3);
   });
+
+  // --- overall `deadlineMs` budget ----------------------------------------
+  // The Management briefing needs a retry but must stay inside the client's
+  // 20s abort, so `deadlineMs` bounds the WHOLE call, not just each attempt.
+  // These four cases pin that contract: retry while time is left, no retry
+  // once the budget is spent, never retry a non-transient status, and leave
+  // deadline-less callers exactly as they were.
+
+  it('retries a fast 503 with budget left and can succeed on the second attempt', async () => {
+    vi.useFakeTimers();
+    mockGenerateContent
+      .mockRejectedValueOnce(Object.assign(new Error('unavailable'), { status: 503 }))
+      .mockResolvedValueOnce({ text: '{"ok":true}' });
+    const { generateStructured } = await import('../geminiClient.js');
+
+    const promise = generateStructured({ prompt: 'p', schema: {}, timeoutMs: 17_000, maxAttempts: 2, deadlineMs: 17_000 });
+    await vi.advanceTimersByTimeAsync(10); // let attempt 1 fail and schedule its backoff
+    await vi.advanceTimersByTimeAsync(1_000); // clear the backoff sleep
+
+    await expect(promise).resolves.toEqual({ ok: true });
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('does not retry a slow 503 when what is left of the deadline cannot cover a real attempt', async () => {
+    vi.useFakeTimers();
+    // Fails after 14s of the 17s budget, leaving ~3s: below MIN_RETRY_TIMEOUT_MS
+    // (5s, just above the fastest healthy answer observed for this model, 4.8s),
+    // so no retry — a retry here would only ever be a guaranteed timeout.
+    mockGenerateContent.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) =>
+          setTimeout(() => reject(Object.assign(new Error('unavailable'), { status: 503 })), 14_000),
+        ),
+    );
+    const { generateStructured } = await import('../geminiClient.js');
+
+    const promise = generateStructured({ prompt: 'p', schema: {}, timeoutMs: 17_000, maxAttempts: 2, deadlineMs: 17_000 });
+    const outcome = expect(promise).rejects.toMatchObject({ statusCode: 502 });
+
+    await vi.advanceTimersByTimeAsync(14_000);
+    await outcome;
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('does not retry a 400 even when the deadline has plenty of room', async () => {
+    mockGenerateContent.mockRejectedValueOnce(Object.assign(new Error('bad request'), { status: 400 }));
+    const { generateStructured } = await import('../geminiClient.js');
+
+    await expect(
+      generateStructured({ prompt: 'p', schema: {}, maxAttempts: 2, deadlineMs: 17_000 }),
+    ).rejects.toMatchObject({ statusCode: 502 });
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps per-attempt timeoutMs and maxAttempts when no deadlineMs is passed', async () => {
+    vi.useFakeTimers();
+    mockGenerateContent.mockImplementation(() => new Promise(() => {})); // every attempt hangs
+    const { generateStructured } = await import('../geminiClient.js');
+
+    const promise = generateStructured({ prompt: 'p', schema: {}, timeoutMs: 2_000, maxAttempts: 3 });
+    const outcome = expect(promise).rejects.toMatchObject({ statusCode: 502 });
+
+    // Just short of the caller's 2s: attempt 1 is still running, so the new
+    // budget code did not shorten (or raise) the per-attempt timeout.
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(20_000); // three full attempts + their backoffs
+    await outcome;
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+    vi.useRealTimers();
+  });
 });

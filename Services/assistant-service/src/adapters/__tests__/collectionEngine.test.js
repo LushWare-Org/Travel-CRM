@@ -112,6 +112,18 @@ describe('happy path', () => {
     expect(bundle.evidence.map((e) => e.id)).toContain(cited);
   });
 
+  it('refuses to follow a redirect, so a 3xx cannot carry the caller identity elsewhere', async () => {
+    const fetchMock = vi.fn(() => jsonResponse(listBody([invoice('inv-1')])));
+    globalThis.fetch = fetchMock;
+    const adapter = createPageAdapter(descriptor());
+
+    await adapter.loadEvidence(ctx, {}, { mode: 'deterministic' });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.redirect).toBe('error');
+    expect(init.headers['x-user-id']).toBe('rep-1');
+  });
+
   it('never puts a field outside the allowlist into evidence', async () => {
     globalThis.fetch = vi.fn(() =>
       jsonResponse(listBody([{ ...invoice('inv-1'), bankAccountNumber: 'SECRET', notes: 'private' }])),

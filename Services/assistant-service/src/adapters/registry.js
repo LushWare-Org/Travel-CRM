@@ -21,6 +21,11 @@
 //                   "changed since the operator last acknowledged this
 //                   scope", never "changed recently"
 //   defaultQuestions — (bundle) => string[]
+//   askTools      — (scope) => string[] — the tool names available to ask mode
+//                   on this scope, declared by the page (a descriptor's
+//                   `tools` list, or the hand-written adapter's branch). The
+//                   registry decides nothing; an empty list means the page
+//                   runs the single-shot answer path over the bundle.
 //
 // loadEvidence must propagate a downstream service's 403/404 verbatim into
 // `notAuthorizedSources` — never pre-check ownership itself, because the

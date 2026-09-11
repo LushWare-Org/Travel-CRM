@@ -3,11 +3,13 @@ import { leadsAdapter } from '../../adapters/leads.adapter.js';
 import { insightsToClaims } from '../../ai/groundingValidator.js';
 import {
   ManagementBriefingCannedRowSchema,
+  ManagementAskCannedRowSchema,
+  evaluateCannedAsk,
   evaluateCannedBriefing,
   judgeBriefingSubstance,
   summarizeBriefingEvaluation,
 } from '../managementBriefingEvaluation.js';
-import { CANNED_MANAGEMENT_BRIEFINGS } from './fixtures/managementBriefing.canned.js';
+import { CANNED_MANAGEMENT_ASKS, CANNED_MANAGEMENT_BRIEFINGS } from './fixtures/managementBriefing.canned.js';
 
 const ctx = {
   user: { id: 'rep-1', role: 'salesRep', permissions: [] },
@@ -136,5 +138,44 @@ describe('management briefing content gate', () => {
     expect(summary.failed).toContain('changed-outside-window');
     expect(summary.failed).toContain('legacy-composite-evidence-id');
     expect(summary.gate).toBe('fail');
+  });
+});
+
+// E1: the ask path must say "not in view" when the bundle cannot answer the
+// question, rather than restating the briefing. Canned model output is replayed
+// through the real validator, so no live Gemini quota is required.
+describe('management ask not-in-view gate (E1)', () => {
+  const askBundleLead = CANNED_MANAGEMENT_BRIEFINGS[0].lead;
+
+  it('fixtures conform to the canned ask schema', () => {
+    for (const row of CANNED_MANAGEMENT_ASKS) {
+      expect(() => ManagementAskCannedRowSchema.parse(row)).not.toThrow();
+    }
+  });
+
+  it('yields an explicit not-in-view outcome when the answer is outside the bundle', async () => {
+    const row = CANNED_MANAGEMENT_ASKS.find((item) => item.id === 'out-of-bundle-honest-not-in-view');
+    const bundle = await loadBundleFor(askBundleLead);
+
+    const result = evaluateCannedAsk(row, { bundle });
+
+    expect(result.answerBlocks).toEqual([]);
+    expect(result.notInView).toBe(true);
+    expect(result.failureKeys).toEqual([]);
+    expect(result.passed).toBe(true);
+  });
+
+  it('fails a grounded restatement of the briefing as an answer to an out-of-bundle question', async () => {
+    const row = CANNED_MANAGEMENT_ASKS.find((item) => item.id === 'out-of-bundle-restated-briefing');
+    const bundle = await loadBundleFor(askBundleLead);
+
+    const result = evaluateCannedAsk(row, { bundle });
+
+    // The claim grounds — the validator accepts it — so grounding alone cannot
+    // tell an answer from a restatement. The ask gate must.
+    expect(result.answerBlocks.map((claim) => claim.id)).toEqual(['c-restate']);
+    expect(result.notInView).toBe(false);
+    expect(result.failureKeys).toEqual([...row.expectedFailures].sort());
+    expect(result.passed).toBe(false);
   });
 });

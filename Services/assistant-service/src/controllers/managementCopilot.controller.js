@@ -11,13 +11,23 @@ import {
 } from '../ai/prompts/managementBriefing.v1.js';
 import { runAgentLoop } from '../ai/agentRunner.js';
 import { validateClaims, buildSources, insightsToClaims } from '../ai/groundingValidator.js';
+import { MANAGEMENT_GENERATION_DEADLINE_MS } from '../constants/managementCopilot.js';
 import prisma from '../db/client.js';
 
-// One model attempt inside a 17s server deadline. The Management client holds
-// a 20s endpoint timeout WITH AbortSignal support: a scope change aborts the
-// in-flight request, and a timeout surfaces as a recoverable failure with
-// Retry rather than an endless loading state (see design §1).
-const MANAGEMENT_GENERATION_DEADLINE_MS = 17_000;
+// The briefing generation runs inside one 17s server deadline. The Management
+// client holds a 20s endpoint timeout WITH AbortSignal support: a scope change
+// aborts the in-flight request, and a timeout surfaces as a recoverable failure
+// with Retry rather than an endless loading state (see design §1). The deadline
+// is defined once in constants/managementCopilot.js and shared with the agent
+// loop, so the loop budget and this phase cannot drift.
+//
+// The phase is allowed a SECOND attempt, but strictly inside that same 17s
+// budget (`deadlineMs`), so worst-case latency does not grow: a transient 503
+// that comes back fast still leaves room and is retried, while an attempt slow
+// enough to leave less than a meaningful retry is not retried at all and falls
+// back as before. That is the difference between a hard `maxAttempts: 1` —
+// which threw away every fast 503 — and a retry that can never outlive the old
+// single attempt's ceiling.
 
 // Server-side feature gates. MANAGEMENT_COPILOT_ENABLED defaults off; when on,
 // MANAGEMENT_COPILOT_PAGE_KEYS (comma-separated) allowlists specific pages for
@@ -157,8 +167,13 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
   }
 
   // No access: short-circuit before the model path — no claims over a record
-  // the caller cannot access.
+  // the caller cannot access. An ask stays answer-shaped even here: the ask
+  // client reads `answerBlocks`, so a briefing-shaped body is dropped on the
+  // floor.
   if (noAccess) {
+    if (mode === 'ask') {
+      return respondWithAnswer(res, page, bundle, adapter, { answerBlocks: [], noAccess: true });
+    }
     return res.json({
       context: { pageKey: page.key, scopeLabel: bundle.context.scopeLabel, generatedAt: new Date().toISOString(), partial: false, noAccess: true },
       claims: [],
@@ -169,15 +184,20 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
     });
   }
 
+  // mode='ask': bounded tool loop, evaluated BEFORE the provider gate below on
+  // purpose. This branch is answer-shaped (`answerBlocks`) while the gate's
+  // fallback is briefing-shaped (`claims`), and an ask must never be answered
+  // with a briefing. With no provider configured the loop's generation fails
+  // and this returns the empty answer payload — the client's honest
+  // not-grounded state — instead of a claims body the ask client silently
+  // drops.
+  if (mode === 'ask') {
+    return handleAsk(res, req, page, bundle, adapter, ctx, scope);
+  }
+
   // Provider unavailable → deterministic fallback (same single claims contract).
   if (!isAIConfigured()) {
     return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
-  }
-
-  // mode='ask': bounded tool loop. The model may gather data via domain tools
-  // before answering; the final answer is grounded against the same bundle.
-  if (mode === 'ask') {
-    return handleAsk(res, req, page, bundle, adapter, ctx, sinceBoundary);
   }
 
   const guidanceEnabled = process.env.MANAGEMENT_COPILOT_GUIDANCE_ENABLED === 'true';
@@ -196,7 +216,8 @@ export const managementCopilotTurn = asyncHandler(async (req, res) => {
       temperature: 0.2,
       maxOutputTokens: 8192,
       timeoutMs: MANAGEMENT_GENERATION_DEADLINE_MS,
-      maxAttempts: 1,
+      maxAttempts: 2,
+      deadlineMs: MANAGEMENT_GENERATION_DEADLINE_MS,
     });
   } catch (err) {
     logger.warn({ err: err.message, pageKey: page.key }, 'management briefing generation failed — falling back to deterministic insights');
@@ -280,44 +301,57 @@ function respondWithFallback(res, page, bundle, adapter, sinceBoundary) {
   });
 }
 
-// mode='ask': bounded tool loop → grounded answer blocks. Tool-gathered data
-// is appended to the bundle as turn-local evidence so answer claims cite it
-// correctly; if the loop yields nothing, fall back to deterministic insights.
-async function handleAsk(res, req, page, bundle, adapter, ctx, sinceBoundary) {
+// mode='ask': bounded tool loop → grounded answer blocks, resolved against the
+// PAGE- AND SCOPE-declared vocabulary (`adapter.askTools(scope)`), never a
+// global tool list. Tool-gathered data is appended to the bundle as turn-local
+// evidence so answer claims cite it correctly. Every outcome here is
+// answer-shaped: an exhausted loop, a rejected claim set, zero declared tools
+// (the single-shot path inside the runner) and an unconfigured provider all
+// return `answerBlocks` — possibly empty — and never the briefing's `claims`.
+async function handleAsk(res, req, page, bundle, adapter, ctx, scope) {
   const question = latestUserQuestion(req.body.messages);
-  const { claims: rawClaims, toolEvidence } = await runAgentLoop({
+  const { answerBlocks: rawBlocks, toolEvidence } = await runAgentLoop({
     ctx,
     scopeLabel: bundle.context.scopeLabel,
     question,
     evidence: bundle.evidence,
+    tools: adapter.askTools(scope),
     generateStructured,
   });
 
-  if (!rawClaims || rawClaims.length === 0) {
-    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
+  if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) {
+    return respondWithAnswer(res, page, bundle, adapter, { answerBlocks: [], toolEvidence });
   }
 
   const validationBundle = { ...bundle, evidence: [...bundle.evidence, ...toolEvidence] };
   const guidanceEnabled = process.env.MANAGEMENT_COPILOT_GUIDANCE_ENABLED === 'true';
-  const canonical = canonicalizeBriefingResponse({ claims: rawClaims }, BriefingClaimSchema);
+  const canonical = canonicalizeBriefingResponse({ claims: rawBlocks }, BriefingClaimSchema);
   const { claims } = validateClaims({ claims: canonical, bundle: validationBundle, enableGuidance: guidanceEnabled });
 
-  if (claims.length === 0) {
-    return respondWithFallback(res, page, bundle, adapter, sinceBoundary);
-  }
+  return respondWithAnswer(res, page, bundle, adapter, { answerBlocks: claims, toolEvidence });
+}
 
+// The ask response contract. `claims` stays empty — the wire contract requires
+// the field, but a briefing-shaped claims payload must never reach an answer
+// slot — while the per-source and failure lists are identical to the
+// briefing's. Tool evidence is validated and cited the same way bundle evidence
+// is, so a claim citing `tool:<name>:<n>` grounds through the same validator.
+function respondWithAnswer(res, page, bundle, adapter, { answerBlocks, toolEvidence = [], noAccess = false }) {
+  const validationBundle = toolEvidence.length
+    ? { ...bundle, evidence: [...bundle.evidence, ...toolEvidence] }
+    : bundle;
   return res.json({
     context: {
       pageKey: page.key,
       scopeLabel: bundle.context.scopeLabel,
       generatedAt: new Date().toISOString(),
       partial: bundle.unavailableSources.length > 0,
-      noAccess: false,
+      noAccess,
     },
     claims: [],
-    answerBlocks: claims,
+    answerBlocks,
     suggestedQuestions: adapter.defaultQuestions(bundle),
-    sources: buildSources(claims, validationBundle),
+    sources: buildSources(answerBlocks, validationBundle),
     unavailableSources: bundle.unavailableSources,
     notAuthorizedSources: bundle.notAuthorizedSources,
   });

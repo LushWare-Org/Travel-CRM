@@ -1,9 +1,16 @@
 import { useRef, type ReactNode } from "react";
-import { ClipboardList, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import CopilotSurface from "./CopilotSurface";
+import CopilotTrigger from "./CopilotTrigger";
 
-/** The briefing heading the drawer focuses on open (rendered by LeadBriefing). */
+/**
+ * The heading that names the panel. Both the drawer and the `xl`+ desktop
+ * trigger move focus onto it on open, so the element the operator lands on is
+ * the one that labels the region they just opened. Rendered by `LeadBriefing`
+ * (record scopes) or `CollectionBriefing` (collection scopes).
+ */
 const DRAWER_HEADING_ID = "copilot-briefing-heading";
 
 type CopilotDrawerProps = {
@@ -30,7 +37,10 @@ export default function CopilotDrawer({
   showCue,
   onDismissCue,
 }: CopilotDrawerProps) {
-  const triggerRef = useRef<HTMLElement | null>(null);
+  // The element is a button, and DialogTrigger's `ref` is typed to match:
+  // pass a narrower ref here rather than the `HTMLElement` this used to hold,
+  // which only typechecked while it was handed to Button as a prop.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} modal>
@@ -46,20 +56,9 @@ export default function CopilotDrawer({
 
         <div className="flex items-center gap-1">
           <DialogTrigger
-            render={
-              <Button
-                ref={triggerRef}
-                variant="outline"
-                className="h-11 min-w-11 gap-2 bg-card px-3 shadow-dropdown"
-                aria-label="Open copilot"
-              />
-            }
-          >
-            <ClipboardList className="h-4 w-4" aria-hidden="true" />
-            <span className="text-sm">Copilot</span>
-            {hasAttention && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warning" />}
-            {hasAttention && <span className="sr-only">This lead has items needing attention.</span>}
-          </DialogTrigger>
+            ref={triggerRef}
+            render={(props) => <CopilotTrigger {...props} hasAttention={hasAttention} />}
+          />
 
           {showCue && (
             <Button variant="ghost" size="icon-sm" onClick={onDismissCue} aria-label="Dismiss briefing ready cue">
@@ -83,7 +82,7 @@ export default function CopilotDrawer({
           </Button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 scroll-pb-24">{children}</div>
+        <CopilotSurface className="px-4 py-4 scroll-pb-24">{children}</CopilotSurface>
       </DialogContent>
     </Dialog>
   );

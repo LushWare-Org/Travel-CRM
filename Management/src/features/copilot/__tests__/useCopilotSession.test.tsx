@@ -208,6 +208,26 @@ describe('useCopilotSession — scope lifecycle', () => {
     expect(screen.getByTestId('claims').textContent).not.toContain('Briefing a');
   });
 
+  it('surfaces an interrupted briefing instead of leaving the model phase pending forever', async () => {
+    // The effect's own cleanup aborts an in-flight briefing whenever its
+    // dependencies change — a benign re-render, not a scope change. The abort
+    // used to return silently, leaving status "pending" permanently: the start
+    // effect refuses to restart a run it already began (`briefingStartedRef`),
+    // and the regenerate effect skips "pending" because that status means a
+    // request is legitimately in flight. Nothing retried and nothing errored, so
+    // the panel read "AI briefing in progress — showing what is already verified"
+    // indefinitely, with no error and no Retry.
+    const interrupted = Object.assign(new Error('cancelled'), { name: 'AbortError' });
+    api.copilotBriefing.mockImplementationOnce(() => Promise.reject(interrupted));
+
+    render(<Harness scope={{ leadId: 'a' }} />);
+    await waitFor(() => expect(api.copilotBriefing).toHaveBeenCalled());
+
+    // Recoverable, not stuck: `modelPartial` is what renders the verified summary
+    // plus the Retry control, and it is what the reopen path regenerates from.
+    await waitFor(() => expect(screen.getByTestId('model')).toHaveTextContent('partial'));
+  });
+
   it('never renders a cancelled request as an error', async () => {
     const aborted = Object.assign(new Error('cancelled'), { name: 'AbortError' });
     api.copilotDeterministic.mockImplementationOnce(() => Promise.reject(aborted));

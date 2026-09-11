@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useOptionalAuth } from "@/contexts/AuthContext";
 import { useCopilotSession } from "./useCopilotSession";
 import { useCopilotVisibility } from "./useCopilotVisibility";
@@ -6,6 +6,8 @@ import { useIsDesktopDock } from "./useMediaQuery";
 import CopilotDock from "./CopilotDock";
 import CopilotDrawer from "./CopilotDrawer";
 import CopilotRail from "./CopilotRail";
+import CopilotTrigger from "./CopilotTrigger";
+import CopilotConversation from "./CopilotConversation";
 import type { CopilotSession, CopilotScope, SinceWindow } from "./types";
 
 const BRIEFING_HEADING_ID = "copilot-briefing-heading";
@@ -25,7 +27,10 @@ type ManagementContextCopilotProps = {
   /** Client-only display label for the active scope. */
   scopeLabel: string;
   since?: SinceWindow;
-  /** Page-specific briefing and conversation sections, hosted by the shared shell. */
+  /**
+   * The page-owned briefing, hosted by the shared shell. The conversation that
+   * follows it is the shell's own, so every page key has the chat.
+   */
   children: (api: CopilotSectionApi) => ReactNode;
 };
 
@@ -41,7 +46,9 @@ export function actorIdOf(user: unknown): string | null {
 
 /**
  * The reusable copilot shell: scope/session ownership, persisted visibility, the
- * responsive surface, and the page-specific sections handed in as children.
+ * responsive surface, the panel's single scroll container, and the conversation
+ * — which therefore renders on every page key, including `/leads` with no row
+ * selected, without any page wiring it.
  *
  * Landing a second workspace therefore means supplying six page-owned pieces —
  * not copying this shell:
@@ -81,7 +88,24 @@ export default function ManagementContextCopilot({
   }, [isDesktop, ready, visibility, session.hasScope, setVisibility]);
 
   const collapse = useCallback(() => setVisibility("collapsed"), [setVisibility]);
-  const expand = useCallback(() => setVisibility("open"), [setVisibility]);
+
+  // Opening the panel from either desktop control lands focus on the element
+  // that names the region, exactly as the drawer's `initialFocus` does. Without
+  // the rule a keyboard operator presses the trigger, the panel appears
+  // elsewhere in the tab order, and they must traverse the page to reach what
+  // they just opened. The dock is not a dialog, so the move is explicit and
+  // runs on the commit that mounts it — never before the heading exists.
+  const focusOnExpandRef = useRef(false);
+  const expand = useCallback(() => {
+    focusOnExpandRef.current = true;
+    setVisibility("open");
+  }, [setVisibility]);
+
+  useEffect(() => {
+    if (!dockOpen || !focusOnExpandRef.current) return;
+    focusOnExpandRef.current = false;
+    document.getElementById(BRIEFING_HEADING_ID)?.focus();
+  }, [dockOpen]);
 
   const handleDrawerOpenChange = useCallback(
     (next: boolean) => {
@@ -103,13 +127,36 @@ export default function ManagementContextCopilot({
     collapse: isDesktop && dockOpen ? collapse : undefined,
   });
 
+  // The panel's two children, in reading order: the page-owned briefing first,
+  // then one hairline, then the shell's conversation, whose composer sticks to
+  // `CopilotSurface`'s scrollport.
+  const body = (
+    <>
+      {content}
+      <CopilotConversation session={session} scopeLabel={scopeLabel} />
+    </>
+  );
+
   return (
     <>
-      {dockOpen && (
-        <CopilotDock labelledBy={BRIEFING_HEADING_ID}>{content}</CopilotDock>
-      )}
+      {dockOpen && <CopilotDock labelledBy={BRIEFING_HEADING_ID}>{body}</CopilotDock>}
 
-      {isDesktop && !dockOpen && <CopilotRail onExpand={expand} hasAttention={session.hasAttention} />}
+      {isDesktop && !dockOpen && (
+        <>
+          <CopilotRail onExpand={expand} hasAttention={session.hasAttention} />
+          {/*
+            The rail is the page's layout edge; the floating trigger is the
+            discoverable one. The two controls perform the same action, so they
+            carry distinct accessible names (`Expand copilot panel` vs
+            `Open copilot`) — never two controls with one name on a viewport.
+            The content column reserves a 72px bottom exclusion (`PageCopilot`)
+            so nothing interactive sits under this control.
+          */}
+          <div className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex items-end">
+            <CopilotTrigger hasAttention={session.hasAttention} onClick={expand} />
+          </div>
+        </>
+      )}
 
       {!isDesktop && (
         <CopilotDrawer
@@ -119,7 +166,7 @@ export default function ManagementContextCopilot({
           showCue={showCue}
           onDismissCue={dismissCue}
         >
-          {content}
+          {body}
         </CopilotDrawer>
       )}
     </>

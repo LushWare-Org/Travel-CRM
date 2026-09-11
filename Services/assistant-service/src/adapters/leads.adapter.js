@@ -87,6 +87,13 @@ export const leadsAdapter = {
     }
     return result.data;
   },
+  askTools() {
+    // A record scope answers about the lead on screen (getLead) and can still
+    // list the wider queue (listLeads). This is the record half of the
+    // `/leads` vocabulary; the collection half lives on the collection
+    // adapter.
+    return ['getLead', 'listLeads'];
+  },
 
   async loadEvidence(ctx, scope) {
     const asOf = new Date().toISOString();

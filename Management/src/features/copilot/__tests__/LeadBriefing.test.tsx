@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe('LeadBriefing — hierarchy', () => {
-  it('renders the changed row, current state, attention before the experienced view, and the composer', () => {
+  it('renders the changed row, current state, attention before the experienced view, and the suggested questions', () => {
     const session = makeSession({
       claims: [
         claim({ id: 'changed-1', section: 'changed', text: 'Budget was updated yesterday.' }),
@@ -54,8 +54,6 @@ describe('LeadBriefing — hierarchy', () => {
     // At most three suggested questions.
     expect(screen.getByRole('button', { name: 'What is the deposit status?' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'A fourth question?' })).not.toBeInTheDocument();
-
-    expect(screen.getByLabelText('Ask about Alice Traveller')).toBeInTheDocument();
   });
 
   it('omits the changed row when nothing changed', () => {
@@ -78,7 +76,18 @@ describe('LeadBriefing — hierarchy', () => {
       />
     );
     expect(screen.getByText('You do not have access to this record.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Ask about Alice Traveller')).not.toBeInTheDocument();
+  });
+});
+
+describe('LeadBriefing — heading focus target', () => {
+  it('marks the real heading as the programmatic focus target', () => {
+    render(<LeadBriefing session={makeSession({})} scopeLabel="Alice Traveller" leadId="a" />);
+
+    // ManagementContextCopilot moves focus to `#copilot-briefing-heading` when
+    // the panel opens. That move silently no-ops if the real heading loses its
+    // tabIndex; the shell test renders its own heading stub, so only an
+    // assertion against the real briefing can catch the regression.
+    expect(screen.getByRole('heading', { name: /lead briefing/i })).toHaveAttribute('tabindex', '-1');
   });
 });
 

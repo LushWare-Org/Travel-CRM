@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { ClipboardList, Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ClaimItem from "./ClaimItem";
+import { SuggestedQuestions, claimsIn } from "./briefingShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
-import { Badge } from "@/components/ui/badge";
 import type { ClaimSection, CopilotClaim, CopilotSession } from "./types";
 
 type CollectionBriefingProps = {
@@ -26,16 +26,6 @@ function formatMoment(value?: string | null): string | null {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString();
-}
-
-function claimsIn(claims: CopilotClaim[], section: ClaimSection): CopilotClaim[] {
-  if (section === "attention") {
-    const rank = { critical: 0, warning: 1, info: 2 } as const;
-    return claims
-      .filter((claim) => claim.section === section)
-      .sort((a, b) => rank[a.severity] - rank[b.severity]);
-  }
-  return claims.filter((claim) => claim.section === section);
 }
 
 function InlineStatusRow({ dotColor, message, onRetry }: { dotColor?: string, message: string, onRetry?: () => void }) {
@@ -112,7 +102,7 @@ export default function CollectionBriefing({ session, scopeLabel, onCollapse }: 
     <section aria-labelledby="copilot-briefing-heading" className="space-y-4">
       <header className="space-y-1">
         <div className="flex items-start justify-between gap-2">
-          <h2 id="copilot-briefing-heading" className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+          <h2 id="copilot-briefing-heading" tabIndex={-1} className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
             <ClipboardList className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             Page briefing
           </h2>
@@ -198,6 +188,8 @@ export default function CollectionBriefing({ session, scopeLabel, onCollapse }: 
               );
             })}
           </div>
+
+          <SuggestedQuestions session={session} />
         </>
       )}
     </section>

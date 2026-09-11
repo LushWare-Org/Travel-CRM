@@ -1,13 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 
-const { mockPrisma } = vi.hoisted(() => ({
+const { mockPrisma, mockGenerateStructured, mockIsAIConfigured } = vi.hoisted(() => ({
   mockPrisma: { managementLastSeen: { findUnique: vi.fn(), upsert: vi.fn() } },
+  mockGenerateStructured: vi.fn(),
+  mockIsAIConfigured: vi.fn(() => true),
 }));
 
 vi.mock('../../db/client.js', () => ({ default: mockPrisma }));
 
+// The S8 ask case must observe the CALL SHAPE (one single-shot generation, no
+// tool block), which a provider forced off cannot show — so the provider seam is
+// stubbed for the whole file. Deterministic-mode cases never reach it.
+vi.mock('../../ai/geminiClient.js', () => ({
+  generateStructured: mockGenerateStructured,
+  isAIConfigured: () => mockIsAIConfigured(),
+}));
+
 const { default: app } = await import('../../app.js');
+const { managementSingleShotResponseJsonSchema } = await import('../../ai/prompts/managementAnswer.v1.js');
 
 // Smoke across EVERY registered page key, through the real route, the real
 // registry, the real engine, and the real response contract. Only the
@@ -64,6 +75,10 @@ beforeEach(() => {
   Object.assign(process.env, SERVICE_ENV);
   mockPrisma.managementLastSeen.findUnique.mockReset();
   mockPrisma.managementLastSeen.findUnique.mockResolvedValue(null);
+  mockGenerateStructured.mockReset();
+  mockGenerateStructured.mockResolvedValue({ claims: [] });
+  mockIsAIConfigured.mockReset();
+  mockIsAIConfigured.mockReturnValue(true);
   realFetch = globalThis.fetch;
 });
 
@@ -208,5 +223,58 @@ describe('selected keys produce grounded insights from real-shaped data', () => 
     // Bank details must never reach the bundle.
     const serialized = JSON.stringify(res.body);
     expect(serialized).not.toMatch(/bankAccountNumber|bankName|upiId/);
+  });
+});
+
+describe('an ask on a page that declares no tools (S8)', () => {
+  it('issues exactly one single-shot generation, with no tool block', async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              success: true,
+              data: {
+                leads: { total: 100, new: 30, converted: 10 },
+                bookings: { total: 40, confirmed: 30, pending: 4 },
+                revenue: { total: 100_000, collected: 20_000 },
+                packages: { total: 50, published: 10 },
+              },
+            }),
+          ),
+      }),
+    );
+
+    const calls = [];
+    mockGenerateStructured.mockImplementation(async (args) => {
+      calls.push(args);
+      return { claims: [] };
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/management/turn')
+      .set(authHeaders)
+      .send({
+        mode: 'ask',
+        page: { key: 'overview', scope: {}, since: '7_days' },
+        messages: [{ role: 'user', content: 'How are we doing?' }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.context.pageKey).toBe('overview');
+    expect(res.body.context.noAccess).toBe(false);
+    expect(res.body.answerBlocks).toEqual([]);
+    expect(res.body.claims).toEqual([]);
+
+    // The branch itself, not merely the envelope: exactly one generation, the
+    // single-shot schema, and a prompt that never mentions tools or the loop's
+    // final_answer envelope. Remove the zero-tool branch and the loop instead
+    // makes four `{ tool, args }` calls against the same stub.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].schema).toBe(managementSingleShotResponseJsonSchema);
+    expect(calls[0].prompt).not.toContain('Available tools:');
+    expect(calls[0].prompt).not.toContain('final_answer');
   });
 });

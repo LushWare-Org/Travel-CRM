@@ -126,3 +126,37 @@ export const CANNED_MANAGEMENT_BRIEFINGS = [
     expectedFailures: ['c-legacy:no-valid-evidence'],
   },
 ];
+
+// Canned ASK fixtures for the not-in-view gate. `answerInView` states whether
+// the fetched bundle can answer the question; `claims` is raw model output for
+// the zero-tool single-shot call. The first row is the honest outcome (no
+// answer, rather than a restated briefing); the second proves a grounded
+// restatement is still a failure for an out-of-bundle question.
+export const CANNED_MANAGEMENT_ASKS = [
+  {
+    id: 'out-of-bundle-honest-not-in-view',
+    description: 'A question the bundle cannot answer; the honest reply is no answer, not a restatement.',
+    question: 'What did this lead say on the last call?',
+    answerInView: false,
+    claims: [],
+    expectedFailures: [],
+  },
+  {
+    id: 'out-of-bundle-restated-briefing',
+    description: 'The same unanswerable question answered by restating a grounded field: a restatement, not an answer.',
+    question: 'What did this lead say on the last call?',
+    answerInView: false,
+    claims: [
+      {
+        id: 'c-restate',
+        section: 'current_state',
+        text: 'Lead is in NEW status.',
+        facts: [],
+        evidenceIds: ['lead:lead-1:lifecycleStatus'],
+        evidenceType: 'record',
+        severity: 'info',
+      },
+    ],
+    expectedFailures: ['c-restate:restates-briefing'],
+  },
+];

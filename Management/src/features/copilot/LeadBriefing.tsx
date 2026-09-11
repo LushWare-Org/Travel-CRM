@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardList, Loader2, PanelRightClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import ClaimItem from "./ClaimItem";
-import LeadConversation from "./LeadConversation";
+import { SuggestedQuestions, claimsIn } from "./briefingShared";
 import { LiveStatus, useAnnouncer } from "./Announcer";
 import type { ClaimSection, CopilotClaim, CopilotSession } from "./types";
 
@@ -30,21 +29,11 @@ function formatMoment(value?: string | null): string | null {
   return parsed.toLocaleString();
 }
 
-function claimsIn(claims: CopilotClaim[], section: ClaimSection): CopilotClaim[] {
-  if (section === "attention") {
-    // Highest severity first: the attention job is the top of the briefing.
-    const rank = { critical: 0, warning: 1, info: 2 } as const;
-    return claims
-      .filter((claim) => claim.section === section)
-      .sort((a, b) => rank[a.severity] - rank[b.severity]);
-  }
-  return claims.filter((claim) => claim.section === section);
-}
-
 /**
  * The briefing-first hierarchy: lead identity and freshness, what changed since
  * the agent last saw this lead, the current state, then what needs attention
- * before interpretation, questions, conversation, and the composer.
+ * before interpretation and its suggested questions. The conversation below it
+ * belongs to the shell, not to this briefing.
  *
  * Deterministic insights render first as a provisional list; a successful
  * non-empty model briefing replaces it atomically — never clearing first and
@@ -97,7 +86,7 @@ export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }
     <section aria-labelledby="copilot-briefing-heading" className="space-y-4">
       <header className="space-y-1">
         <div className="flex items-start justify-between gap-2">
-          <h2 id="copilot-briefing-heading" className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+          <h2 id="copilot-briefing-heading" tabIndex={-1} className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
             <ClipboardList className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             Lead briefing
           </h2>
@@ -227,32 +216,9 @@ export default function LeadBriefing({ session, scopeLabel, leadId, onCollapse }
             </div>
           )}
 
-          {session.suggestedQuestions.length > 0 && (
-            <section aria-label="Suggested questions" className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Suggested questions
-              </p>
-              <div className="flex flex-col items-start gap-1">
-                {session.suggestedQuestions.slice(0, 3).map((question) => (
-                  <Button
-                    key={question}
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto justify-start whitespace-normal text-left text-sm text-primary"
-                    onClick={() => session.submit(question)}
-                  >
-                    {question}
-                  </Button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <Separator />
+          <SuggestedQuestions session={session} />
         </div>
       )}
-
-      <LeadConversation session={session} scopeLabel={scopeLabel} />
     </section>
   );
 }

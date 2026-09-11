@@ -134,8 +134,8 @@ export function useCopilotSession(
   const open = options.open ?? false;
   const scopeKey = deriveScopeKey(scope);
 
-  const [session, setSessionState] = useState<Session>(() => createSession(scopeKey));
-  const sessionRef = useRef(session);
+  const [sessionState, setSessionState] = useState<Session>(() => createSession(scopeKey));
+  const sessionRef = useRef(sessionState);
   const activeKeyRef = useRef(scopeKey);
   // The committed session key. The reset below is guarded by this STATE rather
   // than only by `activeKeyRef`: React may discard a render pass, and a ref
@@ -173,6 +173,18 @@ export function useCopilotSession(
     briefingStartedRef.current = null;
     setSessionState(sessionRef.current);
   }
+
+  // The reset above races completions belonging to the scope being left: React
+  // can re-commit one of those already-queued writes after the reset, leaving
+  // the state holding the previous scope's session. With the selection cleared
+  // there is nothing left in flight to correct it, so the cleared scope's
+  // composer and its claims would stay on screen indefinitely. Wherever the
+  // state has drifted, this render presents the scope it was actually given:
+  // a session carrying another scope's key is discarded rather than shown.
+  const session = sessionState.scopeKey === scopeKey ? sessionState : createSession(scopeKey);
+  // Point later completions at the session being presented, so the state
+  // converges on the next commit rather than staying stale.
+  if (session !== sessionState) sessionRef.current = session;
 
   const register = useCallback((controller: AbortController) => {
     controllersRef.current.add(controller);
@@ -318,7 +330,43 @@ export function useCopilotSession(
         }));
       })
       .catch((err) => {
-        if (isCopilotAbort(err) || activeKeyRef.current !== capturedKey) return;
+        if (activeKeyRef.current !== capturedKey) return;
+
+        if (isCopilotAbort(err)) {
+          // An abort for the scope we are STILL showing. This effect's own
+          // cleanup aborts whenever its dependencies change (a benign re-render,
+          // not a scope change), and returning silently here is what left
+          // `briefing.status === "pending"` forever: the start effect refuses to
+          // restart a run it already started (`briefingStartedRef`), and the
+          // regenerate effect returns early on "pending" because that status
+          // means a request is legitimately in flight. Nothing retried, nothing
+          // errored, so the panel sat on "AI briefing in progress — showing what
+          // is already verified" indefinitely, with no error and no Retry. The
+          // window is wide whenever the model is slow: measured 8-18s per call,
+          // so an interruption mid-flight is common rather than rare.
+          //
+          // Surface it as the recoverable failure it is, exactly as a timeout
+          // already is. Guarded on `runId` so a superseding run that has already
+          // committed its own "pending" is never trampled — a superseding run
+          // commits a new runId, so this one no longer matches.
+          commit((current) =>
+            current.briefing.runId === runId && current.briefing.status === "pending"
+              ? {
+                  ...current,
+                  briefing: {
+                    ...current.briefing,
+                    status: "error",
+                    runId,
+                    error: "The briefing was interrupted. Try again.",
+                    receivedAt: Date.now(),
+                    settledWhileOpen: openRef.current,
+                  },
+                }
+              : current
+          );
+          return;
+        }
+
         // Only the model phase failed: the deterministic list stays on screen.
         commit((current) => ({
           ...current,

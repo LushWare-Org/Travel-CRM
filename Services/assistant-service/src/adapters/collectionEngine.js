@@ -1,7 +1,7 @@
 // ─── Collection engine ────────────────────────────────────────────────────
 // Turns a page descriptor (plain data) into an adapter implementing the frozen
 // interface the controller calls: parseScope / loadEvidence / computeInsights /
-// defaultQuestions.
+// defaultQuestions / askTools.
 //
 // Why an engine rather than one adapter per page: nine of the ten pages do the
 // same mechanical work — fetch bounded sources concurrently under a deadline,
@@ -123,6 +123,11 @@ async function fetchSource(source, ctx, mode, bundle) {
     const res = await fetch(url, {
       headers: { ...ctx.headers, accept: 'application/json', ...auth },
       signal: controller.signal,
+      // A 3xx is a fault, never followed: following one would re-send the
+      // caller's forwarded x-user-* identity to whatever origin the source
+      // names. undici strips `Authorization` cross-origin but keeps custom
+      // headers.
+      redirect: 'error',
     });
 
     // A 401 belongs with 403/404: the service answered, and what it said was
@@ -241,6 +246,8 @@ export function createPageAdapter(descriptor) {
     rules = [],
     aggregates = [],
     questionTemplates = [],
+    // Tool names available to ask mode on this page.
+    tools = [],
   } = descriptor;
 
   if (!key) throw new Error('A page descriptor needs a key');
@@ -428,6 +435,14 @@ export function createPageAdapter(descriptor) {
         if (typeof value === 'string' && value.trim()) questions.push(value);
       }
       return questions.slice(0, 3);
+    },
+
+    askTools() {
+      // Engine pages resolve their vocabulary from the DESCRIPTOR, not from the
+      // scope: a page's tool list is a property of the page. The one key whose
+      // scope changes the vocabulary (`/leads`) is hand-written and does not
+      // come through this factory.
+      return tools;
     },
   };
 }
